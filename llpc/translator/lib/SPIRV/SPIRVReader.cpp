@@ -406,36 +406,41 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
       spvElementType = spvElementType->getArrayElementType();
     }
 
-    switch (spvElementType->getOpCode()) {
-    case OpTypeImage: {
-      if (static_cast<SPIRVTypeImage *>(spvElementType)->getDescriptor().MS) {
-        // Pointer to multisampled image is represented by a struct containing pointer to
-        // normal image descriptor and pointer to fmask descriptor.
-        return StructType::get(*m_context, {getBuilder()->getImageDescPtrTy(), getBuilder()->getFmaskDescPtrTy()});
+    if (spvElementType->getOpCode() == OpTypeImage || spvElementType->getOpCode() == OpTypeSampler ||
+        spvElementType->getOpCode() == OpTypeSampledImage) {
+      // Pointer to image/sampler/sampledimage type.
+      Type *imagePtrTy = nullptr;
+      SPIRVTypeImage *spvImageTy = nullptr;
+
+      if (spvElementType->getOpCode() != OpTypeSampler) {
+        // Image or sampledimage: get the image pointer type.
+        if (spvElementType->getOpCode() == OpTypeSampledImage)
+          spvImageTy = static_cast<SPIRVTypeSampledImage *>(spvElementType)->getImageType();
+        else
+          spvImageTy = static_cast<SPIRVTypeImage *>(spvElementType);
+        if (spvImageTy->getDescriptor().Dim == DimBuffer) {
+          // Texel buffer.
+          imagePtrTy = getBuilder()->getTexelBufferDescPtrTy();
+        } else {
+          // Image descriptor.
+          imagePtrTy = getBuilder()->getImageDescPtrTy();
+        }
+        if (spvImageTy->getDescriptor().MS) {
+          // Pointer to multisampled image is represented as two image pointers, the second one for the fmask.
+          imagePtrTy = StructType::get(*m_context, {imagePtrTy, imagePtrTy});
+        }
       }
-      if (static_cast<SPIRVTypeImage *>(spvElementType)->getDescriptor().Dim == DimBuffer)
-        return getBuilder()->getTexelBufferDescPtrTy();
-      return getBuilder()->getImageDescPtrTy();
-    }
-    case OpTypeSampler: {
-      return getBuilder()->getSamplerDescPtrTy();
-    }
-    case OpTypeSampledImage: {
-      // Pointer to sampled image is represented by a struct containing pointer to image and pointer to
-      // sampler. But if the image is multisampled, then it itself is another struct, as above.
-      Type *imagePtrTy = getBuilder()->getImageDescPtrTy();
-      SPIRVTypeImage *spvImageTy = static_cast<SPIRVTypeSampledImage *>(spvElementType)->getImageType();
-      if (spvImageTy->getDescriptor().Dim == DimBuffer)
-        imagePtrTy = getBuilder()->getTexelBufferDescPtrTy();
-      else if (spvImageTy->getDescriptor().MS) {
-        imagePtrTy =
-            StructType::get(*m_context, {getBuilder()->getImageDescPtrTy(), getBuilder()->getFmaskDescPtrTy()});
-      }
-      return StructType::get(*m_context, {imagePtrTy, getBuilder()->getSamplerDescPtrTy()});
-    }
-    default: {
-      break;
-    }
+
+      // For an image (not sampler or sampledimage), just return the pointer-to-image type.
+      if (spvElementType->getOpCode() == OpTypeImage)
+        return imagePtrTy;
+
+      // Sampler or sampledimage: get the sampler pointer type.
+      Type *samplerPtrTy = getBuilder()->getSamplerDescPtrTy();
+      // For a sampler, just return that. For a sampledimage, return a struct type containing both pointers.
+      if (!imagePtrTy)
+        return samplerPtrTy;
+      return StructType::get(*m_context, {imagePtrTy, samplerPtrTy});
     }
   }
 
@@ -676,25 +681,28 @@ Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMaj
   }
   case OpTypeImage: {
     auto st = static_cast<SPIRVTypeImage *>(t);
+    // A buffer image is represented by a texel buffer descriptor. Any other image is represented by an image
+    // descriptor.
+    Type *imageTy =
+        st->getDescriptor().Dim == DimBuffer ? getBuilder()->getTexelBufferDescTy() : getBuilder()->getImageDescTy();
     if (st->getDescriptor().MS) {
       // A multisampled image is represented by a struct containing both the
       // image descriptor and the fmask descriptor.
-      return mapType(t, StructType::get(*m_context, {getBuilder()->getImageDescTy(), getBuilder()->getFmaskDescTy()}));
+      imageTy = StructType::get(*m_context, {imageTy, imageTy});
     }
-    if (st->getDescriptor().Dim == DimBuffer) {
-      // A buffer image is represented by a texel buffer descriptor.
-      return mapType(t, getBuilder()->getTexelBufferDescTy());
-    }
-    // Otherwise, an image is represented by an image descriptor.
-    return mapType(t, getBuilder()->getImageDescTy());
+    return mapType(t, imageTy);
   }
   case OpTypeSampler:
-    return mapType(t, getBuilder()->getSamplerDescTy());
   case OpTypeSampledImage: {
-    // A sampledimage is represented by a struct containing the image descriptor
-    // and the sampler descriptor.
-    auto sit = static_cast<SPIRVTypeSampledImage *>(t);
-    return mapType(t, StructType::get(*m_context, {transType(sit->getImageType()), getBuilder()->getSamplerDescTy()}));
+    // Get sampler type.
+    Type *ty = getBuilder()->getSamplerDescTy();
+    if (t->getOpCode() == OpTypeSampledImage) {
+      // A sampledimage is represented by a struct containing the image descriptor
+      // and the sampler descriptor.
+      Type *imageTy = transType(static_cast<SPIRVTypeSampledImage *>(t)->getImageType());
+      ty = StructType::get(*m_context, {imageTy, ty});
+    }
+    return mapType(t, ty);
   }
 
   case OpTypeArray: {
@@ -2137,52 +2145,33 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
 //
 // @param spvImageLoadPtr : The image/sampler/sampledimage pointer
 Value *SPIRVToLLVM::transLoadImage(SPIRVValue *spvImageLoadPtr) {
-  SPIRVType *spvLoadedType = spvImageLoadPtr->getType()->getPointerElementType();
+  SPIRVType *spvElementTy = spvImageLoadPtr->getType()->getPointerElementType();
+  Type *elementTy = transType(spvElementTy, 0, false, false, false);
   Value *base = transImagePointer(spvImageLoadPtr);
+  return loadImageSampler(elementTy, base);
+}
 
-  // Load the sampler.
-  Value *sampler = nullptr;
-  auto typeOpcode = spvLoadedType->getOpCode();
-  if (typeOpcode != OpTypeImage) {
-    Value *samplerPtr = base;
-    if (typeOpcode == OpTypeSampledImage)
-      samplerPtr = getBuilder()->CreateExtractValue(base, 1);
-    sampler = getBuilder()->CreateLoadDescFromPtr(samplerPtr);
+// =====================================================================================================================
+// Generate a load of an image, sampler or sampledimage
+//
+// @param elementTy : Element type being loaded
+// @param base : Pointer to load from
+Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
+  if (auto structTy = dyn_cast<StructType>(elementTy)) {
+    // The item being loaded is a struct of two items that need loading separately. There are two cases
+    // of that:
+    // 1. A sampledimage is an image plus a sampler.
+    // 2. An image that is multisampled is an image plus an fmask.
+    Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
+    Value *element1 = loadImageSampler(structTy->getElementType(1), ptr1);
+    Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
+    Value *element0 = loadImageSampler(structTy->getElementType(0), ptr0);
+    Value *result = getBuilder()->CreateInsertValue(UndefValue::get(structTy), element0, 0);
+    result = getBuilder()->CreateInsertValue(result, element1, 1);
+    return result;
   }
 
-  // Load the image.
-  Value *image = nullptr;
-  if (typeOpcode != OpTypeSampler) {
-    bool multisampled = false;
-    Value *imagePtr = base;
-    if (typeOpcode == OpTypeSampledImage) {
-      imagePtr = getBuilder()->CreateExtractValue(base, uint64_t(0));
-      multisampled = static_cast<SPIRVTypeSampledImage *>(spvLoadedType)->getImageType()->getDescriptor().MS;
-    } else
-      multisampled = static_cast<SPIRVTypeImage *>(spvLoadedType)->getDescriptor().MS;
-
-    if (multisampled) {
-      // For a multisampled image, the pointer is in fact a struct containing a normal image descriptor
-      // pointer and an fmask descriptor pointer.
-      image = getBuilder()->CreateLoadDescFromPtr(getBuilder()->CreateExtractValue(imagePtr, uint64_t(0)));
-      Value *fmask = getBuilder()->CreateLoadDescFromPtr(getBuilder()->CreateExtractValue(imagePtr, 1));
-      image = getBuilder()->CreateInsertValue(
-          UndefValue::get(StructType::get(*m_context, {image->getType(), fmask->getType()})), image, uint64_t(0));
-      image = getBuilder()->CreateInsertValue(image, fmask, 1);
-    } else
-      image = getBuilder()->CreateLoadDescFromPtr(imagePtr);
-  }
-
-  // Return image or sampler, or join them together in a struct.
-  if (!image)
-    return sampler;
-  if (!sampler)
-    return image;
-
-  Value *result = UndefValue::get(StructType::get(*m_context, {image->getType(), sampler->getType()}));
-  result = getBuilder()->CreateInsertValue(result, image, uint64_t(0));
-  result = getBuilder()->CreateInsertValue(result, sampler, 1);
-  return result;
+  return getBuilder()->CreateLoadDescFromPtr(base);
 }
 
 // =====================================================================================================================
@@ -2200,44 +2189,54 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
   spvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
 
-  Value *descPtr = nullptr;
-  SPIRVType *spvImageTy = spvImagePtr->getType()->getPointerElementType();
-  while (spvImageTy->getOpCode() == OpTypeArray || spvImageTy->getOpCode() == OpTypeRuntimeArray)
-    spvImageTy = spvImageTy->getArrayElementType();
+  SPIRVType *spvTy = spvImagePtr->getType()->getPointerElementType();
+  while (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
+    spvTy = spvTy->getArrayElementType();
 
-  if (spvImageTy->getOpCode() == OpTypeSampler)
-    return getBuilder()->CreateGetSamplerDescPtr(descriptorSet, binding);
+  Value *imageDescPtr = nullptr;
+  Value *samplerDescPtr = nullptr;
 
-  bool isSampledImage = (spvImageTy->getOpCode() == OpTypeSampledImage);
-  if (isSampledImage)
-    spvImageTy = static_cast<SPIRVTypeSampledImage *>(spvImageTy)->getImageType();
-  assert(spvImageTy->getOpCode() == OpTypeImage);
+  if (spvTy->getOpCode() != OpTypeSampler) {
+    // Image or sampledimage -- need to get the image pointer.
+    SPIRVType *spvImageTy = spvTy;
+    if (spvTy->getOpCode() == OpTypeSampledImage)
+      spvImageTy = static_cast<SPIRVTypeSampledImage *>(spvTy)->getImageType();
+    assert(spvImageTy->getOpCode() == OpTypeImage);
 
-  auto desc = &static_cast<SPIRVTypeImage *>(spvImageTy)->getDescriptor();
-  if (desc->Dim == DimBuffer)
-    descPtr = getBuilder()->CreateGetTexelBufferDescPtr(descriptorSet, binding);
-  else
-    descPtr = getBuilder()->CreateGetImageDescPtr(descriptorSet, binding);
+    auto desc = &static_cast<SPIRVTypeImage *>(spvImageTy)->getDescriptor();
+    if (desc->Dim == DimBuffer)
+      imageDescPtr = getBuilder()->CreateGetTexelBufferDescPtr(descriptorSet, binding);
+    else
+      imageDescPtr = getBuilder()->CreateGetImageDescPtr(descriptorSet, binding);
 
-  if (desc->MS) {
-    // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
-    Value *fmaskDescPtr = getBuilder()->CreateGetFmaskDescPtr(descriptorSet, binding);
-    descPtr = getBuilder()->CreateInsertValue(
-        UndefValue::get(StructType::get(*m_context, {descPtr->getType(), fmaskDescPtr->getType()})), descPtr,
-        uint64_t(0));
-    descPtr = getBuilder()->CreateInsertValue(descPtr, fmaskDescPtr, 1);
+    if (desc->MS) {
+      // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
+      Value *fmaskDescPtr = getBuilder()->CreateGetFmaskDescPtr(descriptorSet, binding);
+      imageDescPtr = getBuilder()->CreateInsertValue(
+          UndefValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})),
+          imageDescPtr, 0);
+      imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, fmaskDescPtr, 1);
+    }
   }
 
-  if (isSampledImage) {
-    // A sampledimage pointer is a struct containing the image pointer and the sampler desc pointer.
-    Value *samplerDescPtr = getBuilder()->CreateGetSamplerDescPtr(descriptorSet, binding);
-    descPtr = getBuilder()->CreateInsertValue(
-        UndefValue::get(StructType::get(*m_context, {descPtr->getType(), samplerDescPtr->getType()})), descPtr,
-        uint64_t(0));
-    descPtr = getBuilder()->CreateInsertValue(descPtr, samplerDescPtr, 1);
+  if (spvTy->getOpCode() != OpTypeImage) {
+    // Sampler or sampledimage -- need to get the sampler pointer.
+    samplerDescPtr = getBuilder()->CreateGetSamplerDescPtr(descriptorSet, binding);
+    if (spvTy->getOpCode() == OpTypeSampler)
+      return samplerDescPtr;
   }
 
-  return descPtr;
+  if (imageDescPtr) {
+    if (samplerDescPtr) {
+      Value *descPtr =
+          UndefValue::get(StructType::get(*m_context, {imageDescPtr->getType(), samplerDescPtr->getType()}));
+      descPtr = getBuilder()->CreateInsertValue(descPtr, imageDescPtr, 0);
+      descPtr = getBuilder()->CreateInsertValue(descPtr, samplerDescPtr, 1);
+      return descPtr;
+    }
+    return imageDescPtr;
+  }
+  return samplerDescPtr;
 }
 
 // =====================================================================================================================
@@ -2571,7 +2570,8 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
     spvElementType = spvElementType->getArrayElementType();
   }
 
-  return indexDescPtr(base, index, isNonUniform, spvElementType);
+  Type *elementTy = transType(spvElementType, 0, false, false, false);
+  return indexDescPtr(elementTy, base, index, isNonUniform);
 }
 
 // =====================================================================================================================
@@ -2580,27 +2580,25 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
 // A pointer to image when the image is multisampled is in fact a structure containing pointer to image
 // and pointer to fmask descriptor.
 //
+// @param elementTy : Ultimate non-array element type
 // @param base : Base pointer to add index to
 // @param index : Index value
 // @param isNonUniform : Whether the index is non-uniform
-// @param spvElementType : Ultimate non-array element type (nullptr means assume single pointer)
-Value *SPIRVToLLVM::indexDescPtr(Value *base, Value *index, bool isNonUniform, SPIRVType *spvElementType) {
-  if (spvElementType) {
-    auto typeOpcode = spvElementType->getOpCode();
-    if (typeOpcode == OpTypeSampledImage ||
-        (typeOpcode == OpTypeImage && static_cast<SPIRVTypeImage *>(spvElementType)->getDescriptor().MS)) {
-      // These are the two cases that the pointer is in fact a structure containing two pointers.
-      Value *ptr0 = getBuilder()->CreateExtractValue(base, uint64_t(0));
-      Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
-      SPIRVType *spvElementType0 = nullptr;
-      if (typeOpcode == OpTypeSampledImage)
-        spvElementType0 = static_cast<SPIRVTypeSampledImage *>(spvElementType)->getImageType();
-      ptr0 = indexDescPtr(ptr0, index, isNonUniform, spvElementType0);
-      ptr1 = indexDescPtr(ptr1, index, isNonUniform, nullptr);
-      base = getBuilder()->CreateInsertValue(UndefValue::get(base->getType()), ptr0, uint64_t(0));
-      base = getBuilder()->CreateInsertValue(base, ptr1, 1);
-      return base;
-    }
+Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, bool isNonUniform) {
+  if (auto structTy = dyn_cast<StructType>(elementTy)) {
+    // The element type is a struct containing two image/sampler elements. The cases where this happens are:
+    // 1. A sampledimage is a struct containing image and sampler.
+    // 2. An image that is multisampled is a struct containing image and fmask.
+    // In both cases, the pointer type is also a struct containing the corresponding two pointers.
+    // Index them separately.
+    assert(structTy->getNumElements() == 2);
+    Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
+    Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
+    ptr0 = indexDescPtr(structTy->getElementType(0), ptr0, index, isNonUniform);
+    ptr1 = indexDescPtr(structTy->getElementType(1), ptr1, index, isNonUniform);
+    base = getBuilder()->CreateInsertValue(UndefValue::get(base->getType()), ptr0, 0);
+    base = getBuilder()->CreateInsertValue(base, ptr1, 1);
+    return base;
   }
 
   return getBuilder()->CreateIndexDescPtr(base, index, isNonUniform);

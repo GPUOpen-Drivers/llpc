@@ -89,9 +89,10 @@ public:
   Constant *transInitializer(SPIRVValue *, Type *);
   template <spv::Op> Value *transValueWithOpcode(SPIRVValue *);
   Value *transLoadImage(SPIRVValue *spvImageLoadPtr);
+  Value *loadImageSampler(Type *elementTy, Value *base);
   Value *transImagePointer(SPIRVValue *spvImagePtr);
   Value *transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessChain);
-  Value *indexDescPtr(Value *base, Value *index, bool isNonUniform, SPIRVType *spvElementType);
+  Value *indexDescPtr(Type *elementTy, Value *base, Value *index, bool isNonUniform);
   Value *transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue *);
 
   bool transDecoration(SPIRVValue *, Value *);
