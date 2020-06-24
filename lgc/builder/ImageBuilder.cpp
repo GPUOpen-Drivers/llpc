@@ -703,14 +703,14 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
 // @param resultTy : Result type
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : Image descriptor
+// @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
 // @param convertingSamplerDesc : Converting sampler descriptor (v8i32)
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescArray,
                                               Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                               const Twine &instName) {
-  return CreateImageSampleConvertYCbCr(resultTy, dim, flags, imageDesc, convertingSamplerDesc, address, instName);
+  return CreateImageSampleConvertYCbCr(resultTy, dim, flags, imageDescArray, convertingSamplerDesc, address, instName);
 }
 
 // =====================================================================================================================
@@ -721,11 +721,11 @@ Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsi
 // @param resultTy : Result type
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : Image descriptor
+// @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
 // @param convertingSamplerDesc : Converting sampler descriptor (v8i32)
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescArray,
                                                    Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                                    const Twine &instName) {
   Value *result = nullptr;
@@ -759,6 +759,11 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
   // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
   // Init sample descriptor for luma channel
   Value *samplerDescLuma = CreateShuffleVector(convertingSamplerDesc, convertingSamplerDesc, ArrayRef<int>{0, 1, 2, 3});
+
+  // If we have an array of image descriptors, extract the first one.
+  Value *imageDesc = imageDescArray;
+  if (isa<ArrayType>(imageDescArray->getType()))
+    imageDesc = CreateExtractValue(imageDescArray, 0);
 
   YCbCrSampleInfo sampleInfoLuma = {resultTy, dim, flags, imageDesc, samplerDescLuma, address, instName.str(), true};
 
