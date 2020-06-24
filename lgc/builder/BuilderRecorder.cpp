@@ -1157,11 +1157,11 @@ Value *BuilderRecorder::CreateImageSample(Type *resultTy, unsigned dim, unsigned
 // @param resultTy : Result type
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : Image descriptor
+// @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
 // @param convertingSamplerDesc : Converting sampler descriptor (constant v8i32)
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+Value *BuilderRecorder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescArray,
                                                  Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                                  const Twine &instName) {
   // Gather a mask of address elements that are not nullptr.
@@ -1174,7 +1174,7 @@ Value *BuilderRecorder::CreateImageSampleConvert(Type *resultTy, unsigned dim, u
   SmallVector<Value *, 8> args;
   args.push_back(getInt32(dim));
   args.push_back(getInt32(flags));
-  args.push_back(imageDesc);
+  args.push_back(imageDescArray);
   args.push_back(convertingSamplerDesc);
   args.push_back(getInt32(addressMask));
   for (unsigned i = 0; i != address.size(); ++i) {

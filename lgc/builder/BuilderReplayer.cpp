@@ -489,7 +489,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderRecorder::Opcode::ImageSampleConvert: {
     unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
     unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
-    Value *imageDesc = args[2];
+    Value *imageDescArray = args[2];
     Value *samplerDesc = args[3];
     unsigned argsMask = cast<ConstantInt>(args[4])->getZExtValue();
     SmallVector<Value *, Builder::ImageAddressCount> address;
@@ -501,7 +501,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
         args = args.slice(1);
       }
     }
-    return m_builder->CreateImageSampleConvert(call->getType(), dim, flags, imageDesc, samplerDesc, address);
+    return m_builder->CreateImageSampleConvert(call->getType(), dim, flags, imageDescArray, samplerDesc, address);
   }
 
   case BuilderRecorder::Opcode::ImageGather: {

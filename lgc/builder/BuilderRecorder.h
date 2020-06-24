@@ -380,7 +380,7 @@ public:
                                  const llvm::Twine &instName = "") override final;
 
   // Create an image sample with conversion.
-  llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+  llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDescArray,
                                         llvm::Value *convertingSamplerDesc, llvm::ArrayRef<llvm::Value *> address,
                                         const llvm::Twine &instName = "") override final;
 

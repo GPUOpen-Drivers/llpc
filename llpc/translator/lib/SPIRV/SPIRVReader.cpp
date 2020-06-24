@@ -690,15 +690,20 @@ Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMaj
   }
   case OpTypeImage: {
     auto st = static_cast<SPIRVTypeImage *>(t);
-    // A buffer image is represented by a texel buffer descriptor. Any other image is represented by an image
-    // descriptor.
-    Type *imageTy =
-        getBuilder()->getDescTy(st->getDescriptor().Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer
-                                                                     : ResourceNodeType::DescriptorResource);
-    if (st->getDescriptor().MS) {
-      // A multisampled image is represented by a struct containing both the
-      // image descriptor and the fmask descriptor.
-      imageTy = StructType::get(*m_context, {imageTy, imageTy});
+    // A buffer image is represented by a texel buffer descriptor. Any other image is represented by an array
+    // of three image descriptors, to allow for multi-plane YCbCr conversion. (The f-mask part of a multi-sampled
+    // image is not an array of three.)
+    Type *imageTy = nullptr;
+    if (st->getDescriptor().Dim == DimBuffer) {
+      imageTy = getBuilder()->getDescTy(ResourceNodeType::DescriptorTexelBuffer);
+    } else {
+      Type *singleImageTy = getBuilder()->getDescTy(ResourceNodeType::DescriptorResource);
+      imageTy = ArrayType::get(singleImageTy, 3);
+      if (st->getDescriptor().MS) {
+        // A multisampled image is represented by a struct containing both the
+        // image descriptor and the fmask descriptor.
+        imageTy = StructType::get(*m_context, {imageTy, singleImageTy});
+      }
     }
     return mapType(t, imageTy);
   }
@@ -2198,6 +2203,26 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
   // The image or sampler "descriptor" is in fact a struct containing the pointer and stride. We only
   // need the pointer here.
   Value *ptr = getBuilder()->CreateExtractValue(base, 0);
+
+  if (auto arrayTy = dyn_cast<ArrayType>(elementTy)) {
+    // The element type being loaded is an array. That must be where a non-texel-buffer image is represented as
+    // an array of three image descriptors, to allow for multiple planes in YCbCr conversion. Normally we only
+    // load one descriptor; if there are any converting samplers, we load all three, and rely on later optimizations
+    // to remove the unused ones (and thus stop us reading off the end of the descriptor table).
+    elementTy = arrayTy->getElementType();
+    Value *oneVal = getBuilder()->CreateLoad(elementTy, ptr);
+    Value *result = getBuilder()->CreateInsertValue(UndefValue::get(arrayTy), oneVal, 0);
+    if (!m_convertingSamplers.empty()) {
+      for (unsigned planeIdx = 1; planeIdx != arrayTy->getNumElements(); ++planeIdx) {
+        ptr = getBuilder()->CreateGEP(elementTy, ptr, getBuilder()->getInt32(1));
+        oneVal = getBuilder()->CreateLoad(elementTy, ptr);
+        result = getBuilder()->CreateInsertValue(result, oneVal, planeIdx);
+      }
+    }
+    return result;
+  }
+
+  // Other cases: Just load the element from the pointer.
   return getBuilder()->CreateLoad(elementTy, ptr);
 }
 
@@ -5178,6 +5203,10 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
       // Extract image descriptor from struct containing image+fmask descs.
       info->imageDesc = getBuilder()->CreateExtractValue(info->imageDesc, uint64_t(0));
     }
+    if (isa<ArrayType>(info->imageDesc->getType())) {
+      // Extract image descriptor from possible array of multi-plane image descriptors.
+      info->imageDesc = getBuilder()->CreateExtractValue(info->imageDesc, 0);
+    }
     // We also need to trace back to the OpVariable or OpFunctionParam to find
     // the coherent and volatile decorations.
     while (bImagePtr->getOpCode() == OpAccessChain || bImagePtr->getOpCode() == OpInBoundsAccessChain) {
@@ -5240,6 +5269,11 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
     info->fmaskDesc = getBuilder()->CreateExtractValue(desc, 1);
     desc = getBuilder()->CreateExtractValue(desc, uint64_t(0));
   }
+
+  // desc might be an array of multi-plane descriptors (for YCbCrSampler conversion).
+  info->imageDescArray = desc;
+  if (isa<ArrayType>(desc->getType()))
+    desc = getBuilder()->CreateExtractValue(desc, 0);
 
   info->imageDesc = desc;
 }
@@ -5730,7 +5764,7 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
         }
         samplerDesc = ConstantVector::get(samplerInts);
         Value *thisResult = getBuilder()->CreateImageSampleConvert(resultTy, imageInfo.dim, imageInfo.flags,
-                                                                   imageInfo.imageDesc, samplerDesc, addr);
+                                                                   imageInfo.imageDescArray, samplerDesc, addr);
         // Add to select ladder.
         Value *selector =
             getBuilder()->CreateICmpEQ(convertingSamplerIdx, getBuilder()->getInt32(thisConvertingSamplerIdx));

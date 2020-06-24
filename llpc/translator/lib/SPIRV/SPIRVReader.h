@@ -121,9 +121,10 @@ public:
   struct ExtractedImageInfo {
     BasicBlock *bb;
     const SPIRVTypeImageDescriptor *desc;
-    unsigned dim;   // lgc::Builder dimension
-    unsigned flags; // lgc::Builder image call flags
-    Value *imageDesc;
+    unsigned dim;          // lgc::Builder dimension
+    unsigned flags;        // lgc::Builder image call flags
+    Value *imageDesc;      // Image descriptor (first plane if multi-plane)
+    Value *imageDescArray; // Array of image descriptors for multi-plane
     Value *fmaskDesc;
     Value *samplerDesc;
   };
