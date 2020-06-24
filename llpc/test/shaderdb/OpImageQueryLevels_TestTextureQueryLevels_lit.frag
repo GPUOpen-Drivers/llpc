@@ -26,13 +26,13 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
+; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 0, i32 0, <8 x {{.*}})
-; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 1, i32 0)
+; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0)
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 0, <8 x {{.*}})
-; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 1)
+; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 1)
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 0, <8 x {{.*}})
-; SHADERTEST: call { <8 x i32> addrspace(4)*, i32 } (...) @"lgc.create.get.image.desc.ptr.s[p4v8i32,i32]"(i32 2, i32 0)
+; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 2, i32 0)
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 8, i32 0, <8 x {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

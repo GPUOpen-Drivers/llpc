@@ -299,6 +299,18 @@ const Type *SpirvLowerResourceCollect::getFlattenArrayElementType(const Type *ty
 // @param module : LLVM module to be visited
 // @param targetCall : Builder call as search target
 Value *SpirvLowerResourceCollect::findCallAndGetIndexValue(Module &module, CallInst *const targetCall) {
+  // TODO: This code no longer compiles, because BuilderRecorder::Opcode::IndexDescPtr no longer exists.
+  // 1. The way it scans IR for LGC Builder calls is dodgy, because that breaks the Builder abstraction.
+  // 2. I don't know why it is doing this loop to find a use of targetCall. Surely it should just be doing
+  //    a loop on targetCall->users().
+  // 3. The Builder API for indexing a descriptor pointer has changed -- now the SPIR-V reader just does its
+  //    own regular IR, instead of calling a Builder method.
+  // 4. I think this code is being called in the hope of finding an index operation on a particular descriptor
+  //    pointer, for marking what size array the descriptor is. But what if the index is variable? What if the
+  //    same descriptor is used more than once with different indices?
+  // 5. I think all this code conditional on m_collectDetailUsage is experimental, and is not being used in anger
+  //    in the driver.
+#if 0
   for (auto &func : module) {
     // Skip non-declarations that are definitely not LLPC builder calls.
     if (!func.isDeclaration())
@@ -328,6 +340,7 @@ Value *SpirvLowerResourceCollect::findCallAndGetIndexValue(Module &module, CallI
       }
     }
   }
+#endif
 
   return nullptr;
 }
@@ -361,29 +374,14 @@ void SpirvLowerResourceCollect::visitCalls(Module &module) {
       auto args = ArrayRef<Use>(&call->getOperandList()[0], call->getNumArgOperands());
 
       ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
-      switch (opcode) {
-      case BuilderRecorder::Opcode::GetSamplerDescPtr: {
-        nodeType = ResourceMappingNodeType::DescriptorSampler;
-        break;
-      }
-      case BuilderRecorder::Opcode::GetImageDescPtr: {
-        nodeType = ResourceMappingNodeType::DescriptorResource;
-        break;
-      }
-      case BuilderRecorder::Opcode::GetTexelBufferDescPtr: {
-        nodeType = ResourceMappingNodeType::DescriptorTexelBuffer;
-        break;
-      }
-      default: {
-        break;
-      }
-      }
+      if (opcode == BuilderRecorder::Opcode::GetDescPtr)
+        nodeType = static_cast<ResourceMappingNodeType>(cast<ConstantInt>(args[0])->getZExtValue());
 
       if (nodeType != ResourceMappingNodeType::Unknown) {
         ResourceNodeDataKey nodeData = {};
 
-        nodeData.value.set = cast<ConstantInt>(args[0])->getZExtValue();
-        nodeData.value.binding = cast<ConstantInt>(args[1])->getZExtValue();
+        nodeData.value.set = cast<ConstantInt>(args[1])->getZExtValue();
+        nodeData.value.binding = cast<ConstantInt>(args[2])->getZExtValue();
         nodeData.value.arraySize = 1;
         auto index = findCallAndGetIndexValue(module, call);
         if (index)

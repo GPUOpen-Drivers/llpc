@@ -58,6 +58,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
@@ -420,11 +421,14 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
           spvImageTy = static_cast<SPIRVTypeImage *>(spvElementType);
         if (spvImageTy->getDescriptor().Dim == DimBuffer) {
           // Texel buffer.
-          imagePtrTy = getBuilder()->getTexelBufferDescPtrTy();
+          imagePtrTy = getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorTexelBuffer);
         } else {
           // Image descriptor.
-          imagePtrTy = getBuilder()->getImageDescPtrTy();
+          imagePtrTy = getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorResource);
         }
+        // Pointer to image is represented as a struct containing pointer and stride.
+        imagePtrTy = StructType::get(*m_context, {imagePtrTy, getBuilder()->getInt32Ty()});
+
         if (spvImageTy->getDescriptor().MS) {
           // Pointer to multisampled image is represented as two image pointers, the second one for the fmask.
           imagePtrTy = StructType::get(*m_context, {imagePtrTy, imagePtrTy});
@@ -436,7 +440,10 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
         return imagePtrTy;
 
       // Sampler or sampledimage: get the sampler pointer type.
-      Type *samplerPtrTy = getBuilder()->getSamplerDescPtrTy();
+      Type *samplerPtrTy = getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorSampler);
+      // Pointer to sampler is represented as a struct containing pointer and stride.
+      samplerPtrTy = StructType::get(*m_context, {samplerPtrTy, getBuilder()->getInt32Ty()});
+
       // For a sampler, just return that. For a sampledimage, return a struct type containing both pointers.
       if (!imagePtrTy)
         return samplerPtrTy;
@@ -684,7 +691,8 @@ Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMaj
     // A buffer image is represented by a texel buffer descriptor. Any other image is represented by an image
     // descriptor.
     Type *imageTy =
-        st->getDescriptor().Dim == DimBuffer ? getBuilder()->getTexelBufferDescTy() : getBuilder()->getImageDescTy();
+        getBuilder()->getDescTy(st->getDescriptor().Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer
+                                                                     : ResourceNodeType::DescriptorResource);
     if (st->getDescriptor().MS) {
       // A multisampled image is represented by a struct containing both the
       // image descriptor and the fmask descriptor.
@@ -695,7 +703,7 @@ Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMaj
   case OpTypeSampler:
   case OpTypeSampledImage: {
     // Get sampler type.
-    Type *ty = getBuilder()->getSamplerDescTy();
+    Type *ty = getBuilder()->getDescTy(ResourceNodeType::DescriptorSampler);
     if (t->getOpCode() == OpTypeSampledImage) {
       // A sampledimage is represented by a struct containing the image descriptor
       // and the sampler descriptor.
@@ -2171,7 +2179,10 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
     return result;
   }
 
-  return getBuilder()->CreateLoadDescFromPtr(base);
+  // The image or sampler "descriptor" is in fact a struct containing the pointer and stride. We only
+  // need the pointer here.
+  Value *ptr = getBuilder()->CreateExtractValue(base, 0);
+  return getBuilder()->CreateLoad(elementTy, ptr);
 }
 
 // =====================================================================================================================
@@ -2197,21 +2208,20 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   Value *samplerDescPtr = nullptr;
 
   if (spvTy->getOpCode() != OpTypeSampler) {
-    // Image or sampledimage -- need to get the image pointer.
+    // Image or sampledimage -- need to get the image pointer-and-stride.
     SPIRVType *spvImageTy = spvTy;
     if (spvTy->getOpCode() == OpTypeSampledImage)
       spvImageTy = static_cast<SPIRVTypeSampledImage *>(spvTy)->getImageType();
     assert(spvImageTy->getOpCode() == OpTypeImage);
 
     auto desc = &static_cast<SPIRVTypeImage *>(spvImageTy)->getDescriptor();
-    if (desc->Dim == DimBuffer)
-      imageDescPtr = getBuilder()->CreateGetTexelBufferDescPtr(descriptorSet, binding);
-    else
-      imageDescPtr = getBuilder()->CreateGetImageDescPtr(descriptorSet, binding);
+    auto resType =
+        desc->Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer : ResourceNodeType::DescriptorResource;
+    imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding);
 
     if (desc->MS) {
       // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
-      Value *fmaskDescPtr = getBuilder()->CreateGetFmaskDescPtr(descriptorSet, binding);
+      Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding);
       imageDescPtr = getBuilder()->CreateInsertValue(
           UndefValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})),
           imageDescPtr, 0);
@@ -2220,8 +2230,8 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   }
 
   if (spvTy->getOpCode() != OpTypeImage) {
-    // Sampler or sampledimage -- need to get the sampler pointer.
-    samplerDescPtr = getBuilder()->CreateGetSamplerDescPtr(descriptorSet, binding);
+    // Sampler or sampledimage -- need to get the sampler pointer-and-stride.
+    samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding);
     if (spvTy->getOpCode() == OpTypeSampler)
       return samplerDescPtr;
   }
@@ -2237,6 +2247,21 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
     return imageDescPtr;
   }
   return samplerDescPtr;
+}
+
+// =====================================================================================================================
+// Get an image/sampler descriptor pointer-and-stride struct
+//
+// @param resType : ResourceNodeType value
+// @param descriptorSet : Descriptor set
+// @param binding : Binding
+Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned descriptorSet, unsigned binding) {
+  Value *descPtr = getBuilder()->CreateGetDescPtr(resType, descriptorSet, binding);
+  Value *descStride = getBuilder()->CreateGetDescStride(resType, descriptorSet, binding);
+  descPtr = getBuilder()->CreateInsertValue(
+      UndefValue::get(StructType::get(*m_context, {descPtr->getType(), descStride->getType()})), descPtr, 0);
+  descPtr = getBuilder()->CreateInsertValue(descPtr, descStride, 1);
+  return descPtr;
 }
 
 // =====================================================================================================================
@@ -2585,11 +2610,12 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
 // @param index : Index value
 // @param isNonUniform : Whether the index is non-uniform
 Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, bool isNonUniform) {
-  if (auto structTy = dyn_cast<StructType>(elementTy)) {
+  auto structTy = dyn_cast<StructType>(elementTy);
+  if (structTy && !structTy->getElementType(structTy->getNumElements() - 1)->isIntegerTy()) {
     // The element type is a struct containing two image/sampler elements. The cases where this happens are:
     // 1. A sampledimage is a struct containing image and sampler.
     // 2. An image that is multisampled is a struct containing image and fmask.
-    // In both cases, the pointer type is also a struct containing the corresponding two pointers.
+    // In both cases, the pointer type is also a struct containing the corresponding two pointer-and-samples.
     // Index them separately.
     assert(structTy->getNumElements() == 2);
     Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
@@ -2601,7 +2627,23 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, boo
     return base;
   }
 
-  return getBuilder()->CreateIndexDescPtr(base, index, isNonUniform);
+  // The descriptor "pointer" is in fact a struct containing the pointer and stride.
+  Value *ptr = getBuilder()->CreateExtractValue(base, 0);
+  Value *stride = getBuilder()->CreateExtractValue(base, 1);
+  index = getBuilder()->CreateMul(index, stride);
+  if (!isNonUniform && !isa<Constant>(index)) {
+    // For a non-constant but uniform index, mark it uniform.
+    index = getBuilder()->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, index);
+  }
+
+  // Do the indexing operation by GEPping as a byte pointer.
+  Type *ptrTy = ptr->getType();
+  ptr = getBuilder()->CreateBitCast(ptr,
+                                    getBuilder()->getInt8Ty()->getPointerTo(ptr->getType()->getPointerAddressSpace()));
+  ptr = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), ptr, index);
+  ptr = getBuilder()->CreateBitCast(ptr, ptrTy);
+  base = getBuilder()->CreateInsertValue(base, ptr, 0);
+  return base;
 }
 
 // =====================================================================================================================
