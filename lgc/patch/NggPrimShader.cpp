@@ -59,9 +59,9 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
     : m_pipelineState(pipelineState), m_context(&pipelineState->getContext()),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()), m_nggControl(m_pipelineState->getNggControl()),
       m_ldsManager(nullptr), m_builder(new IRBuilder<>(*m_context)) {
-  // Always allow reciprocal, to change fdiv(1/x) to rcp(x)
+  // Always allow approximation, to change fdiv(1.0, x) to rcp(x)
   FastMathFlags fastMathFlags;
-  fastMathFlags.setAllowReciprocal();
+  fastMathFlags.setApproxFunc();
   m_builder->setFastMathFlags(fastMathFlags);
 
   assert(m_pipelineState->isGraphics());
@@ -3866,7 +3866,6 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
   auto backfaceEntryBlock = createBlock(func, ".backfaceEntry");
   auto backfaceCullBlock = createBlock(func, ".backfaceCull");
   auto backfaceExponentBlock = createBlock(func, ".backfaceExponent");
-  auto endBackfaceCullBlock = createBlock(func, ".endBackfaceCull");
   auto backfaceExitBlock = createBlock(func, ".backfaceExit");
 
   auto savedInsertPoint = m_builder->saveIP();
@@ -3893,18 +3892,17 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     //   if ((area > 0 && face == CCW) || (area < 0 && face == CW))
     //     frontFace = true
     //
-    //   if ((area < 0 && face == CCW) || (area > 0 && face == CW))
-    //     backFace = true
+    //   backFace = !frontFace
     //
-    //   if (area == 0 || (frontFace && cullFront) || (backFace && cullBack))
+    //   if ((frontFace && cullFront) || (backFace && cullBack))
     //     cullFlag = true
     //
 
-    //        | x0 y0 w0 |
-    //        |          |
-    // area = | x1 y1 w1 | =  x0 * (y1 * w2 - y2 * w1) - x1 * (y0 * w2 - y2 * w0) + x2 * (y0 * w1 - y1 * w0)
-    //        |          |
-    //        | x2 y2 w2 |
+    //          | x0 y0 w0 |
+    //          |          |
+    //   area = | x1 y1 w1 | =  x0 * (y1 * w2 - y2 * w1) - x1 * (y0 * w2 - y2 * w0) + x2 * (y0 * w1 - y1 * w0)
+    //          |          |
+    //          | x2 y2 w2 |
     //
     auto x0 = m_builder->CreateExtractElement(vertex0, static_cast<uint64_t>(0));
     auto y0 = m_builder->CreateExtractElement(vertex0, 1);
@@ -3946,27 +3944,27 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     frontFace = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
                                            {frontFace, m_builder->getInt32(31), m_builder->getInt32(1)});
 
-    // face = (FACE, PA_SU_SC_MODE_CNTRL[2], 0 = CCW, 1 = CW)
+    // face = (FACE, PA_SU_SC_MODE_CNTL[2], 0 = CCW, 1 = CW)
     auto face = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
                                            {paSuScModeCntl, m_builder->getInt32(2), m_builder->getInt32(1)});
 
-    // face ^ signbit(xScale ^ yScale)
+    // frontFace = face ^ signbit(xScale ^ yScale)
     frontFace = m_builder->CreateXor(face, frontFace);
 
-    // (face ^ signbit(xScale ^ yScale)) == 0
+    // frontFace = (frontFace == 0)
     frontFace = m_builder->CreateICmpEQ(frontFace, m_builder->getInt32(0));
 
-    // frontFace = ((face ^ signbit(xScale ^ yScale)) == 0) ? (area < 0) : (area > 0)
+    // frontFace = frontFace == 0 ? area < 0 : area > 0
     frontFace = m_builder->CreateSelect(frontFace, areaLtZero, areaGtZero);
 
     // backFace = !frontFace
     auto backFace = m_builder->CreateNot(frontFace);
 
-    // cullFront = (CULL_FRONT, PA_SU_SC_MODE_CNTRL[0], 0 = DONT CULL, 1 = CULL)
+    // cullFront = (CULL_FRONT, PA_SU_SC_MODE_CNTL[0], 0 = DONT CULL, 1 = CULL)
     auto cullFront = m_builder->CreateAnd(paSuScModeCntl, m_builder->getInt32(1));
     cullFront = m_builder->CreateTrunc(cullFront, m_builder->getInt1Ty());
 
-    // cullBack = (CULL_BACK, PA_SU_SC_MODE_CNTRL[1], 0 = DONT CULL, 1 = CULL)
+    // cullBack = (CULL_BACK, PA_SU_SC_MODE_CNTL[1], 0 = DONT CULL, 1 = CULL)
     Value *cullBack = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
                                                  {paSuScModeCntl, m_builder->getInt32(1), m_builder->getInt32(1)});
     cullBack = m_builder->CreateTrunc(cullBack, m_builder->getInt1Ty());
@@ -3981,7 +3979,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     cullFlag1 = m_builder->CreateOr(cullFront, cullBack);
 
     auto nonZeroBackfaceExp = m_builder->CreateICmpNE(backfaceExponent, m_builder->getInt32(0));
-    m_builder->CreateCondBr(nonZeroBackfaceExp, backfaceExponentBlock, endBackfaceCullBlock);
+    m_builder->CreateCondBr(nonZeroBackfaceExp, backfaceExponentBlock, backfaceExitBlock);
   }
 
   // Construct ".backfaceExponent" block
@@ -3992,7 +3990,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     //
     // Ignore area calculations that are less enough
     //   if (|area| < (10 ^ (-backfaceExponent)) / |w0 * w1 * w2| )
-    //       cullFlag = false
+    //     cullFlag = false
     //
 
     // |w0 * w1 * w2|
@@ -4015,23 +4013,6 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     cullFlag2 = m_builder->CreateFCmpOGE(absArea, threshold);
     cullFlag2 = m_builder->CreateAnd(cullFlag1, cullFlag2);
 
-    m_builder->CreateBr(endBackfaceCullBlock);
-  }
-
-  // Construct ".endBackfaceCull" block
-  Value *cullFlag3 = nullptr;
-  {
-    m_builder->SetInsertPoint(endBackfaceCullBlock);
-
-    // cullFlag = cullFlag || (area == 0)
-    auto cullFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2);
-    cullFlagPhi->addIncoming(cullFlag1, backfaceCullBlock);
-    cullFlagPhi->addIncoming(cullFlag2, backfaceExponentBlock);
-
-    auto areaEqZero = m_builder->CreateFCmpOEQ(area, ConstantFP::get(m_builder->getFloatTy(), 0.0));
-
-    cullFlag3 = m_builder->CreateOr(cullFlagPhi, areaEqZero);
-
     m_builder->CreateBr(backfaceExitBlock);
   }
 
@@ -4039,11 +4020,12 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
   {
     m_builder->SetInsertPoint(backfaceExitBlock);
 
-    auto cullFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2);
+    auto cullFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 3);
     cullFlagPhi->addIncoming(cullFlag, backfaceEntryBlock);
-    cullFlagPhi->addIncoming(cullFlag3, endBackfaceCullBlock);
+    cullFlagPhi->addIncoming(cullFlag1, backfaceCullBlock);
+    cullFlagPhi->addIncoming(cullFlag2, backfaceExponentBlock);
 
-    // polyMode = (POLY_MODE, PA_SU_SC_MODE_CNTRL[4:3], 0 = DISABLE, 1 = DUAL)
+    // polyMode = (POLY_MODE, PA_SU_SC_MODE_CNTL[4:3], 0 = DISABLE, 1 = DUAL)
     auto polyMode = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
                                                {
                                                    paSuScModeCntl,
@@ -5317,7 +5299,7 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
     auto loadPtr = m_builder->CreateGEP(primShaderTablePtr, {m_builder->getInt32(0), regOffset});
     cast<Instruction>(loadPtr)->setMetadata(MetaNameUniform, MDNode::get(m_builder->getContext(), {}));
 
-    auto regValue = m_builder->CreateAlignedLoad(loadPtr, Align(4), /*volatile=*/true);
+    auto regValue = m_builder->CreateAlignedLoad(loadPtr, Align(4));
     regValue->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder->getContext(), {}));
 
     m_builder->CreateRet(regValue);
