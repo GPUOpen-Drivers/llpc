@@ -239,4 +239,4 @@ template <> inline void SPIRVMap<SPIRVDebugExtOpKind, std::string>::init() {
 SPIRV_DEF_NAMEMAP(SPIRVDebugExtOpKind, SPIRVDebugExtOpMap)
 }
 
-#endif // SPIRV_LIBSPIRV_SPIRVEXTINST_H
+#endif

@@ -1491,7 +1491,7 @@ static Result expandInputFilenames(std::vector<std::string> &expandedFilenames) 
     }
 #else  // WIN_OS
     expandedFilenames.push_back(inFile);
-#endif // WIN_OS
+#endif
     ++i;
   }
   return Result::Success;
@@ -1563,7 +1563,7 @@ int main(int argc, char *argv[]) {
       result = Result::Unsupported;
       return onFailure();
     }
-#endif // LLPC_ENABLE_SHADER_CACHE
+#endif
 
     auto nonPipeIt =
         llvm::find_if_not(expandedInputFiles, [](const std::string &filename) { return isPipelineInfoFile(filename); });

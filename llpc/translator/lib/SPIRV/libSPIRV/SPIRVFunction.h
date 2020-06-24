@@ -149,4 +149,4 @@ typedef SPIRVEntryOpCodeOnly<OpFunctionEnd> SPIRVFunctionEnd;
 
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVFUNCTION_H
+#endif

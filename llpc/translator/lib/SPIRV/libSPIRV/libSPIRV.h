@@ -49,4 +49,4 @@
 #include "SPIRVType.h"
 #include "SPIRVValue.h"
 
-#endif // LIBSPIRV_H_
+#endif

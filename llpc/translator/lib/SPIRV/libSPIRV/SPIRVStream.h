@@ -123,4 +123,4 @@ SPIRV_DEC_ENCDEC(LinkageType)
 const SPIRVDecoder &operator>>(const SPIRVDecoder &I, std::string &Str);
 
 } // namespace SPIRV
-#endif // SPIRV_LIBSPIRV_SPIRVSTREAM_H
+#endif

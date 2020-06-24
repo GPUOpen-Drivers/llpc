@@ -115,4 +115,4 @@ private:
 typedef SPIRVBasicBlock SPIRVLabel;
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVBASICBLOCK_H
+#endif

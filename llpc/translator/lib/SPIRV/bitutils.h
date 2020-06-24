@@ -78,4 +78,4 @@ static_assert(SetBits<uint64_t, 16, 16>::get == uint64_t(0x00000000FFFF0000LL),
 
 }  // namespace spvutils
 
-#endif  // LIBSPIRV_UTIL_BITUTILS_H_
+#endif

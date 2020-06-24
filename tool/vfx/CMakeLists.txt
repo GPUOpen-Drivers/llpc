@@ -61,7 +61,3 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/../../include
     ${XGL_ICD_PATH}/api/include/khronos
 )
-
-### Compiler Options ###################################################################################################
-include(../../cmake/CompilerFlags.cmake)
-set_compiler_options(vfx ${VFX_ENABLE_WERROR})

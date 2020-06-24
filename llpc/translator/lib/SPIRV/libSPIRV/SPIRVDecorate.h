@@ -295,4 +295,4 @@ protected:
 
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVDECORATE_H
+#endif

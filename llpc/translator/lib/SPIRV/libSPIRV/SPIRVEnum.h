@@ -439,4 +439,4 @@ inline unsigned extractSPIRVMemOrderSemantic(unsigned Sema) {
 
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVENUM_H
+#endif

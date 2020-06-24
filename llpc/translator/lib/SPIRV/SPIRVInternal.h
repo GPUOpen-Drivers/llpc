@@ -685,4 +685,4 @@ union ShaderExecModeMetadata {
 
 } // namespace SPIRV
 
-#endif // SPIRV_SPIRVINTERNAL_H
+#endif

@@ -524,7 +524,7 @@ private:
 
   // Determine whether a built-in is an output for a particular shader stage.
   bool isBuiltInOutput(BuiltInKind builtIn);
-#endif // NDEBUG
+#endif
 };
 
 // =====================================================================================================================
