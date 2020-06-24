@@ -36,6 +36,7 @@
 #pragma once
 
 #include "lgc/CommonDefs.h"
+#include "lgc/Pipeline.h"
 #include "lgc/state/AbiMetadata.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 
@@ -68,6 +69,15 @@ struct VsEntryRegInfo {
   unsigned instanceId;        // VGPR for instance ID
   unsigned vgprCount;         // Total VGPRs at wave dispatch (exact)
   bool wave32;                // Whether VS is wave32
+};
+
+// =====================================================================================================================
+// Struct with the information for one color export
+struct ColorExportInfo {
+  unsigned hwColorTarget;
+  unsigned location;
+  bool isSigned;
+  llvm::Type *ty;
 };
 
 // =====================================================================================================================
@@ -107,6 +117,9 @@ public:
   // in AbiUnlinked.h is fixed up by looking at pipeline state.
   void fixUpRegisters();
 
+  // Get a register value in PAL metadata.
+  unsigned getRegister(unsigned regNum);
+
   // Set a register value in PAL metadata. If the register is already set, this ORs in the value.
   void setRegister(unsigned regNum, unsigned value);
 
@@ -122,10 +135,26 @@ public:
   // Get the VS entry register info. Used by the linker to generate the fetch shader.
   void getVsEntryRegInfo(VsEntryRegInfo &regInfo);
 
+  // Store the color export info in the PAL metadata
+  void addColorExportInfo(llvm::ArrayRef<ColorExportInfo> exports);
+
+  // Get the count of vertex fetches for a fetchless vertex shader with shader compilation (or 0 otherwise).
+  unsigned getColorExportCount();
+
+  // Get the vertex fetch information out of PAL metadata
+  void getColorExportInfo(llvm::SmallVectorImpl<ColorExportInfo> &exports);
+
+  // Erase the color export info
+  void eraseColorExportInfo();
+
   // Finalize PAL metadata for pipeline.
   // TODO Shader compilation: The idea is that this will be called at the end of a pipeline compilation, or in
   // an ELF link, but not at the end of a shader/half-pipeline compile.
   void finalizePipeline();
+
+  // Updates the PS register information that depends on the exports.
+  void updateSpiShaderColFormat(const llvm::SmallVector<ColorExportInfo, 8> &exps, bool hasDepthExpFmtZero,
+                                bool killEnabled);
 
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
@@ -133,6 +162,9 @@ private:
 
   // Get the first user data register number for the given shader stage.
   unsigned getUserDataReg0(ShaderStage stage);
+
+  // Get the llvm type that corresponds to tyName.  Returns nullptr if no such type exists.
+  llvm::Type *getLlvmType(llvm::StringRef tyName) const;
 
   // Set userDataLimit to maximum
   void setUserDataLimit();
@@ -142,6 +174,7 @@ private:
   llvm::msgpack::MapDocNode m_pipelineNode;   // MsgPack map node for amdpal.pipelines[0]
   llvm::msgpack::MapDocNode m_registers;      // MsgPack map node for amdpal.pipelines[0].registers
   llvm::msgpack::ArrayDocNode m_vertexInputs; // MsgPack map node for amdpal.pipelines[0].vertexInputs
+  llvm::msgpack::DocNode m_colorExports;      // MsgPack map node for amdpal.pipelines[0].colorExports
   // Mapping from ShaderStage to SPI user data register start, allowing for merged shaders and NGG.
   unsigned m_userDataRegMapping[ShaderStageCountInternal] = {};
   llvm::msgpack::DocNode *m_userDataLimit;  // Maximum so far number of user data dwords used

@@ -111,6 +111,7 @@ static constexpr char FetchlessLsEntryName[] = "_amdgpu_ls_main_fetchless";
 namespace PipelineMetadataKey {
 
 static const char VertexInputs[] = ".vertexInputs";
+static const char ColorExports[] = ".colorExports";
 
 } // namespace PipelineMetadataKey
 

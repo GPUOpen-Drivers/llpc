@@ -34,6 +34,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/state/PalMetadata.h"
+#include "lgc/state/AbiMetadata.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -459,6 +460,20 @@ void PalMetadata::finalizePipeline() {
 }
 
 // =====================================================================================================================
+// Get a register value in PAL metadata.  Returns 0 if the node does not have an entry.
+//
+// @param regNum : Register number
+unsigned PalMetadata::getRegister(unsigned regNum) {
+  auto mapIt = m_registers.find(m_document->getNode(regNum));
+  if (mapIt == m_registers.end()) {
+    return 0;
+  }
+  msgpack::DocNode &node = mapIt->second;
+  assert(node.getKind() == msgpack::Type::UInt);
+  return node.getUInt();
+}
+
+// =====================================================================================================================
 // Set a register value in PAL metadata.
 // NOTE: If the register is already set, this ORs in the value.
 //
@@ -526,31 +541,73 @@ void PalMetadata::getVertexFetchInfo(SmallVectorImpl<VertexFetchInfo> &fetches) 
     unsigned location = fetchNode[0].getUInt();
     unsigned component = fetchNode[1].getUInt();
     StringRef tyName = fetchNode[2].getString();
-    unsigned vecLength = 0;
-    if (tyName[0] == 'v') {
-      tyName = tyName.drop_front();
-      tyName.consumeInteger(10, vecLength);
-    }
-    Type *ty = nullptr;
-    if (tyName == "i8")
-      ty = Type::getInt8Ty(m_pipelineState->getContext());
-    else if (tyName == "i16")
-      ty = Type::getInt16Ty(m_pipelineState->getContext());
-    else if (tyName == "i32")
-      ty = Type::getInt32Ty(m_pipelineState->getContext());
-    else if (tyName == "i64")
-      ty = Type::getInt64Ty(m_pipelineState->getContext());
-    else if (tyName == "f16")
-      ty = Type::getHalfTy(m_pipelineState->getContext());
-    else if (tyName == "f32")
-      ty = Type::getFloatTy(m_pipelineState->getContext());
-    else if (tyName == "f64")
-      ty = Type::getDoubleTy(m_pipelineState->getContext());
-    if (vecLength != 0)
-      ty = FixedVectorType::get(ty, vecLength);
+    Type *ty = getLlvmType(tyName);
     fetches.push_back({location, component, ty});
   }
   m_pipelineNode.erase(m_document->getNode(PipelineMetadataKey::VertexInputs));
+}
+
+// =====================================================================================================================
+// Store the color export information in PAL metadata for an exportless fragment shader with shader compilation.
+//
+// @param info : Array of ColorExportInfo structs
+void PalMetadata::addColorExportInfo(ArrayRef<ColorExportInfo> exports) {
+  // Each color export is an array containing {location, original location,type}.
+  // .colorExports is an array containing the color exports.
+  auto colorExportArray = m_pipelineNode[PipelineMetadataKey::ColorExports].getArray(true);
+  m_colorExports = colorExportArray;
+  for (const ColorExportInfo &exportInfo : exports) {
+    msgpack::ArrayDocNode fetchNode = m_document->getArrayNode();
+    fetchNode.push_back(m_document->getNode(exportInfo.hwColorTarget));
+    fetchNode.push_back(m_document->getNode(exportInfo.location));
+    fetchNode.push_back(m_document->getNode(exportInfo.isSigned));
+    fetchNode.push_back(m_document->getNode(getTypeName(exportInfo.ty), /*copy=*/true));
+    colorExportArray.push_back(fetchNode);
+  }
+}
+
+// =====================================================================================================================
+// Get the count of color exports needed by the fragement shader.
+unsigned PalMetadata::getColorExportCount() {
+  if (m_colorExports.isEmpty())
+    return 0;
+  return m_colorExports.getArray(false).size();
+}
+
+// =====================================================================================================================
+// Get the color export information out of PAL metadata. Used by the linker to generate the color export shader, and to
+// finalize the PS register information.
+//
+// @param [out] exports : Vector to store info of each export
+void PalMetadata::getColorExportInfo(llvm::SmallVectorImpl<ColorExportInfo> &exports) {
+  if (m_colorExports.isEmpty()) {
+    auto it = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::ColorExports));
+    if (it == m_pipelineNode.end() || !it->second.isArray())
+      return;
+    m_colorExports = it->second.getArray();
+    m_pipelineNode.erase(m_document->getNode(PipelineMetadataKey::ColorExports));
+  }
+  assert(m_colorExports.isArray());
+  auto colorExportArray = m_colorExports.getArray(false);
+  unsigned numColorExports = colorExportArray.size();
+  for (unsigned i = 0; i != numColorExports; ++i) {
+    msgpack::ArrayDocNode fetchNode = colorExportArray[i].getArray();
+    unsigned hwMrt = fetchNode[0].getUInt();
+    unsigned location = fetchNode[1].getUInt();
+    bool isSigned = fetchNode[2].getBool();
+    StringRef tyName = fetchNode[3].getString();
+    Type *ty = getLlvmType(tyName);
+    exports.push_back({hwMrt, location, isSigned, ty});
+  }
+}
+
+// =====================================================================================================================
+// Get the color export information out of PAL metadata. Used by the linker to generate the color export shader, and to
+// finalize the PS register information.
+//
+void PalMetadata::eraseColorExportInfo() {
+  m_colorExports = m_document->getEmptyNode();
+  m_pipelineNode.erase(m_document->getNode(PipelineMetadataKey::ColorExports));
 }
 
 // =====================================================================================================================
@@ -647,4 +704,57 @@ void PalMetadata::getVsEntryRegInfo(VsEntryRegInfo &regInfo) {
   }
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
     regInfo.wave32 = false;
+}
+
+// =====================================================================================================================
+// Get the llvm type for that corresponds to tyName.  Returns nullptr if no such type exists.
+//
+// @param tyName : A type name that is an encoding of a type.
+llvm::Type *PalMetadata::getLlvmType(StringRef tyName) const {
+  unsigned vecLength = 0;
+  if (tyName[0] == 'v') {
+    tyName = tyName.drop_front();
+    tyName.consumeInteger(10, vecLength);
+  }
+  Type *ty = nullptr;
+  if (tyName == "i8")
+    ty = Type::getInt8Ty(m_pipelineState->getContext());
+  else if (tyName == "i16")
+    ty = Type::getInt16Ty(m_pipelineState->getContext());
+  else if (tyName == "i32")
+    ty = Type::getInt32Ty(m_pipelineState->getContext());
+  else if (tyName == "i64")
+    ty = Type::getInt64Ty(m_pipelineState->getContext());
+  else if (tyName == "f16")
+    ty = Type::getHalfTy(m_pipelineState->getContext());
+  else if (tyName == "f32")
+    ty = Type::getFloatTy(m_pipelineState->getContext());
+  else if (tyName == "f64")
+    ty = Type::getDoubleTy(m_pipelineState->getContext());
+  if (vecLength != 0 && ty != nullptr)
+    ty = FixedVectorType::get(ty, vecLength);
+  return ty;
+}
+
+// =====================================================================================================================
+// Updates the SPI_SHADER_COL_FORMAT entry.
+//
+void PalMetadata::updateSpiShaderColFormat(const SmallVector<ColorExportInfo, 8> &exps, bool hasDepthExpFmtZero,
+                                           bool killEnabled) {
+  unsigned spiShaderColFormat = 0;
+  for (auto &exp : exps) {
+    unsigned expFormat = m_pipelineState->computeExportFormat(exp.ty, exp.location);
+    spiShaderColFormat |= (expFormat << (4 * exp.hwColorTarget));
+  }
+
+  if (spiShaderColFormat == 0 && hasDepthExpFmtZero) {
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || killEnabled) {
+      // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
+      // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
+      // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
+      // off by CB_SHADER_MASK.
+      spiShaderColFormat = SPI_SHADER_32_R;
+    }
+  }
+  setRegister(mmSPI_SHADER_COL_FORMAT, spiShaderColFormat);
 }

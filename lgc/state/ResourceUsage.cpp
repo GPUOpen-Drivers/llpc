@@ -59,7 +59,6 @@ ResourceUsage::ResourceUsage(ShaderStage shaderStage) {
     inOutUsage.gs.calcFactor = {};
   } else if (shaderStage == ShaderStageFragment) {
     for (uint32_t i = 0; i < MaxColorTargets; ++i) {
-      inOutUsage.fs.expFmts[i] = EXP_FORMAT_ZERO;
       inOutUsage.fs.outputTypes[i] = BasicType::Unknown;
     }
 
