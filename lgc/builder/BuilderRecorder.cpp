@@ -208,6 +208,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "image.store";
   case Opcode::ImageSample:
     return "image.sample";
+  case Opcode::ImageSampleConvert:
+    return "image.sample.convert";
   case Opcode::ImageGather:
     return "image.gather";
   case Opcode::ImageAtomic:
@@ -1150,6 +1152,39 @@ Value *BuilderRecorder::CreateImageSample(Type *resultTy, unsigned dim, unsigned
 }
 
 // =====================================================================================================================
+// Create an image sample with a converting sampler.
+//
+// @param resultTy : Result type
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor
+// @param convertingSamplerDesc : Converting sampler descriptor (constant v8i32)
+// @param address : Address and other arguments
+// @param instName : Name to give instruction(s)
+Value *BuilderRecorder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+                                                 Value *convertingSamplerDesc, ArrayRef<Value *> address,
+                                                 const Twine &instName) {
+  // Gather a mask of address elements that are not nullptr.
+  unsigned addressMask = 0;
+  for (unsigned i = 0; i != address.size(); ++i) {
+    if (address[i])
+      addressMask |= 1U << i;
+  }
+
+  SmallVector<Value *, 8> args;
+  args.push_back(getInt32(dim));
+  args.push_back(getInt32(flags));
+  args.push_back(imageDesc);
+  args.push_back(convertingSamplerDesc);
+  args.push_back(getInt32(addressMask));
+  for (unsigned i = 0; i != address.size(); ++i) {
+    if (address[i])
+      args.push_back(address[i]);
+  }
+  return record(Opcode::ImageSampleConvert, resultTy, args, instName);
+}
+
+// =====================================================================================================================
 // Create an image gather.
 //
 // @param resultTy : Result type
@@ -1872,6 +1907,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ImageLoad:
     case Opcode::ImageLoadWithFmask:
     case Opcode::ImageSample:
+    case Opcode::ImageSampleConvert:
     case Opcode::LoadBufferDesc:
     case Opcode::LoadPushConstantsPtr:
     case Opcode::ReadBuiltInInput:

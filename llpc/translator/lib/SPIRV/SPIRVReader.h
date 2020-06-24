@@ -65,10 +65,12 @@ using namespace llvm;
 namespace SPIRV {
 class SPIRVLoopMerge;
 class SPIRVToLLVMDbgTran;
+
 class SPIRVToLLVM {
 public:
   SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
-              lgc::Builder *builder, const Vkgc::ShaderModuleUsage *moduleUsage);
+              llvm::ArrayRef<ConvertingSampler> convertingSamplers, lgc::Builder *builder,
+              const Vkgc::ShaderModuleUsage *moduleUsage);
 
   DebugLoc getDebugLoc(SPIRVInstruction *bi, Function *f);
 
@@ -200,6 +202,7 @@ private:
   ShaderFloatControlFlags m_fpControlFlags;
   SPIRVFunction *m_entryTarget;
   const SPIRVSpecConstMap &m_specConstMap;
+  llvm::ArrayRef<ConvertingSampler> m_convertingSamplers;
   SPIRVToLLVMTypeMap m_typeMap;
   SPIRVToLLVMValueMap m_valueMap;
   SPIRVToLLVMFunctionMap m_funcMap;

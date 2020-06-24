@@ -141,6 +141,7 @@ public:
     ImageLoadWithFmask,
     ImageStore,
     ImageSample,
+    ImageSampleConvert,
     ImageGather,
     ImageAtomic,
     ImageAtomicCompareSwap,
@@ -377,6 +378,11 @@ public:
   llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
                                  llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
                                  const llvm::Twine &instName = "") override final;
+
+  // Create an image sample with conversion.
+  llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+                                        llvm::Value *convertingSamplerDesc, llvm::ArrayRef<llvm::Value *> address,
+                                        const llvm::Twine &instName = "") override final;
 
   // Create an image gather.
   llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,

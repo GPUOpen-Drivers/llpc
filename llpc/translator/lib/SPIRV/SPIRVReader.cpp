@@ -125,9 +125,10 @@ static void dumpLLVM(Module *m, const std::string &fName) {
 }
 
 SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
-                         lgc::Builder *builder, const Vkgc::ShaderModuleUsage *moduleUsage)
+                         ArrayRef<ConvertingSampler> convertingSamplers, lgc::Builder *builder,
+                         const Vkgc::ShaderModuleUsage *moduleUsage)
     : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_enableXfb(false), m_entryTarget(nullptr),
-      m_specConstMap(theSpecConstMap), m_dbgTran(m_bm, m_m, this),
+      m_specConstMap(theSpecConstMap), m_convertingSamplers(convertingSamplers), m_dbgTran(m_bm, m_m, this),
       m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)) {
   assert(m_m);
   m_context = &m_m->getContext();
@@ -441,8 +442,9 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
 
       // Sampler or sampledimage: get the sampler pointer type.
       Type *samplerPtrTy = getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorSampler);
-      // Pointer to sampler is represented as a struct containing pointer and stride.
-      samplerPtrTy = StructType::get(*m_context, {samplerPtrTy, getBuilder()->getInt32Ty()});
+      // Pointer to sampler is represented as a struct containing {pointer,stride,convertingSamplerIdx}
+      samplerPtrTy =
+          StructType::get(*m_context, {samplerPtrTy, getBuilder()->getInt32Ty(), getBuilder()->getInt32Ty()});
 
       // For a sampler, just return that. For a sampledimage, return a struct type containing both pointers.
       if (!imagePtrTy)
@@ -703,7 +705,10 @@ Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMaj
   case OpTypeSampler:
   case OpTypeSampledImage: {
     // Get sampler type.
+    // A sampler is represented by a struct containing the sampler itself, and the convertingSamplerIdx, an i32
+    // that is either 0 or the 1-based index into the converting samplers.
     Type *ty = getBuilder()->getDescTy(ResourceNodeType::DescriptorSampler);
+    ty = StructType::get(*m_context, {ty, getBuilder()->getInt32Ty()});
     if (t->getOpCode() == OpTypeSampledImage) {
       // A sampledimage is represented by a struct containing the image descriptor
       // and the sampler descriptor.
@@ -2166,17 +2171,28 @@ Value *SPIRVToLLVM::transLoadImage(SPIRVValue *spvImageLoadPtr) {
 // @param base : Pointer to load from
 Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
   if (auto structTy = dyn_cast<StructType>(elementTy)) {
-    // The item being loaded is a struct of two items that need loading separately. There are two cases
-    // of that:
-    // 1. A sampledimage is an image plus a sampler.
-    // 2. An image that is multisampled is an image plus an fmask.
-    Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
-    Value *element1 = loadImageSampler(structTy->getElementType(1), ptr1);
-    Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
-    Value *element0 = loadImageSampler(structTy->getElementType(0), ptr0);
-    Value *result = getBuilder()->CreateInsertValue(UndefValue::get(structTy), element0, 0);
-    result = getBuilder()->CreateInsertValue(result, element1, 1);
-    return result;
+    if (!structTy->getElementType(1)->isIntegerTy()) {
+      // The item being loaded is a struct of two items that need loading separately (excluding the case below that
+      // is it a struct with an i32, which is a sampler with its convertingSamplerIdx). There are two cases
+      // of that:
+      // 1. A sampledimage is an image plus a sampler.
+      // 2. An image that is multisampled is an image plus an fmask.
+      Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
+      Value *element1 = loadImageSampler(structTy->getElementType(1), ptr1);
+      Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
+      Value *element0 = loadImageSampler(structTy->getElementType(0), ptr0);
+      Value *result = getBuilder()->CreateInsertValue(UndefValue::get(structTy), element0, 0);
+      result = getBuilder()->CreateInsertValue(result, element1, 1);
+      return result;
+    }
+
+    // The item being loaded is a struct where element 1 is integer. That must be a sampler with its i32
+    // convertingSamplerIdx. The loaded value inherits the convertingSamplerIdx from the
+    // {pointer,stride,convertingSamplerIdx} struct that represents the descriptor pointer.
+    Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(base, 2);
+    Value *loadedVal = loadImageSampler(structTy->getElementType(0), base);
+    loadedVal = getBuilder()->CreateInsertValue(UndefValue::get(structTy), loadedVal, 0);
+    return getBuilder()->CreateInsertValue(loadedVal, convertingSamplerIdx, 1);
   }
 
   // The image or sampler "descriptor" is in fact a struct containing the pointer and stride. We only
@@ -2230,8 +2246,9 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   }
 
   if (spvTy->getOpCode() != OpTypeImage) {
-    // Sampler or sampledimage -- need to get the sampler pointer-and-stride.
+    // Sampler or sampledimage -- need to get the sampler {pointer,stride,convertingSamplerIdx}
     samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding);
+
     if (spvTy->getOpCode() == OpTypeSampler)
       return samplerDescPtr;
   }
@@ -2256,12 +2273,43 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
 // @param descriptorSet : Descriptor set
 // @param binding : Binding
 Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned descriptorSet, unsigned binding) {
-  Value *descPtr = getBuilder()->CreateGetDescPtr(resType, descriptorSet, binding);
-  Value *descStride = getBuilder()->CreateGetDescStride(resType, descriptorSet, binding);
-  descPtr = getBuilder()->CreateInsertValue(
-      UndefValue::get(StructType::get(*m_context, {descPtr->getType(), descStride->getType()})), descPtr, 0);
-  descPtr = getBuilder()->CreateInsertValue(descPtr, descStride, 1);
-  return descPtr;
+  if (resType != ResourceNodeType::DescriptorSampler) {
+    // Image/f-mask/texel buffer, where a pointer is represented by a struct {pointer,stride}.
+    Value *descPtr = getBuilder()->CreateGetDescPtr(resType, descriptorSet, binding);
+    Value *descStride = getBuilder()->CreateGetDescStride(resType, descriptorSet, binding);
+    descPtr = getBuilder()->CreateInsertValue(
+        UndefValue::get(StructType::get(*m_context, {descPtr->getType(), descStride->getType()})), descPtr, 0);
+    descPtr = getBuilder()->CreateInsertValue(descPtr, descStride, 1);
+    return descPtr;
+  }
+
+  // A sampler pointer is represented by a struct {pointer,stride,convertingSamplerIdx}, where
+  // convertingSamplerIdx is 0 or the 1-based converting sampler index. Here we use descriptorSet and binding
+  // to detect whether it is a converting sampler, and set up the converting sampler index.
+  unsigned convertingSamplerIdx = 0;
+  unsigned nextIdx = 1;
+  for (const ConvertingSampler &convertingSampler : m_convertingSamplers) {
+    if (convertingSampler.set == descriptorSet && convertingSampler.binding == binding) {
+      convertingSamplerIdx = nextIdx;
+      break;
+    }
+    nextIdx += convertingSampler.values.size() / ConvertingSamplerDwordCount;
+  }
+  Type *samplerPtrTy = StructType::get(*m_context, {getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorSampler),
+                                                    getBuilder()->getInt32Ty(), getBuilder()->getInt32Ty()});
+  Value *samplerDescPtr = Constant::getNullValue(samplerPtrTy);
+
+  if (convertingSamplerIdx == 0) {
+    // Not a converting sampler. Get a normal sampler pointer and stride and put it in the struct.
+    samplerDescPtr = getBuilder()->CreateInsertValue(
+        samplerDescPtr, getBuilder()->CreateGetDescPtr(resType, descriptorSet, binding), 0);
+    samplerDescPtr = getBuilder()->CreateInsertValue(
+        samplerDescPtr, getBuilder()->CreateGetDescStride(resType, descriptorSet, binding), 1);
+  } else {
+    // It is a converting sampler. Return the struct with just the converting sampler index.
+    samplerDescPtr = getBuilder()->CreateInsertValue(samplerDescPtr, getBuilder()->getInt32(convertingSamplerIdx), 2);
+  }
+  return samplerDescPtr;
 }
 
 // =====================================================================================================================
@@ -2627,6 +2675,17 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, boo
     return base;
   }
 
+  // A sampler pointer is represented by a {pointer,stride,convertingSamplerIdx} struct. If the converting sampler
+  // index is non-zero (i.e. it is actually a converting sampler), we also want to modify that index. That can only
+  // happen if there are any converting samplers at all.
+  if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() >= 3) {
+    Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(base, 2);
+    Value *modifiedIdx = getBuilder()->CreateAdd(convertingSamplerIdx, index);
+    Value *isConvertingSampler = getBuilder()->CreateICmpNE(convertingSamplerIdx, getBuilder()->getInt32(0));
+    modifiedIdx = getBuilder()->CreateSelect(isConvertingSampler, modifiedIdx, getBuilder()->getInt32(0));
+    base = getBuilder()->CreateInsertValue(base, modifiedIdx, 2);
+  }
+
   // The descriptor "pointer" is in fact a struct containing the pointer and stride.
   Value *ptr = getBuilder()->CreateExtractValue(base, 0);
   Value *stride = getBuilder()->CreateExtractValue(base, 1);
@@ -2643,6 +2702,7 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, boo
   ptr = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), ptr, index);
   ptr = getBuilder()->CreateBitCast(ptr, ptrTy);
   base = getBuilder()->CreateInsertValue(base, ptr, 0);
+
   return base;
 }
 
@@ -5644,9 +5704,41 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
 
   setupImageAddressOperands(bii, opndIdx, hasProj, addr, &imageInfo, nullptr);
 
-  // Create the image sample call.
-  Value *result = getBuilder()->CreateImageSample(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc,
-                                                  imageInfo.samplerDesc, addr);
+  // First do a normal image sample, extracting the sampler from the {sampler,convertingSamplerIdx} struct.
+  Value *samplerDesc = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 0);
+  Value *result =
+      getBuilder()->CreateImageSample(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDesc, addr);
+
+  if (!m_convertingSamplers.empty()) {
+    // We have converting samplers. We need to create a converting image sample for each possible one, and
+    // select the one we want with a select ladder. In any sensible case, the converting sampler index is
+    // statically determinable by later optimizations, and all but the correct image sample get optimized away.
+    // The converting sampler index is a 1-based index into all the converting sampler values we have. For example,
+    // if m_convertingSamplers has two entries, the first with an array of 3 samplers (24 ints) and the second with an
+    // array of 5 samplers (40 ints), then the first entry's 3 samplers are referred to as 1,2,3, and the second
+    // entry's 5 samplers are referred to as 4,5,6,7,8.
+    Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 1);
+    int thisConvertingSamplerIdx = 1;
+    for (const ConvertingSampler &convertingSampler : m_convertingSamplers) {
+      unsigned arraySize = convertingSampler.values.size() / ConvertingSamplerDwordCount;
+      for (unsigned idx = 0; idx != arraySize; ++idx) {
+        // We want to do a converting image sample for this sampler value. First get the sampler value.
+        SmallVector<Constant *, ConvertingSamplerDwordCount> samplerInts;
+        for (unsigned component = 0; component != ConvertingSamplerDwordCount; ++component) {
+          samplerInts.push_back(
+              getBuilder()->getInt32(convertingSampler.values[idx * ConvertingSamplerDwordCount + component]));
+        }
+        samplerDesc = ConstantVector::get(samplerInts);
+        Value *thisResult = getBuilder()->CreateImageSampleConvert(resultTy, imageInfo.dim, imageInfo.flags,
+                                                                   imageInfo.imageDesc, samplerDesc, addr);
+        // Add to select ladder.
+        Value *selector =
+            getBuilder()->CreateICmpEQ(convertingSamplerIdx, getBuilder()->getInt32(thisConvertingSamplerIdx));
+        result = getBuilder()->CreateSelect(selector, thisResult, result);
+        ++thisConvertingSamplerIdx;
+      }
+    }
+  }
 
   // For a sparse sample, swap the struct elements back again.
   if (resultTy != origResultTy) {
@@ -5720,6 +5812,9 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
     }
   }
 
+  // A sampler descriptor is encoded as {desc,convertingSamplerIdx}. Extract the actual sampler.
+  Value *samplerDesc = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 0);
+
   Value *result = nullptr;
   if (constOffsets) {
     // A gather with non-standard offsets is done as four separate gathers. If
@@ -5731,7 +5826,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
     for (int idx = 3; idx >= 0; --idx) {
       addr[lgc::Builder::ImageAddressIdxOffset] = getBuilder()->CreateExtractValue(constOffsets, idx);
       Value *singleResult = getBuilder()->CreateImageGather(resultTy, imageInfo.dim, imageInfo.flags,
-                                                            imageInfo.imageDesc, imageInfo.samplerDesc, addr);
+                                                            imageInfo.imageDesc, samplerDesc, addr);
       if (resultTy != origResultTy) {
         // Handle sparse.
         residency = getBuilder()->CreateExtractValue(singleResult, 1);
@@ -5748,8 +5843,8 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
   }
 
   // Create the image gather call.
-  result = getBuilder()->CreateImageGather(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc,
-                                           imageInfo.samplerDesc, addr);
+  result =
+      getBuilder()->CreateImageGather(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDesc, addr);
 
   // For a sparse gather, swap the struct elements back again.
   if (resultTy != origResultTy) {
@@ -5911,10 +6006,12 @@ Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicB
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
+  // A sampler descriptor is encoded as {desc,convertingSamplerIdx}. Extract the actual sampler.
+  Value *samplerDesc = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 0);
+
   // Generate the operation.
   Value *coord = transValue(bii->getOpValue(1), bb->getParent(), bb);
-  return getBuilder()->CreateImageGetLod(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, imageInfo.samplerDesc,
-                                         coord);
+  return getBuilder()->CreateImageGetLod(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDesc, coord);
 }
 
 // =============================================================================
@@ -7914,14 +8011,14 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
 
 bool llvm::readSpirv(Builder *builder, const ShaderModuleUsage *shaderInfo, std::istream &is,
                      spv::ExecutionModel entryExecModel, const char *entryName, const SPIRVSpecConstMap &specConstMap,
-                     Module *m, std::string &errMsg) {
+                     ArrayRef<ConvertingSampler> convertingSamplers, Module *m, std::string &errMsg) {
   assert(entryExecModel != ExecutionModelKernel && "Not support ExecutionModelKernel");
 
   std::unique_ptr<SPIRVModule> bm(SPIRVModule::createSPIRVModule());
 
   is >> *bm;
 
-  SPIRVToLLVM btl(m, bm.get(), specConstMap, builder, shaderInfo);
+  SPIRVToLLVM btl(m, bm.get(), specConstMap, convertingSamplers, builder, shaderInfo);
   bool succeed = true;
   if (!btl.translate(entryExecModel, entryName)) {
     bm->getError(errMsg);

@@ -510,7 +510,6 @@ void PipelineState::setUserDataNodesTable(ArrayRef<ResourceNode> nodes, Resource
       destNode.innerTable = ArrayRef<ResourceNode>(destInnerTable, node.innerTable.size());
       setUserDataNodesTable(node.innerTable, destInnerTable, destInnerTable);
     }
-    m_haveConvertingSampler |= (node.type == ResourceNodeType::DescriptorYCbCrSampler);
   }
 }
 
@@ -711,8 +710,7 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
                 (nodeType == ResourceNodeType::DescriptorBuffer &&
                  (innerNode.type == ResourceNodeType::DescriptorBufferCompact ||
                   innerNode.type == ResourceNodeType::InlineBuffer)) ||
-                ((innerNode.type == ResourceNodeType::DescriptorCombinedTexture ||
-                  innerNode.type == ResourceNodeType::DescriptorYCbCrSampler) &&
+                (innerNode.type == ResourceNodeType::DescriptorCombinedTexture &&
                  (nodeType == ResourceNodeType::DescriptorResource ||
                   nodeType == ResourceNodeType::DescriptorTexelBuffer ||
                   nodeType == ResourceNodeType::DescriptorSampler)))
@@ -723,8 +721,7 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
     } else if (node.set == descSet && node.binding == binding) {
       if (nodeType == ResourceNodeType::Unknown || nodeType == node.type ||
           (nodeType == ResourceNodeType::DescriptorBuffer && node.type == ResourceNodeType::DescriptorBufferCompact) ||
-          ((node.type == ResourceNodeType::DescriptorCombinedTexture ||
-            node.type == ResourceNodeType::DescriptorYCbCrSampler) &&
+          (node.type == ResourceNodeType::DescriptorCombinedTexture &&
            (nodeType == ResourceNodeType::DescriptorResource || nodeType == ResourceNodeType::DescriptorTexelBuffer ||
             nodeType == ResourceNodeType::DescriptorSampler)))
         return {&node, &node};
@@ -1166,7 +1163,6 @@ const char *PipelineState::getResourceNodeTypeName(ResourceNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, Unknown)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorResource)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorSampler)
-    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorYCbCrSampler)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorCombinedTexture)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorTexelBuffer)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorFmask)

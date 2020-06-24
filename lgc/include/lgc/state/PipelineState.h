@@ -226,9 +226,6 @@ public:
   // Find the single root resource node of the given type
   const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType) const;
 
-  // Return whether we have a converting sampler in the user data nodes.
-  bool haveConvertingSampler() const { return m_haveConvertingSampler; }
-
   // Set "no replayer" flag, saying that this pipeline is being compiled with a BuilderImpl so does not
   // need a BuilderReplayer pass.
   void setNoReplayer() { m_noReplayer = true; }
@@ -417,7 +414,6 @@ private:
   std::vector<ShaderOptions> m_shaderOptions;           // Per-shader options
   std::unique_ptr<ResourceNode[]> m_allocUserDataNodes; // Allocated buffer for user data
   llvm::ArrayRef<ResourceNode> m_userDataNodes;         // Top-level user data node table
-  bool m_haveConvertingSampler = false;                 // Whether we have a converting sampler
   llvm::MDString *m_resourceNodeTypeNames[unsigned(ResourceNodeType::Count)] = {};
   // Cached MDString for each resource node type
 

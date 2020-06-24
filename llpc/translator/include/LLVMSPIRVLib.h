@@ -86,6 +86,14 @@ struct SPIRVSpecConstEntry
 /// \brief Represents the map from SpecId to specialization constant data.
 typedef std::map<uint32_t, SPIRVSpecConstEntry> SPIRVSpecConstMap;
 
+// A converting sampler with a constant value (or indexable array thereof).
+struct ConvertingSampler {
+  unsigned set;                    // Descriptor set
+  unsigned binding;                // Binding
+  llvm::ArrayRef<uint32_t> values; // Values; 8 uint32_t per array entry
+};
+static const unsigned ConvertingSamplerDwordCount = 8;
+
 /// \brief Check if a string contains SPIR-V binary.
 bool IsSPIRVBinary(std::string &Img);
 
@@ -108,14 +116,9 @@ bool writeSpirv(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
 
 /// \brief Load SPIRV from istream and translate to LLVM module.
 /// \returns true if succeeds.
-bool readSpirv(lgc::Builder *Builder,
-               const Vkgc::ShaderModuleUsage* ModuleData,
-               std::istream &IS,
-               spv::ExecutionModel EntryExecModel,
-               const char *EntryName,
-               const SPIRV::SPIRVSpecConstMap &SpecConstMap,
-               llvm::Module *M,
-               std::string &ErrMsg);
+bool readSpirv(lgc::Builder *Builder, const Vkgc::ShaderModuleUsage *ModuleData, std::istream &IS,
+               spv::ExecutionModel EntryExecModel, const char *EntryName, const SPIRV::SPIRVSpecConstMap &SpecConstMap,
+               llvm::ArrayRef<SPIRV::ConvertingSampler> ConvertingSamplers, llvm::Module *M, std::string &ErrMsg);
 
 /// \brief Regularize LLVM module by removing entities not representable by
 /// SPIRV.

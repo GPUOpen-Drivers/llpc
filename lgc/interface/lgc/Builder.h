@@ -911,6 +911,22 @@ public:
                                          llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
                                          const llvm::Twine &instName = "") = 0;
 
+  // Create an image sample with a converting sampler.
+  // The caller supplies all arguments to the image sample op in "address", in the order specified
+  // by the indices defined as ImageIndex* below.
+  //
+  // @param resultTy : Result type
+  // @param dim : Image dimension
+  // @param flags : ImageFlag* flags
+  // @param imageDesc : Image descriptor
+  // @param convertingSamplerDesc : Converting sampler descriptor (constant v8i32)
+  // @param address : Address and other arguments
+  // @param instName : Name to give instruction(s)
+  virtual llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags,
+                                                llvm::Value *imageDesc, llvm::Value *convertingSamplerDesc,
+                                                llvm::ArrayRef<llvm::Value *> address,
+                                                const llvm::Twine &instName = "") = 0;
+
   // Create an image gather.
   // The return type is specified by pResultTy as follows:
   // * If it is a struct, then the method generates a TFE (texel fail enable) operation. The first field is the

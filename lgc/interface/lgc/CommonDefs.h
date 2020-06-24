@@ -67,12 +67,8 @@ enum class ResourceNodeType : unsigned {
   DescriptorBufferCompact,   ///< Compact buffer descriptor, only contains the buffer address
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
-  DescriptorYCbCrSampler, ///< Generic descriptor: combined texture, combining resource descriptor with
-                          ///  space for a sampler descriptor (starting with resource descriptor), but the 4-dword
-                          ///  sampler descriptor is ignored and overridden with an 8-dword immutable YCbCr converting
-                          ///  sampler
-  InlineBuffer,           ///< Inline buffer, with descriptor set and binding
-  Count,                  ///< Count of resource mapping node types.
+  InlineBuffer, ///< Inline buffer, with descriptor set and binding
+  Count,        ///< Count of resource mapping node types.
 };
 
 } // namespace lgc
