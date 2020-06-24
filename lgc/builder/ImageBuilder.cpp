@@ -692,50 +692,6 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
                                        Value *samplerDesc, ArrayRef<Value *> address, const Twine &instName) {
   Value *coord = address[ImageAddressIdxCoordinate];
   assert(coord->getType()->getScalarType()->isFloatTy() || coord->getType()->getScalarType()->isHalfTy());
-
-  // See if the descriptor is an immutable converting sampler, by tracing the load address back through
-  // bitcasts and constant GEPs to a global variable whose name starts with "_immutable_converting_sampler",
-  // which is where DescBuilder would have put the immutable sampler value.
-  // This is a hack to cope with the design of the Vulkan YCbCr conversion extension, in which
-  // you cannot see in the SPIR-V that a sampler is a converting sampler. It does not work
-  // if the sampler pointer is passed through a non-inlined function arg or a phi node.
-  // If using BuilderRecorder, it relies on the order in which recorded builder calls are
-  // processed in BuilderReplayer.
-  if (m_pipelineState->haveConvertingSampler()) {
-    if (auto load = dyn_cast<LoadInst>(samplerDesc)) {
-      Value *addr = load->getOperand(0);
-      unsigned byteOffset = 0;
-      for (;;) {
-        // Check for BitCastOperator as it might be an Instruction or ConstantExpr bitcast.
-        if (auto bitcast = dyn_cast<BitCastOperator>(addr)) {
-          addr = bitcast->getOperand(0);
-          continue;
-        }
-        // Check for GEPOperator as it might be an Instruction or ConstantExpr GEP.
-        if (auto gep = dyn_cast<GEPOperator>(addr)) {
-          APInt gepOffset(64, 0);
-          if (gep->accumulateConstantOffset(GetInsertPoint()->getModule()->getDataLayout(), gepOffset)) {
-            byteOffset += gepOffset.getZExtValue();
-            addr = gep->getPointerOperand();
-            continue;
-          }
-        }
-        if (auto global = dyn_cast<GlobalVariable>(addr)) {
-          if (global->getName().startswith(lgcName::ImmutableConvertingSamplerGlobal)) {
-            // The initializer of the global variable is an array of v8i32 immutable sampler values. We need
-            // to extract the right one, then call the appropriate function for a converting image sample.
-            auto initializer = cast<ConstantArray>(global->getInitializer());
-            unsigned index = byteOffset / (initializer->getType()->getArrayElementType()->getPrimitiveSizeInBits() / 8);
-            Constant *convertingSamplerDesc = cast<Constant>(CreateExtractValue(initializer, index));
-            return CreateImageSampleConvert(resultTy, dim, flags, imageDesc, convertingSamplerDesc, address, instName);
-          }
-        }
-        break;
-      }
-    }
-  }
-
-  // Normal image sample.
   return CreateImageSampleGather(resultTy, dim, flags, coord, imageDesc, samplerDesc, address, instName, true);
 }
 

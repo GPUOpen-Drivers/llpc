@@ -331,11 +331,9 @@ public:
                                  const llvm::Twine &instName = "") override final;
 
   // Create an image sample with conversion.
-  // This is not yet a Builder API, but it could become one if there was to be a new SPIR-V YCbCr
-  // converting sampler spec that allows the SPIR-V reader to tell that it has a converting sampler.
   llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
                                         llvm::Value *convertingSamplerDesc, llvm::ArrayRef<llvm::Value *> address,
-                                        const llvm::Twine &instName = "");
+                                        const llvm::Twine &instName = "") override final;
 
   // Create an image sample with YCbCr conversion.
   llvm::Value *CreateImageSampleConvertYCbCr(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,

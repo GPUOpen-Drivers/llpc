@@ -299,7 +299,6 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     StringRef relocNameSuffix = "";
     switch (resType) {
     case ResourceNodeType::DescriptorSampler:
-    case ResourceNodeType::DescriptorYCbCrSampler:
       relocNameSuffix = "_s";
       break;
     case ResourceNodeType::DescriptorResource:

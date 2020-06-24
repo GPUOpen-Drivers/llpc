@@ -492,7 +492,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       if (node.type == ResourceMappingNodeType::PushConst && !isRoot)
         destNode.type = ResourceNodeType::InlineBuffer;
       else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
-        destNode.type = ResourceNodeType::DescriptorYCbCrSampler;
+        destNode.type = ResourceNodeType::DescriptorResource;
       else
         destNode.type = static_cast<ResourceNodeType>(node.type);
 
@@ -519,6 +519,12 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         break;
       }
 
+      // Only check for an immutable value if the resource is or contains a sampler. This specifically excludes
+      // YCbCrSampler; that was handled in the SPIR-V reader.
+      if (node.type != ResourceMappingNodeType::DescriptorSampler &&
+          node.type != ResourceMappingNodeType::DescriptorCombinedTexture)
+        break;
+
       auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(destNode.set, destNode.binding));
       if (it != immutableNodesMap.end()) {
         // This set/binding is (or contains) an immutable value. The value can only be a sampler, so we
@@ -529,15 +535,12 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         SmallVector<Constant *, 8> values;
 
         if (immutableNode.arraySize != 0) {
-          const unsigned samplerDescriptorSize = node.type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 4 : 8;
+          constexpr unsigned SamplerDescriptorSize = 4;
 
           for (unsigned compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx) {
-            Constant *compValues[8] = {};
-            for (unsigned i = 0; i < samplerDescriptorSize; ++i) {
-              compValues[i] = builder.getInt32(immutableNode.pValue[compIdx * samplerDescriptorSize + i]);
-            }
-            for (unsigned i = samplerDescriptorSize; i < 8; ++i)
-              compValues[i] = builder.getInt32(0);
+            Constant *compValues[SamplerDescriptorSize] = {};
+            for (unsigned i = 0; i < SamplerDescriptorSize; ++i)
+              compValues[i] = builder.getInt32(immutableNode.pValue[compIdx * SamplerDescriptorSize + i]);
             values.push_back(ConstantVector::get(compValues));
           }
           destNode.immutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(), values.size()), values);
