@@ -177,6 +177,20 @@ enum class UserDataMapping : unsigned {
   Invalid = ~0U // Invalid value used internally in LGC.
 };
 
+// An enumeration of shader export formats.
+typedef enum SPI_SHADER_EX_FORMAT {
+  SPI_SHADER_ZERO = 0x00000000,
+  SPI_SHADER_32_R = 0x00000001,
+  SPI_SHADER_32_GR = 0x00000002,
+  SPI_SHADER_32_AR = 0x00000003,
+  SPI_SHADER_FP16_ABGR = 0x00000004,
+  SPI_SHADER_UNORM16_ABGR = 0x00000005,
+  SPI_SHADER_SNORM16_ABGR = 0x00000006,
+  SPI_SHADER_UINT16_ABGR = 0x00000007,
+  SPI_SHADER_SINT16_ABGR = 0x00000008,
+  SPI_SHADER_32_ABGR = 0x00000009,
+} SPI_SHADER_EX_FORMAT;
+
 // The names of API shader stages used in PAL metadata, in ShaderStage order.
 static const char *const ApiStageNames[] = {".vertex", ".hull", ".domain", ".geometry", ".pixel", ".compute"};
 
@@ -222,6 +236,10 @@ constexpr unsigned mmSPI_SHADER_PGM_RSRC2_VS = 0x2C4B;
 // Other SPI register numbers in PAL metadata
 constexpr unsigned int mmPA_CL_CLIP_CNTL = 0xA204;
 constexpr unsigned mmVGT_SHADER_STAGES_EN = 0xA2D5;
+constexpr unsigned mmSPI_SHADER_COL_FORMAT = 0xA1C5;
+constexpr unsigned mmDB_SHADER_CONTROL = 0xA203;
+constexpr unsigned mmSPI_SHADER_Z_FORMAT = 0xA1C4;
+constexpr unsigned mmCB_SHADER_MASK = 0xA08F;
 
 // Register bitfield layout.
 
@@ -284,6 +302,16 @@ union VGT_SHADER_STAGES_EN {
     unsigned int VS_W32_EN : 1;
     unsigned int : 8;
   } gfx10;
+  unsigned int u32All;
+};
+
+// The DB_SHADER_CONTROL register.
+union DB_SHADER_CONTROL {
+  struct {
+    unsigned int : 6;
+    unsigned int KILL_ENABLE : 1;
+    unsigned int : 25;
+  } bitfields, bits;
   unsigned int u32All;
 };
 

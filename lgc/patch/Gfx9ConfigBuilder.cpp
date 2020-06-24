@@ -1854,25 +1854,8 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
     depthExpFmt = EXP_FORMAT_32_R;
   SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
 
-  unsigned spiShaderColFormat = 0;
   unsigned cbShaderMask = resUsage->inOutUsage.fs.cbShaderMask;
   cbShaderMask = resUsage->inOutUsage.fs.isNullFs ? 0 : cbShaderMask;
-  const auto &expFmts = resUsage->inOutUsage.fs.expFmts;
-  for (unsigned i = 0; i < MaxColorTargets; ++i) {
-    // Set fields COL0_EXPORT_FORMAT ~ COL7_EXPORT_FORMAT
-    spiShaderColFormat |= (expFmts[i] << (4 * i));
-  }
-
-  if (spiShaderColFormat == 0 && depthExpFmt == EXP_FORMAT_ZERO && resUsage->inOutUsage.fs.dummyExport) {
-    // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
-    // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
-    // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
-    // off by CB_SHADER_MASK.
-    spiShaderColFormat = SPI_SHADER_32_R;
-  }
-
-  SET_REG(&pConfig->psRegs, SPI_SHADER_COL_FORMAT, spiShaderColFormat);
-
   SET_REG(&pConfig->psRegs, CB_SHADER_MASK, cbShaderMask);
   SET_REG_FIELD(&pConfig->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, resUsage->inOutUsage.fs.interpInfo.size());
 

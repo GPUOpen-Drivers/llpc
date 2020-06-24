@@ -36,6 +36,7 @@
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/state/ResourceUsage.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -49,7 +50,7 @@ using namespace llvm;
 namespace {
 
 // The information needed for an export to a hardware color target.
-struct ColorExportInfo {
+struct ColorExportValueInfo {
   std::vector<Value *> value; // The value of each component to be exported.
   unsigned location;          // The location that corresponds to the hardware color target.
   bool isSigned;              // True if the values should be interpreted as signed integers.
@@ -73,7 +74,7 @@ public:
   static char ID; // ID of this pass
 
 private:
-  void updateFragColors(CallInst *callInst, ColorExportInfo expFragColors[], BuilderBase &builder);
+  void updateFragColors(CallInst *callInst, ColorExportValueInfo expFragColors[], BuilderBase &builder);
   Value *getOutputValue(ArrayRef<Value *> expFragColor, unsigned int location, BuilderBase &builder);
   CallInst *addExportForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder);
   CallInst *addExportForBuiltinOutput(Function *module, BuilderBase &builder);
@@ -526,7 +527,8 @@ bool LowerFragColorExport::runOnModule(Module &module) {
 //
 // @param callInst : An call to the generic output export builtin in a fragment shader.
 // @param [in/out] expFragColors : An array with the current color export information for each hw color target.
-void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportInfo expFragColors[], BuilderBase &builder) {
+void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValueInfo expFragColors[],
+                                            BuilderBase &builder) {
   unsigned location = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
   const unsigned compIdx = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
   Value *output = callInst->getOperand(2);
@@ -633,7 +635,7 @@ CallInst *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPo
 
   // Collect all of the values that need to be exported for each hardware color target.
   auto originalInsPos = builder.GetInsertPoint();
-  ColorExportInfo expFragColors[MaxColorTargets] = {};
+  ColorExportValueInfo expFragColors[MaxColorTargets] = {};
   for (CallInst *callInst : colorExports) {
     builder.SetInsertPoint(callInst);
     updateFragColors(callInst, expFragColors, builder);
@@ -654,27 +656,45 @@ CallInst *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPo
       exportValues[hwColorTarget] = getOutputValue(expFragColors[hwColorTarget].value, location, builder);
   }
 
+  // Add the color export information to the palmetadata.
+  SmallVector<ColorExportInfo, 8> info;
+  for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
+    Value *output = exportValues[hwColorTarget];
+    if (output == nullptr)
+      continue;
+    const ColorExportValueInfo &colorExportInfo = expFragColors[hwColorTarget];
+    info.push_back({hwColorTarget, colorExportInfo.location, colorExportInfo.isSigned, output->getType()});
+  }
+
+  if (info.empty()) {
+    const auto &builtInUsage = m_resUsage->builtInUsage.fs;
+    bool hasDepthExpFmtZero = builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth;
+    m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(info, hasDepthExpFmtZero, builtInUsage.discard);
+    return nullptr;
+  }
+
   if (!m_pipelineState->isUnlinked() || m_pipelineState->hasColorExportFormats()) {
     // Whole-pipeline compilation (or shader compilation where we were given the color export formats).
     // Lower each color export
     CallInst *lastExport = nullptr;
-    for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
-      Value *output = exportValues[hwColorTarget];
-      if (!output)
-        continue;
-      unsigned location = expFragColors[hwColorTarget].location;
-      bool isSigned = expFragColors[hwColorTarget].isSigned;
-      ExportFormat expFmt = static_cast<ExportFormat>(
-          m_pipelineState->computeExportFormat(exportValues[hwColorTarget]->getType(), location));
-      m_resUsage->inOutUsage.fs.expFmts[hwColorTarget] = expFmt;
-      lastExport = static_cast<CallInst *>(
-          fragColorExport->run(output, hwColorTarget, &*builder.GetInsertPoint(), expFmt, isSigned));
+    for (const ColorExportInfo &colorExportInfo : info) {
+      Value *output = exportValues[colorExportInfo.hwColorTarget];
+      ExportFormat expFmt =
+          static_cast<ExportFormat>(m_pipelineState->computeExportFormat(colorExportInfo.ty, colorExportInfo.location));
+      lastExport = static_cast<CallInst *>(fragColorExport->run(
+          output, colorExportInfo.hwColorTarget, &*builder.GetInsertPoint(), expFmt, colorExportInfo.isSigned));
     }
+    const auto &builtInUsage = m_resUsage->builtInUsage.fs;
+    bool hasDepthExpFmtZero = builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth;
+    m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(info, hasDepthExpFmtZero, builtInUsage.discard);
     return lastExport;
   }
 
-  // TODO: Unlinked shader compilation; the linker will add a color export shader.
-  // The export values should be returned.
+  // Add the export info to be used when linking shaders to generate the color export shader and compute the spi shader
+  // color format in the metadata.
+  m_pipelineState->getPalMetadata()->addColorExportInfo(info);
+
+  // TODO: The export values should be returned.
   return nullptr;
 }
 
