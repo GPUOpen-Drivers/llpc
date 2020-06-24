@@ -455,7 +455,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
   SmallVector<Value *, 16> args;
   Value *result = nullptr;
   unsigned imageDescArgIndex = 0;
-  if (imageDesc->getType() == getImageDescTy()) {
+  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Not texel buffer; use image load instruction.
     // Build the intrinsic arguments.
     bool tfe = isa<StructType>(intrinsicDataTy);
@@ -620,7 +620,7 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
   SmallVector<Value *, 16> args;
   Instruction *imageStore = nullptr;
   unsigned imageDescArgIndex = 0;
-  if (imageDesc->getType() == getImageDescTy()) {
+  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Not texel buffer; use image store instruction.
     // Build the intrinsic arguments.
     unsigned dmask = 1;
@@ -1236,7 +1236,7 @@ Value *ImageBuilder::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, un
   SmallVector<Value *, 8> args;
   Instruction *atomicInst = nullptr;
   unsigned imageDescArgIndex = 0;
-  if (imageDesc->getType() == getImageDescTy()) {
+  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Resource descriptor. Use the image atomic instruction.
     imageDesc = patchCubeDescriptor(imageDesc, dim);
     args.push_back(inputValue);
@@ -1342,7 +1342,7 @@ Value *ImageBuilder::CreateImageQuerySamples(unsigned dim, unsigned flags, Value
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *imageDesc, Value *lod,
                                           const Twine &instName) {
-  if (imageDesc->getType() == getTexelBufferDescTy()) {
+  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorTexelBuffer)) {
     // Texel buffer.
     // Extract NUM_RECORDS (SQ_BUF_RSRC_WORD2)
     Value *numRecords = CreateExtractElement(imageDesc, 2);

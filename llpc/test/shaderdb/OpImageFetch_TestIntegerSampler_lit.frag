@@ -16,9 +16,9 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.image.load.v4i32(i32 1, i32 4, {{.*}}, <2 x i32> <i32 0, i32 1>, i32 0)
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 1
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.image.load.v4i32(i32 1, i32 0, {{.*}}, <2 x i32> <i32 0, i32 1>, i32 0)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

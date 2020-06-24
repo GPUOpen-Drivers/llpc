@@ -262,25 +262,13 @@ public:
   llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, bool isNonUniform,
                                     bool isWritten, llvm::Type *pointeeTy, const llvm::Twine &instName) override final;
 
-  // Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
-  llvm::Value *CreateIndexDescPtr(llvm::Value *descPtr, llvm::Value *index, bool isNonUniform,
-                                  const llvm::Twine &instName) override final;
+  // Create a get of the stride (in bytes) of a descriptor.
+  llvm::Value *CreateGetDescStride(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                   const llvm::Twine &instName) override final;
 
-  // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
-  llvm::Value *CreateLoadDescFromPtr(llvm::Value *descPtr, const llvm::Twine &instName) override final;
-
-  // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
-  llvm::Value *CreateGetSamplerDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName) override final;
-
-  // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
-  llvm::Value *CreateGetImageDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName) override final;
-
-  // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
-  llvm::Value *CreateGetTexelBufferDescPtr(unsigned descSet, unsigned binding,
-                                           const llvm::Twine &instName) override final;
-
-  // Create a pointer to F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
-  llvm::Value *CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName) override final;
+  // Create a pointer to a descriptor.
+  llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                const llvm::Twine &instName) override final;
 
   // Create a load of the push constants pointer.
   llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *pushConstantsTy, const llvm::Twine &instName) override final;
@@ -297,6 +285,9 @@ private:
   // Get a struct containing the pointer and byte stride for a descriptor
   llvm::Value *getDescPtrAndStride(ResourceNodeType resType, unsigned descSet, unsigned binding,
                                    const ResourceNode *topNode, const ResourceNode *node, bool shadow);
+
+  // Get the stride (in bytes) of a descriptor.
+  llvm::Value *getStride(ResourceNodeType descType, unsigned descSet, unsigned binding, const ResourceNode *node);
 
   // Get a pointer to a descriptor, as a pointer to i8
   llvm::Value *getDescPtr(ResourceNodeType resType, unsigned descSet, unsigned binding, const ResourceNode *topNode,

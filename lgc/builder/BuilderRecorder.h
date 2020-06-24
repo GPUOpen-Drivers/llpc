@@ -131,12 +131,8 @@ public:
 
     // Descriptor
     LoadBufferDesc,
-    IndexDescPtr,
-    LoadDescFromPtr,
-    GetSamplerDescPtr,
-    GetImageDescPtr,
-    GetTexelBufferDescPtr,
-    GetFmaskDescPtr,
+    GetDescStride,
+    GetDescPtr,
     LoadPushConstantsPtr,
     GetBufferDescLength,
 
@@ -348,19 +344,11 @@ public:
   llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, bool isNonUniform,
                                     bool isWritten, llvm::Type *pointeeTy, const llvm::Twine &instName) override final;
 
-  llvm::Value *CreateIndexDescPtr(llvm::Value *descPtr, llvm::Value *index, bool isNonUniform,
-                                  const llvm::Twine &instName) override final;
+  llvm::Value *CreateGetDescStride(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                   const llvm::Twine &instName) override final;
 
-  llvm::Value *CreateLoadDescFromPtr(llvm::Value *descPtr, const llvm::Twine &instName) override final;
-
-  llvm::Value *CreateGetSamplerDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName) override final;
-
-  llvm::Value *CreateGetImageDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName) override final;
-
-  llvm::Value *CreateGetTexelBufferDescPtr(unsigned descSet, unsigned binding,
-                                           const llvm::Twine &instName) override final;
-
-  llvm::Value *CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName) override final;
+  llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                const llvm::Twine &instName) override final;
 
   llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *pushConstantsTy, const llvm::Twine &instName) override final;
 

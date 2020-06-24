@@ -169,30 +169,7 @@ struct ShaderOptions {
 // =====================================================================================================================
 // Definitions for user data resource nodes
 
-/// Enumerates the function of a particular node in a shader's resource mapping graph.
-enum class ResourceNodeType : unsigned {
-  Unknown,                   ///< Invalid type
-  DescriptorResource,        ///< Generic descriptor: resource, including texture resource, image, input
-                             ///  attachment
-  DescriptorSampler,         ///< Generic descriptor: sampler
-  DescriptorCombinedTexture, ///< Generic descriptor: combined texture, combining resource descriptor with
-                             ///  sampler descriptor of the same texture, starting with resource descriptor
-  DescriptorTexelBuffer,     ///< Generic descriptor: texel buffer, including texture buffer and image buffer
-  DescriptorFmask,           ///< Generic descriptor: F-mask
-  DescriptorBuffer,          ///< Generic descriptor: buffer, including uniform buffer and shader storage buffer
-  DescriptorTableVaPtr,      ///< Descriptor table VA pointer
-  IndirectUserDataVaPtr,     ///< Indirect user data VA pointer
-  PushConst,                 ///< Push constant; only a single PushConst in the root table is allowed
-  DescriptorBufferCompact,   ///< Compact buffer descriptor, only contains the buffer address
-  StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
-  DescriptorReserved12,
-  DescriptorYCbCrSampler, ///< Generic descriptor: combined texture, combining resource descriptor with
-                          ///  space for a sampler descriptor (starting with resource descriptor), but the 4-dword
-                          ///  sampler descriptor is ignored and overridden with an 8-dword immutable YCbCr converting
-                          ///  sampler
-  InlineBuffer,           ///< Inline buffer, with descriptor set and binding
-  Count,                  ///< Count of resource mapping node types.
-};
+// ResourceNodeType declaration now in CommonDefs.h.
 
 // The representation of a user data resource node
 struct ResourceNode {
