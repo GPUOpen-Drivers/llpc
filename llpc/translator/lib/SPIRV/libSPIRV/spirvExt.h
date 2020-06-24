@@ -74,4 +74,4 @@ namespace spv
 
 }; // spv
 
-#endif // SPIRVEXT_H
+#endif

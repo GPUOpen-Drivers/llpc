@@ -964,4 +964,4 @@ inline bool isValidMemoryAccessMask(SPIRVWord Mask) {
 
 } /* namespace SPIRV */
 
-#endif // SPIRV_LIBSPIRV_SPIRVISVALIDENUM_H
+#endif

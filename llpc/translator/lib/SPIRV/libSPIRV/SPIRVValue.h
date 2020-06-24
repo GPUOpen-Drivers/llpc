@@ -334,4 +334,4 @@ protected:
 
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVVALUE_H
+#endif

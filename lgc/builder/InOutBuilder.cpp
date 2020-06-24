@@ -797,7 +797,7 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
   assert(expectedTy == valueToWrite->getType() ||
          ((builtIn == BuiltInClipDistance || builtIn == BuiltInCullDistance) &&
           valueToWrite->getType()->getArrayElementType() == expectedTy->getArrayElementType()));
-#endif // NDEBUG
+#endif
 
   // For now, this just generates a call to llpc.output.export.builtin. A future commit will
   // change it to generate IR more directly here.
@@ -1328,4 +1328,4 @@ bool InOutBuilder::isBuiltInInput(BuiltInKind builtIn) {
 bool InOutBuilder::isBuiltInOutput(BuiltInKind builtIn) {
   return (getBuiltInValidMask(builtIn, true) >> m_shaderStage) & 1;
 }
-#endif // NDEBUG
+#endif

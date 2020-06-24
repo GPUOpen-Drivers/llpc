@@ -201,4 +201,4 @@ typedef uint32_t NonSemanticInfoExtOpKind;
 
 }
 
-#endif // SPIRV_LIBSPIRV_SPIRVEXTINST_H
+#endif

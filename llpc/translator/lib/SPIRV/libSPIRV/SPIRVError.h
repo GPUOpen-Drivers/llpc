@@ -123,4 +123,4 @@ inline bool SPIRVErrorLog::checkError(bool Cond, SPIRVErrorCode ErrCode,
 
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVERROR_H
+#endif

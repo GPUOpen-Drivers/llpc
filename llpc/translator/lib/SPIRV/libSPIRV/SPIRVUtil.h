@@ -401,4 +401,4 @@ inline T roundUpToMultiple(T Op, T Alignment) {
 
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVUTIL_H
+#endif

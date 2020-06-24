@@ -2541,4 +2541,4 @@ SPIRVValue *createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
   uint32_t RoundingTypeMask);
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVINSTRUCTION_H
+#endif

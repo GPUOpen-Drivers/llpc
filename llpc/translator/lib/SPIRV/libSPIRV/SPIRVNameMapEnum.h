@@ -446,4 +446,4 @@ SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
 
 } /* namespace SPIRV */
 
-#endif // SPIRV_LIBSPIRV_SPIRVNAMEMAPENUM_H
+#endif

@@ -676,4 +676,4 @@ bool isType(const T1 *Ty, unsigned Bits = 0) {
 }
 
 } // namespace SPIRV
-#endif // SPIRV_LIBSPIRV_SPIRVTYPE_H
+#endif

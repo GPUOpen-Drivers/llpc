@@ -361,4 +361,4 @@ private:
 };
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVMODULE_H
+#endif

@@ -1062,4 +1062,4 @@ inline std::ostream& operator<<<Float16>(std::ostream& os,
 }
 }
 
-#endif  // LIBSPIRV_UTIL_HEX_FLOAT_H_
+#endif

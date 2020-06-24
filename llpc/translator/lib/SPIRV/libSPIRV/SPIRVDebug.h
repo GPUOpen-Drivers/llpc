@@ -73,4 +73,4 @@ inline spv_ostream &spvdbgs() {
 #endif
 
 } // namespace SPIRV
-#endif // SPIRV_LIBSPIRV_SPIRVDEBUG_H
+#endif

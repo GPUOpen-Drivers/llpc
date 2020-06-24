@@ -165,4 +165,4 @@ inline bool isIntelSubgroupOpCode(Op OpCode) {
 
 } // namespace SPIRV
 
-#endif // SPIRV_LIBSPIRV_SPIRVOPCODE_H
+#endif
