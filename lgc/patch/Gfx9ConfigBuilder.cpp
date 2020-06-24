@@ -33,7 +33,6 @@
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
-#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "lgc-gfx9-config-builder"
 

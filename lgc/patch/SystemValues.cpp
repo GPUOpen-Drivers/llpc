@@ -33,7 +33,6 @@
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "lgc-system-values"
 

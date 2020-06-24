@@ -32,7 +32,6 @@
 #include "lgc/BuiltIns.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
-#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "lgc-gfx6-config-builder"
 
