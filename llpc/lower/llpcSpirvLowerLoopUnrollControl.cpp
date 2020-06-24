@@ -32,6 +32,7 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include <vector>
 

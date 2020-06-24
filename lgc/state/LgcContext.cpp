@@ -42,6 +42,7 @@
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CodeGen.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
