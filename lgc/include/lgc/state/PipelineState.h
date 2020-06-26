@@ -236,6 +236,7 @@ public:
 
   // Accessors for color export state
   const ColorExportFormat &getColorExportFormat(unsigned location);
+  const bool hasColorExportFormats() { return !m_colorExportFormats.empty(); }
   const ColorExportState &getColorExportState() { return m_colorExportState; }
 
   // Accessors for pipeline state

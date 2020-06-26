@@ -90,8 +90,6 @@ private:
                                    llvm::Instruction *insertPos);
   void patchGsGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                                   llvm::Instruction *insertPos);
-  void patchFsGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx,
-                                  llvm::Instruction *insertPos);
 
   llvm::Value *patchVsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Instruction *insertPos);
   llvm::Value *patchTcsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,

@@ -109,6 +109,9 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Lower vertex fetch operations.
   passMgr.add(createLowerVertexFetch());
 
+  // Lower fragment export operations.
+  passMgr.add(createLowerFragColorExport());
+
   // Patch entry-point mutation (should be done before external library link)
   passMgr.add(createPatchEntryPointMutate());
 
