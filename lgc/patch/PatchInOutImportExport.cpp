@@ -772,8 +772,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         }
         case ShaderStageFragment: {
           assert(callInst.getNumArgOperands() == 3);
-          const unsigned compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-          patchFsGenericOutputExport(output, loc, compIdx, &callInst);
+          llvm_unreachable("Fragment shader export should have been handled by the LowerFragColorExport pass");
           break;
         }
         case ShaderStageCopyShader: {
@@ -1282,117 +1281,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
     emitCall("llvm.amdgcn.s.sendmsg", Type::getVoidTy(*m_context), args, {}, insertPos);
   } else if (m_shaderStage == ShaderStageFragment) {
-    if (m_fragDepth || m_fragStencilRef || m_sampleMask) {
-      auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-      Value *fragDepth = undef;
-      Value *fragStencilRef = undef;
-      Value *sampleMask = undef;
-
-      unsigned channelMask = 0x1; // Always export gl_FragDepth
-      if (m_fragDepth) {
-        assert(builtInUsage.fragDepth);
-        (void(builtInUsage)); // unused
-        fragDepth = m_fragDepth;
-      }
-
-      if (m_fragStencilRef) {
-        assert(builtInUsage.fragStencilRef);
-        (void(builtInUsage)); // unused
-        channelMask |= 2;
-        fragStencilRef = m_fragStencilRef;
-      }
-
-      if (m_sampleMask) {
-        assert(builtInUsage.sampleMask);
-        (void(builtInUsage)); // unused
-        channelMask |= 4;
-        sampleMask = m_sampleMask;
-      }
-
-      Value *args[] = {
-          ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_Z), // tgt
-          ConstantInt::get(Type::getInt32Ty(*m_context), channelMask),  // en
-          fragDepth,                                                    // src0
-          fragStencilRef,                                               // src1
-          sampleMask,                                                   // src2
-          undef,                                                        // src3
-          ConstantInt::get(Type::getInt1Ty(*m_context), false),         // done
-          ConstantInt::get(Type::getInt1Ty(*m_context), true)           // vm
-      };
-      m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-    }
-
-    // Export fragment colors
-    for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
-      auto &expFragColor = m_expFragColors[hwColorTarget];
-      if (expFragColor.size() > 0) {
-        Value *output = nullptr;
-        unsigned compCount = expFragColor.size();
-        assert(compCount <= 4);
-
-        // Set CB shader mask
-        auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
-        const unsigned channelMask = ((1 << compCount) - 1);
-        unsigned location = resUsage->inOutUsage.fs.outputOrigLocs[hwColorTarget];
-        if (location == InvalidValue)
-          continue;
-
-        resUsage->inOutUsage.fs.cbShaderMask |= (channelMask << (4 * location));
-
-        // Construct exported fragment colors
-        if (compCount == 1)
-          output = expFragColor[0];
-        else {
-          const auto compTy = expFragColor[0]->getType();
-
-          output = UndefValue::get(FixedVectorType::get(compTy, compCount));
-          for (unsigned i = 0; i < compCount; ++i) {
-            assert(expFragColor[i]->getType() == compTy);
-            output = InsertElementInst::Create(output, expFragColor[i],
-                                               ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
-          }
-        }
-
-        // Update the pipeline state with new information about the export.
-        Type *outputTy = output->getType();
-        ExportFormat expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(outputTy, location));
-        if (expFmt == EXP_FORMAT_ZERO) {
-          // Clear channel mask if shader export format is ZERO
-          resUsage->inOutUsage.fs.cbShaderMask &= ~(0xF << (4 * location));
-        }
-
-        BasicType outputType = resUsage->inOutUsage.fs.outputTypes[location];
-        const bool signedness =
-            (outputType == BasicType::Int8 || outputType == BasicType::Int16 || outputType == BasicType::Int);
-
-        resUsage->inOutUsage.fs.expFmts[hwColorTarget] = expFmt;
-
-        // Do fragment color exporting
-        auto exportInst = m_fragColorExport->run(output, hwColorTarget, insertPos, expFmt, signedness);
-        if (exportInst)
-          m_lastExport = cast<CallInst>(exportInst);
-      }
-    }
-
-    // NOTE: If outputs are present in fragment shader, we have to export a dummy one
-    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
-
-    // NOTE: GFX10 can allow no dummy export when the fragment shader does not have discard operation
-    // or ROV (Raster-ordered views)
-    resUsage->inOutUsage.fs.dummyExport = (m_gfxIp.major < 10 || resUsage->builtInUsage.fs.discard);
-    if (!m_lastExport && resUsage->inOutUsage.fs.dummyExport) {
-      Value *args[] = {
-          ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_MRT_0), // tgt
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0x1),              // en
-          zero,                                                             // src0
-          undef,                                                            // src1
-          undef,                                                            // src2
-          undef,                                                            // src3
-          ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
-          ConstantInt::get(Type::getInt1Ty(*m_context), true)               // vm
-      };
-      m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-    }
+    // Fragment shader export are handled in LowerFragColorExport.
+    return;
   }
 
   if (m_lastExport) {
@@ -1854,46 +1744,6 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
   (void(genericOutByteSizes)); // unused
 
   storeValueToGsVsRing(output, location, compIdx, streamId, insertPos);
-}
-
-// =====================================================================================================================
-// Patches export calls for generic outputs of fragment shader.
-//
-// @param output : Output value
-// @param location : Location of the output
-// @param compIdx : Index used for vector element indexing
-// @param insertPos : Where to insert the patch instruction
-void PatchInOutImportExport::patchFsGenericOutputExport(Value *output, unsigned location, unsigned compIdx,
-                                                        Instruction *insertPos) {
-  Type *outputTy = output->getType();
-
-  const unsigned bitWidth = outputTy->getScalarSizeInBits();
-  assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
-  (void(bitWidth)); // unused
-
-  auto compTy = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getElementType() : outputTy;
-  unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
-
-  std::vector<Value *> outputComps;
-  for (unsigned i = 0; i < compCount; ++i) {
-    Value *outputComp = nullptr;
-    if (compCount == 1)
-      outputComp = output;
-    else {
-      outputComp = ExtractElementInst::Create(output, ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
-    }
-
-    outputComps.push_back(outputComp);
-  }
-
-  assert(location < MaxColorTargets);
-  auto &expFragColor = m_expFragColors[location];
-
-  while (compIdx + compCount > expFragColor.size())
-    expFragColor.push_back(UndefValue::get(compTy));
-
-  for (unsigned i = 0; i < compCount; ++i)
-    expFragColor[compIdx + i] = outputComps[i];
 }
 
 // =====================================================================================================================
