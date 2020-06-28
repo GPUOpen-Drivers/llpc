@@ -37,4 +37,5 @@ RUN cmake --build . \
     && cmake --build . --target spvgen
 
 # Run the lit test suite.
-RUN cmake --build . --target check-amdllpc -- -v
+RUN cmake --build . --target check-amdllpc -- -v \
+    && cmake --build . --target check-lgc -- -v
