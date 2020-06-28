@@ -84,4 +84,5 @@ RUN EXTRA_FLAGS="" \
 
 # Run the lit test suite.
 RUN cmake --build . --target check-amdllpc -- -v \
+    && cmake --build . --target check-lgc -- -v \
     && (echo "Base image built on $(date)" | tee /vulkandriver/build_info.txt)
