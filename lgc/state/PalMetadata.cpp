@@ -365,8 +365,12 @@ void PalMetadata::fixUpRegisters() {
   const ResourceNode *pushConstNode;
   for (const auto &node : m_pipelineState->getUserDataNodes()) {
     if (node.type == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
-      unsigned descSet = node.innerTable[0].set;
-      descSetNodes.resize(std::max(unsigned(descSetNodes.size()), descSet + 1));
+      size_t descSet = node.innerTable[0].set;
+      descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
+      descSetNodes[descSet] = &node;
+    } else if (node.type == ResourceNodeType::DescriptorBuffer) {
+      size_t descSet = node.set;
+      descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
       descSetNodes[descSet] = &node;
     } else if (node.type == ResourceNodeType::PushConst) {
       pushConstNode = &node;
