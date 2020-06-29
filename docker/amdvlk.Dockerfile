@@ -69,9 +69,9 @@ RUN EXTRA_FLAGS="" \
     && echo "Extra CMake flags: $EXTRA_FLAGS" \
     && cmake "/vulkandriver/drivers/xgl" \
           -G "$GENERATOR" \
-          -DXGL_BUILD_LIT=ON \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
-          -DLLVM_ENABLE_ASSERTIONS="$ASSERTIONS" \
+          -DXGL_BUILD_LIT=ON \
+          -DXGL_ENABLE_ASSERTIONS="$ASSERTIONS" \
           -DICD_ANALYSIS_WARNINGS_AS_ERRORS=ON \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
           $EXTRA_FLAGS \
