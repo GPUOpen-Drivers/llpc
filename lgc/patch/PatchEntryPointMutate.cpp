@@ -1219,7 +1219,9 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
         break;
       }
     }
-    m_pipelineState->getPalMetadata()->setUserDataSpillUsage(std::min(userDataUsage->spillUsage, minByteOffset / 4));
+    // In relocatable shader compilation userDataUsage is unknown until linking.
+    if (minByteOffset != UINT_MAX && !m_pipelineState->isUnlinked())
+      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(std::min(userDataUsage->spillUsage, minByteOffset / 4));
   }
 
   // Figure out how many sgprs we have available for userDataArgs.
