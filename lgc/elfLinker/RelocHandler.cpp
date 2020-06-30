@@ -29,10 +29,10 @@
  ***********************************************************************************************************************
  */
 #include "RelocHandler.h"
+#include "lgc/LgcContext.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
-#include "lgc/state/TargetInfo.h"
 
 #define DEBUG_TYPE "lgc-elf-reloc-handler"
 
@@ -98,7 +98,7 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
 
       value = node->offsetInDwords * 4;
       if (type == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
-        value += getPipelineState()->getTargetInfo().getGpuProperty().descriptorSizeResource;
+        value += DescriptorSizeResource;
       return true;
     }
   }
@@ -114,16 +114,15 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
       std::tie(outerNode, node) = getPipelineState()->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
       if (!node)
         report_fatal_error("No resource node for " + name);
-      const GpuProperty &gpuProperty = m_pipelineState->getTargetInfo().getGpuProperty();
       switch (node->type) {
       case ResourceNodeType::DescriptorResource:
-        value = gpuProperty.descriptorSizeResource;
+        value = DescriptorSizeResource;
         return true;
       case ResourceNodeType::DescriptorSampler:
-        value = gpuProperty.descriptorSizeSampler;
+        value = DescriptorSizeSampler;
         return true;
       case ResourceNodeType::DescriptorCombinedTexture:
-        value = gpuProperty.descriptorSizeResource + gpuProperty.descriptorSizeSampler;
+        value = DescriptorSizeResource + DescriptorSizeSampler;
         return true;
       default:
         break;

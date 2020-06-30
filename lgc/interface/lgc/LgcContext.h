@@ -56,6 +56,13 @@ class PassManagerCache;
 class Pipeline;
 class TargetInfo;
 
+// Size in bytes of resource (image) descriptor
+static constexpr unsigned DescriptorSizeResource = 8 * sizeof(uint32_t);
+// Size in bytes of sampler descriptor
+static constexpr unsigned DescriptorSizeSampler = 4 * sizeof(uint32_t);
+// Size in bytes of buffer descriptor
+static constexpr unsigned DescriptorSizeBuffer = 4 * sizeof(uint32_t);
+
 // =====================================================================================================================
 // LgcContext class, used to create Pipeline and Builder objects. State shared between multiple compiles
 // is kept here.
