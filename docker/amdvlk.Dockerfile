@@ -27,17 +27,21 @@ ARG FEATURES
 ARG GENERATOR
 
 # Install required packages.
+# Use pip to install an up-to-date version of CMake. The apt package is
+# too old for LLVM.
 RUN apt-get update \
     && apt-get install -yqq --no-install-recommends \
-       build-essential pkg-config cmake cmake-data \
+       build-essential pkg-config \
        gcc g++ ninja-build binutils-gold \
        clang-9 libclang-common-9-dev lld-9 \
-       python python-distutils-extra python3 python3-distutils \
+       python python-distutils-extra python3 python3-distutils python3-pip \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
        libwayland-dev \
        git repo curl vim-tiny \
     && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --no-cache-dir --upgrade pip \
+    && python3 -m pip install --no-cache-dir --upgrade cmake \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10 \
     && update-alternatives --install /usr/bin/lld lld /usr/bin/lld-9 10 \
     && update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-9 10
