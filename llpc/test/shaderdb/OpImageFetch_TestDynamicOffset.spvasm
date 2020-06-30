@@ -1,0 +1,125 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST: define spir_func void @main() {{.*}}
+; SHADERTEST: [[LABEL:[0-9]*]]: {{.*}}
+; SHADERTEST: {{.*}}@lgc.create.image.load.v4f32{{.*}}
+; SHADERTEST: br label %[[LABEL]], {{.*}}
+; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
+; SHADERTEST: image_load
+; SHADERTEST: image_load
+; SHADERTEST: image_load
+; SHADERTEST: image_load
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.0
+; Generator: Google spiregg; 0
+; Bound: 61
+; Schema: 0
+               OpCapability Shader
+               OpCapability ImageGatherExtended
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %gl_GlobalInvocationID
+               OpExecutionMode %main LocalSize 8 8 1
+          %3 = OpString "simplest.hlsl"
+               OpSource HLSL 650 %3 "#line 1 \"simplest.hlsl\"
+Texture2D g_inputTexture;
+RWTexture2D<uint> g_outputTexture;
+
+[numthreads(8, 8, 1)]
+void main(uint3 dispatchThreadID : SV_DispatchThreadID) {
+  uint mask = 0;
+  for (uint i = 0 ; i < 4 ; i++) {
+    uint x = i % 2;
+    uint y = i / 2;
+    float value = g_inputTexture.Load(uint3(dispatchThreadID.xy * 2, 0), uint2(x, y)).r;
+    mask = mask << 1;
+    if (value > 0.0f) {
+      mask |= 1;
+    }
+  }
+  g_outputTexture[dispatchThreadID.xy] = mask;
+}
+"
+               OpName %type_2d_image "type.2d.image"
+               OpName %g_inputTexture "g_inputTexture"
+               OpName %type_2d_image_0 "type.2d.image"
+               OpName %g_outputTexture "g_outputTexture"
+               OpName %main "main"
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpDecorate %g_inputTexture DescriptorSet 0
+               OpDecorate %g_inputTexture Binding 0
+               OpDecorate %g_outputTexture DescriptorSet 0
+               OpDecorate %g_outputTexture Binding 1
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+     %uint_4 = OpConstant %uint 4
+     %uint_2 = OpConstant %uint 2
+     %v2uint = OpTypeVector %uint 2
+         %13 = OpConstantComposite %v2uint %uint_2 %uint_2
+     %uint_1 = OpConstant %uint 1
+      %float = OpTypeFloat 32
+    %float_0 = OpConstant %float 0
+%type_2d_image = OpTypeImage %float 2D 2 0 0 1 Unknown
+%_ptr_UniformConstant_type_2d_image = OpTypePointer UniformConstant %type_2d_image
+%type_2d_image_0 = OpTypeImage %uint 2D 2 0 0 2 R32ui
+%_ptr_UniformConstant_type_2d_image_0 = OpTypePointer UniformConstant %type_2d_image_0
+     %v3uint = OpTypeVector %uint 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+       %void = OpTypeVoid
+         %22 = OpTypeFunction %void
+       %bool = OpTypeBool
+        %int = OpTypeInt 32 1
+      %v3int = OpTypeVector %int 3
+      %v2int = OpTypeVector %int 2
+    %v4float = OpTypeVector %float 4
+%g_inputTexture = OpVariable %_ptr_UniformConstant_type_2d_image UniformConstant
+%g_outputTexture = OpVariable %_ptr_UniformConstant_type_2d_image_0 UniformConstant
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+       %main = OpFunction %void None %22
+         %28 = OpLabel
+         %29 = OpLoad %v3uint %gl_GlobalInvocationID
+               OpBranch %30
+         %30 = OpLabel
+         %31 = OpPhi %uint %uint_0 %28 %32 %33
+         %34 = OpPhi %uint %uint_0 %28 %35 %33
+         %36 = OpULessThan %bool %34 %uint_4
+               OpLoopMerge %37 %33 None
+               OpBranchConditional %36 %38 %37
+         %38 = OpLabel
+         %39 = OpUMod %uint %34 %uint_2
+         %40 = OpUDiv %uint %34 %uint_2
+         %41 = OpVectorShuffle %v2uint %29 %29 0 1
+         %42 = OpIMul %v2uint %41 %13
+         %43 = OpCompositeExtract %uint %42 0
+         %44 = OpCompositeExtract %uint %42 1
+         %45 = OpCompositeConstruct %v3uint %43 %44 %uint_0
+         %46 = OpBitcast %v3int %45
+         %47 = OpVectorShuffle %v2int %46 %46 0 1
+         %48 = OpCompositeExtract %int %46 2
+         %49 = OpCompositeConstruct %v2uint %39 %40
+         %50 = OpBitcast %v2int %49
+         %51 = OpLoad %type_2d_image %g_inputTexture
+         %52 = OpImageFetch %v4float %51 %47 Lod|Offset %48 %50
+         %53 = OpCompositeExtract %float %52 0
+         %54 = OpShiftLeftLogical %uint %31 %uint_1
+         %55 = OpFOrdGreaterThan %bool %53 %float_0
+               OpSelectionMerge %56 None
+               OpBranchConditional %55 %57 %56
+         %57 = OpLabel
+         %58 = OpBitwiseOr %uint %54 %uint_1
+               OpBranch %56
+         %56 = OpLabel
+         %32 = OpPhi %uint %54 %38 %58 %57
+               OpBranch %33
+         %33 = OpLabel
+         %35 = OpIAdd %uint %34 %uint_1
+               OpBranch %30
+         %37 = OpLabel
+         %59 = OpVectorShuffle %v2uint %29 %29 0 1
+         %60 = OpLoad %type_2d_image_0 %g_outputTexture
+               OpImageWrite %60 %59 %31 None
+               OpReturn
+               OpFunctionEnd
