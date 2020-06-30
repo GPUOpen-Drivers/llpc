@@ -84,7 +84,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
       // indexed. This lgc.root.descriptor call is by default lowered in PatchEntryPointMutate into a load from the
       // spill table, but it might be able to "unspill" it to directly use shader entry SGPRs.
-      unsigned byteSize = getLgcContext()->getTargetInfo().getGpuProperty().descriptorSizeBuffer;
+      unsigned byteSize = DescriptorSizeBuffer;
       if (node->type == ResourceNodeType::DescriptorBufferCompact)
         byteSize = DescriptorSizeBufferCompact;
       unsigned dwordSize = byteSize / 4;
@@ -309,13 +309,12 @@ Value *DescBuilder::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const Twin
 Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descSet, unsigned binding,
                                         const ResourceNode *topNode, const ResourceNode *node, bool shadow) {
   // Determine the stride if possible without looking at the resource node.
-  const GpuProperty &gpuProperty = getLgcContext()->getTargetInfo().getGpuProperty();
   unsigned byteSize = 0;
   Value *stride = nullptr;
   switch (resType) {
   case ResourceNodeType::DescriptorBuffer:
   case ResourceNodeType::DescriptorTexelBuffer:
-    byteSize = gpuProperty.descriptorSizeBuffer;
+    byteSize = DescriptorSizeBuffer;
     if (node && node->type == ResourceNodeType::DescriptorBufferCompact)
       byteSize = DescriptorSizeBufferCompact;
     stride = getInt32(byteSize);
@@ -325,11 +324,11 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
     stride = getInt32(byteSize);
     break;
   case ResourceNodeType::DescriptorSampler:
-    byteSize = gpuProperty.descriptorSizeSampler;
+    byteSize = DescriptorSizeSampler;
     break;
   case ResourceNodeType::DescriptorResource:
   case ResourceNodeType::DescriptorFmask:
-    byteSize = gpuProperty.descriptorSizeResource;
+    byteSize = DescriptorSizeResource;
     break;
   default:
     llvm_unreachable("");
@@ -345,15 +344,15 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
       // Pipeline compilation: Get the stride from the resource type in the node.
       switch (node->type) {
       case ResourceNodeType::DescriptorSampler:
-        stride = getInt32(gpuProperty.descriptorSizeSampler);
+        stride = getInt32(DescriptorSizeSampler);
         break;
       case ResourceNodeType::DescriptorResource:
       case ResourceNodeType::DescriptorFmask:
-        stride = getInt32(gpuProperty.descriptorSizeResource);
+        stride = getInt32(DescriptorSizeResource);
         break;
       case ResourceNodeType::DescriptorCombinedTexture:
       case ResourceNodeType::DescriptorYCbCrSampler:
-        stride = getInt32(gpuProperty.descriptorSizeResource + gpuProperty.descriptorSizeSampler);
+        stride = getInt32(DescriptorSizeResource + DescriptorSizeSampler);
         break;
       default:
         llvm_unreachable("Unexpected resource node type");
@@ -370,7 +369,7 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
     StringRef startGlobalName = lgcName::ImmutableSamplerGlobal;
     // We need to change the stride to 4 dwords (8 dwords for a converting sampler). It would otherwise be
     // incorrectly set to 12 dwords for a sampler in a combined texture.
-    stride = getInt32(gpuProperty.descriptorSizeSampler);
+    stride = getInt32(DescriptorSizeSampler);
     if (node->type == ResourceNodeType::DescriptorYCbCrSampler) {
       startGlobalName = lgcName::ImmutableConvertingSamplerGlobal;
       stride = getInt32(DescriptorSizeSamplerYCbCr);
@@ -463,10 +462,9 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
   } else {
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
-    const GpuProperty &gpuProperty = getLgcContext()->getTargetInfo().getGpuProperty();
     unsigned offsetInBytes = node->offsetInDwords * 4;
     if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
-      offsetInBytes += gpuProperty.descriptorSizeResource;
+      offsetInBytes += DescriptorSizeResource;
     offset = getInt32(offsetInBytes);
   }
   descPtr = CreateAddByteOffset(descPtr, offset);
