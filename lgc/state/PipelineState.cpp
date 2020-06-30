@@ -49,7 +49,7 @@ using namespace llvm;
 static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable tessellation off-chip mode"),
                                        cl::init(false));
 // -pack-in-out: pack input/output
-static cl::opt<bool> PackInOut("pack-in-out", cl::desc("Pack input/output"), cl::init(false));
+static cl::opt<bool> PackInOut("pack-in-out", cl::desc("Pack input/output"), cl::init(true));
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";

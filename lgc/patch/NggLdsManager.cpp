@@ -61,8 +61,6 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     // 1 byte (uint8) per thread
     Gfx9::NggMaxThreadsPerSubgroup,                           // LdsRegionDrawFlag
     // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
-    SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionPrimCountInWaves
-    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionVertCountInWaves
     // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionCullDistance
@@ -109,7 +107,6 @@ const char *NggLdsManager::m_ldsRegionNames[LdsRegionCount] = {
     "Distributed primitive ID",             // LdsRegionDistribPrimId
     "Vertex position data",                 // LdsRegionPosData
     "Draw flag",                            // LdsRegionDrawFlag
-    "Primitive count in waves",             // LdsRegionPrimCountInWaves
     "Vertex count in waves",                // LdsRegionVertCountInWaves
     "Cull distance",                        // LdsRegionCullDistance
     "Vertex thread ID map",                 // LdsRegionVertThreadIdMap
@@ -238,12 +235,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
         if (region == LdsRegionCullDistance && !nggControl->enableCullDistanceCulling)
           continue;
 
-        // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
-        // skipped.
-        if (nggControl->compactMode == NggCompactSubgroup &&
-            (region >= LdsRegionCompactBeginRange && region <= LdsRegionCompactEndRange))
-          continue;
-
         if (hasTs) {
           // Skip those regions that are for VS only
           if (region == LdsRegionCompactVertexId || region == LdsRegionCompactInstanceId ||
@@ -310,12 +301,6 @@ unsigned NggLdsManager::calcEsExtraLdsSize(PipelineState *pipelineState) {
 
       // NOTE: If cull distance culling is disabled, skip this region
       if (region == LdsRegionCullDistance && !nggControl->enableCullDistanceCulling)
-        continue;
-
-      // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
-      // skipped.
-      if (nggControl->compactMode == NggCompactSubgroup &&
-          (region >= LdsRegionCompactBeginRange && region <= LdsRegionCompactEndRange))
         continue;
 
       if (hasTs) {

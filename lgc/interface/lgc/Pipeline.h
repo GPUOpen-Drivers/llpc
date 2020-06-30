@@ -57,7 +57,7 @@ enum NggFlag : unsigned {
   NggFlagForceNonPassthrough = 0x0004,          // Force NGG to run in non-passthrough mode
   NggFlagDontAlwaysUsePrimShaderTable = 0x0008, // Don't always use primitive shader table to fetch culling-control
                                                 //   registers
-  NggFlagCompactSubgroup = 0x0010,              // Compaction is based on the whole sub-group rather than on vertices
+  NggFlagCompactDisable = 0x0010,               // Vertex compaction is disabled
   NggFlagEnableFastLaunch = 0x0020,             // Enable the hardware to launch subgroups of work at a faster rate
   NggFlagEnableVertexReuse = 0x0040,            // Enable optimization to cull duplicate vertices
   NggFlagEnableBackfaceCulling = 0x0080,        // Enable culling of primitives that don't meet facing criteria

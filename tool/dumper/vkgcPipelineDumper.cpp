@@ -622,7 +622,11 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.reconfigWorkgroupLayout = " << options->reconfigWorkgroupLayout << "\n";
   dumpFile << "options.shadowDescriptorTableUsage = " << options->shadowDescriptorTableUsage << "\n";
   dumpFile << "options.shadowDescriptorTablePtrHigh = " << options->shadowDescriptorTablePtrHigh << "\n";
-  dumpFile << "options.nullDescriptor = " << options->nullDescriptor << "\n";
+  dumpFile << "options.extendedRobustness.robustBufferAccess = " << options->extendedRobustness.robustBufferAccess
+           << "\n";
+  dumpFile << "options.extendedRobustness.robustImageAccess = " << options->extendedRobustness.robustImageAccess
+           << "\n";
+  dumpFile << "options.extendedRobustness.nullDescriptor = " << options->extendedRobustness.nullDescriptor << "\n";
 }
 
 // =====================================================================================================================
@@ -835,7 +839,9 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
   hasher.Update(pipeline->options.robustBufferAccess);
   hasher.Update(pipeline->options.shadowDescriptorTableUsage);
   hasher.Update(pipeline->options.shadowDescriptorTablePtrHigh);
-  hasher.Update(pipeline->options.nullDescriptor);
+  hasher.Update(pipeline->options.extendedRobustness.robustBufferAccess);
+  hasher.Update(pipeline->options.extendedRobustness.robustImageAccess);
+  hasher.Update(pipeline->options.extendedRobustness.nullDescriptor);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -936,7 +942,9 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     hasher->Update(pipeline->options.reconfigWorkgroupLayout);
     hasher->Update(pipeline->options.shadowDescriptorTableUsage);
     hasher->Update(pipeline->options.shadowDescriptorTablePtrHigh);
-    hasher->Update(pipeline->options.nullDescriptor);
+    hasher->Update(pipeline->options.extendedRobustness.robustBufferAccess);
+    hasher->Update(pipeline->options.extendedRobustness.robustImageAccess);
+    hasher->Update(pipeline->options.extendedRobustness.nullDescriptor);
   }
 }
 
@@ -1531,7 +1539,7 @@ std::ostream &operator<<(std::ostream &out, NggSubgroupSizingType subgroupSizing
 std::ostream &operator<<(std::ostream &out, NggCompactMode compactMode) {
   const char *string = nullptr;
   switch (compactMode) {
-    CASE_ENUM_TO_STRING(NggCompactSubgroup)
+    CASE_ENUM_TO_STRING(NggCompactDisable)
     CASE_ENUM_TO_STRING(NggCompactVertices)
     break;
   default:
