@@ -302,4 +302,4 @@ private:
 
 } // namespace SPIRV
 
-#endif // SPIRVREADER_H
+#endif

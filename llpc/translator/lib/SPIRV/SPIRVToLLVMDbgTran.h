@@ -78,4 +78,4 @@ private:
 
 } // namespace SPIRV
 
-#endif // SPIRV_LLVMTOSPIRVDBGTRAN_H
+#endif

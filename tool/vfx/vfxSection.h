@@ -944,6 +944,35 @@ private:
 };
 
 // =====================================================================================================================
+// Represents the sub section ExtendedRobustness
+class SectionExtendedRobustness : public Section {
+public:
+  typedef Vkgc::ExtendedRobustness SubState;
+
+  SectionExtendedRobustness() : Section(m_addrTable, MemberCount, SectionTypeUnset, "extendedRobustness") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  static void initialAddrTable() {
+    StrToMemberAddr *tableItem = m_addrTable;
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustBufferAccess, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustImageAccess, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, nullDescriptor, MemberTypeBool, false);
+
+    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
+  }
+
+  void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static const unsigned MemberCount = 3;
+  static StrToMemberAddr m_addrTable[MemberCount];
+
+  SubState m_state;
+};
+
+// =====================================================================================================================
 // Represents the sub section color target
 class SectionColorBuffer : public Section {
 public:
@@ -968,35 +997,6 @@ public:
 
 private:
   static const unsigned MemberCount = 4;
-  static StrToMemberAddr m_addrTable[MemberCount];
-
-  SubState m_state;
-};
-
-// =====================================================================================================================
-// Represents the sub section ExtendedRobustness
-class SectionExtendedRobustness : public Section {
-public:
-  typedef Vkgc::ExtendedRobustness SubState;
-
-  SectionExtendedRobustness() : Section(m_addrTable, MemberCount, SectionTypeUnset, "extendedRobustness") {
-    memset(&m_state, 0, sizeof(m_state));
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustBufferAccess, MemberTypeBool, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustImageAccess, MemberTypeBool, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, nullDescriptor, MemberTypeBool, false);
-
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
-  }
-
-  void getSubState(SubState &state) { state = m_state; };
-  SubState &getSubStateRef() { return m_state; };
-
-private:
-  static const unsigned MemberCount = 3;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
