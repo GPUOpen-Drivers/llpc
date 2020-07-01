@@ -146,7 +146,11 @@ void LgcContext::initialize() {
   setOptionDefault("amdgpu-atomic-optimizations", "1");
   setOptionDefault("use-gpu-divergence-analysis", "1");
   setOptionDefault("structurizecfg-skip-uniform-regions", "1");
+#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
+#warning[!amd-gfx] Conditional discard transformations not supported
+#else
   setOptionDefault("amdgpu-conditional-discard-transformations", "1");
+#endif
 }
 
 // =====================================================================================================================

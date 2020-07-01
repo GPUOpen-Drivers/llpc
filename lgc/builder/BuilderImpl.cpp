@@ -159,6 +159,10 @@ BranchInst *BuilderImplBase::createIf(Value *condition, bool wantElse, const Twi
 // @param instName : Name to give instruction(s)
 Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, ArrayRef<unsigned> operandIdxs,
                                                   const Twine &instName) {
+#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
+#warning[!amd-gfx] Waterfall feature disabled
+  abort();
+#else
   assert(operandIdxs.empty() == false);
 
   // For each non-uniform input, try and trace back through a descriptor load to find the non-uniform index
@@ -298,6 +302,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
   // Restore Builder's insert point.
   restoreIP(savedInsertPoint);
   return resultValue;
+#endif
 }
 
 // =====================================================================================================================
