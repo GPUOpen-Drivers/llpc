@@ -1483,8 +1483,12 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
                                           {bufferDesc, offsetVal, m_builder->getInt32(coherent.u32All)});
       } else {
         unsigned intrinsicID = Intrinsic::amdgcn_raw_buffer_load;
+#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
+#warning[!amd-gfx] Atomic load loses memory semantics
+#else
         if (ordering != AtomicOrdering::NotAtomic)
           intrinsicID = Intrinsic::amdgcn_raw_atomic_buffer_load;
+#endif
         part = m_builder->CreateIntrinsic(
             intrinsicID, intAccessType,
             {bufferDesc, offsetVal, m_builder->getInt32(0), m_builder->getInt32(coherent.u32All)});
