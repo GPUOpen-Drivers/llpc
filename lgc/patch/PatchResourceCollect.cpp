@@ -1705,13 +1705,16 @@ void PatchResourceCollect::matchGenericInOut() {
 
     nextMapLoc = 0;
     assert(inOutUsage.outputMapLocCount == 0);
+    bool generatingColorExportShader = m_shaderStage == ShaderStageFragment;
+    generatingColorExportShader &= m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();
     for (auto locMapIt = outLocMap.begin(); locMapIt != outLocMap.end();) {
       auto &locMap = *locMapIt;
       if (m_shaderStage == ShaderStageFragment) {
         unsigned location = locMap.first;
         if (m_pipelineState->getColorExportState().dualSourceBlendEnable && location == 1)
           location = 0;
-        if (m_pipelineState->getColorExportFormat(location).dfmt == BufDataFormatInvalid) {
+        if (!generatingColorExportShader &&
+            m_pipelineState->getColorExportFormat(location).dfmt == BufDataFormatInvalid) {
           locMapIt = outLocMap.erase(locMapIt);
           continue;
         }

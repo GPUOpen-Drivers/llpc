@@ -425,7 +425,7 @@ bool LowerVertexFetch::runOnModule(Module &module) {
     // The return value from the fetch shader needs to use all floats, as the back-end maps an int in the
     // return value as an SGPR rather than a VGPR. For symmetry, we also use all floats here, in the input
     // args to the fetchless vertex shader.
-    ty = VertexFetch::getVgprTy(ty);
+    ty = getVgprTy(ty);
     argTys.push_back(ty);
   }
 
@@ -463,23 +463,6 @@ bool LowerVertexFetch::runOnModule(Module &module) {
   }
 
   return true;
-}
-
-// =====================================================================================================================
-// Given a non-aggregate type, get a float type at least as big that can be used to pass a value of that
-// type in a return value struct, ensuring it gets into VGPRs.
-Type *VertexFetch::getVgprTy(Type *ty) {
-  // The return value from the fetch shader needs to use all floats, as the back-end maps an int in the
-  // return value as an SGPR rather than a VGPR. For symmetry, we also use all floats in the input
-  // args to the fetchless vertex shader. We use a vector of float, even if the integer element type is
-  // not i32.
-  if (ty->isIntOrIntVectorTy()) {
-    unsigned numElements = (ty->getPrimitiveSizeInBits() + 31) / 32;
-    ty = Type::getFloatTy(ty->getContext());
-    if (numElements > 1)
-      ty = FixedVectorType::get(ty, numElements);
-  }
-  return ty;
 }
 
 // =====================================================================================================================
