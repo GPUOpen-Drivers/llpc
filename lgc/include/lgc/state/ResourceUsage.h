@@ -153,7 +153,7 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size of gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved19 : 1;
+        unsigned : 1;               // Reserved
 
         uint64_t unused : 45;
       } vs;
@@ -199,7 +199,7 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved28 : 1;
+        unsigned : 1;               // Reserved
 
         uint64_t unused : 35;
       } tes;
@@ -222,7 +222,7 @@ struct ResourceUsage {
         unsigned primitiveId : 1;   // Whether gl_PrimitiveID is used
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved26 : 1;
+        unsigned : 1;               // Reserved
 
         uint64_t unused : 37;
       } gs;
