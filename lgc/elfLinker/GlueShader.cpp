@@ -237,7 +237,7 @@ Function *FetchShader::createFetchFunc() {
   types.append(m_vsEntryRegInfo.sgprCount, Type::getInt32Ty(getContext()));
   types.append(m_vsEntryRegInfo.vgprCount, Type::getFloatTy(getContext()));
   for (const auto &fetch : m_fetches)
-    types.push_back(VertexFetch::getVgprTy(fetch.ty));
+    types.push_back(getVgprTy(fetch.ty));
   Type *retTy = StructType::get(getContext(), types);
   auto entryTys = ArrayRef<Type *>(types).slice(0, m_vsEntryRegInfo.sgprCount + m_vsEntryRegInfo.vgprCount);
   auto funcTy = FunctionType::get(retTy, entryTys, false);

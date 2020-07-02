@@ -76,10 +76,11 @@ public:
 private:
   void updateFragColors(CallInst *callInst, ColorExportValueInfo expFragColors[], BuilderBase &builder);
   Value *getOutputValue(ArrayRef<Value *> expFragColor, unsigned int location, BuilderBase &builder);
-  CallInst *addExportForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder);
+  Value *addExportForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder);
   CallInst *addExportForBuiltinOutput(Function *module, BuilderBase &builder);
   CallInst *addDummyExport(BuilderBase &builder);
-  void setDoneFlag(CallInst *exportInst, BuilderBase &builder);
+  void setDoneFlag(Value *exportInst, BuilderBase &builder);
+  Value *GenerateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder);
 
   LLVMContext *m_context;         // The context the pass is being run in.
   PipelineState *m_pipelineState; // The pipeline state
@@ -506,9 +507,9 @@ bool LowerFragColorExport::runOnModule(Module &module) {
   BuilderBase builder(module.getContext());
   builder.SetInsertPoint(retInst);
 
-  CallInst *lastExport = nullptr;
+  Value *lastExport = nullptr;
   lastExport = addExportForBuiltinOutput(fragEntryPoint, builder);
-  CallInst *lastGenericExport = addExportForGenericOutputs(fragEntryPoint, builder);
+  Value *lastGenericExport = addExportForGenericOutputs(fragEntryPoint, builder);
   if (lastGenericExport != nullptr) {
     lastExport = lastGenericExport;
   }
@@ -518,7 +519,6 @@ bool LowerFragColorExport::runOnModule(Module &module) {
   }
 
   setDoneFlag(lastExport, builder);
-
   return lastExport != nullptr;
 }
 
@@ -590,7 +590,6 @@ Value *LowerFragColorExport::getOutputValue(ArrayRef<Value *> expFragColor, unsi
   assert(compCount <= 4);
 
   // Set CB shader mask
-  // TODO: This will be moved in a later PR.
   const unsigned channelMask = ((1 << compCount) - 1);
   m_resUsage->inOutUsage.fs.cbShaderMask |= (channelMask << (4 * location));
 
@@ -611,11 +610,12 @@ Value *LowerFragColorExport::getOutputValue(ArrayRef<Value *> expFragColor, unsi
 
 // =====================================================================================================================
 // Generates the export instructions for all of the generic output of the fragment shader fragEntryPoint.  Returns the
-// last export instruction that was generated.  Returns nullptr if no export instructions were generated.
+// last export instruction that was generated or the new return instruction if a new one was generated.  Returns nullptr
+// if no export or return instructions were generated.
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
-CallInst *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder) {
+Value *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder) {
   std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(m_context));
   SmallVector<CallInst *, 8> colorExports;
 
@@ -694,8 +694,30 @@ CallInst *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPo
   // color format in the metadata.
   m_pipelineState->getPalMetadata()->addColorExportInfo(info);
 
-  // TODO: The export values should be returned.
-  return nullptr;
+  // The export values should be returned.
+  // Update the return type of the function
+  auto retInst = fragEntryPoint->back().getTerminator();
+  SmallVector<Type *, 4> outputTypes;
+  for (const ColorExportInfo &output : info) {
+    outputTypes.push_back(getVgprTy(output.ty));
+  }
+  Type *retTy = StructType::get(*m_context, outputTypes);
+  addFunctionArgs(fragEntryPoint, retTy, {});
+
+  Value *retVal = UndefValue::get(retTy);
+  unsigned returnLocation = 0;
+  for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; hwColorTarget++) {
+    Value *output = exportValues[hwColorTarget];
+    if (!output)
+      continue;
+    if (output->getType() != outputTypes[hwColorTarget])
+      output = GenerateValueForOutput(output, outputTypes[hwColorTarget], builder);
+    retVal = builder.CreateInsertValue(retVal, output, returnLocation);
+    ++returnLocation;
+  }
+  retVal = builder.CreateRet(retVal);
+  retInst->eraseFromParent();
+  return retVal;
 }
 
 // =====================================================================================================================
@@ -813,17 +835,45 @@ CallInst *LowerFragColorExport::addDummyExport(BuilderBase &builder) {
 //
 // @param [in/out] exportInst : The export instruction to be updated.
 // @param builder : The builder object that will be used to create new instructions.
-void LowerFragColorExport::setDoneFlag(CallInst *exportInst, BuilderBase &builder) {
+void LowerFragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
   if (!exportInst)
     return;
 
-  unsigned intrinsicId = exportInst->getIntrinsicID();
+  CallInst *callInst = dyn_cast<CallInst>(exportInst);
+  if (!callInst)
+    return;
+
+  unsigned intrinsicId = callInst->getIntrinsicID();
   if (intrinsicId == Intrinsic::amdgcn_exp)
-    exportInst->setOperand(6, builder.getTrue());
+    callInst->setOperand(6, builder.getTrue());
   else {
     assert(intrinsicId == Intrinsic::amdgcn_exp_compr);
-    exportInst->setOperand(4, builder.getTrue());
+    callInst->setOperand(4, builder.getTrue());
   }
+}
+
+// =====================================================================================================================
+// Modified the given value so that it is of the given type.
+//
+// @param value : The value to be modified.
+// @param outputTy : The type that the value should be converted to.
+// @param builder : The builder object that will be used to create new instructions.
+Value *LowerFragColorExport::GenerateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder) {
+  unsigned originalSize = value->getType()->getPrimitiveSizeInBits();
+  unsigned finalSize = outputTy->getPrimitiveSizeInBits();
+  if (originalSize < finalSize) {
+    Type *smallerIntType = IntegerType::get(*m_context, originalSize);
+    Type *largerIntType = IntegerType::get(*m_context, finalSize);
+    if (smallerIntType != value->getType())
+      value = builder.CreateBitCast(value, smallerIntType);
+    value = builder.CreateZExt(value, largerIntType);
+  }
+
+  if (value->getType() != outputTy) {
+    assert(value->getType()->getPrimitiveSizeInBits() == finalSize);
+    value = builder.CreateBitCast(value, outputTy);
+  }
+  return value;
 }
 
 // =====================================================================================================================

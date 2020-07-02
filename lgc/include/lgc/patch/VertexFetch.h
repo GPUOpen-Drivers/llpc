@@ -45,10 +45,6 @@ public:
   // Create a VertexFetch
   static VertexFetch *create(LgcContext *lgcContext);
 
-  // Given a non-aggregate type, get a float type at least as big that can be used to pass a value of that
-  // type in a return value struct, ensuring it gets into VGPRs.
-  static llvm::Type *getVgprTy(llvm::Type *ty);
-
   // Generate code to fetch a vertex value
   virtual llvm::Value *fetchVertex(llvm::Type *inputTy, const VertexInputDescription *description, unsigned location,
                                    unsigned compIdx, BuilderBase &builder) = 0;

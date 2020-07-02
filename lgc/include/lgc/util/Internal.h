@@ -91,4 +91,8 @@ bool canBitCast(const llvm::Type *ty1, const llvm::Type *ty2);
 // Checks if the specified value actually represents a don't-care value (0xFFFFFFFF).
 bool isDontCareValue(llvm::Value *value);
 
+// Given a non-aggregate type, get a float type at least as big that can be used to pass a value of that
+// type in a return value struct, ensuring it gets into VGPRs.
+llvm::Type *getVgprTy(llvm::Type *ty);
+
 } // namespace lgc
