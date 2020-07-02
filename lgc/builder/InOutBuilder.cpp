@@ -1283,6 +1283,7 @@ unsigned InOutBuilder::getBuiltInValidMask(BuiltInKind builtIn, bool isOutput) {
            (1 << ShaderStageFragment),
     HG = (1 << ShaderStageTessControl) | (1 << ShaderStageGeometry),
     MG = (1 << ShaderStageGeometry),
+    MVG = (1 << ShaderStageVertex) | (1 << ShaderStageGeometry),
     MVDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
     MVHDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) |
             (1 << ShaderStageGeometry),
