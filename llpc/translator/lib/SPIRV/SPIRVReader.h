@@ -219,7 +219,7 @@ private:
   const Vkgc::ShaderModuleUsage *m_moduleUsage;
   const Vkgc::PipelineShaderOptions *m_shaderOptions;
   unsigned m_spirvOpMetaKindId;
-  Vkgc::ShaderStage m_shaderStage;
+  unsigned m_execModule;
   lgc::Builder *getBuilder() const { return m_builder; }
 
   Type *mapType(SPIRVType *bt, Type *t) {
