@@ -1428,7 +1428,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   Result result = Result::Success;
   BinaryData elfBin = {};
 
-  const PipelineShaderInfo *shaderInfo[ShaderStageGfxCount] = {
+  SmallVector<const PipelineShaderInfo *, 6> shaderInfo = {
       &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
   };
 

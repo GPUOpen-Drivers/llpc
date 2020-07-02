@@ -6075,7 +6075,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (!m_entryTarget)
     return false;
 
-  m_shaderStage = convertToStageShage(entryExecModel);
+  m_execModule = entryExecModel;
   m_fpControlFlags.U32All = 0;
   static_assert(SPIRVTW_8Bit == (8 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_16Bit == (16 >> 3), "Unexpected value!");
