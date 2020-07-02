@@ -966,9 +966,9 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           clipCullDistance.push_back(undef);
       }
 
-      // NOTE: When gl_PointSize, gl_Layer, or gl_ViewportIndex is used, gl_ClipDistance[] or gl_CullDistance[]
-      // should start from pos2.
-      unsigned pos = (usePointSize || useLayer || useViewportIndex) ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+      bool miscExport = usePointSize || useLayer || useViewportIndex;
+      // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
+      unsigned pos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
       Value *args[] = {
           ConstantInt::get(Type::getInt32Ty(*m_context), pos),  // tgt
           ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),  // en

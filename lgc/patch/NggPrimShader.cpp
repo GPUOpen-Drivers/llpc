@@ -1144,9 +1144,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
           cullDistanceCount = builtInUsage.cullDistance;
         }
 
-        // NOTE: When gl_PointSize, gl_Layer, or gl_ViewportIndex is used, gl_ClipDistance[] or
-        // gl_CullDistance[] should start from pos2.
-        clipCullPos = (usePointSize || useLayer || useViewportIndex) ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+        bool miscExport = usePointSize || useLayer || useViewportIndex;
+        // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
+        clipCullPos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
 
         // Collect clip/cull distance from exported value
         for (const auto &expData : expDataSet) {
