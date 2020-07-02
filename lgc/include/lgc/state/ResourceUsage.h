@@ -153,7 +153,8 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size of gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved19 : 1;
+        unsigned : 1;               // Reserved
+        unsigned : 1;               // Reserved
       } vs;
 
       // Tessellation control shader
@@ -195,7 +196,7 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved28 : 1;
+        unsigned : 1;               // Reserved
       } tes;
 
       // Geometry shader
@@ -216,7 +217,8 @@ struct ResourceUsage {
         unsigned primitiveId : 1;   // Whether gl_PrimitiveID is used
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved26 : 1;
+        unsigned : 1;               // Reserved
+        unsigned : 1;               // Reserved
       } gs;
 
       // Fragment shader
@@ -244,6 +246,7 @@ struct ResourceUsage {
         unsigned viewportIndex : 1;            // Whether gl_ViewportIndex is used
         unsigned helperInvocation : 1;         // Whether gl_HelperInvocation is used
         unsigned viewIndex : 1;                // Whether gl_ViewIndex is used
+        unsigned : 1;                          // Reserved
         unsigned baryCoordNoPersp : 1;         // Whether gl_BaryCoordNoPersp is used (AMD extension)
         unsigned baryCoordNoPerspCentroid : 1; // Whether gl_BaryCoordNoPerspCentroid is used (AMD extension)
         unsigned baryCoordNoPerspSample : 1;   // Whether gl_BaryCoordNoPerspSample is used (AMD extension)
