@@ -19,11 +19,15 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.pow.v4f32(<4 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float
+; SHADERTEST: [[mul1:%.i[0-9]*]] = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float
+; SHADERTEST: [[mul2:%.i[0-9]*]] = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float
+; SHADERTEST: [[mul3:%.i[0-9]*]] = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float
 ; SHADERTEST-NOT: = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 1.200000e+01, float
+; SHADERTEST: [[val1:%[.0-9a-zA-Z]*]] = insertelement <4 x float> <float 1.200000e+01, float undef, float undef, float undef>, float [[mul1]], i32 1
+; SHADERTEST: [[val2:%[.0-9a-zA-Z]*]] = insertelement <4 x float> [[val1]], float [[mul2]], i32 2
+; SHADERTEST: [[val3:%[.0-9a-zA-Z]*]] = insertelement <4 x float> [[val2]], float [[mul3]], i32 3
+; SHADERTEST: [[ret:%[0-9]*]] = insertvalue { <4 x float> } undef, <4 x float> [[val3]], 0
+; SHADERTEST: ret { <4 x float> } [[ret]]
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
