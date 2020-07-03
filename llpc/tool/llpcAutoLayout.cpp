@@ -542,8 +542,8 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
     else
       llvm_unreachable("Should never be called!");
     pipelineInfo->iaState.topology = topology;
-  } else if (shaderStage == ShaderStageFragment) {
-    // Set dummy color formats for fragment outputs
+  } else if (shaderStage == ShaderStageFragment && AutoLayoutDesc) {
+    // Set dummy color formats for fragment outputs, but only if -auto-layout-desc is on.
     for (auto varId : ArrayRef<SPIRVWord>(inOuts.first, inOuts.second)) {
       auto entry = module->getValue(varId);
       if (!entry->isVariable())

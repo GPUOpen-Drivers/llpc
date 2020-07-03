@@ -87,6 +87,10 @@ static cl::opt<bool> EnableSiScheduler("enable-si-scheduler", cl::desc("Enable t
 // -disable-licm: annotate loops with metadata to disable the LLVM LICM pass
 static cl::opt<bool> DisableLicm("disable-licm", cl::desc("Disable LLVM LICM pass"), cl::init(false));
 
+// -disable-color-export-shader: disable the color export shader when doing unlinked shaders.
+static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl::desc("Disable color export shaders"),
+                                              cl::init(false));
+
 // -subgroup-size: sub-group size exposed via Vulkan API.
 static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), cl::init(64));
 
@@ -217,8 +221,10 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const 
       setVertexInputDescriptions(pipeline);
     }
 
-    // Give the color export state to the middle-end.
-    setColorExportState(pipeline);
+    if (!unlinked || DisableColorExportShader) {
+      // Give the color export state to the middle-end.
+      setColorExportState(pipeline);
+    }
 
     // Give the graphics pipeline state to the middle-end.
     setGraphicsStateInPipeline(pipeline);

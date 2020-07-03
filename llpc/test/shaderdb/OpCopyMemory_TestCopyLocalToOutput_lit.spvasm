@@ -5,7 +5,7 @@
 ; SHADERTEST: %{{[0-9]+}} = load <4 x float>, <4 x float> addrspace({{[0-9]+}})* %{{.*}}
 ; SHADERTEST: store <4 x float> %{{[0-9]+}}, <4 x float> addrspace({{[0-9]+}})* @{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC.*}} patching results
-; SHADERTEST: @llvm.amdgcn.exp.f32
+; SHADERTEST: ret { <4 x float> } undef
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

@@ -21,7 +21,7 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.sin.f32(float %{{.*}})
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.sin.f32(float %{{.*}})
 ; SHADERTEST-NOT: = call{{.*}} float @llvm.sin.f32(float %{{.*}})
-; SHADERTEST: ret void
+; SHADERTEST: ret
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

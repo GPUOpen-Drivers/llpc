@@ -19,10 +19,14 @@ void main()
 ; SHADERTEST: = fmul reassoc nnan nsz arcp contract afn <4 x float> %{{.*}}, <float undef, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
 ; SHADERTEST: = insertelement <4 x float> %{{.*}}, float 0x3F9ACEEA00000000, i32 0
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
-; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
-; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 0x3F9ACEEA00000000, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 immarg true, i1 immarg true)
+; SHADERTEST: [[mul1:%.i[0-9]*]] = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
+; SHADERTEST: [[mul2:%.i[0-9]*]] = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
+; SHADERTEST: [[mul3:%.i[0-9]*]] = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
+; SHADERTEST: [[val1:%.[0-9a-zA-Z]*]] = insertelement <4 x float> <float 0x3F9ACEEA00000000, float undef, float undef, float undef>, float [[mul1]], i32 1
+; SHADERTEST: [[val2:%.[0-9a-zA-Z]*]] = insertelement <4 x float> [[val1]], float [[mul2]], i32 2
+; SHADERTEST: [[val3:%.[0-9a-zA-Z]*]] = insertelement <4 x float> [[val2]], float [[mul3]], i32 3
+; SHADERTEST: [[ret:%[0-9]*]] = insertvalue { <4 x float> } undef, <4 x float> [[val3]], 0
+; SHADERTEST: ret { <4 x float> } [[ret]]
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
