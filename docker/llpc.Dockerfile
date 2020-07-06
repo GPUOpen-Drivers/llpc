@@ -37,5 +37,9 @@ RUN cmake --build . \
     && cmake --build . --target spvgen
 
 # Run the lit test suite.
-RUN cmake --build . --target check-amdllpc -- -v \
+RUN if echo "$FEATURES" | grep -q "+sanitizers" ; then \
+        export ASAN_OPTIONS=detect_leaks=0 \
+        && export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so; \
+    fi \
+    && cmake --build . --target check-amdllpc -- -v \
     && cmake --build . --target check-lgc -- -v
