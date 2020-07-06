@@ -51,7 +51,11 @@ WORKDIR /vulkandriver
 RUN repo init -u https://github.com/GPUOpen-Drivers/AMDVLK.git -b "$BRANCH" \
     && repo sync -c --no-clone-bundle -j$(nproc) \
     && cd /vulkandriver/drivers/spvgen/external \
-    && python2 fetch_external_sources.py
+    && python2 fetch_external_sources.py \
+    && if echo "$FEATURES" | grep -q "+sanitizer" ; then \
+         cd glslang \
+         && git checkout adacba3ee9213be19c8c238334a3a61ae4201812; \
+       fi
 
 # Build LLPC.
 WORKDIR /vulkandriver/builds/ci-build
@@ -70,6 +74,9 @@ RUN EXTRA_FLAGS="" \
     && if echo "$FEATURES" | grep -q "+shadercache" ; then \
          EXTRA_FLAGS="$EXTRA_FLAGS -DLLPC_ENABLE_SHADER_CACHE=1"; \
        fi \
+    && if echo "$FEATURES" | grep -q "+sanitizers" ; then \
+         EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_USE_SANITIZER=Address;Undefined"; \
+       fi \
     && echo "Extra CMake flags: $EXTRA_FLAGS" \
     && cmake "/vulkandriver/drivers/xgl" \
           -G "$GENERATOR" \
@@ -87,6 +94,10 @@ RUN EXTRA_FLAGS="" \
     && cmake --build . --target not
 
 # Run the lit test suite.
-RUN cmake --build . --target check-amdllpc -- -v \
+RUN if echo "$FEATURES" | grep -q "+sanitizers" ; then \
+        export ASAN_OPTIONS=detect_leaks=0 \
+        && export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so; \
+    fi \
+    && cmake --build . --target check-amdllpc -- -v \
     && cmake --build . --target check-lgc -- -v \
     && (echo "Base image built on $(date)" | tee /vulkandriver/build_info.txt)
