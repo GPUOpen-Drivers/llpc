@@ -127,10 +127,11 @@ static void dumpLLVM(Module *m, const std::string &fName) {
 
 SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
                          ArrayRef<ConvertingSampler> convertingSamplers, lgc::Builder *builder,
-                         const Vkgc::ShaderModuleUsage *moduleUsage)
+                         const Vkgc::ShaderModuleUsage *moduleUsage, const Vkgc::PipelineShaderOptions *shaderOptions)
     : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_enableXfb(false), m_entryTarget(nullptr),
       m_specConstMap(theSpecConstMap), m_convertingSamplers(convertingSamplers), m_dbgTran(m_bm, m_m, this),
-      m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)) {
+      m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)),
+      m_shaderOptions(reinterpret_cast<const Vkgc::PipelineShaderOptions *>(shaderOptions)) {
   assert(m_m);
   m_context = &m_m->getContext();
   m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
@@ -8044,16 +8045,17 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
 
 } // namespace SPIRV
 
-bool llvm::readSpirv(Builder *builder, const ShaderModuleUsage *shaderInfo, std::istream &is,
-                     spv::ExecutionModel entryExecModel, const char *entryName, const SPIRVSpecConstMap &specConstMap,
-                     ArrayRef<ConvertingSampler> convertingSamplers, Module *m, std::string &errMsg) {
+bool llvm::readSpirv(Builder *builder, const ShaderModuleUsage *shaderInfo, const PipelineShaderOptions *shaderOptions,
+                     std::istream &is, spv::ExecutionModel entryExecModel, const char *entryName,
+                     const SPIRVSpecConstMap &specConstMap, ArrayRef<ConvertingSampler> convertingSamplers, Module *m,
+                     std::string &errMsg) {
   assert(entryExecModel != ExecutionModelKernel && "Not support ExecutionModelKernel");
 
   std::unique_ptr<SPIRVModule> bm(SPIRVModule::createSPIRVModule());
 
   is >> *bm;
 
-  SPIRVToLLVM btl(m, bm.get(), specConstMap, convertingSamplers, builder, shaderInfo);
+  SPIRVToLLVM btl(m, bm.get(), specConstMap, convertingSamplers, builder, shaderInfo, shaderOptions);
   bool succeed = true;
   if (!btl.translate(entryExecModel, entryName)) {
     bm->getError(errMsg);
