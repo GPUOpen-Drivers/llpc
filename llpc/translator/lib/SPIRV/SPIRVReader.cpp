@@ -97,6 +97,12 @@ cl::opt<bool> SPIRVGenFastMath("spirv-gen-fast-math", cl::init(true),
 cl::opt<bool> SPIRVWorkaroundBadSPIRV("spirv-workaround-bad-spirv", cl::init(true),
                                       cl::desc("Enable workarounds for bad SPIR-V"));
 
+cl::opt<Vkgc::DenormalMode> Fp32DenormalModeOpt(
+    "fp32-denormal-mode", cl::init(Vkgc::DenormalMode::Auto), cl::desc("Override denormal mode for FP32"),
+    cl::values(clEnumValN(Vkgc::DenormalMode::Auto, "auto", "No override (default behaviour)"),
+               clEnumValN(Vkgc::DenormalMode::FlushToZero, "ftz", "Denormal input/output flushed to zero"),
+               clEnumValN(Vkgc::DenormalMode::Preserve, "preserve", "Denormal input/output preserved")));
+
 // Prefix for placeholder global variable name.
 const char *KPlaceholderPrefix = "placeholder.";
 
@@ -6090,6 +6096,10 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (auto em = m_entryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
     m_fpControlFlags.RoundingModeRTZ = em->getLiterals()[0] >> 3;
 
+  // Determine any denormal overrides to be applied.
+  Vkgc::DenormalMode fp32DenormalMode =
+      Fp32DenormalModeOpt != Vkgc::DenormalMode::Auto ? Fp32DenormalModeOpt : m_shaderOptions->fp32DenormalMode;
+
   // Set common shader mode (FP mode and useSubgroupSize) for middle-end.
   CommonShaderMode shaderMode = {};
   if (m_fpControlFlags.RoundingModeRTE & SPIRVTW_16Bit)
@@ -6108,9 +6118,9 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
     shaderMode.fp16DenormMode = FpDenormMode::FlushNone;
   else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_16Bit)
     shaderMode.fp16DenormMode = FpDenormMode::FlushInOut;
-  if (m_fpControlFlags.DenormPreserve & SPIRVTW_32Bit)
+  if (m_fpControlFlags.DenormPreserve & SPIRVTW_32Bit || fp32DenormalMode == Vkgc::DenormalMode::Preserve)
     shaderMode.fp32DenormMode = FpDenormMode::FlushNone;
-  else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_32Bit)
+  else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_32Bit || fp32DenormalMode == Vkgc::DenormalMode::FlushToZero)
     shaderMode.fp32DenormMode = FpDenormMode::FlushInOut;
   if (m_fpControlFlags.DenormPreserve & SPIRVTW_64Bit)
     shaderMode.fp64DenormMode = FpDenormMode::FlushNone;
