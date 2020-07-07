@@ -49,6 +49,7 @@ using Vkgc::NggSubgroupSizingType;
 using Vkgc::OutputAllocFunc;
 using Vkgc::PipelineOptions;
 using Vkgc::PipelineShaderInfo;
+using Vkgc::PipelineShaderOptions;
 using Vkgc::ResourceMappingNode;
 using Vkgc::ResourceMappingNodeType;
 using Vkgc::ResourceNodeData;

@@ -105,6 +105,7 @@ class Builder;
 
 namespace Vkgc {
 struct ShaderModuleUsage;
+struct PipelineShaderOptions;
 } // End namespace Vkgc
 
 namespace llvm {
@@ -116,8 +117,9 @@ bool writeSpirv(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
 
 /// \brief Load SPIRV from istream and translate to LLVM module.
 /// \returns true if succeeds.
-bool readSpirv(lgc::Builder *Builder, const Vkgc::ShaderModuleUsage *ModuleData, std::istream &IS,
-               spv::ExecutionModel EntryExecModel, const char *EntryName, const SPIRV::SPIRVSpecConstMap &SpecConstMap,
+bool readSpirv(lgc::Builder *Builder, const Vkgc::ShaderModuleUsage *ModuleData,
+               const Vkgc::PipelineShaderOptions *ShaderOptions, std::istream &IS, spv::ExecutionModel EntryExecModel,
+               const char *EntryName, const SPIRV::SPIRVSpecConstMap &SpecConstMap,
                llvm::ArrayRef<SPIRV::ConvertingSampler> ConvertingSamplers, llvm::Module *M, std::string &ErrMsg);
 
 /// \brief Regularize LLVM module by removing entities not representable by
