@@ -39,6 +39,7 @@ using Vkgc::BinaryData;
 using Vkgc::BinaryType;
 using Vkgc::ColorTarget;
 using Vkgc::ComputePipelineBuildInfo;
+using Vkgc::DenormalMode;
 using Vkgc::DescriptorRangeValue;
 using Vkgc::FsOutInfo;
 using Vkgc::GfxIpVersion;

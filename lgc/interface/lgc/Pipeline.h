@@ -81,6 +81,13 @@ enum class NggSubgroupSizing : unsigned {
                     ///  primsPerSubgroup
 };
 
+/// Enumerate denormal override modes.
+enum class DenormalMode : unsigned {
+  Auto = 0x0,        ///< No denormal override (default behaviour)
+  FlushToZero = 0x1, ///< Denormals flushed to zero
+  Preserve = 0x2,    ///< Denormals preserved
+};
+
 // If next available quad falls outside tile aligned region of size defined by this enumeration, the compiler
 // will force end of vector in the compiler to shader wavefront.
 // All of these values except DrawTime correspond to settings of WAVE_BREAK_REGION_SIZE in PA_SC_SHADER_CONTROL.
@@ -164,6 +171,9 @@ struct ShaderOptions {
 
   /// Default unroll threshold for LLVM.
   unsigned unrollThreshold;
+
+  /// Override FP32 denormal handling.
+  DenormalMode fp32DenormalMode;
 };
 
 // =====================================================================================================================

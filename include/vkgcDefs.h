@@ -74,6 +74,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     40.4 | Added fp32DenormalMode in PipelineShaderOptions to allow overriding SPIR-V denormal settings          |
 //* |     40.3 | Added ICache interface                                                                                |
 //* |     40.2 | Added extendedRobustness in PipelineOptions to support VK_EXT_robustness2                             |
 //* |     40.1 | Added disableLoopUnroll to PipelineShaderOptions                                                      |
@@ -374,6 +375,13 @@ struct PipelineDumpOptions {
                                      ///  numeric suffix attached
 };
 
+/// Enumerate denormal override modes.
+enum class DenormalMode : unsigned {
+  Auto = 0x0,        ///< No denormal override (default behaviour)
+  FlushToZero = 0x1, ///< Denormals flushed to zero
+  Preserve = 0x2,    ///< Denormals preserved
+};
+
 /// If next available quad falls outside tile aligned region of size defined by this enumeration the SC will force end
 /// of vector in the SC to shader wavefront.
 enum class WaveBreakSize : unsigned {
@@ -508,6 +516,9 @@ struct PipelineShaderOptions {
 
   /// Forcibly disable loop unrolling - overrides any explicit unroll directives
   bool disableLoopUnroll;
+
+  /// Override FP32 denormal handling.
+  DenormalMode fp32DenormalMode;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor

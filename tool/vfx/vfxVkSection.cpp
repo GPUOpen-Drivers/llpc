@@ -76,6 +76,10 @@ public:
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _16x16)
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _32x32)
     ADD_CLASS_ENUM_MAP(WaveBreakSize, DrawTime)
+
+    ADD_CLASS_ENUM_MAP(DenormalMode, Auto)
+    ADD_CLASS_ENUM_MAP(DenormalMode, FlushToZero)
+    ADD_CLASS_ENUM_MAP(DenormalMode, Preserve)
   }
 };
 
