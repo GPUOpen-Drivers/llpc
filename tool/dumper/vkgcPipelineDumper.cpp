@@ -36,7 +36,6 @@
 #include "vkgcUtil.h"
 #include <fstream>
 #include <sstream>
-#include <stdarg.h>
 #include <sys/stat.h>
 #include <unordered_set>
 
