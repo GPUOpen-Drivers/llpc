@@ -30,7 +30,6 @@
  */
 
 #pragma once
-#include "lgc/state/PipelineState.h"
 #include "llvm/IR/IRBuilder.h"
 
 namespace lgc {

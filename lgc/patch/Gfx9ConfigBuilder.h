@@ -35,9 +35,6 @@
 
 namespace lgc {
 
-struct ElfDataEntry;
-struct ResourceUsage;
-
 namespace Gfx9 {
 
 // =====================================================================================================================

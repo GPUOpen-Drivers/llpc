@@ -30,7 +30,6 @@
  */
 #include "Gfx9ConfigBuilder.h"
 #include "lgc/BuiltIns.h"
-#include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 

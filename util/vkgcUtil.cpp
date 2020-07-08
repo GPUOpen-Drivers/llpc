@@ -32,7 +32,6 @@
 #include "vkgcElfReader.h"
 
 #include <sys/stat.h>
-#include <sys/types.h>
 
 #define DEBUG_TYPE "vkgc-util"
 

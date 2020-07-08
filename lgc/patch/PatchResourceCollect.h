@@ -38,8 +38,6 @@
 
 namespace lgc {
 
-struct NggControl;
-struct InOutLocation;
 class InOutLocationMapManager;
 
 // =====================================================================================================================

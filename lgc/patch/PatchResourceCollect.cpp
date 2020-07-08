@@ -33,7 +33,6 @@
 #include "Gfx9Chip.h"
 #include "NggLdsManager.h"
 #include "lgc/Builder.h"
-#include "lgc/LgcContext.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
@@ -43,7 +42,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <functional>
 
 #define DEBUG_TYPE "lgc-patch-resource-collect"
 

@@ -29,7 +29,6 @@
 ***********************************************************************************************************************
 */
 #include "lgc/util/GfxRegHandlerBase.h"
-#include "lgc/state/TargetInfo.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 using namespace lgc;

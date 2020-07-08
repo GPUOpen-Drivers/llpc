@@ -32,7 +32,6 @@
 #include "Gfx9ConfigBuilder.h"
 #include "ShaderMerger.h"
 #include "lgc/patch/Patch.h"
-#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"

@@ -35,7 +35,6 @@
 
 namespace llvm {
 
-class CallInst;
 class PassRegistry;
 
 namespace legacy {

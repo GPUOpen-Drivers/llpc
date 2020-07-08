@@ -29,8 +29,6 @@
  ***********************************************************************************************************************
  */
 
-#include "Gfx6Chip.h"
-#include "Gfx9Chip.h"
 #include "lgc/BuilderBase.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
@@ -43,13 +41,9 @@
 #include "lgc/util/AddressExtender.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/InstVisitor.h"
-#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/Cloning.h"
 
 #define DEBUG_TYPE "lgc-patch-entry-point-mutate"
 
