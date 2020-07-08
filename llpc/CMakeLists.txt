@@ -164,11 +164,11 @@ if(ICD_BUILD_LLPC)
     target_sources(llpc PRIVATE
         lower/llpcSpirvLower.cpp
         lower/llpcSpirvLowerAccessChain.cpp
-        lower/llpcSpirvLowerAlgebraTransform.cpp
         lower/llpcSpirvLowerConstImmediateStore.cpp
         lower/llpcSpirvLowerGlobal.cpp
         lower/llpcSpirvLowerInstMetaRemove.cpp
         lower/llpcSpirvLowerLoopUnrollControl.cpp
+        lower/llpcSpirvLowerMath.cpp
         lower/llpcSpirvLowerMemoryOp.cpp
         lower/llpcSpirvLowerResourceCollect.cpp
         lower/llpcSpirvLowerTranslator.cpp

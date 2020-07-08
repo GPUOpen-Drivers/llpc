@@ -177,8 +177,8 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   // Lower SPIR-V constant immediate store.
   passMgr.add(createSpirvLowerConstImmediateStore());
 
-  // Lower SPIR-V algebraic transforms, constant folding must be done before instruction combining pass.
-  passMgr.add(createSpirvLowerAlgebraTransform(true, false));
+  // Lower SPIR-V constant folding - must be done before instruction combining pass.
+  passMgr.add(createSpirvLowerMathConstFolding());
 
   // Lower SPIR-V memory operations
   passMgr.add(createSpirvLowerMemoryOp());
@@ -197,8 +197,8 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createIPConstantPropagationPass());
 
-  // Lower SPIR-V algebraic transforms
-  passMgr.add(createSpirvLowerAlgebraTransform(false, true));
+  // Lower SPIR-V floating point optimisation
+  passMgr.add(createSpirvLowerMathFloatOp());
 
   // Lower SPIR-V instruction metadata remove
   passMgr.add(createSpirvLowerInstMetaRemove());
