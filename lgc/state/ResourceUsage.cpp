@@ -34,6 +34,9 @@ using namespace lgc;
 
 // =====================================================================================================================
 ResourceUsage::ResourceUsage(ShaderStage shaderStage) {
+  // NOTE: We use memset to explicitly zero builtInUsage since it has unions inside.
+  memset(&builtInUsage, 0, sizeof(builtInUsage));
+
   if (shaderStage == ShaderStageVertex) {
     // NOTE: For vertex shader, PAL expects base vertex and base instance in user data,
     // even if they are not used in shader.
