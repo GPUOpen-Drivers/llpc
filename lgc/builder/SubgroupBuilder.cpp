@@ -324,7 +324,7 @@ Value *SubgroupBuilder::CreateSubgroupShuffleXor(Value *const value, Value *cons
   // issue dpp_mov for some simple quad/row shuffle cases;
   // then issue ds_permlane_x16 if supported or ds_swizzle, if maskValue < 32
   // default to call SubgroupShuffle, which may issue waterfallloops to handle complex cases.
-  if (cast<ConstantInt>(mask)) {
+  if (dyn_cast<ConstantInt>(mask)) {
     maskValue = cast<ConstantInt>(mask)->getZExtValue();
 
     if (maskValue < 32) {
