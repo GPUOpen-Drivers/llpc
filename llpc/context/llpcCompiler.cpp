@@ -465,7 +465,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   Result result = Result::Success;
   void *allocBuf = nullptr;
   const void *cacheData = nullptr;
-  void *allocData = nullptr;
+  uint8_t *allocData = nullptr;
   size_t allocSize = 0;
   ShaderModuleDataEx moduleDataEx = {};
   // For trimming debug info
