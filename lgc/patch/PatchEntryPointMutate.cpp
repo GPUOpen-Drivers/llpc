@@ -280,11 +280,11 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
               continue;
             }
             if (isa<LoadInst>(user) && !user->getType()->isAggregateType()) {
-              unsigned bitSize = user->getType()->getPrimitiveSizeInBits();
-              if (bitSize % 32 == 0) {
+              unsigned byteSize = module->getDataLayout().getTypeStoreSize(user->getType());
+              if (byteSize % 4 == 0) {
                 // This is a scalar or vector load with dword-aligned size. We can attempt to unspill it, but, for
                 // a particular dword offset, we only attempt to unspill ones with the same (minimum) size.
-                unsigned dwordSize = bitSize / 32;
+                unsigned dwordSize = byteSize / 4;
                 userDataUsage->pushConstOffsets.resize(
                     std::max(unsigned(userDataUsage->pushConstOffsets.size()), dwordOffset + 1));
                 auto &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
@@ -421,7 +421,14 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           for (Instruction *&load : pushConstOffset.users) {
             if (load && load->getFunction() == &func) {
               builder.SetInsertPoint(load);
-              Value *replacement = builder.CreateBitCast(arg, load->getType());
+              Value *replacement = nullptr;
+              if (!isa<PointerType>(load->getType()))
+                replacement = builder.CreateBitCast(arg, load->getType());
+              else {
+                // For a pointer, we need to bitcast to a single int first, then to the pointer.
+                replacement = builder.CreateBitCast(arg, builder.getIntNTy(arg->getType()->getPrimitiveSizeInBits()));
+                replacement = builder.CreateIntToPtr(replacement, load->getType());
+              }
               load->replaceAllUsesWith(replacement);
               load->eraseFromParent();
               load = nullptr;
