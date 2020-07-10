@@ -18,6 +18,7 @@
 ARG AMDVLK_IMAGE
 FROM "$AMDVLK_IMAGE"
 
+ARG FEATURES
 ARG LLPC_REPO_NAME
 ARG LLPC_REPO_REF
 ARG LLPC_REPO_SHA
@@ -32,14 +33,18 @@ RUN cat /vulkandriver/build_info.txt \
 
 # Build LLPC.
 WORKDIR /vulkandriver/builds/ci-build
-RUN cmake --build . \
+RUN if echo "$FEATURES" | grep -q "+sanitizers" ; then \
+      export ASAN_OPTIONS=detect_leaks=0 \
+      && export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so; \
+    fi \
+    && cmake --build . \
     && cmake --build . --target amdllpc \
     && cmake --build . --target spvgen
 
 # Run the lit test suite.
 RUN if echo "$FEATURES" | grep -q "+sanitizers" ; then \
-        export ASAN_OPTIONS=detect_leaks=0 \
-        && export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so; \
+      export ASAN_OPTIONS=detect_leaks=0 \
+      && export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so; \
     fi \
     && cmake --build . --target check-amdllpc -- -v \
     && cmake --build . --target check-lgc -- -v
