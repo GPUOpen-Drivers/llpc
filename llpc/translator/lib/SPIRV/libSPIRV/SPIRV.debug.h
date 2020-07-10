@@ -520,4 +520,4 @@ inline void DbgImportedEntityMap::init() {
 
 } // namespace SPIRV
 
-#endif // SPIRV_DEBUG_H
+#endif

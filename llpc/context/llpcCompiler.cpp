@@ -586,7 +586,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
           // Per-shader SPIR-V lowering passes.
           SpirvLower::addPasses(context, static_cast<ShaderStage>(entryNames[i].stage), *lowerPassMgr,
                                 timerProfiler.getTimer(TimerLower), cl::ForceLoopUnrollCount
-                                 );
+          );
 
           lowerPassMgr->add(createBitcodeWriterPass(moduleBinaryStream));
 
@@ -1016,7 +1016,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         timerProfiler.startStopTimer(TimerLoadBc, false);
       } else {
         module = new Module((Twine("llpc") + getShaderStageName(shaderInfoEntry->entryStage)).str() +
-                            std::to_string(getModuleIdByIndex(shaderIndex)),
+                                std::to_string(getModuleIdByIndex(shaderIndex)),
                             *context);
       }
 
@@ -1078,9 +1078,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
       lowerPassMgr->setPassIndex(&passIndex);
 
-      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower),
-                            forceLoopUnrollCount
-                            );
+      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower), forceLoopUnrollCount
+      );
       // Run the passes.
       bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       if (!success) {

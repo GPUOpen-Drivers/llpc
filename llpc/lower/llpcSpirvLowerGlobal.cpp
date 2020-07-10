@@ -757,15 +757,14 @@ void SpirvLowerGlobal::lowerInput() {
 // =====================================================================================================================
 // Does lowering opertions for SPIR-V outputs, replaces outputs with proxy variables.
 void SpirvLowerGlobal::lowerOutput() {
-  m_retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
 
+  m_retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
   // Invoke handling of "return" instructions or "emit" calls
   m_instVisitFlags.u32All = 0;
-  if (m_shaderStage == ShaderStageGeometry) {
+  if (m_shaderStage == ShaderStageGeometry)
     m_instVisitFlags.checkEmitCall = true;
-    m_instVisitFlags.checkReturn = true;
-  } else
-    m_instVisitFlags.checkReturn = true;
+
+  m_instVisitFlags.checkReturn = true;
   visit(m_module);
 
   auto retInst = ReturnInst::Create(*m_context, m_retBlock);

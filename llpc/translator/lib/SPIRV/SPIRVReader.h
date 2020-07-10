@@ -212,7 +212,7 @@ private:
   DenseMap<std::pair<BasicBlock *, BasicBlock *>, unsigned> m_blockPredecessorToCount;
   const Vkgc::ShaderModuleUsage *m_moduleUsage;
   unsigned m_spirvOpMetaKindId;
-
+  Vkgc::ShaderStage m_shaderStage;
   lgc::Builder *getBuilder() const { return m_builder; }
 
   Type *mapType(SPIRVType *bt, Type *t) {

@@ -47,6 +47,7 @@
 #include "SPIRVValue.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
+#include "llpcPipelineContext.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -4775,7 +4776,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, transValueWithOpcode<OpDemoteToHelperInvocationEXT>(bv));
   case OpIsHelperInvocationEXT:
     return mapValue(bv, transValueWithOpcode<OpIsHelperInvocationEXT>(bv));
-
   default: {
     auto oc = bv->getOpCode();
     if (isSPIRVCmpInstTransToLLVMInst(static_cast<SPIRVInstruction *>(bv)))
@@ -5897,6 +5897,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (!m_entryTarget)
     return false;
 
+  m_shaderStage = convertToStageShage(entryExecModel);
   m_fpControlFlags.U32All = 0;
   static_assert(SPIRVTW_8Bit == (8 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_16Bit == (16 >> 3), "Unexpected value!");
