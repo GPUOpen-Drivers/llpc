@@ -97,7 +97,7 @@ Value *FragColorExport::run(Value *output, unsigned location, Instruction *inser
 
   const auto undefFloat = UndefValue::get(Type::getFloatTy(*m_context));
   const auto undefFloat16 = UndefValue::get(Type::getHalfTy(*m_context));
-  const auto undefFloat16x2 = UndefValue::get(VectorType::get(Type::getHalfTy(*m_context), 2));
+  const auto undefFloat16x2 = UndefValue::get(FixedVectorType::get(Type::getHalfTy(*m_context), 2));
 
   switch (expFmt) {
   case EXP_FORMAT_ZERO: {
@@ -202,11 +202,11 @@ Value *FragColorExport::run(Value *output, unsigned location, Instruction *inser
       Attribute::AttrKind attribs[] = {Attribute::ReadNone};
 
       // Do packing
-      comps[0] = emitCall("llvm.amdgcn.cvt.pkrtz", VectorType::get(Type::getHalfTy(*m_context), 2),
+      comps[0] = emitCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(Type::getHalfTy(*m_context), 2),
                           {comps[0], comps[1]}, attribs, insertPos);
 
       if (compCount > 2) {
-        comps[1] = emitCall("llvm.amdgcn.cvt.pkrtz", VectorType::get(Type::getHalfTy(*m_context), 2),
+        comps[1] = emitCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(Type::getHalfTy(*m_context), 2),
                             {comps[2], comps[3]}, attribs, insertPos);
       } else
         comps[1] = undefFloat16x2;
@@ -235,10 +235,10 @@ Value *FragColorExport::run(Value *output, unsigned location, Instruction *inser
         expFmt == EXP_FORMAT_SNORM16_ABGR ? "llvm.amdgcn.cvt.pknorm.i16" : "llvm.amdgcn.cvt.pknorm.u16";
 
     for (unsigned i = 0; i < compCount; i += 2) {
-      Value *packedComps =
-          emitCall(funcName, VectorType::get(Type::getInt16Ty(*m_context), 2), {comps[i], comps[i + 1]}, {}, insertPos);
+      Value *packedComps = emitCall(funcName, FixedVectorType::get(Type::getInt16Ty(*m_context), 2),
+                                    {comps[i], comps[i + 1]}, {}, insertPos);
 
-      packedComps = new BitCastInst(packedComps, VectorType::get(Type::getHalfTy(*m_context), 2), "", insertPos);
+      packedComps = new BitCastInst(packedComps, FixedVectorType::get(Type::getHalfTy(*m_context), 2), "", insertPos);
 
       comps[i] =
           ExtractElementInst::Create(packedComps, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
@@ -271,10 +271,10 @@ Value *FragColorExport::run(Value *output, unsigned location, Instruction *inser
     StringRef funcName = expFmt == EXP_FORMAT_SINT16_ABGR ? "llvm.amdgcn.cvt.pk.i16" : "llvm.amdgcn.cvt.pk.u16";
 
     for (unsigned i = 0; i < compCount; i += 2) {
-      Value *packedComps =
-          emitCall(funcName, VectorType::get(Type::getInt16Ty(*m_context), 2), {comps[i], comps[i + 1]}, {}, insertPos);
+      Value *packedComps = emitCall(funcName, FixedVectorType::get(Type::getInt16Ty(*m_context), 2),
+                                    {comps[i], comps[i + 1]}, {}, insertPos);
 
-      packedComps = new BitCastInst(packedComps, VectorType::get(Type::getHalfTy(*m_context), 2), "", insertPos);
+      packedComps = new BitCastInst(packedComps, FixedVectorType::get(Type::getHalfTy(*m_context), 2), "", insertPos);
 
       comps[i] =
           ExtractElementInst::Create(packedComps, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);

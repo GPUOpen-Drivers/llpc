@@ -405,7 +405,7 @@ static Type *convertToFloatingPointType(Type *origTy) {
     llvm_unreachable("Should never be called!");
   }
   if (isa<VectorType>(origTy))
-    newTy = VectorType::get(newTy, cast<VectorType>(origTy)->getNumElements());
+    newTy = FixedVectorType::get(newTy, cast<VectorType>(origTy)->getNumElements());
   return newTy;
 }
 
@@ -434,7 +434,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
   Type *texelTy = origTexelTy;
   if (origTexelTy->isIntOrIntVectorTy(64)) {
     // Only load the first component for 64-bit texel, casted to <2 x i32>
-    texelTy = VectorType::get(getInt32Ty(), 2);
+    texelTy = FixedVectorType::get(getInt32Ty(), 2);
   }
 
   if (auto vectorResultTy = dyn_cast<VectorType>(texelTy))
@@ -556,7 +556,7 @@ Value *ImageBuilder::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsi
     llvm_unreachable("Should never be called!");
     break;
   }
-  Value *fmaskTexel = CreateImageLoad(VectorType::get(getInt32Ty(), 4), fmaskDim, flags, fmaskDesc, coord, nullptr,
+  Value *fmaskTexel = CreateImageLoad(FixedVectorType::get(getInt32Ty(), 4), fmaskDim, flags, fmaskDesc, coord, nullptr,
                                       instName + ".fmaskload");
 
   // Calculate the sample number we would use if the F-mask descriptor format is valid.
@@ -601,7 +601,7 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
   if (texel->getType()->isIntOrIntVectorTy(64)) {
     if (texel->getType()->isVectorTy())
       texel = CreateExtractElement(texel, uint64_t(0));
-    texel = CreateBitCast(texel, VectorType::get(getFloatTy(), 2)); // Casted to <2 x float>
+    texel = CreateBitCast(texel, FixedVectorType::get(getFloatTy(), 2)); // Casted to <2 x float>
   }
 
   // The intrinsics insist on an FP data type, so we need to bitcast from an integer data type.
@@ -655,7 +655,7 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
         texel = CreateShuffleVector(texel, Constant::getNullValue(texelTy), ArrayRef<int>{0, 1, 2, 3});
       }
     } else
-      texel = CreateInsertElement(Constant::getNullValue(VectorType::get(texelTy, 4)), texel, uint64_t(0));
+      texel = CreateInsertElement(Constant::getNullValue(FixedVectorType::get(texelTy, 4)), texel, uint64_t(0));
 
     // Do the buffer store.
     args.push_back(texel);
@@ -847,7 +847,7 @@ Value *ImageBuilder::CreateImageGather(Type *resultTy, unsigned dim, unsigned fl
 
   if (texelComponentTy->isIntegerTy()) {
     // Handle integer texel component type.
-    gatherTy = VectorType::get(getFloatTy(), 4);
+    gatherTy = FixedVectorType::get(getFloatTy(), 4);
     if (resultTy != texelTy)
       gatherTy = StructType::get(getContext(), {gatherTy, getInt32Ty()});
 
@@ -945,12 +945,13 @@ Value *ImageBuilder::preprocessIntegerImageGather(unsigned dim, Value *&imageDes
   SetInsertPoint(branch->getSuccessor(1)->getTerminator());
   Value *zero = getInt32(0);
   dim = dim == DimCubeArray ? DimCube : dim;
-  Value *resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim], {VectorType::get(getFloatTy(), 4), getInt32Ty()},
-                                   {getInt32(15), zero, imageDesc, zero, zero});
-  resInfo = CreateBitCast(resInfo, VectorType::get(getInt32Ty(), 4));
+  Value *resInfo =
+      CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim], {FixedVectorType::get(getFloatTy(), 4), getInt32Ty()},
+                      {getInt32(15), zero, imageDesc, zero, zero});
+  resInfo = CreateBitCast(resInfo, FixedVectorType::get(getInt32Ty(), 4));
 
   Value *widthHeight = CreateShuffleVector(resInfo, resInfo, ArrayRef<int>{0, 1});
-  widthHeight = CreateSIToFP(widthHeight, VectorType::get(getFloatTy(), 2));
+  widthHeight = CreateSIToFP(widthHeight, FixedVectorType::get(getFloatTy(), 2));
   Value *valueToAdd = CreateFDiv(ConstantFP::get(widthHeight->getType(), -0.5), widthHeight);
   unsigned coordCount = cast<VectorType>(coord->getType())->getNumElements();
   if (coordCount > 2) {
@@ -1002,7 +1003,7 @@ Value *ImageBuilder::postprocessIntegerImageGather(Value *needDescPatch, unsigne
     texel = CreateFPToSI(texel, texelTy);
   else
     texel = CreateFPToUI(texel, texelTy);
-  Value *patchedResult = CreateBitCast(texel, VectorType::get(getFloatTy(), 4));
+  Value *patchedResult = CreateBitCast(texel, FixedVectorType::get(getFloatTy(), 4));
   if (tfe)
     patchedResult = CreateInsertValue(result, patchedResult, 0);
 
@@ -1361,11 +1362,11 @@ Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *i
   unsigned modifiedDim = dim == DimCubeArray ? DimCube : change1DTo2DIfNeeded(dim);
   Value *zero = getInt32(0);
   Instruction *resInfo =
-      CreateIntrinsic(ImageGetResInfoIntrinsicTable[modifiedDim], {VectorType::get(getFloatTy(), 4), getInt32Ty()},
+      CreateIntrinsic(ImageGetResInfoIntrinsicTable[modifiedDim], {FixedVectorType::get(getFloatTy(), 4), getInt32Ty()},
                       {getInt32(15), lod, imageDesc, zero, zero});
   if (flags & ImageFlagNonUniformImage)
     resInfo = createWaterfallLoop(resInfo, 2);
-  Value *intResInfo = CreateBitCast(resInfo, VectorType::get(getInt32Ty(), 4));
+  Value *intResInfo = CreateBitCast(resInfo, FixedVectorType::get(getInt32Ty(), 4));
 
   unsigned sizeComponentCount = getImageQuerySizeComponentCount(dim);
 
@@ -1433,7 +1434,7 @@ Value *ImageBuilder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imag
   args.push_back(getInt32(0));    // glc/slc
 
   Instruction *result = CreateIntrinsic(ImageGetLodIntrinsicTable[dim],
-                                        {VectorType::get(getFloatTy(), 2), getFloatTy()}, args, nullptr, instName);
+                                        {FixedVectorType::get(getFloatTy(), 2), getFloatTy()}, args, nullptr, instName);
   // Add a waterfall loop if needed.
   SmallVector<unsigned, 2> nonUniformArgIndexes;
   if (flags & ImageFlagNonUniformImage)
@@ -1820,12 +1821,12 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
 
     const static unsigned BuiltInFragCoord = 15;
     std::string callName = lgcName::InputImportBuiltIn;
-    Type *builtInTy = VectorType::get(getFloatTy(), 4);
+    Type *builtInTy = FixedVectorType::get(getFloatTy(), 4);
     addTypeMangling(builtInTy, {}, callName);
     Value *fragCoord = emitCall(callName, builtInTy, getInt32(BuiltInFragCoord), {}, &*GetInsertPoint());
     fragCoord->setName("FragCoord");
     fragCoord = CreateShuffleVector(fragCoord, fragCoord, ArrayRef<int>{0, 1});
-    fragCoord = CreateFPToSI(fragCoord, VectorType::get(getInt32Ty(), 2));
+    fragCoord = CreateFPToSI(fragCoord, FixedVectorType::get(getInt32Ty(), 2));
     unsigned coordCount = cast<VectorType>(coord->getType())->getNumElements();
     if (coordCount > 2) {
       const static int Indexes[] = {0, 1, 2, 3};

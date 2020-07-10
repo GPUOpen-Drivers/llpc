@@ -33,7 +33,6 @@
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "lgc-system-values"
 
@@ -175,7 +174,7 @@ Value *ShaderSystemValues::getTessCoord() {
     tessCoordZ =
         primitiveMode == PrimitiveMode::Triangles ? tessCoordZ : ConstantFP::get(Type::getFloatTy(*m_context), 0.0f);
 
-    m_tessCoord = UndefValue::get(VectorType::get(Type::getFloatTy(*m_context), 3));
+    m_tessCoord = UndefValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 3));
     m_tessCoord = InsertElementInst::Create(m_tessCoord, tessCoordX, ConstantInt::get(Type::getInt32Ty(*m_context), 0),
                                             "", insertPos);
     m_tessCoord = InsertElementInst::Create(m_tessCoord, tessCoordY, ConstantInt::get(Type::getInt32Ty(*m_context), 1),
@@ -194,7 +193,7 @@ Value *ShaderSystemValues::getEsGsOffsets() {
     auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
-    m_esGsOffsets = UndefValue::get(VectorType::get(Type::getInt32Ty(*m_context), 6));
+    m_esGsOffsets = UndefValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 6));
     for (unsigned i = 0; i < InterfaceData::MaxEsGsOffsetCount; ++i) {
       auto esGsOffset =
           getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.gs.esGsOffsets[i], Twine("esGsOffset") + Twine(i));
@@ -387,9 +386,9 @@ Instruction *ShaderSystemValues::getStreamOutTablePtr() {
 
     // Get the 64-bit extended node value.
     auto streamOutTablePtrLow = getFunctionArgument(m_entryPoint, entryArgIdx, "streamOutTable");
-    auto streamOutTablePtrTy =
-        PointerType::get(ArrayType::get(VectorType::get(Type::getInt32Ty(*m_context), 4), MaxTransformFeedbackBuffers),
-                         ADDR_SPACE_CONST);
+    auto streamOutTablePtrTy = PointerType::get(
+        ArrayType::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 4), MaxTransformFeedbackBuffers),
+        ADDR_SPACE_CONST);
     m_streamOutTablePtr = makePointer(streamOutTablePtrLow, streamOutTablePtrTy, InvalidValue);
   }
   return m_streamOutTablePtr;
@@ -423,7 +422,7 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
       // reuse this PC if its pLowValue is an arg rather than an instruction.
       auto pcInsertPos = &*m_entryPoint->front().getFirstInsertionPt();
       Value *pc = emitCall("llvm.amdgcn.s.getpc", Type::getInt64Ty(*m_context), ArrayRef<Value *>(), {}, pcInsertPos);
-      m_pc = new BitCastInst(pc, VectorType::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
+      m_pc = new BitCastInst(pc, FixedVectorType::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
     } else
       insertPos = m_pc->getNextNode();
     extendedPtrValue = m_pc;
@@ -449,7 +448,7 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
 // @param builder : Builder to use for insertion
 Instruction *ShaderSystemValues::loadDescFromDriverTable(unsigned tableOffset, BuilderBase &builder) {
   auto globalTable = getInternalGlobalTablePtr();
-  Type *descTy = VectorType::get(builder.getInt32Ty(), 4);
+  Type *descTy = FixedVectorType::get(builder.getInt32Ty(), 4);
   globalTable = cast<Instruction>(builder.CreateBitCast(globalTable, descTy->getPointerTo(ADDR_SPACE_CONST)));
   Value *descPtr = builder.CreateGEP(descTy, globalTable, builder.getInt32(tableOffset));
   LoadInst *desc = builder.CreateLoad(descTy, descPtr);

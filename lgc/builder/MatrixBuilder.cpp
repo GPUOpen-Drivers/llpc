@@ -54,7 +54,7 @@ Value *MatrixBuilder::CreateTransposeMatrix(Value *const matrix, const Twine &in
 
   Type *const elementType = cast<VectorType>(columnVectorType)->getElementType();
 
-  Type *const newColumnVectorType = VectorType::get(elementType, columnCount);
+  Type *const newColumnVectorType = FixedVectorType::get(elementType, columnCount);
   Type *const newMatrixType = ArrayType::get(newColumnVectorType, rowCount);
 
   SmallVector<Value *, 4> columns;
@@ -117,7 +117,7 @@ Value *MatrixBuilder::CreateVectorTimesMatrix(Value *const vector, Value *const 
   Type *const matrixTy = matrix->getType();
   Type *const compTy = cast<VectorType>(cast<ArrayType>(matrixTy)->getElementType())->getElementType();
   const unsigned columnCount = matrixTy->getArrayNumElements();
-  Type *const resultTy = VectorType::get(compTy, columnCount);
+  Type *const resultTy = FixedVectorType::get(compTy, columnCount);
   Value *result = UndefValue::get(resultTy);
 
   for (unsigned column = 0; column < columnCount; column++) {

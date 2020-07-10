@@ -298,8 +298,8 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateLog(args[0]);
   }
 
-  case BuilderRecorder::InverseSqrt: {
-    return m_builder->CreateInverseSqrt(args[0]);
+  case BuilderRecorder::Sqrt: {
+    return m_builder->CreateSqrt(args[0]);
   }
 
   case BuilderRecorder::SAbs: {

@@ -40,7 +40,14 @@
 #define VFX_VERSION 0x10000
 #define VFX_REVISION 1
 
+// Enable VFX_SUPPORT_VK_PIPELINE in default
+#if !defined(VFX_SUPPORT_VK_PIPELINE) && !defined(VFX_SUPPORT_RENDER_DOCOUMENT)
+#define VFX_SUPPORT_VK_PIPELINE 1
+#endif
+
+#if VFX_SUPPORT_VK_PIPELINE
 #include "vkgcDefs.h"
+#endif
 
 #define VFXAPI
 
@@ -48,11 +55,17 @@ extern int Snprintf(char *pOutput, size_t bufSize, const char *pFormat, ...);
 
 namespace Vfx {
 
+#if VFX_SUPPORT_VK_PIPELINE
+typedef Vkgc::ShaderStage ShaderStage;
+#else
+#error Not implemetend!
+#endif
+
 // =====================================================================================================================
 // Common definition of VfxParser
-static const unsigned ShaderStageCount = 6; // Number of shader stages in Vulkan
+
 static const unsigned NativeShaderStageCount = 6;        // Number of native shader stages in Vulkan
-static const unsigned MaxSectionCount = 16;              // Max section count
+static const unsigned MaxRenderSectionCount = 16;        // Max render document section count
 static const unsigned MaxBindingCount = 16;              // Max binding count
 static const unsigned MaxResultCount = 16;               // Max result count
 static const unsigned MaxPushConstRangCount = 16;        // Max push const range count
@@ -283,9 +296,9 @@ typedef struct IUFValue_ {
 // =====================================================================================================================
 // Represents the shader binary data
 struct ShaderSource {
-  Vkgc::ShaderStage stage; // Shader stage
-  unsigned dataSize;       // Size of the shader binary data
-  uint8_t *pData;          // Shader binary data
+  ShaderStage stage; // Shader stage
+  unsigned dataSize; // Size of the shader binary data
+  uint8_t *pData;    // Shader binary data
 };
 
 // =====================================================================================================================
@@ -476,10 +489,12 @@ struct DrawState {
 struct ColorBuffer {
   unsigned channelWriteMask;     // Write mask to specify destination channels
   VkFormat format;               // The format of color buffer
+  const char *palFormat;         // The PAL format of color buffer
   unsigned blendEnable;          // Whether the blend is enabled on this color buffer
   unsigned blendSrcAlphaToColor; // Whether source alpha is blended to color channels for this target at draw time
 };
 
+#if VFX_SUPPORT_VK_PIPELINE
 // =====================================================================================================================
 // Represents GraphicsPipelineState section.
 struct GraphicsPipelineState {
@@ -515,28 +530,39 @@ struct ComputePipelineState {
   Vkgc::PipelineOptions options; // Pipeline options
 };
 
+#endif
+
 }; // namespace Vfx
 
+#if VFX_SUPPORT_RENDER_DOCOUMENT
 // =====================================================================================================================
 // Represents the content of RenderDocument.
 struct VfxRenderState {
-  unsigned version;                                 // Render state version
-  Vfx::TestResult result;                           // Section "Result"
-  unsigned numBufferView;                           // Number of section "BufferView"
-  Vfx::BufferView bufferView[Vfx::MaxSectionCount]; // Section "BufferView"
-  Vfx::VertexState vertexState;                     // Section "VertexState"
-  Vfx::DrawState drawState;                         // Section "DrawState"
-  unsigned numImageView;                            // Number of section "ImageView"
-  Vfx::ImageView imageView[Vfx::MaxSectionCount];   // Section "ImageView"
-  unsigned numSampler;                              // Number of section "Sampler"
-  Vfx::Sampler sampler[Vfx::MaxSectionCount];       // Section "Sampler"
-  Vfx::ShaderSource stages[Vfx::ShaderStageCount];  // Shader source sections
+  unsigned version;                                             // Render state version
+  Vfx::TestResult result;                                       // Section "Result"
+  unsigned numBufferView;                                       // Number of section "BufferView"
+  Vfx::BufferView bufferView[Vfx::MaxRenderSectionCount];       // Section "BufferView"
+  Vfx::VertexState vertexState;                                 // Section "VertexState"
+  Vfx::DrawState drawState;                                     // Section "DrawState"
+  unsigned numImageView;                                        // Number of section "ImageView"
+  Vfx::ImageView imageView[Vfx::MaxRenderSectionCount];         // Section "ImageView"
+  unsigned numSampler;                                          // Number of section "Sampler"
+  Vfx::Sampler sampler[Vfx::MaxRenderSectionCount];             // Section "Sampler"
+  Vfx::ShaderSource stages[Vfx::ShaderStage::ShaderStageCount]; // Shader source sections
 };
+typedef struct VfxRenderState *VfxRenderStatePtr;
+#else
+typedef void *VfxRenderStatePtr;
+#endif
 
+#if VFX_SUPPORT_VK_PIPELINE
+// =====================================================================================================================
+// Represents the kind of vkgc pipeline
 enum VfxPipelineType {
   VfxPipelineTypeGraphics,
   VfxPipelineTypeCompute,
 };
+
 // =====================================================================================================================
 // Represents the content of PipelineDoucment.
 struct VfxPipelineState {
@@ -548,15 +574,14 @@ struct VfxPipelineState {
   Vfx::ShaderSource *stages; // Shader source sections
 };
 
+typedef struct VfxPipelineState *VfxPipelineStatePtr;
+#else
+typedef void *VfxPipelineStatePtr;
+#endif
+
 // =====================================================================================================================
 // Types used in VFX library public entry points.
-enum VfxDocType { VfxDocTypeRender, VfxDocTypePipeline };
-
-struct VfxRenderState;
-struct VfxPipelineState;
-
-typedef struct VfxRenderState *VfxRenderStatePtr;
-typedef struct VfxPipelineState *VfxPipelineStatePtr;
+enum VfxDocType { VfxDocTypeRender, VfxDocTypePipeline, VfxDocTypeGlPipeline };
 
 // =====================================================================================================================
 // Public entry points of VFX library. Use these functions (in namespace Vfx) when linking to VFX as a static library.
@@ -567,9 +592,13 @@ bool VFXAPI vfxParseFile(const char *pFilename, unsigned int numMacro, const cha
 
 void VFXAPI vfxCloseDoc(void *pDoc);
 
+#if VFX_SUPPORT_RENDER_DOCOUMENT
 void VFXAPI vfxGetRenderDoc(void *pDoc, VfxRenderStatePtr *pRenderState);
+#endif
 
+#if VFX_SUPPORT_VK_PIPELINE
 void VFXAPI vfxGetPipelineDoc(void *pDoc, VfxPipelineStatePtr *pPipelineState);
+#endif
 
 void VFXAPI vfxPrintDoc(void *pDoc);
 

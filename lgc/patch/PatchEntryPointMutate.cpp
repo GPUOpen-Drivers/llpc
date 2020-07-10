@@ -917,7 +917,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     // Emulate gl_NumWorkGroups via user data registers.
     // Later code needs to ensure that this starts on an even numbered register.
     if (builtInUsage.cs.numWorkgroups || userDataUsage->isSpecialUserDataUsed(UserDataMapping::Workgroup)) {
-      auto numWorkgroupsPtrTy = PointerType::get(VectorType::get(builder.getInt32Ty(), 3), ADDR_SPACE_CONST);
+      auto numWorkgroupsPtrTy = PointerType::get(FixedVectorType::get(builder.getInt32Ty(), 3), ADDR_SPACE_CONST);
       specialUserDataArgs.push_back(
           UserDataArg(numWorkgroupsPtrTy, UserDataMapping::Workgroup, &entryArgIdxs.cs.numWorkgroupsPtr));
     }
@@ -1155,14 +1155,14 @@ unsigned PatchEntryPointMutate::addUserDataArg(SmallVectorImpl<UserDataArg> &use
     // With useFixedLayout, we need a padding arg before the node's arg.
     assert(userDataValue + InterfaceData::CsStartUserData > userDataSize);
     userDataArgs.push_back(UserDataArg(
-        VectorType::get(builder.getInt32Ty(), userDataValue + InterfaceData::CsStartUserData - userDataSize),
+        FixedVectorType::get(builder.getInt32Ty(), userDataValue + InterfaceData::CsStartUserData - userDataSize),
         UserDataMapping::Invalid, nullptr, /*isPadding=*/true));
     userDataSize = userDataValue + InterfaceData::CsStartUserData;
   }
   // Now the node arg itself.
   Type *argTy = builder.getInt32Ty();
   if (sizeInDwords != 1)
-    argTy = VectorType::get(argTy, sizeInDwords);
+    argTy = FixedVectorType::get(argTy, sizeInDwords);
   userDataArgs.push_back(UserDataArg(argTy, userDataValue, argIndex));
   userDataSize += sizeInDwords;
   return userDataSize;
@@ -1299,7 +1299,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
     if (!spillTableArg.empty()) {
       if (userDataIdx != userDataEnd) {
         assert(userDataIdx <= userDataEnd);
-        unspilledArgs.push_back(UserDataArg(VectorType::get(builder.getInt32Ty(), userDataEnd - userDataIdx),
+        unspilledArgs.push_back(UserDataArg(FixedVectorType::get(builder.getInt32Ty(), userDataEnd - userDataIdx),
                                             UserDataMapping::Invalid, nullptr, /*padding=*/true));
       }
       unspilledArgs.push_back(spillTableArg.front());

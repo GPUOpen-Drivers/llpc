@@ -1080,7 +1080,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
         // NOTE: Glslang has a bug. For gl_SubGroupXXXMaskARB, they are implemented as "uint64_t" while
         // for gl_subgroupXXXMask they are "uvec4". And the SPIR-V enumerants "BuiltInSubgroupXXXMaskKHR"
         // and "BuiltInSubgroupXXXMask" share the same numeric values.
-        inOutValue = m_builder->CreateBitCast(inOutValue, VectorType::get(inOutTy, 2));
+        inOutValue = m_builder->CreateBitCast(inOutValue, FixedVectorType::get(inOutTy, 2));
         inOutValue = m_builder->CreateExtractElement(inOutValue, uint64_t(0));
       }
       if (inOutValue->getType()->isIntegerTy(1)) {

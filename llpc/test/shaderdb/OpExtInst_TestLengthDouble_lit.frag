@@ -22,7 +22,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract double @llvm.fabs.f64(double
 ; SHADERTEST: = call reassoc nnan nsz arcp contract double (...) @lgc.create.dot.product.f64(<3 x double>
-; SHADERTEST: = call reassoc nnan nsz arcp contract double @llvm.sqrt.f64(double
+; SHADERTEST: = call reassoc nnan nsz arcp contract double (...) @lgc.create.sqrt.f64(double
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -149,11 +149,16 @@ public:
       setModule(TheBB->getModule());
   }
 
+  void setDebugScope(SPIRVEntry *Scope) { DebugScope = Scope; }
+
+  SPIRVEntry *getDebugScope() const { return DebugScope; }
+
 protected:
   void validate() const override { SPIRVValue::validate(); }
 
 private:
   SPIRVBasicBlock *BB;
+  SPIRVEntry *DebugScope = nullptr;
 };
 
 class SPIRVInstTemplateBase : public SPIRVInstruction {
@@ -1625,7 +1630,7 @@ public:
     assert(BB && "Invalid BB");
   }
   SPIRVFunctionCallGeneric() : SPIRVInstruction(OC) {}
-  const std::vector<SPIRVWord> &getArguments() { return Args; }
+  const std::vector<SPIRVWord> &getArguments() const { return Args; }
   std::vector<SPIRVValue *> getArgumentValues() { return getValues(Args); }
   std::vector<SPIRVType *> getArgumentValueTypes() const {
     std::vector<SPIRVType *> ArgTypes;
@@ -1682,15 +1687,14 @@ public:
   void setExtOp(unsigned ExtOC) { ExtOp = ExtOC; }
   SPIRVId getExtSetId() const { return ExtSetId; }
   SPIRVWord getExtOp() const { return ExtOp; }
+  SPIRVExtInstSetKind getExtSetKind() const { return ExtSetKind; }
   void setExtSetKindById() {
     assert(Module && "Invalid module");
     ExtSetKind = Module->getBuiltinSet(ExtSetId);
-    assert((ExtSetKind == SPIRVEIS_GLSL ||
-            ExtSetKind == SPIRVEIS_ShaderBallotAMD ||
-            ExtSetKind == SPIRVEIS_ShaderExplicitVertexParameterAMD ||
-            ExtSetKind == SPIRVEIS_GcnShaderAMD ||
-            ExtSetKind == SPIRVEIS_ShaderTrinaryMinMaxAMD ||
-            ExtSetKind == SPIRVEIS_NonSemanticInfo) &&
+    assert((ExtSetKind == SPIRVEIS_GLSL || ExtSetKind == SPIRVEIS_ShaderBallotAMD ||
+            ExtSetKind == SPIRVEIS_ShaderExplicitVertexParameterAMD || ExtSetKind == SPIRVEIS_GcnShaderAMD ||
+            ExtSetKind == SPIRVEIS_ShaderTrinaryMinMaxAMD || ExtSetKind == SPIRVEIS_NonSemanticInfo ||
+            ExtSetKind == SPIRVEIS_Debug) &&
            "not supported");
   }
   void decode(std::istream &I) override {
@@ -1715,6 +1719,9 @@ public:
     case SPIRVEIS_NonSemanticInfo:
       getDecoder(I) >> ExtOpNonSemanticInfo;
       break;
+    case SPIRVEIS_Debug:
+      getDecoder(I) >> ExtOpDebug;
+      break;
     default:
       assert(0 && "not supported");
       getDecoder(I) >> ExtOp;
@@ -1738,6 +1745,7 @@ protected:
     GcnShaderAMDExtOpKind ExtOpGcnShaderAMD;
     ShaderTrinaryMinMaxAMDExtOpKind ExtOpShaderTrinaryMinMaxAMD;
     NonSemanticInfoExtOpKind ExtOpNonSemanticInfo;
+    SPIRVDebugExtOpKind ExtOpDebug;
   };
   SPIRVExtInstSetKind ExtSetKind;
 };

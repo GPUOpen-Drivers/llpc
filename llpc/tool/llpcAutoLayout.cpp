@@ -408,7 +408,10 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
   } else if (shaderStage == ShaderStageFragment) {
     // Set dummy color formats for fragment outputs
     for (auto varId : ArrayRef<SPIRVWord>(inOuts.first, inOuts.second)) {
-      auto var = static_cast<SPIRVVariable *>(module->getValue(varId));
+      auto entry = module->getValue(varId);
+      if (!entry->isVariable())
+        continue;
+      auto var = static_cast<SPIRVVariable *>(entry);
       if (var->getStorageClass() != StorageClassOutput)
         continue;
 

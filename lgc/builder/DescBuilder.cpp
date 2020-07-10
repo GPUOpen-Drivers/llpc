@@ -88,7 +88,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       if (node->type == ResourceNodeType::DescriptorBufferCompact)
         byteSize = DescriptorSizeBufferCompact;
       unsigned dwordSize = byteSize / 4;
-      Type *descTy = VectorType::get(getInt32Ty(), dwordSize);
+      Type *descTy = FixedVectorType::get(getInt32Ty(), dwordSize);
       std::string callName = lgcName::RootDescriptor;
       addTypeMangling(descTy, {}, callName);
       unsigned dwordOffset = cast<ConstantInt>(descIndex)->getZExtValue() * dwordSize;
@@ -391,7 +391,7 @@ Value *DescBuilder::getDescPtrAndStride(ResourceNodeType resType, unsigned descS
   }
 
   // Cast the pointer to the right type and create and return the struct.
-  descPtr = CreateBitCast(descPtr, VectorType::get(getInt32Ty(), byteSize / 4)->getPointerTo(ADDR_SPACE_CONST));
+  descPtr = CreateBitCast(descPtr, FixedVectorType::get(getInt32Ty(), byteSize / 4)->getPointerTo(ADDR_SPACE_CONST));
   Value *descPtrStruct =
       CreateInsertValue(UndefValue::get(StructType::get(getContext(), {descPtr->getType(), getInt32Ty()})), descPtr, 0);
   descPtrStruct = CreateInsertValue(descPtrStruct, stride, 1);
@@ -508,7 +508,7 @@ Value *DescBuilder::CreateGetBufferDescLength(Value *const bufferDesc, Value *of
 Value *DescBuilder::buildInlineBufferDesc(Value *descPtr) {
   // Bitcast the pointer to v2i32
   descPtr = CreatePtrToInt(descPtr, getInt64Ty());
-  descPtr = CreateBitCast(descPtr, VectorType::get(getInt32Ty(), 2));
+  descPtr = CreateBitCast(descPtr, FixedVectorType::get(getInt32Ty(), 2));
 
   return buildBufferCompactDesc(descPtr);
 }
@@ -526,7 +526,7 @@ Value *DescBuilder::buildBufferCompactDesc(Value *desc) {
 
   // Build normal buffer descriptor
   // Dword 0
-  Value *bufDesc = UndefValue::get(VectorType::get(getInt32Ty(), 4));
+  Value *bufDesc = UndefValue::get(FixedVectorType::get(getInt32Ty(), 4));
   bufDesc = CreateInsertElement(bufDesc, descElem0, uint64_t(0));
 
   // Dword 1

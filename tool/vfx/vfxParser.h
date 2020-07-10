@@ -50,15 +50,18 @@ struct TestCaseInfo {
 };
 
 // =====================================================================================================================
-// Represents the parse result of Vfx parser
+// Represents the VFX parser
 class Document {
 public:
-  Document() {}
+  Document();
   virtual ~Document();
 
   virtual unsigned getMaxSectionCount(SectionType type) = 0;
   virtual bool checkVersion(unsigned ver) { return true; }
   virtual bool validate() { return true; }
+  virtual Section *createSection(const char *sectionName);
+  virtual bool getPtrOfSubSection(Section *pSection, unsigned lineNum, const char *memberName, MemberType memberType,
+                                  bool isWriteAccess, unsigned arrayIndex, Section **ptrOut, std::string *errorMsg);
 
   static Document *createDocument(VfxDocType type);
 
@@ -69,21 +72,9 @@ public:
 
   std::string *getErrorMsg() { return &m_errorMsg; }
 
-protected:
-  std::vector<Section *> m_sections[SectionTypeNameNum]; // Contains sections
-  std::vector<Section *> m_sectionList;
-  std::string m_errorMsg; // Error message
-  std::string m_fileName; // Name of source file
-};
-
-// =====================================================================================================================
-// Represents the Vfx parser
-class VfxParser {
-public:
-  VfxParser();
   bool isValidVfxFile() { return m_isValidVfxFile; }
 
-  bool parse(const TestCaseInfo &info, Document *doc);
+  bool parse(const TestCaseInfo &info);
 
 private:
   bool macroSubstituteLine(char *line, unsigned lineNum, const MacroDefinition *macroDefinition,
@@ -104,13 +95,17 @@ private:
 
   bool parseKeyValue(char *key, char *value, unsigned lineNum, Section *sectionObject);
 
-  Document *m_vfxDoc;                             // Parse result
-  bool m_isValidVfxFile;                          // If vfx file is valid
+protected:
+  std::vector<Section *> m_sections[SectionTypeNameNum]; // Contains sections
+  std::vector<Section *> m_sectionList;                  // All sections ordered with line number
+  std::string m_errorMsg;                                // Error message
+  std::string m_fileName;                                // Name of source file
+
+  bool m_isValidVfxFile;                          // If VFX file is valid
   Section *m_currentSection;                      // Current section
   unsigned m_currentLineNum;                      // Current line number
   std::stringstream m_currentSectionStringBuffer; // Current section string buffer
   unsigned m_currentSectionLineNum;               // Current section line number
-  std::string *m_errorMsg;                        // Error message
 };
 
 } // namespace Vfx

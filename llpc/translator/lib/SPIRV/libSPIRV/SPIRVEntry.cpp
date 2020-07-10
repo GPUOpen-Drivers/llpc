@@ -304,6 +304,16 @@ bool SPIRVEntry::hasLinkageType() const {
   return OpCode == OpFunction || OpCode == OpVariable;
 }
 
+bool SPIRVEntry::isExtInst(const SPIRVExtInstSetKind InstSet, const SPIRVWord ExtOp) const {
+  if (isExtInst()) {
+    const SPIRVExtInst *EI = static_cast<const SPIRVExtInst *>(this);
+    if (EI->getExtSetKind() == InstSet) {
+      return EI->getExtOp() == ExtOp;
+    }
+  }
+  return false;
+}
+
 SPIRVLinkageTypeKind SPIRVEntry::getLinkageType() const {
   assert(hasLinkageType());
   DecorateMapType::const_iterator Loc =

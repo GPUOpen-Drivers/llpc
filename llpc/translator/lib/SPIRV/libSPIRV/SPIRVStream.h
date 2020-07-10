@@ -117,6 +117,7 @@ SPIRV_DEC_ENCDEC(Op)
 SPIRV_DEC_ENCDEC(Capability)
 SPIRV_DEC_ENCDEC(Decoration)
 SPIRV_DEC_ENCDEC(GLSLExtOpKind)
+SPIRV_DEC_ENCDEC(SPIRVDebugExtOpKind)
 SPIRV_DEC_ENCDEC(LinkageType)
 
 const SPIRVDecoder &operator>>(const SPIRVDecoder &I, std::string &Str);

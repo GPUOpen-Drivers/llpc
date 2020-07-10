@@ -395,11 +395,11 @@ public:
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateLog(llvm::Value *x, const llvm::Twine &instName = "") = 0;
 
-  // Create an inverse square root operation for a scalar or vector FP type
+  // Create a square root operation for a scalar or vector FP type
   //
   // @param x : Input value X
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateInverseSqrt(llvm::Value *x, const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateSqrt(llvm::Value *x, const llvm::Twine &instName = "") = 0;
 
   // Create "signed integer abs" operation for a scalar or vector integer value.
   //

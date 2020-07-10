@@ -42,6 +42,7 @@
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CodeGen.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
@@ -145,6 +146,7 @@ void LgcContext::initialize() {
   setOptionDefault("amdgpu-atomic-optimizations", "1");
   setOptionDefault("use-gpu-divergence-analysis", "1");
   setOptionDefault("structurizecfg-skip-uniform-regions", "1");
+  setOptionDefault("amdgpu-conditional-discard-transformations", "1");
 }
 
 // =====================================================================================================================

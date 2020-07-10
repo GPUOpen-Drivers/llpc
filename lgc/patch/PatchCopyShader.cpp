@@ -39,6 +39,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "lgc-patch-copy-shader"
@@ -359,7 +360,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
     assert(byteSize % 4 == 0);
     unsigned dwordSize = byteSize / 4;
     Value *outputValue =
-        loadValueFromGsVsRing(VectorType::get(builder.getFloatTy(), dwordSize), loc, streamId, builder);
+        loadValueFromGsVsRing(FixedVectorType::get(builder.getFloatTy(), dwordSize), loc, streamId, builder);
     exportGenericOutput(outputValue, loc, streamId, builder);
   }
 
@@ -367,7 +368,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
   std::vector<std::pair<BuiltInKind, Type *>> builtInPairs;
 
   if (builtInUsage.position)
-    builtInPairs.push_back(std::make_pair(BuiltInPosition, VectorType::get(builder.getFloatTy(), 4)));
+    builtInPairs.push_back(std::make_pair(BuiltInPosition, FixedVectorType::get(builder.getFloatTy(), 4)));
 
   if (builtInUsage.pointSize)
     builtInPairs.push_back(std::make_pair(BuiltInPointSize, builder.getFloatTy()));
@@ -525,18 +526,18 @@ Value *PatchCopyShader::loadGsVsRingBufferDescriptor(BuilderBase &builder) {
   Value *internalTablePtrLow = getFunctionArgument(entryPoint, EntryArgIdxInternalTablePtrLow);
 
   Value *pc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
-  pc = builder.CreateBitCast(pc, VectorType::get(builder.getInt32Ty(), 2));
+  pc = builder.CreateBitCast(pc, FixedVectorType::get(builder.getInt32Ty(), 2));
 
   auto internalTablePtrHigh = builder.CreateExtractElement(pc, 1);
 
-  auto undef = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
+  auto undef = UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 2));
   Value *internalTablePtr = builder.CreateInsertElement(undef, internalTablePtrLow, uint64_t(0));
   internalTablePtr = builder.CreateInsertElement(internalTablePtr, internalTablePtrHigh, 1);
   internalTablePtr = builder.CreateBitCast(internalTablePtr, builder.getInt64Ty());
 
   auto gsVsRingBufDescPtr = builder.CreateAdd(internalTablePtr, builder.getInt64(SiDrvTableVsRingInOffs << 4));
 
-  auto int32x4PtrTy = PointerType::get(VectorType::get(builder.getInt32Ty(), 4), ADDR_SPACE_CONST);
+  auto int32x4PtrTy = PointerType::get(FixedVectorType::get(builder.getInt32Ty(), 4), ADDR_SPACE_CONST);
   gsVsRingBufDescPtr = builder.CreateIntToPtr(gsVsRingBufDescPtr, int32x4PtrTy);
   cast<Instruction>(gsVsRingBufDescPtr)
       ->setMetadata(MetaNameUniform, MDNode::get(gsVsRingBufDescPtr->getContext(), {}));
@@ -582,9 +583,9 @@ void PatchCopyShader::exportGenericOutput(Value *outputValue, unsigned location,
 
         const unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
         if (compCount > 1) {
-          outputValue = builder.CreateBitCast(outputValue, VectorType::get(builder.getInt32Ty(), compCount));
-          outputValue = builder.CreateTrunc(outputValue, VectorType::get(builder.getInt16Ty(), compCount));
-          outputValue = builder.CreateBitCast(outputValue, VectorType::get(builder.getHalfTy(), compCount));
+          outputValue = builder.CreateBitCast(outputValue, FixedVectorType::get(builder.getInt32Ty(), compCount));
+          outputValue = builder.CreateTrunc(outputValue, FixedVectorType::get(builder.getInt16Ty(), compCount));
+          outputValue = builder.CreateBitCast(outputValue, FixedVectorType::get(builder.getHalfTy(), compCount));
         } else {
           outputValue = builder.CreateBitCast(outputValue, builder.getInt32Ty());
           outputValue = new TruncInst(outputValue, builder.getInt16Ty());

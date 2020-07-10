@@ -1346,7 +1346,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         else {
           const auto compTy = expFragColor[0]->getType();
 
-          output = UndefValue::get(VectorType::get(compTy, compCount));
+          output = UndefValue::get(FixedVectorType::get(compTy, compCount));
           for (unsigned i = 0; i < compCount; ++i) {
             assert(expFragColor[i]->getType() == compTy);
             output = InsertElementInst::Create(output, expFragColor[i],
@@ -1449,7 +1449,7 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
     compIdx *= 2; // For 64-bit data type, the component indexing must multiply by 2
 
     // Cast 64-bit data type to float vector
-    inputTy = VectorType::get(Type::getFloatTy(*m_context), compCount * 2);
+    inputTy = FixedVectorType::get(Type::getFloatTy(*m_context), compCount * 2);
   } else
     assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
@@ -1571,7 +1571,7 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   else
     interpTy = Type::getFloatTy(*m_context);
   if (numChannels > 1)
-    interpTy = VectorType::get(interpTy, numChannels);
+    interpTy = FixedVectorType::get(interpTy, numChannels);
   Value *interp = UndefValue::get(interpTy);
 
   unsigned startChannel = 0;
@@ -1738,7 +1738,7 @@ void PatchInOutImportExport::patchVsGenericOutputExport(Value *output, unsigned 
 
         unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() * 2 : 2;
 
-        outputTy = VectorType::get(Type::getFloatTy(*m_context), compCount);
+        outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), compCount);
         output = new BitCastInst(output, outputTy, "", insertPos);
       } else
         assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
@@ -1786,7 +1786,7 @@ void PatchInOutImportExport::patchTesGenericOutputExport(Value *output, unsigned
       compIdx *= 2;
 
       unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() * 2 : 2;
-      outputTy = VectorType::get(Type::getFloatTy(*m_context), compCount);
+      outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), compCount);
 
       output = new BitCastInst(output, outputTy, "", insertPos);
     } else
@@ -1816,9 +1816,9 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
     compIdx *= 2;
 
     if (outputTy->isVectorTy())
-      outputTy = VectorType::get(Type::getFloatTy(*m_context), cast<VectorType>(outputTy)->getNumElements() * 2);
+      outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), cast<VectorType>(outputTy)->getNumElements() * 2);
     else
-      outputTy = VectorType::get(Type::getFloatTy(*m_context), 2);
+      outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), 2);
 
     output = new BitCastInst(output, outputTy, "", insertPos);
   } else
@@ -2357,7 +2357,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     auto primMask = getFunctionArgument(m_entryPoint, entryArgIdxs.primMask);
     auto ij = getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center);
 
-    ij = new BitCastInst(ij, VectorType::get(Type::getFloatTy(*m_context), 2), "", insertPos);
+    ij = new BitCastInst(ij, FixedVectorType::get(Type::getFloatTy(*m_context), 2), "", insertPos);
     auto iCoord = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
     auto jCoord = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
 
@@ -3443,7 +3443,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
     // Cast 64-bit output to 32-bit
     compCount *= 2;
     bitWidth = 32;
-    outputTy = VectorType::get(Type::getFloatTy(*m_context), compCount);
+    outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), compCount);
     output = new BitCastInst(output, outputTy, "", insertPos);
   }
   assert(bitWidth == 16 || bitWidth == 32);
@@ -3538,13 +3538,13 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(Value *storeValu
   // }
 
   Type *argTys[] = {
-      storeValue->getType(),                            // %storeValue
-      VectorType::get(Type::getInt32Ty(*m_context), 4), // %streamOutBufDesc
-      Type::getInt32Ty(*m_context),                     // %writeIndex
-      Type::getInt32Ty(*m_context),                     // %threadId
-      Type::getInt32Ty(*m_context),                     // %vertexCount
-      Type::getInt32Ty(*m_context),                     // %xfbOffset
-      Type::getInt32Ty(*m_context)                      // %streamOffset
+      storeValue->getType(),                                 // %storeValue
+      FixedVectorType::get(Type::getInt32Ty(*m_context), 4), // %streamOutBufDesc
+      Type::getInt32Ty(*m_context),                          // %writeIndex
+      Type::getInt32Ty(*m_context),                          // %threadId
+      Type::getInt32Ty(*m_context),                          // %vertexCount
+      Type::getInt32Ty(*m_context),                          // %xfbOffset
+      Type::getInt32Ty(*m_context)                           // %streamOffset
   };
   auto funcTy = FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, funcName, m_module);
@@ -3684,9 +3684,9 @@ unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &
 
   Type *storeTys[4] = {
       Type::getInt32Ty(*m_context),
-      VectorType::get(Type::getInt32Ty(*m_context), 2),
-      VectorType::get(Type::getInt32Ty(*m_context), 3),
-      VectorType::get(Type::getInt32Ty(*m_context), 4),
+      FixedVectorType::get(Type::getInt32Ty(*m_context), 2),
+      FixedVectorType::get(Type::getInt32Ty(*m_context), 3),
+      FixedVectorType::get(Type::getInt32Ty(*m_context), 4),
   };
 
   std::string funcName = "llvm.amdgcn.raw.tbuffer.store.";
@@ -3702,7 +3702,7 @@ unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &
       funcName += getTypeName(storeTys[compCount - 1]);
       Value *storeValue = nullptr;
       if (compCount > 1) {
-        auto storeTy = VectorType::get(Type::getInt32Ty(*m_context), compCount);
+        auto storeTy = FixedVectorType::get(Type::getInt32Ty(*m_context), compCount);
         storeValue = UndefValue::get(storeTy);
 
         for (unsigned i = 0; i < compCount; ++i) {
@@ -3760,9 +3760,9 @@ unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadVal
 
   Type *loadTyps[4] = {
       Type::getInt32Ty(*m_context),
-      VectorType::get(Type::getInt32Ty(*m_context), 2),
-      VectorType::get(Type::getInt32Ty(*m_context), 3),
-      VectorType::get(Type::getInt32Ty(*m_context), 4),
+      FixedVectorType::get(Type::getInt32Ty(*m_context), 2),
+      FixedVectorType::get(Type::getInt32Ty(*m_context), 3),
+      FixedVectorType::get(Type::getInt32Ty(*m_context), 4),
   };
 
   std::string funcName = "llvm.amdgcn.raw.tbuffer.load.";
@@ -3828,7 +3828,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
   if (storeTy->isIntOrIntVectorTy()) {
     Type *bitCastTy = bitWidth == 32 ? Type::getFloatTy(*m_context) : Type::getHalfTy(*m_context);
     if (compCount > 1)
-      bitCastTy = VectorType::get(bitCastTy, compCount);
+      bitCastTy = FixedVectorType::get(bitCastTy, compCount);
     storeValue = new BitCastInst(storeValue, bitCastTy, "", insertPos);
   }
 
@@ -4403,7 +4403,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool isOutput, Type *readTy, Val
     auto intTy = bitWidth == 32 || bitWidth == 64
                      ? Type::getInt32Ty(*m_context)
                      : (bitWidth == 16 ? Type::getInt16Ty(*m_context) : Type::getInt8Ty(*m_context));
-    auto castTy = VectorType::get(intTy, numChannels);
+    auto castTy = FixedVectorType::get(intTy, numChannels);
     castValue = UndefValue::get(castTy);
 
     for (unsigned i = 0; i < numChannels; ++i) {
@@ -4438,7 +4438,7 @@ void PatchInOutImportExport::writeValueToLds(Value *writeValue, Value *ldsOffset
   Type *intTy = bitWidth == 32 || bitWidth == 64
                     ? Type::getInt32Ty(*m_context)
                     : (bitWidth == 16 ? Type::getInt16Ty(*m_context) : Type::getInt8Ty(*m_context));
-  Type *castTy = numChannels > 1 ? cast<Type>(VectorType::get(intTy, numChannels)) : intTy;
+  Type *castTy = numChannels > 1 ? cast<Type>(FixedVectorType::get(intTy, numChannels)) : intTy;
   Value *castValue = new BitCastInst(writeValue, castTy, "", insertPos);
 
   // Extract store values (dwords) from <n x i8>, <n x i16> or <n x i32> vector
@@ -4687,12 +4687,12 @@ void PatchInOutImportExport::createTessBufferStoreFunction() {
   //     ret void
   // }
   Type *argTys[] = {
-      VectorType::get(Type::getInt32Ty(*m_context), 4), // TF buffer descriptor
-      Type::getInt32Ty(*m_context),                     // TF buffer base
-      Type::getInt32Ty(*m_context),                     // Relative patch ID
-      Type::getInt32Ty(*m_context),                     // TF stride
-      Type::getInt32Ty(*m_context),                     // TF offset
-      Type::getFloatTy(*m_context)                      // TF value
+      FixedVectorType::get(Type::getInt32Ty(*m_context), 4), // TF buffer descriptor
+      Type::getInt32Ty(*m_context),                          // TF buffer base
+      Type::getInt32Ty(*m_context),                          // Relative patch ID
+      Type::getInt32Ty(*m_context),                          // TF stride
+      Type::getInt32Ty(*m_context),                          // TF offset
+      Type::getFloatTy(*m_context)                           // TF value
   };
   auto funcTy = FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::TfBufferStore, m_module);
@@ -5122,21 +5122,21 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
   const unsigned numChannels = bitWidth == 64 ? compCount * 2 : compCount;
   unsigned startChannel = bitWidth == 64 ? compIdx * 2 : compIdx;
   Type *exportTy =
-      numChannels > 1 ? VectorType::get(Type::getFloatTy(*m_context), numChannels) : Type::getFloatTy(*m_context);
+      numChannels > 1 ? FixedVectorType::get(Type::getFloatTy(*m_context), numChannels) : Type::getFloatTy(*m_context);
 
   if (outputTy != exportTy) {
     if (bitWidth == 8) {
       // NOTE: For 16-bit output export, we have to cast the 8-bit value to 32-bit floating-point value.
       assert(outputTy->isIntOrIntVectorTy());
       Type *zExtTy = Type::getInt32Ty(*m_context);
-      zExtTy = outputTy->isVectorTy() ? cast<Type>(VectorType::get(zExtTy, compCount)) : zExtTy;
+      zExtTy = outputTy->isVectorTy() ? cast<Type>(FixedVectorType::get(zExtTy, compCount)) : zExtTy;
       exportInst = new ZExtInst(output, zExtTy, "", insertPos);
       exportInst = new BitCastInst(exportInst, exportTy, "", insertPos);
     } else if (bitWidth == 16) {
       // NOTE: For 16-bit output export, we have to cast the 16-bit value to 32-bit floating-point value.
       if (outputTy->isFPOrFPVectorTy()) {
         Type *bitCastTy = Type::getInt16Ty(*m_context);
-        bitCastTy = outputTy->isVectorTy() ? cast<Type>(VectorType::get(bitCastTy, compCount)) : bitCastTy;
+        bitCastTy = outputTy->isVectorTy() ? cast<Type>(FixedVectorType::get(bitCastTy, compCount)) : bitCastTy;
         exportInst = new BitCastInst(output, bitCastTy, "", insertPos);
       } else {
         assert(outputTy->isIntOrIntVectorTy());
@@ -5144,7 +5144,7 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
       }
 
       Type *zExtTy = Type::getInt32Ty(*m_context);
-      zExtTy = outputTy->isVectorTy() ? cast<Type>(VectorType::get(zExtTy, compCount)) : zExtTy;
+      zExtTy = outputTy->isVectorTy() ? cast<Type>(FixedVectorType::get(zExtTy, compCount)) : zExtTy;
       exportInst = new ZExtInst(exportInst, zExtTy, "", insertPos);
       exportInst = new BitCastInst(exportInst, exportTy, "", insertPos);
     } else {

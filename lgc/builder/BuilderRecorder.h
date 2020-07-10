@@ -102,7 +102,7 @@ public:
     Power,
     Exp,
     Log,
-    InverseSqrt,
+    Sqrt,
     SAbs,
     FSign,
     SSign,
@@ -281,7 +281,7 @@ public:
   llvm::Value *CreatePower(llvm::Value *x, llvm::Value *y, const llvm::Twine &instName = "") override final;
   llvm::Value *CreateExp(llvm::Value *x, const llvm::Twine &instName = "") override final;
   llvm::Value *CreateLog(llvm::Value *x, const llvm::Twine &instName = "") override final;
-  llvm::Value *CreateInverseSqrt(llvm::Value *x, const llvm::Twine &instName = "") override final;
+  llvm::Value *CreateSqrt(llvm::Value *x, const llvm::Twine &instName = "") override final;
 
   // General arithmetic operations.
   llvm::Value *CreateSAbs(llvm::Value *x, const llvm::Twine &instName = "") override final;
@@ -551,7 +551,7 @@ protected:
 private:
   // Record one Builder call
   llvm::Instruction *record(Opcode opcode, llvm::Type *returnTy, llvm::ArrayRef<llvm::Value *> args,
-                            const llvm::Twine &instName, llvm::ArrayRef<llvm::Attribute::AttrKind> attribs = {});
+                            const llvm::Twine &instName);
 
   PipelineState *m_pipelineState;             // PipelineState; nullptr for shader compile
   std::unique_ptr<ShaderModes> m_shaderModes; // ShaderModes for a shader compile
