@@ -57,8 +57,8 @@ enum SectionType : unsigned {
   SectionTypeImageView,   // Image view section
   SectionTypeSampler,     // Sampler section
   // VKGC pipeline
-  SectionTypeGraphicsState,    // Graphics state section
-  SectionTypeComputeState,     // Compute state section
+  SectionTypeGraphicsState, // Graphics state section
+  SectionTypeComputeState,  // Compute state section
   SectionTypeVertexInputState, // Vertex input state section
   SectionTypeShaderInfo,       // Shader info section
   // GL pipeline

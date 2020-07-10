@@ -422,8 +422,8 @@ bool SPVAPI InitSpvGen(
         INITFUNC(spvGetVersion);
         INITFUNC(vfxParseFile);
         INITFUNC(vfxCloseDoc);
-        INITFUNC(vfxGetRenderDoc);
-        INITFUNC(vfxGetPipelineDoc);
+        INIT_OPT_FUNC(vfxGetRenderDoc);
+        INIT_OPT_FUNC(vfxGetPipelineDoc);
         INITFUNC(vfxPrintDoc);
     }
     else

@@ -302,6 +302,8 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(BinaryOperator &binaryOp) {
 // @param callInst : Call instruction
 void SpirvLowerAlgebraTransform::visitCallInst(CallInst &callInst) {
   auto callee = callInst.getCalledFunction();
+  if (!callee)
+    return;
 
   if (callee->isIntrinsic() && callee->getIntrinsicID() == Intrinsic::fabs) {
     // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND.
