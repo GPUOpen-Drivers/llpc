@@ -97,7 +97,7 @@ private:
 // Builder implementation subclass for arithmetic operations
 class ArithBuilder : virtual public BuilderImplBase {
 public:
-  ArithBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  ArithBuilder(LgcContext *builderContext) {}
 
   // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
   // the given cube map texture coordinates.
@@ -256,7 +256,7 @@ private:
 // Builder implementation subclass for descriptors
 class DescBuilder : virtual public BuilderImplBase {
 public:
-  DescBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  DescBuilder(LgcContext *builderContext) {}
 
   // Create a load of a buffer descriptor.
   llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, bool isNonUniform,
@@ -308,7 +308,7 @@ class ImageBuilder : virtual public BuilderImplBase {
   friend class YCbCrConverter;
 
 public:
-  ImageBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  ImageBuilder(LgcContext *builderContext) {}
 
   // Create an image load.
   llvm::Value *CreateImageLoad(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
@@ -428,7 +428,7 @@ private:
 // Builder implementation subclass for input/output operations
 class InOutBuilder : virtual public BuilderImplBase {
 public:
-  InOutBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  InOutBuilder(LgcContext *builderContext) {}
 
   // Create a read of (part of) a user input value.
   llvm::Value *CreateReadGenericInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
@@ -520,7 +520,7 @@ private:
 // Builder implementation subclass for matrix operations
 class MatrixBuilder : virtual public BuilderImplBase {
 public:
-  MatrixBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  MatrixBuilder(LgcContext *builderContext) {}
 
   // Create a matrix transpose.
   llvm::Value *CreateTransposeMatrix(llvm::Value *const matrix, const llvm::Twine &instName = "") override final;
@@ -568,7 +568,7 @@ private:
 // Builder implementation subclass for misc. operations
 class MiscBuilder : virtual public BuilderImplBase {
 public:
-  MiscBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  MiscBuilder(LgcContext *builderContext) {}
 
   // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
   // the current output primitive in the specified output-primitive stream.
@@ -606,7 +606,7 @@ private:
 // Builder implementation subclass for subgroup operations
 class SubgroupBuilder : virtual public BuilderImplBase {
 public:
-  SubgroupBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
+  SubgroupBuilder(LgcContext *builderContext) {}
 
   // Create a get subgroup size query.
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName) override final;
