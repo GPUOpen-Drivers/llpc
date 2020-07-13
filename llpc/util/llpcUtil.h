@@ -58,7 +58,7 @@ unsigned shaderStageToMask(ShaderStage stage);
 spv::ExecutionModel convertToExecModel(ShaderStage shaderStage);
 
 // Convert SPIR-V execution model to the shader stage
-ShaderStage convertToStageShage(unsigned execModel);
+ShaderStage convertToShaderStage(unsigned execModel);
 
 // =====================================================================================================================
 // Gets module ID according to the index

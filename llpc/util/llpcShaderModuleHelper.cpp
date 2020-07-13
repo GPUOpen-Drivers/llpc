@@ -125,7 +125,7 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
       ShaderEntryName entry = {};
       // The fourth word is start of the name string of the entry-point
       entry.name = reinterpret_cast<const char *>(&codePos[3]);
-      entry.stage = convertToStageShage(codePos[1]);
+      entry.stage = convertToShaderStage(codePos[1]);
       shaderEntryNames.push_back(entry);
       break;
     }
@@ -278,7 +278,7 @@ unsigned ShaderModuleHelper::getStageMaskFromSpirvBinary(const BinaryData *spvBi
         const char *name = reinterpret_cast<const char *>(&codePos[3]);
         if (strcmp(entryName, name) == 0) {
           // An matching entry-point is found
-          stageMask |= shaderStageToMask(convertToStageShage(codePos[1]));
+          stageMask |= shaderStageToMask(convertToShaderStage(codePos[1]));
         }
       }
 
