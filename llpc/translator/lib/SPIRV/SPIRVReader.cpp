@@ -1301,6 +1301,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             if (store->getMetadata(LLVMContext::MD_nontemporal))
               transNonTemporalMetadata(newStore);
           }
+        } else if (CallInst *const callInst = dyn_cast<CallInst>(value)) {
+          if (callInst->getCalledFunction()->getName().startswith(gSPIRVMD::NonUniform))
+            continue;
         } else
           llvm_unreachable("Should never be called!");
       }
