@@ -26,6 +26,9 @@ ARG ASSERTIONS
 ARG FEATURES
 ARG GENERATOR
 
+# Use bash instead of sh in this docker file.
+SHELL ["/bin/bash", "-c"]
+
 # Install required packages.
 # Use pip to install an up-to-date version of CMake. The apt package is
 # too old for LLVM.
@@ -34,7 +37,7 @@ RUN apt-get update \
        build-essential pkg-config \
        gcc g++ ninja-build binutils-gold \
        clang-9 libclang-common-9-dev lld-9 \
-       python python-distutils-extra python3 python3-distutils python3-pip \
+       python3 python3-distutils python3-pip \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
        libwayland-dev \
@@ -47,12 +50,14 @@ RUN apt-get update \
     && update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-9 10
 
 # Checkout all repositories. Replace llpc with the version in LLPC_SOURCE_DIR.
+# The /vulkandriver/env.sh file is for extra env variables used by later commands.
 WORKDIR /vulkandriver
 RUN repo init -u https://github.com/GPUOpen-Drivers/AMDVLK.git -b "$BRANCH" \
     && repo sync -c --no-clone-bundle -j$(nproc) \
+    && touch ./env.sh \
     && cd /vulkandriver/drivers/spvgen/external \
-    && python2 fetch_external_sources.py \
-    && if echo "$FEATURES" | grep -q "+sanitizer" ; then \
+    && python3 fetch_external_sources.py \
+    && if echo "$FEATURES" | grep -q "+sanitizers" ; then \
          cd glslang \
          && git checkout adacba3ee9213be19c8c238334a3a61ae4201812; \
        fi
@@ -75,11 +80,14 @@ RUN EXTRA_FLAGS="" \
          EXTRA_FLAGS="$EXTRA_FLAGS -DLLPC_ENABLE_SHADER_CACHE=1"; \
        fi \
     && if echo "$FEATURES" | grep -q "+sanitizers" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_USE_SANITIZER=Address;Undefined" \
-         && export ASAN_OPTIONS=detect_leaks=0 \
-         && export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so; \
+         EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_USE_SANITIZER=Address;Undefined"; \
+         echo "export ASAN_OPTIONS=detect_leaks=0" >> /vulkandriver/env.sh; \
+         echo "export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so" >> /vulkandriver/env.sh; \
        fi \
     && echo "Extra CMake flags: $EXTRA_FLAGS" \
+    && echo "Extra env vars (/vulkandriver/env.sh): " \
+    && cat /vulkandriver/env.sh \
+    && source /vulkandriver/env.sh \
     && cmake "/vulkandriver/drivers/xgl" \
           -G "$GENERATOR" \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
@@ -96,10 +104,7 @@ RUN EXTRA_FLAGS="" \
     && cmake --build . --target not
 
 # Run the lit test suite.
-RUN if echo "$FEATURES" | grep -q "+sanitizers" ; then \
-      export ASAN_OPTIONS=detect_leaks=0 \
-      && export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so; \
-    fi \
+RUN source /vulkandriver/env.sh \
     && cmake --build . --target check-amdllpc -- -v \
     && cmake --build . --target check-lgc -- -v \
     && (echo "Base image built on $(date)" | tee /vulkandriver/build_info.txt)
