@@ -673,7 +673,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
       std::min(resUsage->numSgprsAvailable, m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable);
 
   if (shaderOptions->maxThreadGroupsPerComputeUnit != 0) {
-    std::string wavesPerEu = std::string("0,") + std::to_string(shaderOptions->maxThreadGroupsPerComputeUnit);
+    std::string wavesPerEu = std::string("1,") + std::to_string(shaderOptions->maxThreadGroupsPerComputeUnit);
     builder.addAttribute("amdgpu-waves-per-eu", wavesPerEu);
   }
 
