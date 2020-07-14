@@ -173,9 +173,11 @@ public:
   Value *transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicBlock *bb);
 
   Value *createLaunderRowMajorMatrix(Value *const);
-  Value *addLoadInstRecursively(SPIRVType *const, Value *const, bool, bool, bool);
-  void addStoreInstRecursively(SPIRVType *const, Value *const, Value *const, bool, bool, bool);
+  Value *addLoadInstRecursively(SPIRVType *const, Value *const, bool, bool, AtomicOrdering);
+  void addStoreInstRecursively(SPIRVType *const, Value *const, Value *const, bool, bool, AtomicOrdering);
   Constant *buildConstStoreRecursively(SPIRVType *const, Type *const, Constant *const);
+
+  template <class T> AtomicOrdering getMemoryOrdering(T *const, bool);
 
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();

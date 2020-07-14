@@ -1378,10 +1378,10 @@ Value *SPIRVToLLVM::createLaunderRowMajorMatrix(Value *const pointerToMatrix) {
 // @param spvType : The SPIR-V type of the load.
 // @param loadPointer : The LLVM pointer to load from.
 // @param isVolatile : Is the load volatile?
-// @param isCoherent : Is the load coherent?
 // @param isNonTemporal : Is the load non-temporal?
+// @param memoryOrdering : Load memory ordering.
 Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *loadPointer, bool isVolatile,
-                                           bool isCoherent, bool isNonTemporal) {
+                                           bool isNonTemporal, AtomicOrdering memoryOrdering) {
   assert(loadPointer->getType()->isPointerTy());
 
   Type *loadType = loadPointer->getType()->getPointerElementType();
@@ -1415,7 +1415,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       }
 
       Value *const memberLoad = addLoadInstRecursively(spvType->getStructMemberType(i), memberLoadPointer, isVolatile,
-                                                       isCoherent, isNonTemporal);
+                                                       isNonTemporal, memoryOrdering);
 
       memberLoads.push_back(memberLoad);
       memberTypes.push_back(memberLoad->getType());
@@ -1449,7 +1449,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       Value *elementLoadPointer = getBuilder()->CreateGEP(loadPointer, indices);
 
       Value *const elementLoad =
-          addLoadInstRecursively(spvElementType, elementLoadPointer, isVolatile, isCoherent, isNonTemporal);
+          addLoadInstRecursively(spvElementType, elementLoadPointer, isVolatile, isNonTemporal, memoryOrdering);
       load = getBuilder()->CreateInsertValue(load, elementLoad, i);
     }
 
@@ -1473,8 +1473,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     LoadInst *const load = getBuilder()->CreateAlignedLoad(
         loadType, loadPointer, m_m->getDataLayout().getABITypeAlign(alignmentType), isVolatile);
 
-    if (isCoherent)
-      load->setAtomic(AtomicOrdering::Unordered);
+    load->setAtomic(memoryOrdering);
 
     if (isNonTemporal)
       transNonTemporalMetadata(load);
@@ -1495,10 +1494,10 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 // @param storePointer : The LLVM pointer to store to.
 // @param storeValue : The LLVM value to store into the pointer.
 // @param isVolatile : Is the store volatile?
-// @param isCoherent : Is the store coherent?
 // @param isNonTemporal : Is the store non-temporal?
+// @param memoryOrdering: Store memory ordering.
 void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *storePointer, Value *storeValue,
-                                          bool isVolatile, bool isCoherent, bool isNonTemporal) {
+                                          bool isVolatile, bool isNonTemporal, AtomicOrdering memoryOrdering) {
   assert(storePointer->getType()->isPointerTy());
 
   Type *storeType = storePointer->getType()->getPointerElementType();
@@ -1520,8 +1519,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
     StoreInst *const store = getBuilder()->CreateAlignedStore(constStoreValue, storePointer, alignment, isVolatile);
 
-    if (isCoherent)
-      store->setAtomic(AtomicOrdering::Unordered);
+    store->setAtomic(memoryOrdering);
 
     if (isNonTemporal)
       transNonTemporalMetadata(store);
@@ -1541,7 +1539,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
           getBuilder()->CreateGEP(storePointer, {zero, getBuilder()->getInt32(memberIndex)});
       Value *const memberStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
       addStoreInstRecursively(spvType->getStructMemberType(i), memberStorePointer, memberStoreValue, isVolatile,
-                              isCoherent, isNonTemporal);
+                              isNonTemporal, memoryOrdering);
     }
   } else if (storeType->isArrayTy() && !spvType->isTypeVector()) {
     // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
@@ -1560,8 +1558,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
       Value *const elementStorePointer = getBuilder()->CreateGEP(storePointer, indices);
       Value *const elementStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
-      addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreValue, isVolatile, isCoherent,
-                              isNonTemporal);
+      addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreValue, isVolatile, isNonTemporal,
+                              memoryOrdering);
     }
   } else {
     Type *alignmentType = storeType;
@@ -1589,8 +1587,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
     StoreInst *const store = getBuilder()->CreateAlignedStore(
         storeValue, storePointer, m_m->getDataLayout().getABITypeAlign(alignmentType), isVolatile);
 
-    if (isCoherent)
-      store->setAtomic(AtomicOrdering::Unordered);
+    store->setAtomic(memoryOrdering);
 
     if (isNonTemporal)
       transNonTemporalMetadata(store);
@@ -1728,6 +1725,38 @@ static AtomicOrdering transMemorySemantics(const SPIRVConstant *const spvMemoryS
     return AtomicOrdering::Monotonic;
 
   return AtomicOrdering::Monotonic;
+}
+
+// =====================================================================================================================
+// Get memory ordering from SPIR-V opcode and its associated memory mask and scope.
+//
+// @param spvValue : A SPIR-V value.
+// @param isSrcOperand : True for OpLoad or OpCopyMemory source, False for OpStore or OpCopyMemory target.
+template <typename T> AtomicOrdering SPIRVToLLVM::getMemoryOrdering(T *const spvValue, bool isSrcOperand) {
+  unsigned memoryAccessMask = spvValue->getMemoryAccessMask(isSrcOperand);
+
+  if (memoryAccessMask & MemoryAccessNonPrivatePointerKHRMask) {
+    return AtomicOrdering::Monotonic;
+  }
+
+  SPIRVWord spvId = SPIRVID_INVALID;
+  // MakePointerVisible is only valid for OpLoad or OpCopyMemory source
+  if (memoryAccessMask & MemoryAccessMakePointerVisibleKHRMask)
+    spvId = spvValue->getMakeVisibleScope(isSrcOperand);
+  // MakePointerAvailable is only valid for OpStore or OpCopyMemory target
+  if (memoryAccessMask & MemoryAccessMakePointerAvailableKHRMask)
+    spvId = spvValue->getMakeAvailableScope(isSrcOperand);
+
+  if (spvId != SPIRVID_INVALID) {
+    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
+    const unsigned scope = spvScope->getZExtIntValue();
+    const bool isDeviceScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
+    if (isDeviceScope) {
+      return AtomicOrdering::Monotonic;
+    }
+  }
+
+  return AtomicOrdering::NotAtomic;
 }
 
 // =====================================================================================================================
@@ -2053,33 +2082,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
     break;
   }
 
-  bool isCoherent = false;
-
-  if (spvCopyMemory->getMemoryAccessMask(true) & MemoryAccessMakePointerVisibleKHRMask) {
-    SPIRVWord spvId = spvCopyMemory->getMakeVisibleScope(true);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-
-    if (isSystemScope)
-      isCoherent = true;
-  }
-  if (spvCopyMemory->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
-
-  if (spvCopyMemory->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask) {
-    SPIRVWord spvId = spvCopyMemory->getMakeAvailableScope(false);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-
-    if (isSystemScope)
-      isCoherent = true;
-  }
-  if (spvCopyMemory->getMemoryAccessMask(false) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
+  AtomicOrdering memoryOrderingSource = getMemoryOrdering<SPIRVCopyMemory>(spvCopyMemory, true);
+  AtomicOrdering memoryOrderingTarget = getMemoryOrdering<SPIRVCopyMemory>(spvCopyMemory, false);
 
   bool isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(true);
 
@@ -2089,7 +2093,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
   SPIRVType *const spvLoadType = spvCopyMemory->getSource()->getType();
 
   Value *const load = addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, isSrcVolatile,
-                                             isCoherent, isNonTemporal);
+                                             isNonTemporal, memoryOrderingSource);
 
   Value *const storePointer = transValue(spvCopyMemory->getTarget(), getBuilder()->GetInsertBlock()->getParent(),
                                          getBuilder()->GetInsertBlock());
@@ -2097,8 +2101,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
   SPIRVType *const spvStoreType = spvCopyMemory->getTarget()->getType();
   isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(false);
 
-  addStoreInstRecursively(spvStoreType->getPointerElementType(), storePointer, load, isDestVolatile, isCoherent,
-                          isNonTemporal);
+  addStoreInstRecursively(spvStoreType->getPointerElementType(), storePointer, load, isDestVolatile, isNonTemporal,
+                          memoryOrderingTarget);
   return nullptr;
 }
 
@@ -2139,21 +2143,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     break;
   }
 
-  bool isCoherent = spvLoad->getSrc()->isCoherent();
-
-  // MakePointerVisibleKHR is valid with OpLoad
-  if (spvLoad->getMemoryAccessMask(true) & MemoryAccessMakePointerVisibleKHRMask) {
-    SPIRVWord spvId = spvLoad->getMakeVisibleScope(true);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-
-    if (isSystemScope)
-      isCoherent = true;
-  }
-  if (spvLoad->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
+  AtomicOrdering memoryOrdering = getMemoryOrdering<SPIRVLoad>(spvLoad, true);
+  if (memoryOrdering == AtomicOrdering::NotAtomic && spvLoad->getSrc()->isCoherent())
+    memoryOrdering = AtomicOrdering::Unordered;
 
   const bool isNonTemporal = spvLoad->SPIRVMemoryAccess::isNonTemporal(true);
 
@@ -2162,8 +2154,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
 
   SPIRVType *const spvLoadType = spvLoad->getSrc()->getType();
 
-  return addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, isVolatile, isCoherent,
-                                isNonTemporal);
+  return addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, isVolatile, isNonTemporal,
+                                memoryOrdering);
 }
 
 // =====================================================================================================================
@@ -2370,21 +2362,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
     break;
   }
 
-  bool isCoherent = spvStore->getDst()->isCoherent();
-
-  // MakePointerAvailableKHR is valid with OpStore
-  if (spvStore->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask) {
-    SPIRVWord spvId = spvStore->getMakeAvailableScope(false);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-
-    if (isSystemScope)
-      isCoherent = true;
-  }
-  if (spvStore->getMemoryAccessMask(false) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
+  AtomicOrdering memoryOrdering = getMemoryOrdering<SPIRVStore>(spvStore, false);
+  if (memoryOrdering == AtomicOrdering::NotAtomic && spvStore->getDst()->isCoherent())
+    memoryOrdering = AtomicOrdering::Unordered;
 
   const bool isNonTemporal = spvStore->SPIRVMemoryAccess::isNonTemporal(false);
 
@@ -2396,8 +2376,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
 
   SPIRVType *const spvStoreType = spvStore->getDst()->getType();
 
-  addStoreInstRecursively(spvStoreType->getPointerElementType(), storePointer, storeValue, isVolatile, isCoherent,
-                          isNonTemporal);
+  addStoreInstRecursively(spvStoreType->getPointerElementType(), storePointer, storeValue, isVolatile, isNonTemporal,
+                          memoryOrdering);
 
   // For stores, we don't really have a thing to map to, so we just return nullptr here.
   return nullptr;
