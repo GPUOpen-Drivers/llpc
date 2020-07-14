@@ -284,20 +284,20 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 
       // Use a static cast from Vkgc NggSubgroupSizingType to LGC NggSubgroupSizing, and static assert that
       // that is valid.
-      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Auto) == NggSubgroupSizing::Auto, "mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Auto) == NggSubgroupSizing::Auto, "Mismatch");
       static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::MaximumSize) ==
                         NggSubgroupSizing::MaximumSize,
-                    "mismatch");
+                    "Mismatch");
       static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::HalfSize) == NggSubgroupSizing::HalfSize,
-                    "mismatch");
+                    "Mismatch");
       static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForVerts) ==
                         NggSubgroupSizing::OptimizeForVerts,
-                    "mismatch");
+                    "Mismatch");
       static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForPrims) ==
                         NggSubgroupSizing::OptimizeForPrims,
-                    "mismatch");
+                    "Mismatch");
       static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Explicit) == NggSubgroupSizing::Explicit,
-                    "mismatch");
+                    "Mismatch");
       options.nggSubgroupSizing = static_cast<NggSubgroupSizing>(nggState.subgroupSizing);
 
       options.nggVertsPerSubgroup = nggState.vertsPerSubgroup;
@@ -354,11 +354,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 
       // Use a static cast from Vkgc WaveBreakSize to LGC WaveBreak, and static assert that
       // that is valid.
-      static_assert(static_cast<WaveBreak>(WaveBreakSize::None) == WaveBreak::None, "mismatch");
-      static_assert(static_cast<WaveBreak>(WaveBreakSize::_8x8) == WaveBreak::_8x8, "mismatch");
-      static_assert(static_cast<WaveBreak>(WaveBreakSize::_16x16) == WaveBreak::_16x16, "mismatch");
-      static_assert(static_cast<WaveBreak>(WaveBreakSize::_32x32) == WaveBreak::_32x32, "mismatch");
-      static_assert(static_cast<WaveBreak>(WaveBreakSize::DrawTime) == WaveBreak::DrawTime, "mismatch");
+      static_assert(static_cast<WaveBreak>(WaveBreakSize::None) == WaveBreak::None, "Mismatch");
+      static_assert(static_cast<WaveBreak>(WaveBreakSize::_8x8) == WaveBreak::_8x8, "Mismatch");
+      static_assert(static_cast<WaveBreak>(WaveBreakSize::_16x16) == WaveBreak::_16x16, "Mismatch");
+      static_assert(static_cast<WaveBreak>(WaveBreakSize::_32x32) == WaveBreak::_32x32, "Mismatch");
+      static_assert(static_cast<WaveBreak>(WaveBreakSize::DrawTime) == WaveBreak::DrawTime, "Mismatch");
       shaderOptions.waveBreakSize = static_cast<WaveBreak>(shaderInfo->options.waveBreakSize);
 
       shaderOptions.loadScalarizerThreshold = 0;
@@ -377,11 +377,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       shaderOptions.updateDescInElf = shaderInfo->options.updateDescInElf;
       shaderOptions.unrollThreshold = shaderInfo->options.unrollThreshold;
 
-      static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::Auto) == lgc::DenormalMode::Auto, "mismatch");
+      static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::Auto) == lgc::DenormalMode::Auto, "Mismatch");
       static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::FlushToZero) == lgc::DenormalMode::FlushToZero,
-                    "mismatch");
+                    "Mismatch");
       static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::Preserve) == lgc::DenormalMode::Preserve,
-                    "mismatch");
+                    "Mismatch");
       shaderOptions.fp32DenormalMode = static_cast<lgc::DenormalMode>(shaderInfo->options.fp32DenormalMode);
 
       pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
@@ -477,27 +477,27 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       // accidentally depends on LLPC version).
       static_assert(ResourceNodeType::DescriptorResource ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorResource),
-                    "mismatch");
+                    "Mismatch");
       static_assert(ResourceNodeType::DescriptorSampler ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorSampler),
-                    "mismatch");
+                    "Mismatch");
       static_assert(ResourceNodeType::DescriptorCombinedTexture ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorCombinedTexture),
-                    "mismatch");
+                    "Mismatch");
       static_assert(ResourceNodeType::DescriptorTexelBuffer ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorTexelBuffer),
-                    "mismatch");
+                    "Mismatch");
       static_assert(ResourceNodeType::DescriptorFmask ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorFmask),
-                    "mismatch");
+                    "Mismatch");
       static_assert(ResourceNodeType::DescriptorBuffer ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBuffer),
-                    "mismatch");
+                    "Mismatch");
       static_assert(ResourceNodeType::PushConst == static_cast<ResourceNodeType>(ResourceMappingNodeType::PushConst),
-                    "mismatch");
+                    "Mismatch");
       static_assert(ResourceNodeType::DescriptorBufferCompact ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBufferCompact),
-                    "mismatch");
+                    "Mismatch");
       // A "PushConst" is in fact an InlineBuffer when it appears in a non-root table.
       if (node.type == ResourceMappingNodeType::PushConst && !isRoot)
         destNode.type = ResourceNodeType::InlineBuffer;
