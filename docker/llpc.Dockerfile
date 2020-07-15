@@ -11,17 +11,20 @@
 # Required arguments:
 # - AMDVLK_IMAGE: Base image name for prebuilt amdvlk
 # - LLPC_REPO_NAME: Name of the llpc repository to clone
-# - RESPOSITORY_SHA: SHA of the commit to checkout
+# - LLPC_REPO_REF: ref name to checkout
+# - LLPC_REPO_SHA: SHA of the commit to checkout
 #
 
 # Resume build from the specified image.
 ARG AMDVLK_IMAGE
 FROM "$AMDVLK_IMAGE"
 
-ARG FEATURES
 ARG LLPC_REPO_NAME
 ARG LLPC_REPO_REF
 ARG LLPC_REPO_SHA
+
+# Use bash instead of sh in this docker file.
+SHELL ["/bin/bash", "-c"]
 
 # Sync the repos. Replace the base LLPC with a freshly checked-out one.
 RUN cat /vulkandriver/build_info.txt \
@@ -33,18 +36,12 @@ RUN cat /vulkandriver/build_info.txt \
 
 # Build LLPC.
 WORKDIR /vulkandriver/builds/ci-build
-RUN if echo "$FEATURES" | grep -q "+sanitizers" ; then \
-      export ASAN_OPTIONS=detect_leaks=0 \
-      && export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so; \
-    fi \
+RUN source /vulkandriver/env.sh \
     && cmake --build . \
     && cmake --build . --target amdllpc \
     && cmake --build . --target spvgen
 
 # Run the lit test suite.
-RUN if echo "$FEATURES" | grep -q "+sanitizers" ; then \
-      export ASAN_OPTIONS=detect_leaks=0 \
-      && export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so; \
-    fi \
+RUN source /vulkandriver/env.sh \
     && cmake --build . --target check-amdllpc -- -v \
     && cmake --build . --target check-lgc -- -v
