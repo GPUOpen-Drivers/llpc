@@ -2016,14 +2016,7 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
     SET_REG_GFX10_FIELD(config, COMPUTE_PGM_RSRC1, WGP_MODE, wgpMode);
     unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageCompute);
     assert(waveSize == 32 || waveSize == 64);
-    if (m_pipelineState->getPalAbiVersion() < 495) {
-      if (waveSize == 32) {
-        // For GFX10 pipeline, PAL expects to get CS_W32_EN from pipeline metadata,
-        // other fields of this register are set by PAL.
-        SET_REG_GFX10_FIELD(config, COMPUTE_DISPATCH_INITIATOR, CS_W32_EN, true);
-      }
-    } else
-      setWaveFrontSize(Util::Abi::HardwareStage::Cs, waveSize);
+    setWaveFrontSize(Util::Abi::HardwareStage::Cs, waveSize);
   }
 
   // Set registers based on shader interface data

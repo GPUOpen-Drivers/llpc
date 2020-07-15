@@ -297,13 +297,6 @@ CsRegConfig::CsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_1);
   INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_2);
   INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_3);
-
-  if (gfxIp.major >= 10) {
-    // COMPUTE_DISPATCH_INITIATOR is only required for GFX10 pipeline
-    INIT_REG(COMPUTE_DISPATCH_INITIATOR);
-  } else {
-    INIT_REG_TO_INVALID(COMPUTE_DISPATCH_INITIATOR);
-  }
 }
 
 // =====================================================================================================================
