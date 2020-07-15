@@ -276,8 +276,10 @@ bool PatchResourceCollect::canUseNgg(Module *module) {
 
     // NOTE: On GFX10, the bit VGT_GS_INSTANCE_CNT.EN_MAX_VERT_OUT_PER_GS_INSTANCE provided by HW allows each GS
     // instance to emit maximum vertices (256). But this mode is not supported when tessellation is enabled.
-    if (geometryMode.invocations * geometryMode.outputVertices > Gfx9::NggMaxThreadsPerSubgroup)
-      return false;
+    if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waGeNggMaxVertOutWithGsInstancing) {
+      if (geometryMode.invocations * geometryMode.outputVertices > Gfx9::NggMaxThreadsPerSubgroup)
+        return false;
+    }
   }
 
   // We can safely enable NGG here if NGG flag allows us to do so

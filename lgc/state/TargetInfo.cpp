@@ -281,6 +281,7 @@ static void setGfx10Info(TargetInfo *targetInfo) {
   // Hardware workarounds for GFX10 based GPU's:
   targetInfo->getGpuWorkarounds().gfx10.disableI32ModToI16Mod = 1;
   targetInfo->getGpuWorkarounds().gfx10.waLimitedMaxOutputVertexCount = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waGeNggMaxVertOutWithGsInstancing = 1;
 }
 
 // gfx1010 (including gfx101E and gfx101F)
