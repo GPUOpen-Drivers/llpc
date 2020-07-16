@@ -1,0 +1,43 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; XFAIL: assertions
+; END_SHADERTEST
+;
+; Based on https://github.com/GPUOpen-Drivers/llpc/issues/836.
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 7
+; Bound: 371
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main"
+               OpExecutionMode %4 OriginUpperLeft
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+          %6 = OpTypeFloat 32
+          %7 = OpTypeVector %6 2
+          %8 = OpTypePointer Function %7
+          %9 = OpTypeVector %6 4
+         %10 = OpTypePointer Function %9
+         %11 = OpTypeBool
+         %12 = OpTypeFunction %11 %8 %10
+         %31 = OpConstantFalse %11
+        %313 = OpTypeVector %11 4
+        %363 = OpTypePointer Function %313
+        %364 = OpConstantComposite %313 %31 %31 %31 %31
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+               OpReturn
+               OpFunctionEnd
+         %15 = OpFunction %11 None %12
+         %13 = OpFunctionParameter %8
+         %14 = OpFunctionParameter %10
+         %16 = OpLabel
+        %365 = OpVariable %363 Function %364
+               OpReturnValue %31
+               OpFunctionEnd
