@@ -1,0 +1,72 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; XFAIL: *
+; END_SHADERTEST
+;
+; Based on https://github.com/GPUOpen-Drivers/llpc/issues/834.
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 7
+; Bound: 659
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %243
+               OpExecutionMode %4 OriginUpperLeft
+               OpDecorate %243 BuiltIn FragCoord
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+          %6 = OpTypeInt 32 1
+         %22 = OpConstant %6 1
+         %37 = OpTypeInt 32 0
+        %157 = OpTypeFloat 32
+        %241 = OpTypeVector %157 4
+        %242 = OpTypePointer Input %241
+        %243 = OpVariable %242 Input
+        %244 = OpConstant %37 1
+        %245 = OpTypePointer Input %157
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+               OpSelectionMerge %182 None
+               OpSwitch %22 %182 0 %172 1 %173 2 %174 3 %175 4 %176 5 %177 6 %178 7 %179 8 %180 9 %181
+        %172 = OpLabel
+               OpBranch %182
+        %173 = OpLabel
+               OpBranch %182
+        %174 = OpLabel
+               OpBranch %182
+        %175 = OpLabel
+               OpBranch %182
+        %176 = OpLabel
+               OpBranch %182
+        %177 = OpLabel
+               OpBranch %182
+        %178 = OpLabel
+               OpBranch %182
+        %179 = OpLabel
+               OpBranch %182
+        %180 = OpLabel
+               OpBranch %182
+        %181 = OpLabel
+               OpBranch %182
+        %182 = OpLabel
+        %246 = OpAccessChain %245 %243 %244
+               OpBranch %252
+        %288 = OpLabel
+        %652 = OpCopyObject %245 %246
+               OpBranch %294
+        %294 = OpLabel
+               OpBranch %295
+        %295 = OpLabel
+               OpBranch %282
+        %282 = OpLabel
+               OpBranch %269
+        %269 = OpLabel
+               OpBranch %252
+        %252 = OpLabel
+               OpReturn
+               OpFunctionEnd
