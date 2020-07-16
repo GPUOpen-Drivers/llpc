@@ -23,7 +23,7 @@
 ; SHADERTEST1: %[[SPILLCONST:.+]] = call i32 @llvm.amdgcn.reloc.constant(metadata ![[SPILLNODE:[0-9]+]])
 ; SHADERTEST1: %[[CONSTAND:.+]] = and i32 %[[SPILLCONST]], 1
 ; SHADERTEST1: %[[CONSTICMP:.+]] = icmp eq i32 %[[CONSTAND]], 0
-; SHADERTEST1: %[[DESCPTRSELECT:.+]] = select i1 %[[CONSTICMP:[0-9]+]], {{.*}}
+; SHADERTEST1: %[[DESCPTRSELECT:.+]] = select i1 %[[CONSTICMP]], {{.*}}
 ; SHADERTEST1: %[[OFFCONST:.+]] = call i32 @llvm.amdgcn.reloc.constant(metadata ![[OFFNODE:[0-9]+]])
 ; SHADERTEST1: %[[OFFCONSTEXT:.+]] = zext i32 %[[OFFCONST]] to i64
 ; SHADERTEST1: %[[BUFFFERDESCADDR:.+]] = add i64 %{{.+}}, %[[OFFCONSTEXT]]
