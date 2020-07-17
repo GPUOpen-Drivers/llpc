@@ -149,7 +149,7 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
 void PatchInOutImportExport::processShader() {
   if (m_shaderStage == ShaderStageFragment) {
     // Create fragment color export manager
-    m_fragColorExport = new FragColorExport(m_pipelineState, m_module);
+    m_fragColorExport = new FragColorExport(m_context);
   }
 
   // Initialize the output value for gl_PrimitiveID
@@ -1323,8 +1323,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     }
 
     // Export fragment colors
-    for (unsigned location = 0; location < MaxColorTargets; ++location) {
-      auto &expFragColor = m_expFragColors[location];
+    for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
+      auto &expFragColor = m_expFragColors[hwColorTarget];
       if (expFragColor.size() > 0) {
         Value *output = nullptr;
         unsigned compCount = expFragColor.size();
@@ -1333,11 +1333,11 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         // Set CB shader mask
         auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
         const unsigned channelMask = ((1 << compCount) - 1);
-        const unsigned origLoc = resUsage->inOutUsage.fs.outputOrigLocs[location];
-        if (origLoc == InvalidValue)
+        unsigned location = resUsage->inOutUsage.fs.outputOrigLocs[hwColorTarget];
+        if (location == InvalidValue)
           continue;
 
-        resUsage->inOutUsage.fs.cbShaderMask |= (channelMask << (4 * origLoc));
+        resUsage->inOutUsage.fs.cbShaderMask |= (channelMask << (4 * location));
 
         // Construct exported fragment colors
         if (compCount == 1)
@@ -1353,8 +1353,22 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           }
         }
 
+        // Update the pipeline state with new information about the export.
+        Type *outputTy = output->getType();
+        ExportFormat expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(outputTy, location));
+        if (expFmt == EXP_FORMAT_ZERO) {
+          // Clear channel mask if shader export format is ZERO
+          resUsage->inOutUsage.fs.cbShaderMask &= ~(0xF << (4 * location));
+        }
+
+        BasicType outputType = resUsage->inOutUsage.fs.outputTypes[location];
+        const bool signedness =
+            (outputType == BasicType::Int8 || outputType == BasicType::Int16 || outputType == BasicType::Int);
+
+        resUsage->inOutUsage.fs.expFmts[hwColorTarget] = expFmt;
+
         // Do fragment color exporting
-        auto exportInst = m_fragColorExport->run(output, location, insertPos);
+        auto exportInst = m_fragColorExport->run(output, hwColorTarget, insertPos, expFmt, signedness);
         if (exportInst)
           m_lastExport = cast<CallInst>(exportInst);
       }
