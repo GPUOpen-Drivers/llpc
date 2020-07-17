@@ -5691,6 +5691,42 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
 }
 
 // =============================================================================
+// Helper function for handling converting sampler select ladder
+//
+// @param result : [in] The result from non-converting sampler path.
+// @param convertingSamplerIdx : [in] The index of converting sampler that will be used in createImageOp.
+// @param createImageOp : [in] A function that accepts converting sampler and returns the same type as result.
+Value *SPIRVToLLVM::ConvertingSamplerSelectLadderHelper(Value *result, Value *convertingSamplerIdx,
+                                                        std::function<Value *(Value *)> createImageOp) {
+  // We have converting samplers. We need to create a converting image sample for each possible one, and
+  // select the one we want with a select ladder. In any sensible case, the converting sampler index is
+  // statically determinable by later optimizations, and all but the correct image sample get optimized away.
+  // The converting sampler index is a 1-based index into all the converting sampler values we have. For example,
+  // if m_convertingSamplers has two entries, the first with an array of 3 samplers (24 ints) and the second with an
+  // array of 5 samplers (40 ints), then the first entry's 3 samplers are referred to as 1,2,3, and the second
+  // entry's 5 samplers are referred to as 4,5,6,7,8.
+  int thisConvertingSamplerIdx = 1;
+  for (const ConvertingSampler &convertingSampler : m_convertingSamplers) {
+    unsigned arraySize = convertingSampler.values.size() / ConvertingSamplerDwordCount;
+    for (unsigned idx = 0; idx != arraySize; ++idx) {
+      // We want to do a converting image sample for this sampler value. First get the sampler value.
+      SmallVector<Constant *, ConvertingSamplerDwordCount> samplerInts;
+      for (unsigned component = 0; component != ConvertingSamplerDwordCount; ++component) {
+        samplerInts.push_back(
+            getBuilder()->getInt32(convertingSampler.values[idx * ConvertingSamplerDwordCount + component]));
+      }
+      Value *thisResult = createImageOp(ConstantVector::get(samplerInts));
+      // Add to select ladder.
+      Value *selector =
+          getBuilder()->CreateICmpEQ(convertingSamplerIdx, getBuilder()->getInt32(thisConvertingSamplerIdx));
+      result = getBuilder()->CreateSelect(selector, thisResult, result);
+      ++thisConvertingSamplerIdx;
+    }
+  }
+  return result;
+}
+
+// =============================================================================
 // Translate image sample to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
   // Get image type descriptor and load resource and sampler descriptors.
@@ -5754,34 +5790,12 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
       getBuilder()->CreateImageSample(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDesc, addr);
 
   if (!m_convertingSamplers.empty()) {
-    // We have converting samplers. We need to create a converting image sample for each possible one, and
-    // select the one we want with a select ladder. In any sensible case, the converting sampler index is
-    // statically determinable by later optimizations, and all but the correct image sample get optimized away.
-    // The converting sampler index is a 1-based index into all the converting sampler values we have. For example,
-    // if m_convertingSamplers has two entries, the first with an array of 3 samplers (24 ints) and the second with an
-    // array of 5 samplers (40 ints), then the first entry's 3 samplers are referred to as 1,2,3, and the second
-    // entry's 5 samplers are referred to as 4,5,6,7,8.
+    auto createImageSampleConvert = [&](Value *samplerDescIn) -> Value * {
+      return getBuilder()->CreateImageSampleConvert(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDescArray,
+                                                    samplerDescIn, addr);
+    };
     Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 1);
-    int thisConvertingSamplerIdx = 1;
-    for (const ConvertingSampler &convertingSampler : m_convertingSamplers) {
-      unsigned arraySize = convertingSampler.values.size() / ConvertingSamplerDwordCount;
-      for (unsigned idx = 0; idx != arraySize; ++idx) {
-        // We want to do a converting image sample for this sampler value. First get the sampler value.
-        SmallVector<Constant *, ConvertingSamplerDwordCount> samplerInts;
-        for (unsigned component = 0; component != ConvertingSamplerDwordCount; ++component) {
-          samplerInts.push_back(
-              getBuilder()->getInt32(convertingSampler.values[idx * ConvertingSamplerDwordCount + component]));
-        }
-        samplerDesc = ConstantVector::get(samplerInts);
-        Value *thisResult = getBuilder()->CreateImageSampleConvert(resultTy, imageInfo.dim, imageInfo.flags,
-                                                                   imageInfo.imageDescArray, samplerDesc, addr);
-        // Add to select ladder.
-        Value *selector =
-            getBuilder()->CreateICmpEQ(convertingSamplerIdx, getBuilder()->getInt32(thisConvertingSamplerIdx));
-        result = getBuilder()->CreateSelect(selector, thisResult, result);
-        ++thisConvertingSamplerIdx;
-      }
-    }
+    result = ConvertingSamplerSelectLadderHelper(result, convertingSamplerIdx, createImageSampleConvert);
   }
 
   // For a sparse sample, swap the struct elements back again.
@@ -6053,9 +6067,20 @@ Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicB
   // A sampler descriptor is encoded as {desc,convertingSamplerIdx}. Extract the actual sampler.
   Value *samplerDesc = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 0);
 
-  // Generate the operation.
+  // Generate the operation for normal image get lod.
   Value *coord = transValue(bii->getOpValue(1), bb->getParent(), bb);
-  return getBuilder()->CreateImageGetLod(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDesc, coord);
+  Value *result =
+      getBuilder()->CreateImageGetLod(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDesc, coord);
+
+  if (!m_convertingSamplers.empty()) {
+    auto createImageGetLod = [&](Value *samplerDescIn) -> Value * {
+      return getBuilder()->CreateImageGetLod(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDescIn, coord);
+    };
+    Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 1);
+    result = ConvertingSamplerSelectLadderHelper(result, convertingSamplerIdx, createImageGetLod);
+  }
+
+  return result;
 }
 
 // =============================================================================
