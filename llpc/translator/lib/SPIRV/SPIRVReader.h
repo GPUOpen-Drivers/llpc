@@ -305,6 +305,9 @@ private:
 
   Instruction *transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord memScope);
   void truncConstantIndex(std::vector<Value *> &indices, BasicBlock *bb);
+
+  Value *ConvertingSamplerSelectLadderHelper(Value *result, Value *convertingSamplerIdx,
+                                             std::function<Value *(Value *)> createImageOp);
 }; // class SPIRVToLLVM
 
 } // namespace SPIRV
