@@ -360,7 +360,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
     columnType = ArrayType::get(elementType, columnCount);
     columnCount = spvColumnType->getVectorComponentCount();
 
-    //with a MatrixStride Decoration, and one of the RowMajor or ColMajor Decorations
+    // with a MatrixStride Decoration, and one of the RowMajor or ColMajor Decorations
     if (!isColumnMajor && matrixStride == 0) {
       // Targeted for std430 layout
       assert(columnCount == 4);
@@ -6465,12 +6465,12 @@ bool SPIRVToLLVM::transMetadata() {
           }
         }
 
-          // Give the workgroup size to the middle-end.
-          ComputeShaderMode computeMode = {};
-          computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
-          computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
-          computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
-          getBuilder()->setComputeShaderMode(computeMode);
+        // Give the workgroup size to the middle-end.
+        ComputeShaderMode computeMode = {};
+        computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
+        computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
+        computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
+        getBuilder()->setComputeShaderMode(computeMode);
       } else
         llvm_unreachable("Invalid execution model");
 
