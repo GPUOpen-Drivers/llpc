@@ -1257,7 +1257,13 @@ Value *ImageBuilder::CreateImageQueryLevels(unsigned dim, unsigned flags, Value 
                                          {getInt32(8), UndefValue::get(getInt32Ty()), imageDesc, zero, zero});
   if (flags & ImageFlagNonUniformImage)
     resInfo = createWaterfallLoop(resInfo, 2);
-  return CreateBitCast(resInfo, getInt32Ty(), instName);
+
+  Value *intResInfo = CreateBitCast(resInfo, getInt32Ty(), instName);
+
+  if (!(flags & ImageFlagNonUniformImage))
+    intResInfo = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, intResInfo);
+
+  return intResInfo;
 }
 
 // =====================================================================================================================
@@ -1330,6 +1336,15 @@ Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *i
   Value *intResInfo = CreateBitCast(resInfo, FixedVectorType::get(getInt32Ty(), 4));
 
   unsigned sizeComponentCount = getImageQuerySizeComponentCount(dim);
+
+  if (!(flags & ImageFlagNonUniformImage)) {
+    for (unsigned i = 0; i < sizeComponentCount; i++) {
+      Value *index = getInt32(i);
+      Value *element = CreateExtractElement(intResInfo, index, instName);
+      element = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, element);
+      intResInfo = CreateInsertElement(intResInfo, element, index);
+    }
+  }
 
   if (sizeComponentCount == 1)
     return CreateExtractElement(intResInfo, uint64_t(0), instName);
