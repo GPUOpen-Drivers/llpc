@@ -10,4 +10,14 @@ trim_trailing_whitespace = true
 indent_size = 2
 
 [*.md]
+# Trailing whitespace is significant in Markdown: two trailing
+# spaces create a line break without a new paragraph.
 trim_trailing_whitespace = false
+
+# Prefer to break lines earlier in Markdown because it tends to
+# contain prose, which is easier to read with shorter lines.
+# However, the intention is _not_ to forbid longer lines outright.
+# There are often good reasons for having longer lines in Markdown,
+# e.g. due to URLs or pre-formatted code snippets that are
+# included in the .md file. Those should be allowed.
+max_line_length = 80
