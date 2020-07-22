@@ -41,7 +41,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{[0-9]*}} = fcmp oeq <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = fcmp one <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: %{{[0-9]*}} = fcmp {{[ou]}}ne <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: %{{[0-9]*}} = fcmp olt <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: %{{[0-9]*}} = fcmp ogt <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: %{{[0-9]*}} = fcmp ole <2 x half> %{{[0-9]*}}, %{{[0-9]*}}

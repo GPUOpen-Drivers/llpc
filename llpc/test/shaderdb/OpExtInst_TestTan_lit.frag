@@ -27,7 +27,7 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn <3 x float> @llvm.cos.v3f32(<3 x float>
 ; SHADERTEST: %{{[0-9]*}} = fdiv reassoc nnan nsz arcp contract afn <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>,
 ; SHADERTEST: %{{[0-9]*}} = fmul reassoc nnan nsz arcp contract afn <3 x float>
-; SHADERTEST: %{{[0-9]*}} = fcmp one float %{{.*}}, %{{.*}}
+; SHADERTEST: %{{[0-9]*}} = fcmp {{[ou]}}ne float %{{.*}}, %{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
