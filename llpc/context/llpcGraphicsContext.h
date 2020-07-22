@@ -61,8 +61,6 @@ public:
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const { return m_activeStageCount; }
 
-  virtual void doUserDataNodeMerge();
-
   // Gets per pipeline options
   virtual const PipelineOptions *getPipelineOptions() const { return &m_pipelineInfo->options; }
 
@@ -71,7 +69,10 @@ private:
   GraphicsContext(const GraphicsContext &) = delete;
   GraphicsContext &operator=(const GraphicsContext &) = delete;
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
+  void mergeResourceMappingData();
   llvm::ArrayRef<ResourceMappingNode> mergeUserDataNodeTable(llvm::SmallVectorImpl<ResourceMappingNode> &allNodes);
+#endif
 
   void buildNggCullingControlRegister();
 
@@ -82,10 +83,12 @@ private:
 
   bool m_gsOnChip; // Whether to enable GS on-chip mode
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
   llvm::SmallVector<std::unique_ptr<llvm::SmallVectorImpl<ResourceMappingNode>>, 4>
       m_allocUserDataNodes; // Allocated merged user data nodes
   std::unique_ptr<llvm::SmallVectorImpl<DescriptorRangeValue>>
       m_allocDescriptorRangeValues; // Allocated merged descriptor range values
+#endif
 };
 
 } // namespace Llpc

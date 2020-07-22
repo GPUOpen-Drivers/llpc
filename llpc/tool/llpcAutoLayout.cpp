@@ -50,11 +50,6 @@ using namespace llvm;
 using namespace Llpc;
 using namespace SPIRV;
 
-struct ResourceNodeSet {
-  std::vector<ResourceMappingNode> nodes;  // Vector of resource mapping nodes
-  std::map<unsigned, unsigned> bindingMap; // Map from binding to index in nodes vector
-};
-
 // -auto-layout-desc: automatically create descriptor layout based on resource usages
 static cl::opt<bool> AutoLayoutDesc("auto-layout-desc",
                                     cl::desc("Automatically create descriptor layout based on resource usages"));
@@ -86,6 +81,30 @@ static unsigned getTypeDataSize(const SPIRVType *ty) {
   }
 }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+// =====================================================================================================================
+// Find VaPtr userDataNode with specified set.
+//
+// @param resourceMapping : Resource mapping data, possibly containing user data nodes
+// @param set : Accroding this set to find ResourceMappingNode
+static const ResourceMappingRootNode *findDescriptorTableVaPtr(const ResourceMappingData *resourceMapping,
+                                                               unsigned set) {
+  const ResourceMappingRootNode *descriptorTableVaPtr = nullptr;
+
+  for (unsigned k = 0; k < resourceMapping->userDataNodeCount; ++k) {
+    const ResourceMappingRootNode *userDataNode = &resourceMapping->pUserDataNodes[k];
+
+    if (userDataNode->node.type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr) {
+      if (userDataNode->node.tablePtr.pNext[0].srdRange.set == set) {
+        descriptorTableVaPtr = userDataNode;
+        break;
+      }
+    }
+  }
+
+  return descriptorTableVaPtr;
+}
+#else
 // =====================================================================================================================
 // Find VaPtr userDataNode with specified set.
 //
@@ -107,6 +126,7 @@ static const ResourceMappingNode *findDescriptorTableVaPtr(PipelineShaderInfo *s
 
   return descriptorTableVaPtr;
 }
+#endif
 
 // =====================================================================================================================
 // Find userDataNode with specified set and binding. And return Node index.
@@ -133,6 +153,120 @@ static const ResourceMappingNode *findResourceNode(const ResourceMappingNode *us
   return resourceNode;
 }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+// =====================================================================================================================
+// Find userDataNode with specified set and binding. And return Node index.
+//
+// @param userDataNode : ResourceMappingRootNode pointer
+// @param nodeCount : User data node count
+// @param set : find same set in node array
+// @param binding : find same binding in node array
+// @param [out] index : Return node position in node array
+static const ResourceMappingRootNode *findResourceNode(const ResourceMappingRootNode *userDataNode, unsigned nodeCount,
+                                                       unsigned set, unsigned binding, unsigned *index) {
+  const ResourceMappingRootNode *resourceNode = nullptr;
+
+  for (unsigned j = 0; j < nodeCount; ++j) {
+    const ResourceMappingRootNode *next = &userDataNode[j];
+
+    if (set == next->node.srdRange.set && binding == next->node.srdRange.binding) {
+      resourceNode = next;
+      *index = j;
+      break;
+    }
+  }
+
+  return resourceNode;
+}
+
+// =====================================================================================================================
+// Compare if pAutoLayoutUserDataNodes is subset of pUserDataNodes.
+//
+// @param [in] resourceMapping : Resource mapping data, which can contain user data nodes
+// @param [in] autoLayoutUserDataNodeCount : UserData Node count
+// @param [in] autoLayoutUserDataNodes : ResourceMappingNode
+bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
+                                   const ResourceMappingRootNode *autoLayoutUserDataNodes) {
+  bool hit = false;
+
+  if (autoLayoutUserDataNodeCount == 0)
+    hit = true;
+  else if (resourceMapping->pStaticDescriptorValues)
+    hit = false;
+  else if (resourceMapping->userDataNodeCount >= autoLayoutUserDataNodeCount) {
+    for (unsigned n = 0; n < autoLayoutUserDataNodeCount; ++n) {
+      const ResourceMappingRootNode *autoLayoutUserDataNode = &autoLayoutUserDataNodes[n];
+
+      // Multiple levels
+      if (autoLayoutUserDataNode->node.type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr) {
+        unsigned set = autoLayoutUserDataNode->node.tablePtr.pNext[0].srdRange.set;
+        const ResourceMappingRootNode *userDataNode = findDescriptorTableVaPtr(resourceMapping, set);
+
+        if (userDataNode) {
+          bool hitNode = false;
+          for (unsigned i = 0; i < autoLayoutUserDataNode->node.tablePtr.nodeCount; ++i) {
+            const ResourceMappingNode *autoLayoutNext = &autoLayoutUserDataNode->node.tablePtr.pNext[i];
+
+            unsigned index = 0;
+            const ResourceMappingNode *node =
+                findResourceNode(userDataNode->node.tablePtr.pNext, userDataNode->node.tablePtr.nodeCount,
+                                 autoLayoutNext->srdRange.set, autoLayoutNext->srdRange.binding, &index);
+
+            if (node) {
+              if (autoLayoutNext->type == node->type && autoLayoutNext->sizeInDwords == node->sizeInDwords &&
+                  autoLayoutNext->sizeInDwords <= OffsetStrideInDwords &&
+                  autoLayoutNext->offsetInDwords == (index * OffsetStrideInDwords)) {
+                hitNode = true;
+                continue;
+              } else {
+                outs() << "AutoLayoutNode:"
+                       << "\n ->type                    : "
+                       << format("0x%016" PRIX64, static_cast<unsigned>(autoLayoutNext->type))
+                       << "\n ->sizeInDwords            : " << autoLayoutNext->sizeInDwords
+                       << "\n ->offsetInDwords          : " << autoLayoutNext->offsetInDwords;
+
+                outs() << "\nShaderInfoNode:"
+                       << "\n ->type                    : "
+                       << format("0x%016" PRIX64, static_cast<unsigned>(node->type))
+                       << "\n ->sizeInDwords            : " << node->sizeInDwords
+                       << "\n OffsetStrideInDwords      : " << OffsetStrideInDwords
+                       << "\n index*OffsetStrideInDwords: " << (index * OffsetStrideInDwords) << "\n";
+                hitNode = false;
+                break;
+              }
+            } else
+              break;
+          }
+          if (!hitNode) {
+            hit = false;
+            break;
+          } else
+            hit = true;
+        } else {
+          hit = false;
+          break;
+        }
+      }
+      // Single level
+      else {
+        unsigned index = 0;
+        const ResourceMappingRootNode *node = findResourceNode(
+            resourceMapping->pUserDataNodes, resourceMapping->userDataNodeCount,
+            autoLayoutUserDataNode->node.srdRange.set, autoLayoutUserDataNode->node.srdRange.binding, &index);
+        if (node && autoLayoutUserDataNode->node.sizeInDwords == node->node.sizeInDwords) {
+          hit = true;
+          continue;
+        } else {
+          hit = false;
+          break;
+        }
+      }
+    }
+  }
+
+  return hit;
+}
+#else
 // =====================================================================================================================
 // Compare if pAutoLayoutUserDataNodes is subset of pUserDataNodes.
 //
@@ -220,6 +354,7 @@ bool checkShaderInfoComptible(PipelineShaderInfo *shaderInfo, unsigned autoLayou
 
   return hit;
 }
+#endif
 
 // =====================================================================================================================
 // Compare if neccessary pipeline state is same.
@@ -262,19 +397,21 @@ bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipel
 }
 
 // =====================================================================================================================
-// Lay out dummy descriptors and other information for one shader stage. This is used when running amdllpc on a single
-// SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does not
-// matter because we are running a short-lived command-line utility.
+// Lay out dummy bottom-level descriptors and other information for one shader stage. This is used when running amdllpc
+// on a single SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does
+// not matter because we are running a short-lived command-line utility.
 //
 // @param shaderStage : Shader stage
 // @param spirvBin : SPIR-V binary
 // @param [in/out] pipelineInfo : Graphics pipeline info, will have dummy information filled in. nullptr if not a
 // graphics pipeline.
 // @param [in/out] shaderInfo : Shader info, will have user data nodes added to it
-// @param [in/out] topLevelOffset : User data offset; ensures that multiple shader stages use disjoint offsets
+// @param [in/out] resNodeSets : Resource map, will have user data nodes added to it
+// @param [in/out] pushConstSize : Cumulative push constant node size
 // @param checkAutoLayoutCompatible : If check AutoLayout Compatiple
 void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipelineBuildInfo *pipelineInfo,
-                      PipelineShaderInfo *shaderInfo, unsigned &topLevelOffset, bool checkAutoLayoutCompatible) {
+                      PipelineShaderInfo *shaderInfo, ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
+                      bool checkAutoLayoutCompatible) {
   // Read the SPIR-V.
   std::string spirvCode(static_cast<const char *>(spirvBin.pCode), spirvBin.codeSize);
   std::istringstream spirvStream(spirvCode);
@@ -545,9 +682,6 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
     return;
 
   // Collect ResourceMappingNode entries in sets.
-  std::map<unsigned, ResourceNodeSet> resNodeSets;
-  std::map<std::pair<unsigned, unsigned>, unsigned> bindingIndex;
-  unsigned pushConstSize = 0;
   for (unsigned i = 0, varCount = module->getNumVariables(); i < varCount; ++i) {
     auto var = module->getVariable(i);
     switch (var->getStorageClass()) {
@@ -578,6 +712,7 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
           resNodeSet.nodes.push_back({});
           resNodeSet.nodes.back().type = ResourceMappingNodeType::Unknown;
         }
+        resNodeSet.visibility |= shaderStageToMask(shaderStage);
         ResourceMappingNode *node = &resNodeSet.nodes[nodesIndex];
 
         // Get the element type and array size.
@@ -666,62 +801,161 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
       }
     }
   }
+}
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+// =====================================================================================================================
+// Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running amdllpc on a single
+// SPIR-V or GLSL shader, rather than on a .pipe file.
+//
+// @param [in] shaderMask : Shader stage mask
+// @param [in] resNodeSets : User-data nodes to be pointed to by top level nodes
+// @param [in] pushConstSize : Push constant node size
+// @param [in/out] resourceMapping : Resource map, will have user data nodes added to it
+void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
+                          ResourceMappingData *resourceMapping) {
+  // Only auto-layout descriptors if -auto-layout-desc is on.
+  if (!AutoLayoutDesc)
+    return;
+
+  unsigned topLevelOffset = 0;
 
   // Add up how much memory we need and allocate it.
   unsigned topLevelCount = resNodeSets.size();
   topLevelCount += 3; // Allow one for push consts, one for XFB and one for vertex buffer.
-  unsigned resNodeCount = topLevelCount;
+  unsigned subLevelCount = 0;
   for (const auto &resNodeSet : resNodeSets)
-    resNodeCount += resNodeSet.second.nodes.size();
-  auto resNodes = new ResourceMappingNode[resNodeCount];
-  auto nextTable = resNodes + topLevelCount;
-  auto resNode = resNodes;
+    subLevelCount += resNodeSet.second.nodes.size();
+
+  size_t bufferSize = sizeof(ResourceMappingRootNode) * topLevelCount + sizeof(ResourceMappingNode) * subLevelCount;
+  auto rootNodes = static_cast<ResourceMappingRootNode *>(malloc(bufferSize));
+  auto subNodes = reinterpret_cast<ResourceMappingNode *>(rootNodes + topLevelCount);
+  resourceMapping->pUserDataNodes = rootNodes;
+  memset(rootNodes, 0, bufferSize);
 
   // Add a node for each set.
   for (const auto &resNodeSet : resNodeSets) {
-    resNode->type = ResourceMappingNodeType::DescriptorTableVaPtr;
-    resNode->sizeInDwords = 1;
-    resNode->offsetInDwords = topLevelOffset;
-    topLevelOffset += resNode->sizeInDwords;
-    resNode->tablePtr.nodeCount = resNodeSet.second.nodes.size();
-    resNode->tablePtr.pNext = nextTable;
+    rootNodes->node.type = ResourceMappingNodeType::DescriptorTableVaPtr;
+    rootNodes->node.sizeInDwords = 1;
+    rootNodes->node.offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->node.sizeInDwords;
+    rootNodes->node.tablePtr.nodeCount = resNodeSet.second.nodes.size();
+    rootNodes->node.tablePtr.pNext = subNodes;
     for (auto &resNode : resNodeSet.second.nodes)
-      *nextTable++ = resNode;
-    ++resNode;
+      *subNodes++ = resNode;
+    rootNodes->visibility = resNodeSet.second.visibility;
+    ++rootNodes;
+  }
+
+  if (shaderMask & ShaderStageVertexBit) {
+    // Add a node for vertex buffer.
+    rootNodes->node.type = ResourceMappingNodeType::IndirectUserDataVaPtr;
+    rootNodes->node.sizeInDwords = 1;
+    rootNodes->node.offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->node.sizeInDwords;
+    rootNodes->node.userDataPtr.sizeInDwords = 256;
+    rootNodes->visibility = ShaderStageVertexBit;
+    ++rootNodes;
+  }
+
+  const unsigned xfbStageMask = ShaderStageVertexBit | ShaderStageTessEvalBit | ShaderStageGeometryBit;
+  if (shaderMask & xfbStageMask) {
+    // Add a node for XFB.
+    rootNodes->node.type = ResourceMappingNodeType::StreamOutTableVaPtr;
+    rootNodes->node.sizeInDwords = 1;
+    rootNodes->node.offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->node.sizeInDwords;
+    rootNodes->visibility = xfbStageMask & shaderMask;
+    ++rootNodes;
+  }
+
+  if (pushConstSize > 0) {
+    // Add push const node
+    rootNodes->node.type = ResourceMappingNodeType::PushConst;
+    rootNodes->node.sizeInDwords = pushConstSize;
+    rootNodes->node.offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->node.sizeInDwords;
+    rootNodes->visibility = shaderMask;
+    ++rootNodes;
+  }
+
+  resourceMapping->userDataNodeCount = rootNodes - resourceMapping->pUserDataNodes;
+
+  assert(resourceMapping->userDataNodeCount <= topLevelCount);
+  assert(static_cast<unsigned>(subNodes - reinterpret_cast<const ResourceMappingNode *>(
+                                              resourceMapping->pUserDataNodes + topLevelCount)) <= subLevelCount);
+}
+#else
+// =====================================================================================================================
+// Lay out dummy top-level descriptors and populate PipelineShaderInfo. This is used when running amdllpc on a single
+// SPIR-V or GLSL shader, rather than on a .pipe file.
+//
+// @param [in] shaderStage : Shader stage
+// @param [in] resNodeSets : User-data nodes to be pointed to by top level nodes
+// @param [in] pushConstSize : Push constant node size
+// @param [in/out] shaderInfo : Shader info, will have user data nodes added to it
+// @param [in/out] topLevelOffset : Offset in dwords applied to all root nodes (to avoid overlap between stages)
+void buildTopLevelMapping(ShaderStage shaderStage, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
+                          PipelineShaderInfo *shaderInfo, unsigned &topLevelOffset) {
+  // Only auto-layout descriptors if -auto-layout-desc is on.
+  if (!AutoLayoutDesc)
+    return;
+
+  // Add up how much memory we need and allocate it.
+  unsigned topLevelCount = resNodeSets.size();
+  topLevelCount += 3; // Allow one for push consts, one for XFB and one for vertex buffer.
+  unsigned subLevelCount = 0;
+  for (const auto &resNodeSet : resNodeSets)
+    subLevelCount += resNodeSet.second.nodes.size();
+
+  auto rootNodes = new ResourceMappingNode[topLevelCount + subLevelCount];
+  auto subNodes = rootNodes + topLevelCount;
+  shaderInfo->pUserDataNodes = rootNodes;
+
+  // Add a node for each set.
+  for (const auto &resNodeSet : resNodeSets) {
+    rootNodes->type = ResourceMappingNodeType::DescriptorTableVaPtr;
+    rootNodes->sizeInDwords = 1;
+    rootNodes->offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->sizeInDwords;
+    rootNodes->tablePtr.nodeCount = resNodeSet.second.nodes.size();
+    rootNodes->tablePtr.pNext = subNodes;
+    for (auto &resNode : resNodeSet.second.nodes)
+      *subNodes++ = resNode;
+    ++rootNodes;
   }
 
   if (shaderStage == ShaderStageVertex) {
     // Add a node for vertex buffer.
-    resNode->type = ResourceMappingNodeType::IndirectUserDataVaPtr;
-    resNode->sizeInDwords = 1;
-    resNode->offsetInDwords = topLevelOffset;
-    topLevelOffset += resNode->sizeInDwords;
-    resNode->userDataPtr.sizeInDwords = 256;
-    ++resNode;
+    rootNodes->type = ResourceMappingNodeType::IndirectUserDataVaPtr;
+    rootNodes->sizeInDwords = 1;
+    rootNodes->offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->sizeInDwords;
+    rootNodes->userDataPtr.sizeInDwords = 256;
+    ++rootNodes;
   }
 
   if (shaderStage == ShaderStageVertex || shaderStage == ShaderStageTessEval || shaderStage == ShaderStageGeometry) {
     // Add a node for XFB.
-    resNode->type = ResourceMappingNodeType::StreamOutTableVaPtr;
-    resNode->sizeInDwords = 1;
-    resNode->offsetInDwords = topLevelOffset;
-    topLevelOffset += resNode->sizeInDwords;
-    ++resNode;
+    rootNodes->type = ResourceMappingNodeType::StreamOutTableVaPtr;
+    rootNodes->sizeInDwords = 1;
+    rootNodes->offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->sizeInDwords;
+    ++rootNodes;
   }
 
-  if (pushConstSize != 0) {
-    // Add a node for push consts.
-    resNode->type = ResourceMappingNodeType::PushConst;
-    resNode->sizeInDwords = pushConstSize;
-    resNode->offsetInDwords = topLevelOffset;
-    topLevelOffset += resNode->sizeInDwords;
-    ++resNode;
+  if (pushConstSize > 0) {
+    // Add push const node
+    rootNodes->type = ResourceMappingNodeType::PushConst;
+    rootNodes->sizeInDwords = pushConstSize;
+    rootNodes->offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->sizeInDwords;
+    ++rootNodes;
   }
 
-  assert(resNode - resNodes <= topLevelCount);
-  assert(nextTable - resNodes <= resNodeCount);
+  shaderInfo->userDataNodeCount = rootNodes - shaderInfo->pUserDataNodes;
 
-  // Write pointer/size into PipelineShaderInfo.
-  shaderInfo->userDataNodeCount = resNode - resNodes;
-  shaderInfo->pUserDataNodes = resNodes;
+  assert(shaderInfo->userDataNodeCount <= topLevelCount);
+  assert(static_cast<unsigned>(subNodes - (shaderInfo->pUserDataNodes + topLevelCount)) <= subLevelCount);
 }
+#endif

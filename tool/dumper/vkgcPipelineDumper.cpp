@@ -28,12 +28,11 @@
 * @breif VKGC source file: contains implementation of VKGC pipline dump utility.
 ***********************************************************************************************************************
 */
+#include "vkgcPipelineDumper.h"
+#include "vkgcElfReader.h"
+#include "vkgcUtil.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include "vkgcElfReader.h"
-#include "vkgcPipelineDumper.h"
-#include "vkgcUtil.h"
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
@@ -232,8 +231,7 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
   char fileName[64] = {};
   if (pipelineInfo.pComputeInfo) {
     snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
-  }
-  else {
+  } else {
     assert(pipelineInfo.pGraphicsInfo);
     const char *fileNamePrefix = nullptr;
     if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
@@ -351,7 +349,6 @@ PipelineDumpFile *PipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
 
       if (pipelineInfo.pGraphicsInfo)
         dumpGraphicsPipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pGraphicsInfo);
-
     }
   }
 
@@ -386,8 +383,7 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorTexelBuffer:
   case ResourceMappingNodeType::DescriptorBuffer:
   case ResourceMappingNodeType::DescriptorFmask:
-  case ResourceMappingNodeType::DescriptorBufferCompact:
-  {
+  case ResourceMappingNodeType::DescriptorBufferCompact: {
     dumpFile << prefix << ".set = " << userDataNode->srdRange.set << "\n";
     dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
     break;
@@ -461,6 +457,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
     dumpFile << "\n";
   }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
   // Output descriptor range value
   if (shaderInfo->descriptorRangeValueCount > 0) {
     for (unsigned i = 0; i < shaderInfo->descriptorRangeValueCount; ++i) {
@@ -484,7 +481,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
 
   // Output resource node mapping
   if (shaderInfo->userDataNodeCount > 0) {
-    char prefixBuff[64];
+    char prefixBuff[64] = {};
     for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
       auto userDataNode = &shaderInfo->pUserDataNodes[i];
       snprintf(prefixBuff, 64, "userDataNode[%u]", i);
@@ -492,6 +489,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
     }
     dumpFile << "\n";
   }
+#endif
 
   // Output pipeline shader options
   dumpFile << "options.trapPresent = " << shaderInfo->options.trapPresent << "\n";
@@ -516,6 +514,51 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.fp32DenormalMode = " << shaderInfo->options.fp32DenormalMode << "\n";
   dumpFile << "\n";
 }
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+// =====================================================================================================================
+// Dumps resource node and static descriptor value data to file.
+//
+// @param resourceMapping : Pipeline resource mapping data
+// @param [out] dumpFile : Dump file
+void PipelineDumper::dumpResourceMappingInfo(const ResourceMappingData *resourceMapping, std::ostream &dumpFile) {
+  dumpFile << "[ResourceMapping]\n";
+
+  // Output descriptor range value
+  if (resourceMapping->staticDescriptorValueCount > 0) {
+    for (unsigned i = 0; i < resourceMapping->staticDescriptorValueCount; ++i) {
+      auto staticDescriptorValue = &resourceMapping->pStaticDescriptorValues[i];
+      dumpFile << "descriptorRangeValue[" << i << "].visibility = " << staticDescriptorValue->visibility << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].type = " << staticDescriptorValue->type << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].set = " << staticDescriptorValue->set << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].binding = " << staticDescriptorValue->binding << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].arraySize = " << staticDescriptorValue->arraySize << "\n";
+      for (unsigned j = 0; j < staticDescriptorValue->arraySize; ++j) {
+        dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
+        const unsigned descriptorSizeInDw =
+            staticDescriptorValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler ? 8 : 4;
+
+        for (unsigned k = 0; k < descriptorSizeInDw - 1; ++k)
+          dumpFile << staticDescriptorValue->pValue[k] << ", ";
+        dumpFile << staticDescriptorValue->pValue[descriptorSizeInDw - 1] << "\n";
+      }
+    }
+    dumpFile << "\n";
+  }
+
+  // Output resource node mapping
+  if (resourceMapping->userDataNodeCount > 0) {
+    char prefixBuff[64] = {};
+    for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+      auto userDataNode = &resourceMapping->pUserDataNodes[i];
+      snprintf(prefixBuff, 64, "userDataNode[%u]", i);
+      dumpFile << prefixBuff << ".visibility = " << userDataNode->visibility << "\n";
+      dumpResourceMappingNode(&userDataNode->node, prefixBuff, dumpFile);
+    }
+    dumpFile << "\n";
+  }
+}
+#endif
 
 // =====================================================================================================================
 // Dumps SPIR-V shader binary to external file
@@ -637,6 +680,11 @@ void PipelineDumper::dumpComputePipelineInfo(std::ostream *dumpFile, const char 
 
   // Output shader info
   dumpPipelineShaderInfo(&pipelineInfo->cs, *dumpFile);
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+  dumpResourceMappingInfo(&pipelineInfo->resourceMapping, *dumpFile);
+#endif
+
   dumpComputeStateInfo(pipelineInfo, dumpDir, *dumpFile);
 
   dumpFile->flush();
@@ -755,6 +803,10 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
     dumpPipelineShaderInfo(shaderInfo, *dumpFile);
   }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+  dumpResourceMappingInfo(&pipelineInfo->resourceMapping, *dumpFile);
+#endif
+
   dumpGraphicsStateInfo(pipelineInfo, dumpDir, *dumpFile);
 
   dumpFile->flush();
@@ -802,6 +854,10 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
     break;
   }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+  updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isRelocatableShader);
+#endif
+
   hasher.Update(pipeline->iaState.deviceIndex);
 
   if (stage != ShaderStageFragment) {
@@ -828,6 +884,11 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
   MetroHash64 hasher;
 
   updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher, isRelocatableShader);
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+  updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isRelocatableShader);
+#endif
+
   hasher.Update(pipeline->deviceIndex);
   hasher.Update(pipeline->options.includeDisassembly);
   hasher.Update(pipeline->options.scalarBlockLayout);
@@ -1005,6 +1066,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(reinterpret_cast<const uint8_t *>(specializationInfo->pData), specializationInfo->dataSize);
     }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
     hasher->Update(shaderInfo->descriptorRangeValueCount);
     if (shaderInfo->descriptorRangeValueCount > 0) {
       for (unsigned i = 0; i < shaderInfo->descriptorRangeValueCount; ++i) {
@@ -1034,6 +1096,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
         updateHashForResourceMappingNode(userDataNode, true, hasher, isRelocatableShader);
       }
     }
+#endif
 
     if (isCacheHash) {
       auto &options = shaderInfo->options;
@@ -1060,6 +1123,49 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
     }
   }
 }
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+// =====================================================================================================================
+// Updates hash code context for resource node and static descriptor value data.
+//
+// @param resourceMapping : Pipeline resource mapping data
+// @param [in,out] hasher : Haher to generate hash code
+// @param isRelocatableShader : TRUE if we are building relocatable shader
+void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData *pResourceMapping, MetroHash64 *hasher,
+                                                      bool isRelocatableShader) {
+  hasher->Update(pResourceMapping->staticDescriptorValueCount);
+  if (pResourceMapping->staticDescriptorValueCount > 0) {
+    for (unsigned i = 0; i < pResourceMapping->staticDescriptorValueCount; ++i) {
+      auto staticDescriptorValue = &pResourceMapping->pStaticDescriptorValues[i];
+      hasher->Update(staticDescriptorValue->visibility);
+      hasher->Update(staticDescriptorValue->type);
+      hasher->Update(staticDescriptorValue->set);
+      hasher->Update(staticDescriptorValue->binding);
+      hasher->Update(staticDescriptorValue->arraySize);
+
+      // TODO: We should query descriptor size from patch
+
+      // The second part of StaticDescriptorValue is YCbCrMetaData, which is 4 dwords.
+      // The hasher should be updated when the content changes, this is because YCbCrMetaData
+      // is engaged in pipeline compiling.
+      const unsigned descriptorSize =
+          staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
+
+      hasher->Update(reinterpret_cast<const uint8_t *>(staticDescriptorValue->pValue),
+                     staticDescriptorValue->arraySize * descriptorSize);
+    }
+  }
+
+  hasher->Update(pResourceMapping->userDataNodeCount);
+  if (pResourceMapping->userDataNodeCount > 0) {
+    for (unsigned i = 0; i < pResourceMapping->userDataNodeCount; ++i) {
+      auto userDataNode = &pResourceMapping->pUserDataNodes[i];
+      hasher->Update(userDataNode->visibility);
+      updateHashForResourceMappingNode(&userDataNode->node, true, hasher, isRelocatableShader);
+    }
+  }
+}
+#endif
 
 // =====================================================================================================================
 // Updates hash code context for resource mapping node.

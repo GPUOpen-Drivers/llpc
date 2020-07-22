@@ -67,6 +67,12 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
       }
     }
   }
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+  m_resourceMapping = pipelineInfo->resourceMapping;
+#else
+  mergeResourceMappingData();
+#endif
 }
 
 // =====================================================================================================================
@@ -110,15 +116,12 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
   return shaderInfo;
 }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
 // =====================================================================================================================
-// Does user data node merging for all shader stages
-void GraphicsContext::doUserDataNodeMerge() {
+// Merges per-shader resource mapping structs into a single per-pipeline resource mapping struct
+void GraphicsContext::mergeResourceMappingData() {
   unsigned stageMask = getShaderStageMask();
   SmallVector<ResourceMappingNode, 8> allNodes;
-
-  // No need to merge if there is only one shader stage.
-  if (isPowerOf2_32(stageMask))
-    return;
 
   // Collect user data nodes from all shader stages into one big table.
   for (unsigned stage = 0; stage < ShaderStageNativeStageCount; ++stage) {
@@ -132,6 +135,16 @@ void GraphicsContext::doUserDataNodeMerge() {
 
   // Sort and merge.
   ArrayRef<ResourceMappingNode> mergedNodes = mergeUserDataNodeTable(allNodes);
+
+  // Populate root node structs
+  if (mergedNodes.size() > 0) {
+    m_userDataNodeStorage = std::make_unique<SmallVector<ResourceMappingRootNode, 8>>();
+    m_userDataNodeStorage->reserve(mergedNodes.size());
+    for (unsigned i = 0; i < mergedNodes.size(); ++i)
+      m_userDataNodeStorage->push_back({mergedNodes[i], stageMask});
+    m_resourceMapping.userDataNodeCount = m_userDataNodeStorage->size();
+    m_resourceMapping.pUserDataNodes = m_userDataNodeStorage->data();
+  }
 
   // Collect descriptor range values (immutable descriptors) from all shader stages into one big table.
   SmallVector<DescriptorRangeValue, 8> allRangeValues;
@@ -154,8 +167,8 @@ void GraphicsContext::doUserDataNodeMerge() {
 
   if (!allRangeValues.empty()) {
     // Create a new table with merged duplicates.
-    m_allocDescriptorRangeValues = std::make_unique<SmallVector<DescriptorRangeValue, 8>>();
-    auto &mergedRangeValues = *m_allocDescriptorRangeValues;
+    m_staticDescriptorValueStorage = std::make_unique<SmallVector<StaticDescriptorValue, 8>>();
+    auto &mergedRangeValues = *m_staticDescriptorValueStorage;
     ArrayRef<DescriptorRangeValue> rangeValues = allRangeValues;
 
     while (!rangeValues.empty()) {
@@ -175,22 +188,15 @@ void GraphicsContext::doUserDataNodeMerge() {
       }
 
       // Keep the merged range.
-      mergedRangeValues.push_back(rangeValues[0]);
+      StaticDescriptorValue staticDescValue;
+      memcpy(&staticDescValue, &rangeValues[0], sizeof(DescriptorRangeValue));
+      staticDescValue.visibility = stageMask;
+      mergedRangeValues.push_back(staticDescValue);
       rangeValues = rangeValues.slice(duplicateCount);
     }
-  }
 
-  // Point each shader stage at the merged user data nodes and descriptor range values.
-  for (unsigned stage = 0; stage < ShaderStageNativeStageCount; ++stage) {
-    if ((stageMask >> stage) & 1) {
-      auto shaderInfo = const_cast<PipelineShaderInfo *>(getPipelineShaderInfo(ShaderStage(stage)));
-      shaderInfo->pUserDataNodes = mergedNodes.data();
-      shaderInfo->userDataNodeCount = mergedNodes.size();
-      if (m_allocDescriptorRangeValues) {
-        shaderInfo->pDescriptorRangeValues = m_allocDescriptorRangeValues->data();
-        shaderInfo->descriptorRangeValueCount = m_allocDescriptorRangeValues->size();
-      }
-    }
+    m_resourceMapping.staticDescriptorValueCount = m_staticDescriptorValueStorage->size();
+    m_resourceMapping.pStaticDescriptorValues = m_staticDescriptorValueStorage->data();
   }
 }
 
@@ -255,5 +261,6 @@ ArrayRef<ResourceMappingNode> GraphicsContext::mergeUserDataNodeTable(SmallVecto
   }
   return mergedNodes;
 }
+#endif
 
 } // namespace Llpc

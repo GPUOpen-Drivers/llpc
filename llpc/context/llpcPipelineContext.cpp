@@ -110,7 +110,7 @@ namespace Llpc {
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
 PipelineContext::PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash) {
+    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash), m_resourceMapping() {
 }
 
 // =====================================================================================================================
@@ -391,14 +391,16 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 //
 // @param [in/out] pipeline : Middle-end pipeline object
 void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
-  const PipelineShaderInfo *shaderInfo = nullptr;
-  unsigned stageMask = getShaderStageMask();
-  shaderInfo = getPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
+  auto resourceMapping = getResourceMapping();
+  auto allocNodes = std::make_unique<ResourceMappingNode[]>(resourceMapping->userDataNodeCount);
+
+  for (unsigned idx = 0; idx < resourceMapping->userDataNodeCount; ++idx)
+    allocNodes[idx] = resourceMapping->pUserDataNodes[idx].node;
 
   // Translate the resource nodes into the LGC format expected by Pipeline::SetUserDataNodes.
-  ArrayRef<ResourceMappingNode> nodes(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount);
-  ArrayRef<DescriptorRangeValue> descriptorRangeValues(shaderInfo->pDescriptorRangeValues,
-                                                       shaderInfo->descriptorRangeValueCount);
+  ArrayRef<ResourceMappingNode> nodes(allocNodes.get(), resourceMapping->userDataNodeCount);
+  ArrayRef<StaticDescriptorValue> descriptorRangeValues(resourceMapping->pStaticDescriptorValues,
+                                                        resourceMapping->staticDescriptorValueCount);
 
   // First, create a map of immutable nodes.
   ImmutableNodesMap immutableNodesMap;

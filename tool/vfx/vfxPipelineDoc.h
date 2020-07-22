@@ -58,10 +58,17 @@ public:
                           bool isWriteAccess, unsigned arrayIndex, Section **ptrOut, std::string *errorMsg);
 
 private:
+  void DeduplicateResourceMappingData(Vkgc::ResourceMappingData *resourceMapping);
+
   VfxPipelineState m_pipelineState; // Contants the render state
   VkPipelineVertexInputStateCreateInfo m_vertexInputState;
   std::vector<Vfx::ShaderSource> m_shaderSources;
   std::vector<Vkgc::PipelineShaderInfo> m_shaderInfos;
+
+  // Used for backward compatibility with Version 1 .pipe files
+  std::vector<Vkgc::ResourceMappingRootNode> m_resourceMappingNodes;
+  std::vector<Vkgc::ResourceMappingNode> m_resourceMappingSubNodes;
+  std::vector<Vkgc::StaticDescriptorValue> m_descriptorRangeValues;
 };
 
 } // namespace Vfx
