@@ -65,10 +65,12 @@ using namespace llvm;
 namespace SPIRV {
 class SPIRVLoopMerge;
 class SPIRVToLLVMDbgTran;
+
 class SPIRVToLLVM {
 public:
   SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
-              lgc::Builder *builder, const Vkgc::ShaderModuleUsage *moduleUsage);
+              llvm::ArrayRef<ConvertingSampler> convertingSamplers, lgc::Builder *builder,
+              const Vkgc::ShaderModuleUsage *moduleUsage);
 
   DebugLoc getDebugLoc(SPIRVInstruction *bi, Function *f);
 
@@ -89,9 +91,11 @@ public:
   Constant *transInitializer(SPIRVValue *, Type *);
   template <spv::Op> Value *transValueWithOpcode(SPIRVValue *);
   Value *transLoadImage(SPIRVValue *spvImageLoadPtr);
+  Value *loadImageSampler(Type *elementTy, Value *base);
   Value *transImagePointer(SPIRVValue *spvImagePtr);
+  Value *getDescPointerAndStride(lgc::ResourceNodeType resType, unsigned descriptorSet, unsigned binding);
   Value *transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessChain);
-  Value *indexDescPtr(Value *base, Value *index, bool isNonUniform, SPIRVType *spvElementType);
+  Value *indexDescPtr(Type *elementTy, Value *base, Value *index, bool isNonUniform);
   Value *transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue *);
 
   bool transDecoration(SPIRVValue *, Value *);
@@ -117,9 +121,10 @@ public:
   struct ExtractedImageInfo {
     BasicBlock *bb;
     const SPIRVTypeImageDescriptor *desc;
-    unsigned dim;   // lgc::Builder dimension
-    unsigned flags; // lgc::Builder image call flags
-    Value *imageDesc;
+    unsigned dim;          // lgc::Builder dimension
+    unsigned flags;        // lgc::Builder image call flags
+    Value *imageDesc;      // Image descriptor (first plane if multi-plane)
+    Value *imageDescArray; // Array of image descriptors for multi-plane
     Value *fmaskDesc;
     Value *samplerDesc;
   };
@@ -198,6 +203,7 @@ private:
   ShaderFloatControlFlags m_fpControlFlags;
   SPIRVFunction *m_entryTarget;
   const SPIRVSpecConstMap &m_specConstMap;
+  llvm::ArrayRef<ConvertingSampler> m_convertingSamplers;
   SPIRVToLLVMTypeMap m_typeMap;
   SPIRVToLLVMValueMap m_valueMap;
   SPIRVToLLVMFunctionMap m_funcMap;
@@ -302,4 +308,4 @@ private:
 
 } // namespace SPIRV
 
-#endif
+#endif // SPIRVREADER_H

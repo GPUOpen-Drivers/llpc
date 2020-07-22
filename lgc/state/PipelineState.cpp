@@ -63,6 +63,152 @@ static const char RsStateMetadataName[] = "lgc.rasterizer.state";
 static const char ColorExportFormatsMetadataName[] = "lgc.color.export.formats";
 static const char ColorExportStateMetadataName[] = "lgc.color.export.state";
 
+namespace {
+
+// =====================================================================================================================
+// Gets the maximum bit-count of any component in specified color attachment format.
+//
+// @param dfmt : Color attachment data format
+static unsigned getMaxComponentBitCount(BufDataFormat dfmt) {
+  switch (dfmt) {
+  case BufDataFormatInvalid:
+  case BufDataFormatReserved:
+    return 0;
+  case BufDataFormat4_4:
+  case BufDataFormat4_4_4_4:
+  case BufDataFormat4_4_4_4_Bgra:
+    return 4;
+  case BufDataFormat5_6_5:
+  case BufDataFormat5_6_5_Bgr:
+  case BufDataFormat5_6_5_1:
+  case BufDataFormat5_6_5_1_Bgra:
+  case BufDataFormat1_5_6_5:
+    return 6;
+  case BufDataFormat8:
+  case BufDataFormat8_8:
+  case BufDataFormat8_8_8:
+  case BufDataFormat8_8_8_Bgr:
+  case BufDataFormat8_8_8_8:
+  case BufDataFormat8_8_8_8_Bgra:
+    return 8;
+  case BufDataFormat5_9_9_9:
+    return 9;
+  case BufDataFormat10_10_10_2:
+  case BufDataFormat2_10_10_10:
+  case BufDataFormat2_10_10_10_Bgra:
+    return 10;
+  case BufDataFormat10_11_11:
+  case BufDataFormat11_11_10:
+    return 11;
+  case BufDataFormat16:
+  case BufDataFormat16_16:
+  case BufDataFormat16_16_16_16:
+    return 16;
+  case BufDataFormat32:
+  case BufDataFormat32_32:
+  case BufDataFormat32_32_32:
+  case BufDataFormat32_32_32_32:
+    return 32;
+  case BufDataFormat64:
+  case BufDataFormat64_64:
+  case BufDataFormat64_64_64:
+  case BufDataFormat64_64_64_64:
+    return 64;
+  }
+  return 0;
+}
+
+// =====================================================================================================================
+// Checks whether the alpha channel is present in the specified color attachment format.
+//
+// @param dfmt : Color attachment data format
+static bool hasAlpha(BufDataFormat dfmt) {
+  switch (dfmt) {
+  case BufDataFormat10_10_10_2:
+  case BufDataFormat2_10_10_10:
+  case BufDataFormat8_8_8_8:
+  case BufDataFormat16_16_16_16:
+  case BufDataFormat32_32_32_32:
+  case BufDataFormat8_8_8_8_Bgra:
+  case BufDataFormat2_10_10_10_Bgra:
+  case BufDataFormat64_64_64_64:
+  case BufDataFormat4_4_4_4:
+  case BufDataFormat4_4_4_4_Bgra:
+  case BufDataFormat5_6_5_1:
+  case BufDataFormat5_6_5_1_Bgra:
+  case BufDataFormat1_5_6_5:
+  case BufDataFormat5_9_9_9:
+    return true;
+  default:
+    return false;
+  }
+}
+
+// =====================================================================================================================
+// Get the number of channels
+//
+// @param dfmt : Color attachment data format
+static unsigned getNumChannels(BufDataFormat dfmt) {
+  switch (dfmt) {
+  case BufDataFormatInvalid:
+  case BufDataFormatReserved:
+  case BufDataFormat8:
+  case BufDataFormat16:
+  case BufDataFormat32:
+  case BufDataFormat64:
+    return 1;
+  case BufDataFormat4_4:
+  case BufDataFormat8_8:
+  case BufDataFormat16_16:
+  case BufDataFormat32_32:
+  case BufDataFormat64_64:
+    return 2;
+  case BufDataFormat8_8_8:
+  case BufDataFormat8_8_8_Bgr:
+  case BufDataFormat10_11_11:
+  case BufDataFormat11_11_10:
+  case BufDataFormat32_32_32:
+  case BufDataFormat64_64_64:
+  case BufDataFormat5_6_5:
+  case BufDataFormat5_6_5_Bgr:
+    return 3;
+  case BufDataFormat10_10_10_2:
+  case BufDataFormat2_10_10_10:
+  case BufDataFormat8_8_8_8:
+  case BufDataFormat16_16_16_16:
+  case BufDataFormat32_32_32_32:
+  case BufDataFormat8_8_8_8_Bgra:
+  case BufDataFormat2_10_10_10_Bgra:
+  case BufDataFormat64_64_64_64:
+  case BufDataFormat4_4_4_4:
+  case BufDataFormat4_4_4_4_Bgra:
+  case BufDataFormat5_6_5_1:
+  case BufDataFormat5_6_5_1_Bgra:
+  case BufDataFormat1_5_6_5:
+  case BufDataFormat5_9_9_9:
+    return 4;
+  }
+  return 0;
+}
+
+// =====================================================================================================================
+// This is the helper function for the algorithm to determine the shader export format.
+//
+// @param dfmt : Color attachment data format
+static CompSetting computeCompSetting(BufDataFormat dfmt) {
+  CompSetting compSetting = CompSetting::Invalid;
+  switch (getNumChannels(dfmt)) {
+  case 1:
+    compSetting = CompSetting::OneCompRed;
+    break;
+  case 2:
+    compSetting = CompSetting::TwoCompGreenRed;
+    break;
+  }
+  return compSetting;
+}
+} // namespace
+
 namespace lgc {
 // Create BuilderReplayer pass
 ModulePass *createBuilderReplayer(Pipeline *pipeline);
@@ -364,7 +510,6 @@ void PipelineState::setUserDataNodesTable(ArrayRef<ResourceNode> nodes, Resource
       destNode.innerTable = ArrayRef<ResourceNode>(destInnerTable, node.innerTable.size());
       setUserDataNodesTable(node.innerTable, destInnerTable, destInnerTable);
     }
-    m_haveConvertingSampler |= (node.type == ResourceNodeType::DescriptorYCbCrSampler);
   }
 }
 
@@ -424,23 +569,17 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.set)));
       // Operand 4: binding
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.binding)));
+      // Operand 5: stride
+      operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.stride)));
       if (node.immutableValue) {
-        // Operand 5 onwards: immutable descriptor constant.
+        // Operand 6 onwards: immutable descriptor constant.
         // Writing the constant array directly does not seem to work, as it does not survive IR linking.
         // Maybe it is a problem with the IR linker when metadata contains a non-ConstantData constant.
-        // So we write the individual ConstantInts instead.
+        // So we write the individual constant vectors instead.
         // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
-        unsigned samplerDescriptorSize = 4;
-        if (node.type == ResourceNodeType::DescriptorYCbCrSampler)
-          samplerDescriptorSize = 8;
         unsigned elemCount = node.immutableValue->getType()->getArrayNumElements();
-        for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx) {
-          Constant *vectorValue = ConstantExpr::getExtractValue(node.immutableValue, elemIdx);
-          for (unsigned compIdx = 0; compIdx != samplerDescriptorSize; ++compIdx) {
-            operands.push_back(
-                ConstantAsMetadata::get(ConstantExpr::getExtractElement(vectorValue, builder.getInt32(compIdx))));
-          }
-        }
+        for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx)
+          operands.push_back(ConstantAsMetadata::get(ConstantExpr::getExtractValue(node.immutableValue, elemIdx)));
       }
       break;
     }
@@ -501,26 +640,18 @@ void PipelineState::readUserDataNodes(Module *module) {
         nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
         // Operand 4: binding
         nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
+        // Operand 5: stride
+        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
         nextNode->immutableValue = nullptr;
-        if (metadataNode->getNumOperands() >= 6) {
-          // Operand 5 onward: immutable descriptor constant
+        if (metadataNode->getNumOperands() >= 7) {
+          // Operand 6 onward: immutable descriptor constant
           // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
-          static const unsigned OperandStartIdx = 5;
-          unsigned samplerDescriptorSize = 4;
-          if (nextNode->type == ResourceNodeType::DescriptorYCbCrSampler) {
-            samplerDescriptorSize = 8;
-            m_haveConvertingSampler = true;
-          }
-
-          unsigned elemCount = (metadataNode->getNumOperands() - OperandStartIdx) / samplerDescriptorSize;
+          static const unsigned OperandStartIdx = 6;
+          unsigned elemCount = metadataNode->getNumOperands() - OperandStartIdx;
           SmallVector<Constant *, 8> descriptors;
-          for (unsigned elemIdx = 0; elemIdx < elemCount; ++elemIdx) {
-            SmallVector<Constant *, 8> compValues;
-            for (unsigned compIdx = 0; compIdx < samplerDescriptorSize; ++compIdx) {
-              compValues.push_back(mdconst::dyn_extract<ConstantInt>(
-                  metadataNode->getOperand(OperandStartIdx + samplerDescriptorSize * elemIdx + compIdx)));
-            }
-            descriptors.push_back(ConstantVector::get(compValues));
+          for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx) {
+            descriptors.push_back(
+                dyn_cast<ConstantAsMetadata>(metadataNode->getOperand(OperandStartIdx + elemIdx))->getValue());
           }
           nextNode->immutableValue =
               ConstantArray::get(ArrayType::get(descriptors[0]->getType(), elemCount), descriptors);
@@ -579,8 +710,7 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
                 (nodeType == ResourceNodeType::DescriptorBuffer &&
                  (innerNode.type == ResourceNodeType::DescriptorBufferCompact ||
                   innerNode.type == ResourceNodeType::InlineBuffer)) ||
-                ((innerNode.type == ResourceNodeType::DescriptorCombinedTexture ||
-                  innerNode.type == ResourceNodeType::DescriptorYCbCrSampler) &&
+                (innerNode.type == ResourceNodeType::DescriptorCombinedTexture &&
                  (nodeType == ResourceNodeType::DescriptorResource ||
                   nodeType == ResourceNodeType::DescriptorTexelBuffer ||
                   nodeType == ResourceNodeType::DescriptorSampler)))
@@ -591,8 +721,7 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
     } else if (node.set == descSet && node.binding == binding) {
       if (nodeType == ResourceNodeType::Unknown || nodeType == node.type ||
           (nodeType == ResourceNodeType::DescriptorBuffer && node.type == ResourceNodeType::DescriptorBufferCompact) ||
-          ((node.type == ResourceNodeType::DescriptorCombinedTexture ||
-            node.type == ResourceNodeType::DescriptorYCbCrSampler) &&
+          (node.type == ResourceNodeType::DescriptorCombinedTexture &&
            (nodeType == ResourceNodeType::DescriptorResource || nodeType == ResourceNodeType::DescriptorTexelBuffer ||
             nodeType == ResourceNodeType::DescriptorSampler)))
         return {&node, &node};
@@ -931,8 +1060,90 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStage shaderStage) {
 // @param outputTy : Color output type
 // @param location : Location
 unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
-  std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(this, nullptr));
-  return fragColorExport->computeExportFormat(outputTy, location);
+  const ColorExportFormat *colorExportFormat = &getColorExportFormat(location);
+  location = (getColorExportState().dualSourceBlendEnable ? 0 : location);
+  GfxIpVersion gfxIp = getTargetInfo().getGfxIpVersion();
+  auto gpuWorkarounds = &getTargetInfo().getGpuWorkarounds();
+  unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<VectorType>(outputTy)->getNumElements()) - 1 : 1;
+  const auto cbState = &m_colorExportState;
+  // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
+  const bool enableAlphaToCoverage = (cbState->alphaToCoverageEnable && location == 0);
+
+  const bool blendEnabled = colorExportFormat->blendEnable;
+
+  const bool isUnormFormat = (colorExportFormat->nfmt == BufNumFormatUnorm);
+  const bool isSnormFormat = (colorExportFormat->nfmt == BufNumFormatSnorm);
+  bool isFloatFormat = (colorExportFormat->nfmt == BufNumFormatFloat);
+  const bool isUintFormat = (colorExportFormat->nfmt == BufNumFormatUint);
+  const bool isSintFormat = (colorExportFormat->nfmt == BufNumFormatSint);
+  const bool isSrgbFormat = (colorExportFormat->nfmt == BufNumFormatSrgb);
+
+  if (colorExportFormat->dfmt == BufDataFormat8_8_8 || colorExportFormat->dfmt == BufDataFormat8_8_8_Bgr) {
+    // These three-byte formats are handled by pretending they are float.
+    isFloatFormat = true;
+  }
+
+  const unsigned maxCompBitCount = getMaxComponentBitCount(colorExportFormat->dfmt);
+
+  const bool formatHasAlpha = hasAlpha(colorExportFormat->dfmt);
+  const bool alphaExport =
+      (outputMask == 0xF && (formatHasAlpha || colorExportFormat->blendSrcAlphaToColor || enableAlphaToCoverage));
+
+  const CompSetting compSetting = computeCompSetting(colorExportFormat->dfmt);
+
+  // Start by assuming EXP_FORMAT_ZERO (no exports)
+  ExportFormat expFmt = EXP_FORMAT_ZERO;
+
+  bool gfx8RbPlusEnable = false;
+  if (gfxIp.major == 8 && gfxIp.minor == 1)
+    gfx8RbPlusEnable = true;
+
+  if (colorExportFormat->dfmt == BufDataFormatInvalid)
+    expFmt = EXP_FORMAT_ZERO;
+  else if (compSetting == CompSetting::OneCompRed && !alphaExport && !isSrgbFormat &&
+           (!gfx8RbPlusEnable || maxCompBitCount == 32)) {
+    // NOTE: When Rb+ is enabled, "R8 UNORM" and "R16 UNORM" shouldn't use "EXP_FORMAT_32_R", instead
+    // "EXP_FORMAT_FP16_ABGR" and "EXP_FORMAT_UNORM16_ABGR" should be used for 2X exporting performance.
+    expFmt = EXP_FORMAT_32_R;
+  } else if (((isUnormFormat || isSnormFormat) && maxCompBitCount <= 10) || (isFloatFormat && maxCompBitCount <= 16) ||
+             (isSrgbFormat && maxCompBitCount == 8))
+    expFmt = EXP_FORMAT_FP16_ABGR;
+  else if (isSintFormat &&
+           (maxCompBitCount == 16 ||
+            (!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp) && maxCompBitCount < 16)) &&
+           !enableAlphaToCoverage) {
+    // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"
+    // "SINT16" and the CB format is less than 16 bits per channel. On such hardware, the workaround is picking
+    // an appropriate 32-bit export format. If this workaround isn't necessary, then we can choose this higher
+    // performance 16-bit export format in this case.
+    expFmt = EXP_FORMAT_SINT16_ABGR;
+  } else if (isSnormFormat && maxCompBitCount == 16 && !blendEnabled)
+    expFmt = EXP_FORMAT_SNORM16_ABGR;
+  else if (isUintFormat &&
+           (maxCompBitCount == 16 ||
+            (!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp) && maxCompBitCount < 16)) &&
+           !enableAlphaToCoverage) {
+    // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"
+    // "SINT16" and the CB format is less than 16 bits per channel. On such hardware, the workaround is picking
+    // an appropriate 32-bit export format. If this workaround isn't necessary, then we can choose this higher
+    // performance 16-bit export format in this case.
+    expFmt = EXP_FORMAT_UINT16_ABGR;
+  } else if (isUnormFormat && maxCompBitCount == 16 && !blendEnabled)
+    expFmt = EXP_FORMAT_UNORM16_ABGR;
+  else if (((isUintFormat || isSintFormat) || (isFloatFormat && maxCompBitCount > 16) ||
+            ((isUnormFormat || isSnormFormat) && maxCompBitCount == 16)) &&
+           (compSetting == CompSetting::OneCompRed || compSetting == CompSetting::OneCompAlpha ||
+            compSetting == CompSetting::TwoCompAlphaRed))
+    expFmt = EXP_FORMAT_32_AR;
+  else if (((isUintFormat || isSintFormat) || (isFloatFormat && maxCompBitCount > 16) ||
+            ((isUnormFormat || isSnormFormat) && maxCompBitCount == 16)) &&
+           compSetting == CompSetting::TwoCompGreenRed && !alphaExport)
+    expFmt = EXP_FORMAT_32_GR;
+  else if (((isUnormFormat || isSnormFormat) && maxCompBitCount == 16) || (isUintFormat || isSintFormat) ||
+           (isFloatFormat && maxCompBitCount > 16))
+    expFmt = EXP_FORMAT_32_ABGR;
+
+  return expFmt;
 }
 
 // =====================================================================================================================
@@ -952,7 +1163,6 @@ const char *PipelineState::getResourceNodeTypeName(ResourceNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, Unknown)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorResource)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorSampler)
-    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorYCbCrSampler)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorCombinedTexture)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorTexelBuffer)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorFmask)

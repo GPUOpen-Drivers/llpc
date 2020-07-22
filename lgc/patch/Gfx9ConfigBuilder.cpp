@@ -999,8 +999,8 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
 
   useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
 
-  if (usePointSize || useLayer || useViewportIndex)
-  {
+  bool miscExport = usePointSize || useLayer || useViewportIndex;
+  if (miscExport) {
     SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
     SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
     SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
@@ -1030,7 +1030,7 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
   }
 
   unsigned posCount = 1; // gl_Position is always exported
-  if (usePointSize || useLayer || useViewportIndex)
+  if (miscExport)
     ++posCount;
 
   if (clipDistanceCount + cullDistanceCount > 0) {
@@ -1678,8 +1678,8 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
 
   useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
 
-  if (usePointSize || useLayer || useViewportIndex)
-  {
+  bool miscExport = usePointSize || useLayer || useViewportIndex;
+  if (miscExport) {
     SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
     SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
     SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
@@ -1704,7 +1704,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   }
 
   unsigned posCount = 1; // gl_Position is always exported
-  if (usePointSize || useLayer || useViewportIndex)
+  if (miscExport)
     ++posCount;
 
   if (clipDistanceCount + cullDistanceCount > 0) {

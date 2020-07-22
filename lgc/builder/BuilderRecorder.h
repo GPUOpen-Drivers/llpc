@@ -131,12 +131,8 @@ public:
 
     // Descriptor
     LoadBufferDesc,
-    IndexDescPtr,
-    LoadDescFromPtr,
-    GetSamplerDescPtr,
-    GetImageDescPtr,
-    GetTexelBufferDescPtr,
-    GetFmaskDescPtr,
+    GetDescStride,
+    GetDescPtr,
     LoadPushConstantsPtr,
     GetBufferDescLength,
 
@@ -145,6 +141,7 @@ public:
     ImageLoadWithFmask,
     ImageStore,
     ImageSample,
+    ImageSampleConvert,
     ImageGather,
     ImageAtomic,
     ImageAtomicCompareSwap,
@@ -348,19 +345,11 @@ public:
   llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, bool isNonUniform,
                                     bool isWritten, llvm::Type *pointeeTy, const llvm::Twine &instName) override final;
 
-  llvm::Value *CreateIndexDescPtr(llvm::Value *descPtr, llvm::Value *index, bool isNonUniform,
-                                  const llvm::Twine &instName) override final;
+  llvm::Value *CreateGetDescStride(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                   const llvm::Twine &instName) override final;
 
-  llvm::Value *CreateLoadDescFromPtr(llvm::Value *descPtr, const llvm::Twine &instName) override final;
-
-  llvm::Value *CreateGetSamplerDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName) override final;
-
-  llvm::Value *CreateGetImageDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName) override final;
-
-  llvm::Value *CreateGetTexelBufferDescPtr(unsigned descSet, unsigned binding,
-                                           const llvm::Twine &instName) override final;
-
-  llvm::Value *CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName) override final;
+  llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                const llvm::Twine &instName) override final;
 
   llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *pushConstantsTy, const llvm::Twine &instName) override final;
 
@@ -389,6 +378,11 @@ public:
   llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
                                  llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
                                  const llvm::Twine &instName = "") override final;
+
+  // Create an image sample with conversion.
+  llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDescArray,
+                                        llvm::Value *convertingSamplerDesc, llvm::ArrayRef<llvm::Value *> address,
+                                        const llvm::Twine &instName = "") override final;
 
   // Create an image gather.
   llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,

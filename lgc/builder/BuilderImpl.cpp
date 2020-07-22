@@ -222,6 +222,13 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
   auto savedInsertPoint = saveIP();
   SetInsertPoint(nonUniformInst);
 
+  // For any index that is 64 bit, change it back to 32 bit for comparison at the top of the
+  // waterfall loop.
+  for (Value *&nonUniformVal : nonUniformIndices) {
+    if (nonUniformVal->getType()->isIntegerTy(64))
+      nonUniformVal = CreateTrunc(nonUniformVal, getInt32Ty());
+  }
+
   // Get the waterfall index. If there are two indices (image resource+sampler case), join them into
   // a single struct.
   Value *waterfallIndex = nonUniformIndices[0];

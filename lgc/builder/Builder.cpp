@@ -33,6 +33,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ShaderModes.h"
+#include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include <set>
@@ -41,6 +42,11 @@
 
 using namespace lgc;
 using namespace llvm;
+
+namespace {
+// Descriptor sizes that are not part of hardware. Hardware-defined ones are in TargetInfo.
+const unsigned DescriptorSizeBufferCompact = 2 * sizeof(unsigned);
+} // anonymous namespace
 
 // =====================================================================================================================
 // Static method to create a BuilderImpl
@@ -256,55 +262,39 @@ PointerType *Builder::getBufferDescTy(Type *pointeeTy) {
 }
 
 // =====================================================================================================================
-// Get the type of an image descriptor
-VectorType *Builder::getImageDescTy() {
-  return FixedVectorType::get(getInt32Ty(), 8);
+// Get the type of a descriptor
+//
+// @param descType : Descriptor type, one of the ResourceNodeType values
+VectorType *Builder::getDescTy(ResourceNodeType descType) {
+  unsigned byteSize = 0;
+  switch (descType) {
+  case ResourceNodeType::DescriptorBuffer:
+  case ResourceNodeType::DescriptorTexelBuffer:
+    byteSize = DescriptorSizeBuffer;
+    break;
+  case ResourceNodeType::DescriptorBufferCompact:
+    byteSize = DescriptorSizeBufferCompact;
+    break;
+  case ResourceNodeType::DescriptorSampler:
+    byteSize = DescriptorSizeSampler;
+    break;
+  case ResourceNodeType::DescriptorResource:
+  case ResourceNodeType::DescriptorFmask:
+    byteSize = DescriptorSizeResource;
+    break;
+  default:
+    llvm_unreachable("");
+    break;
+  }
+  return FixedVectorType::get(getInt32Ty(), byteSize / sizeof(uint32_t));
 }
 
 // =====================================================================================================================
-// Get the type of an fmask descriptor
-VectorType *Builder::getFmaskDescTy() {
-  return FixedVectorType::get(getInt32Ty(), 8);
-}
-
-// =====================================================================================================================
-// Get the type of a texel buffer descriptor
-VectorType *Builder::getTexelBufferDescTy() {
-  return FixedVectorType::get(getInt32Ty(), 4);
-}
-
-// =====================================================================================================================
-// Get the type of a sampler descriptor
-VectorType *Builder::getSamplerDescTy() {
-  return FixedVectorType::get(getInt32Ty(), 4);
-}
-
-// =====================================================================================================================
-// Get the type of pointer to image descriptor.
-// This is in fact a struct containing the pointer itself plus the stride in dwords.
-Type *Builder::getImageDescPtrTy() {
-  return StructType::get(getContext(), {PointerType::get(getImageDescTy(), ADDR_SPACE_CONST), getInt32Ty()});
-}
-
-// =====================================================================================================================
-// Get the type of pointer to fmask descriptor.
-// This is in fact a struct containing the pointer itself plus the stride in dwords.
-Type *Builder::getFmaskDescPtrTy() {
-  return StructType::get(getContext(), {PointerType::get(getFmaskDescTy(), ADDR_SPACE_CONST), getInt32Ty()});
-}
-
-// =====================================================================================================================
-// Get the type of pointer to texel buffer descriptor.
-// This is in fact a struct containing the pointer itself plus the stride in dwords.
-Type *Builder::getTexelBufferDescPtrTy() {
-  return StructType::get(getContext(), {PointerType::get(getTexelBufferDescTy(), ADDR_SPACE_CONST), getInt32Ty()});
-}
-
-// =====================================================================================================================
-// Get the type of pointer to sampler descriptor.
-// This is in fact a struct containing the pointer itself plus the stride in dwords.
-Type *Builder::getSamplerDescPtrTy() {
-  return StructType::get(getContext(), {PointerType::get(getSamplerDescTy(), ADDR_SPACE_CONST), getInt32Ty()});
+// Get the type of pointer to descriptor.
+//
+// @param descType : Descriptor type, one of the ResourceNodeType values
+Type *Builder::getDescPtrTy(ResourceNodeType descType) {
+  return getDescTy(descType)->getPointerTo(ADDR_SPACE_CONST);
 }
 
 // =====================================================================================================================

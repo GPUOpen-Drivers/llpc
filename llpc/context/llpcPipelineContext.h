@@ -174,7 +174,7 @@ private:
 
   // Give the user data nodes and descriptor range values to the middle-end.
   void setUserDataInPipeline(lgc::Pipeline *pipeline) const;
-  void setUserDataNodesTable(llvm::LLVMContext &context, llvm::ArrayRef<ResourceMappingNode> nodes,
+  void setUserDataNodesTable(lgc::Pipeline *pipeline, llvm::ArrayRef<ResourceMappingNode> nodes,
                              const ImmutableNodesMap &immutableNodesMap, bool isRoot, lgc::ResourceNode *destTable,
                              lgc::ResourceNode *&destInnerTable) const;
 

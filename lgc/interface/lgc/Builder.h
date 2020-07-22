@@ -672,83 +672,36 @@ public:
                                             bool isNonUniform, bool isWritten, llvm::Type *pointeeTy,
                                             const llvm::Twine &instName = "") = 0;
 
-  // Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
+  // Get the type of a descriptor
   //
-  // @param descPtr : Descriptor pointer, as returned by this function or one of the CreateGet*DescPtr methods
-  // @param index : Index value
-  // @param isNonUniform : Whether the descriptor index is non-uniform
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateIndexDescPtr(llvm::Value *descPtr, llvm::Value *index, bool isNonUniform,
-                                          const llvm::Twine &instName = "") = 0;
+  // @param descType : Descriptor type, one of the ResourceNodeType values
+  llvm::VectorType *getDescTy(ResourceNodeType descType);
 
-  // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
-  // Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
+  // Get the type of pointer to descriptor.
   //
-  // @param descPtr : Descriptor pointer, as returned by CreateIndexDesc or one of the CreateGet*DescPtr methods
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateLoadDescFromPtr(llvm::Value *descPtr, const llvm::Twine &instName = "") = 0;
+  // @param descType : Descriptor type, one of the ResourceNodeType values
+  llvm::Type *getDescPtrTy(ResourceNodeType descType);
 
-  // Get the type of an image descriptor.
-  llvm::VectorType *getImageDescTy();
-
-  // Get the type of an F-mask descriptor.
-  llvm::VectorType *getFmaskDescTy();
-
-  // Get the type of a sampler descriptor.
-  llvm::VectorType *getSamplerDescTy();
-
-  // Get the type of a texel buffer descriptor.
-  llvm::VectorType *getTexelBufferDescTy();
-
-  // Get the type of pointer to image or F-mask descriptor, as returned by CreateGetImageDescPtr.
-  // The type is in fact a struct containing the actual pointer plus a stride in dwords.
-  llvm::Type *getImageDescPtrTy();
-
-  // Get the type of pointer to F-mask descriptor, as returned by CreateGetFmaskDescPtr.
-  // The type is in fact a struct containing the actual pointer plus a stride in dwords.
-  llvm::Type *getFmaskDescPtrTy();
-
-  // Get the type of pointer to texel buffer descriptor, as returned by CreateGetTexelBufferDescPtr.
-  // The type is in fact a struct containing the actual pointer plus a stride in dwords.
-  // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
-  // set up the stride, and CreateIndexDescPtr will use it.
-  llvm::Type *getTexelBufferDescPtrTy();
-
-  // Get the type of pointer to sampler descriptor, as returned by CreateGetSamplerDescPtr.
-  // The type is in fact a struct containing the actual pointer plus a stride in dwords.
-  // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
-  // set up the stride, and CreateIndexDescPtr will use it.
-  llvm::Type *getSamplerDescPtrTy();
-
-  // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
+  // Create a get of the stride (in bytes) of a descriptor. Returns an i32 value.
   //
+  // @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+  //                   DescriptorTexelBuffer, DescriptorFmask.
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetSamplerDescPtr(unsigned descSet, unsigned binding,
-                                               const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateGetDescStride(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                           const llvm::Twine &instName = "") = 0;
 
-  // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
+  // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
+  // GetTexelBufferDescPtrTy or GetFmaskDescPtrTy, depending on descType.
   //
+  // @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+  //                   DescriptorTexelBuffer, DescriptorFmask.
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetImageDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName = "") = 0;
-
-  // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
-  //
-  // @param descSet : Descriptor set
-  // @param binding : Descriptor binding
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetTexelBufferDescPtr(unsigned descSet, unsigned binding,
-                                                   const llvm::Twine &instName = "") = 0;
-
-  // Create a load of a F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
-  //
-  // @param descSet : Descriptor set
-  // @param binding : Descriptor binding
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetFmaskDescPtr(unsigned descSet, unsigned binding, const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                        const llvm::Twine &instName = "") = 0;
 
   // Create a load of the push constants pointer.
   // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
@@ -957,6 +910,22 @@ public:
   virtual llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
                                          llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
                                          const llvm::Twine &instName = "") = 0;
+
+  // Create an image sample with a converting sampler.
+  // The caller supplies all arguments to the image sample op in "address", in the order specified
+  // by the indices defined as ImageIndex* below.
+  //
+  // @param resultTy : Result type
+  // @param dim : Image dimension
+  // @param flags : ImageFlag* flags
+  // @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
+  // @param convertingSamplerDesc : Converting sampler descriptor (constant v8i32)
+  // @param address : Address and other arguments
+  // @param instName : Name to give instruction(s)
+  virtual llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags,
+                                                llvm::Value *imageDescArray, llvm::Value *convertingSamplerDesc,
+                                                llvm::ArrayRef<llvm::Value *> address,
+                                                const llvm::Twine &instName = "") = 0;
 
   // Create an image gather.
   // The return type is specified by pResultTy as follows:

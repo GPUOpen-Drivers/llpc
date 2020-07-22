@@ -455,7 +455,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
   SmallVector<Value *, 16> args;
   Value *result = nullptr;
   unsigned imageDescArgIndex = 0;
-  if (imageDesc->getType() == getImageDescTy()) {
+  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Not texel buffer; use image load instruction.
     // Build the intrinsic arguments.
     bool tfe = isa<StructType>(intrinsicDataTy);
@@ -620,7 +620,7 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
   SmallVector<Value *, 16> args;
   Instruction *imageStore = nullptr;
   unsigned imageDescArgIndex = 0;
-  if (imageDesc->getType() == getImageDescTy()) {
+  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Not texel buffer; use image store instruction.
     // Build the intrinsic arguments.
     unsigned dmask = 1;
@@ -692,50 +692,6 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
                                        Value *samplerDesc, ArrayRef<Value *> address, const Twine &instName) {
   Value *coord = address[ImageAddressIdxCoordinate];
   assert(coord->getType()->getScalarType()->isFloatTy() || coord->getType()->getScalarType()->isHalfTy());
-
-  // See if the descriptor is an immutable converting sampler, by tracing the load address back through
-  // bitcasts and constant GEPs to a global variable whose name starts with "_immutable_converting_sampler",
-  // which is where DescBuilder would have put the immutable sampler value.
-  // This is a hack to cope with the design of the Vulkan YCbCr conversion extension, in which
-  // you cannot see in the SPIR-V that a sampler is a converting sampler. It does not work
-  // if the sampler pointer is passed through a non-inlined function arg or a phi node.
-  // If using BuilderRecorder, it relies on the order in which recorded builder calls are
-  // processed in BuilderReplayer.
-  if (m_pipelineState->haveConvertingSampler()) {
-    if (auto load = dyn_cast<LoadInst>(samplerDesc)) {
-      Value *addr = load->getOperand(0);
-      unsigned byteOffset = 0;
-      for (;;) {
-        // Check for BitCastOperator as it might be an Instruction or ConstantExpr bitcast.
-        if (auto bitcast = dyn_cast<BitCastOperator>(addr)) {
-          addr = bitcast->getOperand(0);
-          continue;
-        }
-        // Check for GEPOperator as it might be an Instruction or ConstantExpr GEP.
-        if (auto gep = dyn_cast<GEPOperator>(addr)) {
-          APInt gepOffset(64, 0);
-          if (gep->accumulateConstantOffset(GetInsertPoint()->getModule()->getDataLayout(), gepOffset)) {
-            byteOffset += gepOffset.getZExtValue();
-            addr = gep->getPointerOperand();
-            continue;
-          }
-        }
-        if (auto global = dyn_cast<GlobalVariable>(addr)) {
-          if (global->getName().startswith(lgcName::ImmutableConvertingSamplerGlobal)) {
-            // The initializer of the global variable is an array of v8i32 immutable sampler values. We need
-            // to extract the right one, then call the appropriate function for a converting image sample.
-            auto initializer = cast<ConstantArray>(global->getInitializer());
-            unsigned index = byteOffset / (initializer->getType()->getArrayElementType()->getPrimitiveSizeInBits() / 8);
-            Constant *convertingSamplerDesc = cast<Constant>(CreateExtractValue(initializer, index));
-            return CreateImageSampleConvert(resultTy, dim, flags, imageDesc, convertingSamplerDesc, address, instName);
-          }
-        }
-        break;
-      }
-    }
-  }
-
-  // Normal image sample.
   return CreateImageSampleGather(resultTy, dim, flags, coord, imageDesc, samplerDesc, address, instName, true);
 }
 
@@ -747,14 +703,14 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
 // @param resultTy : Result type
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : Image descriptor
+// @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
 // @param convertingSamplerDesc : Converting sampler descriptor (v8i32)
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescArray,
                                               Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                               const Twine &instName) {
-  return CreateImageSampleConvertYCbCr(resultTy, dim, flags, imageDesc, convertingSamplerDesc, address, instName);
+  return CreateImageSampleConvertYCbCr(resultTy, dim, flags, imageDescArray, convertingSamplerDesc, address, instName);
 }
 
 // =====================================================================================================================
@@ -765,11 +721,11 @@ Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsi
 // @param resultTy : Result type
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : Image descriptor
+// @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
 // @param convertingSamplerDesc : Converting sampler descriptor (v8i32)
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
+Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescArray,
                                                    Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                                    const Twine &instName) {
   Value *result = nullptr;
@@ -803,6 +759,11 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
   // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
   // Init sample descriptor for luma channel
   Value *samplerDescLuma = CreateShuffleVector(convertingSamplerDesc, convertingSamplerDesc, ArrayRef<int>{0, 1, 2, 3});
+
+  // If we have an array of image descriptors, extract the first one.
+  Value *imageDesc = imageDescArray;
+  if (isa<ArrayType>(imageDescArray->getType()))
+    imageDesc = CreateExtractValue(imageDescArray, 0);
 
   YCbCrSampleInfo sampleInfoLuma = {resultTy, dim, flags, imageDesc, samplerDescLuma, address, instName.str(), true};
 
@@ -1236,7 +1197,7 @@ Value *ImageBuilder::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, un
   SmallVector<Value *, 8> args;
   Instruction *atomicInst = nullptr;
   unsigned imageDescArgIndex = 0;
-  if (imageDesc->getType() == getImageDescTy()) {
+  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Resource descriptor. Use the image atomic instruction.
     imageDesc = patchCubeDescriptor(imageDesc, dim);
     args.push_back(inputValue);
@@ -1342,7 +1303,7 @@ Value *ImageBuilder::CreateImageQuerySamples(unsigned dim, unsigned flags, Value
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *imageDesc, Value *lod,
                                           const Twine &instName) {
-  if (imageDesc->getType() == getTexelBufferDescTy()) {
+  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorTexelBuffer)) {
     // Texel buffer.
     // Extract NUM_RECORDS (SQ_BUF_RSRC_WORD2)
     Value *numRecords = CreateExtractElement(imageDesc, 2);

@@ -33,6 +33,7 @@
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcContext.h"
 #include "lgc/Pipeline.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
@@ -190,7 +191,8 @@ ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
 // Set pipeline state in Pipeline object for middle-end
 //
 // @param [in/out] pipeline : Middle-end pipeline object
-// @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs
+// @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs, and a fetch shader
+//                   is needed
 void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const {
   // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
   // to lgc::ShaderStage bit numbers.
@@ -211,8 +213,10 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const 
   }
 
   if (isGraphics()) {
-    // Set vertex input descriptions to the middle-end.
-    setVertexInputDescriptions(pipeline);
+    if (!unlinked) {
+      // Set vertex input descriptions to the middle-end.
+      setVertexInputDescriptions(pipeline);
+    }
 
     // Give the color export state to the middle-end.
     setColorExportState(pipeline);
@@ -411,7 +415,7 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
   ResourceNode *destTable = allocUserDataNodes.get();
   ResourceNode *destInnerTable = destTable + nodeCount;
   auto userDataNodes = ArrayRef<ResourceNode>(destTable, nodes.size());
-  setUserDataNodesTable(pipeline->getContext(), nodes, immutableNodesMap, /*isRoot=*/true, destTable, destInnerTable);
+  setUserDataNodesTable(pipeline, nodes, immutableNodesMap, /*isRoot=*/true, destTable, destInnerTable);
   assert(destInnerTable == destTable + nodes.size());
 
   // Give the table to the LGC Pipeline interface.
@@ -428,7 +432,7 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
 // @param isRoot : Whether this is the root table
 // @param [out] destTable : Where to write nodes
 // @param [in/out] destInnerTable : End of space available for inner tables
-void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<ResourceMappingNode> nodes,
+void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<ResourceMappingNode> nodes,
                                             const ImmutableNodesMap &immutableNodesMap, bool isRoot,
                                             ResourceNode *destTable, ResourceNode *&destInnerTable) const {
   for (unsigned idx = 0; idx != nodes.size(); ++idx) {
@@ -444,7 +448,7 @@ void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<Resou
       destNode.type = ResourceNodeType::DescriptorTableVaPtr;
       destInnerTable -= node.tablePtr.nodeCount;
       destNode.innerTable = ArrayRef<ResourceNode>(destInnerTable, node.tablePtr.nodeCount);
-      setUserDataNodesTable(context, ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
+      setUserDataNodesTable(pipeline, ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
                             immutableNodesMap, /*isRoot=*/false, destInnerTable, destInnerTable);
       break;
     }
@@ -491,13 +495,38 @@ void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<Resou
       if (node.type == ResourceMappingNodeType::PushConst && !isRoot)
         destNode.type = ResourceNodeType::InlineBuffer;
       else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
-        destNode.type = ResourceNodeType::DescriptorYCbCrSampler;
+        destNode.type = ResourceNodeType::DescriptorResource;
       else
         destNode.type = static_cast<ResourceNodeType>(node.type);
 
       destNode.set = node.srdRange.set;
       destNode.binding = node.srdRange.binding;
       destNode.immutableValue = nullptr;
+      switch (node.type) {
+      case ResourceMappingNodeType::DescriptorResource:
+      case ResourceMappingNodeType::DescriptorFmask:
+        destNode.stride = DescriptorSizeResource / sizeof(uint32_t);
+        break;
+      case ResourceMappingNodeType::DescriptorSampler:
+        destNode.stride = DescriptorSizeSampler / sizeof(uint32_t);
+        break;
+      case ResourceMappingNodeType::DescriptorCombinedTexture:
+      case ResourceMappingNodeType::DescriptorYCbCrSampler:
+        destNode.stride = (DescriptorSizeResource + DescriptorSizeSampler) / sizeof(uint32_t);
+        break;
+      case ResourceMappingNodeType::DescriptorBufferCompact:
+        destNode.stride = 2;
+        break;
+      default:
+        destNode.stride = DescriptorSizeBuffer / sizeof(uint32_t);
+        break;
+      }
+
+      // Only check for an immutable value if the resource is or contains a sampler. This specifically excludes
+      // YCbCrSampler; that was handled in the SPIR-V reader.
+      if (node.type != ResourceMappingNodeType::DescriptorSampler &&
+          node.type != ResourceMappingNodeType::DescriptorCombinedTexture)
+        break;
 
       auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(destNode.set, destNode.binding));
       if (it != immutableNodesMap.end()) {
@@ -505,19 +534,16 @@ void PipelineContext::setUserDataNodesTable(LLVMContext &context, ArrayRef<Resou
         // can assume it is four dwords.
         auto &immutableNode = *it->second;
 
-        IRBuilder<> builder(context);
+        IRBuilder<> builder(pipeline->getContext());
         SmallVector<Constant *, 8> values;
 
         if (immutableNode.arraySize != 0) {
-          const unsigned samplerDescriptorSize = node.type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 4 : 8;
+          constexpr unsigned SamplerDescriptorSize = 4;
 
           for (unsigned compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx) {
-            Constant *compValues[8] = {};
-            for (unsigned i = 0; i < samplerDescriptorSize; ++i) {
-              compValues[i] = builder.getInt32(immutableNode.pValue[compIdx * samplerDescriptorSize + i]);
-            }
-            for (unsigned i = samplerDescriptorSize; i < 8; ++i)
-              compValues[i] = builder.getInt32(0);
+            Constant *compValues[SamplerDescriptorSize] = {};
+            for (unsigned i = 0; i < SamplerDescriptorSize; ++i)
+              compValues[i] = builder.getInt32(immutableNode.pValue[compIdx * SamplerDescriptorSize + i]);
             values.push_back(ConstantVector::get(compValues));
           }
           destNode.immutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(), values.size()), values);

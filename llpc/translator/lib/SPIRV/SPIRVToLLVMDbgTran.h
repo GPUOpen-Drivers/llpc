@@ -171,4 +171,4 @@ private:
 };
 } // namespace SPIRV
 
-#endif
+#endif // SPIRVTOLLVMDBGTRAN_H

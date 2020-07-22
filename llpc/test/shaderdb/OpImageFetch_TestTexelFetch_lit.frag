@@ -28,15 +28,15 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 0, {{.*}}, i32 2, i32 2)
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 1, i32 0
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 1, i32 0, {{.*}}, <2 x i32> <i32 7, i32 7>, i32 8)
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 1
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 1, i32 0, {{.*}}, <2 x i32> <i32 3, i32 3>)
-; SHADERTEST: call {{.*}} @"lgc.create.get.texel.buffer.desc.ptr{{.*}}(i32 0, i32 2
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v4i32(i32 4, i32 0, i32 2
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 0, {{.*}}, i32 5)
-; SHADERTEST: call {{.*}} @"lgc.create.get.image.desc.ptr{{.*}}(i32 0, i32 3
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 3
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.with.fmask.v4f32(i32 6, i32 0, {{.*}}, {{.*}}, <2 x i32> <i32 6, i32 6>, i32 4)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

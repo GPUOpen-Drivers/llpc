@@ -101,10 +101,21 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
     }
   }
 
+  // Build the converting sampler info.
+  SmallVector<SPIRV::ConvertingSampler, 4> convertingSamplers;
+  for (const DescriptorRangeValue &range :
+       ArrayRef<DescriptorRangeValue>(shaderInfo->pDescriptorRangeValues, shaderInfo->descriptorRangeValueCount)) {
+    if (range.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
+      convertingSamplers.push_back(
+          {range.set, range.binding,
+           ArrayRef<unsigned>(range.pValue, range.arraySize * SPIRV::ConvertingSamplerDwordCount)});
+    }
+  }
+
   Context *context = static_cast<Context *>(&module->getContext());
 
   if (!readSpirv(context->getBuilder(), &(moduleData->usage), spirvStream, convertToExecModel(entryStage),
-                 shaderInfo->pEntryTarget, specConstMap, module, errMsg)) {
+                 shaderInfo->pEntryTarget, specConstMap, convertingSamplers, module, errMsg)) {
     report_fatal_error(Twine("Failed to translate SPIR-V to LLVM (") +
                            getShaderStageName(static_cast<ShaderStage>(entryStage)) + " shader): " + errMsg,
                        false);

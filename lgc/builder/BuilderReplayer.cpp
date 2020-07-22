@@ -419,35 +419,15 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
                                                                              : nullptr); // pPointeeTy
   }
 
-  case BuilderRecorder::Opcode::IndexDescPtr: {
-    return m_builder->CreateIndexDescPtr(args[0],                                     // pDescPtr
-                                         args[1],                                     // pIndex
-                                         cast<ConstantInt>(args[2])->getZExtValue()); // isNonUniform
-  }
+  case BuilderRecorder::Opcode::GetDescStride:
+    return m_builder->CreateGetDescStride(static_cast<ResourceNodeType>(cast<ConstantInt>(args[0])->getZExtValue()),
+                                          cast<ConstantInt>(args[1])->getZExtValue(),  // descSet
+                                          cast<ConstantInt>(args[2])->getZExtValue()); // binding
 
-  case BuilderRecorder::Opcode::LoadDescFromPtr: {
-    return m_builder->CreateLoadDescFromPtr(args[0]);
-  }
-
-  case BuilderRecorder::Opcode::GetSamplerDescPtr: {
-    return m_builder->CreateGetSamplerDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                                              cast<ConstantInt>(args[1])->getZExtValue()); // binding
-  }
-
-  case BuilderRecorder::Opcode::GetImageDescPtr: {
-    return m_builder->CreateGetImageDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                                            cast<ConstantInt>(args[1])->getZExtValue()); // binding
-  }
-
-  case BuilderRecorder::Opcode::GetFmaskDescPtr: {
-    return m_builder->CreateGetFmaskDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                                            cast<ConstantInt>(args[1])->getZExtValue()); // binding
-  }
-
-  case BuilderRecorder::Opcode::GetTexelBufferDescPtr: {
-    return m_builder->CreateGetTexelBufferDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                                                  cast<ConstantInt>(args[1])->getZExtValue()); // binding
-  }
+  case BuilderRecorder::Opcode::GetDescPtr:
+    return m_builder->CreateGetDescPtr(static_cast<ResourceNodeType>(cast<ConstantInt>(args[0])->getZExtValue()),
+                                       cast<ConstantInt>(args[1])->getZExtValue(),  // descSet
+                                       cast<ConstantInt>(args[2])->getZExtValue()); // binding
 
   case BuilderRecorder::Opcode::LoadPushConstantsPtr: {
     return m_builder->CreateLoadPushConstantsPtr(call->getType()->getPointerElementType()); // pPushConstantsTy
@@ -504,6 +484,24 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
       }
     }
     return m_builder->CreateImageSample(call->getType(), dim, flags, imageDesc, samplerDesc, address);
+  }
+
+  case BuilderRecorder::Opcode::ImageSampleConvert: {
+    unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+    unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
+    Value *imageDescArray = args[2];
+    Value *samplerDesc = args[3];
+    unsigned argsMask = cast<ConstantInt>(args[4])->getZExtValue();
+    SmallVector<Value *, Builder::ImageAddressCount> address;
+    address.resize(Builder::ImageAddressCount);
+    args = args.slice(5);
+    for (unsigned i = 0; i != Builder::ImageAddressCount; ++i) {
+      if ((argsMask >> i) & 1) {
+        address[i] = args[0];
+        args = args.slice(1);
+      }
+    }
+    return m_builder->CreateImageSampleConvert(call->getType(), dim, flags, imageDescArray, samplerDesc, address);
   }
 
   case BuilderRecorder::Opcode::ImageGather: {

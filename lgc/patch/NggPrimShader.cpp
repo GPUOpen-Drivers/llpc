@@ -59,9 +59,9 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
     : m_pipelineState(pipelineState), m_context(&pipelineState->getContext()),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()), m_nggControl(m_pipelineState->getNggControl()),
       m_ldsManager(nullptr), m_builder(new IRBuilder<>(*m_context)) {
-  // Always allow reciprocal, to change fdiv(1/x) to rcp(x)
+  // Always allow approximation, to change fdiv(1.0, x) to rcp(x)
   FastMathFlags fastMathFlags;
-  fastMathFlags.setAllowReciprocal();
+  fastMathFlags.setApproxFunc();
   m_builder->setFastMathFlags(fastMathFlags);
 
   assert(m_pipelineState->isGraphics());
@@ -1144,9 +1144,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
           cullDistanceCount = builtInUsage.cullDistance;
         }
 
-        // NOTE: When gl_PointSize, gl_Layer, or gl_ViewportIndex is used, gl_ClipDistance[] or
-        // gl_CullDistance[] should start from pos2.
-        clipCullPos = (usePointSize || useLayer || useViewportIndex) ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+        bool miscExport = usePointSize || useLayer || useViewportIndex;
+        // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
+        clipCullPos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
 
         // Collect clip/cull distance from exported value
         for (const auto &expData : expDataSet) {
@@ -3772,7 +3772,7 @@ Value *NggPrimShader::doSmallPrimFilterCulling(Module *module, Value *cullFlag, 
 
   // Get run-time flag enableConservativeRasterization
   auto conservativeRaster = fetchCullingControlRegister(module, m_cbLayoutTable.enableConservativeRasterization);
-  conservativeRaster = m_builder->CreateICmpNE(conservativeRaster, m_builder->getInt32(0));
+  conservativeRaster = m_builder->CreateICmpEQ(conservativeRaster, m_builder->getInt32(1));
 
   // Do small primitive filter culling
   return m_builder->CreateCall(smallPrimFilterCuller,
@@ -3866,7 +3866,6 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
   auto backfaceEntryBlock = createBlock(func, ".backfaceEntry");
   auto backfaceCullBlock = createBlock(func, ".backfaceCull");
   auto backfaceExponentBlock = createBlock(func, ".backfaceExponent");
-  auto endBackfaceCullBlock = createBlock(func, ".endBackfaceCull");
   auto backfaceExitBlock = createBlock(func, ".backfaceExit");
 
   auto savedInsertPoint = m_builder->saveIP();
@@ -3893,18 +3892,17 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     //   if ((area > 0 && face == CCW) || (area < 0 && face == CW))
     //     frontFace = true
     //
-    //   if ((area < 0 && face == CCW) || (area > 0 && face == CW))
-    //     backFace = true
+    //   backFace = !frontFace
     //
-    //   if (area == 0 || (frontFace && cullFront) || (backFace && cullBack))
+    //   if ((frontFace && cullFront) || (backFace && cullBack))
     //     cullFlag = true
     //
 
-    //        | x0 y0 w0 |
-    //        |          |
-    // area = | x1 y1 w1 | =  x0 * (y1 * w2 - y2 * w1) - x1 * (y0 * w2 - y2 * w0) + x2 * (y0 * w1 - y1 * w0)
-    //        |          |
-    //        | x2 y2 w2 |
+    //          | x0 y0 w0 |
+    //          |          |
+    //   area = | x1 y1 w1 | =  x0 * (y1 * w2 - y2 * w1) - x1 * (y0 * w2 - y2 * w0) + x2 * (y0 * w1 - y1 * w0)
+    //          |          |
+    //          | x2 y2 w2 |
     //
     auto x0 = m_builder->CreateExtractElement(vertex0, static_cast<uint64_t>(0));
     auto y0 = m_builder->CreateExtractElement(vertex0, 1);
@@ -3946,27 +3944,27 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     frontFace = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
                                            {frontFace, m_builder->getInt32(31), m_builder->getInt32(1)});
 
-    // face = (FACE, PA_SU_SC_MODE_CNTRL[2], 0 = CCW, 1 = CW)
+    // face = (FACE, PA_SU_SC_MODE_CNTL[2], 0 = CCW, 1 = CW)
     auto face = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
                                            {paSuScModeCntl, m_builder->getInt32(2), m_builder->getInt32(1)});
 
-    // face ^ signbit(xScale ^ yScale)
+    // frontFace = face ^ signbit(xScale ^ yScale)
     frontFace = m_builder->CreateXor(face, frontFace);
 
-    // (face ^ signbit(xScale ^ yScale)) == 0
+    // frontFace = (frontFace == 0)
     frontFace = m_builder->CreateICmpEQ(frontFace, m_builder->getInt32(0));
 
-    // frontFace = ((face ^ signbit(xScale ^ yScale)) == 0) ? (area < 0) : (area > 0)
+    // frontFace = frontFace == 0 ? area < 0 : area > 0
     frontFace = m_builder->CreateSelect(frontFace, areaLtZero, areaGtZero);
 
     // backFace = !frontFace
     auto backFace = m_builder->CreateNot(frontFace);
 
-    // cullFront = (CULL_FRONT, PA_SU_SC_MODE_CNTRL[0], 0 = DONT CULL, 1 = CULL)
+    // cullFront = (CULL_FRONT, PA_SU_SC_MODE_CNTL[0], 0 = DONT CULL, 1 = CULL)
     auto cullFront = m_builder->CreateAnd(paSuScModeCntl, m_builder->getInt32(1));
     cullFront = m_builder->CreateTrunc(cullFront, m_builder->getInt1Ty());
 
-    // cullBack = (CULL_BACK, PA_SU_SC_MODE_CNTRL[1], 0 = DONT CULL, 1 = CULL)
+    // cullBack = (CULL_BACK, PA_SU_SC_MODE_CNTL[1], 0 = DONT CULL, 1 = CULL)
     Value *cullBack = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
                                                  {paSuScModeCntl, m_builder->getInt32(1), m_builder->getInt32(1)});
     cullBack = m_builder->CreateTrunc(cullBack, m_builder->getInt1Ty());
@@ -3981,7 +3979,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     cullFlag1 = m_builder->CreateOr(cullFront, cullBack);
 
     auto nonZeroBackfaceExp = m_builder->CreateICmpNE(backfaceExponent, m_builder->getInt32(0));
-    m_builder->CreateCondBr(nonZeroBackfaceExp, backfaceExponentBlock, endBackfaceCullBlock);
+    m_builder->CreateCondBr(nonZeroBackfaceExp, backfaceExponentBlock, backfaceExitBlock);
   }
 
   // Construct ".backfaceExponent" block
@@ -3992,7 +3990,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     //
     // Ignore area calculations that are less enough
     //   if (|area| < (10 ^ (-backfaceExponent)) / |w0 * w1 * w2| )
-    //       cullFlag = false
+    //     cullFlag = false
     //
 
     // |w0 * w1 * w2|
@@ -4015,23 +4013,6 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     cullFlag2 = m_builder->CreateFCmpOGE(absArea, threshold);
     cullFlag2 = m_builder->CreateAnd(cullFlag1, cullFlag2);
 
-    m_builder->CreateBr(endBackfaceCullBlock);
-  }
-
-  // Construct ".endBackfaceCull" block
-  Value *cullFlag3 = nullptr;
-  {
-    m_builder->SetInsertPoint(endBackfaceCullBlock);
-
-    // cullFlag = cullFlag || (area == 0)
-    auto cullFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2);
-    cullFlagPhi->addIncoming(cullFlag1, backfaceCullBlock);
-    cullFlagPhi->addIncoming(cullFlag2, backfaceExponentBlock);
-
-    auto areaEqZero = m_builder->CreateFCmpOEQ(area, ConstantFP::get(m_builder->getFloatTy(), 0.0));
-
-    cullFlag3 = m_builder->CreateOr(cullFlagPhi, areaEqZero);
-
     m_builder->CreateBr(backfaceExitBlock);
   }
 
@@ -4039,11 +4020,12 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
   {
     m_builder->SetInsertPoint(backfaceExitBlock);
 
-    auto cullFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2);
+    auto cullFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 3);
     cullFlagPhi->addIncoming(cullFlag, backfaceEntryBlock);
-    cullFlagPhi->addIncoming(cullFlag3, endBackfaceCullBlock);
+    cullFlagPhi->addIncoming(cullFlag1, backfaceCullBlock);
+    cullFlagPhi->addIncoming(cullFlag2, backfaceExponentBlock);
 
-    // polyMode = (POLY_MODE, PA_SU_SC_MODE_CNTRL[4:3], 0 = DISABLE, 1 = DUAL)
+    // polyMode = (POLY_MODE, PA_SU_SC_MODE_CNTL[4:3], 0 = DISABLE, 1 = DUAL)
     auto polyMode = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
                                                {
                                                    paSuScModeCntl,
@@ -5018,12 +5000,14 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     vtxXyFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // xScale = (VPORT_XSCALE, PA_CL_VPORT_XSCALE[31:0])
+    // NOTE: This register value has already been scaled by MSAA number of samples in driver.
     auto xScale = m_builder->CreateBitCast(paClVportXscale, m_builder->getFloatTy());
 
     // xOffset = (VPORT_XOFFSET, PA_CL_VPORT_XOFFSET[31:0])
     auto xOffset = m_builder->CreateBitCast(paClVportXoffset, m_builder->getFloatTy());
 
     // yScale = (VPORT_YSCALE, PA_CL_VPORT_YSCALE[31:0])
+    // NOTE: This register value has already been scaled by MSAA number of samples in driver.
     auto yScale = m_builder->CreateBitCast(paClVportYscale, m_builder->getFloatTy());
 
     // yOffset = (VPORT_YOFFSET, PA_CL_VPORT_YOFFSET[31:0])
@@ -5066,13 +5050,30 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     // y2' = y2/w2
     y2 = m_builder->CreateFMul(y2, rcpW2);
 
-    // screenMinX = -xScale + xOffset - 0.5
-    auto screenMinX = m_builder->CreateFAdd(m_builder->CreateFNeg(xScale), xOffset);
-    screenMinX = m_builder->CreateFAdd(screenMinX, ConstantFP::get(m_builder->getFloatTy(), -0.5));
+    // NOTE: We apply a "fast" frustum culling based on screen space. VTE will convert coordinates from clip space to
+    // screen space, so we can clamp the coordinate to (viewport min, viewport max) very quickly and save all of the
+    // left/right/top/bottom plane checking, which is provided by traditional frustum culling.
+    Value *screenMinX = nullptr;
+    Value *screenMaxX = nullptr;
+    Value *screenMinY = nullptr;
+    Value *screenMaxY = nullptr;
+    if (!m_nggControl->enableFrustumCulling) {
+      // screenMinX = -xScale + xOffset - 0.75
+      screenMinX = m_builder->CreateFAdd(m_builder->CreateFNeg(xScale), xOffset);
+      screenMinX = m_builder->CreateFAdd(screenMinX, ConstantFP::get(m_builder->getFloatTy(), -0.75));
 
-    // screenMaxX = xScale + xOffset + 0.5
-    auto screenMaxX = m_builder->CreateFAdd(xScale, xOffset);
-    screenMaxX = m_builder->CreateFAdd(screenMaxX, ConstantFP::get(m_builder->getFloatTy(), 0.5));
+      // screenMaxX = xScale + xOffset + 0.75
+      screenMaxX = m_builder->CreateFAdd(xScale, xOffset);
+      screenMaxX = m_builder->CreateFAdd(screenMaxX, ConstantFP::get(m_builder->getFloatTy(), 0.75));
+
+      // screenMinY = -yScale + yOffset - 0.75
+      screenMinY = m_builder->CreateFAdd(m_builder->CreateFNeg(yScale), yOffset);
+      screenMinY = m_builder->CreateFAdd(screenMinY, ConstantFP::get(m_builder->getFloatTy(), -0.75));
+
+      // screenMaxY = yScale + yOffset + 0.75
+      screenMaxY = m_builder->CreateFAdd(yScale, yOffset);
+      screenMaxY = m_builder->CreateFAdd(screenMaxY, ConstantFP::get(m_builder->getFloatTy(), 0.75));
+    }
 
     // screenX0' = x0' * xScale + xOffset
     auto screenX0 = m_builder->CreateIntrinsic(Intrinsic::fma, m_builder->getFloatTy(), {x0, xScale, xOffset});
@@ -5086,7 +5087,10 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     // minX = clamp(min(screenX0', screenX1', screenX2'), screenMinX, screenMaxX) - 1/256.0
     Value *minX = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {screenX0, screenX1});
     minX = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {minX, screenX2});
-    minX = m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinX, minX, screenMaxX});
+    if (!m_nggControl->enableFrustumCulling) {
+      minX =
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinX, minX, screenMaxX});
+    }
     minX = m_builder->CreateFAdd(minX, ConstantFP::get(m_builder->getFloatTy(), -1 / 256.0));
 
     // minX = roundEven(minX)
@@ -5095,19 +5099,14 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     // maxX = clamp(max(screenX0', screenX1', screenX2'), screenMinX, screenMaxX) + 1/256.0
     Value *maxX = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {screenX0, screenX1});
     maxX = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {maxX, screenX2});
-    maxX = m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinX, maxX, screenMaxX});
+    if (!m_nggControl->enableFrustumCulling) {
+      maxX =
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinX, maxX, screenMaxX});
+    }
     maxX = m_builder->CreateFAdd(maxX, ConstantFP::get(m_builder->getFloatTy(), 1 / 256.0));
 
     // maxX = roundEven(maxX)
     maxX = m_builder->CreateIntrinsic(Intrinsic::rint, m_builder->getFloatTy(), maxX);
-
-    // screenMinY = -yScale + yOffset - 0.5
-    auto screenMinY = m_builder->CreateFAdd(m_builder->CreateFNeg(yScale), yOffset);
-    screenMinY = m_builder->CreateFAdd(screenMinY, ConstantFP::get(m_builder->getFloatTy(), -0.5));
-
-    // screenMaxY = yScale + yOffset + 0.5
-    auto screenMaxY = m_builder->CreateFAdd(yScale, yOffset);
-    screenMaxY = m_builder->CreateFAdd(screenMaxX, ConstantFP::get(m_builder->getFloatTy(), 0.5));
 
     // screenY0' = y0' * yScale + yOffset
     auto screenY0 = m_builder->CreateIntrinsic(Intrinsic::fma, m_builder->getFloatTy(), {y0, yScale, yOffset});
@@ -5121,7 +5120,10 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     // minY = clamp(min(screenY0', screenY1', screenY2'), screenMinY, screenMaxY) - 1/256.0
     Value *minY = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {screenY0, screenY1});
     minY = m_builder->CreateIntrinsic(Intrinsic::minnum, m_builder->getFloatTy(), {minY, screenY2});
-    minY = m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinY, minY, screenMaxY});
+    if (!m_nggControl->enableFrustumCulling) {
+      minY =
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinY, minY, screenMaxY});
+    }
     minY = m_builder->CreateFAdd(minY, ConstantFP::get(m_builder->getFloatTy(), -1 / 256.0));
 
     // minY = roundEven(minY)
@@ -5130,7 +5132,10 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     // maxY = clamp(max(screenX0', screenY1', screenY2'), screenMinY, screenMaxY) + 1/256.0
     Value *maxY = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {screenY0, screenY1});
     maxY = m_builder->CreateIntrinsic(Intrinsic::maxnum, m_builder->getFloatTy(), {maxY, screenY2});
-    maxY = m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinY, maxY, screenMaxY});
+    if (!m_nggControl->enableFrustumCulling) {
+      maxY =
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_fmed3, m_builder->getFloatTy(), {screenMinY, maxY, screenMaxY});
+    }
     maxY = m_builder->CreateFAdd(maxY, ConstantFP::get(m_builder->getFloatTy(), 1 / 256.0));
 
     // maxY = roundEven(maxY)
@@ -5317,7 +5322,7 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
     auto loadPtr = m_builder->CreateGEP(primShaderTablePtr, {m_builder->getInt32(0), regOffset});
     cast<Instruction>(loadPtr)->setMetadata(MetaNameUniform, MDNode::get(m_builder->getContext(), {}));
 
-    auto regValue = m_builder->CreateAlignedLoad(loadPtr, Align(4), /*volatile=*/true);
+    auto regValue = m_builder->CreateAlignedLoad(loadPtr, Align(4));
     regValue->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder->getContext(), {}));
 
     m_builder->CreateRet(regValue);

@@ -53,28 +53,19 @@ enum class CompSetting : unsigned {
 // Represents the manager of fragment color export operations.
 class FragColorExport {
 public:
-  FragColorExport(PipelineState *pipelineState, llvm::Module *module);
+  FragColorExport(llvm::LLVMContext *context);
 
-  llvm::Value *run(llvm::Value *output, unsigned location, llvm::Instruction *insertPos);
-
-  ExportFormat computeExportFormat(llvm::Type *outputTy, unsigned location) const;
+  llvm::Value *run(llvm::Value *output, unsigned int hwColorTarget, llvm::Instruction *insertPos, ExportFormat expFmt,
+                   const bool signedness);
 
 private:
   FragColorExport() = delete;
   FragColorExport(const FragColorExport &) = delete;
   FragColorExport &operator=(const FragColorExport &) = delete;
 
-  static CompSetting computeCompSetting(BufDataFormat dfmt);
-  static unsigned getNumChannels(BufDataFormat dfmt);
-
-  static bool hasAlpha(BufDataFormat dfmt);
-
-  static unsigned getMaxComponentBitCount(BufDataFormat dfmt);
-
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, llvm::Instruction *insertPos) const;
   llvm::Value *convertToInt(llvm::Value *value, bool signedness, llvm::Instruction *insertPos) const;
 
-  PipelineState *m_pipelineState; // Pipeline state
   llvm::LLVMContext *m_context;   // LLVM context
 };
 
