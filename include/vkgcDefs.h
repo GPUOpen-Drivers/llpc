@@ -767,6 +767,7 @@ public:
   /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
   static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo *pPipelineInfo, char *pPipeName,
                                          const size_t nameBufSize);
+
 };
 
 /// 128-bit hash compatible structure
