@@ -113,9 +113,6 @@ public:
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const = 0;
 
-  // Does user data node merge for merged shader
-  virtual void doUserDataNodeMerge() = 0;
-
   static void getGpuNameString(GfxIpVersion gfxIp, std::string &gpuName);
   static const char *getGpuNameAbbreviation(GfxIpVersion gfxIp);
 
@@ -147,6 +144,9 @@ public:
   // Get whether we are building a relocatable (unlinked) ElF
   bool isUnlinked() const { return m_unlinked; }
 
+  // Gets pipeline resource mapping data
+  const ResourceMappingData *getResourceMapping() const { return &m_resourceMapping; }
+
 protected:
   // Gets dummy vertex input create info
   virtual VkPipelineVertexInputStateCreateInfo *getDummyVertexInputInfo() { return nullptr; }
@@ -157,9 +157,15 @@ protected:
   // Gets dummy vertex attribute info
   virtual std::vector<VkVertexInputAttributeDescription> *getDummyVertexAttributes() { return nullptr; }
 
-  GfxIpVersion m_gfxIp;           // Graphics IP version info
-  MetroHash::Hash m_pipelineHash; // Pipeline hash code
-  MetroHash::Hash m_cacheHash;    // Cache hash code
+  GfxIpVersion m_gfxIp;                  // Graphics IP version info
+  MetroHash::Hash m_pipelineHash;        // Pipeline hash code
+  MetroHash::Hash m_cacheHash;           // Cache hash code
+  ResourceMappingData m_resourceMapping; // Holds resource mapping nodes and static descriptor values
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
+  // Internal storage for the resource mapping data that is passed through the VKGC interface in versions 41+
+  std::unique_ptr<llvm::SmallVectorImpl<ResourceMappingRootNode>> m_userDataNodeStorage;
+  std::unique_ptr<llvm::SmallVectorImpl<StaticDescriptorValue>> m_staticDescriptorValueStorage;
+#endif
 
 private:
   PipelineContext() = delete;
@@ -167,7 +173,7 @@ private:
   PipelineContext &operator=(const PipelineContext &) = delete;
 
   // Type of immutable nodes map used in SetUserDataNodesTable
-  typedef std::map<std::pair<unsigned, unsigned>, const DescriptorRangeValue *> ImmutableNodesMap;
+  typedef std::map<std::pair<unsigned, unsigned>, const StaticDescriptorValue *> ImmutableNodesMap;
 
   // Give the pipeline options to the middle-end.
   void setOptionsInPipeline(lgc::Pipeline *pipeline) const;

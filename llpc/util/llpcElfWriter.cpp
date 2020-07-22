@@ -206,6 +206,7 @@ static void updateRootDescriptorRegisters(Context *context, msgpack::Document &d
         // Reloc Descriptor user data value is consisted by DescRelocMagic | set.
         unsigned regValue = keyIt->second.getUInt();
         if (DescRelocMagic == (regValue & DescRelocMagicMask)) {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
           const PipelineShaderInfo *shaderInfo = nullptr;
           if (baseRegister == mmComputeUserData0) {
             auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
@@ -214,12 +215,28 @@ static void updateRootDescriptorRegisters(Context *context, msgpack::Document &d
             auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
             shaderInfo = baseRegister == mmSpiShaderUserDataVs0 ? &pipelineInfo->vs : &pipelineInfo->fs;
           }
+#else
+          const ResourceMappingData *resourceMapping = nullptr;
+          if (baseRegister == mmComputeUserData0) {
+            auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
+            resourceMapping = &pipelineInfo->resourceMapping;
+          } else {
+            auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
+            resourceMapping = &pipelineInfo->resourceMapping;
+          }
+#endif
           unsigned set = regValue & DescSetMask;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
           for (unsigned j = 0; j < shaderInfo->userDataNodeCount; ++j) {
-            if (shaderInfo->pUserDataNodes[j].type == ResourceMappingNodeType::DescriptorTableVaPtr &&
-                set == shaderInfo->pUserDataNodes[j].tablePtr.pNext[0].srdRange.set) {
+            auto userDataNode = &shaderInfo->pUserDataNodes[j];
+#else
+          for (unsigned j = 0; j < resourceMapping->userDataNodeCount; ++j) {
+            auto userDataNode = &resourceMapping->pUserDataNodes[j].node;
+#endif
+            if (userDataNode->type == ResourceMappingNodeType::DescriptorTableVaPtr &&
+                set == userDataNode->tablePtr.pNext[0].srdRange.set) {
               // If it's descriptor user data, then update its offset to it.
-              unsigned value = shaderInfo->pUserDataNodes[j].offsetInDwords;
+              unsigned value = userDataNode->offsetInDwords;
               keyIt->second = registers.getDocument()->getNode(value);
               // Update userDataLimit if neccessary
               unsigned userDataLimit = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();

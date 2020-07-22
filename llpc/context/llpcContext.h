@@ -110,6 +110,8 @@ public:
     return m_pipelineContext->getPipelineShaderInfo(shaderStage);
   }
 
+  const ResourceMappingData *getResourceMapping() const { return m_pipelineContext->getResourceMapping(); }
+
   const void *getPipelineBuildInfo() const { return m_pipelineContext->getPipelineBuildInfo(); }
 
   unsigned getShaderStageMask() const { return m_pipelineContext->getShaderStageMask(); }
@@ -119,8 +121,6 @@ public:
   const char *getGpuNameAbbreviation() const { return PipelineContext::getGpuNameAbbreviation(m_gfxIp); }
 
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
-
-  void doUserDataNodeMerge() { m_pipelineContext->doUserDataNodeMerge(); }
 
   uint64_t getPiplineHashCode() const { return m_pipelineContext->getPiplineHashCode(); }
 

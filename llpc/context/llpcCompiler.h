@@ -173,8 +173,9 @@ private:
 
   bool runPasses(lgc::PassManager *passMgr, llvm::Module *module) const;
   void linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context);
-  bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo);
-  bool canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shaderInfo);
+  bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo,
+                                          const GraphicsPipelineBuildInfo *pipelineInfo);
+  bool canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo);
 
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options

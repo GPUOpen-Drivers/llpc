@@ -59,9 +59,6 @@ public:
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const { return 1; }
 
-  // Does user data node merging for all shader stages
-  virtual void doUserDataNodeMerge() {}
-
   // Gets per pipeline options
   virtual const PipelineOptions *getPipelineOptions() const { return &m_pipelineInfo->options; }
 
@@ -69,6 +66,10 @@ private:
   ComputeContext() = delete;
   ComputeContext(const ComputeContext &) = delete;
   ComputeContext &operator=(const ComputeContext &) = delete;
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
+  void mergeResourceMappingData();
+#endif
 
   const ComputePipelineBuildInfo *m_pipelineInfo; // Info to build a compute pipeline
 };

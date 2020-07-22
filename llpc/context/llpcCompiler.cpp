@@ -785,8 +785,6 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   LLPC_OUTS("Building pipeline with relocatable shader elf.\n")
   Result result = Result::Success;
 
-  // Merge the user data once for all stages.
-  context->getPipelineContext()->doUserDataNodeMerge();
   unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
   context->getPipelineContext()->setUnlinked(true);
 
@@ -873,60 +871,96 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 }
 
 // =====================================================================================================================
-// Returns true if userDataNode contains descriptor types that are unsupported by relocatable shader compilation.
+// Returns true if node is of a descriptor type that is unsupported by relocatable shader compilation.
 //
-// @param [in] nodes : User data nodes
-// @param nodeCount : Number of user data nodes
-static bool hasUnrelocatableDescriptorNode(const ResourceMappingNode *nodes, unsigned nodeCount) {
-  for (unsigned i = 0; i < nodeCount; ++i) {
-    const ResourceMappingNode *node = nodes + i;
-    switch (node->type) {
-    case ResourceMappingNodeType::DescriptorTableVaPtr: {
-      const ResourceMappingNode *startInnerNode = node->tablePtr.pNext;
-      const ResourceMappingNode *endInnerNode = startInnerNode + node->tablePtr.nodeCount;
-      for (const ResourceMappingNode *innerNode = startInnerNode; innerNode != endInnerNode; ++innerNode) {
-        if (innerNode->type == ResourceMappingNodeType::DescriptorBufferCompact)
-          // The code to handle a compact descriptor cannot be easily patched, so relocatable shaders assume there are
-          // no compact descriptors.
-          return true;
-      }
-      break;
+// @param [in] node : User data node
+static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *node) {
+  switch (node->type) {
+  case ResourceMappingNodeType::DescriptorTableVaPtr: {
+    const ResourceMappingNode *startInnerNode = node->tablePtr.pNext;
+    const ResourceMappingNode *endInnerNode = startInnerNode + node->tablePtr.nodeCount;
+    for (const ResourceMappingNode *innerNode = startInnerNode; innerNode != endInnerNode; ++innerNode) {
+      if (innerNode->type == ResourceMappingNodeType::DescriptorBufferCompact)
+        // The code to handle a compact descriptor cannot be easily patched, so relocatable shaders assume there are
+        // no compact descriptors.
+        return true;
     }
-    case ResourceMappingNodeType::DescriptorResource:
-    case ResourceMappingNodeType::DescriptorSampler:
-    case ResourceMappingNodeType::DescriptorCombinedTexture:
-    case ResourceMappingNodeType::DescriptorTexelBuffer:
-    case ResourceMappingNodeType::DescriptorBufferCompact:
-      // Generic descriptors in the top level are not handled by the linker.
-      return true;
-    default:
-      break;
-    }
+    break;
+  }
+  case ResourceMappingNodeType::DescriptorResource:
+  case ResourceMappingNodeType::DescriptorSampler:
+  case ResourceMappingNodeType::DescriptorCombinedTexture:
+  case ResourceMappingNodeType::DescriptorTexelBuffer:
+  case ResourceMappingNodeType::DescriptorBufferCompact:
+    // Generic descriptors in the top level are not handled by the linker.
+    return true;
+  default:
+    break;
   }
   return false;
 }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
 // =====================================================================================================================
-// Returns true if a graphics pipeline can be built out of the given shader info.
+// Returns true if any user data nodes inside the given shader infos contain an entry with a descriptor type that is
+// unsupported by relocatable shader compilation.
 //
-// @param shaderInfo : Shader info for the pipeline to be built
-bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfo) {
-  for (unsigned stage = 0; stage < shaderInfo.size(); ++stage) {
+// @param [in] shaderInfos: Array of shader infos (not necessarily indexed by shader stage)
+static bool hasUnrelocatableDescriptorNode(const ArrayRef<const PipelineShaderInfo *> &shaderInfos) {
+  for (auto shaderInfo : shaderInfos) {
+    if (!shaderInfo || !shaderInfo->pModuleData)
+      continue;
+    for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
+      const ResourceMappingNode *node = shaderInfo->pUserDataNodes + i;
+      if (isUnrelocatableResourceMappingRootNode(node))
+        return true;
+    }
+  }
+  return false;
+}
+#else
+// =====================================================================================================================
+// Returns true if resourceMapping contains a user data node entry with a descriptor type that is unsupported by
+// relocatable shader compilation.
+//
+// @param [in] resourceMapping : resource mapping data, containing user data nodes
+static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMapping) {
+  for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+    if (isUnrelocatableResourceMappingRootNode(&resourceMapping->pUserDataNodes[i].node))
+      return true;
+  }
+  return false;
+}
+#endif
+
+// =====================================================================================================================
+// Returns true if a graphics pipeline can be built out of the given shader infos.
+//
+// @param shaderInfos : Shader infos for the pipeline to be built
+// @param pipelineInfo : Pipeline info for the pipeline to be built
+bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfos,
+                                                  const GraphicsPipelineBuildInfo *pipelineInfo) {
+  for (unsigned stage = 0; stage < shaderInfos.size(); ++stage) {
     if (stage != ShaderStageVertex && stage != ShaderStageFragment) {
-      if (shaderInfo[stage] && shaderInfo[stage]->pModuleData)
+      if (shaderInfos[stage] && shaderInfos[stage]->pModuleData)
         return false;
-    } else if (!shaderInfo[stage] || !shaderInfo[stage]->pModuleData) {
+    } else if (!shaderInfos[stage] || !shaderInfos[stage]->pModuleData) {
       // TODO: Generate pass-through shaders when the fragment or vertex shaders are missing.
       return false;
-    } else {
-      // Check UserDataNode for unsupported Descriptor types.
-      if (hasUnrelocatableDescriptorNode(shaderInfo[stage]->pUserDataNodes, shaderInfo[stage]->userDataNodeCount))
-        return false;
     }
   }
 
-  if (shaderInfo[0]) {
-    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo[0]->pModuleData);
+  // Check user data nodes for unsupported Descriptor types.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
+  if (hasUnrelocatableDescriptorNode(shaderInfos))
+    return false;
+#else
+  if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
+    return false;
+#endif
+
+  if (shaderInfos[0]) {
+    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfos[0]->pModuleData);
     if (moduleData && moduleData->binType != BinaryType::Spirv)
       return false;
   }
@@ -944,23 +978,28 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
 // Returns true if a compute pipeline can be built out of the given shader info.
 //
 // @param shaderInfo : Shader info for the pipeline to be built
-bool Compiler::canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shaderInfo) {
+bool Compiler::canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo) {
   // Relocatable shader cannot get the order of the user data nodes correct.  We have to disable them for compute
   // shaders until the restriction in PAL has been relaxed.
   // The tests PipelineCs_StrideReloc.pipe, PipelineCs_RelocCombinedTextureSampler.pipe, PipelineCs_ShaderCache.pipe,
   // and PipelineCs_RelocConst.pipe must be reenabled when this restriction is removed.
   return false;
 
+  const PipelineShaderInfo *shaderInfo = &pipelineInfo->cs;
   if (shaderInfo) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
     if (moduleData && moduleData->binType != BinaryType::Spirv)
       return false;
-    else {
-      // Check UserDataNode for unsupported Descriptor types.
-      if (hasUnrelocatableDescriptorNode(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount))
-        return false;
-    }
   }
+
+  // Check UserDataNode for unsupported Descriptor types.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
+  ArrayRef<const PipelineShaderInfo *> shaderInfos(&shaderInfo, 1);
+  if (hasUnrelocatableDescriptorNode(shaderInfos))
+#else
+  if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
+#endif
+    return false;
 
   if (cl::RelocatableShaderElfLimit != -1) {
     if (m_relocatablePipelineCompilations >= cl::RelocatableShaderElfLimit)
@@ -992,11 +1031,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   // TODO: The front-end should not be using pipeline options.
   context->setScalarBlockLayout(context->getPipelineContext()->getPipelineOptions()->scalarBlockLayout);
   context->setRobustBufferAccess(context->getPipelineContext()->getPipelineOptions()->robustBufferAccess);
-
-  if (!buildingRelocatableElf) {
-    // Merge user data for shader stages into one.
-    context->getPipelineContext()->doUserDataNodeMerge();
-  }
 
   // Set up middle-end objects.
   LgcContext *builderContext = context->getLgcContext();
@@ -1414,7 +1448,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   };
 
   bool buildingRelocatableElf = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
-  buildingRelocatableElf = buildingRelocatableElf && canUseRelocatableGraphicsShaderElf(shaderInfo);
+  buildingRelocatableElf = buildingRelocatableElf && canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo);
 
   for (unsigned i = 0; i < ShaderStageGfxCount && result == Result::Success; ++i)
     result = validatePipelineShaderInfo(shaderInfo[i]);
@@ -1548,7 +1582,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   BinaryData elfBin = {};
 
   bool buildingRelocatableElf = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
-  buildingRelocatableElf = buildingRelocatableElf && canUseRelocatableComputeShaderElf(&pipelineInfo->cs);
+  buildingRelocatableElf = buildingRelocatableElf && canUseRelocatableComputeShaderElf(pipelineInfo);
 
   Result result = validatePipelineShaderInfo(&pipelineInfo->cs);
 
@@ -2001,6 +2035,10 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     // Update common shader info
     PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher, false);
     hasher.Update(pipelineInfo->iaState.deviceIndex);
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+    PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), &hasher, false);
+#endif
 
     // Update input/output usage (provided by middle-end caller of this callback).
     hasher.Update(stageHashes[stage].data(), stageHashes[stage].size());

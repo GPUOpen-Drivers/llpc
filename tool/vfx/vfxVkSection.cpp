@@ -11,6 +11,7 @@ namespace Vfx {
 StrToMemberAddr SectionDescriptorRangeValueItem::m_addrTable[SectionDescriptorRangeValueItem::MemberCount];
 StrToMemberAddr SectionResourceMappingNode::m_addrTable[SectionResourceMappingNode::MemberCount];
 StrToMemberAddr SectionShaderInfo::m_addrTable[SectionShaderInfo::MemberCount];
+StrToMemberAddr SectionResourceMapping::m_addrTable[SectionResourceMapping::MemberCount];
 StrToMemberAddr SectionGraphicsState::m_addrTable[SectionGraphicsState::MemberCount];
 StrToMemberAddr SectionComputeState::m_addrTable[SectionComputeState::MemberCount];
 StrToMemberAddr SectionPipelineOption::m_addrTable[SectionPipelineOption::MemberCount];
@@ -35,12 +36,14 @@ public:
     INIT_SECTION_INFO("GsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageGeometry)
     INIT_SECTION_INFO("FsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageFragment)
     INIT_SECTION_INFO("CsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageCompute)
+    INIT_SECTION_INFO("ResourceMapping", SectionTypeResourceMapping, 0)
 
     SectionGraphicsState::initialAddrTable();
     SectionComputeState::initialAddrTable();
     SectionDescriptorRangeValueItem::initialAddrTable();
     SectionResourceMappingNode::initialAddrTable();
     SectionShaderInfo::initialAddrTable();
+    SectionResourceMapping::initialAddrTable();
     SectionPipelineOption::initialAddrTable();
     SectionShaderOption::initialAddrTable();
     SectionNggState::initialAddrTable();

@@ -31,16 +31,42 @@
 #pragma once
 
 #include "llpc.h"
+#include <map>
+#include <vector>
 
-// Lay out dummy descriptors and other information for one shader stage. This is used when running amdllpc on a single
-// SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does not
-// matter because we are running a short-lived command-line utility.
+struct ResourceNodeSet {
+  std::vector<Llpc::ResourceMappingNode> nodes; // Vector of resource mapping nodes
+  std::map<unsigned, unsigned> bindingMap;      // Map from binding to index in nodes vector
+  unsigned visibility = 0;                      // Mask of shader stages which this set is visible to
+};
+
+using ResourceMappingNodeMap = std::map<unsigned, ResourceNodeSet>;
+
+// Lay out dummy bottom-level descriptors and other information for one shader stage. This is used when running amdllpc
+// on a single SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does
+// not matter because we are running a short-lived command-line utility.
 void doAutoLayoutDesc(Llpc::ShaderStage shaderStage, Llpc::BinaryData spirvBin,
                       Llpc::GraphicsPipelineBuildInfo *pipelineInfo, Llpc::PipelineShaderInfo *shaderInfo,
-                      unsigned &topLevelOffset, bool checkAutoLayoutCompatible);
+                      ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize, bool checkAutoLayoutCompatible);
 
+// Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running amdllpc on a single
+// SPIR-V or GLSL shader, rather than on a .pipe file.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
+                          Llpc::ResourceMappingData *resourceMapping);
+#else
+void buildTopLevelMapping(Llpc::ShaderStage shaderStage, const ResourceMappingNodeMap &resNodeSets,
+                          unsigned pushConstSize, Llpc::PipelineShaderInfo *shaderInfo, unsigned &topLevelOffset);
+#endif
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+bool checkResourceMappingComptible(const Llpc::ResourceMappingData *resourceMapping,
+                                   unsigned autoLayoutUserDataNodeCount,
+                                   const Llpc::ResourceMappingRootNode *autoLayoutUserDataNodes);
+#else
 bool checkShaderInfoComptible(Llpc::PipelineShaderInfo *shaderInfo, unsigned autoLayoutUserDataNodeCount,
                               const Llpc::ResourceMappingNode *autoLayoutUserDataNodes);
+#endif
 
 bool checkPipelineStateCompatible(const Llpc::ICompiler *compiler, Llpc::GraphicsPipelineBuildInfo *pipelineInfo,
                                   Llpc::GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, Llpc::GfxIpVersion gfxIp);

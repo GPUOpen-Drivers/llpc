@@ -65,6 +65,9 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
   case SectionTypeVertexInputState:
     maxSectionCount = 1;
     break;
+  case SectionTypeResourceMapping:
+    maxSectionCount = 1;
+    break;
   case SectionTypeShader:
     maxSectionCount = UINT32_MAX;
     break;
@@ -169,6 +172,10 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       auto pShaderSection = reinterpret_cast<SectionShader *>(section);
       auto stage = pShaderSection->getShaderStage();
 
+      // In case the .pipe file did not contain a ComputePipelineState
+      if (stage == Vkgc::ShaderStageCompute)
+        m_pipelineState.pipelineType = VfxPipelineTypeCompute;
+
       pShaderSection->getSubState(m_pipelineState.stages[stage]);
     }
 
@@ -177,8 +184,37 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       auto pShaderInfoSection = reinterpret_cast<SectionShaderInfo *>(section);
       auto stage = pShaderInfoSection->getShaderStage();
       pShaderInfoSection->getSubState(*(shaderInfo[stage]));
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+      pShaderInfoSection->getSubState(m_resourceMappingNodes);
+      pShaderInfoSection->getSubState(m_descriptorRangeValues);
+#endif
     }
   }
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+  ResourceMappingData *resourceMapping = nullptr;
+  switch (m_pipelineState.pipelineType) {
+  case VfxPipelineTypeGraphics:
+    resourceMapping = &m_pipelineState.gfxPipelineInfo.resourceMapping;
+    break;
+  case VfxPipelineTypeCompute:
+    resourceMapping = &m_pipelineState.compPipelineInfo.resourceMapping;
+    break;
+  default:
+    VFX_NEVER_CALLED();
+    break;
+  }
+
+  // Section "ResourceMapping"
+  if (m_sections[SectionTypeResourceMapping].size() > 0) {
+    auto section = reinterpret_cast<SectionResourceMapping *>(m_sections[SectionTypeResourceMapping][0]);
+    section->getSubState(*resourceMapping);
+  } else {
+    // If no ResourceMapping section was found, this must be an older .pipe file where the resource mapping
+    // was embedded in the pipeline shader infos.
+    DeduplicateResourceMappingData(resourceMapping);
+  }
+#endif
 
   return &m_pipelineState;
 }
@@ -211,8 +247,7 @@ bool PipelineDocument::validate() {
        (1 << SpvGenStageGeometry) | (1 << SpvGenStageFragment));
   const unsigned computeStageMask = (1 << SpvGenStageCompute);
 
-  if (((stageMask & graphicsStageMask) && (stageMask & computeStageMask))
-  ) {
+  if (((stageMask & graphicsStageMask) && (stageMask & computeStageMask))) {
     PARSE_ERROR(m_errorMsg, 0, "Stage Conflict! Different pipeline stage can't in same pipeline file.\n");
     return false;
   }
@@ -257,6 +292,9 @@ Section *PipelineDocument::createSection(const char *sectionName) {
     break;
   case SectionTypeShaderInfo:
     section = new SectionShaderInfo(it->second);
+    break;
+  case SectionTypeResourceMapping:
+    section = new SectionResourceMapping();
     break;
   default:
     section = Document::createSection(sectionName);
@@ -306,6 +344,86 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
 // @param [out] pipelineState : Pointer of struct VfxPipelineState
 void VFXAPI vfxGetPipelineDoc(void *doc, VfxPipelineStatePtr *pipelineState) {
   *pipelineState = reinterpret_cast<PipelineDocument *>(doc)->getDocument();
+}
+
+// =====================================================================================================================
+// Deduplicates any resource mapping data extracted out of shader info sections and populates a ResourceMappingData
+// struct to be used at the pipeline level. Used for backward compatibility with Version 1 .pipe files.
+//
+// @param [out] resourceMapping : Pointer of struct Vkgc::ResourceMappingData
+void PipelineDocument::DeduplicateResourceMappingData(Vkgc::ResourceMappingData *resourceMapping) {
+  struct RootNodeWrapper {
+    Vkgc::ResourceMappingRootNode rootNode;
+    std::map<unsigned, Vkgc::ResourceMappingNode> resourceNodes;
+  };
+
+  std::map<unsigned, RootNodeWrapper> rootNodeMap;
+  std::map<unsigned long long, Vkgc::StaticDescriptorValue> staticMap;
+  size_t maxSubNodeCount = 0;
+
+  for (const auto &userDataNode : m_resourceMappingNodes) {
+    auto iter = rootNodeMap.find(userDataNode.node.offsetInDwords);
+    if (iter == rootNodeMap.end()) {
+      auto result = rootNodeMap.insert({userDataNode.node.offsetInDwords, {userDataNode}});
+      iter = result.first;
+      VFX_ASSERT(result.second);
+    } else {
+      iter->second.rootNode.visibility |= userDataNode.visibility;
+    }
+
+    if (iter->second.rootNode.node.type == Vkgc::ResourceMappingNodeType::DescriptorTableVaPtr) {
+      for (unsigned k = 0; k < iter->second.rootNode.node.tablePtr.nodeCount; ++k) {
+        const auto &resourceNode = iter->second.rootNode.node.tablePtr.pNext[k];
+        iter->second.resourceNodes.insert({resourceNode.offsetInDwords, resourceNode});
+        maxSubNodeCount++;
+      }
+    }
+  }
+
+  for (const auto &descriptorRangeValue : m_descriptorRangeValues) {
+    unsigned long long key = static_cast<unsigned long long>(descriptorRangeValue.set) |
+                             (static_cast<unsigned long long>(descriptorRangeValue.binding) << 32);
+
+    auto iter = staticMap.find(key);
+    if (iter == staticMap.end()) {
+      auto result = staticMap.insert({key, descriptorRangeValue});
+      VFX_ASSERT(result.second);
+    } else {
+      iter->second.visibility |= descriptorRangeValue.visibility;
+    }
+  }
+
+  m_resourceMappingNodes.clear();
+  m_descriptorRangeValues.clear();
+  m_resourceMappingSubNodes.clear();
+
+  m_resourceMappingNodes.reserve(rootNodeMap.size());
+  m_descriptorRangeValues.reserve(rootNodeMap.size());
+  m_resourceMappingSubNodes.reserve(maxSubNodeCount);
+
+  for (auto &rootNodeIter : rootNodeMap) {
+    auto &rootNode = rootNodeIter.second.rootNode;
+    auto &subNodeMap = rootNodeIter.second.resourceNodes;
+
+    if (subNodeMap.size() > 0) {
+      size_t idxOffset = m_resourceMappingSubNodes.size();
+      for (auto &subNode : subNodeMap)
+        m_resourceMappingSubNodes.push_back(subNode.second);
+
+      rootNode.node.tablePtr.pNext = &(m_resourceMappingSubNodes.data()[idxOffset]);
+      rootNode.node.tablePtr.nodeCount = static_cast<uint32_t>(m_resourceMappingSubNodes.size() - idxOffset);
+    }
+
+    m_resourceMappingNodes.push_back(rootNode);
+  }
+
+  for (auto &staticIter : staticMap)
+    m_descriptorRangeValues.push_back(staticIter.second);
+
+  resourceMapping->pUserDataNodes = m_resourceMappingNodes.data();
+  resourceMapping->userDataNodeCount = m_resourceMappingNodes.size();
+  resourceMapping->pStaticDescriptorValues = m_descriptorRangeValues.data();
+  resourceMapping->staticDescriptorValueCount = m_descriptorRangeValues.size();
 }
 
 } // namespace Vfx

@@ -101,18 +101,20 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
     }
   }
 
+  Context *context = static_cast<Context *>(&module->getContext());
+
   // Build the converting sampler info.
+  auto resourceMapping = context->getResourceMapping();
+  auto descriptorRangeValues = ArrayRef<StaticDescriptorValue>(resourceMapping->pStaticDescriptorValues,
+                                                               resourceMapping->staticDescriptorValueCount);
   SmallVector<SPIRV::ConvertingSampler, 4> convertingSamplers;
-  for (const DescriptorRangeValue &range :
-       ArrayRef<DescriptorRangeValue>(shaderInfo->pDescriptorRangeValues, shaderInfo->descriptorRangeValueCount)) {
+  for (const auto &range : descriptorRangeValues) {
     if (range.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
       convertingSamplers.push_back(
           {range.set, range.binding,
            ArrayRef<unsigned>(range.pValue, range.arraySize * SPIRV::ConvertingSamplerDwordCount)});
     }
   }
-
-  Context *context = static_cast<Context *>(&module->getContext());
 
   if (!readSpirv(context->getBuilder(), &(moduleData->usage), &(shaderInfo->options), spirvStream,
                  convertToExecModel(entryStage), shaderInfo->pEntryTarget, specConstMap, convertingSamplers, module,

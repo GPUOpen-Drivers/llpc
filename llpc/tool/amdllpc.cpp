@@ -865,7 +865,13 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
         &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
     };
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+    ResourceMappingNodeMap nodeSets;
+    unsigned pushConstSize = 0;
+    GraphicsPipelineBuildInfo pipelineInfoAuto = *pipelineInfo;
+#else
     unsigned userDataOffset = 0;
+#endif
     for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i) {
 
       PipelineShaderInfo *shaderInfo = shaderInfos[compileInfo->shaderModuleDatas[i].shaderStage];
@@ -882,18 +888,40 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
       shaderInfo->pModuleData = shaderOut->pModuleData;
       shaderInfo->entryStage = compileInfo->shaderModuleDatas[i].shaderStage;
       if (checkAutoLayoutCompatible) {
-        PipelineShaderInfo shaderInfoCopy = *shaderInfo;
-        GraphicsPipelineBuildInfo pipelineInfoCopy = *pipelineInfo;
+        PipelineShaderInfo shaderInfoAuto = *shaderInfo;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
         doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
-                         &pipelineInfoCopy, &shaderInfoCopy, userDataOffset, true);
-        if (checkShaderInfoComptible(shaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes) &&
-            checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoCopy, ParsedGfxIp))
-          outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " hitted\n";
+                         &pipelineInfoAuto, shaderInfo, nodeSets, pushConstSize, true);
+#else
+        GraphicsPipelineBuildInfo pipelineInfoAuto = *pipelineInfo;
+        ResourceMappingNodeMap nodeSets;
+        unsigned pushConstSize = 0;
+        doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
+                         &pipelineInfoAuto, shaderInfo, nodeSets, pushConstSize, true);
+        buildTopLevelMapping(compileInfo->shaderModuleDatas[i].shaderStage, nodeSets, pushConstSize, &shaderInfoAuto,
+                             userDataOffset);
+        if (checkShaderInfoComptible(shaderInfo, shaderInfoAuto.userDataNodeCount, shaderInfoAuto.pUserDataNodes) &&
+            checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoAuto, ParsedGfxIp))
+          outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " hit\n";
         else
           outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " failed to hit\n";
         outs().flush();
+#endif
       }
     }
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+    if (compileInfo->checkAutoLayoutCompatible) {
+      ResourceMappingData resourceMappingAuto = {};
+      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &resourceMappingAuto);
+      if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
+                                        resourceMappingAuto.pUserDataNodes) &&
+          checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoCopy, ParsedGfxIp))
+        outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " hit\n";
+      else
+        outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " failed to hit\n";
+      outs().flush();
+    }
+#endif
   } else if (compileInfo->stageMask == shaderStageToMask(ShaderStageCompute)) {
     ComputePipelineBuildInfo *pipelineInfo = &compileInfo->compPipelineInfo;
 
@@ -908,12 +936,23 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
     shaderInfo->pModuleData = shaderOut->pModuleData;
 
     if (compileInfo->checkAutoLayoutCompatible) {
+      PipelineShaderInfo shaderInfoAuto = *shaderInfo;
+      ResourceMappingNodeMap nodeSets;
+      unsigned pushConstSize = 0;
+      doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, &shaderInfoAuto,
+                       nodeSets, pushConstSize, true);
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+      ResourceMappingData resourceMappingAuto = {};
+      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &resourceMappingAuto);
+      if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
+                                        resourceMappingAuto.pUserDataNodes))
+#else
       unsigned userDataOffset = 0;
-      PipelineShaderInfo shaderInfoCopy = *shaderInfo;
-      doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, &shaderInfoCopy,
-                       userDataOffset, true);
-      if (checkShaderInfoComptible(shaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes))
-        outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " hitted\n";
+      buildTopLevelMapping(ShaderStageCompute, nodeSets, pushConstSize, &shaderInfoAuto, userDataOffset);
+      if (checkShaderInfoComptible(shaderInfo, shaderInfoAuto.userDataNodeCount, shaderInfoAuto.pUserDataNodes))
+#endif
+        outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " hit\n";
       else
         outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " failed to hit\n";
       outs().flush();
@@ -942,7 +981,12 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
         &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
     };
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+    ResourceMappingNodeMap nodeSets;
+    unsigned pushConstSize = 0;
+#else
     unsigned userDataOffset = 0;
+#endif
     for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i) {
 
       PipelineShaderInfo *shaderInfo = shaderInfos[compileInfo->shaderModuleDatas[i].shaderStage];
@@ -957,10 +1001,25 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
 
       // If not compiling from pipeline, lay out user data now.
       if (compileInfo->doAutoLayout) {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
         doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
-                         pipelineInfo, shaderInfo, userDataOffset, false);
+                         pipelineInfo, shaderInfo, nodeSets, pushConstSize, false);
+#else
+        ResourceMappingNodeMap nodeSets;
+        unsigned pushConstSize = 0;
+        doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
+                         pipelineInfo, shaderInfo, nodeSets, pushConstSize, false);
+        buildTopLevelMapping(compileInfo->shaderModuleDatas[i].shaderStage, nodeSets, pushConstSize, shaderInfo,
+                             userDataOffset);
+#endif
       }
     }
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+    if (compileInfo->doAutoLayout) {
+      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &pipelineInfo->resourceMapping);
+    }
+#endif
 
     pipelineInfo->pInstance = nullptr; // Dummy, unused
     pipelineInfo->pUserData = &compileInfo->pipelineBuf;
@@ -1007,8 +1066,7 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
 
       result = decodePipelineBinary(&pipelineOut->pipelineBin, compileInfo, true);
     }
-  }
-  else {
+  } else {
     // Build compute pipeline
     assert(compileInfo->shaderModuleDatas.size() == 1);
     assert(compileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
@@ -1029,9 +1087,17 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
 
     // If not compiling from pipeline, lay out user data now.
     if (compileInfo->doAutoLayout) {
+      ResourceMappingNodeMap nodeSets;
+      unsigned pushConstSize = 0;
+      doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, shaderInfo, nodeSets,
+                       pushConstSize, false);
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping);
+#else
       unsigned userDataOffset = 0;
-      doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, shaderInfo,
-                       userDataOffset, false);
+      buildTopLevelMapping(ShaderStageCompute, nodeSets, pushConstSize, shaderInfo, userDataOffset);
+#endif
     }
 
     pipelineInfo->pInstance = nullptr; // Dummy, unused
@@ -1489,7 +1555,7 @@ static Result expandInputFilenames(std::vector<std::string> &expandedFilenames) 
         return Result::ErrorInvalidValue;
       }
     }
-#else  // WIN_OS
+#else // WIN_OS
     expandedFilenames.push_back(inFile);
 #endif
     ++i;
