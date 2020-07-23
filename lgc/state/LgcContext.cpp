@@ -35,6 +35,7 @@
 #include "lgc/state/PassManagerCache.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/Debug.h"
 #include "lgc/util/Internal.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
@@ -49,6 +50,16 @@
 #include "llvm/Target/TargetOptions.h"
 
 #define DEBUG_TYPE "lgc-context"
+
+namespace llvm {
+
+namespace cl {
+
+// Set the optimization level
+extern opt<CodeGenOpt::Level> OptLevel;
+
+} // namespace cl
+} // namespace llvm
 
 using namespace lgc;
 using namespace llvm;
@@ -190,8 +201,10 @@ LgcContext *LgcContext::Create(LLVMContext &context, StringRef gpuName, unsigned
     targetOpts.MCOptions.AsmVerbose = true;
   }
 
+  LLPC_OUTS("TargetMachine optimization level = " << cl::OptLevel << "\n");
+
   builderContext->m_targetMachine =
-      target->createTargetMachine(triple, gpuName, "", targetOpts, Optional<Reloc::Model>());
+      target->createTargetMachine(triple, gpuName, "", targetOpts, Optional<Reloc::Model>(), None, cl::OptLevel);
   assert(builderContext->m_targetMachine);
   return builderContext;
 }
