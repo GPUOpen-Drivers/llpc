@@ -65,6 +65,13 @@ opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LL
 opt<bool> UseLlvmOpt("use-llvm-opt",
                      desc("Use LLVM's standard optimization set instead of the curated optimization set"), init(false));
 
+// -opt: Set the optimization level
+opt<CodeGenOpt::Level> OptLevel("opt", desc("Set the optimization level:"), init(CodeGenOpt::Default),
+                                values(clEnumValN(CodeGenOpt::None, "none", "no optimizations"),
+                                       clEnumValN(CodeGenOpt::Less, "quick", "quick compilation time"),
+                                       clEnumValN(CodeGenOpt::Default, "default", "default optimizations"),
+                                       clEnumValN(CodeGenOpt::Aggressive, "fast", "fast execution time")));
+
 } // namespace cl
 
 } // namespace llvm
@@ -214,9 +221,10 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
 //
 // @param [in/out] passMgr : Pass manager to add passes to
 void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
+  LLPC_OUTS("PassManager optimization level = " << cl::OptLevel << "\n");
+
   // Set up standard optimization passes.
   if (!cl::UseLlvmOpt) {
-    unsigned optLevel = 3;
     bool disableGvnLoadPre = true;
 
     passMgr.add(createForceFunctionAttrsLegacyPass());
@@ -246,7 +254,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createIndVarSimplifyPass());
     passMgr.add(createLoopIdiomPass());
     passMgr.add(createLoopDeletionPass());
-    passMgr.add(createSimpleLoopUnrollPass(optLevel));
+    passMgr.add(createSimpleLoopUnrollPass(cl::OptLevel));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createScalarizerPass());
     passMgr.add(createPatchLoadScalarizer());
@@ -272,7 +280,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
                                                 .sinkCommonInsts(true)));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createInstSimplifyLegacyPass());
-    passMgr.add(createLoopUnrollPass(optLevel));
+    passMgr.add(createLoopUnrollPass(cl::OptLevel));
     passMgr.add(createInstructionCombiningPass(2));
     passMgr.add(createLICMPass());
     passMgr.add(createStripDeadPrototypesPass());
@@ -284,7 +292,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createCFGSimplificationPass());
   } else {
     PassManagerBuilder passBuilder;
-    passBuilder.OptLevel = 3; // -O3
+    passBuilder.OptLevel = cl::OptLevel;
     passBuilder.DisableGVNLoadPRE = true;
     passBuilder.DivergentTarget = true;
 
