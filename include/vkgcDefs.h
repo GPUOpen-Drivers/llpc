@@ -74,6 +74,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     41.0 | Moved resource mapping from ShaderPipeline-level to Pipeline-level                                    |
 //* |     40.4 | Added fp32DenormalMode in PipelineShaderOptions to allow overriding SPIR-V denormal settings          |
 //* |     40.3 | Added ICache interface                                                                                |
 //* |     40.2 | Added extendedRobustness in PipelineOptions to support VK_EXT_robustness2                             |
@@ -181,6 +182,19 @@ enum ShaderStage : unsigned {
   ShaderStageCountInternal,                 ///< Count of shader stages (internal-use)
 };
 
+/// Enumerating multiple shader stages when used in a mask.
+enum ShaderStageBit : unsigned {
+  ShaderStageVertexBit = (1 << ShaderStageVertex),           ///< Vertex shader bit
+  ShaderStageTessControlBit = (1 << ShaderStageTessControl), ///< Tessellation control shader bit
+  ShaderStageTessEvalBit = (1 << ShaderStageTessEval),       ///< Tessellation evaluation shader bit
+  ShaderStageGeometryBit = (1 << ShaderStageGeometry),       ///< Geometry shader bit
+  ShaderStageFragmentBit = (1 << ShaderStageFragment),       ///< Fragment shader bit
+  ShaderStageComputeBit = (1 << ShaderStageCompute),         ///< Compute shader bit
+};
+
+static_assert((1 << (ShaderStageCount - 1)) == ShaderStageComputeBit,
+              "Vkgc::ShaderStage has been updated. Please update Vkgc::ShaderStageBit as well.");
+
 /// Enumerates the function of a particular node in a shader's resource mapping graph.
 enum class ResourceMappingNodeType : unsigned {
   Unknown,                   ///< Invalid type
@@ -233,6 +247,12 @@ struct ResourceMappingNode {
   };
 };
 
+struct ResourceMappingRootNode {
+  ResourceMappingNode node; ///< Common node contents (between root and sub nodes)
+  unsigned visibility;      ///< Mask composed of ShaderStageBit values
+};
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
 /// Represents the info of static descriptor.
 struct DescriptorRangeValue {
   ResourceMappingNodeType type; ///< Type of this resource mapping node (currently, only sampler is supported)
@@ -240,6 +260,30 @@ struct DescriptorRangeValue {
   unsigned binding;             ///< ID of descriptor binding
   unsigned arraySize;           ///< Element count for arrayed binding
   const unsigned *pValue;       ///< Static SRDs
+};
+#endif
+
+/// Represents the info of static descriptor.
+struct StaticDescriptorValue {
+  ResourceMappingNodeType type; ///< Type of this resource mapping node (currently, only sampler is supported)
+  unsigned set;                 ///< ID of descriptor set
+  unsigned binding;             ///< ID of descriptor binding
+  unsigned arraySize;           ///< Element count for arrayed binding
+  const unsigned *pValue;       ///< Static SRDs
+  unsigned visibility;          ///< Mask composed of ShaderStageBit values
+};
+
+/// Represents the resource mapping data provided during pipeline creation
+struct ResourceMappingData {
+  /// User data nodes, providing the root-level mapping of descriptors in user-data entries (physical registers or
+  /// GPU memory) to resources referenced in this pipeline shader.
+  /// NOTE: Normally, this user data will correspond to the GPU's user data registers. However, Compiler needs some
+  /// user data registers for internal use, so some user data may spill to internal GPU memory managed by Compiler.
+  const ResourceMappingRootNode *pUserDataNodes; ///< An array of user data nodes
+  unsigned userDataNodeCount;                    ///< Count of user data nodes
+
+  const StaticDescriptorValue *pStaticDescriptorValues; ///< An array of static descriptors
+  unsigned staticDescriptorValueCount;                  ///< Count of static descriptors
 };
 
 /// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
@@ -590,8 +634,9 @@ struct PipelineShaderInfo {
   const VkSpecializationInfo *pSpecializationInfo; ///< Specialization constant info
   const char *pEntryTarget;                        ///< Name of the target entry point (for multi-entry)
   ShaderStage entryStage;                          ///< Shader stage of the target entry point
-  unsigned descriptorRangeValueCount;              ///< Count of static descriptors
-  DescriptorRangeValue *pDescriptorRangeValues;    ///< An array of static descriptors
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
+  unsigned descriptorRangeValueCount;           ///< Count of static descriptors
+  DescriptorRangeValue *pDescriptorRangeValues; ///< An array of static descriptors
 
   unsigned userDataNodeCount; ///< Count of user data nodes
 
@@ -600,6 +645,7 @@ struct PipelineShaderInfo {
   /// NOTE: Normally, this user data will correspond to the GPU's user data registers. However, Compiler needs some
   /// user data registers for internal use, so some user data may spill to internal GPU memory managed by Compiler.
   const ResourceMappingNode *pUserDataNodes;
+#endif
   PipelineShaderOptions options; ///< Per shader stage tuning/debugging options
 };
 
@@ -626,6 +672,10 @@ struct GraphicsPipelineBuildInfo {
   PipelineShaderInfo tes; ///< Tessellation evaluation shader
   PipelineShaderInfo gs;  ///< Geometry shader
   PipelineShaderInfo fs;  ///< Fragment shader
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+  ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
+#endif
 
   /// Create info of vertex input state
   const VkPipelineVertexInputStateCreateInfo *pVertexInput;
@@ -682,8 +732,11 @@ struct ComputePipelineBuildInfo {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
   IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
 #endif
-  unsigned deviceIndex;    ///< Device index for device group
-  PipelineShaderInfo cs;   ///< Compute shader
+  unsigned deviceIndex;  ///< Device index for device group
+  PipelineShaderInfo cs; ///< Compute shader
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
+  ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
+#endif
   PipelineOptions options; ///< Per pipeline tuning options
   bool unlinked;           ///< True to build an "unlinked" half-pipeline ELF
 };
@@ -767,7 +820,6 @@ public:
   /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
   static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo *pPipelineInfo, char *pPipeName,
                                          const size_t nameBufSize);
-
 };
 
 /// 128-bit hash compatible structure
