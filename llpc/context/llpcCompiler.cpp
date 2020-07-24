@@ -152,9 +152,6 @@ opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dyn
                                   init(false));
 #endif
 
-// -force-loop-unroll-count: Force to set the loop unroll count.
-opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), init(0));
-
 // -enable-shader-module-opt: Enable translate & lower phase in shader module build.
 opt<bool> EnableShaderModuleOpt("enable-shader-module-opt",
                                 cl::desc("Enable translate & lower phase in shader module build."), init(false));
@@ -788,10 +785,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 //
 // @param context : Acquired context
 // @param shaderInfo : Shader info of this pipeline
-// @param forceLoopUnrollCount : Force loop unroll count (0 means disable)
 // @param [out] pipelineElf : Output Elf package
 Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                                 unsigned forceLoopUnrollCount, ElfPackage *pipelineElf) {
+                                                 ElfPackage *pipelineElf) {
   LLPC_OUTS("Building pipeline with relocatable shader elf.\n")
   Result result = Result::Success;
 
@@ -860,8 +856,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
                                                                                     nullptr, nullptr, nullptr};
     singleStageShaderInfo[stage] = shaderInfo[stage];
 
-    result =
-        buildPipelineInternal(context, singleStageShaderInfo, forceLoopUnrollCount, /*unlinked=*/true, &elf[stage]);
+    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &elf[stage]);
 
     // Add the result to the cache.
     if (result == Result::Success) {
@@ -987,11 +982,10 @@ bool Compiler::canUseRelocatableComputeShaderElf(const PipelineShaderInfo *shade
 //
 // @param context : Acquired context
 // @param shaderInfo : Shader info of this pipeline
-// @param forceLoopUnrollCount : Force loop unroll count (0 means disable)
 // @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs
 // @param [out] pipelineElf : Output Elf package
-Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                       unsigned forceLoopUnrollCount, bool unlinked, ElfPackage *pipelineElf) {
+Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
+                                       ElfPackage *pipelineElf) {
   Result result = Result::Success;
   unsigned passIndex = 0;
   const PipelineShaderInfo *fragmentShaderInfo = nullptr;
@@ -1393,21 +1387,19 @@ unsigned Compiler::ConvertColorBufferFormatToExportFormat(const ColorTarget *tar
 //
 // @param graphicsContext : Graphics context this graphics pipeline
 // @param shaderInfo : Shader info of this graphics pipeline
-// @param forceLoopUnrollCount : Force loop unroll count (0 means disable)
 // @param buildingRelocatableElf : Build the pipeline by linking relocatable elf
 // @param [out] pipelineElf : Output Elf package
 Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                                ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                               unsigned forceLoopUnrollCount, bool buildingRelocatableElf,
-                                               ElfPackage *pipelineElf) {
+                                               bool buildingRelocatableElf, ElfPackage *pipelineElf) {
   Context *context = acquireContext();
   context->attachPipelineContext(graphicsContext);
 
   Result result = Result::Success;
   if (buildingRelocatableElf)
-    result = buildPipelineWithRelocatableElf(context, shaderInfo, forceLoopUnrollCount, pipelineElf);
+    result = buildPipelineWithRelocatableElf(context, shaderInfo, pipelineElf);
   else
-    result = buildPipelineInternal(context, shaderInfo, forceLoopUnrollCount, /*unlinked=*/false, pipelineElf);
+    result = buildPipelineInternal(context, shaderInfo, /*unlinked=*/false, pipelineElf);
   releaseContext(context);
   return result;
 }
@@ -1489,11 +1481,9 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   ElfPackage candidateElf;
 
   if (cacheEntryState == ShaderEntryState::Compiling || (m_cache && cacheResult != Result::Success)) {
-    unsigned forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
     GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
-    result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, forceLoopUnrollCount, buildingRelocatableElf,
-                                           &candidateElf);
+    result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildingRelocatableElf, &candidateElf);
 
     if (result == Result::Success) {
       elfBin.codeSize = candidateElf.size();
@@ -1533,12 +1523,10 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 //
 // @param computeContext : Compute context this compute pipeline
 // @param pipelineInfo : Pipeline info of this compute pipeline
-// @param forceLoopUnrollCount : Force loop unroll count (0 means disable)
 // @param buildingRelocatableElf : Build the pipeline by linking relocatable elf
 // @param [out] pipelineElf : Output Elf package
 Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
-                                              const ComputePipelineBuildInfo *pipelineInfo,
-                                              unsigned forceLoopUnrollCount, bool buildingRelocatableElf,
+                                              const ComputePipelineBuildInfo *pipelineInfo, bool buildingRelocatableElf,
                                               ElfPackage *pipelineElf) {
   Context *context = acquireContext();
   context->attachPipelineContext(computeContext);
@@ -1548,9 +1536,9 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
   };
   Result result;
   if (buildingRelocatableElf)
-    result = buildPipelineWithRelocatableElf(context, shadersInfo, forceLoopUnrollCount, pipelineElf);
+    result = buildPipelineWithRelocatableElf(context, shadersInfo, pipelineElf);
   else
-    result = buildPipelineInternal(context, shadersInfo, forceLoopUnrollCount, /*unlinked=*/false, pipelineElf);
+    result = buildPipelineInternal(context, shadersInfo, /*unlinked=*/false, pipelineElf);
   releaseContext(context);
   return result;
 }
@@ -1621,12 +1609,10 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   ElfPackage candidateElf;
 
   if ((cacheEntryState == ShaderEntryState::Compiling) || (m_cache && (cacheResult != Result::Success))) {
-    unsigned forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
     ComputeContext computeContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
 
-    result = buildComputePipelineInternal(&computeContext, pipelineInfo, forceLoopUnrollCount, buildingRelocatableElf,
-                                          &candidateElf);
+    result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildingRelocatableElf, &candidateElf);
 
     if (result == Result::Success) {
       elfBin.codeSize = candidateElf.size();

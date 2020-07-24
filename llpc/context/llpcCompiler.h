@@ -122,18 +122,16 @@ public:
                                       ComputePipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr);
   Result buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                        llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                       unsigned forceLoopUnrollCount, bool buildingRelocatableElf,
-                                       ElfPackage *pipelineElf);
+                                       bool buildingRelocatableElf, ElfPackage *pipelineElf);
 
   Result buildComputePipelineInternal(ComputeContext *computeContext, const ComputePipelineBuildInfo *pipelineInfo,
-                                      unsigned forceLoopUnrollCount, bool buildingRelocatableElf,
-                                      ElfPackage *pipelineElf);
+                                      bool buildingRelocatableElf, ElfPackage *pipelineElf);
 
   Result buildPipelineWithRelocatableElf(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                         unsigned forceLoopUnrollCount, ElfPackage *pipelineElf);
+                                         ElfPackage *pipelineElf);
 
-  Result buildPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                               unsigned forceLoopUnrollCount, bool unlinked, ElfPackage *pipelineElf);
+  Result buildPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
+                               ElfPackage *pipelineElf);
 
   // Gets the count of compiler instance.
   static unsigned getInstanceCount() { return m_instanceCount; }
