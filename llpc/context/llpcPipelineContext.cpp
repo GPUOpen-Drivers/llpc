@@ -99,6 +99,9 @@ static cl::opt<unsigned> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
                                                 cl::desc("High part of VA for shadow descriptor table pointer"),
                                                 cl::init(2));
 
+// -force-loop-unroll-count: Force to set the loop unroll count.
+static cl::opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), cl::init(0));
+
 namespace Llpc {
 
 // =====================================================================================================================
@@ -380,6 +383,9 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       shaderOptions.disableLicm = DisableLicm || shaderInfo->options.disableLicm;
       shaderOptions.updateDescInElf = shaderInfo->options.updateDescInElf;
       shaderOptions.unrollThreshold = shaderInfo->options.unrollThreshold;
+      // A non-zero command line -force-loop-unroll-count value overrides the shaderInfo option value.
+      shaderOptions.forceLoopUnrollCount =
+          ForceLoopUnrollCount ? ForceLoopUnrollCount : shaderInfo->options.forceLoopUnrollCount;
 
       static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::Auto) == lgc::DenormalMode::Auto, "Mismatch");
       static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::FlushToZero) == lgc::DenormalMode::FlushToZero,
