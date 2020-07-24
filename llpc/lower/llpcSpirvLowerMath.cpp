@@ -334,34 +334,6 @@ void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
       // by backend compiler with sign bit reversed via XOR. Check floating-point controls.
       flushDenormIfNeeded(&binaryOp);
     }
-  } else if (opCode == Instruction::FRem) {
-    auto destTy = binaryOp.getType();
-    if (destTy->getScalarType()->isHalfTy()) {
-      // TODO: FREM for float16 type is not well handled by backend compiler. We lower it here:
-      // frem(x, y) = x - y * trunc(x/y)
-
-      auto builder = m_context->getBuilder();
-      builder->SetInsertPoint(&binaryOp);
-
-      auto one = ConstantFP::get(Type::getHalfTy(*m_context), 1.0);
-      if (auto vecTy = dyn_cast<VectorType>(destTy))
-        one = ConstantVector::getSplat(vecTy->getElementCount(), one);
-
-      // -trunc(x * 1/y)
-      Value *trunc = BinaryOperator::CreateFDiv(one, src2, "", &binaryOp);
-      trunc = BinaryOperator::CreateFMul(trunc, src1, "", &binaryOp);
-      trunc = builder->CreateIntrinsic(Intrinsic::trunc, destTy, trunc);
-      trunc = UnaryOperator::CreateFNeg(trunc, "", &binaryOp);
-
-      // -trunc(x/y) * y + x
-      auto fRem = builder->CreateIntrinsic(Intrinsic::fmuladd, destTy, {trunc, src2, src1});
-
-      binaryOp.replaceAllUsesWith(fRem);
-      binaryOp.dropAllReferences();
-      binaryOp.eraseFromParent();
-
-      m_changed = true;
-    }
   }
 
   // NOTE: We can't do constant folding for the following floating operations if we have floating-point controls that
