@@ -668,7 +668,7 @@ CallInst *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPo
 
   if (info.empty()) {
     const auto &builtInUsage = m_resUsage->builtInUsage.fs;
-    bool hasDepthExpFmtZero = builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth;
+    bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
     m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(info, hasDepthExpFmtZero, builtInUsage.discard);
     return nullptr;
   }
@@ -685,7 +685,7 @@ CallInst *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPo
           output, colorExportInfo.hwColorTarget, &*builder.GetInsertPoint(), expFmt, colorExportInfo.isSigned));
     }
     const auto &builtInUsage = m_resUsage->builtInUsage.fs;
-    bool hasDepthExpFmtZero = builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth;
+    bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
     m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(info, hasDepthExpFmtZero, builtInUsage.discard);
     return lastExport;
   }
