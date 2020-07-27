@@ -502,7 +502,19 @@ bool LowerFragColorExport::runOnModule(Module &module) {
   if (!fragEntryPoint)
     return false;
 
-  auto retInst = fragEntryPoint->back().getTerminator();
+  // Find the return instruction as that will be the insertion point for the export instructions.
+  // It is possible that there is no return instruction if there is an infinite loop.  See the shaderdb test
+  // OpLoopMerge_TestIterationControls_lit.frag.  In that case, there should be no need for exports.
+  ReturnInst *retInst = nullptr;
+  for (auto &block : llvm::reverse(*fragEntryPoint)) {
+    if (auto ret = dyn_cast<ReturnInst>(block.getTerminator())) {
+      retInst = ret;
+      break;
+    }
+  }
+  if (retInst == nullptr)
+    return false;
+
   BuilderBase builder(module.getContext());
   builder.SetInsertPoint(retInst);
 
