@@ -513,6 +513,8 @@ bool LowerFragColorExport::runOnModule(Module &module) {
     lastExport = lastGenericExport;
   }
 
+  m_resUsage->inOutUsage.fs.dummyExport =
+      (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_resUsage->builtInUsage.fs.discard);
   if (!lastExport && m_resUsage->inOutUsage.fs.dummyExport) {
     lastExport = addDummyExport(builder);
   }
@@ -630,8 +632,13 @@ CallInst *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPo
     }
   }
 
-  if (colorExports.empty())
+  if (colorExports.empty()) {
+    SmallVector<ColorExportInfo, 8> info;
+    const auto &builtInUsage = m_resUsage->builtInUsage.fs;
+    bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
+    m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(info, hasDepthExpFmtZero, builtInUsage.discard);
     return nullptr;
+  }
 
   // Collect all of the values that need to be exported for each hardware color target.
   auto originalInsPos = builder.GetInsertPoint();
