@@ -80,7 +80,7 @@ bool PatchResourceCollect::runOnModule(Module &module) {
   m_pipelineShaders = &getAnalysis<PipelineShaders>();
   m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
-  // If packing final vertex stage outputs and FS inputs, scalarize those outputs and inputs now.
+  // If packing {VS, TES} outputs and {TCS, FS} inputs, scalarize those outputs and inputs now.
   if (m_pipelineState->isPackInOut())
     scalarizeForInOutPacking(&module);
 
@@ -1290,13 +1290,20 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
   }
 
   if (m_pipelineState->isPackInOut()) {
-    if (m_shaderStage == ShaderStageFragment && !isDeadCall &&
+    // Process input import calls with constant location offset in FS (VS-FS, TES-FS) or TCS (VS-TCS)
+    // Collect output export calls to re-assemble in VS (VS-FS) or TES (TES-FS)
+    const bool isPackIn = m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl;
+    const bool isPackOut = m_pipelineState->getNextShaderStage(m_shaderStage) == ShaderStageFragment &&
+                           (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval);
+
+    if (isPackIn && !m_hasDynIndexedInput && !isDeadCall &&
         (mangledName.startswith(lgcName::InputImportGeneric) ||
          mangledName.startswith(lgcName::InputImportInterpolant))) {
-      // Collect LocationSpans according to each FS' input call
-      m_locationMapManager->addSpan(&callInst);
+      // Collect LocationSpans according to each TCS or FS input call
+      m_locationMapManager->addSpan(&callInst, m_shaderStage);
       m_inOutCalls.push_back(&callInst);
-    } else if (m_shaderStage == ShaderStageVertex && mangledName.startswith(lgcName::OutputExportGeneric)) {
+    } else if (isPackOut && mangledName.startswith(lgcName::OutputExportGeneric)) {
+      // Collect outputs of VS or TES
       m_inOutCalls.push_back(&callInst);
       m_deadCalls.push_back(&callInst);
     }
@@ -2567,44 +2574,54 @@ void PatchResourceCollect::mapGsBuiltInOutput(unsigned builtInId, unsigned elemC
 // =====================================================================================================================
 // The process of packing input/output
 void PatchResourceCollect::packInOutLocation() {
-  if (m_shaderStage == ShaderStageFragment) {
-    m_locationMapManager->buildLocationMap();
+  if (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl) {
+    // Build location map based on FS (VS-FS, TES-FS) and TCS spans
+    m_locationMapManager->buildLocationMap(m_shaderStage == ShaderStageFragment);
     fillInOutLocMap();
-    m_inOutCalls.clear(); // It will hold XX' output calls
-  } else if (m_shaderStage == ShaderStageVertex) {
+  } else {
     reassembleOutputExportCalls();
 
-    // For computing the shader hash
-    m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.inOutLocMap =
-        m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->inOutUsage.inOutLocMap;
-  } else {
-    // TODO: Pack input/output in other stages is not supported
-    llvm_unreachable("Not implemented!");
+    // Copy the InOutLocMap of the next stage to that of the current stage for computing the shader hash and looking
+    // remapped location
+    auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+    if (nextStage != ShaderStageInvalid) {
+      m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.inOutLocMap =
+          m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.inOutLocMap;
+    }
   }
+  // Clear it to hold previous calls
+  m_inOutCalls.clear();
 }
 
 // =====================================================================================================================
-// Fill inOutLocMap based on FS input import calls
+// Fill inOutLocMap based on FS or TCS input import calls
 void PatchResourceCollect::fillInOutLocMap() {
   if (m_inOutCalls.empty())
     return;
 
-  assert(m_shaderStage == ShaderStageFragment);
+  assert(m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl);
 
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &inputLocMap = inOutUsage.inputLocMap;
   inputLocMap.clear();
+  inOutUsage.inOutLocMap.clear();
 
+  // TCS: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
   // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
   //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-  //
+  //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
+  const bool isTcs = m_shaderStage == ShaderStageTessControl;
   for (auto call : m_inOutCalls) {
-    const bool isInterpolant = call->arg_size() != 4;
-    const unsigned compIdxArgIdx = isInterpolant ? 2 : 1;
-    assert(!isInterpolant || (isInterpolant && isa<ConstantInt>(call->getOperand(1))));
-    const unsigned locOffset = isInterpolant ? cast<ConstantInt>(call->getOperand(1))->getZExtValue() : 0;
+    const bool isInterpolant = !isTcs && call->getNumArgOperands() != 4;
+    unsigned locOffset = 0;
+    unsigned compIdxArgIdx = 1;
+    if (isInterpolant || isTcs) {
+      assert(isa<ConstantInt>(call->getOperand(1)));
+      locOffset = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
+      compIdxArgIdx = 2;
+    }
 
-    // Construct original InOutLocation from the location and elemIdx operands of the FS' input import call
+    // Construct original InOutLocation from the location and elemIdx operands of the FS' or TCS' input import call
     InOutLocation origInLoc = {};
     origInLoc.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset;
     origInLoc.locationInfo.component = cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue();
@@ -2636,10 +2653,10 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   struct ElementsInfo {
     // Elements to be packed in one location, where 32-bit element is placed at the even index
     Value *elements[8];
-    // Element number
-    unsigned elemCount;
-    // Wether it is a 16-bit element array or not
-    bool is16Bit;
+    // Element number of 32-bit
+    unsigned elemCountOf32bit;
+    // Element number of 16-bit
+    unsigned elemCountOf16bit;
   };
 
   // Collect ElementsInfo in each packed location
@@ -2664,20 +2681,22 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
     // Bit cast i8/i16/f16 to i32 for packing in a 32-bit component
     Value *element = call->getOperand(2);
     Type *elementTy = element->getType();
-    unsigned bitWidth = elementTy->getScalarSizeInBits();
+    const unsigned bitWidth = elementTy->getScalarSizeInBits();
     if (bitWidth == 8) {
       element = builder.CreateZExt(element, builder.getInt32Ty());
     } else if (bitWidth == 16) {
       if (elementTy->isHalfTy())
         element = builder.CreateBitCast(element, builder.getInt16Ty());
       element = builder.CreateZExt(element, builder.getInt32Ty());
-    } else if (elementTy->isIntegerTy()) {
-      // i32 -> float
-      element = builder.CreateBitCast(element, builder.getFloatTy());
+    } else if (elementTy->isFloatTy()) {
+      // float -> i32
+      element = builder.CreateBitCast(element, builder.getInt32Ty());
     }
-    elementsInfo.is16Bit = bitWidth < 32;
     elementsInfo.elements[elemIdx] = element;
-    ++elementsInfo.elemCount;
+    if (bitWidth < 32)
+      ++elementsInfo.elemCountOf16bit;
+    else
+      ++elementsInfo.elemCountOf32bit;
   }
 
   // Re-assamble XX' output export calls for each packed location
@@ -2687,46 +2706,42 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   Value *args[3] = {};
   unsigned newLoc = 0;
   for (auto &elementsInfo : elementsInfoArray) {
-    if (elementsInfo.elemCount == 0) {
+    if (elementsInfo.elemCountOf16bit + elementsInfo.elemCountOf32bit == 0) {
       // It's the end of the packed location
       break;
     }
 
     // Construct the output value - a scalar or a vector
+    const unsigned compCount = (elementsInfo.elemCountOf16bit + 1) / 2 + elementsInfo.elemCountOf32bit;
+    assert(compCount <= 4);
     Value *outValue = nullptr;
-    const unsigned compCount = elementsInfo.is16Bit ? (elementsInfo.elemCount + 1) / 2 : elementsInfo.elemCount;
-
-    if (elementsInfo.elemCount == 1) {
-      // the single element is i32 or float
+    if (compCount == 1) {
+      // Output a scalar
       outValue = elementsInfo.elements[0];
-      if (outValue->getType() != builder.getFloatTy()) {
-        outValue = builder.CreateBitCast(outValue, builder.getFloatTy());
+      if (elementsInfo.elemCountOf16bit == 2) {
+        // Two 16-bit elements packed as a 32-bit scalar
+        Value *highElem = builder.CreateShl(elementsInfo.elements[1], 16);
+        outValue = builder.CreateOr(outValue, highElem);
       }
+      outValue = builder.CreateBitCast(outValue, builder.getFloatTy());
     } else {
+      // Output a vector
       outValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), compCount));
-      if (elementsInfo.is16Bit) {
-        // Pack two elements for a component
-        unsigned compIdx = 0;
-        for (auto elemIdx = 0; elemIdx < elementsInfo.elemCount; elemIdx += 2) {
-          Value *lowElem = elementsInfo.elements[elemIdx];
-          Value *component = lowElem;
-          Value *highElem = elementsInfo.elements[elemIdx + 1];
-          if (highElem != nullptr) {
-            highElem = builder.CreateShl(highElem, 16);
-            component = builder.CreateOr(lowElem, highElem);
-          }
-          component = builder.CreateBitCast(component, builder.getFloatTy());
-          outValue =
-              elementsInfo.elemCount == 2 ? component : builder.CreateInsertElement(outValue, component, compIdx++);
+      for (unsigned compIdx = 0; compIdx < compCount; ++compIdx) {
+        const unsigned elemIdx = compIdx * 2;
+        Value *elems[2] = {elementsInfo.elements[elemIdx], elementsInfo.elements[elemIdx + 1]};
+        Value *component = elems[0];
+        if (elems[1]) {
+          // Two 16 - bit elements packed as a 32 - bit scalar
+          elems[1] = builder.CreateShl(elems[1], 16);
+          component = builder.CreateOr(component, elems[1]);
         }
-      } else {
-        // Each element is seen as a component
-        for (auto compIdx = 0; compIdx < compCount; ++compIdx) {
-          outValue = builder.CreateInsertElement(outValue, elementsInfo.elements[compIdx * 2], compIdx);
-        }
+        component = builder.CreateBitCast(component, builder.getFloatTy());
+        outValue = builder.CreateInsertElement(outValue, component, compIdx);
       }
     }
 
+    // Create an output export call at new location with packed value
     args[0] = builder.getInt32(newLoc);
     args[1] = builder.getInt32(0);
     args[2] = outValue;
@@ -2740,56 +2755,58 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
 }
 
 // =====================================================================================================================
-// Scalarize last vertex processing stage outputs and FS inputs ready for packing.
+// Scalarize last vertex processing stage outputs and {TCS,FS} inputs ready for packing.
 //
 // @param [in/out] module : Module
 void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
   // First gather the input/output calls that need scalarizing.
-  SmallVector<CallInst *, 4> vsOutputCalls;
-  SmallVector<CallInst *, 4> fsInputCalls;
+  SmallVector<CallInst *, 4> outputCalls;
+  SmallVector<CallInst *, 4> inputCalls;
   for (Function &func : *module) {
     if (func.getName().startswith(lgcName::InputImportGeneric) ||
         func.getName().startswith(lgcName::InputImportInterpolant)) {
-      // This is a generic (possibly interpolated) input. Find its uses in FS.
+      // This is a generic (possibly interpolated) input. Find its uses in FS (VS-FS, TES-FS) or TCS.
       for (User *user : func.users()) {
         auto call = cast<CallInst>(user);
-        if (m_pipelineShaders->getShaderStage(call->getFunction()) != ShaderStageFragment)
-          continue;
-        // We have a use in FS. See if it needs scalarizing.
-        if (isa<VectorType>(call->getType()) || call->getType()->getPrimitiveSizeInBits() == 64)
-          fsInputCalls.push_back(call);
+        ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
+        if (shaderStage == ShaderStageFragment || shaderStage == ShaderStageTessControl) {
+          // We have a use in FS (VS-FS, TES-FS) or TCS. See if it needs scalarizing.
+          if (isa<VectorType>(call->getType()) || call->getType()->getPrimitiveSizeInBits() == 64)
+            inputCalls.push_back(call);
+        }
       }
     } else if (func.getName().startswith(lgcName::OutputExportGeneric)) {
-      // This is a generic output. Find its uses in the last vertex processing stage.
+      // This is a generic output. Find its uses in VS or TES (TES-FS).
       for (User *user : func.users()) {
         auto call = cast<CallInst>(user);
-        if (m_pipelineShaders->getShaderStage(call->getFunction()) != m_pipelineState->getLastVertexProcessingStage())
-          continue;
-        // We have a use the last vertex processing stage. See if it needs scalarizing. The output value is
-        // always the final argument.
-        Type *valueTy = call->getArgOperand(call->getNumArgOperands() - 1)->getType();
-        if (isa<VectorType>(valueTy) || valueTy->getPrimitiveSizeInBits() == 64)
-          vsOutputCalls.push_back(call);
+        ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
+        if (shaderStage == ShaderStageTessEval || shaderStage == ShaderStageVertex) {
+          // We have a use in the last vertex processing stage. See if it needs scalarizing. The output value is
+          // always the final argument.
+          Type *valueTy = call->getArgOperand(call->getNumArgOperands() - 1)->getType();
+          if (isa<VectorType>(valueTy) || valueTy->getPrimitiveSizeInBits() == 64)
+            outputCalls.push_back(call);
+        }
       }
     }
   }
 
   // Scalarize the gathered inputs and outputs.
-  for (CallInst *call : fsInputCalls)
+  for (CallInst *call : inputCalls)
     scalarizeGenericInput(call);
-  for (CallInst *call : vsOutputCalls)
+  for (CallInst *call : outputCalls)
     scalarizeGenericOutput(call);
 }
 
 // =====================================================================================================================
 // Scalarize a generic input.
-// This is known to be an FS generic or interpolant input that is either a vector or 64 bit.
+// This is known to be an FS generic or interpolant input or TCS input that is either a vector or 64 bit.
 //
 // @param call : Call that represents importing the generic or interpolant input
 void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   BuilderBase builder(call->getContext());
   builder.SetInsertPoint(call);
-
+  // TCS: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
   // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
   //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
   //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
@@ -2797,8 +2814,9 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   for (unsigned i = 0, end = call->getNumArgOperands(); i != end; ++i)
     args.push_back(call->getArgOperand(i));
 
-  bool isInterpolant = args.size() != 4;
-  unsigned elemIdxArgIdx = isInterpolant ? 2 : 1;
+  const bool isFs = m_pipelineShaders->getShaderStage(call->getFunction()) == ShaderStageFragment;
+  bool isInterpolant = isFs && args.size() == 5;
+  unsigned elemIdxArgIdx = isFs && !isInterpolant ? 1 : 2;
   unsigned elemIdx = cast<ConstantInt>(args[elemIdxArgIdx])->getZExtValue();
   Type *resultTy = call->getType();
 
@@ -2950,50 +2968,71 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
 // Fill the locationSpan container by constructing a LocationSpan from each input import call
 //
 // @param call : Call to process
-void InOutLocationMapManager::addSpan(CallInst *call) {
-  LocationSpan span = {};
-  const bool isInterpolant = call->getNumArgOperands() != 4;
+// @param shaderStage : Shader stage
+void InOutLocationMapManager::addSpan(CallInst *call, ShaderStage shaderStage) {
+  const bool isTcs = shaderStage == ShaderStageTessControl;
+  const bool isInterpolant = !isTcs && call->getNumArgOperands() != 4;
+  unsigned locOffset = 0;
+  unsigned compIdxArgIdx = 1;
+  if (isInterpolant || isTcs) {
+    assert(isa<ConstantInt>(call->getOperand(1)));
+    locOffset = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
+    compIdxArgIdx = 2;
+  }
 
-  assert(!isInterpolant || (isInterpolant && isa<ConstantInt>(call->getOperand(1))));
-  const unsigned locOffset = isInterpolant ? cast<ConstantInt>(call->getOperand(1))->getZExtValue() : 0;
+  LocationSpan span = {};
   span.firstLocation.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset;
-  const unsigned compIdxArgIdx = isInterpolant ? 2 : 1;
   span.firstLocation.locationInfo.component = cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue();
   span.firstLocation.locationInfo.half = false;
 
-  const unsigned interpMode = cast<ConstantInt>(call->getOperand(compIdxArgIdx + 1))->getZExtValue();
-  span.compatibilityInfo.isFlat = interpMode == InOutInfo::InterpModeFlat;
-  span.compatibilityInfo.isCustom = interpMode == InOutInfo::InterpModeCustom;
   unsigned bitWidth = call->getType()->getScalarSizeInBits();
-  // int8 is treated as 16-bit
-  bitWidth = (bitWidth == 8) ? 16 : bitWidth;
+  if (isTcs && bitWidth < 32)
+    bitWidth = 32;
+  else if (bitWidth == 8)
+    bitWidth = 16;
   span.compatibilityInfo.halfComponentCount = bitWidth / 16;
-  span.compatibilityInfo.is16Bit = (bitWidth == 16);
+  // For XX-FS, 32-bit and 16-bit are packed seperately; For VS-TCS, they are packed together
+  span.compatibilityInfo.is16Bit = bitWidth == 16;
 
-  assert(isInterpolant ||
-         (!isInterpolant && std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end()));
-  if (std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end()) {
+  if (!isTcs) {
+    const unsigned interpMode = cast<ConstantInt>(call->getOperand(compIdxArgIdx + 1))->getZExtValue();
+    span.compatibilityInfo.isFlat = interpMode == InOutInfo::InterpModeFlat;
+    span.compatibilityInfo.isCustom = interpMode == InOutInfo::InterpModeCustom;
+
+    assert(isInterpolant || (!isInterpolant && !is_contained(m_locationSpans, span)));
+  }
+  if (!is_contained(m_locationSpans, span)) {
     m_locationSpans.push_back(span);
   }
 }
 
 // =====================================================================================================================
 // Build the map between orignal InOutLocation and packed InOutLocation based on sorted locaiton spans
-void InOutLocationMapManager::buildLocationMap() {
+//
+// @param checkCompatibility : whether to check compatibilty between two spans to start a new location
+void InOutLocationMapManager::buildLocationMap(bool checkCompatibility) {
+  if (m_locationSpans.empty())
+    return;
   // Sort m_locationSpans based on LocationSpan::GetCompatibilityKey() and InOutLocation::AsIndex()
   std::sort(m_locationSpans.begin(), m_locationSpans.end());
+
+  m_locationMap.clear();
 
   // Map original InOutLocation to new InOutLocation
   unsigned consectiveLocation = 0;
   unsigned compIdx = 0;
   bool isHighHalf = false;
   for (auto spanIt = m_locationSpans.begin(); spanIt != m_locationSpans.end(); ++spanIt) {
-    // Increase consectiveLocation when a vec4 is full or the span isn't compatible to previous
-    // Otherwise, increase the compIdx in a packed vector
     if (spanIt != m_locationSpans.begin()) {
+      // Check the current span with previous span to determine wether it is put in the same location or the next
+      // location.
       const auto &prevSpan = *(--spanIt);
       ++spanIt;
-      if (!isCompatible(prevSpan, *spanIt) || compIdx > 3) {
+
+      // Start a new location in two case:
+      // 1. the component index is up to 4
+      // 2. checkCompatibility is enabled (FS input) and the two adjacent spans are not compatible
+      if (compIdx > 3 || (checkCompatibility && !isCompatible(prevSpan, *spanIt))) {
         ++consectiveLocation;
         compIdx = 0;
         isHighHalf = false;
@@ -3002,20 +3041,18 @@ void InOutLocationMapManager::buildLocationMap() {
       }
     }
 
+    // Add a location map item
     InOutLocation newLocation = {};
     newLocation.locationInfo.location = consectiveLocation;
     newLocation.locationInfo.component = compIdx;
     newLocation.locationInfo.half = isHighHalf;
-
-    // Update component index
-    if (spanIt->compatibilityInfo.is16Bit)
-      compIdx = isHighHalf ? compIdx + 1 : compIdx;
-    else
-      compIdx += spanIt->compatibilityInfo.halfComponentCount / 2;
-    assert(compIdx <= 4);
-
     InOutLocation &origLocation = spanIt->firstLocation;
     m_locationMap[origLocation] = newLocation;
+
+    // Update component index
+    if (spanIt->compatibilityInfo.is16Bit && isHighHalf || !spanIt->compatibilityInfo.is16Bit)
+      ++compIdx;
+    assert(compIdx <= 4);
   }
 
   // Exists temporarily for computing m_locationMap

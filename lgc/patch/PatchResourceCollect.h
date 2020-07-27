@@ -142,8 +142,8 @@ class InOutLocationMapManager {
 public:
   InOutLocationMapManager() {}
 
-  void addSpan(llvm::CallInst *call);
-  void buildLocationMap();
+  void addSpan(llvm::CallInst *call, ShaderStage shaderStage);
+  void buildLocationMap(bool checkCompatibility);
 
   bool findMap(const InOutLocation &originalLocation, const InOutLocation *&newLocation);
 

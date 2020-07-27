@@ -446,10 +446,12 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
             loc = resUsage->inOutUsage.perPatchInputLocMap[value];
           }
         } else {
-          if ((m_shaderStage == ShaderStageFragment) && m_pipelineState->isPackInOut()) {
+          if (m_pipelineState->isPackInOut() &&
+              (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl)) {
+            // The new InOutLocationInfo is used to map scalarized FS and TCS input import as compact as possible
             InOutLocationInfo origLocInfo = {};
-            origLocInfo.location = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-            const uint32_t elemIdxArgIdx = isInterpolantInputImport ? 2 : 1;
+            origLocInfo.location = value;
+            const uint32_t elemIdxArgIdx = isInterpolantInputImport || m_shaderStage != ShaderStageFragment ? 2 : 1;
             origLocInfo.component = cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue();
             origLocInfo.half = false;
             assert(resUsage->inOutUsage.inOutLocMap.find(origLocInfo.u16All) != resUsage->inOutUsage.inOutLocMap.end());
@@ -471,8 +473,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       case ShaderStageTessControl: {
         assert(callInst.getNumArgOperands() == 4);
 
-        auto elemIdx = callInst.getOperand(2);
-        assert(isDontCareValue(elemIdx) == false);
+        if (!elemIdx) {
+          elemIdx = callInst.getOperand(2);
+          assert(isDontCareValue(elemIdx) == false);
+        }
 
         auto vertexIdx = callInst.getOperand(3);
         assert(isDontCareValue(vertexIdx) == false);
@@ -694,6 +698,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       bool exist = false;
       unsigned loc = InvalidValue;
       Value *locOffset = nullptr;
+      unsigned elemIdx = InvalidValue;
 
       if (m_shaderStage == ShaderStageTessControl) {
         // NOTE: If location offset is a constant, we have to add it to the unmapped location before querying
@@ -729,7 +734,23 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           loc = resUsage->inOutUsage.outputLocMap[outLocInfo.u32All];
         }
       } else {
-        if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end()) {
+        if (m_pipelineState->isPackInOut() && m_shaderStage == ShaderStageVertex &&
+            m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
+          // The new InOutLocationInfo is used to map scalarized VS output export in a VS-TCS-TES-FS to lds as compact
+          // as possible
+          InOutLocationInfo origLocInfo = {};
+          origLocInfo.location = value;
+          origLocInfo.component = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+          origLocInfo.half = false;
+          if (resUsage->inOutUsage.inOutLocMap.find(origLocInfo.u16All) != resUsage->inOutUsage.inOutLocMap.end()) {
+            InOutLocationInfo newLocInfo = {};
+            newLocInfo.u16All = resUsage->inOutUsage.inOutLocMap[origLocInfo.u16All];
+            loc = newLocInfo.location;
+            elemIdx = newLocInfo.component;
+            exist = true;
+          } else
+            exist = false;
+        } else if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end()) {
           exist = true;
           loc = resUsage->inOutUsage.outputLocMap[value];
         }
@@ -742,8 +763,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         switch (m_shaderStage) {
         case ShaderStageVertex: {
           assert(callInst.getNumArgOperands() == 3);
-          const unsigned compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-          patchVsGenericOutputExport(output, loc, compIdx, &callInst);
+          if (elemIdx == InvalidValue)
+            elemIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+          patchVsGenericOutputExport(output, loc, elemIdx, &callInst);
           break;
         }
         case ShaderStageTessControl: {
@@ -759,8 +781,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         }
         case ShaderStageTessEval: {
           assert(callInst.getNumArgOperands() == 3);
-          const unsigned compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-          patchTesGenericOutputExport(output, loc, compIdx, &callInst);
+          if (elemIdx == InvalidValue)
+            elemIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+          patchTesGenericOutputExport(output, loc, elemIdx, &callInst);
           break;
         }
         case ShaderStageGeometry: {
