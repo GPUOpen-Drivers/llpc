@@ -988,8 +988,15 @@ bool PipelineState::isTessOffChip() {
 bool PipelineState::isPackInOut() {
   // Pack input/output requirements:
   // 1) -pack-in-out option is on
-  // 2) It is a VS-FS pipeline
-  return PackInOut && (m_stageMask == (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment)));
+  // 2) It supports VS-FS, VS-TCS-TES-(FS)
+  if (!PackInOut)
+    return false;
+
+  if (hasShaderStage(ShaderStageVertex) && !hasShaderStage(ShaderStageGeometry)) {
+    const unsigned nextStage = getNextShaderStage(ShaderStageVertex);
+    return nextStage == ShaderStageFragment || nextStage == ShaderStageTessControl;
+  }
+  return false;
 }
 
 // =====================================================================================================================
