@@ -41,14 +41,6 @@ struct NggControl;
 class NggLdsManager;
 class PipelineState;
 
-// Represents exported data used in "exp" instruction
-struct ExpData {
-  uint8_t target;        // Export target
-  uint8_t channelMask;   // Channel mask of export value
-  bool doneFlag;         // "Done" flag
-  llvm::Value *expValue; // Export value
-};
-
 // Represents constant buffer offsets (in bytes) of viewport controls in primitive shader table.
 // NOTE: The layout structure is defined by @ref Util::Abi::PrimShaderVportCb.
 struct PrimShaderVportCbLookupTable {
@@ -124,12 +116,12 @@ private:
   void doPrimitiveExportWithoutGs(llvm::Value *cullFlag = nullptr);
   void doPrimitiveExportWithGs(llvm::Value *vertexId);
 
-  void doEarlyExit(unsigned fullyCullThreadCount, unsigned expPosCount);
+  void doEarlyExit(unsigned fullyCullThreadCount);
 
-  void runEsOrEsVariant(llvm::Module *module, llvm::StringRef entryName, llvm::Argument *sysValueStart,
-                        bool sysValueFromLds, std::vector<ExpData> *expDataSet, llvm::BasicBlock *insertAtEnd);
+  void runEs(llvm::Module *module, llvm::Argument *sysValueStart);
+  llvm::Value *runEsPartial(llvm::Module *module, llvm::Argument *sysValueStart, llvm::Value *position = nullptr);
 
-  llvm::Function *mutateEsToVariant(llvm::Module *module, llvm::StringRef entryName, std::vector<ExpData> &expDataSet);
+  void splitEs(llvm::Module *module);
 
   void runGs(llvm::Module *module, llvm::Argument *sysValueStart);
 
@@ -254,7 +246,7 @@ private:
   bool m_hasGs;  // Whether the pipeline has geometry shader
 
   // Base offsets (in dwords) of GS output vertex streams in GS-VS ring
-  uint32_t m_gsStreamBases[MaxGsStreams];
+  unsigned m_gsStreamBases[MaxGsStreams];
 
   std::unique_ptr<llvm::IRBuilder<>> m_builder; // LLVM IR builder
 };
