@@ -264,7 +264,12 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createFloat2IntPass());
     passMgr.add(createLoopRotatePass());
-    passMgr.add(createCFGSimplificationPass(1, true, true, true, true));
+    passMgr.add(createCFGSimplificationPass(SimplifyCFGOptions()
+                                                .bonusInstThreshold(1)
+                                                .forwardSwitchCondToPhi(true)
+                                                .convertSwitchToLookupTable(true)
+                                                .needCanonicalLoops(true)
+                                                .sinkCommonInsts(true)));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createLoopUnrollPass(optLevel));
