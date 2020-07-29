@@ -317,6 +317,15 @@ void ConfigBuilderBase::appendConfig(ArrayRef<PalMetadataNoteEntry> config) {
 }
 
 // =====================================================================================================================
+// Whether USES_VIEWPORT_ARRAY_INDEX is set
+bool ConfigBuilderBase::usesViewportArrayIndex() {
+  if (m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex].isEmpty())
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex] = false;
+
+  return m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex].getBool();
+}
+
+// =====================================================================================================================
 // Finish ConfigBuilder processing by writing into the PalMetadata document
 void ConfigBuilderBase::writePalMetadata() {
   // Generating MsgPack metadata.
