@@ -80,6 +80,10 @@ private:
                                   llvm::Value *elemIdx, llvm::Value *vertexIdx, unsigned emitStreamId,
                                   llvm::Instruction *insertPos);
 
+  Value *loadDynamicIndexedMembers(Type *inOutTy, unsigned addrSpace, const std::vector<Value *> &indexOperands,
+                                   unsigned operandIdx, Constant *inOutMetaVal, Value *locOffset, unsigned interpLoc,
+                                   Value *auxInterpValue, Instruction *insertPos);
+
   llvm::Value *loadInOutMember(llvm::Type *inOutTy, unsigned addrSpace, const std::vector<llvm::Value *> &indexOperands,
                                unsigned operandIdx, unsigned maxLocOffset, llvm::Constant *inOutMeta,
                                llvm::Value *locOffset, llvm::Value *vertexIdx, unsigned interpLoc,

@@ -1343,6 +1343,106 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
 }
 
 // =====================================================================================================================
+// Inserts instructions to load possibly dynamic indexed members from input/ouput location.
+//
+// Sometimes, we are accessing data with dynamic index, but the hardware currently may not be able to do this under
+// situations like interpolation in fragment shader, what we do here is check whether the index is dynamic, if that
+// is true, we pre-load all the possibly accessed members, if the index is a static constant, we just pre-load the
+// specific one. Then later after this function been called, you could load the really needed data from the pre-loaded
+// data.
+//
+// @param inOutTy : Type of this input/output member
+// @param addrSpace : Address space
+// @param indexOperands : Index operands
+// @param operandIdx : Index of the index operand in processing
+// @param inOutMetaVal : Metadata of this input/output member
+// @param locOffset : Relative location offset of this input/output member
+// @param interpLoc : Interpolation location, valid for fragment shader (use "InterpLocUnknown" as don't-care value)
+// @param auxInterpValue : Auxiliary value of interpolation (valid for fragment shader):
+//                       - Sample ID for "InterpLocSample"
+//                       - Offset from the center of the pixel for "InterpLocCenter"
+//                       - Vertex no. (0 ~ 2) for "InterpLocCustom"
+// @param insertPos : Where to insert instructions
+Value *SpirvLowerGlobal::loadDynamicIndexedMembers(Type *inOutTy, unsigned addrSpace,
+                                                   const std::vector<Value *> &indexOperands, unsigned operandIdx,
+                                                   Constant *inOutMetaVal, Value *locOffset, unsigned interpLoc,
+                                                   Value *auxInterpValue, Instruction *insertPos) {
+  // Currently this is only used in fragment shader on loading interpolate sources.
+  assert(m_shaderStage == ShaderStageFragment);
+
+  Value *inOutValue = UndefValue::get(inOutTy);
+  if (inOutTy->isArrayTy()) {
+    assert(inOutMetaVal->getNumOperands() == 4);
+
+    auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
+    unsigned stride = cast<ConstantInt>(inOutMetaVal->getOperand(0))->getZExtValue();
+    auto elemTy = inOutTy->getArrayElementType();
+    if (!locOffset)
+      locOffset = m_builder->getInt32(0);
+
+    if (!isa<Constant>(indexOperands[operandIdx])) {
+      // the index is not constant, we don't know which value will be accessed, just load all members.
+      const uint64_t elemCount = inOutTy->getArrayNumElements();
+      for (unsigned idx = 0; idx < elemCount; ++idx) {
+        Value *elemLocOffset = nullptr;
+        if (isa<ConstantInt>(locOffset))
+          elemLocOffset = m_builder->getInt32(cast<ConstantInt>(locOffset)->getZExtValue() + stride * idx);
+        else
+          elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * idx), "", insertPos);
+
+        auto elem = loadDynamicIndexedMembers(elemTy, addrSpace, indexOperands, operandIdx + 1, elemMeta, elemLocOffset,
+                                              interpLoc, auxInterpValue, insertPos);
+        inOutValue = InsertValueInst::Create(inOutValue, elem, {idx}, "", insertPos);
+      }
+      return inOutValue;
+    } else {
+      // for constant index, we only need to load the specified value
+      unsigned elemIdx = cast<ConstantInt>(indexOperands[operandIdx])->getZExtValue();
+      Value *elemLocOffset = nullptr;
+      if (isa<ConstantInt>(locOffset))
+        elemLocOffset = m_builder->getInt32(cast<ConstantInt>(locOffset)->getZExtValue() + stride * elemIdx);
+      else
+        elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * elemIdx), "", insertPos);
+
+      Value *elem = loadDynamicIndexedMembers(elemTy, addrSpace, indexOperands, operandIdx + 1, elemMeta, elemLocOffset,
+                                              interpLoc, auxInterpValue, insertPos);
+      return InsertValueInst::Create(inOutValue, elem, {elemIdx}, "", insertPos);
+    }
+  } else if (inOutTy->isStructTy()) {
+    // struct type always has a constant operand-index
+    unsigned memberIdx = cast<ConstantInt>(indexOperands[operandIdx])->getZExtValue();
+
+    auto memberTy = inOutTy->getStructElementType(memberIdx);
+    auto memberMeta = cast<Constant>(inOutMetaVal->getOperand(memberIdx));
+
+    auto loadValue = loadDynamicIndexedMembers(memberTy, addrSpace, indexOperands, operandIdx + 1, memberMeta,
+                                               locOffset, interpLoc, auxInterpValue, insertPos);
+    return InsertValueInst::Create(inOutValue, loadValue, {memberIdx}, "", insertPos);
+  } else if (inOutTy->isVectorTy()) {
+    assert(operandIdx <= indexOperands.size());
+
+    Type *loadTy = inOutTy;
+    Value *compIdx = nullptr;
+    if (operandIdx < indexOperands.size() && isa<ConstantInt>(indexOperands[operandIdx])) {
+      // loading a component of the vector
+      loadTy = cast<VectorType>(inOutTy)->getElementType();
+      compIdx = indexOperands[operandIdx];
+      Value *compValue = addCallInstForInOutImport(loadTy, addrSpace, inOutMetaVal, locOffset, 0, compIdx, nullptr,
+                                                   interpLoc, auxInterpValue, insertPos);
+      return InsertElementInst::Create(inOutValue, compValue, compIdx, "", insertPos);
+    } else
+      return addCallInstForInOutImport(loadTy, addrSpace, inOutMetaVal, locOffset, 0, compIdx, nullptr, interpLoc,
+                                       auxInterpValue, insertPos);
+  } else {
+    // simple scalar type
+    return addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, locOffset, 0, nullptr, nullptr, interpLoc,
+                                     auxInterpValue, insertPos);
+  }
+
+  llvm_unreachable("Should never be called!");
+  return nullptr;
+}
+// =====================================================================================================================
 // Inserts instructions to load value from input/ouput member.
 //
 // @param inOutTy : Type of this input/output member
@@ -1815,8 +1915,6 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
   // bypass first zero offset
   std::vector<Value *> indexOperands = makeArrayRef(operands).slice(1);
 
-  unsigned operandIdx = 0;
-
   auto input = cast<GlobalVariable>(getElemPtr->getPointerOperand());
   auto inputTy = input->getType()->getContainedType(0);
 
@@ -1825,63 +1923,25 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
   auto inputMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
   if (getElemPtr->hasAllConstantIndices()) {
-    auto loadValue = loadInOutMember(inputTy, SPIRAS_Input, indexOperands, operandIdx, 0, inputMeta, nullptr, nullptr,
-                                     interpLoc, auxInterpValue, &callInst);
+    auto loadValue = loadInOutMember(inputTy, SPIRAS_Input, indexOperands, 0, 0, inputMeta, nullptr, nullptr, interpLoc,
+                                     auxInterpValue, &callInst);
 
     m_interpCalls.insert(&callInst);
     callInst.replaceAllUsesWith(loadValue);
   } else {
     // Interpolant an element via dynamic index by extending interpolant to each element
-    auto interpValueTy = inputTy;
-    auto interpPtr = new AllocaInst(interpValueTy, m_module->getDataLayout().getAllocaAddrSpace(), "",
+    auto interpPtr = new AllocaInst(inputTy, m_module->getDataLayout().getAllocaAddrSpace(), "",
                                     &*(m_entryPoint->begin()->getFirstInsertionPt()));
+    // load all possibly accessed values
+    auto loadValue = loadDynamicIndexedMembers(inputTy, SPIRAS_Input, indexOperands, 0, inputMeta, nullptr, interpLoc,
+                                               auxInterpValue, &callInst);
 
-    std::vector<unsigned> arraySizes;
-    std::vector<unsigned> indexOperandIdxs;
-    unsigned flattenElemCount = 1;
-    auto elemTy = inputTy;
-    for (unsigned i = 0, indexOperandCount = indexOperands.size(); i < indexOperandCount; ++i) {
-      if (isa<ConstantInt>(indexOperands[i])) {
-        unsigned index = (cast<ConstantInt>(indexOperands[i]))->getZExtValue();
-        elemTy = elemTy->getContainedType(index);
-      } else {
-        arraySizes.push_back(cast<ArrayType>(elemTy)->getNumElements());
-        elemTy = elemTy->getArrayElementType();
-        flattenElemCount *= arraySizes.back();
-        indexOperandIdxs.push_back(i);
-      }
-    }
-
-    const unsigned arraySizeCount = arraySizes.size();
-    SmallVector<unsigned, 4> elemStrides;
-    elemStrides.resize(arraySizeCount, 1);
-    for (unsigned i = arraySizeCount - 1; i > 0; --i)
-      elemStrides[i - 1] = arraySizes[i] * elemStrides[i];
-
-    std::vector<Value *> newIndexOperands = indexOperands;
-    Value *interpValue = UndefValue::get(interpValueTy);
-
-    for (unsigned elemIdx = 0; elemIdx < flattenElemCount; ++elemIdx) {
-      unsigned flattenElemIdx = elemIdx;
-      for (unsigned arraySizeIdx = 0; arraySizeIdx < arraySizeCount; ++arraySizeIdx) {
-        unsigned index = flattenElemIdx / elemStrides[arraySizeIdx];
-        flattenElemIdx = flattenElemIdx - index * elemStrides[arraySizeIdx];
-        newIndexOperands[indexOperandIdxs[arraySizeIdx]] = ConstantInt::get(Type::getInt32Ty(*m_context), index, true);
-      }
-
-      auto loadValue = loadInOutMember(inputTy, SPIRAS_Input, newIndexOperands, operandIdx, 0, inputMeta, nullptr,
-                                       nullptr, interpLoc, auxInterpValue, &callInst);
-
-      std::vector<unsigned> idxs;
-      for (auto indexIt = newIndexOperands.begin(); indexIt != newIndexOperands.end(); ++indexIt)
-        idxs.push_back((cast<ConstantInt>(*indexIt))->getZExtValue());
-      interpValue = InsertValueInst::Create(interpValue, loadValue, idxs, "", &callInst);
-    }
-    new StoreInst(interpValue, interpPtr, &callInst);
+    new StoreInst(loadValue, interpPtr, &callInst);
 
     auto interpElemPtr = GetElementPtrInst::Create(nullptr, interpPtr, operands, "", &callInst);
     auto interpElemTy = interpElemPtr->getType()->getPointerElementType();
 
+    // only get the value that the original getElemPtr points to
     auto interpElemValue = new LoadInst(interpElemTy, interpElemPtr, "", &callInst);
     callInst.replaceAllUsesWith(interpElemValue);
 
