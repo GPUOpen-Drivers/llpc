@@ -928,10 +928,18 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   SET_REG_FIELD(&pConfig->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, resUsage->inOutUsage.fs.interpInfo.size());
 
   unsigned pointCoordLoc = InvalidValue;
-  if (resUsage->inOutUsage.builtInInputLocMap.find(BuiltInPointCoord) !=
-      resUsage->inOutUsage.builtInInputLocMap.end()) {
+  unsigned viewportIndexLoc = InvalidValue;
+
+  auto builtInInputLocMapIt = resUsage->inOutUsage.builtInInputLocMap.find(BuiltInPointCoord);
+  if (builtInInputLocMapIt != resUsage->inOutUsage.builtInInputLocMap.end()) {
     // Get generic input corresponding to gl_PointCoord (to set the field PT_SPRITE_TEX)
-    pointCoordLoc = resUsage->inOutUsage.builtInInputLocMap[BuiltInPointCoord];
+    pointCoordLoc = builtInInputLocMapIt->second;
+  }
+
+  builtInInputLocMapIt = resUsage->inOutUsage.builtInInputLocMap.find(BuiltInViewportIndex);
+  if (builtInInputLocMapIt != resUsage->inOutUsage.builtInInputLocMap.end()) {
+    // Get generic input corresponding to gl_ViewportIndex (to set the field OFFSET and FLAT_SHADE)
+    viewportIndexLoc = builtInInputLocMapIt->second;
   }
 
   // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none
@@ -967,12 +975,16 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
       spiPsInputCntl.bits.ATTR1_VALID__VI = interpInfoElem.attr1Valid;
     }
 
+    constexpr unsigned UseDefaultVal = (1 << 5);
     if (pointCoordLoc == i) {
       spiPsInputCntl.bits.PT_SPRITE_TEX = true;
 
       // NOTE: Set the offset value to force hardware to select input defaults (no VS match).
-      static const unsigned UseDefaultVal = (1 << 5);
       spiPsInputCntl.bits.OFFSET = UseDefaultVal;
+    } else if (viewportIndexLoc == i && !usesViewportArrayIndex()) {
+      // NOTE: Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
+      spiPsInputCntl.bits.OFFSET = UseDefaultVal;
+      spiPsInputCntl.bits.FLAT_SHADE = false;
     }
 
     appendConfig(mmSPI_PS_INPUT_CNTL_0 + i, spiPsInputCntl.u32All);

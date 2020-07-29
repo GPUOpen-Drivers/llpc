@@ -86,6 +86,8 @@ protected:
   void appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config);
   void appendConfig(unsigned key, unsigned value);
 
+  bool usesViewportArrayIndex();
+
   template <typename T> void appendConfig(const T &config) {
     static_assert(T::ContainsPalAbiMetadataOnly, "may only be used with structs that are fully metadata notes");
     static_assert(sizeof(T) % sizeof(PalMetadataNoteEntry) == 0,
