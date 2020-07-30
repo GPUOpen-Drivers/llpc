@@ -62,6 +62,7 @@ void GlueShader::compile(raw_pwrite_stream &outStream) {
   // Get the pass manager and run it on the module, generating ELF.
   PassManager &passManager = m_lgcContext->getPassManagerCache()->getGlueShaderPassManager(outStream);
   passManager.run(*module);
+  m_lgcContext->getPassManagerCache()->resetStream();
 }
 
 namespace {

@@ -102,3 +102,10 @@ lgc::PassManager &PassManagerCache::getPassManager(const PassManagerInfo &info, 
 
   return *passManager;
 }
+
+// =====================================================================================================================
+// Removes references to the cached stream.  This must be called before the cached stream has been destroyed.
+//
+void PassManagerCache::resetStream() {
+  m_proxyStream.setUnderlyingStream(nullptr);
+}
