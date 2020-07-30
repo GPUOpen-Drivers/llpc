@@ -3269,7 +3269,7 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
     Value *outputVec = UndefValue::get(FixedVectorType::get(outputElemTy, elemCount));
     for (unsigned i = 0; i < elemCount; ++i) {
       auto outputElem = m_builder->CreateExtractValue(output, i);
-      m_builder->CreateInsertElement(outputVec, outputElem, i);
+      outputVec = m_builder->CreateInsertElement(outputVec, outputElem, i);
     }
 
     outputTy = outputVec->getType();
