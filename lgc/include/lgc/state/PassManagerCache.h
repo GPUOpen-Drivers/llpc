@@ -83,6 +83,8 @@ public:
   // Get pass manager for glue shader compilation
   PassManager &getGlueShaderPassManager(llvm::raw_pwrite_stream &outStream);
 
+  void resetStream();
+
 private:
   PassManager &getPassManager(const PassManagerInfo &info, llvm::raw_pwrite_stream &outStream);
 
