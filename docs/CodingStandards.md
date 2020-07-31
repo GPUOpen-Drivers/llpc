@@ -140,7 +140,7 @@ Parameters should be commented in the main comment at
 the top of the function like this:
 
 ```
-// \param hatstand : [in/out] The Hatstand object to modify
+// @param [in/out] hatstand : The Hatstand object to modify
 ```
 
 A tag of `[in]` is unnecessary, and is assumed for a reference or pointer parameter
@@ -149,6 +149,11 @@ where no tag is given.
 Parameter comments should not be placed on the parameter line itself and aligned
 (as happens in PAL style), to avoid spuriously large diffs when a change or addition
 of one parameter means all the others need realigning.
+
+Return values have to be documented in a similar way:
+```
+// @returns : The return value description.
+```
 
 Similarly, a bunch of fields or variables should not have aligned inline comments.
 Instead, put each field's comment on the line above the field.

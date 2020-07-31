@@ -80,7 +80,7 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
 // =====================================================================================================================
 // Create directory.
 //
-// @param dir : the path of directory
+// @param dir : The path of directory
 bool createDirectory(const char *dir) {
   int result = mkdir(dir, S_IRWXU);
   return result == 0;

@@ -550,7 +550,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
           cacheResult = cacheEntry.WaitForEntry();
         if (cacheResult == Result::Success) {
           cacheResult = cacheEntry.GetValueZeroCopy(&cacheData, &allocSize);
-          if (cacheResult == Result::Unsupported && cacheData == nullptr) {
+          if (cacheResult == Result::Unsupported && !cacheData) {
             cacheResult = cacheEntry.GetValue(nullptr, &allocSize);
             if (cacheResult == Result::Success && allocSize > 0) {
               cacheData = allocData = new uint8_t[allocSize];
@@ -881,8 +881,8 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 // =====================================================================================================================
 // Returns true if userDataNode contains descriptor types that are unsupported by relocatable shader compilation.
 //
-// @param [in] nodes : user data nodes
-// @param nodeCount : number of user data nodes
+// @param [in] nodes : User data nodes
+// @param nodeCount : Number of user data nodes
 static bool hasUnrelocatableDescriptorNode(const ResourceMappingNode *nodes, unsigned nodeCount) {
   for (unsigned i = 0; i < nodeCount; ++i) {
     const ResourceMappingNode *node = nodes + i;
@@ -1023,7 +1023,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   // If not IR input, run the per-shader passes, including SPIR-V translation, and then link the modules
   // into a single pipeline module.
-  if (pipelineModule == nullptr) {
+  if (!pipelineModule) {
     // Create empty modules and set target machine in each.
     std::vector<Module *> modules(shaderInfo.size());
     unsigned stageSkipMask = 0;
@@ -1141,7 +1141,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
     // Link the shader modules into a single pipeline module.
     pipelineModule.reset(pipeline->irLink(modulesToLink, context->getPipelineContext()->isUnlinked()));
-    if (pipelineModule == nullptr) {
+    if (!pipelineModule) {
       LLPC_ERRS("Failed to link shader modules into pipeline module\n");
       result = Result::ErrorInvalidShader;
     }
@@ -1276,7 +1276,7 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, unsigned stageM
 // =====================================================================================================================
 // Update root level descriptor offset for graphics pipeline.
 //
-// @param [In, Out] pipelineElf : ELF that could be from compile or merged
+// @param [in/out] pipelineElf : ELF that could be from compile or merged
 void GraphicsShaderCacheChecker::updateRootUserDateOffset(ElfPackage *pipelineElf) {
   ElfWriter<Elf64> writer(m_context->getGfxIpVersion());
   // Load ELF binary
@@ -1360,7 +1360,7 @@ void GraphicsShaderCacheChecker::updateAndMerge(Result result, ElfPackage *outpu
 // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
 //
 // @param target : GraphicsPipelineBuildInfo
-// @param enableAlphaToCoverage : whether enalbe AlphaToCoverage
+// @param enableAlphaToCoverage : Whether enable AlphaToCoverage
 unsigned Compiler::ConvertColorBufferFormatToExportFormat(const ColorTarget *target,
                                                           const bool enableAlphaToCoverage) const {
   Context *context = acquireContext();
@@ -1925,8 +1925,8 @@ void Compiler::updateShaderCache(bool insert, const BinaryData *elfBin, ShaderCa
 //
 // @param appPipelineCache : App's pipeline cache
 // @param cacheHash : Hash code of the shader
-// @param elfBin : [out] Pointer to shader data
-// @param entryHandle : [out] Handle to use
+// @param [out] elfBin : Pointer to shader data
+// @param [out] entryHandle : Handle to use
 Result Compiler::lookUpCaches(ICache *appPipelineCache, HashId *cacheHash, BinaryData *elfBin,
                               EntryHandle *entryHandle) {
   Result cacheResult = Result::Unsupported;
@@ -1952,7 +1952,7 @@ Result Compiler::lookUpCaches(ICache *appPipelineCache, HashId *cacheHash, Binar
   };
 
   if (m_cache)
-    cacheResult = LookUpCache(m_cache, appPipelineCache == nullptr, cacheHash, elfBin, entryHandle);
+    cacheResult = LookUpCache(m_cache, !appPipelineCache, cacheHash, elfBin, entryHandle);
 
   if (appPipelineCache && cacheResult != Result::Success)
     cacheResult = LookUpCache(appPipelineCache, true, cacheHash, elfBin, entryHandle);

@@ -84,7 +84,7 @@ CallInst *emitCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args, Arra
 // Gets LLVM-style name for type.
 //
 // @param ty : Type to get mangle name
-// @param [in,out] nameStream : Stream to write the type name into
+// @param [in/out] nameStream : Stream to write the type name into
 void getTypeName(Type *ty, raw_ostream &nameStream) {
   for (;;) {
     if (auto pointerTy = dyn_cast<PointerType>(ty)) {

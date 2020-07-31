@@ -126,7 +126,7 @@ char SpirvLowerMathFloatOp::ID = 0;
 // =====================================================================================================================
 // Initialise transform class.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 void SpirvLowerMath::init(Module &module) {
   SpirvLower::init(&module);
   m_changed = false;
@@ -223,7 +223,7 @@ void SpirvLowerMath::disableFastMath(Value *value) {
 // =====================================================================================================================
 // Executes constand folding SPIR-V lowering pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool SpirvLowerMathConstFolding::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Const-Folding\n");
 
@@ -282,7 +282,7 @@ bool SpirvLowerMathConstFolding::runOnModule(Module &module) {
 // =====================================================================================================================
 // Executes floating point optimisation SPIR-V lowering pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool SpirvLowerMathFloatOp::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Float-Op\n");
 

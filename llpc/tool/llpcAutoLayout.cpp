@@ -113,8 +113,8 @@ static const ResourceMappingNode *findDescriptorTableVaPtr(PipelineShaderInfo *s
 //
 // @param userDataNode : ResourceMappingNode pointer
 // @param nodeCount : User data node count
-// @param set : find same set in node array
-// @param binding : find same binding in node array
+// @param set : Find same set in node array
+// @param binding : Find same binding in node array
 // @param [out] index : Return node position in node array
 static const ResourceMappingNode *findResourceNode(const ResourceMappingNode *userDataNode, unsigned nodeCount,
                                                    unsigned set, unsigned binding, unsigned *index) {
@@ -226,7 +226,7 @@ bool checkShaderInfoComptible(PipelineShaderInfo *shaderInfo, unsigned autoLayou
 //
 // @param compiler : LLPC compiler object
 // @param pipelineInfo : Graphics pipeline info
-// @param autoLayoutPipelineInfo : layout pipeline info
+// @param autoLayoutPipelineInfo : Layout pipeline info
 // @param gfxIp : Graphics IP version
 bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipelineBuildInfo *pipelineInfo,
                                   Llpc::GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, Llpc::GfxIpVersion gfxIp) {
@@ -272,7 +272,7 @@ bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipel
 // graphics pipeline.
 // @param [in/out] shaderInfo : Shader info, will have user data nodes added to it
 // @param [in/out] topLevelOffset : User data offset; ensures that multiple shader stages use disjoint offsets
-// @param checkAutoLayoutCompatible : if check AutoLayout Compatiple
+// @param checkAutoLayoutCompatible : If check AutoLayout Compatiple
 void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipelineBuildInfo *pipelineInfo,
                       PipelineShaderInfo *shaderInfo, unsigned &topLevelOffset, bool checkAutoLayoutCompatible) {
   // Read the SPIR-V.

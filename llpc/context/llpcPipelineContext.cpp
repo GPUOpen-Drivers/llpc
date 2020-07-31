@@ -188,8 +188,7 @@ ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
 #else
   const ShaderModuleData *pModuleData = reinterpret_cast<const ShaderModuleData *>(pShaderInfo->pModuleData);
 
-  return (pModuleData == nullptr) ? 0
-                                  : MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash *>(&pModuleData->hash));
+  return (!pModuleData) ? 0 : MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash *>(&pModuleData->hash));
 #endif
 }
 

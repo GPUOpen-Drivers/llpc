@@ -153,7 +153,7 @@ void ShaderCache::resetRuntimeCache() {
 // NOTE: It is expected that the calling function has not used this shader cache since querying the size
 //
 // @param [out] blob : System memory pointer where the serialized data should be placed
-// @param [in,out] size : Size of the memory pointed to by pBlob. If the value stored in pSize is zero then no data will
+// @param [in/out] size : Size of the memory pointed to by pBlob. If the value stored in pSize is zero then no data will
 // be copied and instead the size required for serialization will be returned in pSize
 Result ShaderCache::Serialize(void *blob, size_t *size) {
   Result result = Result::Success;
@@ -514,7 +514,7 @@ ShaderEntryState ShaderCache::findShader(MetroHash::Hash hash, bool allocateOnMi
 //
 // @param hEntry : Handle of shader cache entry
 // @param blob : Shader data
-// @param shaderSize : size of shader data in bytes
+// @param shaderSize : Size of shader data in bytes
 void ShaderCache::insertShader(CacheEntryHandle hEntry, const void *blob, size_t shaderSize) {
   auto *const index = static_cast<ShaderIndex *>(hEntry);
   assert(m_disableCache == false);
@@ -605,7 +605,7 @@ void ShaderCache::resetShader(CacheEntryHandle hEntry) {
 //
 // @param hEntry : Handle of shader cache entry
 // @param [out] ppBlob : Shader data
-// @param [out] size : size of shader data in bytes
+// @param [out] size : Size of shader data in bytes
 Result ShaderCache::retrieveShader(CacheEntryHandle hEntry, const void **ppBlob, size_t *size) {
   const auto *const index = static_cast<ShaderIndex *>(hEntry);
 

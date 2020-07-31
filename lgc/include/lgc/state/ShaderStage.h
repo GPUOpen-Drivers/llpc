@@ -67,7 +67,7 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage);
 // @param retTy : New return type, nullptr to use the same as in the original function
 // @param argTys : Types of new args
 // @param inRegMask : Bitmask of which args should be marked "inreg", to be passed in SGPRs
-// @return : The new function
+// @returns : The new function
 llvm::Function *addFunctionArgs(llvm::Function *oldFunc, llvm::Type *retTy, llvm::ArrayRef<llvm::Type *> argTys,
                                 uint64_t inRegMask = 0);
 
@@ -75,7 +75,7 @@ llvm::Function *addFunctionArgs(llvm::Function *oldFunc, llvm::Type *retTy, llvm
 //
 // @param callingConv : Which hardware shader stage
 // @param isFetchlessVs : Whether it is (or contains) a fetchless vertex shader
-// @return : The entry-point name, or "" if callingConv not recognized
+// @returns : The entry-point name, or "" if callingConv not recognized
 llvm::StringRef getEntryPointName(unsigned callingConv, bool isFetchlessVs);
 
 } // namespace lgc

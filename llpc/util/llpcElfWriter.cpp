@@ -160,7 +160,7 @@ public:
 // =====================================================================================================================
 // Merges the map item pair from source map to destination map for llvm::msgpack::MapDocNode.
 //
-// @param [in,out] destMap : Destination map
+// @param [in/out] destMap : Destination map
 // @param srcMap : Source map
 // @param key : Key to check in source map
 template <class Elf>
@@ -183,8 +183,8 @@ void ElfWriter<Elf>::mergeMapItem(msgpack::MapDocNode &destMap, msgpack::MapDocN
 // =====================================================================================================================
 // Update descriptor offset to USER_DATA in metaNote, in place in the messagepack document.
 //
-// @param context : context related to ElfNote
-// @param document : [in, out] The parsed message pack document of the metadata note.
+// @param context : Context related to ElfNote
+// @param [in/out] document : The parsed message pack document of the metadata note.
 static void updateRootDescriptorRegisters(Context *context, msgpack::Document &document) {
   auto pipeline = document.getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
   auto registers = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
@@ -712,9 +712,9 @@ Result ElfWriter<Elf>::getSectionDataBySectionIndex(unsigned secIdx, const Secti
 // =====================================================================================================================
 // Update descriptor offset to USER_DATA in metaNote.
 //
-// @param pContext : context related to ElfNote
+// @param pContext : Context related to ElfNote
 // @param pNote : Note section to update
-// @param [out] pNewNote : new note section
+// @param [out] pNewNote : New note section
 template <class Elf> void ElfWriter<Elf>::updateMetaNote(Context *pContext, const ElfNote *pNote, ElfNote *pNewNote) {
   msgpack::Document document;
 
@@ -737,9 +737,9 @@ template <class Elf> void ElfWriter<Elf>::updateMetaNote(Context *pContext, cons
 // =====================================================================================================================
 // Retrieves the section data for the specified section name, if it exists.
 //
-// @param pName : [in] Name of the section to look for
-// @param ppData : [out] Pointer to section data
-// @param pDataLength : [out] Size of the section data
+// @param [in] pName : Name of the section to look for
+// @param [out] ppData : Pointer to section data
+// @param [out] pDataLength : Size of the section data
 template <class Elf>
 Result ElfWriter<Elf>::getSectionData(const char *name, const void **ppData, size_t *dataLength) const {
   Result result = Result::ErrorInvalidValue;

@@ -77,7 +77,7 @@ ModulePass *lgc::createPatchSetupTargetFeatures() {
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool PatchSetupTargetFeatures::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
 
@@ -92,7 +92,7 @@ bool PatchSetupTargetFeatures::runOnModule(Module &module) {
 // =====================================================================================================================
 // Setup LLVM target features, target features are set per entry point function.
 //
-// @param [in, out] module : LLVM module
+// @param [in/out] module : LLVM module
 void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
   std::string globalFeatures = "";
 

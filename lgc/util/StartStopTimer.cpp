@@ -75,7 +75,7 @@ ModulePass *LgcContext::createStartStopTimer(Timer *timer, bool starting) {
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool StartStopTimer::runOnModule(Module &module) {
   if (m_starting)
     m_timer->startTimer();

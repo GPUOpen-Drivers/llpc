@@ -633,9 +633,9 @@ public:
   // Note that when doing vector calculation, it means add/sub are element-wise between vectors, and the product will
   // be Hadamard product.
   //
-  // @param x : left Value
-  // @param y : right Value
-  // @param a : wight Value
+  // @param x : Left Value
+  // @param y : Right Value
+  // @param a : Wight Value
   virtual llvm::Value *createFMix(llvm::Value *x, llvm::Value *y, llvm::Value *a, const llvm::Twine &instName = "") = 0;
 
   // -----------------------------------------------------------------------------------------------------------------
@@ -1436,7 +1436,7 @@ public:
   // Create a subgroup quad broadcast.
   //
   // @param value : The value to broadcast
-  // @param index : the index within the quad to broadcast from
+  // @param index : The index within the quad to broadcast from
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index,
                                                    const llvm::Twine &instName = "") = 0;

@@ -39,7 +39,7 @@ using namespace llvm;
 // =====================================================================================================================
 // Implement wrapped YCbCr sample
 //
-// @param Wrapped YCbCr sample infomation
+// @param wrapInfo : Wrapped YCbCr sample infomation
 Value *YCbCrConverter::wrappedSample(YCbCrWrappedSampleInfo &wrapInfo) {
   SmallVector<Value *, 4> coordsChroma;
   YCbCrSampleInfo *sampleInfo = wrapInfo.ycbcrInfo;
@@ -85,7 +85,7 @@ Value *YCbCrConverter::wrappedSample(YCbCrWrappedSampleInfo &wrapInfo) {
 // =====================================================================================================================
 // Create YCbCr reconstruct linear X chroma sample
 //
-// @param Infomation for downsampled chroma channels in X dimension
+// @param xChromeInfo : Infomation for downsampled chroma channels in X dimension
 Value *YCbCrConverter::reconstructLinearXChromaSample(XChromaSampleInfo &xChromaInfo) {
   YCbCrSampleInfo *sampleInfo = xChromaInfo.ycbcrInfo;
   Value *isEvenI = m_builder->CreateICmpEQ(
@@ -131,7 +131,7 @@ Value *YCbCrConverter::reconstructLinearXChromaSample(XChromaSampleInfo &xChroma
 // =====================================================================================================================
 // Create YCbCr Reconstruct linear XY chroma sample
 //
-// @param Infomation for downsampled chroma channels in XY dimension
+// @param xyChromeInfo : Information for downsampled chroma channels in XY dimension
 Value *YCbCrConverter::reconstructLinearXYChromaSample(XYChromaSampleInfo &xyChromaInfo) {
   YCbCrSampleInfo *sampleInfo = xyChromaInfo.ycbcrInfo;
 
@@ -871,7 +871,7 @@ Value *YCbCrConverter::convertColor(Type *resultTy, SamplerYCbCrModelConversion 
 // Implement transfer form  ST coordinates to UV coordiantes operation
 //
 // @param coordST : ST coords
-// @param scale : with/height
+// @param scale : With/height
 Value *YCbCrConverter::transferSTtoUVCoords(Value *coordST, Value *scale) {
   return m_builder->CreateFMul(coordST, scale);
 }

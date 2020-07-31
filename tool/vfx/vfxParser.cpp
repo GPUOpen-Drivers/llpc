@@ -597,7 +597,7 @@ Section *Document::createSection(const char *sectionName) {
 // =====================================================================================================================
 // Gets the pointer of sub section according to member name
 //
-// @param section : input section object
+// @param section : Input section object
 // @param lineNum : Line No.
 // @param memberName : Member name
 // @param memberType : Member type
@@ -924,7 +924,7 @@ bool parseDVec2(char *str, unsigned lineNum, IUFValue *output) {
 // @param str : Input string
 // @param lineNum : Current line number
 // @param isSign : True if it is signed integer
-// @param [in,out] bufMem : Buffer data
+// @param [in/out] bufMem : Buffer data
 bool parseIArray(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> &bufMem) {
   bool result = true;
 
@@ -963,7 +963,7 @@ bool parseIArray(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> 
 // @param str : Input string
 // @param lineNum : Current line number
 // @param isSign : True if it is signed integer
-// @param [in,out] bufMem : Buffer data
+// @param [in/out] bufMem : Buffer data
 bool parseI64Array(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> &bufMem) {
   bool result = true;
 
@@ -1002,7 +1002,7 @@ bool parseI64Array(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t
 //
 // @param str : Input string
 // @param lineNum : Current line number
-// @param [in,out] bufMem : Buffer data
+// @param [in/out] bufMem : Buffer data
 bool parseFArray(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
   bool result = true;
 
@@ -1031,7 +1031,7 @@ bool parseFArray(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
 //
 // @param str : Input string
 // @param lineNum : Current line number
-// @param [in,out] bufMem : Buffer data
+// @param [in/out] bufMem : Buffer data
 bool parseF16Array(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
   bool result = true;
 
@@ -1063,7 +1063,7 @@ bool parseF16Array(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
 //
 // @param str : Input string
 // @param lineNum : Current line number
-// @param [in,out] bufMem : Buffer data
+// @param [in/out] bufMem : Buffer data
 bool parseDArray(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
   bool result = true;
 

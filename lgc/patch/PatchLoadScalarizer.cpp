@@ -71,7 +71,7 @@ void PatchLoadScalarizer::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
-// @param [in,out] function : Function that will run this optimization.
+// @param [in/out] function : Function that will run this optimization.
 bool PatchLoadScalarizer::runOnFunction(Function &function) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Load-Scalarizer-Opt\n");
 

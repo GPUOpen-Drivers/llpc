@@ -223,7 +223,7 @@ Pipeline *LgcContext::createPipeline() {
 // because it always uses BuilderRecorder.
 //
 // @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
-// @param useBuilderRecorder : true to use BuilderRecorder, false to use BuilderImpl
+// @param useBuilderRecorder : True to use BuilderRecorder, false to use BuilderImpl
 Builder *LgcContext::createBuilder(Pipeline *pipeline, bool useBuilderRecorder) {
   if (!pipeline || useBuilderRecorder || EmitLgc)
     return Builder::createBuilderRecorder(this, pipeline, EmitLgc);
@@ -253,7 +253,7 @@ void LgcContext::preparePassManager(legacy::PassManager *passMgr) {
 // =====================================================================================================================
 // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
 //
-// @param [in/out] passMgr : pass manager to add passes to
+// @param [in/out] passMgr : Pass manager to add passes to
 // @param codeGenTimer : Timer to time target passes with, nullptr if not timing
 // @param [out] outStream : Output stream
 void LgcContext::addTargetPasses(lgc::PassManager &passMgr, Timer *codeGenTimer, raw_pwrite_stream &outStream) {

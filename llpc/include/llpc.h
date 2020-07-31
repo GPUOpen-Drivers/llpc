@@ -145,7 +145,7 @@ public:
   ///                         data will be copied and instead the size required for serialization will be returned
   ///                         in pSize.
   ///
-  /// @returns Success if data was serialized successfully, Unknown if fail to do serialize.
+  /// @returns : Success if data was serialized successfully, Unknown if fail to do serialize.
   virtual Result Serialize(void *pBlob, size_t *pSize) = 0;
 
   /// Merges the provided source shader caches' content into this shader cache.
@@ -153,7 +153,7 @@ public:
   /// @param [in]  srcCacheCount  Count of source shader caches to be merged.
   /// @param [in]  ppSrcCaches    Pointer to an array of pointers to shader cache objects.
   ///
-  /// @returns Success if data of source shader caches was merged successfully, OutOfMemory if the internal allocator
+  /// @returns : Success if data of source shader caches was merged successfully, OutOfMemory if the internal allocator
   ///          memory cannot be allocated.
   virtual Result Merge(unsigned srcCacheCount, const IShaderCache **ppSrcCaches) = 0;
 
@@ -176,10 +176,10 @@ public:
   ///
   /// @param [in]  optionCount    Count of compilation-option strings
   /// @param [in]  options        An array of compilation-option strings
-  /// @param [out] ppCompiler     Pointer to the created pipeline compiler object
+  /// @param [out] ppCompiler : Pointer to the created pipeline compiler object
   /// @param [in]  pCache         Pointer to the ICache object
   ///
-  /// @returns Result::Success if successful. Other return codes indicate failure.
+  /// @returns : Result::Success if successful. Other return codes indicate failure.
   static Result VKAPI_CALL Create(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options,
                                   ICompiler **ppCompiler, Vkgc::ICache *pCache = nullptr);
 
@@ -187,7 +187,7 @@ public:
   ///
   /// @parame [in] format  Vertex attribute format
   ///
-  /// @return TRUE if the specified format is supported by fetch shader. Otherwise, FALSE is returned.
+  /// @returns : True if the specified format is supported by fetch shader. Otherwise, FALSE is returned.
   static bool VKAPI_CALL IsVertexFormatSupported(VkFormat format);
 
   /// Destroys the pipeline compiler.
@@ -198,34 +198,34 @@ public:
   /// param [in] pTarget                  Color target including color buffer format
   /// param [in] enableAlphaToCoverage    Whether enable AlphaToCoverage
   ///
-  /// @return unsigned type casted from fragment shader export format.
+  /// @returns : Unsigned type casted from fragment shader export format.
   virtual unsigned ConvertColorBufferFormatToExportFormat(const ColorTarget *pTarget,
                                                           const bool enableAlphaToCoverage) const = 0;
 
   /// Build shader module from the specified info.
   ///
   /// @param [in]  pShaderInfo    Info to build this shader module
-  /// @param [out] pShaderOut     Output of building this shader module
+  /// @param [out] pShaderOut : Output of building this shader module
   ///
-  /// @returns Result::Success if successful. Other return codes indicate failure.
+  /// @returns : Result::Success if successful. Other return codes indicate failure.
   virtual Result BuildShaderModule(const ShaderModuleBuildInfo *pShaderInfo,
                                    ShaderModuleBuildOut *pShaderOut) const = 0;
 
   /// Build graphics pipeline from the specified info.
   ///
   /// @param [in]  pPipelineInfo  Info to build this graphics pipeline
-  /// @param [out] pPipelineOut   Output of building this graphics pipeline
+  /// @param [out] pPipelineOut : Output of building this graphics pipeline
   ///
-  /// @returns Result::Success if successful. Other return codes indicate failure.
+  /// @returns : Result::Success if successful. Other return codes indicate failure.
   virtual Result BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pPipelineInfo,
                                        GraphicsPipelineBuildOut *pPipelineOut, void *pPipelineDumpFile = nullptr) = 0;
 
   /// Build compute pipeline from the specified info.
   ///
   /// @param [in]  pPipelineInfo  Info to build this compute pipeline
-  /// @param [out] pPipelineOut   Output of building this compute pipeline
+  /// @param [out] pPipelineOut : Output of building this compute pipeline
   ///
-  /// @returns Result::Success if successful. Other return codes indicate failure.
+  /// @returns : Result::Success if successful. Other return codes indicate failure.
   virtual Result BuildComputePipeline(const ComputePipelineBuildInfo *pPipelineInfo,
                                       ComputePipelineBuildOut *pPipelineOut, void *pPipelineDumpFile = nullptr) = 0;
 
@@ -233,9 +233,9 @@ public:
   /// Creates a shader cache object with the requested properties.
   ///
   /// @param [in]  pCreateInfo    Create info of the shader cache.
-  /// @param [out] ppShaderCache  Constructed shader cache object.
+  /// @param [out] ppShaderCache : Constructed shader cache object.
   ///
-  /// @returns Success if the shader cache was successfully created. Otherwise, ErrorOutOfMemory is returned.
+  /// @returns : Success if the shader cache was successfully created. Otherwise, ErrorOutOfMemory is returned.
   virtual Result CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache) = 0;
 #endif
 

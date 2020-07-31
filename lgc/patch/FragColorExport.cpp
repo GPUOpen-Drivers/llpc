@@ -511,7 +511,7 @@ bool LowerFragColorExport::runOnModule(Module &module) {
       break;
     }
   }
-  if (retInst == nullptr)
+  if (!retInst)
     return false;
 
   BuilderBase builder(module.getContext());
@@ -677,7 +677,7 @@ Value *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPoint
   SmallVector<ColorExportInfo, 8> info;
   for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
     Value *output = exportValues[hwColorTarget];
-    if (output == nullptr)
+    if (!output)
       continue;
     const ColorExportValueInfo &colorExportInfo = expFragColors[hwColorTarget];
     info.push_back({hwColorTarget, colorExportInfo.location, colorExportInfo.isSigned, output->getType()});

@@ -74,8 +74,8 @@ ConfigBuilderBase::~ConfigBuilderBase() {
 // =====================================================================================================================
 /// Adds the .shaders.$(apiStage).hardware_mapping node to the PAL metadata.
 ///
-/// @param [in] apiStage The API shader stage
-/// @param [in] hwStages The HW stage(s) that the API shader is mapped to, as a combination of
+/// @param [in] apiStage : The API shader stage
+/// @param [in] hwStages : The HW stage(s) that the API shader is mapped to, as a combination of
 ///                      @ref Util::Abi::HardwareStageFlagBits.
 void ConfigBuilderBase::addApiHwShaderMapping(ShaderStage apiStage, unsigned hwStages) {
   auto hwMappingNode = getApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping].getArray(true);
@@ -284,8 +284,8 @@ void ConfigBuilderBase::setEsGsLdsSize(unsigned value) {
 // =====================================================================================================================
 /// Append a single entry to the PAL register metadata.
 ///
-/// @param [in] key The metadata key (usually a register address).
-/// @param [in] value The metadata value.
+/// @param [in] key : The metadata key (usually a register address).
+/// @param [in] value : The metadata value.
 void ConfigBuilderBase::appendConfig(unsigned key, unsigned value) {
   assert(key != InvalidMetadataKey);
 
@@ -298,7 +298,7 @@ void ConfigBuilderBase::appendConfig(unsigned key, unsigned value) {
 // =====================================================================================================================
 /// Append an array of entries to the PAL register metadata. Invalid keys are filtered out.
 ///
-/// @param [in] config The array of register metadata entries.
+/// @param [in] config : The array of register metadata entries.
 void ConfigBuilderBase::appendConfig(ArrayRef<PalMetadataNoteEntry> config) {
   unsigned count = 0;
 

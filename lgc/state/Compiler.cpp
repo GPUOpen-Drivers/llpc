@@ -146,7 +146,7 @@ Module *PipelineState::irLink(ArrayRef<std::pair<Module *, ShaderStage>> modules
 // @param otherElf : Optional ELF for the other half-pipeline when compiling an unlinked half-pipeline ELF.
 //                   Supplying this could allow more optimal code for writing/reading attribute values between
 //                   the two pipeline halves
-// @return : True for success.
+// @returns : True for success.
 //           False if irLink asked for an "unlinked" shader or half-pipeline, and there is some reason why the
 //           module cannot be compiled that way.  The client typically then does a whole-pipeline compilation
 //           instead. The client can call getLastError() to get a textual representation of the error, for
@@ -224,7 +224,7 @@ ElfLinker *PipelineState::createElfLinker(llvm::ArrayRef<llvm::MemoryBufferRef> 
 // it can be useful in avoiding an unnecessary shader compile before falling back to full-pipeline
 // compilation.
 //
-// @return : True for success, false if some reason for failure found, in which case getLastError()
+// @returns : True for success, false if some reason for failure found, in which case getLastError()
 //           returns a textual description
 bool PipelineState::checkElfLinkable() {
   return true;
@@ -243,7 +243,7 @@ void PipelineState::setError(const Twine &message) {
 // methods finding something about the shaders or pipeline state that means that shader compilation then
 // linking cannot be done. This error message is intended only for logging or command-line error reporting.
 //
-// @return : Error message from last such recoverable error; remains valid until next time generate() or
+// @returns : Error message from last such recoverable error; remains valid until next time generate() or
 //           one of the ElfLinker methods is called, or the Pipeline object is destroyed
 StringRef PipelineState::getLastError() {
   return m_lastError;

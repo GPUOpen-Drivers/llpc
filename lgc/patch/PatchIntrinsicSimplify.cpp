@@ -78,7 +78,7 @@ void PatchIntrinsicSimplify::getAnalysisUsage(AnalysisUsage &analysisUsage) cons
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM function.
 //
-// @param [in,out] func : LLVM function to be run on.
+// @param [in/out] func : LLVM function to be run on.
 bool PatchIntrinsicSimplify::runOnFunction(Function &func) {
   SmallVector<IntrinsicInst *, 32> candidateCalls;
   bool changed = false;

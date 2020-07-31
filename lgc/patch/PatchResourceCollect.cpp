@@ -72,7 +72,7 @@ PatchResourceCollect::PatchResourceCollect()
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool PatchResourceCollect::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 

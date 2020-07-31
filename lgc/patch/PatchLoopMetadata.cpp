@@ -84,7 +84,7 @@ PatchLoopMetadata::PatchLoopMetadata()
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool PatchLoopMetadata::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass patch-loop-metadata\n");
 
