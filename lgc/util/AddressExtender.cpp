@@ -53,7 +53,7 @@ Instruction *AddressExtender::getFirstInsertionPt() {
 // @param highHalf : Value to use for high half; HighAddrPc to use PC
 // @param ptrTy : Type to cast pointer to
 // @param builder : IRBuilder to use, already set to the required insert point
-// @return : 64-bit pointer value
+// @returns : 64-bit pointer value
 Instruction *AddressExtender::extend(Value *addr32, unsigned highHalf, Type *ptrTy, IRBuilder<> &builder) {
   Value *ptr = nullptr;
   if (highHalf == HighAddrPc) {

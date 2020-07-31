@@ -75,7 +75,7 @@ public:
   // internally compiled. The client only needs to call this if it wants to cache the glue code's blob.
   //
   // @param glueIndex : Index into the array that was returned by getGlueInfo()
-  // @return : The blob. A zero-length blob indicates that a recoverable error occurred, and link() will also return
+  // @returns : The blob. A zero-length blob indicates that a recoverable error occurred, and link() will also return
   //           and empty ELF blob.
   virtual llvm::StringRef compileGlue(unsigned glueIndex) = 0;
 
@@ -84,7 +84,7 @@ public:
   // Like other LGC and LLVM library functions, an internal compiler error could cause an assert or report_fatal_error.
   //
   // @param [out] outStream : Stream to write linked ELF to
-  // @return : True for success.
+  // @returns : True for success.
   //           False if there is some reason why the pipeline cannot be linked from unlinked shader/half-pipeline
   //           ELFs. The client typically then does a whole-pipeline compilation instead. The client can call
   //           getLastError() to get a textual representation of the error, for use in logging or in error

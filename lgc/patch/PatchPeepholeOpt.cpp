@@ -69,7 +69,7 @@ PatchPeepholeOpt::PatchPeepholeOpt() : FunctionPass(ID) {
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
-// @param [in,out] function : Function that we will peephole optimize.
+// @param [in/out] function : Function that we will peephole optimize.
 bool PatchPeepholeOpt::runOnFunction(Function &function) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Peephole-Opt\n");
 
@@ -89,7 +89,7 @@ bool PatchPeepholeOpt::runOnFunction(Function &function) {
 // =====================================================================================================================
 // Specify what analysis passes this pass depends on.
 //
-// @param [in,out] analysisUsage : The place to record our analysis pass usage requirements.
+// @param [in/out] analysisUsage : The place to record our analysis pass usage requirements.
 void PatchPeepholeOpt::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.setPreservesCFG();
 }

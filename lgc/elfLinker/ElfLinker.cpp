@@ -299,7 +299,7 @@ void ElfLinkerImpl::addGlue(unsigned glueIndex, StringRef blob) {
 // internally compiled. The client only needs to call this if it wants to cache the glue code's blob.
 //
 // @param glueIndex : Index into the array that was returned by getGlueInfo()
-// @return : The blob. A zero-length blob indicates that a recoverable error occurred, and link() will also return
+// @returns : The blob. A zero-length blob indicates that a recoverable error occurred, and link() will also return
 //           and empty ELF blob.
 StringRef ElfLinkerImpl::compileGlue(unsigned glueIndex) {
   return m_glueShaders[glueIndex]->getElfBlob();
@@ -318,7 +318,7 @@ StringRef ElfLinkerImpl::compileGlue(unsigned glueIndex) {
 //    made by LLVM to avoid memory leaks.
 //
 // @param [out] outStream : Stream to write linked ELF to
-// @return : True for success, false if something about the pipeline state stops linking
+// @returns : True for success, false if something about the pipeline state stops linking
 bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
   // Insert glue shaders (if any).
   if (!insertGlueShaders())
@@ -493,7 +493,7 @@ unsigned ElfLinkerImpl::getStringIndex(StringRef string) {
 // Find symbol in output ELF
 //
 // @param nameIndex : Index of symbol name in string table
-// @return : Index in symbol table, or 0 if not found
+// @returns : Index in symbol table, or 0 if not found
 unsigned ElfLinkerImpl::findSymbol(unsigned nameIndex) {
   for (auto &sym : getSymbols()) {
     if (sym.st_name == nameIndex)
@@ -523,7 +523,7 @@ uint64_t ElfLinkerImpl::getRelocValue(object::RelocationRef reloc) {
 //
 // @param elfInput : ElfInput object for the ELF input
 // @param section : Section from that input
-// @return : {outputSectionIdx,withinIdx} pair, both elements UINT_MAX if no contribution to an output section
+// @returns : {outputSectionIdx,withinIdx} pair, both elements UINT_MAX if no contribution to an output section
 std::pair<unsigned, unsigned> ElfLinkerImpl::findInputSection(ElfInput &elfInput, object::SectionRef section) {
   unsigned idx = section.getIndex();
   if (idx >= elfInput.sectionMap.size())
@@ -585,7 +585,7 @@ void ElfLinkerImpl::writePalMetadata() {
 // =====================================================================================================================
 // Insert glue shaders (if any).
 //
-// @return : False if a recoverable error occurred and was reported with setError().
+// @returns : False if a recoverable error occurred and was reported with setError().
 bool ElfLinkerImpl::insertGlueShaders() {
   // Ensure glue code is compiled, and insert them as new input shaders.
   for (auto &glueShader : m_glueShaders) {

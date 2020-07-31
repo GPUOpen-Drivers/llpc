@@ -112,11 +112,11 @@ namespace llvm {
 
 class raw_pwrite_stream;
 /// \brief Translate LLVM module to SPIRV and write to ostream.
-/// \returns true if succeeds.
+/// @returns : True if succeeds.
 bool writeSpirv(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
 
 /// \brief Load SPIRV from istream and translate to LLVM module.
-/// \returns true if succeeds.
+/// @returns : True if succeeds.
 bool readSpirv(lgc::Builder *Builder, const Vkgc::ShaderModuleUsage *ModuleData,
                const Vkgc::PipelineShaderOptions *ShaderOptions, std::istream &IS, spv::ExecutionModel EntryExecModel,
                const char *EntryName, const SPIRV::SPIRVSpecConstMap &SpecConstMap,

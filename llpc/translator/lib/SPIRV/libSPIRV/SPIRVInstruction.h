@@ -229,7 +229,7 @@ public:
     if (L != ~0U)
       Lit.insert(L);
   }
-  /// \return Expected number of operands. If the instruction has variable
+  /// @returns : Expected number of operands. If the instruction has variable
   /// number of words, return the minimum.
   SPIRVWord getExpectedNumOperands() const {
     assert(WordCount > 0 && "Word count not initialized");
@@ -2451,7 +2451,7 @@ public:
     return MappedConst;
   }
   void mapToConstant(SPIRVValue *Const) {
-    assert(MappedConst == nullptr && "OpSpecConstantOp mapped twice");
+    assert(!MappedConst && "OpSpecConstantOp mapped twice");
     MappedConst = Const;
   }
 protected:

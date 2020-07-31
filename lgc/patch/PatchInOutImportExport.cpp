@@ -87,7 +87,7 @@ void PatchInOutImportExport::initPerShader() {
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool PatchInOutImportExport::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-In-Out-Import-Export\n");
 
@@ -4189,7 +4189,7 @@ Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, un
 // =====================================================================================================================
 // Reads value from LDS.
 //
-// @param isOutput : is the value from output variable
+// @param isOutput : Is the value from output variable
 // @param readTy : Type of value read from LDS
 // @param ldsOffset : Start offset to do LDS read operations
 // @param insertPos : Where to insert read instructions

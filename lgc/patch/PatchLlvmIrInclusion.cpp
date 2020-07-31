@@ -59,7 +59,7 @@ PatchLlvmIrInclusion::PatchLlvmIrInclusion() : Patch(ID) {
 // This pass includes LLVM IR as a separate section in the ELF binary by inserting a new global variable with explicit
 // section.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool PatchLlvmIrInclusion::runOnModule(Module &module) {
   Patch::init(&module);
 

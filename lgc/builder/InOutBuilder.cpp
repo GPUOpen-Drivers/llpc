@@ -747,7 +747,7 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param instName : Name to give instruction(s)
-// @return : Value of input; nullptr if not handled here
+// @returns : Value of input; nullptr if not handled here
 Value *InOutBuilder::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   switch (builtIn) {
   case BuiltInBaseVertex:

@@ -61,7 +61,7 @@ SpirvLowerMemoryOp::SpirvLowerMemoryOp() : SpirvLower(ID) {
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool SpirvLowerMemoryOp::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Memory-Op\n");
 

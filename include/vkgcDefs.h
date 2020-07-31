@@ -763,7 +763,7 @@ public:
   /// @param [in]  pDumpDir                 Directory of pipeline dump
   /// @param [in]  pipelineInfo             Info of the pipeline to be built
   ///
-  /// @returns The handle of pipeline dump file
+  /// @returns : The handle of pipeline dump file
   static void *VKAPI_CALL BeginPipelineDump(const PipelineDumpOptions *pDumpOptions, PipelineBuildInfo pipelineInfo);
 
   /// Ends to dump graphics/compute pipeline info.
@@ -788,27 +788,27 @@ public:
   ///
   /// @param [in]  pModuleData   Pointer to the shader module data.
   ///
-  /// @returns Hash code associated this shader module.
+  /// @returns : Hash code associated this shader module.
   static uint64_t VKAPI_CALL GetShaderHash(const void *pModuleData);
 
   /// Calculates graphics pipeline hash code.
   ///
   /// @param [in]  pPipelineInfo  Info to build this graphics pipeline
   ///
-  /// @returns Hash code associated this graphics pipeline.
+  /// @returns : Hash code associated this graphics pipeline.
   static uint64_t VKAPI_CALL GetPipelineHash(const GraphicsPipelineBuildInfo *pPipelineInfo);
 
   /// Calculates compute pipeline hash code.
   ///
   /// @param [in]  pPipelineInfo  Info to build this compute pipeline
   ///
-  /// @returns Hash code associated this compute pipeline.
+  /// @returns : Hash code associated this compute pipeline.
   static uint64_t VKAPI_CALL GetPipelineHash(const ComputePipelineBuildInfo *pPipelineInfo);
 
   /// Gets graphics pipeline name.
   ///
   /// @param [in]  pPipelineInfo  Info to build this graphics pipeline
-  /// @param [out] pPipeName      The full name of this graphics pipeline
+  /// @param [out] pPipeName : The full name of this graphics pipeline
   /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
   static void VKAPI_CALL GetPipelineName(const GraphicsPipelineBuildInfo *pPipelineInfo, char *pPipeName,
                                          const size_t nameBufSize);
@@ -816,7 +816,7 @@ public:
   /// Gets compute pipeline name.
   ///
   /// @param [in]  pPipelineInfo  Info to build this compute pipeline
-  /// @param [out] pPipeName      The full name of this compute pipeline
+  /// @param [out] pPipeName : The full name of this compute pipeline
   /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
   static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo *pPipelineInfo, char *pPipeName,
                                          const size_t nameBufSize);
@@ -846,10 +846,11 @@ public:
   ///
   /// Valid handles are always non-null.
   ///
-  /// \param hash the hash key for the cache entry
-  /// \param allocateOnMiss if true, a new cache entry will be allocated when none is found
-  /// \param pHandle will be filled with a handle to the cache entry on Success, NotReady and allocateOnMiss if NotFound
-  /// \return success code, possible values:
+  /// @param hash : The hash key for the cache entry
+  /// @param allocateOnMiss : If true, a new cache entry will be allocated when none is found
+  /// @param pHandle : Will be filled with a handle to the cache entry on Success, NotReady and allocateOnMiss if
+  /// NotFound
+  /// @returns : Success code, possible values:
   ///   * Success: an existing, ready entry was found
   ///   * NotReady: an existing entry was found, but it is not ready yet because another thread
   ///               is working on filling it
@@ -864,15 +865,15 @@ public:
   /// method without first calling SetValue.
   /// Put can be called multiple times if the Entry is empty.
   ///
-  /// \param rawHandle the handle to cache entry to be released
+  /// @param rawHandle : The handle to cache entry to be released
   virtual void ReleaseEntry(RawEntryHandle rawHandle) = 0;
 
   /// \brief Wait for a cache entry to become ready (populated by another thread).
   ///
   /// This block the current thread until the entry becomes ready.
   ///
-  /// \param rawHandle the handle to the cache entry to be wait.
-  /// \return success code, possible values:
+  /// @param rawHandle : The handle to the cache entry to be wait.
+  /// @returns : Success code, possible values:
   ///   * Success: the entry is now ready
   ///   * ErrorXxx: some internal error has occurred, or populating the cache was not successful
   ///               (e.g. due to a compiler error). The operation was semantically a no-op:
@@ -881,13 +882,13 @@ public:
 
   /// \brief Retrieve the value contents of a cache entry.
   ///
-  /// \param rawHandle the handle to the cache entry
-  /// \param pData if non-null, up to *pDataLen bytes of contents of the cache entry will be copied
+  /// @param rawHandle : The handle to the cache entry
+  /// @param pData : If non-null, up to *pDataLen bytes of contents of the cache entry will be copied
   ///              into the memory pointed to by pData
-  /// \param pDataLen if \p pData is non-null, the caller must set *pDataLen to the space available
+  /// @param pDataLen : If \p pData is non-null, the caller must set *pDataLen to the space available
   ///                 in the memory that it points to. The method will store the total size of the
   ///                 cache entry in *pDataLen.
-  /// \return success code, possible values:
+  /// @returns : Success code, possible values:
   ///   * Success: operation completed successfully
   ///   * NotReady: the entry is not ready yet (waiting to be populated by another thread)
   ///   * ErrorXxx: some internal error has occurred. The operation was semantically a no-op.
@@ -895,11 +896,11 @@ public:
 
   /// \brief Zero-copy retrieval of the value contents of a cache entry.
   ///
-  /// \param handle the handle to the cache entry
-  /// \param ppData will be set to a pointer to the cache value contents. The pointer remains
+  /// @param handle : The handle to the cache entry
+  /// @param ppData : Will be set to a pointer to the cache value contents. The pointer remains
   ///               valid until the handle is released via \ref PutEntry.
-  /// \param pDataLen will be set to the total size of the cache entry in *pDataLen.
-  /// \return success code, possible values:
+  /// @param pDataLen : Will be set to the total size of the cache entry in *pDataLen.
+  /// @returns : Success code, possible values:
   ///   * Success: operation completed successfully
   ///   * Unsupported: this implementation does not support zero-copy, the caller must use
   ///                  \ref GetValue instead
@@ -914,11 +915,11 @@ public:
   ///
   /// The handle must still be released using \ref PutEntry after calling this method.
   ///
-  /// \param handle the handle to be populated
-  /// \param success whether computing the value contents was successful
-  /// \param pData pointer to the value contents
-  /// \param dataLen size of the value contents in bytes
-  /// \return success code, possible values:
+  /// @param handle : The handle to be populated
+  /// @param success : Whether computing the value contents was successful
+  /// @param pData : Pointer to the value contents
+  /// @param dataLen : Size of the value contents in bytes
+  /// @returns : Success code, possible values:
   ///   * Success: operation completed successfully
   ///   * ErrorXxx: some internal error has occurred. The caller must not call SetValue again,
   ///               but it must still release the handle via \ref PutEntry.
@@ -931,7 +932,7 @@ public:
   /// implementation is trivial.
   virtual Result ReleaseWithValue(RawEntryHandle rawHandle, bool success, const void *pData, size_t dataLen) {
     Result result = Result::ErrorUnknown;
-    if (rawHandle == nullptr)
+    if (!rawHandle)
       return result;
     result = SetValue(rawHandle, success, pData, dataLen);
     ReleaseEntry(rawHandle);

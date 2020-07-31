@@ -1633,9 +1633,9 @@ Value *BuilderRecorder::CreateSubgroupBallotFindMsb(Value *const value, const Tw
 // =====================================================================================================================
 // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector.
 //
-// @param x : left Value
-// @param y : right Value
-// @param a : wight Value
+// @param x : Left Value
+// @param y : Right Value
+// @param a : Wight Value
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::createFMix(Value *x, Value *y, Value *a, const Twine &instName) {
   return record(Opcode::FMix, x->getType(), {x, y, a}, instName);
@@ -1987,7 +1987,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
 // This does not have to be particularly efficient, as it is only used with the lgc command-line utility.
 //
 // @param name : Name of function declaration
-// @return : Opcode
+// @returns : Opcode
 BuilderRecorder::Opcode BuilderRecorder::getOpcodeFromName(StringRef name) {
   assert(name.startswith(BuilderCallPrefix));
   name = name.drop_front(strlen(BuilderCallPrefix));

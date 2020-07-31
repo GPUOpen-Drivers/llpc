@@ -1766,7 +1766,7 @@ Value *ImageBuilder::patchCubeDescriptor(Value *desc, unsigned dim) {
 //
 // @param coord : Coordinate, scalar or vector i32
 // @param flags : Image flags
-// @param [in,out] dim : Image dimension
+// @param [in/out] dim : Image dimension
 Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsigned &dim) {
   bool useViewIndex = false;
   if (flags & ImageFlagCheckMultiView) {

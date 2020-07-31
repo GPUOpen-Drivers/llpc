@@ -53,7 +53,7 @@ ModulePass *createPipelineShaders() {
 // This populates the shader array. In the pipeline module, a shader entrypoint is a non-internal function definition,
 // and it has metadata giving the SPIR-V execution model.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool PipelineShaders::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
 

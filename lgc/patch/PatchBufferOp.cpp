@@ -82,7 +82,7 @@ void PatchBufferOp::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM function.
 //
-// @param [in,out] function : LLVM function to be run on
+// @param [in/out] function : LLVM function to be run on
 bool PatchBufferOp::runOnFunction(Function &function) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
 

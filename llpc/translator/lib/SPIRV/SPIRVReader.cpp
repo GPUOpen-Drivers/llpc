@@ -5292,13 +5292,13 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
 // Set up address operand array for image sample/gather/fetch/read/write
 // builder call.
 //
-// \param BI The SPIR-V instruction
-// \param MaskIdx Operand number of mask operand
-// \param HasProj Whether there is an extra projective component in coordinate
-// \param Addr [in/out] image address array
-// \param ImageInfo [in/out] Decoded image type information; flags modified by
+// @param BI : The SPIR-V instruction
+// @param MaskIdx : Operand number of mask operand
+// @param HasProj : Whether there is an extra projective component in coordinate
+// @param [in/out] Addr : Image address array
+// @param [in/out] ImageInfo : Decoded image type information; flags modified by
 //        memory model image operands
-// \param Sample [out] Where to store sample number for OpImageFetch; nullptr to
+// @param [out] Sample : Where to store sample number for OpImageFetch; nullptr to
 //        ignore it
 void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskIdx, bool hasProj,
                                             MutableArrayRef<Value *> addr, ExtractedImageInfo *imageInfo,

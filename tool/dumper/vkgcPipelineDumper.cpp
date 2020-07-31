@@ -371,7 +371,7 @@ void PipelineDumper::EndPipelineDump(PipelineDumpFile *dumpFile) {
 //
 // @param userDataNode : User data nodes to be dumped
 // @param prefix : Prefix string for each line
-// @param [out] dumpFile : dump file
+// @param [out] dumpFile : Dump file
 void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userDataNode, const char *prefix,
                                              std::ostream &dumpFile) {
   dumpFile << prefix << ".type = " << userDataNode->type << "\n";
@@ -423,7 +423,7 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
 // Dumps pipeline shader info to file.
 //
 // @param shaderInfo : Shader info of specified shader stage
-// @param [out] dumpFile : dump file
+// @param [out] dumpFile : Dump file
 void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo, std::ostream &dumpFile) {
   const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
   auto moduleHash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
@@ -589,7 +589,7 @@ void PipelineDumper::DumpPipelineExtraInfo(PipelineDumpFile *dumpFile, const std
 // =====================================================================================================================
 // Dumps LLPC version info to file
 //
-// @param [out] dumpFile : dump file
+// @param [out] dumpFile : Dump file
 void PipelineDumper::dumpVersionInfo(std::ostream &dumpFile) {
   dumpFile << "[Version]\n";
   dumpFile << "version = " << Version << "\n\n";
@@ -600,7 +600,7 @@ void PipelineDumper::dumpVersionInfo(std::ostream &dumpFile) {
 //
 // @param pipelineInfo : Info of the graphics pipeline to be built
 // @param dumpDir : Directory of pipeline dump
-// @param [out] dumpFile : dump file
+// @param [out] dumpFile : Dump file
 void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipelineInfo, const char *dumpDir,
                                           std::ostream &dumpFile) {
   dumpFile << "[ComputePipelineState]\n";
@@ -614,7 +614,7 @@ void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipeli
 // Dumps pipeline options to file.
 //
 // @param options : Pipeline options
-// @param [out] dumpFile : dump file
+// @param [out] dumpFile : Dump file
 void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::ostream &dumpFile) {
   dumpFile << "options.includeDisassembly = " << options->includeDisassembly << "\n";
   dumpFile << "options.scalarBlockLayout = " << options->scalarBlockLayout << "\n";
@@ -652,7 +652,7 @@ void PipelineDumper::dumpComputePipelineInfo(std::ostream *dumpFile, const char 
 //
 // @param pipelineInfo : Info of the graphics pipeline to be built
 // @param dumpDir : Directory of pipeline dump
-// @param [out] dumpFile : dump file
+// @param [out] dumpFile : Dump file
 void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipelineInfo, const char *dumpDir,
                                            std::ostream &dumpFile) {
   dumpFile << "[GraphicsPipelineState]\n";
@@ -854,7 +854,7 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
 // Updates hash code context for vertex input state
 //
 // @param vertexInput : Vertex input state
-// @param [in,out] hasher : Haher to generate hash code
+// @param [in/out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
                                                    MetroHash64 *hasher) {
   if (vertexInput && vertexInput->vertexBindingDescriptionCount > 0) {
@@ -883,7 +883,7 @@ void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputSt
 //
 // @param pipeline : Info to build a graphics pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
-// @param [in,out] hasher : Hasher to generate hash code
+// @param [in/out] hasher : Hasher to generate hash code
 void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
                                                    MetroHash64 *hasher) {
   auto iaState = &pipeline->iaState;
@@ -953,7 +953,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 // Update hash code from fragment pipeline state
 //
 // @param pipeline : Info to build a graphics pipeline
-// @param [in,out] hasher : Hasher to generate hash code
+// @param [in/out] hasher : Hasher to generate hash code
 void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher) {
   auto rsState = &pipeline->rsState;
   hasher->Update(rsState->innerCoverage);
@@ -977,10 +977,10 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
 // =====================================================================================================================
 // Updates hash code context for pipeline shader stage.
 //
-// @param stage : shader stage
+// @param stage : Shader stage
 // @param shaderInfo : Shader info in specified shader stage
 // @param isCacheHash : TRUE if the hash is used by shader cache
-// @param [in,out] hasher : Haher to generate hash code
+// @param [in/out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo,
                                                      bool isCacheHash, MetroHash64 *hasher, bool isRelocatableShader) {
   if (shaderInfo->pModuleData) {
@@ -1077,7 +1077,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 //
 // @param userDataNode : Resource mapping node
 // @param isRootNode : TRUE if the node is in root level
-// @param [in,out] hasher : Haher to generate hash code
+// @param [in/out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
                                                       MetroHash64 *hasher, bool isRelocatableShader) {
   hasher->Update(userDataNode->type);

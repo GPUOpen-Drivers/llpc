@@ -496,7 +496,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 // =====================================================================================================================
 // Performs cleanup work for LLPC standalone tool.
 //
-// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
+// @param [in/out] compileInfo : Compilation info of LLPC standalone tool
 static void cleanupCompileInfo(CompileInfo *compileInfo) {
   for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i) {
     // NOTE: We do not have to free SPIR-V binary for pipeline info file.
@@ -803,7 +803,7 @@ static Result assembleSpirv(const std::string &inFilename, std::string &outFilen
 // Decodes the binary after building a pipeline and outputs the decoded info.
 //
 // @param pipelineBin : Pipeline binary
-// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
+// @param [in/out] compileInfo : Compilation info of LLPC standalone tool
 // @param isGraphics : Whether it is graphics pipeline
 static Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo, bool isGraphics) {
   // Ignore failure from ElfReader. It fails if pPipelineBin is not ELF, as happens with
@@ -823,7 +823,7 @@ static Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *c
 // Builds shader module based on the specified SPIR-V binary.
 //
 // @param compiler : LLPC compiler object
-// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
+// @param [in/out] compileInfo : Compilation info of LLPC standalone tool
 static Result buildShaderModules(const ICompiler *compiler, CompileInfo *compileInfo) {
   Result result = Result::Success;
 
@@ -851,7 +851,7 @@ static Result buildShaderModules(const ICompiler *compiler, CompileInfo *compile
 // Check autolayout compatible.
 //
 // @param compiler : LLPC compiler object
-// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
+// @param [in/out] compileInfo : Compilation info of LLPC standalone tool
 static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileInfo *compileInfo) {
   Result result = Result::Success;
 
@@ -927,7 +927,7 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
 // Builds pipeline and do linking.
 //
 // @param compiler : LLPC compiler object
-// @param [in,out] compileInfo : Compilation info of LLPC standalone tool
+// @param [in/out] compileInfo : Compilation info of LLPC standalone tool
 static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
   Result result = Result::Success;
 
@@ -1472,7 +1472,7 @@ static void findAllMatchFiles(const std::string &inFile, std::vector<std::string
 // Expands all input files in a platform-specific way.
 //
 // @param [out] expandedFilenames : Returned expanded input filenames.
-// @returns Result::Success on success, Result::ErrorInvalidValue when expansion fails.
+// @returns : Result::Success on success, Result::ErrorInvalidValue when expansion fails.
 static Result expandInputFilenames(std::vector<std::string> &expandedFilenames) {
   unsigned i = 0;
   for (const auto &inFile : InFiles) {

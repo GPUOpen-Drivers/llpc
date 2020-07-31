@@ -109,7 +109,7 @@ const char *lgc::getShaderStageAbbreviation(ShaderStage shaderStage) {
 // @param retTy : New return type, nullptr to use the same as in the original function
 // @param argTys : Types of new args
 // @param inRegMask : Bitmask of which args should be marked "inreg", to be passed in SGPRs
-// @return : The new function
+// @returns : The new function
 Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> argTys, uint64_t inRegMask) {
   // Gather all arg types: first the new ones, then the ones from the original function.
   FunctionType *oldFuncTy = oldFunc->getFunctionType();
@@ -182,7 +182,7 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
 //
 // @param callingConv : Which hardware shader stage
 // @param isFetchlessVs : Whether it is (or contains) a fetchless vertex shader
-// @return : The entry-point name, or "" if callingConv not recognized
+// @returns : The entry-point name, or "" if callingConv not recognized
 StringRef lgc::getEntryPointName(unsigned callingConv, bool isFetchlessVs) {
   StringRef entryName;
   switch (callingConv) {

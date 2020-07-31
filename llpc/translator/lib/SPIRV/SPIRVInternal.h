@@ -426,7 +426,7 @@ inline bool operator<(const SPIRVImageOpInfo &L, const SPIRVImageOpInfo &R) {
   return L.U32All < R.U32All;
 }
 
-/// \returns a vector of types for a collection of values.
+/// @returns : a vector of types for a collection of values.
 template <class T> std::vector<Type *> getTypes(T V) {
   std::vector<Type *> Tys;
   for (auto &I : V)

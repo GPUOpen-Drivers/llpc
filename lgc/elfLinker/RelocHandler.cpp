@@ -46,7 +46,7 @@ using namespace llvm;
 // @param [out] descSet : Value of first integer
 // @param [out] binding : Value of second integer
 // @param [out] typeLetter : Value of optional type letter, 0 if none
-// @return : True if parse successful
+// @returns : True if parse successful
 static bool parseDescSetBinding(StringRef str, unsigned &descSet, unsigned &binding, int &typeLetter) {
   typeLetter = 0;
   if (str.consumeInteger(10, descSet) || str.empty() || str[0] != '_')
@@ -67,7 +67,7 @@ static bool parseDescSetBinding(StringRef str, unsigned &descSet, unsigned &bind
 //
 // @param name : Symbol name used by relocation
 // @param [out] value : Returns value of symbol if found
-// @return : True if successful, false if not handled
+// @returns : True if successful, false if not handled
 bool RelocHandler::getValue(StringRef name, uint64_t &value) {
   if (name.startswith(reloc::DescriptorOffset)) {
     // Descriptor offset in bytes in the descriptor table for its set, or in the spill table if in the root table.

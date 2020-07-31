@@ -193,7 +193,7 @@ PatchEntryPointMutate::PatchEntryPointMutate() : Patch(ID), m_hasTs(false), m_ha
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool PatchEntryPointMutate::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
 
@@ -727,7 +727,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
 // @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs
 // @param [out] inRegMask : "Inreg" bit mask for the arguments, with a bit set to indicate that the corresponding
 //                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
-// @return : The newly-constructed function type
+// @returns : The newly-constructed function type
 //
 uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys) {
 
@@ -1148,7 +1148,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
 // @param useFixedLayout : True to insert padding before if required
 // @param userDataSize : Size so far of user data in dwords
 // @param builder : IRBuilder (just for getting types)
-// @return : Updated size so far of user data in dwords
+// @returns : Updated size so far of user data in dwords
 unsigned PatchEntryPointMutate::addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue,
                                                unsigned sizeInDwords, unsigned *argIndex, bool useFixedLayout,
                                                unsigned userDataSize, IRBuilder<> &builder) {

@@ -3367,8 +3367,8 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
 // @param module : LLVM module
 // @param streamId : ID of output vertex stream
 // @param threadIdInSubgroup : Thread ID in subgroup
-// @param [in,out] emitVertsPtr : Pointer to the counter of GS emitted vertices for this stream
-// @param [in,out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
+// @param [in/out] emitVertsPtr : Pointer to the counter of GS emitted vertices for this stream
+// @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *threadIdInSubgroup, Value *emitVertsPtr,
                                   Value *outVertsPtr) {
   auto gsEmitHandler = module->getFunction(lgcName::NggGsEmit);
@@ -3383,7 +3383,7 @@ void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *thre
 //
 // @param module : LLVM module
 // @param streamId : ID of output vertex stream
-// @param [in,out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
+// @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsCut(Module *module, unsigned streamId, Value *outVertsPtr) {
   auto gsCutHandler = module->getFunction(lgcName::NggGsCut);
   if (!gsCutHandler)

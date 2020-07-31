@@ -104,7 +104,7 @@ ModulePass *lgc::createPatchPreparePipelineAbi(bool onlySetCallingConvs) {
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool PatchPreparePipelineAbi::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Pipeline-Abi\n");
 

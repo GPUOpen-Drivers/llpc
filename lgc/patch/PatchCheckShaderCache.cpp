@@ -77,7 +77,7 @@ PatchCheckShaderCache::PatchCheckShaderCache() : Patch(ID) {
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
-// @param [in,out] module : LLVM module to be run on
+// @param [in/out] module : LLVM module to be run on
 bool PatchCheckShaderCache::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Check-Shader-Cache\n");
 
