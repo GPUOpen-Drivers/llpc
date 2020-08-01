@@ -161,7 +161,8 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
                                                   const Twine &instName) {
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
 #warning[!amd-gfx] Waterfall feature disabled
-  abort();
+  errs() << "Generating invalid waterfall loop code\n";
+  return nonUniformInst;
 #else
   assert(operandIdxs.empty() == false);
 
