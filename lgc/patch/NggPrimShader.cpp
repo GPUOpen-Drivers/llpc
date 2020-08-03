@@ -544,8 +544,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
       initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
-      // Record ES-GS vertex offsets info
-      m_nggFactor.esGsOffsets01 = esGsOffsets01;
+      // Record primitive connectivity data
+      m_nggFactor.primData = esGsOffsets01;
 
       if (distributePrimId) {
         auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.primCountInWave);
@@ -572,7 +572,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         // Distribute primitive ID
         auto vertexId0 =
             m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                       {m_nggFactor.esGsOffsets01, m_builder->getInt32(0), m_builder->getInt32(9)});
+                                       {m_nggFactor.primData, m_builder->getInt32(0), m_builder->getInt32(9)});
 
         unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionDistribPrimId);
 
@@ -931,8 +931,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       m_nggFactor.primShaderTableAddrHigh = primShaderTableAddrHigh;
 
       // Record ES-GS vertex offsets info
-      m_nggFactor.esGsOffsets01 = esGsOffsets01;
-      m_nggFactor.esGsOffsets23 = esGsOffsets23;
+      m_nggFactor.esGsOffset0 = CreateUBfe(esGsOffsets01, 0, 16);
+      m_nggFactor.esGsOffset1 = CreateUBfe(esGsOffsets01, 16, 16);
+      m_nggFactor.esGsOffset2 = CreateUBfe(esGsOffsets23, 0, 16);
 
       if (distributePrimId) {
         auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.primCountInWave);
@@ -953,15 +954,12 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         //   ES_GS_OFFSET01[31:16] = vertexId1 (in dwords)
         //   ES_GS_OFFSET01[15:0]  = vertexId0 (in dwords)
 
-        // Use vertex0 as provoking vertex to distribute primitive ID
-        auto esGsOffset0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                      {
-                                                          m_nggFactor.esGsOffsets01,
-                                                          m_builder->getInt32(0),
-                                                          m_builder->getInt32(16),
-                                                      });
+        const unsigned esGsRingItemSize =
+            m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+        assert(isPowerOf2_32(esGsRingItemSize));
 
-        auto vertexId0 = m_builder->CreateLShr(esGsOffset0, 2);
+        // Use vertex0 as provoking vertex to distribute primitive ID
+        auto vertexId0 = m_builder->CreateLShr(m_nggFactor.esGsOffset0, Log2_32(esGsRingItemSize));
 
         unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionDistribPrimId);
 
@@ -1208,29 +1206,13 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(cullingBlock);
 
-      Value *vertexId0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                    {
-                                                        m_nggFactor.esGsOffsets01,
-                                                        m_builder->getInt32(0),
-                                                        m_builder->getInt32(16),
-                                                    });
-      vertexId0 = m_builder->CreateLShr(vertexId0, 2);
+      const unsigned esGsRingItemSize =
+          m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+      assert(isPowerOf2_32(esGsRingItemSize));
 
-      Value *vertexId1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                    {
-                                                        m_nggFactor.esGsOffsets01,
-                                                        m_builder->getInt32(16),
-                                                        m_builder->getInt32(16),
-                                                    });
-      vertexId1 = m_builder->CreateLShr(vertexId1, 2);
-
-      Value *vertexId2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                    {
-                                                        m_nggFactor.esGsOffsets23,
-                                                        m_builder->getInt32(0),
-                                                        m_builder->getInt32(16),
-                                                    });
-      vertexId2 = m_builder->CreateLShr(vertexId2, 2);
+      auto vertexId0 = m_builder->CreateLShr(m_nggFactor.esGsOffset0, Log2_32(esGsRingItemSize));
+      auto vertexId1 = m_builder->CreateLShr(m_nggFactor.esGsOffset1, Log2_32(esGsRingItemSize));
+      auto vertexId2 = m_builder->CreateLShr(m_nggFactor.esGsOffset2, Log2_32(esGsRingItemSize));
 
       doCull = doCulling(module, vertexId0, vertexId1, vertexId2);
       m_builder->CreateBr(endCullingBlock);
@@ -1255,17 +1237,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(writeDrawFlagBlock);
 
-      auto esGsOffset0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                    {esGsOffsets01, m_builder->getInt32(0), m_builder->getInt32(16)});
-      auto vertexId0 = m_builder->CreateLShr(esGsOffset0, 2);
-
-      auto esGsOffset1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                    {esGsOffsets01, m_builder->getInt32(16), m_builder->getInt32(16)});
-      auto vertexId1 = m_builder->CreateLShr(esGsOffset1, 2);
-
-      auto esGsOffset2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                    {esGsOffsets23, m_builder->getInt32(0), m_builder->getInt32(16)});
-      auto vertexId2 = m_builder->CreateLShr(esGsOffset2, 2);
+      auto vertexId0 = m_builder->CreateLShr(m_nggFactor.esGsOffset0, 2);
+      auto vertexId1 = m_builder->CreateLShr(m_nggFactor.esGsOffset1, 2);
+      auto vertexId2 = m_builder->CreateLShr(m_nggFactor.esGsOffset2, 2);
 
       Value *vertexId[3] = {vertexId0, vertexId1, vertexId2};
 
@@ -1756,9 +1730,12 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     m_nggFactor.primShaderTableAddrHigh = primShaderTableAddrHigh;
 
     // Record ES-GS vertex offsets info
-    m_nggFactor.esGsOffsets01 = esGsOffsets01;
-    m_nggFactor.esGsOffsets23 = esGsOffsets23;
-    m_nggFactor.esGsOffsets45 = esGsOffsets45;
+    m_nggFactor.esGsOffset0 = CreateUBfe(esGsOffsets01, 0, 16);
+    m_nggFactor.esGsOffset1 = CreateUBfe(esGsOffsets01, 16, 16);
+    m_nggFactor.esGsOffset2 = CreateUBfe(esGsOffsets23, 0, 16);
+    m_nggFactor.esGsOffset3 = CreateUBfe(esGsOffsets23, 16, 16);
+    m_nggFactor.esGsOffset4 = CreateUBfe(esGsOffsets45, 0, 16);
+    m_nggFactor.esGsOffset5 = CreateUBfe(esGsOffsets45, 16, 16);
 
     auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
     m_builder->CreateCondBr(vertValid, beginEsBlock, endEsBlock);
@@ -2216,32 +2193,16 @@ void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
 
   if (m_nggControl->passthroughMode) {
     // Pass-through mode (primitive data has been constructed)
-    primData = m_nggFactor.esGsOffsets01;
+    primData = m_nggFactor.primData;
   } else {
     // Non pass-through mode (primitive data has to be constructed)
-    auto esGsOffset0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                  {
-                                                      m_nggFactor.esGsOffsets01,
-                                                      m_builder->getInt32(0),
-                                                      m_builder->getInt32(16),
-                                                  });
-    Value *vertexId0 = m_builder->CreateLShr(esGsOffset0, 2);
+    const unsigned esGsRingItemSize =
+        m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+    assert(isPowerOf2_32(esGsRingItemSize));
 
-    auto esGsOffset1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                  {
-                                                      m_nggFactor.esGsOffsets01,
-                                                      m_builder->getInt32(16),
-                                                      m_builder->getInt32(16),
-                                                  });
-    Value *vertexId1 = m_builder->CreateLShr(esGsOffset1, 2);
-
-    auto esGsOffset2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                  {
-                                                      m_nggFactor.esGsOffsets23,
-                                                      m_builder->getInt32(0),
-                                                      m_builder->getInt32(16),
-                                                  });
-    Value *vertexId2 = m_builder->CreateLShr(esGsOffset2, 2);
+    Value *vertexId0 = m_builder->CreateLShr(m_nggFactor.esGsOffset0, Log2_32(esGsRingItemSize));
+    Value *vertexId1 = m_builder->CreateLShr(m_nggFactor.esGsOffset1, Log2_32(esGsRingItemSize));
+    Value *vertexId2 = m_builder->CreateLShr(m_nggFactor.esGsOffset2, Log2_32(esGsRingItemSize));
 
     // NOTE: If the current vertex count in sub-group is less than the original value, then there must be
     // vertex culling. When vertex culling occurs, the vertex IDs should be fetched from LDS (compacted).
@@ -2893,33 +2854,12 @@ void NggPrimShader::runGs(Module *module, Argument *sysValueStart) {
 
   Value *userData = arg++;
 
-  Value *esGsOffsets01 = arg;
-  Value *esGsOffsets23 = (arg + 1);
   Value *gsPrimitiveId = (arg + 2);
   Value *invocationId = (arg + 3);
-  Value *esGsOffsets45 = (arg + 4);
 
   // NOTE: For NGG, GS invocation ID is stored in lowest 8 bits ([7:0]) and other higher bits are used for other
   // purposes according to GE-SPI interface.
   invocationId = m_builder->CreateAnd(invocationId, m_builder->getInt32(0xFF));
-
-  auto esGsOffset0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {esGsOffsets01, m_builder->getInt32(0), m_builder->getInt32(16)});
-
-  auto esGsOffset1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {esGsOffsets01, m_builder->getInt32(16), m_builder->getInt32(16)});
-
-  auto esGsOffset2 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {esGsOffsets23, m_builder->getInt32(0), m_builder->getInt32(16)});
-
-  auto esGsOffset3 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {esGsOffsets23, m_builder->getInt32(16), m_builder->getInt32(16)});
-
-  auto esGsOffset4 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {esGsOffsets45, m_builder->getInt32(0), m_builder->getInt32(16)});
-
-  auto esGsOffset5 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {esGsOffsets45, m_builder->getInt32(16), m_builder->getInt32(16)});
 
   std::vector<Value *> args;
 
@@ -2967,13 +2907,13 @@ void NggPrimShader::runGs(Module *module, Argument *sysValueStart) {
   args.push_back(waveId);
 
   // Set up system value VGPRs
-  args.push_back(esGsOffset0);
-  args.push_back(esGsOffset1);
+  args.push_back(m_nggFactor.esGsOffset0);
+  args.push_back(m_nggFactor.esGsOffset1);
   args.push_back(gsPrimitiveId);
-  args.push_back(esGsOffset2);
-  args.push_back(esGsOffset3);
-  args.push_back(esGsOffset4);
-  args.push_back(esGsOffset5);
+  args.push_back(m_nggFactor.esGsOffset2);
+  args.push_back(m_nggFactor.esGsOffset3);
+  args.push_back(m_nggFactor.esGsOffset4);
+  args.push_back(m_nggFactor.esGsOffset5);
   args.push_back(invocationId);
 
   assert(args.size() == gsArgCount); // Must have visit all arguments of ES entry point
@@ -5468,6 +5408,27 @@ Value *NggPrimShader::calcVertexItemOffset(unsigned streamId, Value *vertexId) {
 // @param blockName : Name of the new block
 BasicBlock *NggPrimShader::createBlock(Function *parent, const Twine &blockName) {
   return BasicBlock::Create(*m_context, blockName, parent);
+}
+
+// =====================================================================================================================
+// Extracts bitfield [offset, offset + count - 1] from the source value (int32). This is a substitute of the intrinsic
+// amdgcn_ubfe when the offset and count are both constants.
+//
+// @param value : Source value to extract
+// @param offset : Bit number of least-significant end of bitfield
+// @param count : Count of bits in bitfield
+// @returns : The extracted bitfied
+Value *NggPrimShader::CreateUBfe(Value *value, unsigned offset, unsigned count) {
+  assert(value->getType()->isIntegerTy(32));
+  assert(offset <= 31 && count >= 1 && offset + count - 1 <= 31);
+
+  if (count == 32)
+    return value; // Return the whole
+
+  if (offset == 0)
+    return m_builder->CreateAnd(value, (1U << count) - 1); // Just need mask
+
+  return m_builder->CreateAnd(m_builder->CreateLShr(value, offset), (1U << count) - 1);
 }
 
 } // namespace lgc
