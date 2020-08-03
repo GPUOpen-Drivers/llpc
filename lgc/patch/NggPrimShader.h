@@ -203,6 +203,8 @@ private:
 
   llvm::BasicBlock *createBlock(llvm::Function *parent, const llvm::Twine &blockName = "");
 
+  llvm::Value *CreateUBfe(llvm::Value *value, unsigned offset, unsigned count);
+
   static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
 
   PipelineState *m_pipelineState; // Pipeline state
@@ -235,9 +237,14 @@ private:
     llvm::Value *primShaderTableAddrHigh; // Primitive shader table address high
 
     // System values (VGPRs)
-    llvm::Value *esGsOffsets01; // ES-GS offset 0 and 1
-    llvm::Value *esGsOffsets23; // ES-GS offset 2 and 3
-    llvm::Value *esGsOffsets45; // ES-GS offset 4 and 5
+    llvm::Value *primData; // Primitive connectivity data (only for non-GS NGG pass-through mode)
+
+    llvm::Value *esGsOffset0; // ES-GS offset of vertex0
+    llvm::Value *esGsOffset1; // ES-GS offset of vertex1
+    llvm::Value *esGsOffset2; // ES-GS offset of vertex2
+    llvm::Value *esGsOffset3; // ES-GS offset of vertex3
+    llvm::Value *esGsOffset4; // ES-GS offset of vertex4
+    llvm::Value *esGsOffset5; // ES-GS offset of vertex5
 
   } m_nggFactor;
 
