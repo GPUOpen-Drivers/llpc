@@ -405,7 +405,6 @@ struct ResourceUsage {
       std::vector<FsInterpInfo> interpInfo;   // Array of interpolation info
       BasicType outputTypes[MaxColorTargets]; // Array of basic types of fragment outputs
       unsigned cbShaderMask;                  // CB shader channel mask (correspond to register CB_SHADER_MASK)
-      bool dummyExport;                       // Control to generate fragment shader dummy export
       bool isNullFs;                          // Is null FS, so should set final cbShaderMask to 0
     } fs;
   } inOutUsage;

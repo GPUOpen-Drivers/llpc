@@ -19,7 +19,7 @@ void main()
 ; SHADERTEST: call void @lgc.output.export.builtin.SampleMask.i32.a1i32
 ; SHADERTEST: call void @lgc.output.export.builtin.FragStencilRef
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.exp.f32
+; SHADERTEST: ret { <4 x float> }
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

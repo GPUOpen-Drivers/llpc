@@ -1,0 +1,36 @@
+// Test that when building relocatable shaders, that the color export shader contains exactly one export, which is for
+// the depth, and that the done flag is set.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: <color_export_shader>:
+; SHADERTEST-NEXT: exp mrtz v0, off, off, off done vm
+; SHADERTEST-NEXT: s_endpgm
+; END_SHADERTEST
+
+[Version]
+version = 40
+
+
+[VsGlsl]
+#version 450
+
+void main() {
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+
+layout(location = 0) out vec4 outputColor;
+
+void main() {
+	gl_FragDepth = 0;
+	outputColor = vec4(1.0, 1.0, 1.0, 0.0);
+}
+
+[FsInfo]
+entryPoint = main
+
