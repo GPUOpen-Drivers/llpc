@@ -33,6 +33,7 @@
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/patch/VertexFetch.h"
+#include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PassManagerCache.h"
 #include "lgc/state/ShaderStage.h"
 #include "lgc/state/TargetInfo.h"
@@ -140,6 +141,7 @@ private:
   // The encoded or hashed (in some way) single string version of the above.
   std::string m_shaderString;
   PipelineState *m_pipelineState; // The pipeline state.  Used to set meta data information.
+  bool m_killEnabled;             // True if this fragement shader has kill enabled.
 };
 } // anonymous namespace
 
@@ -337,10 +339,17 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
 
   memset(m_exportFormat, 0, sizeof(m_exportFormat));
   for (auto &exp : m_exports) {
+    if (exp.hwColorTarget == MaxColorTargets)
+      continue;
     m_exportFormat[exp.hwColorTarget] =
         static_cast<ExportFormat>(pipelineState->computeExportFormat(exp.ty, exp.location));
   }
   m_pipelineState = pipelineState;
+
+  PalMetadata *metadata = pipelineState->getPalMetadata();
+  DB_SHADER_CONTROL shaderControl = {};
+  shaderControl.u32All = metadata->getRegister(mmDB_SHADER_CONTROL);
+  m_killEnabled = shaderControl.bits.KILL_ENABLE;
 }
 
 // =====================================================================================================================
@@ -352,6 +361,7 @@ StringRef ColorExportShader::getString() {
     m_shaderString =
         StringRef(reinterpret_cast<const char *>(m_exports.data()), m_exports.size() * sizeof(ColorExportInfo)).str();
     m_shaderString += StringRef(reinterpret_cast<const char *>(m_exportFormat), sizeof(m_exportFormat)).str();
+    m_shaderString += StringRef(reinterpret_cast<const char *>(&m_killEnabled), sizeof(m_killEnabled));
   }
   return m_shaderString;
 }
@@ -373,19 +383,23 @@ Module *ColorExportShader::generate() {
   auto ret = cast<ReturnInst>(colorExportFunc->back().getTerminator());
   BuilderBase builder(ret);
 
-  Value *lastExport = nullptr;
+  SmallVector<Value *, 8> values(MaxColorTargets + 1, nullptr);
   for (unsigned idx = 0; idx != m_exports.size(); ++idx) {
-    const ColorExportInfo &exp = m_exports[idx];
-    Argument *output = colorExportFunc->getArg(idx);
-    ExportFormat expFmt = m_exportFormat[exp.hwColorTarget];
-    Value *currentExport = fragColorExport->run(output, exp.hwColorTarget, ret, expFmt, exp.isSigned);
-    if (currentExport) {
-      lastExport = currentExport;
+    values[m_exports[idx].hwColorTarget] = colorExportFunc->getArg(idx);
+  }
+
+  bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
+  fragColorExport->generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
+
+  bool hasDepthExpFmtZero = true;
+  for (auto &info : m_exports) {
+    if (info.hwColorTarget == MaxColorTargets) {
+      hasDepthExpFmtZero = false;
+      break;
     }
   }
-  if (lastExport)
-    FragColorExport::setDoneFlag(lastExport, builder);
-  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(m_exports, 0, 0);
+
+  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(m_exports, hasDepthExpFmtZero, m_killEnabled);
   return colorExportFunc->getParent();
 }
 

@@ -60,7 +60,7 @@ struct ColorExportValueInfo {
 // Pass to lower color export calls
 class LowerFragColorExport : public ModulePass {
 public:
-  LowerFragColorExport() : ModulePass(ID) {}
+  LowerFragColorExport() : ModulePass(ID), m_exportValues(MaxColorTargets + 1, nullptr) {}
   LowerFragColorExport(const LowerFragColorExport &) = delete;
   LowerFragColorExport &operator=(const LowerFragColorExport &) = delete;
 
@@ -76,13 +76,16 @@ public:
 private:
   void updateFragColors(CallInst *callInst, ColorExportValueInfo expFragColors[], BuilderBase &builder);
   Value *getOutputValue(ArrayRef<Value *> expFragColor, unsigned int location, BuilderBase &builder);
-  Value *addExportForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder);
-  CallInst *addExportForBuiltinOutput(Function *module, BuilderBase &builder);
-  Value *GenerateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder);
+  void collectExportInfoForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder);
+  void collectExportInfoForBuiltinOutput(Function *module, BuilderBase &builder);
+  Value *generateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder);
+  Value *generateReturn(Function *fragEntryPoint, BuilderBase &builder);
 
   LLVMContext *m_context;         // The context the pass is being run in.
   PipelineState *m_pipelineState; // The pipeline state
   ResourceUsage *m_resUsage;      // The resource usage object from the pipeline state.
+  SmallVector<ColorExportInfo, 8> m_info;  // The color export information for each export.
+  SmallVector<Value *, 10> m_exportValues; // The value to be exported indexed by the hw render target.
 };
 
 } // namespace
@@ -518,19 +521,28 @@ bool LowerFragColorExport::runOnModule(Module &module) {
   builder.SetInsertPoint(retInst);
 
   Value *lastExport = nullptr;
-  lastExport = addExportForBuiltinOutput(fragEntryPoint, builder);
-  Value *lastGenericExport = addExportForGenericOutputs(fragEntryPoint, builder);
-  if (lastGenericExport != nullptr) {
-    lastExport = lastGenericExport;
+  collectExportInfoForBuiltinOutput(fragEntryPoint, builder);
+  collectExportInfoForGenericOutputs(fragEntryPoint, builder);
+
+  bool willGenerateColorExportShader = m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();
+  if (willGenerateColorExportShader && !m_info.empty()) {
+    generateReturn(fragEntryPoint, builder);
+    return true;
   }
 
-  m_resUsage->inOutUsage.fs.dummyExport =
+  FragColorExport fragColorExport(m_context);
+  SmallVector<ExportFormat, 8> exportFormat(MaxColorTargets + 1, EXP_FORMAT_ZERO);
+  for (auto &exp : m_info) {
+    exportFormat[exp.hwColorTarget] =
+        static_cast<ExportFormat>(m_pipelineState->computeExportFormat(exp.ty, exp.location));
+  }
+  bool dummyExport =
       (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_resUsage->builtInUsage.fs.discard);
-  if (!lastExport && m_resUsage->inOutUsage.fs.dummyExport) {
-    lastExport = FragColorExport::addDummyExport(builder);
-  }
+  fragColorExport.generateExportInstructions(m_info, m_exportValues, exportFormat, dummyExport, builder);
 
-  FragColorExport::setDoneFlag(lastExport, builder);
+  const auto &builtInUsage = m_resUsage->builtInUsage.fs;
+  bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
+  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(m_info, hasDepthExpFmtZero, builtInUsage.discard);
   return lastExport != nullptr;
 }
 
@@ -621,13 +633,12 @@ Value *LowerFragColorExport::getOutputValue(ArrayRef<Value *> expFragColor, unsi
 }
 
 // =====================================================================================================================
-// Generates the export instructions for all of the generic output of the fragment shader fragEntryPoint.  Returns the
-// last export instruction that was generated or the new return instruction if a new one was generated.  Returns nullptr
-// if no export or return instructions were generated.
+// Collects the information needed to generate the export instructions for all of the generic outputs of the fragment
+// shader fragEntryPoint.  This infomration is stored in m_info and m_exportValues.
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
-Value *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder) {
+void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder) {
   std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(m_context));
   SmallVector<CallInst *, 8> colorExports;
 
@@ -642,13 +653,8 @@ Value *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPoint
     }
   }
 
-  if (colorExports.empty()) {
-    SmallVector<ColorExportInfo, 8> info;
-    const auto &builtInUsage = m_resUsage->builtInUsage.fs;
-    bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
-    m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(info, hasDepthExpFmtZero, builtInUsage.discard);
-    return nullptr;
-  }
+  if (colorExports.empty())
+    return;
 
   // Collect all of the values that need to be exported for each hardware color target.
   auto originalInsPos = builder.GetInsertPoint();
@@ -662,75 +668,58 @@ Value *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPoint
   // This insertion point should be the return instruction, so we know we can dereference the iterator.
   builder.SetInsertPoint(&*originalInsPos);
 
-  Value *exportValues[MaxColorTargets] = {};
-
   // Recombine the values being exported for each hw color target.
   for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
     unsigned location = m_resUsage->inOutUsage.fs.outputOrigLocs[hwColorTarget];
     if (location == InvalidValue)
-      exportValues[hwColorTarget] = nullptr;
+      m_exportValues[hwColorTarget] = nullptr;
     else
-      exportValues[hwColorTarget] = getOutputValue(expFragColors[hwColorTarget].value, location, builder);
+      m_exportValues[hwColorTarget] = getOutputValue(expFragColors[hwColorTarget].value, location, builder);
   }
 
   // Add the color export information to the palmetadata.
-  SmallVector<ColorExportInfo, 8> info;
   for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
-    Value *output = exportValues[hwColorTarget];
+    Value *output = m_exportValues[hwColorTarget];
     if (!output)
       continue;
     const ColorExportValueInfo &colorExportInfo = expFragColors[hwColorTarget];
-    info.push_back({hwColorTarget, colorExportInfo.location, colorExportInfo.isSigned, output->getType()});
+    m_info.push_back({hwColorTarget, colorExportInfo.location, colorExportInfo.isSigned, output->getType()});
   }
+}
 
-  if (info.empty()) {
-    const auto &builtInUsage = m_resUsage->builtInUsage.fs;
-    bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
-    m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(info, hasDepthExpFmtZero, builtInUsage.discard);
-    return nullptr;
-  }
-
-  if (!m_pipelineState->isUnlinked() || m_pipelineState->hasColorExportFormats()) {
-    // Whole-pipeline compilation (or shader compilation where we were given the color export formats).
-    // Lower each color export
-    CallInst *lastExport = nullptr;
-    for (const ColorExportInfo &colorExportInfo : info) {
-      Value *output = exportValues[colorExportInfo.hwColorTarget];
-      ExportFormat expFmt =
-          static_cast<ExportFormat>(m_pipelineState->computeExportFormat(colorExportInfo.ty, colorExportInfo.location));
-      Value *currentExport = fragColorExport->run(output, colorExportInfo.hwColorTarget, &*builder.GetInsertPoint(),
-                                                  expFmt, colorExportInfo.isSigned);
-      if (currentExport)
-        lastExport = dyn_cast<CallInst>(currentExport);
-    }
-    const auto &builtInUsage = m_resUsage->builtInUsage.fs;
-    bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
-    m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(info, hasDepthExpFmtZero, builtInUsage.discard);
-    return lastExport;
-  }
-
+// =====================================================================================================================
+// Generates a return instruction that will make all of the values for the exports available to the color export shader.
+// The color export information is added to the pal metadata, so that everything needed to generate the color export
+// shader is available.
+//
+// @param fragEntryPoint : The fragment shader to which we should add the export instructions.
+// @param builder : The builder object that will be used to create new instructions.
+Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBase &builder) {
   // Add the export info to be used when linking shaders to generate the color export shader and compute the spi shader
   // color format in the metadata.
-  m_pipelineState->getPalMetadata()->addColorExportInfo(info);
+  m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
 
-  // The export values should be returned.
-  // Update the return type of the function
   auto retInst = fragEntryPoint->back().getTerminator();
-  SmallVector<Type *, 4> outputTypes;
-  for (const ColorExportInfo &output : info) {
-    outputTypes.push_back(getVgprTy(output.ty));
+
+  // Fisrt build the return type for the fragment shader.
+  SmallVector<Type *, 8> outputTypes;
+  for (const ColorExportInfo &info : m_info) {
+    outputTypes.push_back(getVgprTy(info.ty));
   }
   Type *retTy = StructType::get(*m_context, outputTypes);
   addFunctionArgs(fragEntryPoint, retTy, {});
 
+  // Now build the return value.
   Value *retVal = UndefValue::get(retTy);
   unsigned returnLocation = 0;
-  for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; hwColorTarget++) {
-    Value *output = exportValues[hwColorTarget];
+  for (unsigned idx = 0; idx < m_info.size(); ++idx) {
+    const ColorExportInfo &info = m_info[idx];
+    unsigned hwColorTarget = info.hwColorTarget;
+    Value *output = m_exportValues[hwColorTarget];
     if (!output)
       continue;
-    if (output->getType() != outputTypes[hwColorTarget])
-      output = GenerateValueForOutput(output, outputTypes[hwColorTarget], builder);
+    if (output->getType() != outputTypes[idx])
+      output = generateValueForOutput(output, outputTypes[idx], builder);
     retVal = builder.CreateInsertValue(retVal, output, returnLocation);
     ++returnLocation;
   }
@@ -740,12 +729,12 @@ Value *LowerFragColorExport::addExportForGenericOutputs(Function *fragEntryPoint
 }
 
 // =====================================================================================================================
-// Generates the export instructions for builtin fragment outputs depth, stencil ref, and sample mask.  Returns the
-// last export instruction that was generated.  Returns nullptr if no export instructions were generated.
+// Collects the information need to generate the export instruction for the builtin fragment outputs depth, stencil ref,
+// and sample mask.  This infomration is added to m_info and m_exportValues.
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
-CallInst *LowerFragColorExport::addExportForBuiltinOutput(Function *module, BuilderBase &builder) {
+void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, BuilderBase &builder) {
   // Collect calls to the builtins
   Value *m_fragDepth = nullptr;
   Value *m_fragStencilRef = nullptr;
@@ -786,7 +775,7 @@ CallInst *LowerFragColorExport::addExportForBuiltinOutput(Function *module, Buil
   }
 
   if (!m_fragDepth && !m_fragStencilRef && !m_sampleMask) {
-    return nullptr;
+    return;
   }
 
   auto &builtInUsage = m_resUsage->builtInUsage.fs;
@@ -816,17 +805,18 @@ CallInst *LowerFragColorExport::addExportForBuiltinOutput(Function *module, Buil
     sampleMask = m_sampleMask;
   }
 
-  Value *args[] = {
-      builder.getInt32(EXP_TARGET_Z), // tgt
-      builder.getInt32(channelMask),  // en
-      fragDepth,                      // src0
-      fragStencilRef,                 // src1
-      sampleMask,                     // src2
-      undef,                          // src3
-      builder.getFalse(),             // done
-      builder.getTrue()               // vm
-  };
-  return builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args);
+  ColorExportInfo info = {};
+  info.hwColorTarget = MaxColorTargets;
+  info.location = channelMask;
+  info.isSigned = false;
+  info.ty = FixedVectorType::get(builder.getFloatTy(), 4);
+  m_info.push_back(info);
+
+  Value *output = UndefValue::get(info.ty);
+  output = builder.CreateInsertElement(output, fragDepth, static_cast<uint64_t>(0));
+  output = builder.CreateInsertElement(output, fragStencilRef, 1);
+  output = builder.CreateInsertElement(output, sampleMask, 2);
+  m_exportValues[MaxColorTargets] = output;
 }
 
 // =====================================================================================================================
@@ -872,12 +862,58 @@ void FragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
 }
 
 // =====================================================================================================================
+// Generates the export instructions based on the given color export infomration.
+//
+// @param info : The color export information for each color export in no particular order.
+// @param values : The values that are to be exported.  Indexed by the hw color target.
+// @param exportFormat : The export format for each color target. Indexed by the hw color target.
+// @param builder : The builder object that will be used to create new instructions.
+void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> info, ArrayRef<llvm::Value *> values,
+                                                 ArrayRef<ExportFormat> exportFormat, bool dummyExport,
+                                                 BuilderBase &builder) {
+  Value *lastExport = nullptr;
+  for (const ColorExportInfo &exp : info) {
+    Value *output = values[exp.hwColorTarget];
+    if (exp.hwColorTarget != MaxColorTargets) {
+      ExportFormat expFmt = exportFormat[exp.hwColorTarget];
+      Value *currentExport = run(output, exp.hwColorTarget, &*builder.GetInsertPoint(), expFmt, exp.isSigned);
+      if (currentExport) {
+        lastExport = currentExport;
+      }
+    } else {
+      auto undef = UndefValue::get(Type::getFloatTy(*m_context));
+      Value *fragDepth = builder.CreateExtractElement(output, static_cast<uint64_t>(0));
+      Value *fragStencilRef = builder.CreateExtractElement(output, 1);
+      Value *sampleMask = builder.CreateExtractElement(output, 2);
+      Value *args[] = {
+          builder.getInt32(EXP_TARGET_Z), // tgt
+          builder.getInt32(exp.location), // en
+          fragDepth,                      // src0
+          fragStencilRef,                 // src1
+          sampleMask,                     // src2
+          undef,                          // src3
+          builder.getFalse(),             // done
+          builder.getTrue()               // vm
+      };
+      lastExport = builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args);
+    }
+  }
+
+  if (!lastExport && dummyExport) {
+    lastExport = FragColorExport::addDummyExport(builder);
+  }
+
+  if (lastExport)
+    FragColorExport::setDoneFlag(lastExport, builder);
+}
+
+// =====================================================================================================================
 // Modified the given value so that it is of the given type.
 //
 // @param value : The value to be modified.
 // @param outputTy : The type that the value should be converted to.
 // @param builder : The builder object that will be used to create new instructions.
-Value *LowerFragColorExport::GenerateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder) {
+Value *LowerFragColorExport::generateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder) {
   unsigned originalSize = value->getType()->getPrimitiveSizeInBits();
   unsigned finalSize = outputTy->getPrimitiveSizeInBits();
   if (originalSize < finalSize) {

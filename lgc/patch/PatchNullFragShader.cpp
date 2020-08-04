@@ -148,7 +148,6 @@ bool PatchNullFragShader::runOnModule(Module &module) {
 
   // Add usage info for dummy output
   resUsage->inOutUsage.fs.cbShaderMask = 0;
-  resUsage->inOutUsage.fs.dummyExport = true;
   resUsage->inOutUsage.fs.isNullFs = true;
   resUsage->inOutUsage.outputLocMap[0] = InvalidValue;
 

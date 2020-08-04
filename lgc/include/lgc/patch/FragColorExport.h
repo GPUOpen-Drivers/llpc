@@ -33,6 +33,7 @@
 #include "lgc/BuilderBase.h"
 #include "lgc/Pipeline.h"
 #include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/util/Internal.h"
 
 namespace lgc {
@@ -59,6 +60,8 @@ public:
   llvm::Value *run(llvm::Value *output, unsigned int hwColorTarget, llvm::Instruction *insertPos, ExportFormat expFmt,
                    const bool signedness);
 
+  void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
+                                  llvm::ArrayRef<ExportFormat> exportFormat, bool dummyExport, BuilderBase &builder);
   static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
   static llvm::CallInst *addDummyExport(BuilderBase &builder);
 

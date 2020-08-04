@@ -63,7 +63,6 @@ ResourceUsage::ResourceUsage(ShaderStage shaderStage) {
     }
 
     inOutUsage.fs.cbShaderMask = 0;
-    inOutUsage.fs.dummyExport = true;
     inOutUsage.fs.isNullFs = false;
   }
 }
