@@ -74,6 +74,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
 //* |     41.0 | Moved resource mapping from ShaderPipeline-level to Pipeline-level                                    |
 //* |     40.4 | Added fp32DenormalMode in PipelineShaderOptions to allow overriding SPIR-V denormal settings          |
 //* |     40.3 | Added ICache interface                                                                                |
@@ -600,8 +601,12 @@ struct SamplerYCbCrConversionMetaData {
       unsigned xChromaOffset : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
       unsigned yChromaOffset : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
       unsigned xSubSampled : 1;   ///< true(1) or false(0)
-      unsigned ySubSampled : 1;   ///< true(1) or false(0)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 42
+      unsigned : 1; ///< Unused
+#else
       unsigned tileOptimal : 1;   ///< true(1) or false(0)
+#endif
+      unsigned ySubSampled : 1;   ///< true(1) or false(0)
       unsigned dstSelXYZW : 12;   ///< dst selection Swizzle
       unsigned undefined : 11;
     };

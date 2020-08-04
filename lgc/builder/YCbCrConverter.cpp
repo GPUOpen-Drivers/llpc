@@ -371,7 +371,7 @@ void YCbCrConverter::genImgDescChroma() {
 
     YCbCrAddressHandler addrHelper(m_builder, &proxySqRsrcRegHelper, m_gfxIp);
     addrHelper.genHeightAndPitch(m_metaData.word0.bitDepth.channelBitsR, 32, m_metaData.word2.bitCounts.xBitCount,
-                                 m_metaData.word1.tileOptimal, m_metaData.word1.planes);
+                                 m_metaData.word1.planes);
     proxySqRsrcRegHelper.setReg(SqRsrcRegs::Width,
                                 m_builder->CreateLShr(width, ConstantInt::get(m_builder->getInt32Ty(), 1)));
     proxySqRsrcRegHelper.setReg(SqRsrcRegs::DstSelXYZW, dstSelXYZW);

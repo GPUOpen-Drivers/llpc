@@ -51,7 +51,7 @@ public:
   void genBaseAddress(unsigned planeCount);
 
   // Generate height and pitch
-  void genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, bool isTileOptimal, unsigned planeNum);
+  void genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, unsigned planeNum);
 
   // Power2Align operation
   llvm::Value *power2Align(llvm::Value *x, unsigned align);
@@ -83,7 +83,6 @@ private:
   llvm::Value *m_pitchCb = nullptr;
   llvm::Value *m_heightCb = nullptr;
   llvm::Value *m_swizzleMode = nullptr;
-  llvm::Value *m_isTileOpt = nullptr;
   llvm::Value *m_one;
   GfxIpVersion *m_gfxIp;
 };
