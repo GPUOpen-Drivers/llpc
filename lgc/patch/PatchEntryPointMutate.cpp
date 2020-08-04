@@ -927,23 +927,26 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones
   // above, which go after the user data node args).
   if (userDataUsage->usesStreamOutTable || userDataUsage->isSpecialUserDataUsed(UserDataMapping::StreamOutTable)) {
-    auto userDataValue = UserDataMapping::StreamOutTable;
-    switch (m_shaderStage) {
-    case ShaderStageVertex:
-      userDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), userDataValue, &intfData->entryArgIdxs.vs.streamOutData.tablePtr));
-      break;
-    case ShaderStageTessEval:
-      userDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), userDataValue, &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
-      break;
-    // Allocate dummy stream-out register for Geometry shader
-    case ShaderStageGeometry:
-      userDataArgs.push_back(UserDataArg(builder.getInt32Ty()));
-      break;
-    default:
-      llvm_unreachable("Should never be called!");
-      break;
+    if (enableNgg || !m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage.enableXfb) {
+      // If no NGG, stream out table will be set to copy shader's user data entry, we should not set it duplicately.
+      auto userDataValue = UserDataMapping::StreamOutTable;
+      switch (m_shaderStage) {
+      case ShaderStageVertex:
+        userDataArgs.push_back(
+            UserDataArg(builder.getInt32Ty(), userDataValue, &intfData->entryArgIdxs.vs.streamOutData.tablePtr));
+        break;
+      case ShaderStageTessEval:
+        userDataArgs.push_back(
+            UserDataArg(builder.getInt32Ty(), userDataValue, &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
+        break;
+      // Allocate dummy stream-out register for Geometry shader
+      case ShaderStageGeometry:
+        userDataArgs.push_back(UserDataArg(builder.getInt32Ty()));
+        break;
+      default:
+        llvm_unreachable("Should never be called!");
+        break;
+      }
     }
   }
 }
