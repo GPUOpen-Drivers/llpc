@@ -73,9 +73,8 @@ struct SamplerYCbCrConversionMetaData {
       unsigned yChromaOffset : 1; // COSITED_EVEN(0) or MIDPOINT(1)
       unsigned xSubSampled : 1;   // true(1) or false(0)
       unsigned ySubSampled : 1;   // true(1) or false(0)
-      unsigned tileOptimal : 1;   // true(1) or false(0)
       unsigned dstSelXYZW : 12;   // dst selection Swizzle
-      unsigned undefined : 11;
+      unsigned undefined : 12;
     };
     unsigned u32All;
   } word1;

@@ -132,10 +132,8 @@ Value *YCbCrAddressHandler::power2Align(Value *x, unsigned align) {
 // @param bits : Channel bits
 // @param bpp : Bits per pixel
 // @param xBitCount : Effective channel bits
-// @param isTileOptimal : Is tiling optimal
 // @param planeNum : Number of planes
-void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, bool isTileOptimal,
-                                            unsigned planeNum) {
+void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, unsigned planeNum) {
   m_swizzleMode = m_regHandler->getReg(SqRsrcRegs::SwizzleMode);
 
   switch (m_gfxIp->major) {
@@ -159,20 +157,6 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
     // PitchCb = PitchCb * (xBitCount >> 3)
     m_pitchCb = m_builder->CreateMul(pitchHalf, m_builder->CreateLShr(m_builder->getInt32(xBitCount), 3));
 
-    if (isTileOptimal) {
-      m_isTileOpt = m_builder->CreateICmpNE(m_swizzleMode, m_builder->getInt32(0));
-
-      // PtchYOpt = PitchY * (bits[0] >> 3)
-      Value *ptchYOpt = m_builder->CreateMul(pitch, m_builder->CreateLShr(m_builder->getInt32(bits), 3));
-      // PitchY = IsTileOpt ? (PtchYOpt << 5) : PitchY
-      m_pitchY = m_builder->CreateSelect(m_isTileOpt, m_builder->CreateShl(ptchYOpt, m_builder->getInt32(5)), m_pitchY);
-
-      // PitchCbOpt = PitchCb * (bits[0] >> 3)
-      Value *pitchCbOpt = m_builder->CreateMul(pitchHalf, m_builder->CreateLShr(m_builder->getInt32(bits), 3));
-      // PitchCb = IsTileOpt ? (PitchCbOpt << 5) : PitchCb
-      m_pitchCb =
-          m_builder->CreateSelect(m_isTileOpt, m_builder->CreateShl(pitchCbOpt, m_builder->getInt32(5)), m_pitchCb);
-    }
     break;
   }
   case 10: {
@@ -201,29 +185,6 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
     // PitchCb = PitchCb * ElementBytes
     m_pitchCb = m_builder->CreateMul(m_pitchCb, m_builder->getInt32(elementBytes));
 
-    if (isTileOptimal) {
-      const unsigned log2BlkSize = 16;
-      const unsigned log2EleBytes = log2(bpp >> 3);
-      const unsigned log2NumEle = log2BlkSize - log2EleBytes;
-      const bool widthPrecedent = 1;
-      const unsigned log2Width = (log2NumEle + (widthPrecedent ? 1 : 0)) / 2;
-      const unsigned pitchAlignOpt = 1u << log2Width;
-      const unsigned heightAlignOpt = 1u << (log2NumEle - log2Width);
-
-      // PitchY = PitchY * ElementBytes
-      Value *ptchYOpt = m_builder->CreateMul(power2Align(width, pitchAlignOpt), m_builder->getInt32(elementBytes));
-
-      // PitchCb = PitchCb * ElementBytes
-      Value *pitchCbOpt =
-          m_builder->CreateMul(power2Align(widthHalf, pitchAlignOpt), m_builder->getInt32(elementBytes));
-
-      m_isTileOpt = m_builder->CreateICmpNE(m_swizzleMode, m_builder->getInt32(0));
-      m_pitchY = m_builder->CreateSelect(m_isTileOpt, ptchYOpt, m_pitchY);
-      m_heightY = m_builder->CreateSelect(m_isTileOpt, power2Align(height, heightAlignOpt), height);
-
-      m_pitchCb = m_builder->CreateSelect(m_isTileOpt, pitchCbOpt, m_pitchCb);
-      m_heightCb = m_builder->CreateSelect(m_isTileOpt, power2Align(heightHalf, heightAlignOpt), heightHalf);
-    }
     break;
   }
   default:
