@@ -45,10 +45,6 @@
 #include <iostream>
 #include "spirvExt.h"
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 39
-#define Vkgc Llpc
-#endif
-
 namespace llvm {
 // llvm::Pass initialization functions need to be declared before inclusion of
 // PassSupport.h.

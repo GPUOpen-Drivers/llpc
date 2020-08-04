@@ -56,12 +56,8 @@
 #endif
 #endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 32
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 40
 #error LLPC client version is too old
-#endif
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 39
-#define Vkgc Llpc
 #endif
 
 #ifndef LLPC_ENABLE_SHADER_CACHE
@@ -212,10 +208,7 @@ enum class ResourceMappingNodeType : unsigned {
   PushConst,                 ///< Push constant
   DescriptorBufferCompact,   ///< Compact buffer descriptor, only contains the buffer address
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 40
   DescriptorReserved12,
-#elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 29
-#endif
   DescriptorYCbCrSampler, ///< Generic descriptor: YCbCr sampler
   Count,                  ///< Count of resource mapping node types.
 };
@@ -487,24 +480,18 @@ struct NggState {
   unsigned vertsPerSubgroup; ///< Preferred number of vertices consumed by a primitive shader sub-group
 };
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
 /// ShaderHash represents a 128-bit client-specified hash key which uniquely identifies a shader program.
 struct ShaderHash {
   uint64_t lower; ///< Lower 64 bits of hash key.
   uint64_t upper; ///< Upper 64 bits of hash key.
 };
-#else
-typedef uint64_t ShaderHash;
-#endif
 
 /// Represents per shader stage options.
 struct PipelineShaderOptions {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
   ShaderHash clientHash; ///< Client-supplied unique shader hash. A value of zero indicates that LLPC should
                          ///  calculate its own hash. This hash is used for dumping, shader replacement, SPP, etc.
                          ///  If the client provides this hash, they are responsible for ensuring it is as stable
                          ///  as possible.
-#endif
   bool trapPresent;           ///< Indicates a trap handler will be present when this pipeline is executed,
                               ///  and any trap conditions encountered in this shader should call the trap
                               ///  handler. This could include an arithmetic exception, an explicit trap
@@ -538,21 +525,19 @@ struct PipelineShaderOptions {
   /// Force loop unroll count. "0" means using default value; "1" means disabling loop unroll.
   unsigned forceLoopUnrollCount;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
   /// Enable LLPC load scalarizer optimization.
   bool enableLoadScalarizer;
-#endif
-  bool allowVaryWaveSize; ///< If set, lets the pipeline vary the wave sizes.
+  /// If set, lets the pipeline vary the wave sizes.
+  bool allowVaryWaveSize;
   /// Use the LLVM backend's SI scheduler instead of the default scheduler.
   bool useSiScheduler;
 
   // Whether update descriptor root offset in ELF
   bool updateDescInElf;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
   /// Disable the the LLVM backend's LICM pass.
   bool disableLicm;
-#endif
+
   /// Default unroll threshold for LLVM.
   unsigned unrollThreshold;
 
@@ -669,7 +654,7 @@ struct GraphicsPipelineBuildInfo {
   void *pUserData;                ///< User data
   OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
   ICache *cache;                  ///< ICache, used to search for the compiled shader data
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+#if LLPC_ENABLE_SHADER_CACHE
   IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
 #endif
   PipelineShaderInfo vs;  ///< Vertex shader
@@ -734,7 +719,7 @@ struct ComputePipelineBuildInfo {
   void *pUserData;                ///< User data
   OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
   ICache *cache;                  ///< ICache, used to search for the compiled shader data
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+#if LLPC_ENABLE_SHADER_CACHE
   IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
 #endif
   unsigned deviceIndex;  ///< Device index for device group

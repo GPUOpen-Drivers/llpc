@@ -146,12 +146,6 @@ static opt<std::string> ExecutableName("executable-name", desc("Executable file 
 // -enable-spirv-opt: enable optimization for SPIR-V binary
 opt<bool> EnableSpirvOpt("enable-spirv-opt", desc("Enable optimization for SPIR-V binary"), init(false));
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 37
-// -enable-dynamic-loop-unroll: Enable dynamic loop unroll. (Deprecated)
-opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dynamic loop unroll (deprecated)"),
-                                  init(false));
-#endif
-
 // -enable-shader-module-opt: Enable translate & lower phase in shader module build.
 opt<bool> EnableShaderModuleOpt("enable-shader-module-opt",
                                 cl::desc("Enable translate & lower phase in shader module build."), init(false));
@@ -810,14 +804,14 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     if (context->isGraphics()) {
       auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
       cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+#if LLPC_ENABLE_SHADER_CACHE
       userShaderCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
       userCache = pipelineInfo->cache;
     } else {
       auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
       cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, true);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+#if LLPC_ENABLE_SHADER_CACHE
       userShaderCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
       userCache = pipelineInfo->cache;
@@ -1225,7 +1219,7 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, unsigned stageM
 
   IShaderCache *appCache = nullptr;
   auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+#if LLPC_ENABLE_SHADER_CACHE
   appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
   ICache *userCache = nullptr;
@@ -1456,7 +1450,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   ShaderEntryState cacheEntryState = ShaderEntryState::New;
   IShaderCache *appCache = nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+#if LLPC_ENABLE_SHADER_CACHE
   appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
   ICache *userCache = nullptr;
@@ -1585,7 +1579,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 
   ShaderEntryState cacheEntryState = ShaderEntryState::New;
   IShaderCache *appCache = nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+#if LLPC_ENABLE_SHADER_CACHE
   appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
 #endif
   ICache *userCache = nullptr;
@@ -1735,7 +1729,7 @@ Result Compiler::validatePipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   return result;
 }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38 || LLPC_ENABLE_SHADER_CACHE
+#if LLPC_ENABLE_SHADER_CACHE
 // =====================================================================================================================
 // Creates shader cache object with the requested properties.
 // @param : Shader cache create info.

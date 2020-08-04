@@ -62,16 +62,6 @@ inline unsigned compact32(const Hash *hash) {
   return hash->dwords[3] ^ hash->dwords[2] ^ hash->dwords[1] ^ hash->dwords[0];
 }
 
-// Compacts a 64-bit hash checksum into a 32-bit one by XOR'ing each 32-bit chunk together.
-//
-// Takes input parameter hash, which is 64-bit hash to be compacted.
-//
-// Returns 32-bit hash value based on the inputted 64-bit hash.
-inline unsigned compact32(uint64_t hash) {
-  return static_cast<unsigned>(hash) ^ static_cast<unsigned>(hash >> 32);
-}
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
 // Compacts a 128-bit hash into a 32-bit one by XOR'ing each 32-bit chunk together.
 //
 // Takes input parameter ShaderHash, which is a struct consisting of 2 quad words to be compacted.
@@ -81,6 +71,5 @@ inline unsigned compact32(Vkgc::ShaderHash hash) {
   return (static_cast<unsigned>(hash.lower) ^ static_cast<unsigned>(hash.lower >> 32) ^
           static_cast<unsigned>(hash.upper) ^ static_cast<unsigned>(hash.upper >> 32));
 }
-#endif
 
 } // namespace MetroHash
