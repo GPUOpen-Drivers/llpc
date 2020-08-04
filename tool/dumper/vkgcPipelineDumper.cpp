@@ -508,12 +508,8 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.useSiScheduler = " << shaderInfo->options.useSiScheduler << "\n";
   dumpFile << "options.updateDescInElf = " << shaderInfo->options.updateDescInElf << "\n";
   dumpFile << "options.allowVaryWaveSize = " << shaderInfo->options.allowVaryWaveSize << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
   dumpFile << "options.enableLoadScalarizer = " << shaderInfo->options.enableLoadScalarizer << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
   dumpFile << "options.disableLicm = " << shaderInfo->options.disableLicm << "\n";
-#endif
   dumpFile << "options.unrollThreshold = " << shaderInfo->options.unrollThreshold << "\n";
   dumpFile << "options.scalarThreshold = " << shaderInfo->options.scalarThreshold << "\n";
   dumpFile << "options.disableLoopUnroll = " << shaderInfo->options.disableLoopUnroll << "\n";
@@ -1056,12 +1052,8 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.useSiScheduler);
       hasher->Update(options.updateDescInElf);
       hasher->Update(options.allowVaryWaveSize);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
       hasher->Update(options.enableLoadScalarizer);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
       hasher->Update(options.disableLicm);
-#endif
       hasher->Update(options.unrollThreshold);
       hasher->Update(options.scalarThreshold);
       hasher->Update(options.disableLoopUnroll);

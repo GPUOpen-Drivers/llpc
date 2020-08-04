@@ -172,7 +172,6 @@ ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
   auto shaderInfo = getPipelineShaderInfo(stage);
   assert(shaderInfo);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
   if (shaderInfo->options.clientHash.upper != 0 && shaderInfo->options.clientHash.lower != 0)
     return shaderInfo->options.clientHash;
   else {
@@ -185,11 +184,6 @@ ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
     }
     return hash;
   }
-#else
-  const ShaderModuleData *pModuleData = reinterpret_cast<const ShaderModuleData *>(pShaderInfo->pModuleData);
-
-  return (!pModuleData) ? 0 : MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash *>(&pModuleData->hash));
-#endif
 }
 
 // =====================================================================================================================
@@ -320,14 +314,9 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       ShaderOptions shaderOptions = {};
 
       ShaderHash hash = getShaderHashCode(static_cast<ShaderStage>(stage));
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
       // 128-bit hash
       shaderOptions.hash[0] = hash.lower;
       shaderOptions.hash[1] = hash.upper;
-#else
-      // 64-bit hash
-      shaderOptions.hash[0] = hash;
-#endif
 
       const PipelineShaderInfo *shaderInfo = getPipelineShaderInfo(static_cast<ShaderStage>(stage));
       shaderOptions.trapPresent = shaderInfo->options.trapPresent;
@@ -369,14 +358,13 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       shaderOptions.loadScalarizerThreshold = 0;
       if (EnableScalarLoad)
         shaderOptions.loadScalarizerThreshold = ScalarThreshold;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+
       if (shaderInfo->options.enableLoadScalarizer) {
         if (shaderInfo->options.scalarThreshold != 0)
           shaderOptions.loadScalarizerThreshold = shaderInfo->options.scalarThreshold;
         else
           shaderOptions.loadScalarizerThreshold = MaxScalarThreshold;
       }
-#endif
 
       shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo->options.useSiScheduler;
       shaderOptions.disableLicm = DisableLicm || shaderInfo->options.disableLicm;
