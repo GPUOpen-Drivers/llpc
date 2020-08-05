@@ -1711,8 +1711,6 @@ void PatchResourceCollect::matchGenericInOut() {
       auto &locMap = *locMapIt;
       if (m_shaderStage == ShaderStageFragment) {
         unsigned location = locMap.first;
-        if (m_pipelineState->getColorExportState().dualSourceBlendEnable && location == 1)
-          location = 0;
         if (!generatingColorExportShader &&
             m_pipelineState->getColorExportFormat(location).dfmt == BufDataFormatInvalid) {
           locMapIt = outLocMap.erase(locMapIt);

@@ -1832,8 +1832,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, Z_EXPORT_ENABLE, builtInUsage.fragDepth);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, STENCIL_TEST_VAL_EXPORT_ENABLE, builtInUsage.fragStencilRef);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, MASK_EXPORT_ENABLE, builtInUsage.sampleMask);
-  SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE,
-                (builtInUsage.sampleMask || m_pipelineState->getColorExportState().alphaToCoverageEnable == false));
+  SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE, 0); // Set during pipeline finalization.
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, fragmentMode.earlyFragmentTests);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                 (fragmentMode.earlyFragmentTests && resUsage->resourceWrite));
