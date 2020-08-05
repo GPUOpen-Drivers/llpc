@@ -872,7 +872,7 @@ void PipelineState::setColorExportState(ArrayRef<ColorExportFormat> formats, con
 //
 // @param location : Export location
 const ColorExportFormat &PipelineState::getColorExportFormat(unsigned location) {
-  if (m_colorExportState.dualSourceBlendEnable)
+  if (getColorExportState().dualSourceBlendEnable)
     location = 0;
 
   if (location >= m_colorExportFormats.size()) {
@@ -1085,7 +1085,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   GfxIpVersion gfxIp = getTargetInfo().getGfxIpVersion();
   auto gpuWorkarounds = &getTargetInfo().getGpuWorkarounds();
   unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<VectorType>(outputTy)->getNumElements()) - 1 : 1;
-  const auto cbState = &m_colorExportState;
+  const auto cbState = &getColorExportState();
   // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
   const bool enableAlphaToCoverage = (cbState->alphaToCoverageEnable && location == 0);
 

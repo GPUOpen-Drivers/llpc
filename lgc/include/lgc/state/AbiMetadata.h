@@ -310,7 +310,11 @@ union DB_SHADER_CONTROL {
   struct {
     unsigned int : 6;
     unsigned int KILL_ENABLE : 1;
-    unsigned int : 25;
+    unsigned int : 1;
+    unsigned int MASK_EXPORT_ENABLE : 1;
+    unsigned int : 2;
+    unsigned int ALPHA_TO_MASK_DISABLE : 1;
+    unsigned int : 20;
   } bitfields, bits;
   unsigned int u32All;
 };

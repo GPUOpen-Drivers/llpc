@@ -458,6 +458,15 @@ void PalMetadata::finalizePipeline() {
     paClClipCntl.bits.ZCLIP_FAR_DISABLE = depthClipDisable;
     paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
     setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
+
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
+      DB_SHADER_CONTROL dbShaderControl = {};
+      dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
+      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE =
+          dbShaderControl.bitfields.MASK_EXPORT_ENABLE ||
+          m_pipelineState->getColorExportState().alphaToCoverageEnable == false;
+      setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
+    }
   }
 
   // If there are root user data nodes but none of them are used, adjust userDataLimit accordingly.
