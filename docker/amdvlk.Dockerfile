@@ -33,21 +33,27 @@ SHELL ["/bin/bash", "-c"]
 # Use pip to install an up-to-date version of CMake. The apt package is
 # too old for LLVM.
 RUN apt-get update \
+    && TOOLCHAIN_PACKAGES="gcc g++ binutils-gold" \
+    && if echo "$FEATURES" | grep -q "+clang" ; then \
+         TOOLCHAIN_PACKAGES="clang-9 libclang-common-9-dev lld-9"; \
+       fi \
     && apt-get install -yqq --no-install-recommends \
-       build-essential pkg-config \
-       gcc g++ ninja-build binutils-gold \
-       clang-9 libclang-common-9-dev lld-9 \
+       build-essential pkg-config ninja-build \
+       $TOOLCHAIN_PACKAGES \
        python3 python3-distutils python3-pip \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
        libwayland-dev \
-       git repo curl vim-tiny \
+       git repo curl \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir --upgrade cmake \
-    && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10 \
-    && update-alternatives --install /usr/bin/lld lld /usr/bin/lld-9 10 \
-    && update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-9 10
+    && if echo "$FEATURES" | grep -q "+clang" ; then \
+         update-alternatives --install /usr/bin/lld lld /usr/bin/lld-9 10 ; \
+         update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-9 10 ; \
+       else \
+        update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10 ; \
+      fi
 
 # Checkout all repositories. Replace llpc with the version in LLPC_SOURCE_DIR.
 # The /vulkandriver/env.sh file is for extra env variables used by later commands.
