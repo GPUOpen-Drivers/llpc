@@ -33,7 +33,6 @@
 #include "NggLdsManager.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
-#include "lgc/util/Internal.h"
 #include "llvm/IR/Module.h"
 
 namespace lgc {

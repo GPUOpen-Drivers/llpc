@@ -146,10 +146,7 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 // @param stage : Shader stage
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param lowerTimer : Timer to time lower passes with, nullptr if not timing
-// @param forceLoopUnrollCount : 0 or force loop unroll count
-void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassManager &passMgr, Timer *lowerTimer,
-                           unsigned forceLoopUnrollCount
-) {
+void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassManager &passMgr, Timer *lowerTimer) {
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
   context->getLgcContext()->preparePassManager(&passMgr);
 
@@ -165,9 +162,6 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   passMgr.add(createAlwaysInlinerLegacyPass());
   passMgr.add(createGlobalDCEPass());
 
-  // Control loop unrolling
-  passMgr.add(createSpirvLowerLoopUnrollControl(forceLoopUnrollCount));
-
   // Lower SPIR-V access chain
   passMgr.add(createSpirvLowerAccessChain());
 
@@ -177,8 +171,8 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   // Lower SPIR-V constant immediate store.
   passMgr.add(createSpirvLowerConstImmediateStore());
 
-  // Lower SPIR-V algebraic transforms, constant folding must be done before instruction combining pass.
-  passMgr.add(createSpirvLowerAlgebraTransform(true, false));
+  // Lower SPIR-V constant folding - must be done before instruction combining pass.
+  passMgr.add(createSpirvLowerMathConstFolding());
 
   // Lower SPIR-V memory operations
   passMgr.add(createSpirvLowerMemoryOp());
@@ -197,8 +191,8 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createIPConstantPropagationPass());
 
-  // Lower SPIR-V algebraic transforms
-  passMgr.add(createSpirvLowerAlgebraTransform(false, true));
+  // Lower SPIR-V floating point optimisation
+  passMgr.add(createSpirvLowerMathFloatOp());
 
   // Lower SPIR-V instruction metadata remove
   passMgr.add(createSpirvLowerInstMetaRemove());

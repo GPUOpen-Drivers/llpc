@@ -31,7 +31,6 @@
 #include "PatchInOutImportExport.h"
 #include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
-#include "lgc/LgcContext.h"
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineShaders.h"
@@ -40,7 +39,6 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include <unordered_set>
 
 #define DEBUG_TYPE "lgc-patch-in-out-import-export"
 

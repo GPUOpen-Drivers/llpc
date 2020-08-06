@@ -48,12 +48,12 @@ class PassManager;
 
 class PassRegistry;
 void initializeSpirvLowerAccessChainPass(PassRegistry &);
-void initializeSpirvLowerAlgebraTransformPass(PassRegistry &);
+void initializeSpirvLowerMathConstFoldingPass(PassRegistry &);
+void initializeSpirvLowerMathFloatOpPass(PassRegistry &);
 void initializeSpirvLowerConstImmediateStorePass(PassRegistry &);
 void initializeSpirvLowerMemoryOpPass(PassRegistry &);
 void initializeSpirvLowerGlobalPass(PassRegistry &);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry &);
-void initializeSpirvLowerLoopUnrollControlPass(PassRegistry &);
 void initializeSpirvLowerResourceCollectPass(PassRegistry &);
 void initializeSpirvLowerTranslatorPass(PassRegistry &);
 } // namespace llvm
@@ -71,12 +71,12 @@ namespace Llpc {
 // @param passRegistry : Pass registry
 inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
   initializeSpirvLowerAccessChainPass(passRegistry);
-  initializeSpirvLowerAlgebraTransformPass(passRegistry);
   initializeSpirvLowerConstImmediateStorePass(passRegistry);
+  initializeSpirvLowerMathConstFoldingPass(passRegistry);
+  initializeSpirvLowerMathFloatOpPass(passRegistry);
   initializeSpirvLowerMemoryOpPass(passRegistry);
   initializeSpirvLowerGlobalPass(passRegistry);
   initializeSpirvLowerInstMetaRemovePass(passRegistry);
-  initializeSpirvLowerLoopUnrollControlPass(passRegistry);
   initializeSpirvLowerResourceCollectPass(passRegistry);
   initializeSpirvLowerTranslatorPass(passRegistry);
 }
@@ -84,12 +84,12 @@ inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
 class Context;
 
 llvm::ModulePass *createSpirvLowerAccessChain();
-llvm::ModulePass *createSpirvLowerAlgebraTransform(bool enableConstFolding, bool enableFloatOpt);
 llvm::ModulePass *createSpirvLowerConstImmediateStore();
+llvm::ModulePass *createSpirvLowerMathConstFolding();
+llvm::ModulePass *createSpirvLowerMathFloatOp();
 llvm::ModulePass *createSpirvLowerMemoryOp();
 llvm::ModulePass *createSpirvLowerGlobal();
 llvm::ModulePass *createSpirvLowerInstMetaRemove();
-llvm::ModulePass *createSpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount);
 llvm::ModulePass *createSpirvLowerResourceCollect(bool collectDetailUsage);
 llvm::ModulePass *createSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo);
 
@@ -103,8 +103,7 @@ public:
 
   // Add per-shader lowering passes to pass manager
   static void addPasses(Context *context, ShaderStage stage, llvm::legacy::PassManager &passMgr,
-                        llvm::Timer *lowerTimer, unsigned forceLoopUnrollCount
-                        );
+                        llvm::Timer *lowerTimer);
 
   static void removeConstantExpr(Context *context, llvm::GlobalVariable *global);
   static void replaceConstWithInsts(Context *context, llvm::Constant *const constVal);

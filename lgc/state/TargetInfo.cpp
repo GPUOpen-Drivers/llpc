@@ -280,6 +280,8 @@ static void setGfx10Info(TargetInfo *targetInfo) {
 
   // Hardware workarounds for GFX10 based GPU's:
   targetInfo->getGpuWorkarounds().gfx10.disableI32ModToI16Mod = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waLimitedMaxOutputVertexCount = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waGeNggMaxVertOutWithGsInstancing = 1;
 }
 
 // gfx1010 (including gfx101E and gfx101F)
@@ -295,6 +297,7 @@ static void setGfx1010Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waNsaCannotFollowWritelane = 1;
   targetInfo->getGpuWorkarounds().gfx10.waTessIncorrectRelativeIndex = 1;
   targetInfo->getGpuWorkarounds().gfx10.waSmemFollowedByVopc = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
 }
 
 // gfx1012

@@ -365,8 +365,12 @@ void PalMetadata::fixUpRegisters() {
   const ResourceNode *pushConstNode;
   for (const auto &node : m_pipelineState->getUserDataNodes()) {
     if (node.type == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
-      unsigned descSet = node.innerTable[0].set;
-      descSetNodes.resize(std::max(unsigned(descSetNodes.size()), descSet + 1));
+      size_t descSet = node.innerTable[0].set;
+      descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
+      descSetNodes[descSet] = &node;
+    } else if (node.type == ResourceNodeType::DescriptorBuffer) {
+      size_t descSet = node.set;
+      descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
       descSetNodes[descSet] = &node;
     } else if (node.type == ResourceNodeType::PushConst) {
       pushConstNode = &node;
@@ -429,23 +433,25 @@ void PalMetadata::finalizePipeline() {
   pipelineHashNode[0] = options.hash[0];
   pipelineHashNode[1] = options.hash[1];
 
-  // Set PA_CL_CLIP_CNTL from pipeline state settings.
-  bool depthClipDisable = !m_pipelineState->getViewportState().depthClipEnable;
-  uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-  bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
-  PA_CL_CLIP_CNTL paClClipCntl = {};
-  paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
-  paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
-  paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
-  paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
-  paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
-  paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
-  paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
-  paClClipCntl.bits.DX_CLIP_SPACE_DEF = true; // DepthRange::ZeroToOne
-  paClClipCntl.bits.ZCLIP_NEAR_DISABLE = depthClipDisable;
-  paClClipCntl.bits.ZCLIP_FAR_DISABLE = depthClipDisable;
-  paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
-  setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
+  if (m_pipelineState->isGraphics()) {
+    // Set PA_CL_CLIP_CNTL from pipeline state settings.
+    bool depthClipDisable = !m_pipelineState->getViewportState().depthClipEnable;
+    uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
+    bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
+    PA_CL_CLIP_CNTL paClClipCntl = {};
+    paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
+    paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
+    paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
+    paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
+    paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
+    paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
+    paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
+    paClClipCntl.bits.DX_CLIP_SPACE_DEF = true; // DepthRange::ZeroToOne
+    paClClipCntl.bits.ZCLIP_NEAR_DISABLE = depthClipDisable;
+    paClClipCntl.bits.ZCLIP_FAR_DISABLE = depthClipDisable;
+    paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
+    setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
+  }
 
   // If there are root user data nodes but none of them are used, adjust userDataLimit accordingly.
   if (m_userDataLimit->getUInt() == 0 && !m_pipelineState->getUserDataNodes().empty())

@@ -33,7 +33,6 @@
 #include "Gfx9Chip.h"
 #include "NggLdsManager.h"
 #include "lgc/Builder.h"
-#include "lgc/LgcContext.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
@@ -43,7 +42,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <functional>
 
 #define DEBUG_TYPE "lgc-patch-resource-collect"
 
@@ -123,49 +121,27 @@ void PatchResourceCollect::setNggControl(Module *module) {
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
     return;
 
-  unsigned stageMask = m_pipelineState->getShaderStageMask();
   const bool hasTs =
-      ((stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0);
-  const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
+      m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
+  const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
 
   // Check the use of cull distance for NGG primitive shader
   bool useCullDistance = false;
-  bool enableXfb = false;
   if (hasGs) {
     const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-    enableXfb = resUsage->inOutUsage.enableXfb;
+    useCullDistance = resUsage->builtInUsage.gs.cullDistance > 0;
+  } else if (hasTs) {
+    const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
+    useCullDistance = resUsage->builtInUsage.tes.cullDistance > 0;
   } else {
-    if (hasTs) {
-      const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
-      const auto &builtInUsage = resUsage->builtInUsage.tes;
-      useCullDistance = builtInUsage.cullDistance > 0;
-      enableXfb = resUsage->inOutUsage.enableXfb;
-    } else {
-      const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
-      const auto &builtInUsage = resUsage->builtInUsage.vs;
-      useCullDistance = builtInUsage.cullDistance > 0;
-      enableXfb = resUsage->inOutUsage.enableXfb;
-    }
+    const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+    useCullDistance = resUsage->builtInUsage.vs.cullDistance > 0;
   }
 
   const auto &options = m_pipelineState->getOptions();
   NggControl &nggControl = *m_pipelineState->getNggControl();
 
-  bool enableNgg = (options.nggFlags & NggFlagDisable) == 0;
-  if (enableXfb) {
-    // TODO: If transform feedback is enabled, disable NGG.
-    enableNgg = false;
-  }
-
-  if (hasGs && (options.nggFlags & NggFlagEnableGsUse) == 0) {
-    // NOTE: NGG used on GS is disabled by default
-    enableNgg = false;
-  }
-
-  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waNggDisabled)
-    enableNgg = false;
-
-  nggControl.enableNgg = enableNgg;
+  nggControl.enableNgg = canUseNgg(module);
   nggControl.enableGsUse = (options.nggFlags & NggFlagEnableGsUse);
   nggControl.alwaysUsePrimShaderTable = (options.nggFlags & NggFlagDontAlwaysUsePrimShaderTable) == 0;
   nggControl.compactMode = (options.nggFlags & NggFlagCompactDisable) ? NggCompactDisable : NggCompactVertices;
@@ -260,6 +236,57 @@ void PatchResourceCollect::setNggControl(Module *module) {
 }
 
 // =====================================================================================================================
+// Checks whether NGG could be enabled.
+//
+// @param [in/out] module : Module
+bool PatchResourceCollect::canUseNgg(Module *module) {
+  assert(m_pipelineState->isGraphics());
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
+
+  const bool hasTs =
+      m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
+  const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+
+  // If the workaround flag requests us to disable NGG, respect it. Hardware must have some limitations.
+  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waNggDisabled)
+    return false;
+
+  // NGG used on GS is disabled by default.
+  const auto &options = m_pipelineState->getOptions();
+  if (hasGs && (options.nggFlags & NggFlagEnableGsUse) == 0)
+    return false;
+
+  // TODO: If transform feedback is enabled, currently disable NGG.
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(
+      hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex));
+  if (resUsage->inOutUsage.enableXfb)
+    return false;
+
+  if (hasTs && hasGs) {
+    auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
+
+    // NOTE: On GFX10, when tessllation and geometry shader are both enabled, the lowest number of GS primitives per
+    // NGG subgroup is implicitly 3 (specified by HW). Thus, the maximum primitive amplification factor is therefore
+    // 256/3 = 85.
+    if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waLimitedMaxOutputVertexCount) {
+      static const unsigned MaxOutputVertices = Gfx9::NggMaxThreadsPerSubgroup / 3;
+      if (geometryMode.outputVertices > MaxOutputVertices)
+        return false;
+    }
+
+    // NOTE: On GFX10, the bit VGT_GS_INSTANCE_CNT.EN_MAX_VERT_OUT_PER_GS_INSTANCE provided by HW allows each GS
+    // instance to emit maximum vertices (256). But this mode is not supported when tessellation is enabled.
+    if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waGeNggMaxVertOutWithGsInstancing) {
+      if (geometryMode.invocations * geometryMode.outputVertices > Gfx9::NggMaxThreadsPerSubgroup)
+        return false;
+    }
+  }
+
+  // We can safely enable NGG here if NGG flag allows us to do so
+  return (options.nggFlags & NggFlagDisable) == 0;
+}
+
+// =====================================================================================================================
 // Checks whether NGG culling could be enabled.
 //
 // @param [in/out] module : Module
@@ -299,6 +326,15 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
   const auto polygonMode = m_pipelineState->getRasterizerState().polygonMode;
   if (polygonMode == PolygonModeLine || polygonMode == PolygonModePoint) {
     return false;
+  }
+
+  // Check resource usage, disable culling if there are resource write operations (including atomic operations) in
+  // non-GS NGG cases. This is because such write operations have side effect in execution sequences. But in GS NGG
+  // cases, we can still enable culling. Culling is performed after GS execution.
+  if (!hasGs) {
+    const auto resUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+    if (resUsage->resourceWrite)
+      return false;
   }
 
   // Check the presence of position export, disable NGG culling if position export is absent

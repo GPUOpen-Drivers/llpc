@@ -29,8 +29,6 @@
  ***********************************************************************************************************************
  */
 
-#include "Gfx6Chip.h"
-#include "Gfx9Chip.h"
 #include "lgc/BuilderBase.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
@@ -43,13 +41,9 @@
 #include "lgc/util/AddressExtender.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/InstVisitor.h"
-#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/Cloning.h"
 
 #define DEBUG_TYPE "lgc-patch-entry-point-mutate"
 
@@ -286,11 +280,11 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
               continue;
             }
             if (isa<LoadInst>(user) && !user->getType()->isAggregateType()) {
-              unsigned bitSize = user->getType()->getPrimitiveSizeInBits();
-              if (bitSize % 32 == 0) {
+              unsigned byteSize = module->getDataLayout().getTypeStoreSize(user->getType());
+              if (byteSize % 4 == 0) {
                 // This is a scalar or vector load with dword-aligned size. We can attempt to unspill it, but, for
                 // a particular dword offset, we only attempt to unspill ones with the same (minimum) size.
-                unsigned dwordSize = bitSize / 32;
+                unsigned dwordSize = byteSize / 4;
                 userDataUsage->pushConstOffsets.resize(
                     std::max(unsigned(userDataUsage->pushConstOffsets.size()), dwordOffset + 1));
                 auto &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
@@ -427,7 +421,14 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           for (Instruction *&load : pushConstOffset.users) {
             if (load && load->getFunction() == &func) {
               builder.SetInsertPoint(load);
-              Value *replacement = builder.CreateBitCast(arg, load->getType());
+              Value *replacement = nullptr;
+              if (!isa<PointerType>(load->getType()))
+                replacement = builder.CreateBitCast(arg, load->getType());
+              else {
+                // For a pointer, we need to bitcast to a single int first, then to the pointer.
+                replacement = builder.CreateBitCast(arg, builder.getIntNTy(arg->getType()->getPrimitiveSizeInBits()));
+                replacement = builder.CreateIntToPtr(replacement, load->getType());
+              }
               load->replaceAllUsesWith(replacement);
               load->eraseFromParent();
               load = nullptr;
@@ -672,7 +673,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
       std::min(resUsage->numSgprsAvailable, m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable);
 
   if (shaderOptions->maxThreadGroupsPerComputeUnit != 0) {
-    std::string wavesPerEu = std::string("0,") + std::to_string(shaderOptions->maxThreadGroupsPerComputeUnit);
+    std::string wavesPerEu = std::string("1,") + std::to_string(shaderOptions->maxThreadGroupsPerComputeUnit);
     builder.addAttribute("amdgpu-waves-per-eu", wavesPerEu);
   }
 
@@ -1218,7 +1219,9 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
         break;
       }
     }
-    m_pipelineState->getPalMetadata()->setUserDataSpillUsage(std::min(userDataUsage->spillUsage, minByteOffset / 4));
+    // In relocatable shader compilation userDataUsage is unknown until linking.
+    if (minByteOffset != UINT_MAX && !m_pipelineState->isUnlinked())
+      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(std::min(userDataUsage->spillUsage, minByteOffset / 4));
   }
 
   // Figure out how many sgprs we have available for userDataArgs.

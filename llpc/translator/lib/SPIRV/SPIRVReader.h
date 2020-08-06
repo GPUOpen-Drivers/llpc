@@ -70,7 +70,7 @@ class SPIRVToLLVM {
 public:
   SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
               llvm::ArrayRef<ConvertingSampler> convertingSamplers, lgc::Builder *builder,
-              const Vkgc::ShaderModuleUsage *moduleUsage);
+              const Vkgc::ShaderModuleUsage *moduleUsage, const Vkgc::PipelineShaderOptions *shaderOptions);
 
   DebugLoc getDebugLoc(SPIRVInstruction *bi, Function *f);
 
@@ -217,8 +217,9 @@ private:
   DenseMap<std::pair<SPIRVType *, unsigned>, Type *> m_overlappingStructTypeWorkaroundMap;
   DenseMap<std::pair<BasicBlock *, BasicBlock *>, unsigned> m_blockPredecessorToCount;
   const Vkgc::ShaderModuleUsage *m_moduleUsage;
+  const Vkgc::PipelineShaderOptions *m_shaderOptions;
   unsigned m_spirvOpMetaKindId;
-  Vkgc::ShaderStage m_shaderStage;
+  unsigned m_execModule;
   lgc::Builder *getBuilder() const { return m_builder; }
 
   Type *mapType(SPIRVType *bt, Type *t) {

@@ -24,19 +24,20 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerAlgebraTransform.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerAlgebraTransform.
+ * @file  llpcSpirvLowerMath.cpp
+ * @brief LLPC source file: implementations of Llpc::SpirvLowerMathConstFolding and Llpc::SpirvLowerMathFloatOp.
  ***********************************************************************************************************************
  */
-#include "llpcSpirvLowerAlgebraTransform.h"
 #include "SPIRVInternal.h"
 #include "hex_float.h"
 #include "llpcContext.h"
+#include "llpcSpirvLower.h"
 #include "lgc/Builder.h"
 #include "lgc/Pipeline.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/Debug.h"
@@ -44,40 +45,89 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Local.h"
 
-#define DEBUG_TYPE "llpc-spirv-lower-algebra-transform"
+#define DEBUG_TYPE_CONST_FOLDING "llpc-spirv-lower-math-const-folding"
+#define DEBUG_TYPE_FLOAT_OP "llpc-spirv-lower-math-float-op"
 
 using namespace lgc;
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 
-namespace Llpc {
+namespace {
+
+// =====================================================================================================================
+// SPIR-V lowering operations for math transformation.
+class SpirvLowerMath : public SpirvLower {
+public:
+  explicit SpirvLowerMath(char &ID)
+      : SpirvLower(ID), m_changed(false), m_fp16DenormFlush(false), m_fp32DenormFlush(false), m_fp64DenormFlush(false),
+        m_fp16RoundToZero(false) {}
+
+  void init(llvm::Module &module);
+
+  void flushDenormIfNeeded(llvm::Instruction *inst);
+  bool isOperandNoContract(llvm::Value *operand);
+  void disableFastMath(llvm::Value *value);
+
+  bool m_changed;         // Whether the module is changed
+  bool m_fp16DenormFlush; // Whether FP mode wants f16 denorms to be flushed to zero
+  bool m_fp32DenormFlush; // Whether FP mode wants f32 denorms to be flushed to zero
+  bool m_fp64DenormFlush; // Whether FP mode wants f64 denorms to be flushed to zero
+  bool m_fp16RoundToZero; // Whether FP mode wants f16 round-to-zero
+
+  SpirvLowerMath() = delete;
+  SpirvLowerMath(const SpirvLowerMath &) = delete;
+  SpirvLowerMath &operator=(const SpirvLowerMath &) = delete;
+};
+
+// =====================================================================================================================
+// SPIR-V lowering operations for math constant folding.
+class SpirvLowerMathConstFolding : public SpirvLowerMath {
+public:
+  SpirvLowerMathConstFolding() : SpirvLowerMath(ID) {}
+
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<llvm::TargetLibraryInfoWrapperPass>();
+  }
+
+  virtual bool runOnModule(llvm::Module &module) override;
+
+  static char ID;
+
+  SpirvLowerMathConstFolding(const SpirvLowerMathConstFolding &) = delete;
+  SpirvLowerMathConstFolding &operator=(const SpirvLowerMathConstFolding &) = delete;
+};
+
+// =====================================================================================================================
+// SPIR-V lowering operations for math floating point optimisation.
+class SpirvLowerMathFloatOp : public SpirvLowerMath, public llvm::InstVisitor<SpirvLowerMathFloatOp> {
+public:
+  SpirvLowerMathFloatOp() : SpirvLowerMath(ID) {}
+
+  virtual bool runOnModule(llvm::Module &module) override;
+  virtual void visitBinaryOperator(llvm::BinaryOperator &binaryOp);
+  virtual void visitUnaryOperator(llvm::UnaryOperator &unaryOp);
+  virtual void visitCallInst(llvm::CallInst &callInst);
+  virtual void visitFPTruncInst(llvm::FPTruncInst &fptruncInst);
+
+  static char ID;
+
+  SpirvLowerMathFloatOp(const SpirvLowerMathFloatOp &) = delete;
+  SpirvLowerMathFloatOp &operator=(const SpirvLowerMathFloatOp &) = delete;
+};
+
+} // anonymous namespace
 
 // =====================================================================================================================
 // Initializes static members.
-char SpirvLowerAlgebraTransform::ID = 0;
+char SpirvLowerMathConstFolding::ID = 0;
+char SpirvLowerMathFloatOp::ID = 0;
 
 // =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering opertions for algebraic transformation.
-ModulePass *createSpirvLowerAlgebraTransform(bool enableConstFolding, bool enableFloatOpt) {
-  return new SpirvLowerAlgebraTransform(enableConstFolding, enableFloatOpt);
-}
-
-// =====================================================================================================================
-//
-// @param enableConstFolding : Whether enable constant folding
-// @param enableFloatOpt : Whether enable floating point optimization
-SpirvLowerAlgebraTransform::SpirvLowerAlgebraTransform(bool enableConstFolding, bool enableFloatOpt)
-    : SpirvLower(ID), m_enableConstFolding(enableConstFolding), m_enableFloatOpt(enableFloatOpt), m_changed(false) {
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
+// Initialise transform class.
 //
 // @param [in,out] module : LLVM module to be run on
-bool SpirvLowerAlgebraTransform::runOnModule(Module &module) {
-  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Algebra-Transform\n");
-
+void SpirvLowerMath::init(Module &module) {
   SpirvLower::init(&module);
   m_changed = false;
 
@@ -88,9 +138,98 @@ bool SpirvLowerAlgebraTransform::runOnModule(Module &module) {
                       commonShaderMode.fp32DenormMode == FpDenormMode::FlushInOut;
   m_fp64DenormFlush = commonShaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
                       commonShaderMode.fp64DenormMode == FpDenormMode::FlushInOut;
-  m_fp16Rtz = commonShaderMode.fp16RoundMode == FpRoundMode::Zero;
+  m_fp16RoundToZero = commonShaderMode.fp16RoundMode == FpRoundMode::Zero;
+}
 
-  if (m_enableConstFolding && (m_fp16DenormFlush || m_fp32DenormFlush || m_fp64DenormFlush)) {
+// =====================================================================================================================
+// Checks desired denormal flush behavior and inserts llvm.canonicalize.
+//
+// @param inst : Instruction to flush denormals if needed
+void SpirvLowerMath::flushDenormIfNeeded(Instruction *inst) {
+  auto destTy = inst->getType();
+  if ((destTy->getScalarType()->isHalfTy() && m_fp16DenormFlush) ||
+      (destTy->getScalarType()->isFloatTy() && m_fp32DenormFlush) ||
+      (destTy->getScalarType()->isDoubleTy() && m_fp64DenormFlush)) {
+    // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
+    auto builder = m_context->getBuilder();
+    builder->SetInsertPoint(inst->getNextNode());
+    auto canonical = builder->CreateIntrinsic(Intrinsic::canonicalize, destTy, UndefValue::get(destTy));
+
+    inst->replaceAllUsesWith(canonical);
+    canonical->setArgOperand(0, inst);
+    m_changed = true;
+  }
+}
+
+// =====================================================================================================================
+// Recursively finds backward if the FPMathOperator operand does not specifiy "contract" flag.
+//
+// @param operand : Operand to check
+bool SpirvLowerMath::isOperandNoContract(Value *operand) {
+  if (isa<BinaryOperator>(operand)) {
+    auto inst = dyn_cast<BinaryOperator>(operand);
+
+    if (isa<FPMathOperator>(operand)) {
+      auto fastMathFlags = inst->getFastMathFlags();
+      bool allowContract = fastMathFlags.allowContract();
+      if (fastMathFlags.any() && !allowContract)
+        return true;
+    }
+
+    for (auto opIt = inst->op_begin(), end = inst->op_end(); opIt != end; ++opIt)
+      return isOperandNoContract(*opIt);
+  }
+  return false;
+}
+
+// =====================================================================================================================
+// Disable fast math for all values related with the specified value
+//
+// @param value : Value to disable fast math
+void SpirvLowerMath::disableFastMath(Value *value) {
+  std::set<Instruction *> allValues;
+  std::list<Instruction *> workSet;
+  if (isa<Instruction>(value)) {
+    allValues.insert(cast<Instruction>(value));
+    workSet.push_back(cast<Instruction>(value));
+  }
+
+  auto it = workSet.begin();
+  while (!workSet.empty()) {
+    if (isa<FPMathOperator>(*it)) {
+      // Reset fast math flags to default
+      auto inst = cast<Instruction>(*it);
+      FastMathFlags fastMathFlags;
+      inst->copyFastMathFlags(fastMathFlags);
+    }
+
+    for (Value *operand : (*it)->operands()) {
+      if (isa<Instruction>(operand)) {
+        // Add new values
+        auto inst = cast<Instruction>(operand);
+        if (allValues.find(inst) == allValues.end()) {
+          allValues.insert(inst);
+          workSet.push_back(inst);
+        }
+      }
+    }
+
+    it = workSet.erase(it);
+  }
+}
+
+#define DEBUG_TYPE DEBUG_TYPE_CONST_FOLDING
+
+// =====================================================================================================================
+// Executes constand folding SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
+bool SpirvLowerMathConstFolding::runOnModule(Module &module) {
+  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Const-Folding\n");
+
+  SpirvLowerMath::init(module);
+
+  if (m_fp16DenormFlush || m_fp32DenormFlush || m_fp64DenormFlush) {
     // Do constant folding if we need flush denorm to zero.
     auto &targetLibInfo = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(*m_entryPoint);
     auto &dataLayout = m_module->getDataLayout();
@@ -134,37 +273,30 @@ bool SpirvLowerAlgebraTransform::runOnModule(Module &module) {
     }
   }
 
-  if (m_enableFloatOpt)
-    visit(m_module);
-
   return m_changed;
 }
 
-// =====================================================================================================================
-// Checks desired denormal flush behavior and inserts llvm.canonicalize.
-//
-// @param inst : Instruction to flush denormals if needed
-void SpirvLowerAlgebraTransform::flushDenormIfNeeded(Instruction *inst) {
-  auto destTy = inst->getType();
-  if ((destTy->getScalarType()->isHalfTy() && m_fp16DenormFlush) ||
-      (destTy->getScalarType()->isFloatTy() && m_fp32DenormFlush) ||
-      (destTy->getScalarType()->isDoubleTy() && m_fp64DenormFlush)) {
-    // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
-    auto builder = m_context->getBuilder();
-    builder->SetInsertPoint(inst->getNextNode());
-    auto canonical = builder->CreateIntrinsic(Intrinsic::canonicalize, destTy, UndefValue::get(destTy));
+#undef DEBUG_TYPE // DEBUG_TYPE_CONST_FOLDING
+#define DEBUG_TYPE DEBUG_TYPE_FLOAT_OP
 
-    inst->replaceAllUsesWith(canonical);
-    canonical->setArgOperand(0, inst);
-    m_changed = true;
-  }
+// =====================================================================================================================
+// Executes floating point optimisation SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in,out] module : LLVM module to be run on
+bool SpirvLowerMathFloatOp::runOnModule(Module &module) {
+  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Float-Op\n");
+
+  SpirvLowerMath::init(module);
+  visit(m_module);
+
+  return m_changed;
 }
 
 // =====================================================================================================================
 // Visits unary operator instruction.
 //
 // @param unaryOp : Unary operator instruction
-void SpirvLowerAlgebraTransform::visitUnaryOperator(UnaryOperator &unaryOp) {
+void SpirvLowerMathFloatOp::visitUnaryOperator(UnaryOperator &unaryOp) {
   if (unaryOp.getOpcode() == Instruction::FNeg)
     flushDenormIfNeeded(&unaryOp);
 }
@@ -173,7 +305,7 @@ void SpirvLowerAlgebraTransform::visitUnaryOperator(UnaryOperator &unaryOp) {
 // Visits binary operator instruction.
 //
 // @param binaryOp : Binary operator instruction
-void SpirvLowerAlgebraTransform::visitBinaryOperator(BinaryOperator &binaryOp) {
+void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
   Instruction::BinaryOps opCode = binaryOp.getOpcode();
 
   auto src1 = binaryOp.getOperand(0);
@@ -300,7 +432,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(BinaryOperator &binaryOp) {
 // Visits call instruction.
 //
 // @param callInst : Call instruction
-void SpirvLowerAlgebraTransform::visitCallInst(CallInst &callInst) {
+void SpirvLowerMathFloatOp::visitCallInst(CallInst &callInst) {
   auto callee = callInst.getCalledFunction();
   if (!callee)
     return;
@@ -331,8 +463,8 @@ void SpirvLowerAlgebraTransform::visitCallInst(CallInst &callInst) {
 // Visits fptrunc instruction.
 //
 // @param fptruncInst : Fptrunc instruction
-void SpirvLowerAlgebraTransform::visitFPTruncInst(FPTruncInst &fptruncInst) {
-  if (m_fp16Rtz) {
+void SpirvLowerMathFloatOp::visitFPTruncInst(FPTruncInst &fptruncInst) {
+  if (m_fp16RoundToZero) {
     auto src = fptruncInst.getOperand(0);
     auto srcTy = src->getType();
     auto destTy = fptruncInst.getDestTy();
@@ -355,65 +487,30 @@ void SpirvLowerAlgebraTransform::visitFPTruncInst(FPTruncInst &fptruncInst) {
   }
 }
 
+#undef DEBUG_TYPE // DEBUG_TYPE_FLOAT_OP
+
 // =====================================================================================================================
-// Recursively finds backward if the FPMathOperator operand does not specifiy "contract" flag.
-//
-// @param operand : Operand to check
-bool SpirvLowerAlgebraTransform::isOperandNoContract(Value *operand) {
-  if (isa<BinaryOperator>(operand)) {
-    auto inst = dyn_cast<BinaryOperator>(operand);
+// Initializes SPIR-V lowering - math constant folding.
+INITIALIZE_PASS(SpirvLowerMathConstFolding, DEBUG_TYPE_CONST_FOLDING, "Lower SPIR-V math constant folding", false,
+                false)
 
-    if (isa<FPMathOperator>(operand)) {
-      auto fastMathFlags = inst->getFastMathFlags();
-      bool allowContract = fastMathFlags.allowContract();
-      if (fastMathFlags.any() && !allowContract)
-        return true;
-    }
+// =====================================================================================================================
+// Initializes SPIR-V lowering - math constant folding.
+INITIALIZE_PASS(SpirvLowerMathFloatOp, DEBUG_TYPE_FLOAT_OP, "Lower SPIR-V math floating point optimisation", false,
+                false)
 
-    for (auto opIt = inst->op_begin(), end = inst->op_end(); opIt != end; ++opIt)
-      return isOperandNoContract(*opIt);
-  }
-  return false;
+namespace Llpc {
+
+// =====================================================================================================================
+// Pass creator, SPIR-V lowering for math constant folding.
+ModulePass *createSpirvLowerMathConstFolding() {
+  return new SpirvLowerMathConstFolding();
 }
 
 // =====================================================================================================================
-// Disable fast math for all values related with the specified value
-//
-// @param value : Value to disable fast math
-void SpirvLowerAlgebraTransform::disableFastMath(Value *value) {
-  std::set<Instruction *> allValues;
-  std::list<Instruction *> workSet;
-  if (isa<Instruction>(value)) {
-    allValues.insert(cast<Instruction>(value));
-    workSet.push_back(cast<Instruction>(value));
-  }
-
-  auto it = workSet.begin();
-  while (!workSet.empty()) {
-    if (isa<FPMathOperator>(*it)) {
-      // Reset fast math flags to default
-      auto inst = cast<Instruction>(*it);
-      FastMathFlags fastMathFlags;
-      inst->copyFastMathFlags(fastMathFlags);
-    }
-
-    for (Value *operand : (*it)->operands()) {
-      if (isa<Instruction>(operand)) {
-        // Add new values
-        auto inst = cast<Instruction>(operand);
-        if (allValues.find(inst) == allValues.end()) {
-          allValues.insert(inst);
-          workSet.push_back(inst);
-        }
-      }
-    }
-
-    it = workSet.erase(it);
-  }
+// Pass creator, SPIR-V lowering for math floating point optimisation.
+ModulePass *createSpirvLowerMathFloatOp() {
+  return new SpirvLowerMathFloatOp();
 }
 
 } // namespace Llpc
-
-// =====================================================================================================================
-// Initializes the pass of SPIR-V lowering opertions for algebraic transformation.
-INITIALIZE_PASS(SpirvLowerAlgebraTransform, DEBUG_TYPE, "Lower SPIR-V algebraic transforms", false, false)

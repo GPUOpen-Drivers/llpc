@@ -36,7 +36,6 @@
 #include "vkgcUtil.h"
 #include <fstream>
 #include <sstream>
-#include <stdarg.h>
 #include <sys/stat.h>
 #include <unordered_set>
 
@@ -60,6 +59,7 @@ std::ostream &operator<<(std::ostream &out, VkFrontFace frontFace);
 std::ostream &operator<<(std::ostream &out, ResourceMappingNodeType type);
 std::ostream &operator<<(std::ostream &out, NggSubgroupSizingType subgroupSizing);
 std::ostream &operator<<(std::ostream &out, NggCompactMode compactMode);
+std::ostream &operator<<(std::ostream &out, DenormalMode denormalMode);
 std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize);
 std::ostream &operator<<(std::ostream &out, ShadowDescriptorTableUsage shadowDescriptorTableUsage);
 
@@ -517,6 +517,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.unrollThreshold = " << shaderInfo->options.unrollThreshold << "\n";
   dumpFile << "options.scalarThreshold = " << shaderInfo->options.scalarThreshold << "\n";
   dumpFile << "options.disableLoopUnroll = " << shaderInfo->options.disableLoopUnroll << "\n";
+  dumpFile << "options.fp32DenormalMode = " << shaderInfo->options.fp32DenormalMode << "\n";
 
   dumpFile << "\n";
 }
@@ -1064,6 +1065,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.unrollThreshold);
       hasher->Update(options.scalarThreshold);
       hasher->Update(options.disableLoopUnroll);
+      hasher->Update(options.fp32DenormalMode);
     }
   }
 }
@@ -1545,6 +1547,26 @@ std::ostream &operator<<(std::ostream &out, NggCompactMode compactMode) {
   switch (compactMode) {
     CASE_ENUM_TO_STRING(NggCompactDisable)
     CASE_ENUM_TO_STRING(NggCompactVertices)
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+
+  return out << string;
+}
+
+// =====================================================================================================================
+// Translates enum "DenormalMode" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param denormalMode : Denormal mode
+std::ostream &operator<<(std::ostream &out, DenormalMode denormalMode) {
+  const char *string = nullptr;
+  switch (denormalMode) {
+    CASE_CLASSENUM_TO_STRING(DenormalMode, Auto)
+    CASE_CLASSENUM_TO_STRING(DenormalMode, FlushToZero)
+    CASE_CLASSENUM_TO_STRING(DenormalMode, Preserve)
     break;
   default:
     llvm_unreachable("Should never be called!");

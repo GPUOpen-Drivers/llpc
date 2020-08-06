@@ -69,7 +69,6 @@ static bool parseDescSetBinding(StringRef str, unsigned &descSet, unsigned &bind
 // @param [out] value : Returns value of symbol if found
 // @return : True if successful, false if not handled
 bool RelocHandler::getValue(StringRef name, uint64_t &value) {
-
   if (name.startswith(reloc::DescriptorOffset)) {
     // Descriptor offset in bytes in the descriptor table for its set, or in the spill table if in the root table.
     unsigned descSet = 0;
@@ -87,10 +86,14 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
       case 'b':
         type = ResourceNodeType::DescriptorBuffer;
         break;
+      case 't':
+        type = ResourceNodeType::DescriptorTexelBuffer;
+        break;
       }
       const ResourceNode *outerNode = nullptr;
       const ResourceNode *node = nullptr;
       std::tie(outerNode, node) = getPipelineState()->findResourceNode(type, descSet, binding);
+
       if (!node)
         report_fatal_error("No resource node for " + name);
       if (node->type == ResourceNodeType::DescriptorBufferCompact)
@@ -99,6 +102,35 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
       value = node->offsetInDwords * 4;
       if (type == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
         value += DescriptorSizeResource;
+      return true;
+    }
+  }
+
+  if (name.startswith(reloc::DescriptorUseSpillTable)) {
+    // If the corresponding node is a root node and the type is DescriptorBuffer, use the spill table to get the
+    // descriptor pointer.
+    unsigned descSet = 0;
+    unsigned binding = 0;
+    // We don't care about typeLetter. This should always be 'b' for DescriptorBuffers.
+    int typeLetter = 0;
+    StringRef suffix = name.drop_front(strlen(reloc::DescriptorUseSpillTable));
+    if (parseDescSetBinding(suffix, descSet, binding, typeLetter)) {
+      const ResourceNode *outerNode = nullptr;
+      const ResourceNode *node = nullptr;
+      std::tie(outerNode, node) =
+          getPipelineState()->findResourceNode(ResourceNodeType::DescriptorBuffer, descSet, binding);
+
+      if (!node)
+        report_fatal_error("No resource node for " + name);
+
+      assert(node->type == ResourceNodeType::DescriptorBuffer);
+      // Check if this is a top-level node.
+      value = (node == outerNode) ? 1 : 0;
+
+      // Mark access to spill table.
+      if (value == 1)
+        m_pipelineState->getPalMetadata()->setUserDataSpillUsage(0);
+
       return true;
     }
   }

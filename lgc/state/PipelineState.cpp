@@ -537,13 +537,43 @@ const ResourceNode *PipelineState::findPushConstantResourceNode() const {
 }
 
 // =====================================================================================================================
-// Find the resource node for the given {set,binding}.
-// For nodeType == Unknown, the function finds any node of the given set,binding.
-// For nodeType == Resource, it matches Resource or CombinedTexture.
-// For nodeType == Sampler, it matches Sampler or CombinedTexture.
-// For nodeType == Buffer, it matches Buffer, BufferCompact or InlineBuffer.
-// For other nodeType, only a node of the specified type is returned.
-// For nodeType == DescriptorTableVaPtr, the node is returned whose first child matches descSet.
+// Returns true when type nodeType is compatible with candidateType.
+// A node type is compatible with a candidate type iff (nodeType) <= (candidateType) in the ResourceNodeType lattice:
+//
+//                                                        DescriptorCombinedTexture
+//                                                                   +
+// DescriptorBufferCompact   InlineBuffer                            |
+//                   +         +                 +-------------------+--------------------+
+//                   |         |                 |                   |                    |
+//                   v         v                 v                   v                    v
+//                 DescriptorBuffer     DescriptorResource  DescriptorTexelBuffer  DescriptorSampler
+//                         +                     +                   +                    +
+//                         |                     |                   |                    |
+//                         |                     v                   |                    |
+//                         +----------------> Unknown <--------------+--------------------+
+//
+// @param nodeType : Resource node type
+// @param candidateType : Resource node candidate type
+static bool IsNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType candidateType) {
+  if (nodeType == ResourceNodeType::Unknown || candidateType == nodeType)
+    return true;
+
+  if (nodeType == ResourceNodeType::DescriptorBuffer &&
+      (candidateType == ResourceNodeType::DescriptorBufferCompact || candidateType == ResourceNodeType::InlineBuffer))
+    return true;
+
+  if ((nodeType == ResourceNodeType::DescriptorResource || nodeType == ResourceNodeType::DescriptorTexelBuffer ||
+       nodeType == ResourceNodeType::DescriptorSampler) &&
+      candidateType == ResourceNodeType::DescriptorCombinedTexture)
+    return true;
+
+  return false;
+}
+
+// =====================================================================================================================
+// Find the resource node for the given {set,binding} compatible with nodeType.
+//
+// For nodeType == DescriptorTableVaPtr, the node whose first child matches descSet is returned.
 // Returns {topNode, node} where "node" is the found user data node, and "topNode" is the top-level user data
 // node that contains it (or is equal to it).
 //
@@ -554,31 +584,20 @@ std::pair<const ResourceNode *, const ResourceNode *>
 PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, unsigned binding) const {
   for (const ResourceNode &node : getUserDataNodes()) {
     if (node.type == ResourceNodeType::DescriptorTableVaPtr) {
-      if (nodeType == node.type) {
-        if (!node.innerTable.empty() && node.innerTable[0].set == descSet)
+      if (nodeType == ResourceNodeType::DescriptorTableVaPtr) {
+        assert(!node.innerTable.empty());
+
+        if (node.innerTable[0].set == descSet)
           return {&node, &node};
-      } else {
-        for (const ResourceNode &innerNode : node.innerTable) {
-          if (innerNode.set == descSet && innerNode.binding == binding) {
-            if (nodeType == ResourceNodeType::Unknown || nodeType == innerNode.type ||
-                (nodeType == ResourceNodeType::DescriptorBuffer &&
-                 (innerNode.type == ResourceNodeType::DescriptorBufferCompact ||
-                  innerNode.type == ResourceNodeType::InlineBuffer)) ||
-                (innerNode.type == ResourceNodeType::DescriptorCombinedTexture &&
-                 (nodeType == ResourceNodeType::DescriptorResource ||
-                  nodeType == ResourceNodeType::DescriptorTexelBuffer ||
-                  nodeType == ResourceNodeType::DescriptorSampler)))
-              return {&node, &innerNode};
-          }
-        }
+        continue;
       }
-    } else if (node.set == descSet && node.binding == binding) {
-      if (nodeType == ResourceNodeType::Unknown || nodeType == node.type ||
-          (nodeType == ResourceNodeType::DescriptorBuffer && node.type == ResourceNodeType::DescriptorBufferCompact) ||
-          (node.type == ResourceNodeType::DescriptorCombinedTexture &&
-           (nodeType == ResourceNodeType::DescriptorResource || nodeType == ResourceNodeType::DescriptorTexelBuffer ||
-            nodeType == ResourceNodeType::DescriptorSampler)))
-        return {&node, &node};
+
+      // Check inner nodes.
+      for (const ResourceNode &innerNode : node.innerTable)
+        if (innerNode.set == descSet && innerNode.binding == binding && IsNodeTypeCompatible(nodeType, innerNode.type))
+          return {&node, &innerNode};
+    } else if (node.set == descSet && node.binding == binding && IsNodeTypeCompatible(nodeType, node.type)) {
+      return {&node, &node};
     }
   }
   return {nullptr, nullptr};

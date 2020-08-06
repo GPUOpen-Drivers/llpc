@@ -31,7 +31,6 @@
 #pragma once
 
 #include "lgc/CommonDefs.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Pass.h"
 #include <map>
 

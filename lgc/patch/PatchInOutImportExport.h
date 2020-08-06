@@ -32,7 +32,6 @@
 
 #include "SystemValues.h"
 #include "lgc/patch/Patch.h"
-#include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"

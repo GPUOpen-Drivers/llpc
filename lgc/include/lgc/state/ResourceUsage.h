@@ -153,9 +153,8 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size of gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved19 : 1;
-
-        uint64_t unused : 45;
+        unsigned : 1;               // Reserved
+        unsigned : 1;               // Reserved
       } vs;
 
       // Tessellation control shader
@@ -175,8 +174,6 @@ struct ResourceUsage {
         unsigned cullDistance : 4;   // Array size of gl_out[].gl_CullDistance[] (0 means unused)
         unsigned tessLevelOuter : 1; // Whether gl_TessLevelOuter[] is used
         unsigned tessLevelInner : 1; // Whether gl_TessLevelInner[] is used
-
-        uint64_t unused : 39;
       } tcs;
 
       // Tessellation evaluation shader
@@ -199,9 +196,7 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved28 : 1;
-
-        uint64_t unused : 35;
+        unsigned : 1;               // Reserved
       } tes;
 
       // Geometry shader
@@ -222,9 +217,8 @@ struct ResourceUsage {
         unsigned primitiveId : 1;   // Whether gl_PrimitiveID is used
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned reserved26 : 1;
-
-        uint64_t unused : 37;
+        unsigned : 1;               // Reserved
+        unsigned : 1;               // Reserved
       } gs;
 
       // Fragment shader
@@ -252,6 +246,7 @@ struct ResourceUsage {
         unsigned viewportIndex : 1;            // Whether gl_ViewportIndex is used
         unsigned helperInvocation : 1;         // Whether gl_HelperInvocation is used
         unsigned viewIndex : 1;                // Whether gl_ViewIndex is used
+        unsigned : 1;                          // Reserved
         unsigned baryCoordNoPersp : 1;         // Whether gl_BaryCoordNoPersp is used (AMD extension)
         unsigned baryCoordNoPerspCentroid : 1; // Whether gl_BaryCoordNoPerspCentroid is used (AMD extension)
         unsigned baryCoordNoPerspSample : 1;   // Whether gl_BaryCoordNoPerspSample is used (AMD extension)
@@ -266,8 +261,6 @@ struct ResourceUsage {
         // Statements
         unsigned discard : 1;         // Whether "discard" statement is used
         unsigned runAtSampleRate : 1; // Whether fragment shader run at sample rate
-
-        uint64_t unused : 32;
       } fs;
 
       // Compute shader
@@ -280,36 +273,22 @@ struct ResourceUsage {
         unsigned workgroupId : 1;       // Whether gl_WorkGroupID is used
         unsigned numSubgroups : 1;      // Whether gl_NumSubgroups is used
         unsigned subgroupId : 1;        // Whether gl_SubgroupID is used
-
-        uint64_t unused : 57;
       } cs;
-
-      struct {
-        uint64_t u64All;
-      } perStage;
     };
 
     // Common built-in usage
-    union {
-      struct {
-        unsigned subgroupSize : 1;              // Whether gl_SubGroupSize is used
-        unsigned subgroupLocalInvocationId : 1; // Whether gl_SubGroupInvocation is used
-        unsigned subgroupEqMask : 1;            // Whether gl_SubGroupEqMask is used
-        unsigned subgroupGeMask : 1;            // Whether gl_SubGroupGeMask is used
-        unsigned subgroupGtMask : 1;            // Whether gl_SubGroupGtMask is used
-        unsigned subgroupLeMask : 1;            // Whether gl_SubGroupLeMask is used
-        unsigned subgroupLtMask : 1;            // Whether gl_SubGroupLtMask is used
-        unsigned deviceIndex : 1;               // Whether gl_DeviceIndex is used
+    struct {
+      unsigned subgroupSize : 1;              // Whether gl_SubGroupSize is used
+      unsigned subgroupLocalInvocationId : 1; // Whether gl_SubGroupInvocation is used
+      unsigned subgroupEqMask : 1;            // Whether gl_SubGroupEqMask is used
+      unsigned subgroupGeMask : 1;            // Whether gl_SubGroupGeMask is used
+      unsigned subgroupGtMask : 1;            // Whether gl_SubGroupGtMask is used
+      unsigned subgroupLeMask : 1;            // Whether gl_SubGroupLeMask is used
+      unsigned subgroupLtMask : 1;            // Whether gl_SubGroupLtMask is used
+      unsigned deviceIndex : 1;               // Whether gl_DeviceIndex is used
+    } common;
 
-        uint64_t unused : 56;
-      } common;
-
-      struct {
-        uint64_t u64All;
-      } allStage;
-    };
-
-  } builtInUsage = {};
+  } builtInUsage;
 
   // Usage of generic input/output
   struct {

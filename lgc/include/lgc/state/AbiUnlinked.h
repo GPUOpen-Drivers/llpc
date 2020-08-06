@@ -53,6 +53,16 @@ namespace reloc {
 // It is illegal for the specified descriptor not to exist.
 const static char DescriptorOffset[] = "doff_";
 
+// Whether the descriptor pointer comes from a spill table.
+// The format is: "dusespill_X_Y" where:
+// * X is the descriptor set number
+// * Y is the binding number
+//
+// The value of the relocation is either:
+//  * 0: spill table not used and the pointer comes from descriptor table
+//  * 1: descriptor pointer should be loaded from the spill table
+const static char DescriptorUseSpillTable[] = "dusespill_";
+
 // Descriptor stride is "dstride_X_Y" where:
 // * X is the descriptor set number
 // * Y is the binding number

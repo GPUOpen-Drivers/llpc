@@ -70,7 +70,7 @@ const char *getShaderStageName(ShaderStage shaderStage) {
 // Converts the SPIR-V execution model to the shader stage
 //
 // @param execModel : SPIR-V execution model
-ShaderStage convertToStageShage(unsigned execModel) {
+ShaderStage convertToShaderStage(unsigned execModel) {
   switch (execModel) {
   case spv::ExecutionModelVertex:
   case spv::ExecutionModelTessellationControl:

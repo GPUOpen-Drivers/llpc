@@ -98,6 +98,12 @@ cl::opt<bool> SPIRVGenFastMath("spirv-gen-fast-math", cl::init(true),
 cl::opt<bool> SPIRVWorkaroundBadSPIRV("spirv-workaround-bad-spirv", cl::init(true),
                                       cl::desc("Enable workarounds for bad SPIR-V"));
 
+cl::opt<Vkgc::DenormalMode> Fp32DenormalModeOpt(
+    "fp32-denormal-mode", cl::init(Vkgc::DenormalMode::Auto), cl::desc("Override denormal mode for FP32"),
+    cl::values(clEnumValN(Vkgc::DenormalMode::Auto, "auto", "No override (default behaviour)"),
+               clEnumValN(Vkgc::DenormalMode::FlushToZero, "ftz", "Denormal input/output flushed to zero"),
+               clEnumValN(Vkgc::DenormalMode::Preserve, "preserve", "Denormal input/output preserved")));
+
 // Prefix for placeholder global variable name.
 const char *KPlaceholderPrefix = "placeholder.";
 
@@ -127,10 +133,11 @@ static void dumpLLVM(Module *m, const std::string &fName) {
 
 SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
                          ArrayRef<ConvertingSampler> convertingSamplers, lgc::Builder *builder,
-                         const Vkgc::ShaderModuleUsage *moduleUsage)
+                         const Vkgc::ShaderModuleUsage *moduleUsage, const Vkgc::PipelineShaderOptions *shaderOptions)
     : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_enableXfb(false), m_entryTarget(nullptr),
       m_specConstMap(theSpecConstMap), m_convertingSamplers(convertingSamplers), m_dbgTran(m_bm, m_m, this),
-      m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)) {
+      m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)),
+      m_shaderOptions(reinterpret_cast<const Vkgc::PipelineShaderOptions *>(shaderOptions)) {
   assert(m_m);
   m_context = &m_m->getContext();
   m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
@@ -1294,6 +1301,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             if (store->getMetadata(LLVMContext::MD_nontemporal))
               transNonTemporalMetadata(newStore);
           }
+        } else if (CallInst *const callInst = dyn_cast<CallInst>(value)) {
+          if (callInst->getCalledFunction()->getName().startswith(gSPIRVMD::NonUniform))
+            continue;
         } else
           llvm_unreachable("Should never be called!");
       }
@@ -6068,7 +6078,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (!m_entryTarget)
     return false;
 
-  m_shaderStage = convertToStageShage(entryExecModel);
+  m_execModule = entryExecModel;
   m_fpControlFlags.U32All = 0;
   static_assert(SPIRVTW_8Bit == (8 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_16Bit == (16 >> 3), "Unexpected value!");
@@ -6090,6 +6100,10 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (auto em = m_entryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
     m_fpControlFlags.RoundingModeRTZ = em->getLiterals()[0] >> 3;
 
+  // Determine any denormal overrides to be applied.
+  Vkgc::DenormalMode fp32DenormalMode =
+      Fp32DenormalModeOpt != Vkgc::DenormalMode::Auto ? Fp32DenormalModeOpt : m_shaderOptions->fp32DenormalMode;
+
   // Set common shader mode (FP mode and useSubgroupSize) for middle-end.
   CommonShaderMode shaderMode = {};
   if (m_fpControlFlags.RoundingModeRTE & SPIRVTW_16Bit)
@@ -6108,9 +6122,9 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
     shaderMode.fp16DenormMode = FpDenormMode::FlushNone;
   else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_16Bit)
     shaderMode.fp16DenormMode = FpDenormMode::FlushInOut;
-  if (m_fpControlFlags.DenormPreserve & SPIRVTW_32Bit)
+  if (m_fpControlFlags.DenormPreserve & SPIRVTW_32Bit || fp32DenormalMode == Vkgc::DenormalMode::Preserve)
     shaderMode.fp32DenormMode = FpDenormMode::FlushNone;
-  else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_32Bit)
+  else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_32Bit || fp32DenormalMode == Vkgc::DenormalMode::FlushToZero)
     shaderMode.fp32DenormMode = FpDenormMode::FlushInOut;
   if (m_fpControlFlags.DenormPreserve & SPIRVTW_64Bit)
     shaderMode.fp64DenormMode = FpDenormMode::FlushNone;
@@ -8044,16 +8058,17 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
 
 } // namespace SPIRV
 
-bool llvm::readSpirv(Builder *builder, const ShaderModuleUsage *shaderInfo, std::istream &is,
-                     spv::ExecutionModel entryExecModel, const char *entryName, const SPIRVSpecConstMap &specConstMap,
-                     ArrayRef<ConvertingSampler> convertingSamplers, Module *m, std::string &errMsg) {
+bool llvm::readSpirv(Builder *builder, const ShaderModuleUsage *shaderInfo, const PipelineShaderOptions *shaderOptions,
+                     std::istream &is, spv::ExecutionModel entryExecModel, const char *entryName,
+                     const SPIRVSpecConstMap &specConstMap, ArrayRef<ConvertingSampler> convertingSamplers, Module *m,
+                     std::string &errMsg) {
   assert(entryExecModel != ExecutionModelKernel && "Not support ExecutionModelKernel");
 
   std::unique_ptr<SPIRVModule> bm(SPIRVModule::createSPIRVModule());
 
   is >> *bm;
 
-  SPIRVToLLVM btl(m, bm.get(), specConstMap, convertingSamplers, builder, shaderInfo);
+  SPIRVToLLVM btl(m, bm.get(), specConstMap, convertingSamplers, builder, shaderInfo, shaderOptions);
   bool succeed = true;
   if (!btl.translate(entryExecModel, entryName)) {
     bm->getError(errMsg);

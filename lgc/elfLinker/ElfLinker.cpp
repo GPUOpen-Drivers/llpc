@@ -114,10 +114,10 @@ private:
   uint64_t getAlignment(const InputSection &inputSection);
 
   ElfLinkerImpl *m_linker;
-  uint64_t m_offset;                            // File offset of this output section
-  SmallVector<InputSection, 4> m_inputSections; // Input sections contributing to this output section
   StringRef m_name;                             // Section name
   unsigned m_type;                              // Section type (SHT_* value)
+  uint64_t m_offset = 0;                        // File offset of this output section
+  SmallVector<InputSection, 4> m_inputSections; // Input sections contributing to this output section
   uint64_t m_alignment = 0;                     // Overall alignment required for the section
   unsigned m_reduceAlign = 0;                   // Bitmap of input sections to reduce alignment for
 };

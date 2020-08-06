@@ -255,6 +255,27 @@ Value *DescBuilder::getStride(ResourceNodeType descType, unsigned descSet, unsig
 }
 
 // =====================================================================================================================
+// Returns the reloc string suffix for the given resource type.
+// This is used with `reloc::DescriptorOffset` and must match the parsing logic in RelocHandler.cpp.
+//
+// @param type : Resource type
+static StringRef GetRelocTypeSuffix(ResourceNodeType type) {
+  switch (type) {
+  case ResourceNodeType::DescriptorSampler:
+    return "_s";
+  case ResourceNodeType::DescriptorResource:
+    return "_r";
+  case ResourceNodeType::DescriptorBuffer:
+  case ResourceNodeType::DescriptorBufferCompact:
+    return "_b";
+  case ResourceNodeType::DescriptorTexelBuffer:
+    return "_t";
+  default:
+    return "_x";
+  }
+}
+
+// =====================================================================================================================
 // Get a pointer to a descriptor, as a pointer to i8
 //
 // @param resType : Resource type
@@ -267,27 +288,42 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
                                const ResourceNode *topNode, const ResourceNode *node, bool shadow) {
   Value *descPtr = nullptr;
 
-  // Get the descriptor table pointer.
-  // TODO Shader compilation: If we do not have user data layout info (topNode and node are nullptr), then
-  // we do not know at compile time whether a DescriptorBuffer is in the root table or the table for its
-  // descriptor set, so we need to generate a select between the two, where the condition is a reloc.
-  if (node && node == topNode) {
+  auto GetSpillTablePtr = [this]() {
     // The descriptor is in the top-level table. (This can only happen for a DescriptorBuffer.) Contrary
     // to what used to happen, we just load from the spill table, so we can get a pointer to the descriptor.
     // The spill table gets returned as a pointer to array of i8.
-    descPtr =
-        CreateNamedCall(lgcName::SpillTable, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), {}, Attribute::ReadNone);
-    // Ensure we mark spill table usage.
-    getPipelineState()->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
-  } else {
+    return CreateNamedCall(lgcName::SpillTable, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), {}, Attribute::ReadNone);
+  };
+
+  auto GetDescriptorSetPtr = [this, descSet, shadow]() {
     // Get the descriptor table pointer for the set, which might be passed as a user SGPR to the shader.
     // The args to the lgc.descriptor.set call are:
     // - descriptor set number
     // - value for high 32 bits of pointer; HighAddrPc to use PC
     // TODO Shader compilation: For the "shadow" case, the high half of the address needs to be a reloc.
     unsigned highHalf = shadow ? m_pipelineState->getOptions().shadowDescriptorTable : HighAddrPc;
-    descPtr = CreateNamedCall(lgcName::DescriptorSet, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                              {getInt32(descSet), getInt32(highHalf)}, Attribute::ReadNone);
+    return CreateNamedCall(lgcName::DescriptorSet, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
+                           {getInt32(descSet), getInt32(highHalf)}, Attribute::ReadNone);
+  };
+
+  // Get the descriptor table pointer.
+  if (node && node == topNode) {
+    // Ensure we mark spill table usage.
+    descPtr = GetSpillTablePtr();
+    getPipelineState()->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+  } else if (!node && !topNode && resType == ResourceNodeType::DescriptorBuffer) {
+    // If we do not have user data layout info (topNode and node are nullptr), then
+    // we do not know at compile time whether a DescriptorBuffer is in the root table or the table for its
+    // descriptor set, so we need to generate a select between the two, where the condition is a reloc.
+    // If the descriptor ends up in the root table (top-level), a value from the spill table will be used.
+    // The linking code has to take care of marking PAL metadata for user spill usage.
+    Value *spillDescPtr = GetSpillTablePtr();
+    Value *descriptorTableDescPtr = GetDescriptorSetPtr();
+    Value *reloc = CreateRelocationConstant(reloc::DescriptorUseSpillTable + Twine(descSet) + "_" + Twine(binding));
+    Value *useSpillTable = CreateZExtOrTrunc(reloc, getInt1Ty());
+    descPtr = CreateSelect(useSpillTable, spillDescPtr, descriptorTableDescPtr);
+  } else {
+    descPtr = GetDescriptorSetPtr();
   }
 
   // Add on the byte offset of the descriptor.
@@ -296,25 +332,8 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     // Shader compilation with no user data layout. Get the offset for the descriptor using a reloc. The
     // reloc symbol name needs to contain the descriptor set and binding, and, for image, fmask or sampler,
     // whether it is a sampler.
-    StringRef relocNameSuffix = "";
-    switch (resType) {
-    case ResourceNodeType::DescriptorSampler:
-      relocNameSuffix = "_s";
-      break;
-    case ResourceNodeType::DescriptorResource:
-      relocNameSuffix = "_r";
-      break;
-    case ResourceNodeType::DescriptorBuffer:
-    case ResourceNodeType::DescriptorBufferCompact:
-    case ResourceNodeType::DescriptorTexelBuffer:
-      relocNameSuffix = "_b";
-      break;
-    default:
-      relocNameSuffix = "_x";
-      break;
-    }
-    offset =
-        CreateRelocationConstant(reloc::DescriptorOffset + Twine(descSet) + "_" + Twine(binding) + relocNameSuffix);
+    offset = CreateRelocationConstant(reloc::DescriptorOffset + Twine(descSet) + "_" + Twine(binding) +
+                                      GetRelocTypeSuffix(resType));
   } else {
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
@@ -323,9 +342,8 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
       offsetInBytes += DescriptorSizeResource;
     offset = getInt32(offsetInBytes);
   }
-  descPtr = CreateAddByteOffset(descPtr, offset);
 
-  return descPtr;
+  return CreateAddByteOffset(descPtr, offset);
 }
 
 // =====================================================================================================================

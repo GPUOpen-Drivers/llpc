@@ -38,8 +38,6 @@
 
 namespace lgc {
 
-struct NggControl;
-struct InOutLocation;
 class InOutLocationMapManager;
 
 // =====================================================================================================================
@@ -68,6 +66,7 @@ private:
 
   // Sets NGG control settings
   void setNggControl(llvm::Module *module);
+  bool canUseNgg(llvm::Module *module);
   bool canUseNggCulling(llvm::Module *module);
   void buildNggCullingControlRegister(NggControl &nggControl);
   unsigned getVerticesPerPrimitive() const;

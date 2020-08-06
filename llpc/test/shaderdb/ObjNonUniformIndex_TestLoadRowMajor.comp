@@ -1,0 +1,21 @@
+#version 450
+
+#extension GL_EXT_nonuniform_qualifier : enable
+layout(local_size_x = 1) in;
+
+layout(row_major, binding = 1) buffer BlockB
+{
+    vec4 value;
+    mat3x4 mm;
+} blockB[];
+
+void main (void)
+{
+    blockB[nonuniformEXT(0)].value = blockB[nonuniformEXT(0)].mm[0];
+}
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST

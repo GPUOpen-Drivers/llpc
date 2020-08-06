@@ -114,8 +114,9 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
 
   Context *context = static_cast<Context *>(&module->getContext());
 
-  if (!readSpirv(context->getBuilder(), &(moduleData->usage), spirvStream, convertToExecModel(entryStage),
-                 shaderInfo->pEntryTarget, specConstMap, convertingSamplers, module, errMsg)) {
+  if (!readSpirv(context->getBuilder(), &(moduleData->usage), &(shaderInfo->options), spirvStream,
+                 convertToExecModel(entryStage), shaderInfo->pEntryTarget, specConstMap, convertingSamplers, module,
+                 errMsg)) {
     report_fatal_error(Twine("Failed to translate SPIR-V to LLVM (") +
                            getShaderStageName(static_cast<ShaderStage>(entryStage)) + " shader): " + errMsg,
                        false);

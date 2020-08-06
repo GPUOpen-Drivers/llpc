@@ -24,91 +24,85 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerLoopUnrollControl.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerLoopUnrollControl.
+ * @file  PatchLoopMetadata.cpp
+ * @brief LLPC source file: contains implementation of class lgc::PatchLoopMetadata.
  ***********************************************************************************************************************
  */
-#include "llpcSpirvLowerLoopUnrollControl.h"
-#include "SPIRVInternal.h"
-#include "llpcContext.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include <vector>
 
-#define DEBUG_TYPE "llpc-spirv-lower-loop-unroll-control"
-
-namespace llvm {
-
-namespace cl {
-
-extern opt<bool> DisableLicm;
-
-} // namespace cl
-
-} // namespace llvm
+#define DEBUG_TYPE "llpc-patch-loop-metadata"
 
 using namespace llvm;
-using namespace SPIRV;
-using namespace Llpc;
+using namespace lgc;
 
-namespace Llpc {
+namespace {
+
+// =====================================================================================================================
+// Represents the LLVM pass for patching loop metadata.
+class PatchLoopMetadata : public Patch {
+public:
+  PatchLoopMetadata();
+
+  bool runOnModule(Module &module) override;
+
+  static char ID; // ID of this pass
+
+  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<PipelineStateWrapper>();
+  }
+
+private:
+  unsigned m_forceLoopUnrollCount; // Force loop unroll count
+  bool m_disableLicm;              // Disable LLVM LICM pass
+  bool m_disableLoopUnroll;        // Forcibly disable loop unroll
+  GfxIpVersion m_gfxIp;
+};
+
+} // anonymous namespace
 
 // =====================================================================================================================
 // Initializes static members.
-char SpirvLowerLoopUnrollControl::ID = 0;
+char PatchLoopMetadata::ID = 0;
 
 // =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering operations for loop unroll control
-//
-// @param forceLoopUnrollCount : Force loop unroll count
-ModulePass *createSpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount) {
-  auto pass = new SpirvLowerLoopUnrollControl(forceLoopUnrollCount);
-  return pass;
+// Pass creator, creates the pass for patching loop metadata
+ModulePass *lgc::createPatchLoopMetadata() {
+  return new PatchLoopMetadata();
 }
 
 // =====================================================================================================================
-SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl()
-    : SpirvLower(ID), m_forceLoopUnrollCount(0), m_disableLicm(false), m_disableLoopUnroll(false) {
+PatchLoopMetadata::PatchLoopMetadata()
+    : Patch(ID), m_forceLoopUnrollCount(0), m_disableLicm(false), m_disableLoopUnroll(false) {
 }
 
 // =====================================================================================================================
-//
-// @param forceLoopUnrollCount : Force loop unroll count
-SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl(unsigned forceLoopUnrollCount)
-    : SpirvLower(ID), m_forceLoopUnrollCount(forceLoopUnrollCount), m_disableLicm(false), m_disableLoopUnroll(false) {
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
+// Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in,out] module : LLVM module to be run on
-bool SpirvLowerLoopUnrollControl::runOnModule(Module &module) {
-  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Unroll-Control\n");
+bool PatchLoopMetadata::runOnModule(Module &module) {
+  LLVM_DEBUG(dbgs() << "Run the pass patch-loop-metadata\n");
 
-  SpirvLower::init(&module);
-
-  if (m_context->getPipelineContext()) {
-    auto shaderOptions = &(m_context->getPipelineShaderInfo(m_shaderStage)->options);
-    if (shaderOptions->forceLoopUnrollCount > 0)
-      m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
-    m_disableLicm = shaderOptions->disableLicm | cl::DisableLicm;
-#endif
-    m_disableLoopUnroll = shaderOptions->disableLoopUnroll;
-  }
-
-  if (m_forceLoopUnrollCount == 0 && !m_disableLicm && !m_disableLoopUnroll)
-    return false;
-
-  if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval ||
-      m_shaderStage == ShaderStageGeometry) {
-    // Disabled on above shader types.
-    return false;
-  }
-
+  Patch::init(&module);
+  PipelineState *m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   bool changed = false;
-  for (auto &func : module) {
+
+  for (Function &func : module) {
+    ShaderStage stage = getShaderStage(&func);
+    if (stage == -1)
+      continue;
+    if (auto shaderOptions = &m_pipelineState->getShaderOptions(stage)) {
+      m_disableLoopUnroll = shaderOptions->disableLoopUnroll;
+      m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
+      m_disableLicm = shaderOptions->disableLicm;
+    }
+
     for (auto &block : func) {
       auto terminator = block.getTerminator();
       MDNode *loopMetaNode = terminator->getMetadata("llvm.loop");
@@ -124,17 +118,16 @@ bool SpirvLowerLoopUnrollControl::runOnModule(Module &module) {
             MDNode::get(*m_context, MDString::get(*m_context, "llvm.loop.unroll.disable"));
         loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, disableLoopUnrollMetaNode));
       } else if (m_forceLoopUnrollCount && loopMetaNode->getNumOperands() <= 1) {
-        // We have a loop backedge with !llvm.loop metadata containing just
-        // one operand pointing to itself, meaning that the SPIR-V did not
-        // have an unroll or don't-unroll directive, so we can add the force
-        // unroll count metadata.
+        // We have a loop backedge with !llvm.loop metadata containing just one
+        // operand pointing to itself, meaning that the SPIR-V did not have an
+        // unroll directive, so we can add the force unroll count metadata.
         Metadata *unrollCountMeta[] = {
             MDString::get(*m_context, "llvm.loop.unroll.count"),
             ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), m_forceLoopUnrollCount))};
         MDNode *loopUnrollCountMetaNode = MDNode::get(*m_context, unrollCountMeta);
         loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, loopUnrollCountMetaNode));
         // We also disable all nonforced loop transformations to ensure our transformation is not blocked
-        llvm::Metadata *nonforcedMeta[] = {MDString::get(*m_context, "llvm.loop.disable_nonforced")};
+        Metadata *nonforcedMeta[] = {MDString::get(*m_context, "llvm.loop.disable_nonforced")};
         MDNode *nonforcedMetaNode = MDNode::get(*m_context, nonforcedMeta);
         loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, nonforcedMetaNode));
       }
@@ -151,9 +144,6 @@ bool SpirvLowerLoopUnrollControl::runOnModule(Module &module) {
   return changed;
 }
 
-} // namespace Llpc
-
 // =====================================================================================================================
-// Initializes the pass of SPIR-V lowering operations for loop unroll control.
-INITIALIZE_PASS(SpirvLowerLoopUnrollControl, "Spirv-lower-loop-unroll-control",
-                "Set metadata to control LLPC loop unrolling", false, false)
+// Initializes the pass for patching Loop metadata.
+INITIALIZE_PASS(PatchLoopMetadata, DEBUG_TYPE, "Set or amend metadata to control loop unrolling", false, false)

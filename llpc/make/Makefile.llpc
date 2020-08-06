@@ -52,11 +52,10 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     CPPFILES +=                                 \
         llpcSpirvLower.cpp                      \
         llpcSpirvLowerAccessChain.cpp           \
-        llpcSpirvLowerAlgebraTransform.cpp      \
         llpcSpirvLowerConstImmediateStore.cpp   \
         llpcSpirvLowerGlobal.cpp                \
         llpcSpirvLowerInstMetaRemove.cpp        \
-        llpcSpirvLowerLoopUnrollControl.cpp     \
+        llpcSpirvLowerMath.cpp                  \
         llpcSpirvLowerMemoryOp.cpp              \
         llpcSpirvLowerResourceCollect.cpp       \
         llpcSpirvLowerTranslator.cpp            \

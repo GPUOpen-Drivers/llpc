@@ -70,7 +70,7 @@ ShaderStage getShaderStageFromModule(Module *module) {
   if (!execModelNode)
     return ShaderStageInvalid;
   auto execModel = mdconst::dyn_extract<ConstantInt>(execModelNode->getOperand(0))->getZExtValue();
-  return convertToStageShage(execModel);
+  return convertToShaderStage(execModel);
 }
 
 // =====================================================================================================================
