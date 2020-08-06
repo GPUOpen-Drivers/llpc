@@ -966,7 +966,6 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       bool miscExport = usePointSize || useLayer || useViewportIndex;
       // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
       unsigned pos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
-
       Value *args[] = {
           ConstantInt::get(Type::getInt32Ty(*m_context), pos),  // tgt
           ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),  // en

@@ -1010,6 +1010,7 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     } else if (gfxIp.major == 10) {
     } else
       llvm_unreachable("Not implemented!");
+
   }
 
   if (clipDistanceCount > 0 || cullDistanceCount > 0) {
@@ -1600,7 +1601,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   bool usePrimitiveId = false;
   bool useLayer = false;
   bool useViewportIndex = false;
-
   unsigned clipDistanceCount = 0;
   unsigned cullDistanceCount = 0;
 

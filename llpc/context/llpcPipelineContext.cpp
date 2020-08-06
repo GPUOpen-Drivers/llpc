@@ -392,7 +392,6 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::Preserve) == lgc::DenormalMode::Preserve,
                     "Mismatch");
       shaderOptions.fp32DenormalMode = static_cast<lgc::DenormalMode>(shaderInfo->options.fp32DenormalMode);
-
       pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
     }
   }
