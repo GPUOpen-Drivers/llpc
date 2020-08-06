@@ -3687,10 +3687,10 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
     Constant *initializer = cast<Constant>(transValue(spvValue, nullptr, nullptr, false));
     if (initializer->getType() != type) {
       // The translated value type is different to the requested type. This can only happen in the
-      // case that the SPIR-V value was bool but the requested type was i32 because it is a bool
+      // case that the SPIR-V value was (vector of) bool but the requested type was (vector of) i32 because it is a bool
       // in memory.
-      assert(initializer->getType()->isIntegerTy(1));
-      assert(type->isIntegerTy(32));
+      assert(initializer->getType()->isIntOrIntVectorTy(1));
+      assert(type->isIntOrIntVectorTy(32));
       initializer = ConstantExpr::getZExt(initializer, type);
     }
     return initializer;
