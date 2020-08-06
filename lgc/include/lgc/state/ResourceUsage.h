@@ -153,8 +153,8 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size of gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned : 1;               // Reserved
-        unsigned : 1;               // Reserved
+        unsigned : 1; // Reserved
+        unsigned : 1; // Reserved
       } vs;
 
       // Tessellation control shader
@@ -196,7 +196,7 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned : 1;               // Reserved
+        unsigned : 1; // Reserved
       } tes;
 
       // Geometry shader
@@ -217,8 +217,8 @@ struct ResourceUsage {
         unsigned primitiveId : 1;   // Whether gl_PrimitiveID is used
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned : 1;               // Reserved
-        unsigned : 1;               // Reserved
+        unsigned : 1; // Reserved
+        unsigned : 1; // Reserved
       } gs;
 
       // Fragment shader
@@ -233,20 +233,20 @@ struct ResourceUsage {
         unsigned pullMode : 1;      // Whether pull mode interpolation is used
         unsigned custom : 1;        // Whether custom interpolation is used
         // Input
-        unsigned fragCoord : 1;                // Whether gl_FragCoord is used
-        unsigned frontFacing : 1;              // Whether gl_FrontFacing is used
-        unsigned clipDistance : 4;             // Array size of gl_ClipDistance[] (0 means unused)
-        unsigned cullDistance : 4;             // Array size of gl_CullDistance[] (0 means unused)
-        unsigned pointCoord : 1;               // Whether gl_PointCoord is used
-        unsigned primitiveId : 1;              // Whether gl_PrimitiveID is used
-        unsigned sampleId : 1;                 // Whether gl_SampleID is used
-        unsigned samplePosition : 1;           // Whether gl_SamplePosition is used
-        unsigned sampleMaskIn : 1;             // Whether gl_SampleMaskIn[] is used
-        unsigned layer : 1;                    // Whether gl_Layer is used
-        unsigned viewportIndex : 1;            // Whether gl_ViewportIndex is used
-        unsigned helperInvocation : 1;         // Whether gl_HelperInvocation is used
-        unsigned viewIndex : 1;                // Whether gl_ViewIndex is used
-        unsigned : 1;                          // Reserved
+        unsigned fragCoord : 1;        // Whether gl_FragCoord is used
+        unsigned frontFacing : 1;      // Whether gl_FrontFacing is used
+        unsigned clipDistance : 4;     // Array size of gl_ClipDistance[] (0 means unused)
+        unsigned cullDistance : 4;     // Array size of gl_CullDistance[] (0 means unused)
+        unsigned pointCoord : 1;       // Whether gl_PointCoord is used
+        unsigned primitiveId : 1;      // Whether gl_PrimitiveID is used
+        unsigned sampleId : 1;         // Whether gl_SampleID is used
+        unsigned samplePosition : 1;   // Whether gl_SamplePosition is used
+        unsigned sampleMaskIn : 1;     // Whether gl_SampleMaskIn[] is used
+        unsigned layer : 1;            // Whether gl_Layer is used
+        unsigned viewportIndex : 1;    // Whether gl_ViewportIndex is used
+        unsigned helperInvocation : 1; // Whether gl_HelperInvocation is used
+        unsigned viewIndex : 1;        // Whether gl_ViewIndex is used
+        unsigned : 1; // Reserved
         unsigned baryCoordNoPersp : 1;         // Whether gl_BaryCoordNoPersp is used (AMD extension)
         unsigned baryCoordNoPerspCentroid : 1; // Whether gl_BaryCoordNoPerspCentroid is used (AMD extension)
         unsigned baryCoordNoPerspSample : 1;   // Whether gl_BaryCoordNoPerspSample is used (AMD extension)

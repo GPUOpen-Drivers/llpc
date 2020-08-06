@@ -1585,6 +1585,7 @@ void PatchResourceCollect::clearInactiveOutput() {
 
     if (builtInUsage.viewportIndex && m_activeOutputBuiltIns.find(BuiltInViewportIndex) == m_activeOutputBuiltIns.end())
       builtInUsage.viewportIndex = false;
+
   }
 }
 

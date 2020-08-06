@@ -624,7 +624,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
           // Per-shader SPIR-V lowering passes.
           SpirvLower::addPasses(context, static_cast<ShaderStage>(entryNames[i].stage), *lowerPassMgr,
-                                timerProfiler.getTimer(TimerLower));
+                                timerProfiler.getTimer(TimerLower)
+          );
 
           lowerPassMgr->add(createBitcodeWriterPass(moduleBinaryStream));
 
@@ -1135,7 +1136,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
       lowerPassMgr->setPassIndex(&passIndex);
 
-      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
+      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
+      );
       // Run the passes.
       bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       if (!success) {

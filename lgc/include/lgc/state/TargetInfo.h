@@ -122,7 +122,8 @@ struct WorkaroundFlags {
       unsigned waNggDisabled : 1;
       unsigned waLimitedMaxOutputVertexCount : 1;
       unsigned waGeNggMaxVertOutWithGsInstancing : 1;
-      unsigned reserved : 13;
+      unsigned : 1;
+      unsigned reserved : 12;
     };
     unsigned u32All;
   } gfx10;

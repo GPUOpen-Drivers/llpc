@@ -403,6 +403,10 @@ template <> inline void SPIRVMap<BuiltIn, SPIRVCapVec>::init() {
   ADD_VEC_INIT(BuiltInSubgroupLtMaskKHR, { CapabilitySubgroupBallotKHR });
   ADD_VEC_INIT(BuiltInDeviceIndex, { CapabilityDeviceGroup });
   ADD_VEC_INIT(BuiltInViewIndex, { CapabilityMultiView });
+#if VKI_KHR_FRAGMENT_SHADING_RATE
+  ADD_VEC_INIT(BuiltInPrimitiveShadingRateKHR, {CapabilityFragmentShadingRateKHR});
+  ADD_VEC_INIT(BuiltInShadingRateKHR, {CapabilityFragmentShadingRateKHR});
+#endif
 }
 
 template <> inline void SPIRVMap<MemorySemanticsMask, SPIRVCapVec>::init() {
