@@ -187,10 +187,12 @@ void PalMetadata::mergeFromBlob(StringRef blob) {
             // This happens when linking in a glue shader.
             SPI_SHADER_PGM_RSRC1 destRsrc1;
             SPI_SHADER_PGM_RSRC1 srcRsrc1;
-            destRsrc1.u32All = destNode->getUInt();
+            SPI_SHADER_PGM_RSRC1 origRsrc1;
+            origRsrc1.u32All = destNode->getUInt();
             srcRsrc1.u32All = srcNode.getUInt();
-            destRsrc1.bits.VGPRS = std::max(destRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
-            destRsrc1.bits.SGPRS = std::max(destRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
+            destRsrc1.u32All = origRsrc1.u32All | srcRsrc1.u32All;
+            destRsrc1.bits.VGPRS = std::max(origRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
+            destRsrc1.bits.SGPRS = std::max(origRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
             *destNode = srcNode.getDocument()->getNode(destRsrc1.u32All);
             return 0;
           }
