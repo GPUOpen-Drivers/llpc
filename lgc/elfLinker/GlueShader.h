@@ -67,6 +67,9 @@ public:
   // Get the symbol name of the main shader that this glue shader is prolog or epilog for
   virtual llvm::StringRef getMainShaderName() = 0;
 
+  // Get the symbol name of the glue shader.
+  virtual llvm::StringRef getGlueShaderName() = 0;
+
   // Get whether this glue shader is a prolog (rather than epilog) for its main shader.
   virtual bool isProlog() { return false; }
 
