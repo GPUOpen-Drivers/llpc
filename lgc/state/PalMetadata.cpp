@@ -196,11 +196,16 @@ void PalMetadata::mergeFromBlob(StringRef blob) {
           }
           }
         } else if (mapKey.isString()) {
-          // For .userdatalimit and .spillthreshold, take the max or min value respectively.
-          if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit) {
+          // For .userdatalimit, register counts, and register limits, take the max value.
+          if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit ||
+              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprCount ||
+              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprLimit ||
+              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprCount ||
+              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprLimit) {
             *destNode = std::max(destNode->getUInt(), srcNode.getUInt());
             return 0;
           }
+          // For .spillthreshold, take the min value.
           if (mapKey.getString() == Util::Abi::PipelineMetadataKey::SpillThreshold) {
             *destNode = std::min(destNode->getUInt(), srcNode.getUInt());
             return 0;
