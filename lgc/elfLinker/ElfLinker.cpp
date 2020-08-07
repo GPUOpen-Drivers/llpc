@@ -409,6 +409,29 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
     }
   }
 
+  // Update the size of the symbols that had code appended to them.
+  // Note that we currently cannot have the same shader get both an epilogue and a prologue.  However, if this does
+  // happen the epilogue will have to come first in m_glueShaders.  This way the size of the epilogue will be added to
+  // the size of the main shader, and then the updated size will be added to the size of the prologue to get the whole
+  // shader.
+  for (auto &glueShader : m_glueShaders) {
+    auto glueNameStringIdx = getStringIndex(glueShader->getGlueShaderName());
+    auto glueShaderSym = findSymbol(glueNameStringIdx);
+    assert(glueShaderSym != 0);
+
+    auto mainNameStringIdx = getStringIndex(glueShader->getMainShaderName());
+    auto mainSym = findSymbol(mainNameStringIdx);
+    assert(mainSym != 0);
+
+    if (glueShader->isProlog()) {
+      m_symbols[glueShaderSym].st_size =
+          (m_symbols[mainSym].st_value + m_symbols[mainSym].st_size) - m_symbols[glueShaderSym].st_value;
+    } else {
+      m_symbols[mainSym].st_size =
+          (m_symbols[glueShaderSym].st_value + m_symbols[glueShaderSym].st_size) - m_symbols[mainSym].st_value;
+    }
+  }
+
   // Output each section, and let it set its section table entry.
   // Ensure each section is aligned in the file by the minimum of 4 and its address alignment requirement.
   // I am not sure if that is actually required by the ELF standard, but vkgcPipelineDumper.cpp relies on

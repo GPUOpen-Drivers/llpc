@@ -83,6 +83,11 @@ public:
   // Get the symbol name of the main shader that this glue shader is prolog or epilog for.
   StringRef getMainShaderName() override;
 
+  // Get the symbol name of the glue shader.
+  StringRef getGlueShaderName() override {
+    return getEntryPointName(m_vsEntryRegInfo.callingConv, /*isFetchlessVs=*/false);
+  }
+
   // Get whether this glue shader is a prolog (rather than epilog) for its main shader.
   bool isProlog() override { return true; }
 
@@ -119,6 +124,9 @@ public:
 
   // Get the symbol name of the main shader that this glue shader is prolog or epilog for.
   StringRef getMainShaderName() override;
+
+  // Get the symbol name of the glue shader.
+  StringRef getGlueShaderName() override { return "color_export_shader"; }
 
   // Get whether this glue shader is a prolog (rather than epilog) for its main shader.
   bool isProlog() override { return false; }
@@ -290,8 +298,7 @@ Function *FetchShader::createFetchFunc() {
   auto funcTy = FunctionType::get(retTy, entryTys, false);
 
   // Create the function. Mark SGPR inputs as "inreg".
-  StringRef funcName = getEntryPointName(m_vsEntryRegInfo.callingConv, /*isFetchlessVs=*/false);
-  Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, module);
+  Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, getGlueShaderName(), module);
   func->setCallingConv(m_vsEntryRegInfo.callingConv);
   for (unsigned i = 0; i != m_vsEntryRegInfo.sgprCount; ++i)
     func->getArg(i)->addAttr(Attribute::InReg);
@@ -420,8 +427,7 @@ Function *ColorExportShader::createColorExportFunc() {
   auto funcTy = FunctionType::get(Type::getVoidTy(getContext()), entryTys, false);
 
   // Create the function. Mark SGPR inputs as "inreg".
-  StringRef funcName = "color_export_shader";
-  Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, module);
+  Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, getGlueShaderName(), module);
   func->setCallingConv(CallingConv::AMDGPU_PS);
 
   BasicBlock *block = BasicBlock::Create(func->getContext(), "", func);
