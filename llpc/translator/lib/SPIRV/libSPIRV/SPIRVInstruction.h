@@ -1451,7 +1451,8 @@ protected:
 
       (void)ResTy;
       (void)OpTy;
-      assert(getType() == getValueType(Op) && "Inconsistent type");
+      // NOTE: SPIR-V spec only request OpFNegate to match the type between Operand and Result.
+      assert((getType() == getValueType(Op) || static_cast<unsigned>(OpCode) != OpFNegate) && "Inconsistent type");
       assert((ResTy->isTypeInt() || ResTy->isTypeFloat()) &&
              "Invalid type for Generic Negate instruction");
       assert((ResTy->getBitWidth() == OpTy->getBitWidth()) &&
