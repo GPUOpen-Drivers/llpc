@@ -99,15 +99,12 @@ RUN EXTRA_FLAGS="" \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
           -DXGL_BUILD_LIT=ON \
           -DXGL_ENABLE_ASSERTIONS="$ASSERTIONS" \
+          -DLLPC_BUILD_LLVM_TOOLS=OFF \
           -DICD_ANALYSIS_WARNINGS_AS_ERRORS=ON \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
           $EXTRA_FLAGS \
     && cmake --build . \
-    && cmake --build . --target amdllpc \
-    && cmake --build . --target spvgen \
-    && cmake --build . --target FileCheck \
-    && cmake --build . --target count \
-    && cmake --build . --target not
+    && cmake --build . --target lgc spvgen count FileCheck llvm-objdump not
 
 # Run the lit test suite.
 RUN source /vulkandriver/env.sh \
