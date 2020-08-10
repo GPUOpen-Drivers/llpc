@@ -525,8 +525,10 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
         if (inst && inst->getFunction() == &func) {
           auto call = cast<CallInst>(inst);
           if (descriptorSet.entryArgIdx != 0) {
-            // The descriptor set is unspilled, and uses an entry arg.
+            // The descriptor set is unspilled, and uses an entry arg. Set builder to insert the 32-to-64
+            // extension code at the start of the function.
             descSetVal = func.getArg(descriptorSet.entryArgIdx);
+            builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
           } else {
             // The descriptor set is spilled, so we to GEP an offset from the spill table and load from that. For all
             // users, we share a single load at the start of the function.
@@ -554,12 +556,13 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
               load = builder.CreateLoad(builder.getInt32Ty(), addr);
             }
             descSetVal = load;
+            // Set builder to insert the 32-to-64 extension code just after the load.
+            builder.SetInsertPoint(load->getNextNode());
           }
           descSetVal->setName("descSet" + Twine(descSetIdx));
 
           // Now we want to extend the loaded 32-bit value to a 64-bit pointer, using either PC or the provided
           // high half.
-          builder.SetInsertPoint(call);
           unsigned highHalf = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
           descSetVal = addressExtender.extend(descSetVal, highHalf, call->getType(), builder);
           // Replace uses of the call and erase it.
