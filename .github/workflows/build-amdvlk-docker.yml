@@ -20,6 +20,18 @@ jobs:
         feature-set:    ["+gcc", "+clang", "+clang+shadercache", "+clang+sanitizers"]
         generator:      [Ninja]
     steps:
+      - name: Free up disk space
+        if: matrix.feature-set == '+clang+sanitizers'
+        run: |
+          sudo apt-get purge "ghc-*" "adoptopenjdk-*" "openjdk-*" hhvm \
+                       google-chrome-stable firefox \
+                       "llvm-*" "clang-*" "libclang*" \
+                       "g++-*" "r-*" "mongodb-*" \
+                       "dotnet-*" powershell azure-cli \
+                       snapd
+          sudo apt-get autoremove
+          sudo apt-get clean
+          df -h
       - name: Checkout LLPC
         run: |
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
