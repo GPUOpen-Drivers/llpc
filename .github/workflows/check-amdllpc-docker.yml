@@ -25,6 +25,7 @@ jobs:
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
           git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
           git checkout ${GITHUB_SHA}
+          find ./ -maxdepth 1 -mindepth 1 ! -name docker -exec rm -rf '{}' '+'
       - name: Generate Docker base image tag string
         run: |
           CONFIG_LOWER=$(echo "${{ matrix.config }}" | tr "[:upper:]" "[:lower:]")
