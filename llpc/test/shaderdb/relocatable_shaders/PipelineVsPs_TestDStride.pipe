@@ -1,0 +1,115 @@
+; Test that the descriptor stride relocation is correctly used and replaced.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL:  _amdgpu_vs_main:
+; SHADERTEST: s_lshl_b32 [[offset:s[0-9]*]], dstride_3_14@abs32@lo, 2
+; SHADERTEST: s_ashr_i32 [[sign:s[0-9]*]], [[offset]], 31
+; SHADERTEST: s_add_u32 s[[base1:[0-9]*]], {{s[0-9]*}}, [[offset]]
+; SHADERTEST: s_addc_u32 s[[base2:[0-9]*]], {{s[0-9]*}}, [[sign]]
+; SHADERTEST: s_load_dwordx8 s{{\[[0-9]*:[0-9]*\]}}, s{{\[}}[[base1]]:[[base2]]{{\]}}
+; SasdfaHADERTEST: s_load_dwordx8 s{{[0-9]*}}, 
+; END_SHADERTEST
+
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST1 %s
+; SHADERTEST1-LABEL: 0000000000000100 <_amdgpu_ps_main>:
+; SHADERTEST1: s_lshl_b32 [[offset:s[0-9]*]], 32, 2
+; SHADERTEST1: s_ashr_i32 [[sign:s[0-9]*]], [[offset]], 31
+; SHADERTEST1: s_add_u32 s[[base1:[0-9]*]], {{s[0-9]*}}, [[offset]]
+; SHADERTEST1: s_addc_u32 s[[base2:[0-9]*]], {{s[0-9]*}}, [[sign]]
+; SHADERTEST1: s_load_dwordx8 s{{\[[0-9]*:[0-9]*\]}}, s{{\[}}[[base1]]:[[base2]]{{\]}}
+; END_SHADERTEST
+
+[Version]
+version = 40
+
+[VsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %4 "main"
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+               OpReturn
+               OpFunctionEnd
+
+[VsInfo]
+entryPoint = main
+
+[FsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %633
+               OpExecutionMode %4 OriginUpperLeft
+               OpDecorate %177 DescriptorSet 3
+               OpDecorate %177 Binding 14
+               OpDecorate %633 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+    %v2float = OpTypeVector %float 2
+       %uint = OpTypeInt 32 0
+         %38 = OpTypeImage %float 2D 0 0 0 1 Unknown
+%_ptr_UniformConstant_38 = OpTypePointer UniformConstant %38
+         %40 = OpTypeSampler
+     %uint_4 = OpConstant %uint 4
+  %float_128 = OpConstant %float 128
+        %101 = OpConstantComposite %v2float %float_128 %float_128
+        %117 = OpTypeSampledImage %38
+    %float_0 = OpConstant %float 0
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %int_3 = OpConstant %int 3
+       %bool = OpTypeBool
+%_arr_38_uint_4 = OpTypeArray %38 %uint_4
+%_ptr_UniformConstant__arr_38_uint_4 = OpTypePointer UniformConstant %_arr_38_uint_4
+        %177 = OpVariable %_ptr_UniformConstant__arr_38_uint_4 UniformConstant
+        %591 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+        %633 = OpVariable %_ptr_Output_v4float Output
+       %1285 = OpUndef %40
+      %int_4 = OpConstant %int 4
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+               OpBranch %998
+        %998 = OpLabel
+       %1222 = OpPhi %v4float %591 %5 %1026 %1002
+       %1221 = OpPhi %int %int_0 %5 %int_3 %1002
+       %1001 = OpSLessThan %bool %1221 %int_3
+               OpLoopMerge %1030 %1002 None
+               OpBranchConditional %1001 %1002 %1030
+       %1002 = OpLabel
+       %1005 = OpAccessChain %_ptr_UniformConstant_38 %177 %int_4
+       %1006 = OpLoad %38 %1005
+       %1008 = OpSampledImage %117 %1006 %1285
+       %1012 = OpImageSampleImplicitLod %v4float %1008 %101
+       %1026 = OpExtInst %v4float %1 FMix %591 %1012 %1012
+               OpBranch %998
+       %1030 = OpLabel
+               OpStore %633 %1222
+               OpReturn
+               OpFunctionEnd
+
+[FsInfo]
+entryPoint = main
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 18
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorResource
+userDataNode[0].next[0].offsetInDwords = 72
+userDataNode[0].next[0].sizeInDwords = 32
+userDataNode[0].next[0].set = 3
+userDataNode[0].next[0].binding = 14
+
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_SRGB
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
