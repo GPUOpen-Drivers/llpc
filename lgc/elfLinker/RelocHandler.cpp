@@ -147,6 +147,7 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
       if (!node)
         report_fatal_error("No resource node for " + name);
       value = node->stride * sizeof(uint32_t);
+      return true;
     }
   }
 
