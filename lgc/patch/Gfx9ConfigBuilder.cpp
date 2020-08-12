@@ -1774,8 +1774,6 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
 
   if (gfxIp.major == 10) {
     SET_REG_GFX10_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC1_PS, MEM_ORDERED, true);
-    SET_REG_GFX10_FIELD(&pConfig->psRegs, PA_SC_SHADER_CONTROL, WAVE_BREAK_REGION_SIZE,
-                        static_cast<unsigned>(shaderOptions.waveBreakSize));
     SET_REG_GFX10_FIELD(&pConfig->psRegs, PA_STEREO_CNTL, STEREO_MODE, STATE_STEREO_X);
     SET_REG_GFX10_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR_MSB, userSgprMsb);
   } else {
@@ -1937,12 +1935,6 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
     setPsWritesDepth(builtInUsage.fragDepth);
   } else
     setPsUsesUavs(static_cast<unsigned>(resUsage->resourceWrite));
-
-  if (m_pipelineState->getRasterizerState().innerCoverage) {
-    SET_REG_FIELD(&pConfig->psRegs, PA_SC_AA_CONFIG, COVERAGE_TO_SHADER_SELECT, INPUT_INNER_COVERAGE);
-  } else {
-    SET_REG_FIELD(&pConfig->psRegs, PA_SC_AA_CONFIG, COVERAGE_TO_SHADER_SELECT, INPUT_COVERAGE);
-  }
 
   const unsigned loadCollisionWaveId = GET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC2_PS, LOAD_COLLISION_WAVEID);
   const unsigned loadIntrawaveCollision =

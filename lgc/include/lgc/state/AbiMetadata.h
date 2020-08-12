@@ -240,9 +240,11 @@ constexpr unsigned mmDB_SHADER_CONTROL = 0xA203;
 constexpr unsigned mmSPI_SHADER_Z_FORMAT = 0xA1C4;
 constexpr unsigned mmCB_SHADER_MASK = 0xA08F;
 
-// PS Input register numbers in PAL metadata
-constexpr unsigned int mmSPI_PS_INPUT_ENA = 0xA1B3;
-constexpr unsigned int mmSPI_PS_INPUT_ADDR = 0xA1B4;
+// PS register numbers in PAL metadata
+constexpr unsigned mmSPI_PS_INPUT_ENA = 0xA1B3;
+constexpr unsigned mmSPI_PS_INPUT_ADDR = 0xA1B4;
+constexpr unsigned mmPA_SC_SHADER_CONTROL = 0xA310;
+constexpr unsigned mmPA_SC_AA_CONFIG = 0xA2F8;
 
 // Register bitfield layout.
 
@@ -320,6 +322,33 @@ union DB_SHADER_CONTROL {
     unsigned int : 20;
   } bitfields, bits;
   unsigned int u32All;
+};
+
+union PA_SC_SHADER_CONTROL {
+  struct {
+    unsigned : 5;
+    unsigned WAVE_BREAK_REGION_SIZE : 2;
+    unsigned : 25;
+  } gfx10;
+
+  unsigned u32All;
+};
+
+enum CovToShaderSel {
+  INPUT_COVERAGE = 0x00000000,
+  INPUT_INNER_COVERAGE = 0x00000001,
+  INPUT_DEPTH_COVERAGE = 0x00000002,
+  RAW = 0x00000003,
+};
+
+union PA_SC_AA_CONFIG {
+  struct {
+    unsigned : 26;
+    unsigned COVERAGE_TO_SHADER_SELECT : 2;
+    unsigned : 4;
+  } bits, bitfields;
+
+  unsigned u32All;
 };
 
 } // namespace lgc

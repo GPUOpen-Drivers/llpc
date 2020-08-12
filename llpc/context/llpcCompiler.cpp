@@ -2072,7 +2072,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     fragmentHasher.Update(pipelineOptions->extendedRobustness.robustBufferAccess);
     fragmentHasher.Update(pipelineOptions->extendedRobustness.robustImageAccess);
     fragmentHasher.Update(pipelineOptions->extendedRobustness.nullDescriptor);
-    PipelineDumper::updateHashForFragmentState(pipelineInfo, &fragmentHasher);
+    PipelineDumper::updateHashForFragmentState(pipelineInfo, &fragmentHasher, false);
     fragmentHasher.Finalize(fragmentHash->bytes);
   }
 
