@@ -2,7 +2,6 @@
 ; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
 ; SHADERTEST: AMDLLPC SUCCESS
-; XFAIL: *
 ; END_SHADERTEST
 ;
 ; Based on https://github.com/GPUOpen-Drivers/llpc/issues/834.
