@@ -107,7 +107,8 @@ public:
   static void updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
                                             MetroHash64 *hasher, bool isRelocatableShader);
 
-  static void updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher);
+  static void updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher,
+                                         bool isRelocatableShader);
 
   // Get name of register, or "" if not known
   static const char *getRegisterNameString(unsigned regNumber);

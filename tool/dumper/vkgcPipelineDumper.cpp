@@ -870,7 +870,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   }
 
   if (stage == ShaderStageFragment || stage == ShaderStageInvalid)
-    updateHashForFragmentState(pipeline, &hasher);
+    updateHashForFragmentState(pipeline, &hasher, isRelocatableShader);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1020,22 +1020,27 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 //
 // @param pipeline : Info to build a graphics pipeline
 // @param [in/out] hasher : Hasher to generate hash code
-void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher) {
+// @param isRelocatableShader : TRUE if we are building relocatable shader
+void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher,
+                                                bool isRelocatableShader) {
   auto rsState = &pipeline->rsState;
-  hasher->Update(rsState->innerCoverage);
   hasher->Update(rsState->perSampleShading);
-  hasher->Update(rsState->numSamples);
-  hasher->Update(rsState->samplePatternIdx);
 
-  auto cbState = &pipeline->cbState;
-  hasher->Update(cbState->alphaToCoverageEnable);
-  hasher->Update(cbState->dualSourceBlendEnable);
-  for (unsigned i = 0; i < MaxColorTargets; ++i) {
-    if (cbState->target[i].format != VK_FORMAT_UNDEFINED) {
-      hasher->Update(cbState->target[i].channelWriteMask);
-      hasher->Update(cbState->target[i].blendEnable);
-      hasher->Update(cbState->target[i].blendSrcAlphaToColor);
-      hasher->Update(cbState->target[i].format);
+  if (!isRelocatableShader) {
+    hasher->Update(rsState->innerCoverage);
+    hasher->Update(rsState->numSamples);
+    hasher->Update(rsState->samplePatternIdx);
+
+    auto cbState = &pipeline->cbState;
+    hasher->Update(cbState->alphaToCoverageEnable);
+    hasher->Update(cbState->dualSourceBlendEnable);
+    for (unsigned i = 0; i < MaxColorTargets; ++i) {
+      if (cbState->target[i].format != VK_FORMAT_UNDEFINED) {
+        hasher->Update(cbState->target[i].channelWriteMask);
+        hasher->Update(cbState->target[i].blendEnable);
+        hasher->Update(cbState->target[i].blendSrcAlphaToColor);
+        hasher->Update(cbState->target[i].format);
+      }
     }
   }
 }
@@ -1122,7 +1127,10 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.maxThreadGroupsPerComputeUnit);
       hasher->Update(options.waveSize);
       hasher->Update(options.wgpMode);
-      hasher->Update(options.waveBreakSize);
+
+      if (!isRelocatableShader)
+        hasher->Update(options.waveBreakSize);
+
       hasher->Update(options.forceLoopUnrollCount);
       hasher->Update(options.useSiScheduler);
       hasher->Update(options.updateDescInElf);
