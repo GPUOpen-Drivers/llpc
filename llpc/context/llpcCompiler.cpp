@@ -2077,7 +2077,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
   }
 
   if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
-    PipelineDumper::updateHashForNonFragmentState(pipelineInfo, true, &nonFragmentHasher);
+    PipelineDumper::updateHashForNonFragmentState(pipelineInfo, true, &nonFragmentHasher, false);
     nonFragmentHasher.Finalize(nonFragmentHash->bytes);
   }
 }

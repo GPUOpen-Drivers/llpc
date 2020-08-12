@@ -864,8 +864,9 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   hasher.Update(pipeline->iaState.deviceIndex);
 
   if (stage != ShaderStageFragment) {
-    updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
-    updateHashForNonFragmentState(pipeline, isCacheHash, &hasher);
+    if (!isRelocatableShader)
+      updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
+    updateHashForNonFragmentState(pipeline, isCacheHash, &hasher, isRelocatableShader);
   }
 
   if (stage == ShaderStageFragment || stage == ShaderStageInvalid)
@@ -944,8 +945,9 @@ void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputSt
 // @param pipeline : Info to build a graphics pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param [in/out] hasher : Hasher to generate hash code
+// @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
-                                                   MetroHash64 *hasher) {
+                                                   MetroHash64 *hasher, bool isRelocatableShader) {
   auto iaState = &pipeline->iaState;
   hasher->Update(iaState->topology);
   hasher->Update(iaState->patchControlPoints);
@@ -953,11 +955,13 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   hasher->Update(iaState->switchWinding);
   hasher->Update(iaState->enableMultiView);
 
-  auto vpState = &pipeline->vpState;
-  hasher->Update(vpState->depthClipEnable);
+  if (!isRelocatableShader) {
+    auto vpState = &pipeline->vpState;
+    hasher->Update(vpState->depthClipEnable);
 
-  auto rsState = &pipeline->rsState;
-  hasher->Update(rsState->rasterizerDiscardEnable);
+    auto rsState = &pipeline->rsState;
+    hasher->Update(rsState->rasterizerDiscardEnable);
+  }
 
   auto nggState = &pipeline->nggState;
   bool enableNgg = nggState->enableNgg;
@@ -970,6 +974,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   updateHashFromRs |= (enableNgg && !passthroughMode);
 
   if (updateHashFromRs) {
+    auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
     hasher->Update(rsState->polygonMode);
     hasher->Update(rsState->cullMode);
@@ -979,23 +984,24 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 
   if (isCacheHash) {
     hasher->Update(nggState->enableNgg);
-    hasher->Update(nggState->enableGsUse);
-    hasher->Update(nggState->forceNonPassthrough);
-    hasher->Update(nggState->alwaysUsePrimShaderTable);
-    hasher->Update(nggState->compactMode);
-    hasher->Update(nggState->enableFastLaunch);
-    hasher->Update(nggState->enableVertexReuse);
-    hasher->Update(nggState->enableBackfaceCulling);
-    hasher->Update(nggState->enableFrustumCulling);
-    hasher->Update(nggState->enableBoxFilterCulling);
-    hasher->Update(nggState->enableSphereCulling);
-    hasher->Update(nggState->enableSmallPrimFilter);
-    hasher->Update(nggState->enableCullDistanceCulling);
-    hasher->Update(nggState->backfaceExponent);
-    hasher->Update(nggState->subgroupSizing);
-    hasher->Update(nggState->primsPerSubgroup);
-    hasher->Update(nggState->vertsPerSubgroup);
-
+    if (nggState->enableNgg) {
+      hasher->Update(nggState->enableGsUse);
+      hasher->Update(nggState->forceNonPassthrough);
+      hasher->Update(nggState->alwaysUsePrimShaderTable);
+      hasher->Update(nggState->compactMode);
+      hasher->Update(nggState->enableFastLaunch);
+      hasher->Update(nggState->enableVertexReuse);
+      hasher->Update(nggState->enableBackfaceCulling);
+      hasher->Update(nggState->enableFrustumCulling);
+      hasher->Update(nggState->enableBoxFilterCulling);
+      hasher->Update(nggState->enableSphereCulling);
+      hasher->Update(nggState->enableSmallPrimFilter);
+      hasher->Update(nggState->enableCullDistanceCulling);
+      hasher->Update(nggState->backfaceExponent);
+      hasher->Update(nggState->subgroupSizing);
+      hasher->Update(nggState->primsPerSubgroup);
+      hasher->Update(nggState->vertsPerSubgroup);
+    }
     hasher->Update(pipeline->options.includeDisassembly);
     hasher->Update(pipeline->options.scalarBlockLayout);
     hasher->Update(pipeline->options.includeIr);
