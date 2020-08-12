@@ -819,35 +819,34 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
 //
 // @param pipeline : Info to build a graphics pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
-// @param isRelocatableShader : TRUE if we are building relocatable shader
+// @param isUnlinked : TRUE if we are building an unlinked shader
 // @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
 MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline,
-                                                                bool isCacheHash, bool isRelocatableShader,
-                                                                unsigned stage) {
+                                                                bool isCacheHash, bool isUnlinked, unsigned stage) {
   MetroHash64 hasher;
 
   switch (stage) {
   case ShaderStageVertex:
-    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isUnlinked);
     break;
   case ShaderStageTessControl:
-    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isUnlinked);
     break;
   case ShaderStageTessEval:
-    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isUnlinked);
     break;
   case ShaderStageGeometry:
-    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isUnlinked);
     break;
   case ShaderStageFragment:
-    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isUnlinked);
     break;
   case ShaderStageInvalid:
-    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isUnlinked);
+    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isUnlinked);
+    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isUnlinked);
+    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isUnlinked);
+    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isUnlinked);
     break;
   default:
     llvm_unreachable("Should never be called!");
@@ -855,7 +854,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   }
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
-  updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isRelocatableShader);
+  updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isUnlinked);
 #endif
 
   hasher.Update(pipeline->iaState.deviceIndex);
@@ -880,13 +879,13 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 // @param pipeline : Info to build a compute pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
 MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline,
-                                                               bool isCacheHash, bool isRelocatableShader) {
+                                                               bool isCacheHash, bool isUnlinked) {
   MetroHash64 hasher;
 
-  updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher, isRelocatableShader);
+  updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher, isUnlinked);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
-  updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isRelocatableShader);
+  updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isUnlinked);
 #endif
 
   hasher.Update(pipeline->deviceIndex);
@@ -1037,8 +1036,9 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
 // @param shaderInfo : Shader info in specified shader stage
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param [in/out] hasher : Haher to generate hash code
+// @param isUnlinked : TRUE if we are building an unlinked shader
 void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo,
-                                                     bool isCacheHash, MetroHash64 *hasher, bool isRelocatableShader) {
+                                                     bool isCacheHash, MetroHash64 *hasher, bool isUnlinked) {
   if (shaderInfo->pModuleData) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
     hasher->Update(stage);
@@ -1093,7 +1093,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
     if (shaderInfo->userDataNodeCount > 0) {
       for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
         auto userDataNode = &shaderInfo->pUserDataNodes[i];
-        updateHashForResourceMappingNode(userDataNode, true, hasher, isRelocatableShader);
+        updateHashForResourceMappingNode(userDataNode, true, hasher, isUnlinked);
       }
     }
 #endif
@@ -1130,9 +1130,9 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 //
 // @param resourceMapping : Pipeline resource mapping data
 // @param [in,out] hasher : Haher to generate hash code
-// @param isRelocatableShader : TRUE if we are building relocatable shader
+// @param isUnlinked : TRUE if we are building an unlinked shader
 void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData *pResourceMapping, MetroHash64 *hasher,
-                                                      bool isRelocatableShader) {
+                                                      bool isUnlinked) {
   hasher->Update(pResourceMapping->staticDescriptorValueCount);
   if (pResourceMapping->staticDescriptorValueCount > 0) {
     for (unsigned i = 0; i < pResourceMapping->staticDescriptorValueCount; ++i) {
@@ -1161,7 +1161,7 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
     for (unsigned i = 0; i < pResourceMapping->userDataNodeCount; ++i) {
       auto userDataNode = &pResourceMapping->pUserDataNodes[i];
       hasher->Update(userDataNode->visibility);
-      updateHashForResourceMappingNode(&userDataNode->node, true, hasher, isRelocatableShader);
+      updateHashForResourceMappingNode(&userDataNode->node, true, hasher, isUnlinked);
     }
   }
 }
@@ -1175,10 +1175,11 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
 // @param userDataNode : Resource mapping node
 // @param isRootNode : TRUE if the node is in root level
 // @param [in/out] hasher : Haher to generate hash code
+// @param isUnlinked : TRUE if we are building an unlinked shader
 void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
-                                                      MetroHash64 *hasher, bool isRelocatableShader) {
+                                                      MetroHash64 *hasher, bool isUnlinked) {
   hasher->Update(userDataNode->type);
-  if (!isRelocatableShader) {
+  if (!isUnlinked) {
     hasher->Update(userDataNode->sizeInDwords);
     hasher->Update(userDataNode->offsetInDwords);
   }
@@ -1196,7 +1197,7 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   }
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
     for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i)
-      updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher, isRelocatableShader);
+      updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher, isUnlinked);
     break;
   }
   case ResourceMappingNodeType::IndirectUserDataVaPtr: {

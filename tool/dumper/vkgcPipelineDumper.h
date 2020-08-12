@@ -77,19 +77,19 @@ public:
   static void DumpPipelineExtraInfo(PipelineDumpFile *binaryFile, const std::string *str);
 
   static MetroHash::Hash generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
-                                                         bool isRelocatableShader, unsigned stage = ShaderStageInvalid);
+                                                         bool isUnlinked, unsigned stage = ShaderStageInvalid);
 
   static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline, bool isCacheHash,
-                                                        bool isRelocatableShader);
+                                                        bool isUnlinked);
 
   static std::string getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const MetroHash::Hash *hash);
 
   static void updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo, bool isCacheHash,
-                                              MetroHash64 *hasher, bool isRelocatableShader);
+                                              MetroHash64 *hasher, bool isUnlinked);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   static void updateHashForResourceMappingInfo(const ResourceMappingData *pResourceMapping, MetroHash64 *hasher,
-                                               bool isRelocatableShader);
+                                               bool isUnlinked);
 #endif
 
   static void updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
@@ -134,7 +134,7 @@ private:
   static void dumpPipelineOptions(const PipelineOptions *options, std::ostream &dumpFile);
 
   static void updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
-                                               MetroHash64 *hasher, bool isRelocatableShader);
+                                               MetroHash64 *hasher, bool isUnlinked);
 };
 
 } // namespace Vkgc
