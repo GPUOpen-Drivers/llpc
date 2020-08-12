@@ -282,6 +282,15 @@ void ConfigBuilderBase::setEsGsLdsSize(unsigned value) {
 }
 
 // =====================================================================================================================
+// Set NGG sub-group size
+//
+// @param value : Value to set
+void ConfigBuilderBase::setNggSubgroupSize(unsigned value) {
+  assert(value != 0);
+  m_pipelineNode[Util::Abi::PipelineMetadataKey::NggSubgroupSize] = value;
+}
+
+// =====================================================================================================================
 /// Append a single entry to the PAL register metadata.
 ///
 /// @param [in] key : The metadata key (usually a register address).

@@ -1476,6 +1476,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
 
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
+  setNggSubgroupSize(std::max(calcFactor.esVertsPerSubgroup, calcFactor.gsPrimsPerSubgroup));
 
   const unsigned gsInstPrimsInSubgrp = geometryMode.invocations > 1
                                            ? (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations)
