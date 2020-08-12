@@ -1094,11 +1094,13 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       }
     }
 
-    hasher->Update(shaderInfo->userDataNodeCount);
-    if (shaderInfo->userDataNodeCount > 0) {
-      for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
-        auto userDataNode = &shaderInfo->pUserDataNodes[i];
-        updateHashForResourceMappingNode(userDataNode, true, hasher, isRelocatableShader);
+    if (!isRelocatableShader) {
+      hasher->Update(shaderInfo->userDataNodeCount);
+      if (shaderInfo->userDataNodeCount > 0) {
+        for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
+          auto userDataNode = &shaderInfo->pUserDataNodes[i];
+          updateHashForResourceMappingNode(userDataNode, true, hasher);
+        }
       }
     }
 #endif
@@ -1161,12 +1163,14 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
     }
   }
 
-  hasher->Update(pResourceMapping->userDataNodeCount);
-  if (pResourceMapping->userDataNodeCount > 0) {
-    for (unsigned i = 0; i < pResourceMapping->userDataNodeCount; ++i) {
-      auto userDataNode = &pResourceMapping->pUserDataNodes[i];
-      hasher->Update(userDataNode->visibility);
-      updateHashForResourceMappingNode(&userDataNode->node, true, hasher, isRelocatableShader);
+  if (!isRelocatableShader) {
+    hasher->Update(pResourceMapping->userDataNodeCount);
+    if (pResourceMapping->userDataNodeCount > 0) {
+      for (unsigned i = 0; i < pResourceMapping->userDataNodeCount; ++i) {
+        auto userDataNode = &pResourceMapping->pUserDataNodes[i];
+        hasher->Update(userDataNode->visibility);
+        updateHashForResourceMappingNode(&userDataNode->node, true, hasher);
+      }
     }
   }
 }
@@ -1180,14 +1184,11 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
 // @param userDataNode : Resource mapping node
 // @param isRootNode : TRUE if the node is in root level
 // @param [in/out] hasher : Haher to generate hash code
-// @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
-                                                      MetroHash64 *hasher, bool isRelocatableShader) {
+                                                      MetroHash64 *hasher) {
   hasher->Update(userDataNode->type);
-  if (!isRelocatableShader) {
-    hasher->Update(userDataNode->sizeInDwords);
-    hasher->Update(userDataNode->offsetInDwords);
-  }
+  hasher->Update(userDataNode->sizeInDwords);
+  hasher->Update(userDataNode->offsetInDwords);
   switch (userDataNode->type) {
   case ResourceMappingNodeType::DescriptorResource:
   case ResourceMappingNodeType::DescriptorSampler:
@@ -1202,7 +1203,7 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   }
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
     for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i)
-      updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher, isRelocatableShader);
+      updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher);
     break;
   }
   case ResourceMappingNodeType::IndirectUserDataVaPtr: {
