@@ -702,10 +702,12 @@ void OutputSection::layout() {
       // Remove GFX10 s_end_code padding by removing any suffix of the section that is not inside a function symbol.
       inputSection.size = 0;
       for (auto &sym : inputSection.sectionRef.getObject()->symbols()) {
-        if (cantFail(sym.getSection()) == inputSection.sectionRef &&
-            cantFail(sym.getType()) == object::SymbolRef::ST_Function) {
-          inputSection.size =
-              std::max(inputSection.size, cantFail(sym.getValue()) + object::ELFSymbolRef(sym).getSize());
+        if (cantFail(sym.getSection()) == inputSection.sectionRef) {
+          auto symType = cantFail(sym.getType());
+          if (symType == object::SymbolRef::ST_Function || symType == object::SymbolRef::ST_Data) {
+            inputSection.size =
+                std::max(inputSection.size, cantFail(sym.getValue()) + object::ELFSymbolRef(sym).getSize());
+          }
         }
       }
       if (inputSection.size == 0) {

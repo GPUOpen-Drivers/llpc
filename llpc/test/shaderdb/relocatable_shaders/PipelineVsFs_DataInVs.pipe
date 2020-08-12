@@ -1,0 +1,98 @@
+; This test case checks that the constant data (%117) is not overwritten when linking.
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: _amdgpu_vs_main
+; SHADERTEST: s_endpgm
+; SHADERTEST: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 3F800000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 3F800000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 3F800000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 3F800000
+; SHADERTEST-NEXT: // {{[0-9A-F]*}}: 00000000
+; SHADERTEST-LABEL: _amdgpu_ps_main
+; END_SHADERTEST
+
+[Version]
+version = 40
+
+[VsSpirv]
+               OpCapability Shader
+               OpCapability ClipDistance
+               OpCapability CullDistance
+               OpCapability SampledBuffer
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %2 "main" %gl_ClipDistance %gl_VertexIndex
+               OpDecorate %gl_ClipDistance BuiltIn ClipDistance
+               OpDecorate %gl_VertexIndex BuiltIn VertexIndex
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %uint_4 = OpConstant %uint 4
+     %uint_0 = OpConstant %uint 0
+     %uint_2 = OpConstant %uint 2
+    %float_1 = OpConstant %float 1
+    %float_0 = OpConstant %float 0
+    %v4float = OpTypeVector %float 4
+         %59 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_1
+%_arr_v4float_uint_4 = OpTypeArray %v4float %uint_4
+%_arr_float_uint_2 = OpTypeArray %float %uint_2
+%_ptr_Output__arr_float_uint_2 = OpTypePointer Output %_arr_float_uint_2
+%_ptr_Input_uint = OpTypePointer Input %uint
+       %void = OpTypeVoid
+         %94 = OpTypeFunction %void
+%_ptr_Output_float = OpTypePointer Output %float
+%_ptr_Function_v4float = OpTypePointer Function %v4float
+%gl_ClipDistance = OpVariable %_ptr_Output__arr_float_uint_2 Output
+%gl_VertexIndex = OpVariable %_ptr_Input_uint Input
+%_ptr_Function__arr_v4float_uint_4 = OpTypePointer Function %_arr_v4float_uint_4
+        %116 = OpConstantComposite %v4float %float_0 %float_0 %float_1 %float_0
+        %117 = OpConstantComposite %_arr_v4float_uint_4 %116 %59 %59 %116
+          %2 = OpFunction %void None %94
+        %120 = OpLabel
+         %26 = OpVariable %_ptr_Function__arr_v4float_uint_4 Function
+               OpStore %26 %117
+        %122 = OpLoad %uint %gl_VertexIndex
+        %203 = OpAccessChain %_ptr_Function_v4float %26 %122
+        %204 = OpLoad %v4float %203
+        %205 = OpDot %float %59 %204
+        %428 = OpAccessChain %_ptr_Output_float %gl_ClipDistance %uint_0
+               OpStore %428 %205
+               OpReturn
+               OpFunctionEnd
+
+[VsInfo]
+entryPoint = main
+
+[FsSpirv]
+               OpCapability Shader
+               OpCapability ClipDistance
+               OpCapability SampledBuffer
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %2 "main"
+               OpExecutionMode %2 OriginUpperLeft
+       %void = OpTypeVoid
+         %99 = OpTypeFunction %void
+          %2 = OpFunction %void None %99
+        %108 = OpLabel
+               OpKill
+               OpFunctionEnd
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_B10G11R11_UFLOAT_PACK32
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 1
+colorBuffer[0].blendSrcAlphaToColor = 1
