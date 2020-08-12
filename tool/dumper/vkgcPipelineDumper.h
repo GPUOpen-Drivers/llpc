@@ -134,7 +134,7 @@ private:
   static void dumpPipelineOptions(const PipelineOptions *options, std::ostream &dumpFile);
 
   static void updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
-                                               MetroHash64 *hasher, bool isRelocatableShader);
+                                               MetroHash64 *hasher);
 };
 
 } // namespace Vkgc
