@@ -879,6 +879,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 //
 // @param pipeline : Info to build a compute pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
+// @param isRelocatableShader : TRUE if we are building relocatable shader
 MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline,
                                                                bool isCacheHash, bool isRelocatableShader) {
   MetroHash64 hasher;
@@ -1037,6 +1038,7 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
 // @param shaderInfo : Shader info in specified shader stage
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param [in/out] hasher : Haher to generate hash code
+// @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo,
                                                      bool isCacheHash, MetroHash64 *hasher, bool isRelocatableShader) {
   if (shaderInfo->pModuleData) {
@@ -1175,6 +1177,7 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
 // @param userDataNode : Resource mapping node
 // @param isRootNode : TRUE if the node is in root level
 // @param [in/out] hasher : Haher to generate hash code
+// @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
                                                       MetroHash64 *hasher, bool isRelocatableShader) {
   hasher->Update(userDataNode->type);

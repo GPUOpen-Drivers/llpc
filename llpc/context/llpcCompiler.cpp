@@ -828,6 +828,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       elf[stage].assign(data, data + elfBin.codeSize);
       // Release Entry
       ReleaseCacheEntry(false, nullptr, &cacheEntry);
+      LLPC_OUTS("Cache hit for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
       continue;
     }
 
@@ -838,10 +839,10 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     if (cacheEntryState == ShaderEntryState::Ready) {
       auto data = reinterpret_cast<const char *>(elfBin.pCode);
       elf[stage].assign(data, data + elfBin.codeSize);
-      LLPC_OUTS("Cache hit for shader stage " << stage << "\n");
+      LLPC_OUTS("Cache hit for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
       continue;
     }
-    LLPC_OUTS("Cache miss for shader stage " << stage << "\n");
+    LLPC_OUTS("Cache miss for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
 
     // There was a cache miss, so we need to build the relocatable shader for
     // this stage.
