@@ -4211,12 +4211,15 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, scale);
   }
 
-#if SPV_VERSION >= 0x10400
-  case OpCopyObject:
-  case OpCopyLogical: {
-#else
   case OpCopyObject: {
-#endif
+    SPIRVCopyBase *copy = static_cast<SPIRVCopyBase *>(bv);
+    Value *v = transValue(copy->getOperand(), f, bb);
+    assert(v);
+    return mapValue(bv, v);
+  }
+
+#if SPV_VERSION >= 0x10400
+  case OpCopyLogical: {
     SPIRVCopyBase *copy = static_cast<SPIRVCopyBase *>(bv);
     AllocaInst *ai = nullptr;
     auto at = transType(copy->getOperand()->getType());
@@ -4232,6 +4235,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     LoadInst *li = new LoadInst(at, ai, "", bb);
     return mapValue(bv, li);
   }
+#endif
 
   case OpCompositeConstruct: {
     auto cc = static_cast<SPIRVCompositeConstruct *>(bv);
