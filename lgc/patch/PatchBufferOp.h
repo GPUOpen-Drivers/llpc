@@ -87,9 +87,12 @@ private:
                               llvm::Instruction *const insertPos);
   void postVisitMemCpyInst(llvm::MemCpyInst &memCpyInst);
   void postVisitMemSetInst(llvm::MemSetInst &memSetInst);
+  void fixIncompletePhis();
 
   using Replacement = std::pair<llvm::Value *, llvm::Value *>;
+  using PhiIncoming = std::pair<llvm::PHINode *, llvm::BasicBlock *>;
   llvm::DenseMap<llvm::Value *, Replacement> m_replacementMap; // The replacement map.
+  llvm::DenseMap<PhiIncoming, llvm::Value *> m_incompletePhis; // The incomplete phi map.
   llvm::DenseSet<llvm::Value *> m_invariantSet;                // The invariant set.
   llvm::DenseSet<llvm::Value *> m_divergenceSet;               // The divergence set.
   llvm::LegacyDivergenceAnalysis *m_divergenceAnalysis;        // The divergence analysis.

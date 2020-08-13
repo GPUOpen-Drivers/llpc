@@ -1,0 +1,45 @@
+// This test case checks whether a phi is well-handed in PatchBufferOp pass. This shader will result in a phi in IR that
+// one of the incoming value comes from downstream of the control flow.
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST
+
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+struct s
+{
+    int n;
+};
+
+layout(binding = 0) buffer _1
+{
+    s a[];
+} buffer1;
+
+layout(binding = 1) buffer _2
+{
+    int b[];
+} buffer2;
+
+void main()
+{
+    int i = buffer2.b[0];
+
+    for (;;)
+    {
+        s struct0 = buffer1.a[i];
+
+        if (i == 0)
+        {
+            break;
+        }
+
+        i = struct0.n;
+    }
+}
