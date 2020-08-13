@@ -70,6 +70,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     43.0 | Removed the enumerant WaveBreakSize::DrawTime                                                         |
 //* |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
 //* |     41.0 | Moved resource mapping from ShaderPipeline-level to Pipeline-level                                    |
 //* |     40.4 | Added fp32DenormalMode in PipelineShaderOptions to allow overriding SPIR-V denormal settings          |
@@ -423,11 +424,13 @@ enum class DenormalMode : unsigned {
 /// If next available quad falls outside tile aligned region of size defined by this enumeration the SC will force end
 /// of vector in the SC to shader wavefront.
 enum class WaveBreakSize : unsigned {
-  None = 0x0,     ///< No wave break by region
-  _8x8 = 0x1,     ///< Outside a 8x8 pixel region
-  _16x16 = 0x2,   ///< Outside a 16x16 pixel region
-  _32x32 = 0x3,   ///< Outside a 32x32 pixel region
+  None = 0x0,   ///< No wave break by region
+  _8x8 = 0x1,   ///< Outside a 8x8 pixel region
+  _16x16 = 0x2, ///< Outside a 16x16 pixel region
+  _32x32 = 0x3, ///< Outside a 32x32 pixel region
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 43
   DrawTime = 0xF, ///< Choose wave break size per draw
+#endif
 };
 
 /// Enumerates various sizing options of sub-group size for NGG primitive shader.

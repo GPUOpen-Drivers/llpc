@@ -196,14 +196,6 @@ void ConfigBuilderBase::setEsGsLdsByteSize(unsigned value) {
 }
 
 // =====================================================================================================================
-// Set CALC_WAVE_BREAK_SIZE_AT_DRAW_TIME
-//
-// @param value : Value to set
-void ConfigBuilderBase::setCalcWaveBreakSizeAtDrawTime(bool value) {
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::CalcWaveBreakSizeAtDrawTime] = value;
-}
-
-// =====================================================================================================================
 // Set hardware stage wavefront
 //
 // @param hwStage : Hardware shader stage

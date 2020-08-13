@@ -352,7 +352,6 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       static_assert(static_cast<WaveBreak>(WaveBreakSize::_8x8) == WaveBreak::_8x8, "Mismatch");
       static_assert(static_cast<WaveBreak>(WaveBreakSize::_16x16) == WaveBreak::_16x16, "Mismatch");
       static_assert(static_cast<WaveBreak>(WaveBreakSize::_32x32) == WaveBreak::_32x32, "Mismatch");
-      static_assert(static_cast<WaveBreak>(WaveBreakSize::DrawTime) == WaveBreak::DrawTime, "Mismatch");
       shaderOptions.waveBreakSize = static_cast<WaveBreak>(shaderInfo->options.waveBreakSize);
 
       shaderOptions.loadScalarizerThreshold = 0;

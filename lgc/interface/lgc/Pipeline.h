@@ -90,13 +90,12 @@ enum class DenormalMode : unsigned {
 
 // If next available quad falls outside tile aligned region of size defined by this enumeration, the compiler
 // will force end of vector in the compiler to shader wavefront.
-// All of these values except DrawTime correspond to settings of WAVE_BREAK_REGION_SIZE in PA_SC_SHADER_CONTROL.
+// All of these values correspond to settings of WAVE_BREAK_REGION_SIZE in PA_SC_SHADER_CONTROL.
 enum class WaveBreak : unsigned {
   None = 0x0,     ///< No wave break by region
   _8x8 = 0x1,     ///< Outside a 8x8 pixel region
   _16x16 = 0x2,   ///< Outside a 16x16 pixel region
   _32x32 = 0x3,   ///< Outside a 32x32 pixel region
-  DrawTime = 0xF, ///< Choose wave break size per draw
 };
 
 // Value for shadowDescriptorTable pipeline option.

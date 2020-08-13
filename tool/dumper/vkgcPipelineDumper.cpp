@@ -1579,7 +1579,9 @@ std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize) {
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _8x8)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _16x16)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _32x32)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 43
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, DrawTime)
+#endif
     break;
   default:
     llvm_unreachable("Should never be called!");
