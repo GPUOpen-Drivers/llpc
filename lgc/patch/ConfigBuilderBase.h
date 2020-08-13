@@ -75,7 +75,6 @@ protected:
   void setPsWritesUavs(bool value);
   void setPsWritesDepth(bool value);
   void setEsGsLdsByteSize(unsigned value);
-  void setCalcWaveBreakSizeAtDrawTime(bool value);
   void setWaveFrontSize(Util::Abi::HardwareStage hwStage, unsigned value);
   void setApiName(const char *value);
   void setPipelineType(Util::Abi::PipelineType value);

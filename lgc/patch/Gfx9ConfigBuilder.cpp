@@ -1774,14 +1774,8 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
 
   if (gfxIp.major == 10) {
     SET_REG_GFX10_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC1_PS, MEM_ORDERED, true);
-
-    if (shaderOptions.waveBreakSize == lgc::WaveBreak::DrawTime)
-      setCalcWaveBreakSizeAtDrawTime(true);
-    else {
-      SET_REG_GFX10_FIELD(&pConfig->psRegs, PA_SC_SHADER_CONTROL, WAVE_BREAK_REGION_SIZE,
-                          static_cast<unsigned>(shaderOptions.waveBreakSize));
-    }
-
+    SET_REG_GFX10_FIELD(&pConfig->psRegs, PA_SC_SHADER_CONTROL, WAVE_BREAK_REGION_SIZE,
+                        static_cast<unsigned>(shaderOptions.waveBreakSize));
     SET_REG_GFX10_FIELD(&pConfig->psRegs, PA_STEREO_CNTL, STEREO_MODE, STATE_STEREO_X);
     SET_REG_GFX10_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR_MSB, userSgprMsb);
   } else {

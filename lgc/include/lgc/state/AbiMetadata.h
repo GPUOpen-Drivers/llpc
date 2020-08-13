@@ -105,7 +105,6 @@ static constexpr char StreamOutTableAddress[] = ".stream_out_table_address";
 static constexpr char IndirectUserDataTableAddresses[] = ".indirect_user_data_table_addresses";
 static constexpr char NggSubgroupSize[] = ".nggSubgroupSize";
 static constexpr char NumInterpolants[] = ".num_interpolants";
-static constexpr char CalcWaveBreakSizeAtDrawTime[] = ".calc_wave_break_size_at_draw_time";
 static constexpr char Api[] = ".api";
 static constexpr char ApiCreateInfo[] = ".api_create_info";
 }; // namespace PipelineMetadataKey

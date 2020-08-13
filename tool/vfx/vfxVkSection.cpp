@@ -75,7 +75,9 @@ public:
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _8x8)
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _16x16)
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _32x32)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 43
     ADD_CLASS_ENUM_MAP(WaveBreakSize, DrawTime)
+#endif
 
     ADD_CLASS_ENUM_MAP(DenormalMode, Auto)
     ADD_CLASS_ENUM_MAP(DenormalMode, FlushToZero)
