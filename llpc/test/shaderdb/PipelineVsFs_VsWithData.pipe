@@ -1,0 +1,82 @@
+; Test that constant data in the vertex shader is handled correctly.
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -D -r %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: <_amdgpu_vs_main>:
+; SHADERTEST: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
+; SHADERTEST-NEXT: R_AMDGPU_REL32_LO    [[vs_data_sym:[.a-z]*]]
+; SHADERTEST-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
+; SHADERTEST-NEXT: R_AMDGPU_REL32_HI    [[vs_data_sym]]
+; SHADERTEST: 0000000000000000 <[[vs_data_sym]]>:
+; SHADERTEST-NEXT: 000000000000: 3F800000
+; SHADERTEST-NEXT: 000000000004: 00000000
+; SHADERTEST-NEXT: 000000000008: 00000000
+; SHADERTEST-NEXT: 00000000000C: 3F800000
+; SHADERTEST-NEXT: 000000000010: 00000000
+; SHADERTEST-NEXT: 000000000014: 3F800000
+; SHADERTEST-NEXT: 000000000018: 00000000
+; SHADERTEST-NEXT: 00000000001C: 3F800000
+; SHADERTEST-NEXT: 000000000020: 00000000
+; SHADERTEST-NEXT: 000000000024: 00000000
+; SHADERTEST-NEXT: 000000000028: 3F800000
+; SHADERTEST-NEXT: 00000000002C: 3F800000
+; END_SHADERTEST
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -D -r %t.elf | FileCheck -check-prefix=SHADERTEST2 %s
+; SHADERTEST2-LABEL: <_amdgpu_vs_main>:
+; SHADERTEST2: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 0x[[vsdata_offset:[0-9]*]]
+; SHADERTEST2-NEXT: R_AMDGPU_REL32_LO    .text
+; SHADERTEST2-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, 0x[[vsdata_offset]]
+; SHADERTEST2-NEXT: R_AMDGPU_REL32_HI    .text
+; SHADERTEST2-LABEL: <__llpc_global_proxy_>:
+; SHADERTEST2-NEXT: {{[0-9]*}}: 3F800000
+; SHADERTEST2-NEXT: {{[0]*}}[[vsdata_offset]]: 00000000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 00000000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 3F800000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 00000000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 3F800000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 00000000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 3F800000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 00000000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 00000000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 3F800000
+; SHADERTEST2-NEXT: {{[0-9]*}}: 3F800000
+; END_SHADERTEST
+
+[Version]
+version = 40
+
+[VsGlsl]
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+vec4 pos[3] = vec4[](
+  vec4(1.0, 0.0, 0.0, 1.0),
+  vec4(0.0, 1.0, 0.0, 1.0),
+  vec4(0.0, 0.0, 1.0, 1.0)
+);
+
+void main() {
+  gl_Position = pos[gl_VertexIndex%3];
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+layout(location = 0) out vec4 outColor;
+
+void main() {
+  outColor = vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
