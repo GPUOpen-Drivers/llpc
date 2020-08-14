@@ -90,6 +90,10 @@ public:
   // Add a symbol to the output symbol table
   void addSymbol(const object::ELFSymbolRef &elfSymRef, unsigned inputSectIdx);
 
+  // Add a relocation to the output elf
+  void addRelocation(object::ELFRelocationRef relocRef, StringRef id, unsigned int relocSectionOffset,
+                     unsigned int targetSectionOffset);
+
   // Get the output file offset of a particular input section in the output section
   uint64_t getOutputOffset(unsigned inputIdx) { return m_offset + m_inputSections[inputIdx].offset; }
 
@@ -154,18 +158,23 @@ public:
   ArrayRef<OutputSection> getOutputSections() { return m_outputSections; }
   StringRef getStrings() { return m_strings; }
   SmallVectorImpl<ELF::Elf64_Sym> &getSymbols() { return m_symbols; }
+  SmallVectorImpl<ELF::Elf64_Rel> &getRelocations() { return m_relocations; }
   void setStringTableIndex(unsigned index) { m_ehdr.e_shstrndx = index; }
   StringRef getNotes() { return m_notes; }
 
   // Get string index in output ELF, adding to string table if necessary
   unsigned getStringIndex(StringRef string);
 
-  // Find symbol in output ELF
+  // Get string index in output ELF.  Returns 0 if not found.
+  unsigned findStringIndex(StringRef string);
+
+  // Find symbol in output ELF. Returns 0 if not found.
   unsigned findSymbol(unsigned nameIndex);
+  unsigned findSymbol(StringRef name);
 
 private:
   // Get the value of the symbol referenced in a reloc
-  uint64_t getRelocValue(object::RelocationRef reloc);
+  bool getRelocValue(object::RelocationRef reloc, uint64_t &value);
 
   // Find where an input section contributes to an output section
   std::pair<unsigned, unsigned> findInputSection(ElfInput &elfInput, object::SectionRef section);
@@ -190,6 +199,7 @@ private:
   ELF::Elf64_Ehdr m_ehdr;                                    // Output ELF header, copied from first input
   SmallVector<OutputSection, 4> m_outputSections;            // Output sections
   SmallVector<ELF::Elf64_Sym, 8> m_symbols;                  // Symbol table
+  SmallVector<ELF::Elf64_Rel, 8> m_relocations;              // Relocations
   StringMap<unsigned> m_symbolMap;                           // Map from name to symbol index
   std::string m_strings;                                     // Strings for string table
   StringMap<unsigned> m_stringMap;                           // Map from string to string table index
@@ -341,6 +351,7 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
   // 2: symbol table
   // 3: .text
   // 4: .note
+  // 5: .rel.text
   m_outputSections.push_back(OutputSection(this, "", ELF::SHT_NULL));
   m_outputSections.push_back(OutputSection(this, ".strtab", ELF::SHT_STRTAB));
   m_outputSections.push_back(OutputSection(this, ".symtab", ELF::SHT_SYMTAB));
@@ -348,30 +359,26 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
   m_outputSections.push_back(OutputSection(this, ".text"));
   unsigned noteSectionIdx = m_outputSections.size();
   m_outputSections.push_back(OutputSection(this, ".note", ELF::SHT_NOTE));
+  m_outputSections.push_back(OutputSection(this, ".rel.text", ELF::SHT_REL));
 
   // Allocate input sections to output sections.
   for (auto &elfInput : m_elfInputs) {
     for (const object::SectionRef &section : elfInput.objectFile->sections()) {
       object::ELFSectionRef elfSection(section);
-      if (elfSection.getType() == ELF::SHT_PROGBITS &&
-          (elfSection.getFlags() & (ELF::SHF_ALLOC | ELF::SHF_WRITE)) == ELF::SHF_ALLOC) {
-        // All text and rodata sections get lumped together, even if they have different names.
-        // Reduce the alignment (for gluing code together) if the section name matches elfInput.reduceAlign.
-        bool reduceAlign = false;
-        if (elfInput.reduceAlign != "")
-          reduceAlign = cantFail(elfSection.getName()) == elfInput.reduceAlign;
-        m_outputSections[textSectionIdx].addInputSection(elfInput, section, reduceAlign);
-      } else if (elfSection.getType() == ELF::SHT_PROGBITS) {
+      if (elfSection.getType() == ELF::SHT_PROGBITS) {
         // Put same-named sections together (excluding symbol table, string table, reloc sections).
         StringRef name = cantFail(section.getName());
+        bool reduceAlign = false;
+        if (elfInput.reduceAlign != "")
+          reduceAlign = name == elfInput.reduceAlign;
         for (unsigned idx = 1;; ++idx) {
           if (idx == m_outputSections.size()) {
             m_outputSections.push_back(OutputSection(this));
-            m_outputSections[idx].addInputSection(elfInput, section);
+            m_outputSections[idx].addInputSection(elfInput, section, reduceAlign);
             break;
           }
           if (name == m_outputSections[idx].getName()) {
-            m_outputSections[idx].addInputSection(elfInput, section);
+            m_outputSections[idx].addInputSection(elfInput, section, reduceAlign);
             break;
           }
         }
@@ -432,6 +439,38 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
     }
   }
 
+  // Add relocations that cannot be applied at this stage.
+  for (auto &elfInput : m_elfInputs) {
+    for (const object::SectionRef section : elfInput.objectFile->sections()) {
+      unsigned sectType = object::ELFSectionRef(section).getType();
+      if (sectType == ELF::SHT_REL || sectType == ELF::SHT_RELA) {
+        for (object::RelocationRef reloc : section.relocations()) {
+          unsigned targetSectionIdx = UINT_MAX;
+          unsigned targetIdxInSection = UINT_MAX;
+          std::tie(targetSectionIdx, targetIdxInSection) =
+              findInputSection(elfInput, *cantFail(section.getRelocatedSection()));
+          if (targetSectionIdx != UINT_MAX) {
+            uint64_t value = 0;
+            if (getRelocValue(reloc, value)) {
+              continue;
+            }
+            (void)(textSectionIdx);
+            assert(targetSectionIdx == textSectionIdx && "We assume all relocations are applied to the text section");
+            assert(sectType == ELF::SHT_REL && "We do not output a RELA section yet");
+            object::SectionRef relocSection = *cantFail(reloc.getSymbol()->getSection());
+            unsigned relocSectionId = UINT_MAX;
+            unsigned relocIdxInSection = UINT_MAX;
+            std::tie(relocSectionId, relocIdxInSection) = findInputSection(elfInput, relocSection);
+            uint64_t relocSectionOffset = m_outputSections[relocSectionId].getOutputOffset(relocIdxInSection);
+            uint64_t targetSectionOffset = m_outputSections[targetSectionIdx].getOutputOffset(targetIdxInSection);
+            m_outputSections[relocSectionId].addRelocation(reloc, elfInput.objectFile->getFileName(),
+                                                           relocSectionOffset, targetSectionOffset);
+          }
+        }
+      }
+    }
+  }
+
   // Output each section, and let it set its section table entry.
   // Ensure each section is aligned in the file by the minimum of 4 and its address alignment requirement.
   // I am not sure if that is actually required by the ELF standard, but vkgcPipelineDumper.cpp relies on
@@ -458,13 +497,16 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
           unsigned withinSectIdx = UINT_MAX;
           std::tie(outputSectIdx, withinSectIdx) = findInputSection(elfInput, *cantFail(section.getRelocatedSection()));
           if (outputSectIdx != UINT_MAX) {
+            uint64_t value = 0;
+            if (!getRelocValue(reloc, value)) {
+              continue;
+            }
+
             uint64_t inputOffset = reloc.getOffset();
             uint64_t outputOffset = m_outputSections[outputSectIdx].getOutputOffset(withinSectIdx) + inputOffset;
             uint64_t addend = 0;
             if (sectType == ELF::SHT_RELA)
               addend = cantFail(object::ELFRelocationRef(reloc).getAddend());
-            uint64_t value = getRelocValue(reloc);
-
             switch (reloc.getType()) {
 
             case ELF::R_AMDGPU_ABS32: {
@@ -520,6 +562,12 @@ unsigned ElfLinkerImpl::getStringIndex(StringRef string) {
 }
 
 // =====================================================================================================================
+// Get string index in output ELF.  Returns 0 if not found.
+unsigned ElfLinkerImpl::findStringIndex(StringRef string) {
+  return m_stringMap.lookup(string);
+}
+
+// =====================================================================================================================
 // Find symbol in output ELF
 //
 // @param nameIndex : Index of symbol name in string table
@@ -533,19 +581,28 @@ unsigned ElfLinkerImpl::findSymbol(unsigned nameIndex) {
 }
 
 // =====================================================================================================================
-// Get the value of the symbol referenced in a reloc
-uint64_t ElfLinkerImpl::getRelocValue(object::RelocationRef reloc) {
+// Find symbol in output ELF
+//
+// @param name: name of the symbol to find.
+// @returns : Index in symbol table, or 0 if not found
+unsigned ElfLinkerImpl::findSymbol(StringRef name) {
+  unsigned nameIndex = findStringIndex(name);
+  return findSymbol(nameIndex);
+}
+
+// =====================================================================================================================
+// Get the value of the symbol referenced in a reloc.
+//
+// @param reloc : The relocation for which to find the value.
+// @param [out] value: The value for the relocation if it is found.
+// @returns : True if the value for the relocation was found.  False otherwise.
+bool ElfLinkerImpl::getRelocValue(object::RelocationRef reloc, uint64_t &value) {
   StringRef name = cantFail(reloc.getSymbol()->getName());
 
   // Handle the special case relocs from pipeline state
-  uint64_t value = 0;
   if (m_relocHandler.getValue(name, value))
-    return value;
-
-  // TODO: Handle a reloc to a symbol, so we are then able to generate a shader ELF with its constant pools
-  // in a separate .rodata section that gets merged into .text in the linker.
-
-  report_fatal_error("Unknown reloc: " + name);
+    return true;
+  return false;
 }
 
 // =====================================================================================================================
@@ -784,6 +841,31 @@ void OutputSection::addSymbol(const object::ELFSymbolRef &elfSymRef, unsigned in
   m_linker->getSymbols().push_back(newSym);
 }
 
+// Add a relocation to the output elf
+void OutputSection::addRelocation(object::ELFRelocationRef relocRef, StringRef id, unsigned int relocSectionOffset,
+                                  unsigned int targetSectionOffset) {
+  ELF::Elf64_Rel newReloc = {};
+  std::string rodataSymName = cantFail(relocRef.getSymbol()->getName()).str();
+  rodataSymName += ".";
+  rodataSymName += id;
+  unsigned rodataSymIdx = m_linker->findSymbol(rodataSymName);
+  if (rodataSymIdx == 0) {
+    // Create the ".rodata" symbol
+    ELF::Elf64_Sym newSym = {};
+    newSym.st_name = m_linker->getStringIndex(rodataSymName);
+    newSym.setBinding(ELF::STB_LOCAL);
+    newSym.setType(cantFail(object::SymbolRef::ST_Data));
+    newSym.st_shndx = getIndex();
+    newSym.st_value = relocSectionOffset;
+    newSym.st_size = 0;
+    rodataSymIdx = m_linker->getSymbols().size();
+    m_linker->getSymbols().push_back(newSym);
+  }
+  newReloc.setSymbolAndType(rodataSymIdx, relocRef.getType());
+  newReloc.r_offset = targetSectionOffset + relocRef.getOffset();
+  m_linker->getRelocations().push_back(newReloc);
+}
+
 // =====================================================================================================================
 // Write the output section
 //
@@ -817,6 +899,18 @@ void OutputSection::write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr) {
     shdr->sh_type = m_type;
     shdr->sh_size = notes.size();
     outStream << notes;
+    return;
+  }
+
+  if (m_type == ELF::SHT_REL) {
+    ArrayRef<ELF::Elf64_Rel> relocations = m_linker->getRelocations();
+    shdr->sh_type = m_type;
+    shdr->sh_size = relocations.size() * sizeof(ELF::Elf64_Rel);
+    shdr->sh_entsize = sizeof(ELF::Elf64_Rel);
+    shdr->sh_link = 2; // Section index of symbol table
+    shdr->sh_info = 3; // Section index of the .text section
+    outStream << StringRef(reinterpret_cast<const char *>(relocations.data()),
+                           relocations.size() * sizeof(ELF::Elf64_Sym));
     return;
   }
 
