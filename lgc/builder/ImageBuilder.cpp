@@ -503,6 +503,13 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
       texel = CreateInsertElement(UndefValue::get(origTexelTy), texel, uint64_t(0));
 
       SmallVector<Value *, 3> defaults = {getInt64(0), getInt64(0), getInt64(1)};
+      // The default of W channel is set to 0 if allowNullDescriptor is on and image descriptor is a null descriptor
+      if (m_pipelineState->getOptions().allowNullDescriptor) {
+        // Check dword3 against 0 for a null descriptor
+        Value *descWord3 = CreateExtractElement(imageDesc, 3);
+        Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
+        defaults[2] = CreateSelect(isNullDesc, getInt64(0), getInt64(1));
+      }
       for (unsigned i = 1; i < cast<VectorType>(origTexelTy)->getNumElements(); ++i)
         texel = CreateInsertElement(texel, defaults[i - 1], i);
     }
