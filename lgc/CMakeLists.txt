@@ -95,8 +95,10 @@ if(WIN32)
 endif()
 
 target_include_directories(LLVMlgc
+PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/interface>
+    $<INSTALL_INTERFACE:interface>
 PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/interface
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/imported
 )
