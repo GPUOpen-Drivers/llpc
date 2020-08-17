@@ -79,6 +79,10 @@ public:
     ADD_CLASS_ENUM_MAP(WaveBreakSize, DrawTime)
 #endif
 
+    ADD_CLASS_ENUM_MAP(ShadowDescriptorTableUsage, Auto)
+    ADD_CLASS_ENUM_MAP(ShadowDescriptorTableUsage, Enable)
+    ADD_CLASS_ENUM_MAP(ShadowDescriptorTableUsage, Disable)
+
     ADD_CLASS_ENUM_MAP(DenormalMode, Auto)
     ADD_CLASS_ENUM_MAP(DenormalMode, FlushToZero)
     ADD_CLASS_ENUM_MAP(DenormalMode, Preserve)
