@@ -255,11 +255,14 @@ void PipelineState::clearPalMetadata() {
 
 // =====================================================================================================================
 // Merge blob of MsgPack data into existing PAL metadata
-void PipelineState::mergePalMetadataFromBlob(StringRef blob) {
+//
+// @param blob : MsgPack PAL metadata to merge
+// @param isGlueCode : True if the blob is was generated for glue code.
+void PipelineState::mergePalMetadataFromBlob(llvm::StringRef blob, bool isGlueCode) {
   if (!m_palMetadata)
     m_palMetadata = new PalMetadata(this, blob);
   else
-    m_palMetadata->mergeFromBlob(blob);
+    m_palMetadata->mergeFromBlob(blob, isGlueCode);
 }
 
 // =====================================================================================================================

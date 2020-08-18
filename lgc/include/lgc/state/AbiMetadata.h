@@ -240,6 +240,10 @@ constexpr unsigned mmDB_SHADER_CONTROL = 0xA203;
 constexpr unsigned mmSPI_SHADER_Z_FORMAT = 0xA1C4;
 constexpr unsigned mmCB_SHADER_MASK = 0xA08F;
 
+// PS Input register numbers in PAL metadata
+constexpr unsigned int mmSPI_PS_INPUT_ENA = 0xA1B3;
+constexpr unsigned int mmSPI_PS_INPUT_ADDR = 0xA1B4;
+
 // Register bitfield layout.
 
 // General RSRC1 register, enough to get the VGPR and SGPR counts.

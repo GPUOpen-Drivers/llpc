@@ -1,0 +1,59 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: SPI_PS_INPUT_CNTL_0                           0x0000000000000000
+; SHADERTEST: SPI_PS_INPUT_ENA                              0x0000000000000002
+; SHADERTEST: SPI_PS_INPUT_ADDR                             0x0000000000000002
+; END_SHADERTEST
+
+[Version]
+version = 40
+
+[VsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %4 "main"
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+               OpReturn
+               OpFunctionEnd
+
+[VsInfo]
+entryPoint = main
+
+[FsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %26 %320
+               OpExecutionMode %4 OriginUpperLeft
+               OpDecorate %26 Location 0
+               OpDecorate %320 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+    %v2float = OpTypeVector %float 2
+%_ptr_Input_v2float = OpTypePointer Input %v2float
+         %26 = OpVariable %_ptr_Input_v2float Input
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+        %320 = OpVariable %_ptr_Output_v4float Output
+        %348 = OpUndef %v2float
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+        %154 = OpLoad %v2float %26
+        %155 = OpVectorShuffle %v4float %154 %348 0 1 0 1
+               OpStore %320 %155
+               OpReturn
+               OpFunctionEnd
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+olorBuffer[0].format = VK_FORMAT_R16G16B16A16_SFLOAT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0

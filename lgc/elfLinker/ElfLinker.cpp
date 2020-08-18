@@ -180,7 +180,7 @@ private:
   std::pair<unsigned, unsigned> findInputSection(ElfInput &elfInput, object::SectionRef section);
 
   // Read PAL metadata from an ELF file and merge it in to the PAL metadata that we already have
-  void mergePalMetadataFromElf(object::ObjectFile &objectFile);
+  void mergePalMetadataFromElf(object::ObjectFile &objectFile, bool isGlueCode);
 
   // Write the PAL metadata out into the .note section.
   void writePalMetadata();
@@ -240,7 +240,7 @@ ElfLinkerImpl::ElfLinkerImpl(PipelineState *pipelineState, ArrayRef<MemoryBuffer
   // Gather and merge PAL metadata.
   m_pipelineState->clearPalMetadata();
   for (auto &elfInput : m_elfInputs)
-    mergePalMetadataFromElf(*elfInput.objectFile);
+    mergePalMetadataFromElf(*elfInput.objectFile, false);
 
   // Create any needed glue shaders.
   createGlueShaders();
@@ -622,7 +622,7 @@ std::pair<unsigned, unsigned> ElfLinkerImpl::findInputSection(ElfInput &elfInput
 // Read PAL metadata from an ELF file and merge it in to the PAL metadata that we already have
 //
 // @param objectFile : The ELF input
-void ElfLinkerImpl::mergePalMetadataFromElf(object::ObjectFile &objectFile) {
+void ElfLinkerImpl::mergePalMetadataFromElf(object::ObjectFile &objectFile, bool isGlueCode) {
   for (const object::SectionRef &section : objectFile.sections()) {
     object::ELFSectionRef elfSection(section);
     if (elfSection.getType() == ELF::SHT_NOTE) {
@@ -634,8 +634,8 @@ void ElfLinkerImpl::mergePalMetadataFromElf(object::ObjectFile &objectFile) {
       for (auto note : elfFile->notes(*shdr, err)) {
         if (note.getName() == Util::Abi::AmdGpuArchName && note.getType() == ELF::NT_AMDGPU_METADATA) {
           ArrayRef<uint8_t> desc = note.getDesc();
-          m_pipelineState->mergePalMetadataFromBlob(
-              StringRef(reinterpret_cast<const char *>(desc.data()), desc.size()));
+          m_pipelineState->mergePalMetadataFromBlob(StringRef(reinterpret_cast<const char *>(desc.data()), desc.size()),
+                                                    isGlueCode);
         }
       }
     }
@@ -725,7 +725,7 @@ bool ElfLinkerImpl::insertGlueShaders() {
     // Merge PAL metadata from glue ELF.
     // Note that the merger callback in PalMetadata.cpp relies on the PAL metadata for the shader/half-pipeline
     // ELFs being read first, and the glue shaders being merged in afterwards.
-    mergePalMetadataFromElf(*glueElfInput.objectFile);
+    mergePalMetadataFromElf(*glueElfInput.objectFile, true);
 
     // Insert the glue shader in the appropriate place in the list of ELFs.
     assert(insertPos != UINT_MAX && "Main shader not found for glue shader");
