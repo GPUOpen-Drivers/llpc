@@ -866,8 +866,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       wantEsGsLdsSize = enableNgg;
       break;
     case ShaderStageTessControl:
-      wantEsGsLdsSize = m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
-                        m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize;
+      wantEsGsLdsSize = false;
       break;
     case ShaderStageTessEval:
       wantEsGsLdsSize = enableNgg;
