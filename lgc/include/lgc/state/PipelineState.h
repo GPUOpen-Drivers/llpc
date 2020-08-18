@@ -279,7 +279,7 @@ public:
   void clearPalMetadata();
 
   // Merge blob of MsgPack data into existing PAL metadata
-  void mergePalMetadataFromBlob(llvm::StringRef blob);
+  void mergePalMetadataFromBlob(llvm::StringRef blob, bool isGlueCode);
 
   // Set error message to be returned to the client by it calling getLastError
   void setError(const llvm::Twine &message);

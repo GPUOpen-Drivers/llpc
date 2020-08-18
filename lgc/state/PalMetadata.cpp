@@ -134,14 +134,16 @@ void PalMetadata::record(Module *module) {
 // Read blob as PAL metadata and merge it into existing PAL metadata (if any)
 //
 // @param blob : MsgPack PAL metadata to merge
-void PalMetadata::mergeFromBlob(StringRef blob) {
+// @param isGlueCode : True if the blob is was generated for glue code.
+void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
   // Use msgpack::Document::readFromBlob to read the new MsgPack PAL metadata, merging it into the msgpack::Document
   // we already have. We pass it a lambda that determines how to cope with merge conflicts, which returns:
   // -1: failure
   // 0: success; *dest has been set up with the merged node. For an array, 0 means overwrite the existing array
   //    rather than appending.
   bool success = m_document->readFromBlob(
-      blob, /*multi=*/false, [](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
+      blob, /*multi=*/false,
+      [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
         // Allow array and map merging.
         if (srcNode.isMap() && destNode->isMap())
           return 0;
@@ -192,6 +194,13 @@ void PalMetadata::mergeFromBlob(StringRef blob) {
             destRsrc1.bits.VGPRS = std::max(destRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
             destRsrc1.bits.SGPRS = std::max(destRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
             *destNode = srcNode.getDocument()->getNode(destRsrc1.u32All);
+            return 0;
+          }
+          case mmSPI_PS_INPUT_ENA:
+          case mmSPI_PS_INPUT_ADDR: {
+            if (!isGlueCode) {
+              *destNode = srcNode.getUInt();
+            }
             return 0;
           }
           }

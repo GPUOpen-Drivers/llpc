@@ -94,7 +94,7 @@ public:
   ~PalMetadata();
 
   // Read blob as PAL metadata and merge it into existing PAL metadata (if any).
-  void mergeFromBlob(llvm::StringRef blob);
+  void mergeFromBlob(llvm::StringRef blob, bool isGlueCode);
 
   // Record the PAL metadata into IR metadata in the specified module.
   void record(llvm::Module *module);
