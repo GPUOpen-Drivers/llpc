@@ -232,6 +232,16 @@ public:
                                   llvm::ArrayRef<llvm::Value *> args, llvm::Instruction *fmfSource = nullptr,
                                   const llvm::Twine &name = "");
 
+  /// Create a call to intrinsic @p ID with return type @p RetTy and arguments @p Args. Type overloads are deduced
+  /// automatically.
+  ///
+  /// If @p FMFSource is provided, copy fast-math-flags from that instruction to the intrinsic.
+  ///
+  /// @note This overload is convenient when the overload signature of an intrinsic changes in LLVM.
+  /// @ref CreateIntrinsic should be used otherwise.
+  llvm::CallInst *CreateIntrinsicByType(llvm::Intrinsic::ID id, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
+                                        llvm::Instruction *fmfSource = nullptr, const llvm::Twine &name = "");
+
   // -----------------------------------------------------------------------------------------------------------------
   // Arithmetic operations
 

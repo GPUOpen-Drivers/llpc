@@ -2728,7 +2728,7 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, boo
   index = getBuilder()->CreateMul(index, stride);
   if (!isNonUniform && !isa<Constant>(index)) {
     // For a non-constant but uniform index, mark it uniform.
-    index = getBuilder()->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, index);
+    index = getBuilder()->CreateIntrinsicByType(Intrinsic::amdgcn_readfirstlane, getBuilder()->getInt32Ty(), index);
   }
 
   // Do the indexing operation by GEPping as a byte pointer.

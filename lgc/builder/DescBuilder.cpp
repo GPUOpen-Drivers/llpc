@@ -356,7 +356,7 @@ Value *DescBuilder::scalarizeIfUniform(Value *value, bool isNonUniform) {
   if (!isNonUniform && !isa<Constant>(value)) {
     // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major > 6)
-      value = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, value);
+      value = CreateIntrinsicByType(Intrinsic::amdgcn_readfirstlane, getInt32Ty(), value);
   }
   return value;
 }

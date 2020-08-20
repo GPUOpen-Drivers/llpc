@@ -1320,7 +1320,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       vertCountInWaves = m_ldsManager->readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
 
       // NOTE: We promote vertex count in waves to SGPR since it is treated as an uniform value.
-      vertCountInWaves = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInWaves);
+      vertCountInWaves =
+          m_builder->CreateIntrinsicByType(Intrinsic::amdgcn_readfirstlane, m_builder->getInt32Ty(), vertCountInWaves);
       threadCountInWaves = vertCountInWaves;
 
       // Get vertex count for all waves prior to this wave
@@ -1419,7 +1420,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
       // as an uniform value later. This is similar to the provided primitive count in sub-group that is
       // a system value.
-      primCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCountInSubgroup);
+      primCountInSubgroup =
+          m_builder->CreateIntrinsicByType(Intrinsic::amdgcn_readfirstlane, m_builder->getInt32Ty(),
+                                           primCountInSubgroup);
 
       Value *vertCountInSubgroup =
           m_builder->CreateSelect(hasSurviveVert, vertCountInWaves, m_builder->getInt32(fullyCulledThreadCount));
@@ -1427,7 +1430,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
       // an uniform value later, similar to what we have done for the revised primitive count in
       // sub-group.
-      vertCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInSubgroup);
+      vertCountInSubgroup = m_builder->CreateIntrinsicByType(Intrinsic::amdgcn_readfirstlane, m_builder->getInt32Ty(),
+                                                             vertCountInSubgroup);
 
       m_nggFactor.primCountInSubgroup = primCountInSubgroup;
       m_nggFactor.vertCountInSubgroup = vertCountInSubgroup;
@@ -1959,12 +1963,14 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
     // The last dword following dwords for all waves (each wave has one dword) stores GS output vertex count of the
     // entire sub-group
-    auto vertCountInSubgroup = m_builder->CreateIntrinsic(
-        Intrinsic::amdgcn_readlane, {}, {outVertCountInWaves, m_builder->getInt32(waveCountInSubgroup)});
+    auto vertCountInSubgroup = m_builder->CreateIntrinsicByType(
+          Intrinsic::amdgcn_readlane, m_builder->getInt32Ty(),
+          {outVertCountInWaves, m_builder->getInt32(waveCountInSubgroup)});
 
     // Get output vertex count for all waves prior to this wave
     vertCountInPrevWaves =
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {outVertCountInWaves, m_nggFactor.waveIdInSubgroup});
+        m_builder->CreateIntrinsicByType(Intrinsic::amdgcn_readlane, m_builder->getInt32Ty(),
+                                         {outVertCountInWaves, m_nggFactor.waveIdInSubgroup});
 
     vertCompacted = m_builder->CreateICmpULT(vertCountInSubgroup, m_nggFactor.vertCountInSubgroup);
     m_builder->CreateCondBr(m_builder->CreateAnd(drawFlag, vertCompacted), compactOutVertIdBlock,

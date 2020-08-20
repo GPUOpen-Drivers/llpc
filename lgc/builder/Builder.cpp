@@ -500,3 +500,25 @@ CallInst *Builder::CreateIntrinsic(Intrinsic::ID id, ArrayRef<Type *> types, Arr
   return result;
 }
 
+// =====================================================================================================================
+// Create a call to the specified intrinsic with the specified arguments, mangled automatically based on the return
+// type and argument types.
+//
+// Prefer @ref CreateIntrinsic, except when an intrinsic's overload mangling is changed in LLVM. VarArg intrinsics are
+// not supported by this method.
+//
+// This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math flags from
+// the Builder if none are specified by pFmfSource.
+//
+// @param id : Intrinsic ID
+// @param retTy : Return type
+// @param args : Input values
+// @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+// @param name : Name to give instruction
+CallInst *Builder::CreateIntrinsicByType(Intrinsic::ID id, Type *retTy, ArrayRef<Value *> args, Instruction *fmfSource,
+                                         const Twine &name) {
+  CallInst *result = IRBuilder<>::CreateIntrinsicByType(id, retTy, args, fmfSource, name);
+  if (!fmfSource && isa<FPMathOperator>(result))
+    result->setFastMathFlags(getFastMathFlags());
+  return result;
+}

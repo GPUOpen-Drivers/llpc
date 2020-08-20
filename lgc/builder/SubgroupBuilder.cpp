@@ -137,7 +137,8 @@ Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, bool wqm, con
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupBroadcast(Value *const value, Value *const index, const Twine &instName) {
   auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-    return builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
+    return builder.CreateIntrinsicByType(Intrinsic::amdgcn_readlane, builder.getInt32Ty(),
+                                         {mappedArgs[0], passthroughArgs[0]});
   };
 
   return CreateMapToInt32(mapFunc, value, index);
@@ -150,7 +151,7 @@ Value *SubgroupBuilder::CreateSubgroupBroadcast(Value *const value, Value *const
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupBroadcastFirst(Value *const value, const Twine &instName) {
   auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-    return builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, mappedArgs[0]);
+    return builder.CreateIntrinsicByType(Intrinsic::amdgcn_readfirstlane, builder.getInt32Ty(), mappedArgs[0]);
   };
 
   return CreateMapToInt32(mapFunc, {createInlineAsmSideEffect(value)}, {});
@@ -301,8 +302,8 @@ Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const i
   } else {
     auto mapFunc = [this](Builder &builder, ArrayRef<Value *> mappedArgs,
                           ArrayRef<Value *> passthroughArgs) -> Value * {
-      Value *const readlane =
-          builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
+      Value *const readlane = builder.CreateIntrinsicByType(Intrinsic::amdgcn_readlane, builder.getInt32Ty(),
+                                                            {mappedArgs[0], passthroughArgs[0]});
       return createWaterfallLoop(cast<Instruction>(readlane), 1);
     };
 
@@ -1042,12 +1043,8 @@ Value *SubgroupBuilder::CreateSubgroupSwizzleMask(Value *const value, Value *con
 Value *SubgroupBuilder::CreateSubgroupWriteInvocation(Value *const inputValue, Value *const writeValue,
                                                       Value *const invocationIndex, const Twine &instName) {
   auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-    return builder.CreateIntrinsic(Intrinsic::amdgcn_writelane, {},
-                                   {
-                                       mappedArgs[1],
-                                       passthroughArgs[0],
-                                       mappedArgs[0],
-                                   });
+    return builder.CreateIntrinsicByType(Intrinsic::amdgcn_writelane, builder.getInt32Ty(),
+                                         {mappedArgs[1], passthroughArgs[0], mappedArgs[0]});
   };
 
   return CreateMapToInt32(mapFunc, {inputValue, writeValue}, invocationIndex);
