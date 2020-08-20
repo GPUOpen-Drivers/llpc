@@ -1057,7 +1057,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       break;
     }
 
-    case ResourceNodeType::PushConst:
+    case ResourceNodeType::PushConst: {
       // For CS fixed layout, only attempt to unspill the push constant if uses of it use the whole push constant.
       // Trying to do anything else runs into problems with the push constant being split between unspilled parts
       // and spilled parts, which PAL does not like.
@@ -1075,9 +1075,21 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       // We already know that loads we have on our pushConstOffsets lists are at dword-aligned offset and dword-aligned
       // size. We need to ensure that all loads are the same size, by removing ones that are bigger than the
       // minimum size.
-      for (unsigned dwordOffset = 0,
-                    dwordEndOffset = std::min(unsigned(userDataUsage->pushConstOffsets.size()), node.sizeInDwords);
-           dwordOffset != dwordEndOffset; ++dwordOffset) {
+      //
+      // First cope with the case that the app uses more push const than the size of the resource node. This is
+      // a workaround for an incorrect application; according to the Vulkan spec (version 1.2.151, section 14.6.1
+      // "Push Constant Interface"):
+      //
+      //    Each statically used member of a push constant block must be placed at an Offset such that the entire
+      //    member is entirely contained within the VkPushConstantRange for each OpEntryPoint that uses it, and
+      //    the stageFlags for that range must specify the appropriate VkShaderStageFlagBits for that stage.
+      unsigned dwordEndOffset = userDataUsage->pushConstOffsets.size();
+      if (dwordEndOffset > node.sizeInDwords) {
+        userDataUsage->pushConstSpill = true;
+        dwordEndOffset = node.sizeInDwords;
+      }
+
+      for (unsigned dwordOffset = 0; dwordOffset != dwordEndOffset; ++dwordOffset) {
         UserDataNodeUsage &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
         if (pushConstOffset.users.empty())
           continue;
@@ -1107,6 +1119,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
         userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, node.offsetInDwords);
 
       break;
+    }
 
     default:
       // Descriptor in the root table. If it is an array of descriptors, there could be multiple entries in
