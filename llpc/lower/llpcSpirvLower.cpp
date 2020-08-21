@@ -146,7 +146,6 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 // @param stage : Shader stage
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param lowerTimer : Timer to time lower passes with, nullptr if not timing
-// @param forceLoopUnrollCount : 0 or force loop unroll count
 void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassManager &passMgr, Timer *lowerTimer
 ) {
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.

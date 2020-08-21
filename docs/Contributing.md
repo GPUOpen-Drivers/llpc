@@ -13,7 +13,6 @@ over time.
 LLPC uses pull requests on GitHub for code review. We maintain a linear
 history, that is, pull requests are rebased on top of the `dev` branch.
 
-
 ## Commits as the logical atomic unit of change
 
 Adapted from [the Linux kernel guide on submitting patches](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/submitting-patches.rst),
@@ -56,7 +55,6 @@ Having multiple incomplete commits locally and rewriting them using
 `git rebase` is normal and encouraged as part of the process of shaping
 a series of logically self-contained commits. The guidelines above only apply
 once you send out your changes via a pull request.
-
 
 ## Write useful commit messages
 
@@ -130,7 +128,6 @@ useful as a comment when reading the code? Or does it only distract?
 Is the explanation independent of the current context and is it likely
 to stand the test of time?
 
-
 ## Useful things to know about Git
 
 Not all projects that use Git aim for commits as the logical unit of change,
@@ -158,7 +155,6 @@ that are useful to know of for this workflow:
 
 Read Git's documentation or search online to learn more about them. Similar
 functionality is available in some GUI tools.
-
 
 ## Additional sources
 

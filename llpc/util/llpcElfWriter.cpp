@@ -380,7 +380,7 @@ template <class Elf> ElfSymbol *ElfWriter<Elf>::getSymbol(const char *pSymbolNam
 // Gets note according to noteType.
 //
 // @param noteType : Note type
-template <class Elf> ElfNote ElfWriter<Elf>::getNote(Util::Abi::PipelineAbiNoteType noteType) {
+template <class Elf> ElfNote ElfWriter<Elf>::getNote(uint32_t noteType) {
   for (auto &note : m_notes) {
     if (note.hdr.type == noteType)
       return note;
@@ -777,7 +777,7 @@ void ElfWriter<Elf>::GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSy
 template <class Elf> void ElfWriter<Elf>::updateElfBinary(Context *pContext, ElfPackage *pPipelineElf) {
   // Merge PAL metadata
   ElfNote metaNote = {};
-  metaNote = getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+  metaNote = getNote(Util::Abi::MetadataNoteType);
 
   assert(metaNote.data);
   ElfNote newMetaNote = {};
@@ -956,12 +956,12 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
 
   // Merge PAL metadata
   ElfNote nonFragmentMetaNote = {};
-  nonFragmentMetaNote = getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+  nonFragmentMetaNote = getNote(Util::Abi::MetadataNoteType);
 
   assert(nonFragmentMetaNote.data);
   ElfNote fragmentMetaNote = {};
   ElfNote newMetaNote = {};
-  fragmentMetaNote = reader.getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+  fragmentMetaNote = reader.getNote(Util::Abi::MetadataNoteType);
   mergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
   setNote(&newMetaNote);
 

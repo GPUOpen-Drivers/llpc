@@ -1214,27 +1214,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         const NoteHeader *node = reinterpret_cast<const NoteHeader *>(section->data + offset);
         const unsigned noteNameSize = alignTo(node->nameSize, 4);
         switch (static_cast<unsigned>(node->type)) {
-        case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::HsaIsa): {
-          out << "    HsaIsa                       (name = " << node->name << "  size = " << node->descSize << ")\n";
-
-          auto gpu = reinterpret_cast<const Util::Abi::AbiAmdGpuVersionNote *>(section->data + offset + noteHeaderSize +
-                                                                               noteNameSize);
-
-          out << "        vendorName  = " << gpu->vendorName << "\n";
-          out << "        archName    = " << gpu->archName << "\n";
-          out << "        gfxIp       = " << gpu->gfxipMajorVer << "." << gpu->gfxipMinorVer << "."
-              << gpu->gfxipStepping << "\n";
-          break;
-        }
-        case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::AbiMinorVersion): {
-          out << "    AbiMinorVersion              (name = " << node->name << "  size = " << node->descSize << ")\n";
-
-          auto codeVersion = reinterpret_cast<const Util::Abi::AbiMinorVersionNote *>(section->data + offset +
-                                                                                      noteHeaderSize + noteNameSize);
-          out << "        minor = " << codeVersion->minorVersion << "\n";
-          break;
-        }
-        case static_cast<unsigned>(Util::Abi::PipelineAbiNoteType::PalMetadata): {
+        case static_cast<unsigned>(Util::Abi::MetadataNoteType): {
           out << "    PalMetadata                  (name = " << node->name << "  size = " << node->descSize << ")\n";
 
           auto buffer = section->data + offset + noteHeaderSize + noteNameSize;

@@ -4770,6 +4770,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   case OpSampledImage:
     return mapValue(bv, transValueWithOpcode<OpSampledImage>(bv));
   case OpKill:
+  case OpTerminateInvocation:
     return mapValue(bv, transValueWithOpcode<OpKill>(bv));
   case OpReadClockKHR:
     return mapValue(bv, transValueWithOpcode<OpReadClockKHR>(bv));

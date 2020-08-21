@@ -376,14 +376,8 @@ inline bool isValid(spv::BuiltIn V) {
   case BuiltInSubgroupGtMaskKHR:
   case BuiltInSubgroupLeMaskKHR:
   case BuiltInSubgroupLtMaskKHR:
-#if VKI_KHR_FRAGMENT_SHADING_RATE
-  case BuiltInPrimitiveShadingRateKHR:
-#endif
   case BuiltInDeviceIndex:
   case BuiltInViewIndex:
-#if VKI_KHR_FRAGMENT_SHADING_RATE
-  case BuiltInShadingRateKHR:
-#endif
   case BuiltInBaryCoordNoPerspAMD:
   case BuiltInBaryCoordNoPerspCentroidAMD:
   case BuiltInBaryCoordNoPerspSampleAMD:
@@ -514,9 +508,6 @@ inline bool isValid(spv::Capability V) {
   case CapabilityShaderClockKHR:
   case CapabilityVariablePointersStorageBuffer:
   case CapabilityVariablePointers:
-#if VKI_KHR_FRAGMENT_SHADING_RATE
-  case CapabilityFragmentShadingRateKHR:
-#endif
 #if SPV_VERSION >= 0x10500
   case CapabilityShaderNonUniform:
   case CapabilityRuntimeDescriptorArray:
@@ -843,6 +834,7 @@ inline bool isValid(spv::Op V) {
   case OpPtrDiff:
 #endif
   case OpForward:
+  case OpTerminateInvocation:
   case OpSubgroupBallotKHR:
   case OpSubgroupFirstInvocationKHR:
   case OpSubgroupReadInvocationKHR:

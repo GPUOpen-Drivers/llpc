@@ -319,7 +319,7 @@ template <class Elf> bool ElfReader<Elf>::isValidSymbol(const char *symbolName) 
 // Gets note according to note type
 //
 // @param noteType : Note type
-template <class Elf> ElfNote ElfReader<Elf>::getNote(Util::Abi::PipelineAbiNoteType noteType) const {
+template <class Elf> ElfNote ElfReader<Elf>::getNote(uint32_t noteType) const {
   unsigned noteSecIdx = m_map.at(NoteName);
   assert(noteSecIdx > 0);
 

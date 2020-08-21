@@ -175,6 +175,8 @@ struct ShaderOptions {
   /// Override FP32 denormal handling.
   DenormalMode fp32DenormalMode;
 
+  bool reserved;
+
   // Unroll loops by specified amount. 0 is default, 1 is no unroll.
   unsigned forceLoopUnrollCount;
 
