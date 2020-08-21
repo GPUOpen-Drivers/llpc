@@ -424,6 +424,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceRead = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
   imageDesc = patchCubeDescriptor(imageDesc, dim);
+  imageDesc = patchInvalidImageDescriptor(imageDesc);
   coord = handleFragCoordViewIndex(coord, flags, dim);
 
   unsigned dmask = 1;
@@ -602,6 +603,7 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
   imageDesc = patchCubeDescriptor(imageDesc, dim);
+  imageDesc = patchInvalidImageDescriptor(imageDesc);
   coord = handleFragCoordViewIndex(coord, flags, dim);
 
   // For 64-bit texel, only the first component is stored
@@ -1198,6 +1200,7 @@ Value *ImageBuilder::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, un
   if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Resource descriptor. Use the image atomic instruction.
     imageDesc = patchCubeDescriptor(imageDesc, dim);
+    imageDesc = patchInvalidImageDescriptor(imageDesc);
     args.push_back(inputValue);
     if (atomicOp == AtomicOpCompareSwap)
       args.push_back(comparatorValue);
@@ -1720,6 +1723,28 @@ void ImageBuilder::combineCubeArrayFaceAndSlice(Value *coord, SmallVectorImpl<Va
   }
   coords[2] = combined;
   coords.pop_back();
+}
+
+// =====================================================================================================================
+// A buffer descriptor may be incorrectly given when it should be an image descriptor, we need to fix it to valid buffer
+// type (0) to make hardware happily ignore it. This is to check and fix against buggy applications which declares a
+// image descriptor in shader but provide a buffer descriptor in driver. Note this only applies to gfx10.
+//
+// @param desc : Descriptor before patching
+Value *ImageBuilder::patchInvalidImageDescriptor(Value *desc) {
+  if (getPipelineState()->getOptions().disableImageResourceCheck ||
+      getPipelineState()->getTargetInfo().getGfxIpVersion().major != 10)
+    return desc;
+
+  // Extract the dword3. force the 'type' to 0 if [0, 7]
+  Value *elem3 = CreateExtractElement(desc, 3);
+  Value *resourceType = CreateLShr(elem3, getInt32(28));
+  Value *isInvalid = CreateICmpSLE(resourceType, getInt32(7));
+  Value *masked = CreateAnd(elem3, getInt32(0x0FFFFFFF));
+  elem3 = CreateSelect(isInvalid, masked, elem3);
+
+  // Reassemble descriptor.
+  return CreateInsertElement(desc, elem3, 3);
 }
 
 // =====================================================================================================================

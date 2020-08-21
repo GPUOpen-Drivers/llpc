@@ -412,6 +412,9 @@ private:
   // Patch descriptor with cube dimension for image call
   llvm::Value *patchCubeDescriptor(llvm::Value *desc, unsigned dim);
 
+  // Patch invalid resource descriptor for image call
+  llvm::Value *patchInvalidImageDescriptor(llvm::Value *desc);
+
   // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
   llvm::Value *handleFragCoordViewIndex(llvm::Value *coord, unsigned flags, unsigned &dim);
 
