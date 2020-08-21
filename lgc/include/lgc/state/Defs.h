@@ -95,9 +95,8 @@ const static char EsGsEntryPoint[] = "lgc.shader.ESGS.main";
 const static char LsHsEntryPoint[] = "lgc.shader.LSHS.main";
 
 const static char NggEsEntryPoint[] = "lgc.ngg.ES.main";
-const static char NggEsEntryVariant[] = "lgc.ngg.ES.variant";
-const static char NggEsEntryVariantPos[] = "lgc.ngg.ES.variant.pos";
-const static char NggEsEntryVariantParam[] = "lgc.ngg.ES.variant.param";
+const static char NggEsCullDataFetch[] = "lgc.ngg.ES.cull.data.fetch";
+const static char NggEsDeferredVertexExport[] = "lgc.ngg.ES.deferred.vertex.export";
 
 const static char NggGsEntryPoint[] = "lgc.ngg.GS.main";
 const static char NggGsOutputExport[] = "lgc.ngg.GS.output.export.";

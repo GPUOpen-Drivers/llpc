@@ -665,7 +665,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(expVertBlock);
 
-      runEsOrEsVariant(module, lgcName::NggEsEntryPoint, entryPoint->arg_begin(), false, nullptr, expVertBlock);
+      runEs(module, entryPoint->arg_begin());
 
       m_builder->CreateBr(endExpVertBlock);
     }
@@ -743,9 +743,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     //
     // .writePosData:
     //     ; Write LDS region (position data)
-    //     %expData = call [ POS0: <4 x float>, POS1: <4 x float>, ...,
-    //                       PARAM0: <4 x float>, PARAM1: <4 xfloat>, ... ]
-    //                     @llpc.ngg.ES.variant(%sgpr..., %userData..., %vgpr...)
+    //     %cullData = call [ position: <4 x float>, cull-distance: [8 x float] ]
+    //                     @lgc.ngg.ES.cull.data.fetch(%sgpr..., %userData..., %vgpr...)
     //     br label %.endWritePosData
     //
     // .endWritePosData:
@@ -828,7 +827,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     //     br i1 %firstThreadInSubgroup, label %.dummyExp, label %.endDummyExp
     //
     // .dummyExp:
-    //     ; Do vertex position export: exp pos, ... (off, off, off, off)
+    //     ; Do position export: exp pos, ... (off, off, off, off)
     //     ; Do primitive export: exp prim, ... (0, off, off, off)
     //     br label %.endDummyExp
     //
@@ -845,20 +844,14 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     //
     // .endExpPrim:
     //     %vertExp = icmp ult i32 %threadIdInSubgroup, %vertCountInSubgroup
-    //     br i1 %vertExp, label %.expVertPos, label %.endExpVertPos
+    //     br i1 %vertExp, label %.expVert, label %.endExpVert
     //
-    // .expVertPos:
-    //     ; Do vertex position export: exp pos, ...
-    //     br label %.endExpVertPos
+    // .expVert:
+    //     ; Do deferred vertex export: exp posN, ...; exp paramN, ...
+    //     call void @lgc.ngg.ES.deferred.vertex.export(%position, %sgpr..., %userData..., %vgpr...)
+    //     br label %.endExpVert
     //
-    // .endExpVertPos:
-    //     br i1 %vertExp, label %.expVertParam, label %.endExpVertParam
-    //
-    // .expVertParam:
-    //     ; Do vertex parameter export: exp param, ...
-    //     br label %.endExpVertParam
-    //
-    // .endExpVertParam:
+    // .endExpVert:
     //     ret void
     // }
 
@@ -914,11 +907,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     auto expPrimBlock = createBlock(entryPoint, ".expPrim");
     auto endExpPrimBlock = createBlock(entryPoint, ".endExpPrim");
 
-    auto expVertPosBlock = createBlock(entryPoint, ".expVertPos");
-    auto endExpVertPosBlock = createBlock(entryPoint, ".endExpVertPos");
-
-    auto expVertParamBlock = createBlock(entryPoint, ".expVertParam");
-    auto endExpVertParamBlock = createBlock(entryPoint, ".endExpVertParam");
+    auto expVertBlock = createBlock(entryPoint, ".expVert");
+    auto endExpVertBlock = createBlock(entryPoint, ".endExpVert");
 
     // Construct ".entry" block
     {
@@ -1076,87 +1066,29 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     }
 
     // Construct ".writePosData" block
-    std::vector<ExpData> expDataSet;
-    bool separateExp = false;
+    Value *posData = nullptr;
     {
       m_builder->SetInsertPoint(writePosDataBlock);
 
-      separateExp = !resUsage->resourceWrite; // No resource writing
+      // Split ES to two parts: fetch cull data before NGG culling; do deferred vertex export after NGG culling
+      splitEs(module);
 
-      // NOTE: For vertex compaction, we have to run ES for twice (get vertex position data and
-      // get other exported data).
-      const auto entryName = separateExp ? lgcName::NggEsEntryVariantPos : lgcName::NggEsEntryVariant;
-
-      runEsOrEsVariant(module, entryName, entryPoint->arg_begin(), false, &expDataSet, writePosDataBlock);
+      // Run ES-partial to fetch cull data
+      auto cullData = runEsPartial(module, entryPoint->arg_begin());
+      posData = m_nggControl->enableCullDistanceCulling ? m_builder->CreateExtractValue(cullData, 0) : cullData;
 
       // Write vertex position data to LDS
-      for (const auto &expData : expDataSet) {
-        if (expData.target == EXP_TARGET_POS_0) {
-          const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPosData);
-          assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
-
-          Value *ldsOffset = m_builder->CreateMul(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(SizeOfVec4));
-          ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
-
-          // Use 128-bit LDS store
-          m_ldsManager->writeValueToLds(expData.expValue, ldsOffset, true);
-
-          break;
-        }
-      }
+      writePerThreadDataToLds(posData, m_nggFactor.threadIdInSubgroup, LdsRegionPosData);
 
       // Write cull distance sign mask to LDS
       if (m_nggControl->enableCullDistanceCulling) {
-        unsigned clipCullPos = EXP_TARGET_POS_1;
-        std::vector<Value *> clipCullDistance;
-        std::vector<Value *> cullDistance;
-
-        bool usePointSize = false;
-        bool useLayer = false;
-        bool useViewportIndex = false;
-        unsigned clipDistanceCount = 0;
-        unsigned cullDistanceCount = 0;
-
-        if (hasTs) {
-          const auto &builtInUsage = resUsage->builtInUsage.tes;
-
-          usePointSize = builtInUsage.pointSize;
-          useLayer = builtInUsage.layer;
-          useViewportIndex = builtInUsage.viewportIndex;
-          clipDistanceCount = builtInUsage.clipDistance;
-          cullDistanceCount = builtInUsage.cullDistance;
-        } else {
-          const auto &builtInUsage = resUsage->builtInUsage.vs;
-
-          usePointSize = builtInUsage.pointSize;
-          useLayer = builtInUsage.layer;
-          useViewportIndex = builtInUsage.viewportIndex;
-          clipDistanceCount = builtInUsage.clipDistance;
-          cullDistanceCount = builtInUsage.cullDistance;
-        }
-
-        bool miscExport = usePointSize || useLayer || useViewportIndex;
-        // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
-        clipCullPos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
-
-        // Collect clip/cull distance from exported value
-        for (const auto &expData : expDataSet) {
-          if (expData.target == clipCullPos || expData.target == clipCullPos + 1) {
-            for (unsigned i = 0; i < 4; ++i) {
-              auto expValue = m_builder->CreateExtractElement(expData.expValue, i);
-              clipCullDistance.push_back(expValue);
-            }
-          }
-        }
-        assert(clipCullDistance.size() < MaxClipCullDistanceCount);
-
-        for (unsigned i = clipDistanceCount; i < clipDistanceCount + cullDistanceCount; ++i)
-          cullDistance.push_back(clipCullDistance[i]);
+        auto cullDistance = m_builder->CreateExtractValue(cullData, 1);
 
         // Calculate the sign mask for cull distance
         Value *signMask = m_builder->getInt32(0);
-        for (unsigned i = 0; i < cullDistance.size(); ++i) {
-          auto cullDistanceVal = m_builder->CreateBitCast(cullDistance[i], m_builder->getInt32Ty());
+        for (unsigned i = 0; i < cullDistance->getType()->getArrayNumElements(); ++i) {
+          auto cullDistanceVal = m_builder->CreateExtractValue(cullDistance, i);
+          cullDistanceVal = m_builder->CreateBitCast(cullDistanceVal, m_builder->getInt32Ty());
 
           Value *signBit =
               m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
@@ -1166,13 +1098,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
           signMask = m_builder->CreateOr(signMask, signBit);
         }
 
-        // Write the sign mask to LDS
-        const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionCullDistance);
-
-        Value *ldsOffset = m_builder->CreateShl(m_nggFactor.threadIdInSubgroup, 2);
-        ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
-
-        m_ldsManager->writeValueToLds(signMask, ldsOffset);
+        writePerThreadDataToLds(signMask, m_nggFactor.threadIdInSubgroup, LdsRegionCullDistance);
       }
 
       m_builder->CreateBr(endWritePosDataBlock);
@@ -1182,14 +1108,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(endWritePosDataBlock);
 
-      auto undef = UndefValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 4));
-      for (auto &expData : expDataSet) {
-        PHINode *expValue = m_builder->CreatePHI(FixedVectorType::get(Type::getFloatTy(*m_context), 4), 2);
-        expValue->addIncoming(expData.expValue, writePosDataBlock);
-        expValue->addIncoming(undef, endZeroDrawFlagBlock);
-
-        expData.expValue = expValue; // Update the exportd data
-      }
+      PHINode *posDataPhi = m_builder->CreatePHI(FixedVectorType::get(m_builder->getFloatTy(), 4), 2);
+      posDataPhi->addIncoming(posData, writePosDataBlock);
+      posDataPhi->addIncoming(UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 4)), endZeroDrawFlagBlock);
+      posData = posDataPhi; // Update vertex position data
 
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
@@ -1358,18 +1280,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       compactThreadIdInSubrgoup = m_builder->CreateAdd(vertCountInPrevWaves, compactThreadIdInSubrgoup);
 
       // Write vertex position data to LDS
-      for (const auto &expData : expDataSet) {
-        if (expData.target == EXP_TARGET_POS_0) {
-          const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPosData);
-
-          Value *ldsOffset = m_builder->CreateMul(compactThreadIdInSubrgoup, m_builder->getInt32(SizeOfVec4));
-          ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
-
-          m_ldsManager->writeValueToLds(expData.expValue, ldsOffset);
-
-          break;
-        }
-      }
+      writePerThreadDataToLds(posData, compactThreadIdInSubrgoup, LdsRegionPosData);
 
       // Write thread ID in sub-group to LDS
       Value *compactThreadId = m_builder->CreateTrunc(compactThreadIdInSubrgoup, m_builder->getInt8Ty());
@@ -1459,13 +1370,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(earlyExitBlock);
 
-      unsigned expPosCount = 0;
-      for (const auto &expData : expDataSet) {
-        if (expData.target >= EXP_TARGET_POS_0 && expData.target <= EXP_TARGET_POS_4)
-          ++expPosCount;
-      }
-
-      doEarlyExit(fullyCulledThreadCount, expPosCount);
+      doEarlyExit(fullyCulledThreadCount);
     }
 
     // Construct ".noEarlyExit" block
@@ -1490,106 +1395,22 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       m_builder->SetInsertPoint(endExpPrimBlock);
 
       vertExp = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
-      m_builder->CreateCondBr(vertExp, expVertPosBlock, endExpVertPosBlock);
+      m_builder->CreateCondBr(vertExp, expVertBlock, endExpVertBlock);
     }
 
-    // Construct ".expVertPos" block
+    // Construct ".expVert" block
     {
-      m_builder->SetInsertPoint(expVertPosBlock);
+      m_builder->SetInsertPoint(expVertBlock);
 
-      // NOTE: We have to run ES to get exported data once again.
-      expDataSet.clear();
+      // Run ES-partial to do deferred vertex export
+      runEsPartial(module, entryPoint->arg_begin(), posData);
 
-      runEsOrEsVariant(module, lgcName::NggEsEntryVariant, entryPoint->arg_begin(), true, &expDataSet, expVertPosBlock);
-
-      // For vertex position, we get the exported data from LDS
-      for (auto &expData : expDataSet) {
-        if (expData.target == EXP_TARGET_POS_0) {
-          const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionPosData);
-          assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
-
-          auto ldsOffset = m_builder->CreateMul(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(SizeOfVec4));
-          ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
-
-          // Use 128-bit LDS load
-          auto expValue =
-              m_ldsManager->readValueFromLds(FixedVectorType::get(Type::getFloatTy(*m_context), 4), ldsOffset, true);
-          expData.expValue = expValue;
-
-          break;
-        }
-      }
-
-      for (const auto &expData : expDataSet) {
-        if (expData.target >= EXP_TARGET_POS_0 && expData.target <= EXP_TARGET_POS_4) {
-          std::vector<Value *> args;
-
-          args.push_back(m_builder->getInt32(expData.target));      // tgt
-          args.push_back(m_builder->getInt32(expData.channelMask)); // en
-
-          // src0 ~ src3
-          for (unsigned i = 0; i < 4; ++i) {
-            auto expValue = m_builder->CreateExtractElement(expData.expValue, i);
-            args.push_back(expValue);
-          }
-
-          args.push_back(m_builder->getInt1(expData.doneFlag)); // done
-          args.push_back(m_builder->getFalse());                // vm
-
-          m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(), args);
-        }
-      }
-
-      m_builder->CreateBr(endExpVertPosBlock);
+      m_builder->CreateBr(endExpVertBlock);
     }
 
-    // Construct ".endExpVertPos" block
+    // Construct ".endExpVert" block
     {
-      m_builder->SetInsertPoint(endExpVertPosBlock);
-
-      auto undef = UndefValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 4));
-      for (auto &expData : expDataSet) {
-        PHINode *expValue = m_builder->CreatePHI(FixedVectorType::get(Type::getFloatTy(*m_context), 4), 2);
-
-        expValue->addIncoming(expData.expValue, expVertPosBlock);
-        expValue->addIncoming(undef, endExpPrimBlock);
-
-        expData.expValue = expValue; // Update the exportd data
-      }
-
-      m_builder->CreateCondBr(vertExp, expVertParamBlock, endExpVertParamBlock);
-    }
-
-    // Construct ".expVertParam" block
-    {
-      m_builder->SetInsertPoint(expVertParamBlock);
-
-      for (const auto &expData : expDataSet) {
-        if (expData.target >= EXP_TARGET_PARAM_0 && expData.target <= EXP_TARGET_PARAM_31) {
-          std::vector<Value *> args;
-
-          args.push_back(m_builder->getInt32(expData.target));      // tgt
-          args.push_back(m_builder->getInt32(expData.channelMask)); // en
-
-          // src0 ~ src3
-          for (unsigned i = 0; i < 4; ++i) {
-            auto expValue = m_builder->CreateExtractElement(expData.expValue, i);
-            args.push_back(expValue);
-          }
-
-          args.push_back(m_builder->getInt1(expData.doneFlag)); // done
-          args.push_back(m_builder->getFalse());                // vm
-
-          m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(), args);
-        }
-      }
-
-      m_builder->CreateBr(endExpVertParamBlock);
-    }
-
-    // Construct ".endExpVertParam" block
-    {
-      m_builder->SetInsertPoint(endExpVertParamBlock);
+      m_builder->SetInsertPoint(endExpVertBlock);
 
       m_builder->CreateRetVoid();
     }
@@ -1745,7 +1566,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(beginEsBlock);
 
-    runEsOrEsVariant(module, lgcName::NggEsEntryPoint, entryPoint->arg_begin(), false, nullptr, beginEsBlock);
+    runEs(module, entryPoint->arg_begin());
 
     m_builder->CreateBr(endEsBlock);
   }
@@ -2373,8 +2194,7 @@ void NggPrimShader::doPrimitiveExportWithGs(Value *vertexId) {
 // primitive/vertex export if necessary.
 //
 // @param fullyCulledThreadCount : Thread count left when the entire sub-group is fully culled
-// @param expPosCount : Position export count
-void NggPrimShader::doEarlyExit(unsigned fullyCulledThreadCount, unsigned expPosCount) {
+void NggPrimShader::doEarlyExit(unsigned fullyCulledThreadCount) {
   if (fullyCulledThreadCount > 0) {
     assert(fullyCulledThreadCount == 1); // Currently, if workarounded, this is set to 1
 
@@ -2408,16 +2228,44 @@ void NggPrimShader::doEarlyExit(unsigned fullyCulledThreadCount, unsigned expPos
                                      m_builder->getFalse() // vm
                                  });
 
+      // Determine how many dummy position exports we need
+      unsigned posExpCount = 1;
+      if (m_hasGs) {
+        const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+
+        bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+        if (miscExport)
+          ++posExpCount;
+
+        posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
+      } else if (m_hasTcs || m_hasTes) {
+        const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.tes;
+
+        bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+        if (miscExport)
+          ++posExpCount;
+
+        posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
+      } else {
+        const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.vs;
+
+        bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+        if (miscExport)
+          ++posExpCount;
+
+        posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
+      }
+
       undef = UndefValue::get(m_builder->getFloatTy());
 
-      for (unsigned i = 0; i < expPosCount; ++i) {
+      for (unsigned i = 0; i < posExpCount; ++i) {
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
                                    {
                                        m_builder->getInt32(EXP_TARGET_POS_0 + i), // tgt
                                        m_builder->getInt32(0x0),                  // en
                                        // src0 ~ src3
                                        undef, undef, undef, undef,
-                                       m_builder->getInt1(i == expPosCount - 1), // done
+                                       m_builder->getInt1(i == posExpCount - 1), // done
                                        m_builder->getFalse()                     // vm
                                    });
       }
@@ -2435,40 +2283,19 @@ void NggPrimShader::doEarlyExit(unsigned fullyCulledThreadCount, unsigned expPos
 }
 
 // =====================================================================================================================
-// Runs ES or ES variant (to get exported data).
-//
-// NOTE: The ES variant is derived from original ES main function with some additional special handling added to the
-// function body and also mutates its return type.
+// Runs ES.
 //
 // @param module : LLVM module
-// @param entryName : ES entry name
 // @param sysValueStart : Start of system value
-// @param sysValueFromLds : Whether some system values are loaded from LDS (for vertex compaction)
-// @param [out] expDataSet : Set of exported data (could be null)
-// @param insertAtEnd : Where to insert instructions
-void NggPrimShader::runEsOrEsVariant(Module *module, StringRef entryName, Argument *sysValueStart, bool sysValueFromLds,
-                                     std::vector<ExpData> *expDataSet, BasicBlock *insertAtEnd) {
+void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
   const bool hasTs = (m_hasTcs || m_hasTes);
   if (((hasTs && m_hasTes) || (!hasTs && m_hasVs)) == false) {
     // No TES (tessellation is enabled) or VS (tessellation is disabled), don't have to run
     return;
   }
 
-  const bool runEsVariant = (entryName != lgcName::NggEsEntryPoint);
-
-  Function *esEntry = nullptr;
-  if (runEsVariant) {
-    assert(expDataSet);
-    esEntry = mutateEsToVariant(module, entryName, *expDataSet); // Mutate ES to variant
-
-    if (!esEntry) {
-      // ES variant is NULL, don't have to run
-      return;
-    }
-  } else {
-    esEntry = module->getFunction(lgcName::NggEsEntryPoint);
-    assert(esEntry);
-  }
+  auto esEntry = module->getFunction(lgcName::NggEsEntryPoint);
+  assert(esEntry);
 
   // Call ES entry
   Argument *arg = sysValueStart;
@@ -2488,70 +2315,16 @@ void NggPrimShader::runEsOrEsVariant(Module *module, StringRef entryName, Argume
 
   Value *userData = arg++;
 
-  // Initialize those system values to undefined ones
-  Value *tessCoordX = UndefValue::get(m_builder->getFloatTy());
-  Value *tessCoordY = UndefValue::get(m_builder->getFloatTy());
-  Value *relPatchId = UndefValue::get(m_builder->getInt32Ty());
-  Value *patchId = UndefValue::get(m_builder->getInt32Ty());
+  Value *tessCoordX = (arg + 5);
+  Value *tessCoordY = (arg + 6);
+  Value *relPatchId = (arg + 7);
+  Value *patchId = (arg + 8);
 
-  Value *vertexId = UndefValue::get(m_builder->getInt32Ty());
-  Value *relVertexId = UndefValue::get(m_builder->getInt32Ty());
-  Value *vsPrimitiveId = UndefValue::get(m_builder->getInt32Ty());
-  Value *instanceId = UndefValue::get(m_builder->getInt32Ty());
-
-  if (sysValueFromLds) {
-    // NOTE: For vertex compaction, system values are from LDS compaction data region rather than from VGPRs.
-    assert(m_nggControl->compactMode == NggCompactVertices);
-
-    const auto resUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
-
-    if (hasTs) {
-      if (resUsage->builtInUsage.tes.tessCoord) {
-        tessCoordX = readPerThreadDataFromLds(m_builder->getFloatTy(), m_nggFactor.threadIdInSubgroup,
-                                              LdsRegionCompactTessCoordX);
-
-        tessCoordY = readPerThreadDataFromLds(m_builder->getFloatTy(), m_nggFactor.threadIdInSubgroup,
-                                              LdsRegionCompactTessCoordY);
-      }
-
-      relPatchId =
-          readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionCompactRelPatchId);
-
-      if (resUsage->builtInUsage.tes.primitiveId) {
-        patchId =
-            readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionCompactPatchId);
-      }
-    } else {
-      if (resUsage->builtInUsage.vs.vertexIndex) {
-        vertexId =
-            readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionCompactVertexId);
-      }
-
-      // NOTE: Relative vertex ID Will not be used when VS is merged to GS.
-
-      if (resUsage->builtInUsage.vs.primitiveId) {
-        vsPrimitiveId =
-            readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionCompactPrimId);
-      }
-
-      if (resUsage->builtInUsage.vs.instanceIndex) {
-        instanceId = readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup,
-                                              LdsRegionCompactInstanceId);
-      }
-    }
-  } else {
-    tessCoordX = (arg + 5);
-    tessCoordY = (arg + 6);
-    relPatchId = (arg + 7);
-    patchId = (arg + 8);
-
-    vertexId = (arg + 5);
-    relVertexId = (arg + 6);
-    // NOTE: VS primitive ID for NGG is specially obtained, not simply from system VGPR.
-    if (m_nggFactor.primitiveId)
-      vsPrimitiveId = m_nggFactor.primitiveId;
-    instanceId = (arg + 8);
-  }
+  Value *vertexId = (arg + 5);
+  Value *relVertexId = (arg + 6);
+  // NOTE: VS primitive ID for NGG is specially obtained, not simply from system VGPR.
+  Value *vsPrimitiveId = m_nggFactor.primitiveId ? m_nggFactor.primitiveId : UndefValue::get(m_builder->getInt32Ty());
+  Value *instanceId = (arg + 8);
 
   std::vector<Value *> args;
 
@@ -2562,7 +2335,7 @@ void NggPrimShader::runEsOrEsVariant(Module *module, StringRef entryName, Argume
 
   auto esArgBegin = esEntry->arg_begin();
   const unsigned esArgCount = esEntry->arg_size();
-  (void(esArgCount)); // unused
+  (void(esArgCount)); // Unused
 
   // Set up user data SGPRs
   while (userDataIdx < userDataCount) {
@@ -2619,123 +2392,255 @@ void NggPrimShader::runEsOrEsVariant(Module *module, StringRef entryName, Argume
     args.push_back(relVertexId);
     args.push_back(vsPrimitiveId);
     args.push_back(instanceId);
-  }
 
-  // If the ES is the API VS, and it is a fetchless VS, then we need to add args for the vertex fetches.
-  // Also set the name of each vertex fetch prim shader arg while we're here.
-  if (!hasTs) {
+    // When tessellation is not enabled, the ES is actually a fetchless VS. Then, we need to add arguments for the
+    // vertex fetches. Also set the name of each vertex fetch primitive shader argument while we're here.
     unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
     if (vertexFetchCount != 0) {
-      // The final vertexFetchCount args of the prim shader and of ES (API VS) are the vertex fetches.
-      Function *primShader = insertAtEnd->getParent();
-      unsigned primArgSize = primShader->arg_size();
-      Function *esEntry = module->getFunction(lgcName::NggEsEntryPoint);
-      unsigned esArgSize = esEntry->arg_size();
-      for (unsigned idx = 0; idx != vertexFetchCount; ++idx) {
-        Argument *arg = primShader->getArg(primArgSize - vertexFetchCount + idx);
-        arg->setName(esEntry->getArg(esArgSize - vertexFetchCount + idx)->getName());
-        args.push_back(arg);
+      // The last vertexFetchCount arguments of the primitive shader and ES are the vertex fetches
+      Function *primShader = m_builder->GetInsertBlock()->getParent();
+      unsigned primArgCount = primShader->arg_size();
+      for (unsigned i = 0; i != vertexFetchCount; ++i) {
+        Argument *vertexFetch = primShader->getArg(primArgCount - vertexFetchCount + i);
+        vertexFetch->setName(esEntry->getArg(esArgCount - vertexFetchCount + i)->getName()); // Copy argument name
+        args.push_back(vertexFetch);
       }
     }
   }
 
   assert(args.size() == esArgCount); // Must have visit all arguments of ES entry point
 
-  if (runEsVariant) {
-    auto expData = emitCall(entryName, esEntry->getReturnType(), args, {}, insertAtEnd);
-
-    // Re-construct exported data from the return value
-    auto expDataTy = expData->getType();
-    assert(expDataTy->isArrayTy());
-
-    const unsigned expCount = expDataTy->getArrayNumElements();
-    for (unsigned i = 0; i < expCount; ++i) {
-      Value *expValue = m_builder->CreateExtractValue(expData, i);
-      (*expDataSet)[i].expValue = expValue;
-    }
-  } else {
-    emitCall(entryName, esEntry->getReturnType(), args, {}, insertAtEnd);
-  }
+  m_builder->CreateCall(esEntry, args);
 }
 
 // =====================================================================================================================
-// Mutates the entry-point (".main") of ES to its variant (".variant").
-//
-// NOTE: Initially, the return type of ES entry-point is void. After this mutation, position and parameter exporting
-// are both removed. Instead, the exported values are returned via either a new entry-point (combined) or two new
-// entry-points (separate). Return types is something like this:
-//   .variant:       [ POS0: <4 x float>, POS1: <4 x float>, ..., PARAM0: <4 x float>, PARAM1: <4 x float>, ... ]
-//   .variant.pos:   [ POS0: <4 x float>, POS1: <4 x float>, ... ]
-//   .variant.param: [ PARAM0: <4 x float>, PARAM1: <4 x float>, ... ]
+// Runs ES-partial. Before doing this, ES must have been already split to two parts: one is to fetch cull data for
+// NGG culling; the other is to do deferred vertex export.
 //
 // @param module : LLVM module
-// @param entryName : ES entry name
-// @param [out] expDataSet : Set of exported data
-Function *NggPrimShader::mutateEsToVariant(Module *module, StringRef entryName, std::vector<ExpData> &expDataSet) {
-  assert(m_hasGs == false); // GS must not be present
-  assert(expDataSet.empty());
+// @param sysValueStart : Start of system value
+// @param position : Vertex position data (if provided, the ES-partial is to do deferred vertex export)
+Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Value *position) {
+  assert(m_hasGs == false);                       // GS must not be present
+  assert(m_nggControl->passthroughMode == false); // NGG culling is enabled
 
-  const auto esEntryPoint = module->getFunction(lgcName::NggEsEntryPoint);
-  assert(esEntryPoint);
+  const bool deferredVertexExport = position != nullptr;
+  Function *esPartialEntry =
+      module->getFunction(deferredVertexExport ? lgcName::NggEsDeferredVertexExport : lgcName::NggEsCullDataFetch);
+  assert(esPartialEntry);
 
-  const bool doExp = (entryName == lgcName::NggEsEntryVariant);
-  const bool doPosExp = (entryName == lgcName::NggEsEntryVariantPos);
-  const bool doParamExp = (entryName == lgcName::NggEsEntryVariantParam);
+  const bool hasTs = (m_hasTcs || m_hasTes);
 
-  // Calculate export count
-  unsigned expCount = 0;
+  // Call ES-partial entry
+  Argument *arg = sysValueStart;
 
-  for (auto &func : module->functions()) {
-    if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) {
-      for (auto user : func.users()) {
-        CallInst *const call = dyn_cast<CallInst>(user);
-        assert(call);
+  Value *offChipLdsBase = (arg + EsGsSysValueOffChipLdsBase);
+  Value *isOffChip = UndefValue::get(m_builder->getInt32Ty()); // NOTE: This flag is unused.
 
-        if (call->getParent()->getParent() != esEntryPoint) {
-          // Export call doesn't belong to ES, skip
-          continue;
-        }
+  arg += EsGsSpecialSysValueCount;
 
-        uint8_t expTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+  Value *userData = arg++;
 
-        bool expPos = (expTarget >= EXP_TARGET_POS_0 && expTarget <= EXP_TARGET_POS_4);
-        bool expParam = (expTarget >= EXP_TARGET_PARAM_0 && expTarget <= EXP_TARGET_PARAM_31);
+  Value *tessCoordX = (arg + 5);
+  Value *tessCoordY = (arg + 6);
+  Value *relPatchId = (arg + 7);
+  Value *patchId = (arg + 8);
 
-        if ((doExp && (expPos || expParam)) || (doPosExp && expPos) || (doParamExp && expParam))
-          ++expCount;
+  Value *vertexId = (arg + 5);
+  Value *relVertexId = (arg + 6);
+  // NOTE: VS primitive ID for NGG is specially obtained, not simply from system VGPR.
+  Value *vsPrimitiveId = m_nggFactor.primitiveId ? m_nggFactor.primitiveId : UndefValue::get(m_builder->getInt32Ty());
+  Value *instanceId = (arg + 8);
+
+  if (deferredVertexExport) {
+    position = readPerThreadDataFromLds(FixedVectorType::get(m_builder->getFloatTy(), 4),
+                                        m_nggFactor.threadIdInSubgroup, LdsRegionPosData);
+
+    // NOTE: For deferred vertex export, the system values are from LDS compaction data region rather than from VGPRs
+    // (caused by NGG culling and vertex compaction)
+    const auto resUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+    if (hasTs) {
+      if (resUsage->builtInUsage.tes.tessCoord) {
+        tessCoordX = readPerThreadDataFromLds(m_builder->getFloatTy(), m_nggFactor.threadIdInSubgroup,
+                                              LdsRegionCompactTessCoordX);
+
+        tessCoordY = readPerThreadDataFromLds(m_builder->getFloatTy(), m_nggFactor.threadIdInSubgroup,
+                                              LdsRegionCompactTessCoordY);
+      }
+
+      relPatchId =
+          readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionCompactRelPatchId);
+
+      if (resUsage->builtInUsage.tes.primitiveId) {
+        patchId =
+            readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionCompactPatchId);
+      }
+    } else {
+      if (resUsage->builtInUsage.vs.vertexIndex) {
+        vertexId =
+            readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionCompactVertexId);
+      }
+
+      // NOTE: Relative vertex ID is used when VS is merged to GS.
+      if (resUsage->builtInUsage.vs.primitiveId) {
+        vsPrimitiveId =
+            readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionCompactPrimId);
+      }
+
+      if (resUsage->builtInUsage.vs.instanceIndex) {
+        instanceId = readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup,
+                                              LdsRegionCompactInstanceId);
       }
     }
   }
 
-  if (expCount == 0) {
-    // If the export count is zero, return NULL
-    return nullptr;
+  std::vector<Value *> args;
+
+  if (deferredVertexExport)
+    args.push_back(position); // Setup vertex position data as the first argument
+
+  auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+  const unsigned userDataCount = intfData->userDataCount;
+
+  unsigned userDataIdx = 0;
+
+  auto esPartialArgBegin = esPartialEntry->arg_begin();
+  const unsigned esPartialArgCount = esPartialEntry->arg_size();
+  (void(esPartialArgCount)); // Unused
+
+  // Set up user data SGPRs
+  while (userDataIdx < userDataCount) {
+    assert(args.size() < esPartialArgCount);
+
+    auto esPartialArg = (esPartialArgBegin + args.size());
+    assert(esPartialArg->hasAttribute(Attribute::InReg));
+
+    auto esPartialArgTy = esPartialArg->getType();
+    if (esPartialArgTy->isVectorTy()) {
+      assert(cast<VectorType>(esPartialArgTy)->getElementType()->isIntegerTy());
+
+      const unsigned userDataSize = cast<VectorType>(esPartialArgTy)->getNumElements();
+
+      std::vector<int> shuffleMask;
+      for (unsigned i = 0; i < userDataSize; ++i)
+        shuffleMask.push_back(userDataIdx + i);
+
+      userDataIdx += userDataSize;
+
+      auto esUserData = m_builder->CreateShuffleVector(userData, userData, shuffleMask);
+      args.push_back(esUserData);
+    } else {
+      assert(esPartialArgTy->isIntegerTy());
+
+      auto esUserData = m_builder->CreateExtractElement(userData, userDataIdx);
+      args.push_back(esUserData);
+      ++userDataIdx;
+    }
   }
 
-  // Clone new entry-point
-  auto expDataTy = ArrayType::get(FixedVectorType::get(Type::getFloatTy(*m_context), 4), expCount);
-  Value *expData = UndefValue::get(expDataTy);
+  if (hasTs) {
+    // Set up system value SGPRs
+    if (m_pipelineState->isTessOffChip()) {
+      args.push_back(isOffChip);
+      args.push_back(offChipLdsBase);
+    }
 
-  auto esEntryVariantTy = FunctionType::get(expDataTy, esEntryPoint->getFunctionType()->params(), false);
-  auto esEntryVariant = Function::Create(esEntryVariantTy, esEntryPoint->getLinkage(), "", module);
-  esEntryVariant->copyAttributesFrom(esEntryPoint);
+    // Set up system value VGPRs
+    args.push_back(tessCoordX);
+    args.push_back(tessCoordY);
+    args.push_back(relPatchId);
+    args.push_back(patchId);
+  } else {
+    // Set up system value VGPRs
+    args.push_back(vertexId);
+    args.push_back(relVertexId);
+    args.push_back(vsPrimitiveId);
+    args.push_back(instanceId);
+  }
+
+  assert(args.size() == esPartialArgCount); // Must have visit all arguments of ES-partial entry point
+
+  return m_builder->CreateCall(esPartialEntry, args);
+}
+
+// =====================================================================================================================
+// Split ES to two parts. One is to fetch cull data for NGG culling, such as position and cull distance (if cull
+// distance culling is enabled). The other is to do deferred vertex export like original ES.
+//
+// @param module : LLVM module
+// @param fetchData : Whether the mutation is to fetch data
+void NggPrimShader::splitEs(Module *module) {
+  assert(m_hasGs == false); // GS must not be present
+
+  const auto esEntryPoint = module->getFunction(lgcName::NggEsEntryPoint);
+  assert(esEntryPoint);
+
+  //
+  // Collect all export calls for further analysis
+  //
+  SmallVector<Function *, 8> expFuncs;
+  for (auto &func : module->functions()) {
+    if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
+      expFuncs.push_back(&func);
+  }
+
+  //
+  // Preparation for fetching cull distances
+  //
+  unsigned clipCullPos = EXP_TARGET_POS_1;
+  unsigned clipDistanceCount = 0;
+  unsigned cullDistanceCount = 0;
+
+  if (m_nggControl->enableCullDistanceCulling) {
+    const bool hasTs = (m_hasTcs || m_hasTes);
+    const auto &resUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+
+    if (hasTs) {
+      const auto &builtInUsage = resUsage->builtInUsage.tes;
+
+      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+      clipCullPos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+      clipDistanceCount = builtInUsage.clipDistance;
+      cullDistanceCount = builtInUsage.cullDistance;
+    } else {
+      const auto &builtInUsage = resUsage->builtInUsage.vs;
+
+      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+      clipCullPos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+      clipDistanceCount = builtInUsage.clipDistance;
+      cullDistanceCount = builtInUsage.cullDistance;
+    }
+
+    assert(cullDistanceCount > 0); // Cull distance must exist if the culling is enabled
+  }
+
+  //
+  // Create ES-partial to fetch cull data for NGG culling
+  //
+  const auto positionTy = FixedVectorType::get(m_builder->getFloatTy(), 4);
+  const auto cullDistanceTy = ArrayType::get(m_builder->getFloatTy(), cullDistanceCount);
+
+  Type *cullDataTy = positionTy;
+  if (m_nggControl->enableCullDistanceCulling)
+    cullDataTy = StructType::get(*m_context, {positionTy, cullDistanceTy});
+
+  // Clone ES
+  auto esCullDataFetchFuncTy = FunctionType::get(cullDataTy, esEntryPoint->getFunctionType()->params(), false);
+  auto esCullDataFetchFunc = Function::Create(esCullDataFetchFuncTy, esEntryPoint->getLinkage(), "", module);
 
   ValueToValueMapTy valueMap;
 
-  Argument *variantArg = esEntryVariant->arg_begin();
+  Argument *newArg = esCullDataFetchFunc->arg_begin();
   for (Argument &arg : esEntryPoint->args())
-    valueMap[&arg] = variantArg++;
+    valueMap[&arg] = newArg++;
 
   SmallVector<ReturnInst *, 8> retInsts;
-  CloneFunctionInto(esEntryVariant, esEntryPoint, valueMap, false, retInsts);
+  CloneFunctionInto(esCullDataFetchFunc, esEntryPoint, valueMap, false, retInsts);
+  esCullDataFetchFunc->setName(lgcName::NggEsCullDataFetch);
 
-  esEntryVariant->setName(entryName);
-
-  auto savedInsertPos = m_builder->saveIP();
-
-  // Find the return block and remove old return instruction
+  // Find the return block, remove all exports, and mutate return type
   BasicBlock *retBlock = nullptr;
-  for (BasicBlock &block : *esEntryVariant) {
+  for (BasicBlock &block : *esCullDataFetchFunc) {
     auto retInst = dyn_cast<ReturnInst>(block.getTerminator());
     if (retInst) {
       retInst->dropAllReferences();
@@ -2745,89 +2650,110 @@ Function *NggPrimShader::mutateEsToVariant(Module *module, StringRef entryName, 
       break;
     }
   }
+  assert(retBlock);
 
+  auto savedInsertPos = m_builder->saveIP();
   m_builder->SetInsertPoint(retBlock);
 
-  // Get exported data
-  std::vector<Instruction *> expCalls;
+  SmallVector<CallInst *, 8> removeCalls;
 
-  unsigned lastExport = InvalidValue; // Record last position export that needs "done" flag
-  for (auto &func : module->functions()) {
-    if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) {
-      for (auto user : func.users()) {
-        CallInst *const call = dyn_cast<CallInst>(user);
-        assert(call);
+  // Fetch position and cull distances
+  Value *position = UndefValue::get(positionTy);
+  SmallVector<Value *, MaxClipCullDistanceCount> clipCullDistance(MaxClipCullDistanceCount);
 
-        if (call->getParent()->getParent() != esEntryVariant) {
-          // Export call doesn't belong to ES variant, skip
-          continue;
+  for (auto func : expFuncs) {
+    for (auto user : func->users()) {
+      CallInst *const call = dyn_cast<CallInst>(user);
+      assert(call);
+
+      if (call->getParent()->getParent() != esCullDataFetchFunc)
+        continue; // Export call doesn't belong to targeted function, skip
+
+      assert(call->getParent() == retBlock); // Must in return block
+
+      unsigned exportTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+      if (exportTarget == EXP_TARGET_POS_0) {
+        // Get position value
+        for (unsigned i = 0; i < 4; ++i)
+          position = m_builder->CreateInsertElement(position, call->getArgOperand(2 + i), i);
+      } else if (exportTarget == clipCullPos) {
+        // Get clip/cull distance value
+        if (m_nggControl->enableCullDistanceCulling) {
+          clipCullDistance[0] = call->getArgOperand(2);
+          clipCullDistance[1] = call->getArgOperand(3);
+          clipCullDistance[2] = call->getArgOperand(4);
+          clipCullDistance[3] = call->getArgOperand(5);
         }
-
-        assert(call->getParent() == retBlock); // Must in return block
-
-        uint8_t expTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-
-        bool expPos = (expTarget >= EXP_TARGET_POS_0 && expTarget <= EXP_TARGET_POS_4);
-        bool expParam = (expTarget >= EXP_TARGET_PARAM_0 && expTarget <= EXP_TARGET_PARAM_31);
-
-        if ((doExp && (expPos || expParam)) || (doPosExp && expPos) || (doParamExp && expParam)) {
-          uint8_t channelMask = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
-
-          Value *expValues[4] = {};
-          expValues[0] = call->getArgOperand(2);
-          expValues[1] = call->getArgOperand(3);
-          expValues[2] = call->getArgOperand(4);
-          expValues[3] = call->getArgOperand(5);
-
-          if (func.getName().endswith(".i32")) {
-            expValues[0] = m_builder->CreateBitCast(expValues[0], m_builder->getFloatTy());
-            expValues[1] = m_builder->CreateBitCast(expValues[1], m_builder->getFloatTy());
-            expValues[2] = m_builder->CreateBitCast(expValues[2], m_builder->getFloatTy());
-            expValues[3] = m_builder->CreateBitCast(expValues[3], m_builder->getFloatTy());
-          }
-
-          Value *expValue = UndefValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 4));
-          for (unsigned i = 0; i < 4; ++i)
-            expValue = m_builder->CreateInsertElement(expValue, expValues[i], i);
-
-          if (expPos) {
-            // Last position export that needs "done" flag
-            lastExport = expDataSet.size();
-          }
-
-          ExpData expData = {expTarget, channelMask, false, expValue};
-          expDataSet.push_back(expData);
+      } else if (exportTarget == clipCullPos + 1 && clipDistanceCount + cullDistanceCount > 4) {
+        // Get clip/cull distance value
+        if (m_nggControl->enableCullDistanceCulling) {
+          clipCullDistance[4] = call->getArgOperand(2);
+          clipCullDistance[5] = call->getArgOperand(3);
+          clipCullDistance[6] = call->getArgOperand(4);
+          clipCullDistance[7] = call->getArgOperand(5);
         }
+      }
 
-        expCalls.push_back(call);
+      removeCalls.push_back(call); // Remove export
+    }
+  }
+
+  Value *cullData = position;
+  if (m_nggControl->enableCullDistanceCulling) {
+    Value *cullDistance = UndefValue::get(cullDistanceTy);
+
+    for (unsigned i = 0; i < cullDistanceCount; ++i)
+      cullDistance = m_builder->CreateInsertValue(cullDistance, clipCullDistance[clipDistanceCount + i], i);
+
+    cullData = m_builder->CreateInsertValue(UndefValue::get(cullDataTy), position, 0);
+    cullData = m_builder->CreateInsertValue(cullData, cullDistance, 1);
+  }
+
+  m_builder->CreateRet(cullData);
+
+  //
+  // Create ES-partial to do deferred vertex export after NGG culling
+  //
+
+  // NOTE: Here, we just mutate original ES to do deferred vertex export. We add vertex position data as an additional
+  // input (the first argument). This could avoid re-fetching it since we already get the data before NGG culling.
+  auto esDeferredVertexExportFunc = addFunctionArgs(esEntryPoint, nullptr, positionTy);
+  esDeferredVertexExportFunc->setName(lgcName::NggEsDeferredVertexExport);
+
+  position = esDeferredVertexExportFunc->getArg(0); // The first argument is vertex position data
+  assert(position->getType() == positionTy);
+
+  for (auto func : expFuncs) {
+    for (auto user : func->users()) {
+      CallInst *const call = dyn_cast<CallInst>(user);
+      assert(call);
+
+      if (call->getParent()->getParent() != esDeferredVertexExportFunc)
+        continue; // Export call doesn't belong to targeted function, skip
+
+      unsigned exportTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+      if (exportTarget == EXP_TARGET_POS_0) {
+        // Replace vertex position data
+        m_builder->SetInsertPoint(call);
+        call->setArgOperand(2, m_builder->CreateExtractElement(position, static_cast<uint64_t>(0)));
+        call->setArgOperand(3, m_builder->CreateExtractElement(position, 1));
+        call->setArgOperand(4, m_builder->CreateExtractElement(position, 2));
+        call->setArgOperand(5, m_builder->CreateExtractElement(position, 3));
       }
     }
   }
-  assert(expDataSet.size() == expCount);
 
-  // Set "done" flag for last position export
-  if (lastExport != InvalidValue)
-    expDataSet[lastExport].doneFlag = true;
+  // Original ES is no longer needed
+  assert(esEntryPoint->use_empty());
+  esEntryPoint->eraseFromParent();
 
-  // Construct exported data
-  unsigned i = 0;
-  for (auto &expDataElement : expDataSet) {
-    expData = m_builder->CreateInsertValue(expData, expDataElement.expValue, i++);
-    expDataElement.expValue = nullptr;
-  }
-
-  // Insert new "return" instruction
-  m_builder->CreateRet(expData);
-
-  // Clear export calls
-  for (auto expCall : expCalls) {
-    expCall->dropAllReferences();
-    expCall->eraseFromParent();
+  // Remove calls
+  for (auto call : removeCalls) {
+    call->dropAllReferences();
+    call->eraseFromParent();
   }
 
   m_builder->restoreIP(savedInsertPos);
-
-  return esEntryVariant;
 }
 
 // =====================================================================================================================
