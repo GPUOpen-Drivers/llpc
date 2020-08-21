@@ -158,7 +158,7 @@ static const uint32_t NT_AMD_AMDGPU_ISA = 11; // Note type of AMDGPU ISA version
 struct NoteHeader {
   uint32_t nameSize;                   // Byte size of note name
   uint32_t descSize;                   // Descriptor size in byte
-  Util::Abi::PipelineAbiNoteType type; // Note type
+  uint32_t type;                       // Note type
   char name[8];                        // Note name, include padding
 };
 static_assert(sizeof(Util::Abi::AmdGpuVendorName) < 8, "");
@@ -433,7 +433,7 @@ public:
 
   bool isValidSymbol(const char *symbolName);
 
-  ElfNote getNote(Util::Abi::PipelineAbiNoteType noteType) const;
+  ElfNote getNote(uint32_t noteType) const;
 
   // Gets all associated symbols by section index.
   // NOTE: Do not change the name or API of this method as it is used by AMD internal code and we need to

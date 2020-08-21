@@ -91,7 +91,7 @@ public:
 
   ElfSymbol *getSymbol(const char *symbolName);
 
-  ElfNote getNote(Util::Abi::PipelineAbiNoteType noteType);
+  ElfNote getNote(uint32_t noteType);
 
   void setNote(ElfNote *note);
 

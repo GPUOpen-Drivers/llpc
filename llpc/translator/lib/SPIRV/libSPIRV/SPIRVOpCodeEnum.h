@@ -280,6 +280,7 @@ _SPIRV_OP(PtrNotEqual, 402)
 _SPIRV_OP(PtrDiff, 403)
 #endif
 _SPIRV_OP(Forward, 1024)
+_SPIRV_OP(TerminateInvocation, 4416)
 _SPIRV_OP(SubgroupBallotKHR, 4421)
 _SPIRV_OP(SubgroupFirstInvocationKHR, 4422)
 _SPIRV_OP(SubgroupAllKHR, 4428)
