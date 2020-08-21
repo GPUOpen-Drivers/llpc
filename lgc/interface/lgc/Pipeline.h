@@ -123,6 +123,7 @@ struct Options {
   unsigned shadowDescriptorTable;      // High dword of shadow descriptor table address, or
                                        //   ShadowDescriptorTableDisable to disable shadow descriptor tables
   unsigned allowNullDescriptor;        // Allow and give defined behavior for null descriptor
+  unsigned disableImageResourceCheck;  // Don't do image resource type check
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.
