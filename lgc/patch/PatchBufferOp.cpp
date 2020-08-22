@@ -1095,7 +1095,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
     Value *newValue = nullptr;
 
     if (Constant *const constVal = dyn_cast<Constant>(value)) {
-      newValue = ConstantVector::getSplat({stride, false}, constVal);
+      newValue = ConstantVector::getSplat(ElementCount::get(stride, false), constVal);
       newValue = m_builder->CreateBitCast(newValue, castDestType->getPointerElementType());
       copyMetadata(newValue, &memSetInst);
     } else {
