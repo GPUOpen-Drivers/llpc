@@ -571,6 +571,9 @@ void PipelineDumper::DumpSpirvBinary(const char *dumpDir, const BinaryData *spir
   pathName += "/";
   pathName += getSpirvBinaryFileName(hash);
 
+  // Make sure directory exists
+  createDirectory(dumpDir);
+
   // Open dumpfile
   std::ofstream dumpFile(pathName.c_str(), std::ios_base::binary | std::ios_base::out);
   if (!dumpFile.bad())
