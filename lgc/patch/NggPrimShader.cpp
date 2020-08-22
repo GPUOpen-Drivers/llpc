@@ -1015,7 +1015,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       auto zero = m_builder->getInt32(0);
 
       // Zero per-wave primitive/vertex count
-      auto zeros = ConstantVector::getSplat({Gfx9::NggMaxWavesPerSubgroup, false}, zero);
+      auto zeros = ConstantVector::getSplat(ElementCount::get(Gfx9::NggMaxWavesPerSubgroup, false), zero);
 
       auto ldsOffset = m_builder->getInt32(regionStart);
       m_ldsManager->writeValueToLds(zeros, ldsOffset);
