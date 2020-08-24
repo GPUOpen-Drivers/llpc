@@ -1542,7 +1542,9 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   // TODO: Multiple output streams are not supported.
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, calcFactor.gsVsRingItemSize);
-  SET_REG_FIELD(&pConfig->primShaderRegs, VGT_ESGS_RING_ITEMSIZE, ITEMSIZE, calcFactor.esGsRingItemSize);
+  // NOTE: When GS is absent, always set ES-GS ring item size to 1. Thus, we can easily get vertex ID in subgroup
+  // without any additional calculations.
+  SET_REG_FIELD(&pConfig->primShaderRegs, VGT_ESGS_RING_ITEMSIZE, ITEMSIZE, hasGs ? calcFactor.esGsRingItemSize : 1);
 
   const unsigned maxVertsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, NggMaxThreadsPerSubgroup);
   SET_REG_FIELD(&pConfig->primShaderRegs, GE_MAX_OUTPUT_PER_SUBGROUP, MAX_VERTS_PER_SUBGROUP, maxVertsPerSubgroup);
