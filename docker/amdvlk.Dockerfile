@@ -62,11 +62,7 @@ RUN repo init -u https://github.com/GPUOpen-Drivers/AMDVLK.git -b "$BRANCH" \
     && repo sync -c --no-clone-bundle -j$(nproc) \
     && touch ./env.sh \
     && cd /vulkandriver/drivers/spvgen/external \
-    && python3 fetch_external_sources.py \
-    && if echo "$FEATURES" | grep -q "+sanitizers" ; then \
-         cd glslang \
-         && git checkout adacba3ee9213be19c8c238334a3a61ae4201812; \
-       fi
+    && python3 fetch_external_sources.py
 
 # Build LLPC.
 WORKDIR /vulkandriver/builds/ci-build
