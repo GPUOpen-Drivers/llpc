@@ -3,6 +3,7 @@ name: Build AMDVLK for LLPC
 on:
   schedule:
     - cron:  "0 */12 * * *"
+  workflow_dispatch:
 
 jobs:
   build-and-push-amdvlk:
