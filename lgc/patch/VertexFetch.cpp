@@ -128,6 +128,8 @@ private:
 
   bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
 
+  bool needSplitFetch(unsigned offset, unsigned stride, unsigned dfmt, const VertexCompFormatInfo *formatInfo) const;
+
   LgcContext *m_lgcContext = nullptr;   // LGC context
   LLVMContext *m_context = nullptr;     // LLVM context
   Value *m_vertexBufTablePtr = nullptr; // Vertex buffer table pointer
@@ -939,10 +941,9 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
                                          Instruction *insertPos, Value **ppFetch) const {
   const VertexCompFormatInfo *formatInfo = getVertexComponentFormatInfo(dfmt);
 
-  // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we can do a vertex fetch
-  // operation to read the whole vertex. Otherwise, we have to do vertex per-component fetch operations.
-  if (((offset % formatInfo->vertexByteSize) == 0 && (stride % formatInfo->vertexByteSize) == 0) ||
-      formatInfo->compDfmt == dfmt) {
+  // NOTE: If the vertex fetch does not need to be split, or we are loading a single component, we can do a single
+  // vertex fetch operation.
+  if (!needSplitFetch(offset, stride, dfmt, formatInfo) || formatInfo->compDfmt == dfmt) {
     // NOTE: If the vertex attribute offset is greater than vertex attribute stride, we have to adjust both vertex
     // buffer index and vertex attribute offset accordingly. Otherwise, vertex fetch might behave unexpectedly.
     if (stride != 0 && offset > stride) {
@@ -1130,6 +1131,41 @@ bool VertexFetchImpl::needPatchA2S(const VertexInputDescription *inputDesc) cons
 // @param inputDesc : Vertex input description
 bool VertexFetchImpl::needSecondVertexFetch(const VertexInputDescription *inputDesc) const {
   return inputDesc->dfmt == BufDataFormat64_64_64 || inputDesc->dfmt == BufDataFormat64_64_64_64;
+}
+
+// =====================================================================================================================
+// Checks whether the vertex fetch operation needs to be split according to the given infomation.
+//
+// @param offset : Vertex attribute offset (in bytes)
+// @param stride : Vertex attribute stride (in bytes)
+// @param dfmt : Vertex buffer data format
+// @param formatInfo : Vertex format info
+bool VertexFetchImpl::needSplitFetch(unsigned offset, unsigned stride, unsigned dfmt,
+                                     const VertexCompFormatInfo *formatInfo) const {
+  bool needSplitFetch = false;
+
+  if ((offset % formatInfo->vertexByteSize) != 0 || (stride % formatInfo->vertexByteSize) != 0) {
+    // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we may do a vertex fetch
+    // operation to read the whole vertex. Otherwise, we have to do vertex per-component fetch operations.
+    needSplitFetch = true;
+  } else {
+    // NOTE: For these formats, there is a HW defect when the binding offset of vertex buffer is unaligned, we need to
+    // split the vertex fetch operation in this case. But we may not have the vertex buffer binding info at pipeline
+    // creation time, we have to split the fetch unconditionally unless there is a better solution.
+    switch (dfmt) {
+    case BufDataFormat8_8:
+    case BufDataFormat8_8_8_8:
+    case BufDataFormat16_16:
+    case BufDataFormat16_16_16_16:
+      needSplitFetch = true;
+      break;
+    default:
+      needSplitFetch = false;
+      break;
+    }
+  }
+
+  return needSplitFetch;
 }
 
 // =====================================================================================================================

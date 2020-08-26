@@ -1,0 +1,46 @@
+; Test the vertex fetch of specific format is split correctly.
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 %VertexIndex, i32 0, i32 0, i32 immarg 49, i32 immarg 0)
+; SHADERTEST: call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 %VertexIndex, i32 1, i32 0, i32 immarg 49, i32 immarg 0)
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 3
+
+[VsGlsl]
+#version 450
+layout(location = 0) in vec2 inVec;
+layout(location = 0) out vec2 outVec;
+void main()
+{
+    outVec = inVec;
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+layout(location = 0) in vec2 inVec;
+layout(location = 0) out vec2 outVec;
+
+void main()
+{
+    outVec = inVec;
+}
+
+[FsInfo]
+entryPoint = main
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 2
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R8G8_SSCALED
+attribute[0].offset = 0
