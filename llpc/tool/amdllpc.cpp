@@ -915,7 +915,7 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
       buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &resourceMappingAuto);
       if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
                                         resourceMappingAuto.pUserDataNodes) &&
-          checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoCopy, ParsedGfxIp))
+          checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoAuto, ParsedGfxIp))
         outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " hit\n";
       else
         outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " failed to hit\n";
