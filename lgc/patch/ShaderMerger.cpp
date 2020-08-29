@@ -49,7 +49,7 @@ using namespace lgc;
 // @param pipelineShaders : API shaders in the pipeline
 ShaderMerger::ShaderMerger(PipelineState *pipelineState, PipelineShaders *pipelineShaders)
     : m_pipelineState(pipelineState), m_context(&pipelineState->getContext()),
-      m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()), m_primShader(pipelineState) {
+      m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()) {
   assert(m_gfxIp.major >= 9);
   assert(m_pipelineState->isGraphics());
 
