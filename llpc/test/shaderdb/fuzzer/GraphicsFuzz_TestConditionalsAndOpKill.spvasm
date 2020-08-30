@@ -1,0 +1,70 @@
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; XFAIL: *
+; END_SHADERTEST
+;
+; Based on https://github.com/GPUOpen-Drivers/llpc/issues/922.
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 7
+; Bound: 386
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %243 %369
+               OpExecutionMode %4 OriginUpperLeft
+               OpDecorate %243 BuiltIn FragCoord
+               OpDecorate %369 Location 0
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+          %6 = OpTypeInt 32 1
+         %31 = OpTypeBool
+         %37 = OpTypeInt 32 0
+        %157 = OpTypeFloat 32
+        %241 = OpTypeVector %157 4
+        %242 = OpTypePointer Input %241
+        %243 = OpVariable %242 Input
+        %244 = OpConstant %37 1
+        %245 = OpTypePointer Input %157
+        %253 = OpTypePointer Function %157
+        %255 = OpConstant %157 0.5
+        %259 = OpConstant %157 10
+        %305 = OpConstant %6 150
+        %314 = OpConstant %6 180
+        %368 = OpTypePointer Output %241
+        %369 = OpVariable %368 Output
+        %373 = OpConstant %157 1
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+        %254 = OpVariable %253 Function
+        %302 = OpAccessChain %245 %243 %244
+        %303 = OpLoad %157 %302
+        %304 = OpConvertFToS %6 %303
+        %306 = OpSLessThan %31 %304 %305
+               OpSelectionMerge %308 None
+               OpBranchConditional %306 %307 %310
+        %307 = OpLabel
+               OpKill
+        %310 = OpLabel
+        %315 = OpSLessThan %31 %304 %314
+               OpSelectionMerge %317 None
+               OpBranchConditional %315 %316 %324
+        %316 = OpLabel
+               OpStore %254 %255
+               OpBranch %317
+        %324 = OpLabel
+               OpStore %254 %259
+               OpBranch %317
+        %317 = OpLabel
+               OpBranch %308
+        %308 = OpLabel
+        %370 = OpLoad %157 %254
+        %377 = OpCompositeConstruct %241 %255 %255 %370 %373
+               OpStore %369 %377
+               OpReturn
+               OpFunctionEnd
