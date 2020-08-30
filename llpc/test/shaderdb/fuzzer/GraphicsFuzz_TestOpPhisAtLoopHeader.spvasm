@@ -1,0 +1,95 @@
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; XFAIL: *
+; END_SHADERTEST
+;
+; Based on https://github.com/GPUOpen-Drivers/llpc/issues/927.
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 7
+; Bound: 870
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main"
+               OpExecutionMode %4 OriginUpperLeft
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+         %18 = OpTypeInt 32 1
+         %19 = OpConstant %18 0
+         %24 = OpTypeVector %18 2
+         %27 = OpTypeInt 32 0
+         %28 = OpConstant %27 0
+         %41 = OpTypePointer Function %18
+         %49 = OpConstant %18 256
+         %50 = OpTypeBool
+         %52 = OpConstant %27 256
+         %53 = OpTypeArray %18 %52
+         %60 = OpConstant %18 1
+         %63 = OpConstantComposite %24 %19 %19
+         %66 = OpConstantTrue %50
+         %82 = OpConstant %18 2
+         %86 = OpConstant %18 16
+        %447 = OpTypePointer Function %53
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+         %55 = OpVariable %447 Function
+               OpSwitch %28 %443
+        %443 = OpLabel
+               OpBranch %43
+         %43 = OpLabel
+        %829 = OpPhi %50 %66 %443 %864 %44
+        %755 = OpPhi %18 %19 %443 %828 %44
+         %51 = OpPhi %50 %66 %443 %829 %44
+               OpLoopMerge %45 %44 None
+               OpBranchConditional %51 %44 %45
+         %44 = OpLabel
+         %58 = OpAccessChain %41 %55 %755
+               OpStore %58 %19
+        %828 = OpIAdd %18 %755 %60
+        %864 = OpSLessThan %50 %755 %49
+               OpBranch %43
+         %45 = OpLabel
+               OpBranch %68
+         %68 = OpLabel
+        %520 = OpPhi %24 %63 %45 %637 %71
+         %98 = OpCompositeExtract %18 %520 1
+        %147 = OpIAdd %18 %98 %82
+        %148 = OpIMul %18 %147 %86
+        %150 = OpAccessChain %41 %55 %148
+        %151 = OpLoad %18 %150
+        %152 = OpIEqual %50 %151 %19
+               OpLoopMerge %70 %71 None
+               OpBranch %154
+        %154 = OpLabel
+               OpSelectionMerge %161 None
+               OpBranchConditional %152 %160 %207
+        %160 = OpLabel
+               OpBranch %161
+        %207 = OpLabel
+        %491 = OpCompositeInsert %24 %82 %63 1
+               OpBranch %393
+        %392 = OpLabel
+               OpBranch %393
+        %393 = OpLabel
+        %638 = OpPhi %24 %491 %207 %63 %392
+               OpBranch %161
+        %161 = OpLabel
+        %637 = OpPhi %24 %63 %160 %638 %393
+        %431 = OpIEqual %50 %755 %60
+               OpSelectionMerge %433 None
+               OpBranchConditional %431 %432 %433
+        %432 = OpLabel
+               OpBranch %70
+        %433 = OpLabel
+               OpBranch %71
+         %71 = OpLabel
+               OpBranchConditional %152 %68 %70
+         %70 = OpLabel
+               OpReturn
+               OpFunctionEnd
