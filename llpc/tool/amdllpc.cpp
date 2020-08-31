@@ -888,11 +888,11 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
       shaderInfo->pModuleData = shaderOut->pModuleData;
       shaderInfo->entryStage = compileInfo->shaderModuleDatas[i].shaderStage;
       if (checkAutoLayoutCompatible) {
-        PipelineShaderInfo shaderInfoAuto = *shaderInfo;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
         doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
                          &pipelineInfoAuto, shaderInfo, nodeSets, pushConstSize, true);
 #else
+        PipelineShaderInfo shaderInfoAuto = *shaderInfo;
         GraphicsPipelineBuildInfo pipelineInfoAuto = *pipelineInfo;
         ResourceMappingNodeMap nodeSets;
         unsigned pushConstSize = 0;
