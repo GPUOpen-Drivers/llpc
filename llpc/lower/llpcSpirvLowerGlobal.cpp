@@ -1022,12 +1022,12 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
 
         for (unsigned idx = 0; idx < elemCount; ++idx) {
           // Handle array elements recursively
-
           // elemLocOffset = locOffset + stride * idx
-          Value *elemLocOffset =
-              BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context), stride),
-                                        ConstantInt::get(Type::getInt32Ty(*m_context), idx), "", insertPos);
-          elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
+          Value *elemLocOffset = nullptr;
+          if (isa<ConstantInt>(locOffset))
+            elemLocOffset = m_builder->getInt32(cast<ConstantInt>(locOffset)->getZExtValue() + stride * idx);
+          else
+            elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * idx), "", insertPos);
 
           auto elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, elemLocOffset, maxLocOffset, elemIdx,
                                                 vertexIdx, InterpLocUnknown, nullptr, insertPos);
@@ -1222,14 +1222,12 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
         Value *elemLocOffset = nullptr;
         ConstantInt *locOffsetConst = dyn_cast<ConstantInt>(locOffset);
 
+        // elemLocOffset = locOffset + stride * idx
         if (locOffsetConst) {
           unsigned locOffset = locOffsetConst->getZExtValue();
           elemLocOffset = ConstantInt::get(Type::getInt32Ty(*m_context), locOffset + stride * idx);
         } else {
-          // elemLocOffset = locOffset + stride * idx
-          elemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context), stride),
-                                                    ConstantInt::get(Type::getInt32Ty(*m_context), idx), "", insertPos);
-          elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
+          elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * idx), "", insertPos);
         }
 
         // NOTE: GLSL spec says: an array of size N of blocks is captured by N consecutive buffers,
