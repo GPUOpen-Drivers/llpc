@@ -150,6 +150,8 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
       func.setLinkage(GlobalValue::ExternalLinkage);
     } else {
       func.setLinkage(GlobalValue::InternalLinkage);
+      if (func.getAttributes().hasFnAttribute(Attribute::NoInline))
+        func.removeFnAttr(Attribute::NoInline);
       func.addFnAttr(Attribute::AlwaysInline);
     }
   }
