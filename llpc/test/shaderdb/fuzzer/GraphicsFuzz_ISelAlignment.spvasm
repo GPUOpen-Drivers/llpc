@@ -1,0 +1,66 @@
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+;
+; Based on https://github.com/GPUOpen-Drivers/llpc/issues/933.
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 7
+; Bound: 1048
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main"
+               OpExecutionMode %4 OriginUpperLeft
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+          %6 = OpTypeInt 32 1
+         %13 = OpTypeInt 32 0
+         %18 = OpConstant %6 0
+         %19 = OpTypeBool
+         %23 = OpConstant %13 1
+        %438 = OpTypePointer Function %6
+        %440 = OpConstant %13 256
+        %441 = OpTypeArray %6 %440
+        %442 = OpConstant %6 1
+        %456 = OpTypePointer Function %441
+        %460 = OpConstantComposite %441 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18 %18
+        %732 = OpTypePointer Function %13
+        %734 = OpConstant %13 10
+       %1038 = OpConstantNull %13
+       %1039 = OpConstantNull %6
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+        %905 = OpFunctionCall %2 %458
+               OpReturn
+               OpFunctionEnd
+        %458 = OpFunction %2 None %3
+        %459 = OpLabel
+        %733 = OpVariable %732 Function %1038
+        %461 = OpVariable %456 Function %460
+               OpSwitch %1038 %463
+        %463 = OpLabel
+               OpBranch %475
+        %475 = OpLabel
+        %478 = OpPhi %6 %1039 %463 %476 %475
+        %481 = OpAccessChain %438 %461 %478
+               OpStore %481 %1039
+        %476 = OpIAdd %6 %442 %478
+        %735 = OpLoad %13 %733
+        %736 = OpIAdd %13 %23 %735
+               OpStore %733 %736
+        %737 = OpUGreaterThanEqual %19 %735 %734
+               OpLoopMerge %480 %475 None
+               OpBranchConditional %737 %480 %475 593140764 729029869
+        %480 = OpLabel
+        %527 = OpAccessChain %438 %461 %18
+        %528 = OpLoad %6 %527
+        %716 = OpAccessChain %438 %461 %528
+               OpStore %716 %442
+               OpReturn
+               OpFunctionEnd
