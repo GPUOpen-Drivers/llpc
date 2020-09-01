@@ -88,8 +88,9 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
 
   Patch::init(&module);
 
-  // NOTE: Global constant are added to the end of pipeline binary. we can't merge ELF binaries if global constant
-  // is used in non-fragment shader stages.
+  // NOTE: Global constants are either added to the end of the .text section, or in a separate .rodata section with
+  // relocs in the .text section to refer to them. We can't merge ELF binaries if relocs are used because llpcElfWriter
+  // doesn't know how to merge them.
   for (auto &global : module.globals()) {
     if (auto globalVar = dyn_cast<GlobalVariable>(&global)) {
       if (globalVar->isConstant()) {
@@ -101,8 +102,7 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
               vals.push_back(user);
               continue;
             }
-            if (getShaderStage(cast<Instruction>(user)->getFunction()) != ShaderStageFragment)
-              return false;
+            return false;
           }
         }
       }
