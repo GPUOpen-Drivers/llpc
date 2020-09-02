@@ -530,7 +530,8 @@ void PatchBufferOp::visitInsertElementInst(InsertElementInst &insertElementInst)
   Value *indexVector = nullptr;
 
   if (isa<UndefValue>(insertElementInst.getOperand(0)))
-    indexVector = UndefValue::get(FixedVectorType::get(index->getType(), cast<VectorType>(type)->getNumElements()));
+    indexVector =
+        UndefValue::get(FixedVectorType::get(index->getType(), cast<FixedVectorType>(type)->getNumElements()));
   else
     indexVector = m_replacementMap[getPointerOperandAsInst(insertElementInst.getOperand(0))].second;
 
@@ -1153,8 +1154,8 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
       Value *const castMemoryPointer = m_builder->CreateBitCast(memoryPointer, int8PtrTy);
       copyMetadata(castMemoryPointer, &memSetInst);
 
-      Value *const memSet =
-          m_builder->CreateMemSet(castMemoryPointer, value, cast<VectorType>(memoryType)->getNumElements(), Align());
+      Value *const memSet = m_builder->CreateMemSet(castMemoryPointer, value,
+                                                    cast<FixedVectorType>(memoryType)->getNumElements(), Align());
       copyMetadata(memSet, &memSetInst);
 
       newValue = m_builder->CreateLoad(memoryPointer);
@@ -1215,7 +1216,7 @@ Value *PatchBufferOp::getBaseAddressFromBufferDesc(Value *const bufferDesc) cons
   Type *const descType = bufferDesc->getType();
 
   assert(descType->isVectorTy());
-  assert(cast<VectorType>(descType)->getNumElements() == 4);
+  assert(cast<FixedVectorType>(descType)->getNumElements() == 4);
   assert(cast<VectorType>(descType)->getElementType()->isIntegerTy(32));
 
   // Get the base address of our buffer by extracting the two components with the 48-bit address, and masking.
@@ -1541,7 +1542,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
         const unsigned byteSize = static_cast<unsigned>(dataLayout.getTypeStoreSize(part->getType()));
 
         // Bitcast it to a vector of the smallest load type.
-        VectorType *const castType = FixedVectorType::get(smallestType, byteSize / smallestByteSize);
+        FixedVectorType *const castType = FixedVectorType::get(smallestType, byteSize / smallestByteSize);
         part = m_builder->CreateBitCast(part, castType);
         copyMetadata(part, &inst);
 
@@ -1598,7 +1599,7 @@ Value *PatchBufferOp::replaceICmp(ICmpInst *const iCmpInst) {
   Type *const bufferDescTy = bufferDescs[0]->getType();
 
   assert(bufferDescTy->isVectorTy());
-  assert(cast<VectorType>(bufferDescTy)->getNumElements() == 4);
+  assert(cast<FixedVectorType>(bufferDescTy)->getNumElements() == 4);
   assert(cast<VectorType>(bufferDescTy)->getElementType()->isIntegerTy(32));
   (void(bufferDescTy)); // unused
   assert(iCmpInst->getPredicate() == ICmpInst::ICMP_EQ || iCmpInst->getPredicate() == ICmpInst::ICMP_NE);

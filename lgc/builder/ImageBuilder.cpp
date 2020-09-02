@@ -405,7 +405,7 @@ static Type *convertToFloatingPointType(Type *origTy) {
     llvm_unreachable("Should never be called!");
   }
   if (isa<VectorType>(origTy))
-    newTy = FixedVectorType::get(newTy, cast<VectorType>(origTy)->getNumElements());
+    newTy = FixedVectorType::get(newTy, cast<FixedVectorType>(origTy)->getNumElements());
   return newTy;
 }
 
@@ -437,7 +437,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
     texelTy = FixedVectorType::get(getInt32Ty(), 2);
   }
 
-  if (auto vectorResultTy = dyn_cast<VectorType>(texelTy))
+  if (auto vectorResultTy = dyn_cast<FixedVectorType>(texelTy))
     dmask = (1U << vectorResultTy->getNumElements()) - 1;
 
   // Prepare the coordinate, which might also change the dimension.
@@ -510,7 +510,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
         Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
         defaults[2] = CreateSelect(isNullDesc, getInt64(0), getInt64(1));
       }
-      for (unsigned i = 1; i < cast<VectorType>(origTexelTy)->getNumElements(); ++i)
+      for (unsigned i = 1; i < cast<FixedVectorType>(origTexelTy)->getNumElements(); ++i)
         texel = CreateInsertElement(texel, defaults[i - 1], i);
     }
 
@@ -631,7 +631,7 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
     // Not texel buffer; use image store instruction.
     // Build the intrinsic arguments.
     unsigned dmask = 1;
-    if (auto vectorTexelTy = dyn_cast<VectorType>(texelTy))
+    if (auto vectorTexelTy = dyn_cast<FixedVectorType>(texelTy))
       dmask = (1U << vectorTexelTy->getNumElements()) - 1;
 
     // Build the intrinsic arguments.
@@ -657,7 +657,7 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
   } else {
     // Texel buffer descriptor. Use the buffer instruction.
     // First widen texel to vec4 if necessary.
-    if (auto vectorTexelTy = dyn_cast<VectorType>(texelTy)) {
+    if (auto vectorTexelTy = dyn_cast<FixedVectorType>(texelTy)) {
       if (vectorTexelTy->getNumElements() != 4) {
         texel = CreateShuffleVector(texel, Constant::getNullValue(texelTy), ArrayRef<int>{0, 1, 2, 3});
       }
@@ -928,7 +928,7 @@ Value *ImageBuilder::preprocessIntegerImageGather(unsigned dim, Value *&imageDes
   Value *widthHeight = CreateShuffleVector(resInfo, resInfo, ArrayRef<int>{0, 1});
   widthHeight = CreateSIToFP(widthHeight, FixedVectorType::get(getFloatTy(), 2));
   Value *valueToAdd = CreateFDiv(ConstantFP::get(widthHeight->getType(), -0.5), widthHeight);
-  unsigned coordCount = cast<VectorType>(coord->getType())->getNumElements();
+  unsigned coordCount = cast<FixedVectorType>(coord->getType())->getNumElements();
   if (coordCount > 2) {
     valueToAdd = CreateShuffleVector(valueToAdd, Constant::getNullValue(valueToAdd->getType()),
                                      ArrayRef<int>({0, 1, 2, 3}).slice(0, coordCount));
@@ -1052,10 +1052,10 @@ Value *ImageBuilder::CreateImageSampleGather(Type *resultTy, unsigned dim, unsig
     Value *singleOffsetVal = nullptr;
     if (isa<VectorType>((offsetVal)->getType())) {
       singleOffsetVal = CreateAnd(CreateExtractElement(offsetVal, uint64_t(0)), getInt32(0x3F));
-      if (cast<VectorType>(offsetVal->getType())->getNumElements() >= 2) {
+      if (cast<FixedVectorType>(offsetVal->getType())->getNumElements() >= 2) {
         singleOffsetVal = CreateOr(
             singleOffsetVal, CreateShl(CreateAnd(CreateExtractElement(offsetVal, 1), getInt32(0x3F)), getInt32(8)));
-        if (cast<VectorType>(offsetVal->getType())->getNumElements() >= 3) {
+        if (cast<FixedVectorType>(offsetVal->getType())->getNumElements() >= 3) {
           singleOffsetVal = CreateOr(
               singleOffsetVal, CreateShl(CreateAnd(CreateExtractElement(offsetVal, 2), getInt32(0x3F)), getInt32(16)));
         }
@@ -1464,7 +1464,7 @@ unsigned ImageBuilder::prepareCoordinate(unsigned dim, Value *coord, Value *proj
     assert(getImageNumCoords(dim) == 1);
     outCoords.push_back(coord);
   } else {
-    assert(getImageNumCoords(dim) == cast<VectorType>(coordTy)->getNumElements());
+    assert(getImageNumCoords(dim) == cast<FixedVectorType>(coordTy)->getNumElements());
 
     // Push the components.
     for (unsigned i = 0; i != getImageNumCoords(dim); ++i)
@@ -1555,7 +1555,7 @@ unsigned ImageBuilder::prepareCoordinate(unsigned dim, Value *coord, Value *proj
   // Push the derivative components.
   if (derivativeX) {
     // Derivatives by X
-    if (auto vectorDerivativeXTy = dyn_cast<VectorType>(derivativeX->getType())) {
+    if (auto vectorDerivativeXTy = dyn_cast<FixedVectorType>(derivativeX->getType())) {
       for (unsigned i = 0; i != vectorDerivativeXTy->getNumElements(); ++i)
         outDerivatives.push_back(CreateExtractElement(derivativeX, i));
     } else
@@ -1567,7 +1567,7 @@ unsigned ImageBuilder::prepareCoordinate(unsigned dim, Value *coord, Value *proj
     }
 
     // Derivatives by Y
-    if (auto vectorDerivativeYTy = dyn_cast<VectorType>(derivativeY->getType())) {
+    if (auto vectorDerivativeYTy = dyn_cast<FixedVectorType>(derivativeY->getType())) {
       for (unsigned i = 0; i != vectorDerivativeYTy->getNumElements(); ++i)
         outDerivatives.push_back(CreateExtractElement(derivativeY, i));
     } else
@@ -1780,7 +1780,7 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
     if (getPipelineState()->getInputAssemblyState().enableMultiView) {
       useViewIndex = true;
       dim = Dim2DArray;
-      unsigned coordCount = cast<VectorType>(coord->getType())->getNumElements();
+      unsigned coordCount = cast<FixedVectorType>(coord->getType())->getNumElements();
       if (coordCount < 3) {
         const static int Indexes[] = {0, 1, 1};
         coord = CreateShuffleVector(coord, Constant::getNullValue(coord->getType()), Indexes);
@@ -1802,7 +1802,7 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
     fragCoord->setName("FragCoord");
     fragCoord = CreateShuffleVector(fragCoord, fragCoord, ArrayRef<int>{0, 1});
     fragCoord = CreateFPToSI(fragCoord, FixedVectorType::get(getInt32Ty(), 2));
-    unsigned coordCount = cast<VectorType>(coord->getType())->getNumElements();
+    unsigned coordCount = cast<FixedVectorType>(coord->getType())->getNumElements();
     if (coordCount > 2) {
       const static int Indexes[] = {0, 1, 2, 3};
       fragCoord = CreateShuffleVector(fragCoord, Constant::getNullValue(fragCoord->getType()),
