@@ -296,10 +296,8 @@ Value *YCbCrConverter::createImageSampleInternal(SmallVectorImpl<Value *> &coord
 // @param gfxIp : The GfxIp Version
 YCbCrConverter::YCbCrConverter(ImageBuilder *builder, const SamplerYCbCrConversionMetaData &ycbcrMetaData,
                                YCbCrSampleInfo *ycbcrSampleInfo, GfxIpVersion *gfxIp)
-    : m_metaData(ycbcrMetaData) {
+    : m_builder(builder), m_metaData(ycbcrMetaData), m_gfxIp(gfxIp) {
   m_imgDescsChroma.resize(3);
-  Register(builder);
-  setGfxIpVersion(gfxIp);
   setYCbCrSampleInfo(ycbcrSampleInfo);
   genSamplerDescChroma();
   genImgDescChroma();
