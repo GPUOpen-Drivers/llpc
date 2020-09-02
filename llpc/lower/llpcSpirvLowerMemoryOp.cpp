@@ -116,7 +116,7 @@ void SpirvLowerMemoryOp::visitExtractElementInst(ExtractElementInst &extractElem
     auto addrSpace = loadPtr->getType()->getPointerAddressSpace();
 
     if (addrSpace == SPIRAS_Local || addrSpace == SPIRAS_Uniform) {
-      auto srcTy = cast<VectorType>(src->getType());
+      auto srcTy = cast<FixedVectorType>(src->getType());
       auto castTy = ArrayType::get(srcTy->getElementType(), srcTy->getNumElements());
       auto castPtrTy = castTy->getPointerTo(addrSpace);
       auto castPtr = new BitCastInst(loadPtr, castPtrTy, "", &extractElementInst);
@@ -219,7 +219,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(GetElementPtrInst *getElemPtr, u
               *dynIndexBound = arrayTy->getNumElements();
           } else if (isa<VectorType>(indexedTy)) {
             // Always expand for vector
-            auto vectorTy = dyn_cast<VectorType>(indexedTy);
+            auto vectorTy = dyn_cast<FixedVectorType>(indexedTy);
             *dynIndexBound = vectorTy->getNumElements();
           } else {
             llvm_unreachable("Should never be called!");

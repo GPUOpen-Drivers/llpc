@@ -133,7 +133,7 @@ const ComputeShaderMode &Builder::getComputeShaderMode() {
 // @param elementTy : Element type
 // @param maybeVecTy : Possible vector type to get number of elements from
 Type *Builder::getConditionallyVectorizedTy(Type *elementTy, Type *maybeVecTy) {
-  if (auto vecTy = dyn_cast<VectorType>(maybeVecTy))
+  if (auto vecTy = dyn_cast<FixedVectorType>(maybeVecTy))
     return FixedVectorType::get(elementTy, vecTy->getNumElements());
   return elementTy;
 }
@@ -160,7 +160,7 @@ Value *Builder::CreateMapToInt32(PFN_MapToInt32Func mapFunc, ArrayRef<Value *> m
 
   if (mappedArgs[0]->getType()->isVectorTy()) {
     // For vectors we extract each vector component and map them individually.
-    const unsigned compCount = cast<VectorType>(type)->getNumElements();
+    const unsigned compCount = cast<FixedVectorType>(type)->getNumElements();
 
     SmallVector<Value *, 4> results;
 
@@ -247,7 +247,7 @@ Type *Builder::getTransposedMatrixTy(Type *const matrixType) const {
   assert(columnVectorType->isVectorTy());
 
   const unsigned columnCount = matrixType->getArrayNumElements();
-  const unsigned rowCount = cast<VectorType>(columnVectorType)->getNumElements();
+  const unsigned rowCount = cast<FixedVectorType>(columnVectorType)->getNumElements();
 
   return ArrayType::get(FixedVectorType::get(cast<VectorType>(columnVectorType)->getElementType(), columnCount),
                         rowCount);

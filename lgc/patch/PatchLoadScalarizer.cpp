@@ -107,7 +107,7 @@ bool PatchLoadScalarizer::runOnFunction(Function &function) {
 // @param loadInst : The instruction
 void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
   const unsigned addrSpace = loadInst.getPointerAddressSpace();
-  auto loadTy = dyn_cast<VectorType>(loadInst.getType());
+  auto loadTy = dyn_cast<FixedVectorType>(loadInst.getType());
 
   if (loadTy) {
     // This optimization will try to scalarize the load inst. The pattern is like:
