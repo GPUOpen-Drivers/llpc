@@ -749,20 +749,6 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
   yCbCrMetaData.word2.u32All = getYCbCrMetaElement(6);
   yCbCrMetaData.word3.u32All = getYCbCrMetaElement(7);
 
-  // Prepare the coordinate and derivatives, which might also change the dimension.
-  SmallVector<Value *, 4> coords;
-  SmallVector<Value *, 6> derivatives;
-
-  Value *projective = address[ImageAddressIdxProjective];
-  if (projective)
-    projective = CreateFDiv(ConstantFP::get(projective->getType(), 1.0), projective);
-
-  Value *coord = address[ImageAddressIdxCoordinate];
-  assert((coord->getType()->getScalarType()->isFloatTy()) || (coord->getType()->getScalarType()->isHalfTy()));
-
-  dim = prepareCoordinate(dim, coord, projective, address[ImageAddressIdxDerivativeX],
-                          address[ImageAddressIdxDerivativeY], coords, derivatives);
-
   // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
   // Init sample descriptor for luma channel
   Value *samplerDescLuma = CreateShuffleVector(convertingSamplerDesc, convertingSamplerDesc, ArrayRef<int>{0, 1, 2, 3});
@@ -785,8 +771,6 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
     YCbCrConverter.SetImgDescChroma(planeIdx, imageDesc);
   }
 
-  // Set sample coordinate ST and convert to UV and IJ coordinates
-  YCbCrConverter.setCoord(coords[0], coords[1]);
   // Sample image source data
   YCbCrConverter.sampleYCbCrData();
   // Convert from YCbCr to RGB
