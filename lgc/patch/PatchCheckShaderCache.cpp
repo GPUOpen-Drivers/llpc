@@ -150,12 +150,14 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
   if (modifiedStageMask == stageMask)
     return false;
 
-  // "Remove" a shader stage by making its entry-point function internal, so it gets removed later.
+  // "Remove" a shader stage by making its entry-point function internal and not DLLExport, so it gets removed later.
   for (auto &func : module) {
-    if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage) {
+    if (isShaderEntryPoint(&func)) {
       auto stage = getShaderStage(&func);
-      if (stage != ShaderStageInvalid && (shaderStageToMask(stage) & ~modifiedStageMask) != 0)
+      if (stage != ShaderStageInvalid && (shaderStageToMask(stage) & ~modifiedStageMask) != 0) {
         func.setLinkage(GlobalValue::InternalLinkage);
+        func.setDLLStorageClass(GlobalValue::DefaultStorageClass);
+      }
     }
   }
   return true;

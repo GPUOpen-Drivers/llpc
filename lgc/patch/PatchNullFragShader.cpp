@@ -113,6 +113,7 @@ bool PatchNullFragShader::runOnModule(Module &module) {
 
   // Create function for the null fragment shader entrypoint.
   auto entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::NullFsEntryPoint, &module);
+  entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
 
   // Create its basic block, and terminate it with return.
   auto block = BasicBlock::Create(*m_context, "", entryPoint, nullptr);

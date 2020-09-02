@@ -157,6 +157,7 @@ Function *NggPrimShader::generate(Function *esEntryPoint, Function *gsEntryPoint
     esEntryPoint->setName(lgcName::NggEsEntryPoint);
     esEntryPoint->setCallingConv(CallingConv::C);
     esEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+    esEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
     esEntryPoint->addFnAttr(Attribute::AlwaysInline);
   }
 
@@ -165,12 +166,14 @@ Function *NggPrimShader::generate(Function *esEntryPoint, Function *gsEntryPoint
     gsEntryPoint->setName(lgcName::NggGsEntryPoint);
     gsEntryPoint->setCallingConv(CallingConv::C);
     gsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+    gsEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
     gsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
     assert(copyShaderEntryPoint); // Copy shader must be present
     copyShaderEntryPoint->setName(lgcName::NggCopyShaderEntryPoint);
     copyShaderEntryPoint->setCallingConv(CallingConv::C);
     copyShaderEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+    copyShaderEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
     copyShaderEntryPoint->addFnAttr(Attribute::AlwaysInline);
   }
 
@@ -373,6 +376,7 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   auto entryPointTy = generatePrimShaderEntryPointType(module, &inRegMask);
 
   Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::NggPrimShaderEntryPoint);
+  entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
 
   module->getFunctionList().push_front(entryPoint);
 

@@ -100,7 +100,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     globalFeatures += ",+DumpCode";
 
   for (auto func = module->begin(), end = module->end(); func != end; ++func) {
-    if (!func->empty() && func->getLinkage() == GlobalValue::ExternalLinkage) {
+    if (isShaderEntryPoint(&*func)) {
       std::string targetFeatures(globalFeatures);
       AttrBuilder builder;
 

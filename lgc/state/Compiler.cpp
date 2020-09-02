@@ -52,33 +52,61 @@ ElfLinker *createElfLinkerImpl(PipelineState *pipelineState, llvm::ArrayRef<llvm
 } // namespace lgc
 
 // =====================================================================================================================
+// Mark a function as a shader entry-point. This must be done before linking shader modules into a pipeline
+// with irLink(). This is a static method in Pipeline, as it does not need a Pipeline object, and can be used
+// in the front-end before a shader is associated with a pipeline.
+//
+// @param func : Shader entry-point function
+// @param stage : Shader stage
+void Pipeline::markShaderEntryPoint(Function *func, ShaderStage stage) {
+  // We mark the shader entry-point function by
+  // 1. marking it external linkage and DLLExportStorageClass; and
+  // 2. adding the shader stage metadata.
+  // The shader stage metadata for any other non-inlined functions in the module is added in irLink().
+  func->setLinkage(GlobalValue::ExternalLinkage);
+  func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  setShaderStage(func, stage);
+}
+
+// =====================================================================================================================
 // Link shader IR modules into a pipeline module.
 //
-// @param modules : Array of {module, shaderStage} pairs. Modules are freed
+// @param modules : Array of modules. Modules are freed
 // @param unlinked : True if generating an "unlinked" half-pipeline ELF that then needs further linking to
 //                   generate a pipeline ELF
-Module *PipelineState::irLink(ArrayRef<std::pair<Module *, ShaderStage>> modules, bool unlinked) {
+Module *PipelineState::irLink(ArrayRef<Module *> modules, bool unlinked) {
   m_unlinked = unlinked;
+#ifndef NDEBUG
+  unsigned shaderStageMask = 0;
+#endif
+
   // Processing for each shader module before linking.
   IRBuilder<> builder(getContext());
-  for (auto moduleAndStage : modules) {
-    Module *module = moduleAndStage.first;
-    ShaderStage stage = moduleAndStage.second;
+  for (Module *module : modules) {
     if (!module)
       continue;
 
-    // If this is a link of shader modules from earlier separate shader compiles, then the modes are
-    // recorded in IR metadata. Read the modes here.
-    getShaderModes()->readModesFromShader(module, stage);
-
-    // Add IR metadata for the shader stage to each function in the shader, and rename the entrypoint to
-    // ensure there is no clash on linking.
-    setShaderStage(module, stage);
+    // Find the shader entry-point (marked with irLink()), and get the shader stage from that.
+    // Default to compute to handle the case of a compute library, which does not have a shader entry-point.
+    ShaderStage stage = ShaderStageCompute;
     for (Function &func : *module) {
-      if (!func.isDeclaration() && func.getLinkage() != GlobalValue::InternalLinkage) {
-        func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
-                     "." + func.getName());
-      }
+      if (!isShaderEntryPoint(&func))
+        continue;
+      // We have the entry-point (marked as DLLExportStorageClass).
+      stage = getShaderStage(&func);
+#ifndef NDEBUG
+      assert((shaderStageMask & (1 << stage)) == 0);
+      shaderStageMask |= 1 << stage;
+#endif
+      // Rename the entry-point to ensure there is no clash on linking.
+      func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
+                   "." + func.getName());
+    }
+
+    // Mark all other function definitions in the module with the same shader stage.
+    for (Function &func : *module) {
+      if (!func.isDeclaration() && !isShaderEntryPoint(&func))
+        setShaderStage(&func, stage);
     }
   }
 
@@ -86,20 +114,17 @@ Module *PipelineState::irLink(ArrayRef<std::pair<Module *, ShaderStage>> modules
   // Assert that the front-end's call to setShaderStageMask was correct. (We want the front-end to call it
   // before calling any builder calls in case it is using direct BuilderImpl and one of the builder calls needs
   // the shader stage mask.)
-  unsigned shaderStageMask = 0;
-  for (auto moduleAndStage : modules)
-    shaderStageMask |= 1 << moduleAndStage.second;
   assert(shaderStageMask == getShaderStageMask());
 #endif
 
   // If the front-end was using a BuilderRecorder, record pipeline state into IR metadata.
   if (!m_noReplayer)
-    record(modules[0].first);
+    record(modules[0]);
 
   // If there is only one shader, just change the name on its module and return it.
   Module *pipelineModule = nullptr;
   if (modules.size() == 1) {
-    pipelineModule = modules[0].first;
+    pipelineModule = modules[0];
     pipelineModule->setModuleIdentifier("lgcPipeline");
   } else {
     // Create an empty module then link each shader module into it. We record pipeline state into IR
@@ -112,8 +137,7 @@ Module *PipelineState::irLink(ArrayRef<std::pair<Module *, ShaderStage>> modules
     pipelineModule->setDataLayout(targetMachine->createDataLayout());
 
     Linker linker(*pipelineModule);
-    for (auto moduleAndStage : modules) {
-      Module *module = moduleAndStage.first;
+    for (Module *module : modules) {
       // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
       // linked into pipeline module.
       if (linker.linkInModule(std::unique_ptr<Module>(module)))

@@ -74,7 +74,7 @@ target triple = "amdgcn--amdpal"
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
 target triple = "amdgcn--amdpal"
 
-define spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !5 {
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !5 {
 .entry:
   %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 false)
   %1 = call {}* @llvm.invariant.start.p7i8(i64 -1, i8 addrspace(7)* %0)
@@ -134,7 +134,7 @@ attributes #2 = { argmemonly nounwind willreturn }
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
 target triple = "amdgcn--amdpal"
 
-define spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !lgc.shaderstage !5 {
+define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !lgc.shaderstage !5 {
 .entry:
   call void (...) @lgc.create.write.generic.output(<4 x float> <float 0.000000e+00, float 1.000000e+00, float 0.000000e+00, float 1.000000e+00>, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
   ret void

@@ -74,7 +74,7 @@ void lgc::setShaderStage(Function *func, ShaderStage stage) {
 }
 
 // =====================================================================================================================
-// Gets the shader stage from the specified LLVM function. Returns ShaderStageInvalid if not shader entrypoint.
+// Gets the shader stage from the specified LLVM function. Returns ShaderStageInvalid if metadata not found.
 //
 // @param func : LLVM function
 ShaderStage lgc::getShaderStage(const Function *func) {
@@ -83,6 +83,16 @@ ShaderStage lgc::getShaderStage(const Function *func) {
   if (stageMetaNode)
     return ShaderStage(mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
   return ShaderStageInvalid;
+}
+
+// =====================================================================================================================
+// Determine whether the function is a shader entry-point.
+// A shader entry-point is marked DLLExportStorageClass by markShaderEntryPoint() in Compiler.cpp, which the front-end
+// must call before IR linking.
+//
+// @param func : LLVM function
+bool lgc::isShaderEntryPoint(const Function *func) {
+  return !func->isDeclaration() && func->getDLLStorageClass() == GlobalValue::DLLExportStorageClass;
 }
 
 // =====================================================================================================================
@@ -125,6 +135,7 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   newFunc->setCallingConv(oldFunc->getCallingConv());
   newFunc->takeName(oldFunc);
   newFunc->setSubprogram(oldFunc->getSubprogram());
+  newFunc->setDLLStorageClass(oldFunc->getDLLStorageClass());
 
   // Transfer code from old function to new function.
   while (!oldFunc->empty()) {
