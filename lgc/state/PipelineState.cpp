@@ -324,7 +324,7 @@ void PipelineState::readState(Module *module) {
 void PipelineState::readShaderStageMask(Module *module) {
   m_stageMask = 0;
   for (auto &func : *module) {
-    if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage) {
+    if (isShaderEntryPoint(&func)) {
       auto shaderStage = getShaderStage(&func);
       if (shaderStage != ShaderStageInvalid)
         m_stageMask |= 1 << shaderStage;

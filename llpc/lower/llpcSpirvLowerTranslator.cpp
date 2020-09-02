@@ -130,10 +130,8 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
 
   ShaderModuleHelper::cleanOptimizedSpirv(&optimizedSpirvBin);
 
-  // NOTE: Our shader entrypoint is marked in the SPIR-V reader as dllexport. Here we mark it as follows:
-  //   * remove the dllexport;
-  //   * ensure it is public.
-  // Also mark all other functions internal and always_inline.
+  // NOTE: Our shader entrypoint is marked in the SPIR-V reader as dllexport. Here we tell LGC that it is the
+  // shader entry-point, and mark other functions as internal and always_inline.
   //
   // TODO: We should rationalize this code as follows:
   //   1. Add code to the spir-v reader to add the entrypoint name as metadata;
@@ -146,14 +144,14 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
       continue;
 
     if (func.getDLLStorageClass() == GlobalValue::DLLExportStorageClass) {
-      func.setDLLStorageClass(GlobalValue::DefaultStorageClass);
-      func.setLinkage(GlobalValue::ExternalLinkage);
-    } else {
-      func.setLinkage(GlobalValue::InternalLinkage);
-      if (func.getAttributes().hasFnAttribute(Attribute::NoInline))
-        func.removeFnAttr(Attribute::NoInline);
-      func.addFnAttr(Attribute::AlwaysInline);
+      lgc::Pipeline::markShaderEntryPoint(&func, getLgcShaderStage(entryStage));
+      continue;
     }
+    // Not shader entry-point.
+    func.setLinkage(GlobalValue::InternalLinkage);
+    if (func.getAttributes().hasFnAttribute(Attribute::NoInline))
+      func.removeFnAttr(Attribute::NoInline);
+    func.addFnAttr(Attribute::AlwaysInline);
   }
 }
 

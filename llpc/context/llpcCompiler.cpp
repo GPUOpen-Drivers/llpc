@@ -1150,7 +1150,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         result = Result::ErrorInvalidShader;
       }
     }
-    SmallVector<std::pair<Module *, lgc::ShaderStage>, 5> modulesToLink;
+    SmallVector<Module *, 5> modulesToLink;
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
       // Per-shader SPIR-V lowering passes.
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
@@ -1160,7 +1160,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (stageSkipMask & shaderStageToMask(entryStage)) {
         // Do not run SPIR-V translator and lowering passes on this shader; we were given it as IR ready
         // to link into pipeline module.
-        modulesToLink.push_back({modules[shaderIndex], getLgcShaderStage(static_cast<ShaderStage>(shaderIndex))});
+        modulesToLink.push_back(modules[shaderIndex]);
         continue;
       }
 
@@ -1176,7 +1176,9 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
         result = Result::ErrorInvalidShader;
       }
-      modulesToLink.push_back({modules[shaderIndex], getLgcShaderStage(static_cast<ShaderStage>(shaderIndex))});
+
+      // Add the shader module to the list for the pipeline.
+      modulesToLink.push_back(modules[shaderIndex]);
     }
 
     // Link the shader modules into a single pipeline module.
