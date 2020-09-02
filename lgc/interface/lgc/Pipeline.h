@@ -574,22 +574,33 @@ public:
   // -----------------------------------------------------------------------------------------------------------------
   // IR link and generate pipeline methods
 
+  // Mark a function as a shader entry-point. This must be done before linking shader modules into a pipeline
+  // with irLink(). This is a static method in Pipeline, as it does not need a Pipeline object, and can be used
+  // in the front-end before a shader is associated with a pipeline.
+  //
+  // @param func : Shader entry-point function
+  // @param stage : Shader stage
+  static void markShaderEntryPoint(llvm::Function *func, ShaderStage stage);
+
   // Link the individual shader modules into a single pipeline module. The front-end must have
   // finished calling Builder::Create* methods and finished building the IR. In the case that
   // there are multiple shader modules, they are all freed by this call, and the linked pipeline
   // module is returned. If there is a single shader module, this might instead just return that.
-  // Before calling this, each shader module needs to have one global function for the shader
-  // entrypoint, then all other functions with internal linkage.
+  //
+  // Before calling this, each shader module needs to have exactly one public (external linkage) function
+  // for the shader entry-point that was marked by calling markShaderEntryPoint(). Any other functions in the
+  // module must not have a non-default DLL storage class, and typically have internal linkage.
+  //
   // Returns the pipeline module, or nullptr on link failure.
   //
-  // @param modules : Array of {module, shaderStage} pairs
+  // @param modules : Array of modules
   // @param unlinked : True if generating an "unlinked" half-pipeline ELF that then needs further linking to
   //                   generate a pipeline ELF. In that case, using the methods above to set pipeline state items
   //                   (setUserDataNodes, setDeviceIndex, setVertexInputDescriptions, setColorExportState,
   //                   setGraphicsState) becomes optional, as LGC will generate relocs or user data entries
   //                   that are fixed up in the ELF link step.
   //                   TODO: That isn't implemented yet.
-  virtual llvm::Module *irLink(llvm::ArrayRef<std::pair<llvm::Module *, ShaderStage>> modules, bool unlinked) = 0;
+  virtual llvm::Module *irLink(llvm::ArrayRef<llvm::Module *> modules, bool unlinked) = 0;
 
   // Typedef of function passed in to Generate to check the shader cache.
   // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages

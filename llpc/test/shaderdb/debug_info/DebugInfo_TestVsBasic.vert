@@ -20,7 +20,7 @@ void main()
 ; SHADERTEST: !spirv.InOut [[D1:![0-9]*]]
 ; SHADERTEST: !spirv.InOut [[D2:![0-9]*]]
 ; SHADERTEST: !spirv.InOut [[D3:![0-9]*]]
-; SHADERTEST: define spir_func void @main() #{{[0-9]*}} !dbg [[D15:![0-9]*]] !spirv.ExecutionModel [[D4:![0-9]*]] {
+; SHADERTEST: define dllexport spir_func void @main() #{{[0-9]*}} !dbg [[D15:![0-9]*]] !spirv.ExecutionModel [[D4:![0-9]*]]
 ; SHADERTEST: load {{.*}} !dbg [[D5:![0-9]*]]
 ; SHADERTEST: store {{.*}} !dbg [[D5]]
 ; SHADERTEST: load {{.*}} !dbg [[D6:![0-9]*]]

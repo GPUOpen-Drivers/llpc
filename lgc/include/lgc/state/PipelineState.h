@@ -156,7 +156,7 @@ public:
                         const RasterizerState &rsState) override final;
 
   // Link the individual shader IR modules into a single pipeline module
-  llvm::Module *irLink(llvm::ArrayRef<std::pair<llvm::Module *, ShaderStage>> modules, bool unlinked) override final;
+  llvm::Module *irLink(llvm::ArrayRef<llvm::Module *> modules, bool unlinked) override final;
 
   // Generate pipeline module
   bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,

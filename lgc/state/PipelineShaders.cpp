@@ -62,7 +62,7 @@ bool PipelineShaders::runOnModule(Module &module) {
     entryPoint = nullptr;
 
   for (auto &func : module) {
-    if (!func.empty() && func.getLinkage() != GlobalValue::InternalLinkage) {
+    if (isShaderEntryPoint(&func)) {
       auto shaderStage = lgc::getShaderStage(&func);
 
       if (shaderStage != ShaderStageInvalid) {

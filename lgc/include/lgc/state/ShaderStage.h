@@ -55,6 +55,9 @@ void setShaderStage(llvm::Function *func, ShaderStage stage);
 // Gets the shader stage from the specified LLVM function.
 ShaderStage getShaderStage(const llvm::Function *func);
 
+// Determine whether the function is a shader entry-point.
+bool isShaderEntryPoint(const llvm::Function *func);
+
 // Gets name string of the abbreviation for the specified shader stage
 const char *getShaderStageAbbreviation(ShaderStage shaderStage);
 

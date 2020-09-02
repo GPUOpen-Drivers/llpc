@@ -44,7 +44,7 @@ target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:3
 target triple = "amdgcn--amdpal"
 
 ; Function Attrs: nounwind
-define spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !0 !lgc.shaderstage !0 {
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !0 !lgc.shaderstage !0 {
 .entry:
   %.desc.ptr2 = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 3, i32 3)
   %.desc.ptr1 = bitcast <8 x i32> addrspace(4)* %.desc.ptr2 to i8 addrspace(4)*
