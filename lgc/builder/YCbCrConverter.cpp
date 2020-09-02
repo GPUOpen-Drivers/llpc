@@ -272,10 +272,15 @@ Value *YCbCrConverter::reconstructLinearXYChromaSample(XYChromaSampleInfo &xyChr
 // @param coords : The ST coordinates
 // @param ycbcrInfo : YCbCr smaple information
 Value *YCbCrConverter::createImageSampleInternal(SmallVectorImpl<Value *> &coordsIn, YCbCrSampleInfo *ycbcrInfo) {
-  Value *coords = m_builder->CreateInsertElement(UndefValue::get(FixedVectorType::get(coordsIn[0]->getType(), 2)),
-                                                 coordsIn[0], uint64_t(0));
 
+  unsigned imageDim = ycbcrInfo->dim;
+
+  Value *coords = UndefValue::get(FixedVectorType::get(coordsIn[0]->getType(), m_builder->getImageNumCoords(imageDim)));
+  coords = m_builder->CreateInsertElement(coords, coordsIn[0], uint64_t(0));
   coords = m_builder->CreateInsertElement(coords, coordsIn[1], uint64_t(1));
+
+  if (imageDim == Builder::Dim2DArray)
+    coords = m_builder->CreateInsertElement(coords, m_coordZ, uint64_t(2));
 
   return m_builder->CreateImageSampleGather(ycbcrInfo->resultTy, ycbcrInfo->dim, ycbcrInfo->flags, coords,
                                             ycbcrInfo->imageDesc, ycbcrInfo->samplerDesc, ycbcrInfo->address,
@@ -298,6 +303,7 @@ YCbCrConverter::YCbCrConverter(ImageBuilder *builder, const SamplerYCbCrConversi
   setYCbCrSampleInfo(ycbcrSampleInfo);
   genSamplerDescChroma();
   genImgDescChroma();
+  prepareCoord();
 }
 
 // =====================================================================================================================
@@ -415,16 +421,22 @@ Value *YCbCrConverter::convertColorSpace() {
 }
 
 // =====================================================================================================================
-// Set the ST coords
-//
-// @param coordS : Coordinate S
-// @param coordT : Coordinate T
-void YCbCrConverter::setCoord(Value *coordS, Value *coordT) {
-  m_coordS = coordS;
-  m_coordT = coordT;
+// Prepare the ST coords
+void YCbCrConverter::prepareCoord() {
+  Value *coords = m_ycbcrSampleInfo->address[Builder::ImageAddressIdxCoordinate];
+
+  assert(Builder::getImageNumCoords(m_ycbcrSampleInfo->dim) == cast<VectorType>(coords->getType())->getNumElements());
+
+  m_coordS = m_builder->CreateExtractElement(coords, m_builder->getInt64(0));
+  m_coordT = m_builder->CreateExtractElement(coords, m_builder->getInt64(1));
+
+  if (m_ycbcrSampleInfo->dim == Builder::Dim2DArray) {
+    m_coordZ = m_builder->CreateExtractElement(coords, m_builder->getInt64(2));
+  }
 
   m_coordU = transferSTtoUVCoords(m_coordS, m_width);
   m_coordV = transferSTtoUVCoords(m_coordT, m_height);
+
   m_coordI = transferUVtoIJCoords(static_cast<SamplerFilter>(m_metaData.word1.lumaFilter), m_coordU);
   m_coordJ = transferUVtoIJCoords(static_cast<SamplerFilter>(m_metaData.word1.lumaFilter), m_coordV);
 }

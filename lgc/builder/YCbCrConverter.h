@@ -240,8 +240,8 @@ public:
   // Note: Should be called after genImgDescChroma and genSamplerDescChroma completes
   void sampleYCbCrData();
 
-  // Set the ST coords
-  void setCoord(llvm::Value *coordS, llvm::Value *coordT);
+  // Prepare the sample coords
+  void prepareCoord();
 
   // Set the sample infomation of Luma channel
   void setSampleInfoLuma(llvm::Type *resultType) { m_resultType = resultType; }
@@ -324,6 +324,7 @@ private:
   llvm::Value *m_coordV = nullptr;
   llvm::Value *m_coordI = nullptr;
   llvm::Value *m_coordJ = nullptr;
+  llvm::Value *m_coordZ = nullptr;
 
   // Sample result type
   llvm::Value *m_ycbcrData = nullptr;
