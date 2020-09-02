@@ -218,15 +218,6 @@ public:
   // Make sure default constructor deleted - const ref can't be initialized
   YCbCrConverter() = delete;
 
-  // Set YCbCr sample infomation
-  void setYCbCrSampleInfo(YCbCrSampleInfo *ycbcrSampleInfo);
-
-  // Generate sampler descriptor for chroma channel
-  void genSamplerDescChroma();
-
-  // Generate image descriptor for chroma channel
-  void genImgDescChroma();
-
   // Set image descriptor for chroma channel
   void SetImgDescChroma(unsigned planeIndex, llvm::Value *imageDesc);
 
@@ -239,6 +230,16 @@ public:
   // Sample YCbCr data from each plane
   // Note: Should be called after genImgDescChroma and genSamplerDescChroma completes
   void sampleYCbCrData();
+
+private:
+  // Set YCbCr sample infomation
+  void setYCbCrSampleInfo(YCbCrSampleInfo *ycbcrSampleInfo);
+
+  // Generate sampler descriptor for chroma channel
+  void genSamplerDescChroma();
+
+  // Generate image descriptor for chroma channel
+  void genImgDescChroma();
 
   // Prepare the sample coords
   void prepareCoord();
@@ -288,7 +289,6 @@ public:
   llvm::Value *convertColor(llvm::Type *resultTy, SamplerYCbCrModelConversion colorModel, SamplerYCbCrRange range,
                             unsigned *channelBits, llvm::Value *imageOp);
 
-private:
   // Builder context
   ImageBuilder *m_builder = nullptr;
 
