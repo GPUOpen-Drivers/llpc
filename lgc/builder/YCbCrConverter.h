@@ -206,23 +206,11 @@ struct YCbCrWrappedSampleInfo : XYChromaSampleInfo {
 // Represents LLPC sampler YCbCr conversion helper class
 class YCbCrConverter {
 public:
-  // Regist Builder
-  void Register(ImageBuilder *builder) { m_builder = builder; }
-
-  // Unregist Builder
-  void unregisterBuilder() { m_builder = nullptr; }
-
   YCbCrConverter(ImageBuilder *builder, const SamplerYCbCrConversionMetaData &ycbcrMetaData,
                  YCbCrSampleInfo *ycbcrSampleInfo, GfxIpVersion *gfxIp);
 
   // Make sure default constructor deleted - const ref can't be initialized
   YCbCrConverter() = delete;
-
-  // Set image descriptor for chroma channel
-  void SetImgDescChroma(unsigned planeIndex, llvm::Value *imageDesc);
-
-  // Get image descriptor for chroma channel
-  llvm::Value *GetImgDescChroma(unsigned planeIndex);
 
   // Convert from YCbCr to RGBA color space
   llvm::Value *convertColorSpace();
@@ -230,6 +218,12 @@ public:
   // Sample YCbCr data from each plane
   // Note: Should be called after genImgDescChroma and genSamplerDescChroma completes
   void sampleYCbCrData();
+
+  // Set image descriptor for chroma channel
+  void SetImgDescChroma(unsigned planeIndex, llvm::Value *imageDesc);
+
+  // Get image descriptor for chroma channel
+  llvm::Value *GetImgDescChroma(unsigned planeIndex);
 
 private:
   // Set YCbCr sample infomation
@@ -243,12 +237,6 @@ private:
 
   // Prepare the sample coords
   void prepareCoord();
-
-  // Set the sample infomation of Luma channel
-  void setSampleInfoLuma(llvm::Type *resultType) { m_resultType = resultType; }
-
-  // Set GfxIp version
-  void setGfxIpVersion(GfxIpVersion *gfxIp) { m_gfxIp = gfxIp; }
 
   // Implement transfer from ST coordinates to UV coordiantes operation
   llvm::Value *transferSTtoUVCoords(llvm::Value *coordST, llvm::Value *scale);
@@ -290,13 +278,13 @@ private:
                             unsigned *channelBits, llvm::Value *imageOp);
 
   // Builder context
-  ImageBuilder *m_builder = nullptr;
+  ImageBuilder *m_builder;
 
   // Sampler YCbCr conversion meta data
   const SamplerYCbCrConversionMetaData &m_metaData;
 
   // Current GFX ip version
-  GfxIpVersion *m_gfxIp = nullptr;
+  GfxIpVersion *m_gfxIp;
 
   // Sampler YCbCr conversion information
   YCbCrSampleInfo *m_ycbcrSampleInfo = nullptr;
