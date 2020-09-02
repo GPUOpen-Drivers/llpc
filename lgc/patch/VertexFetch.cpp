@@ -446,7 +446,7 @@ bool LowerVertexFetch::runOnModule(Module &module) {
       if (call->getType() != vertex->getType()) {
         // The types are now vectors of the same element type but different element counts, or call->getType()
         // is scalar.
-        if (auto vecTy = dyn_cast<FixedVectorType>(call->getType())) {
+        if (auto vecTy = dyn_cast<VectorType>(call->getType())) {
           int indices[] = {0, 1, 2, 3};
           vertex =
               builder.CreateShuffleVector(vertex, vertex, ArrayRef<int>(indices).slice(0, vecTy->getNumElements()));
@@ -587,7 +587,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     }
 
     if (patchA2S) {
-      assert(cast<FixedVectorType>(vertexFetches[0]->getType())->getNumElements() == 4);
+      assert(cast<VectorType>(vertexFetches[0]->getType())->getNumElements() == 4);
 
       // Extract alpha channel: %a = extractelement %vf0, 3
       Value *alpha = ExtractElementInst::Create(vertexFetches[0], ConstantInt::get(Type::getInt32Ty(*m_context), 3), "",
@@ -674,9 +674,9 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     // NOTE: If we performs vertex fetch operations twice, we have to coalesce result values of the two
     // fetch operations and generate a combined one.
     assert(vertexFetches[0] && vertexFetches[1]);
-    assert(cast<FixedVectorType>(vertexFetches[0]->getType())->getNumElements() == 4);
+    assert(cast<VectorType>(vertexFetches[0]->getType())->getNumElements() == 4);
 
-    unsigned compCount = cast<FixedVectorType>(vertexFetches[1]->getType())->getNumElements();
+    unsigned compCount = cast<VectorType>(vertexFetches[1]->getType())->getNumElements();
     assert(compCount == 2 || compCount == 4); // Should be <2 x i32> or <4 x i32>
 
     if (compCount == 2) {
@@ -732,7 +732,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   } else
     llvm_unreachable("Should never be called!");
 
-  const unsigned defaultCompCount = cast<FixedVectorType>(defaults->getType())->getNumElements();
+  const unsigned defaultCompCount = cast<VectorType>(defaults->getType())->getNumElements();
   std::vector<Value *> defaultValues(defaultCompCount);
 
   for (unsigned i = 0; i < defaultValues.size(); ++i) {
@@ -742,7 +742,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
 
   // Get vertex fetch values
   const unsigned fetchCompCount =
-      vertexFetch->getType()->isVectorTy() ? cast<FixedVectorType>(vertexFetch->getType())->getNumElements() : 1;
+      vertexFetch->getType()->isVectorTy() ? cast<VectorType>(vertexFetch->getType())->getNumElements() : 1;
   std::vector<Value *> fetchValues(fetchCompCount);
 
   if (fetchCompCount == 1)
@@ -755,7 +755,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   }
 
   // Construct vertex fetch results
-  const unsigned inputCompCount = inputTy->isVectorTy() ? cast<FixedVectorType>(inputTy)->getNumElements() : 1;
+  const unsigned inputCompCount = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getNumElements() : 1;
   const unsigned vertexCompCount = inputCompCount * (bitWidth == 64 ? 2 : 1);
 
   std::vector<Value *> vertexValues(vertexCompCount);
@@ -795,7 +795,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     Type *vertexTy = vertex->getType();
     Type *truncTy = Type::getInt8Ty(*m_context);
     truncTy = vertexTy->isVectorTy()
-                  ? cast<Type>(FixedVectorType::get(truncTy, cast<FixedVectorType>(vertexTy)->getNumElements()))
+                  ? cast<Type>(FixedVectorType::get(truncTy, cast<VectorType>(vertexTy)->getNumElements()))
                   : truncTy;
     vertex = new TruncInst(vertex, truncTy, "", insertPos);
   } else if (is16bitFetch) {
@@ -804,7 +804,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     Type *vertexTy = vertex->getType();
     Type *truncTy = Type::getInt16Ty(*m_context);
     truncTy = vertexTy->isVectorTy()
-                  ? cast<Type>(FixedVectorType::get(truncTy, cast<FixedVectorType>(vertexTy)->getNumElements()))
+                  ? cast<Type>(FixedVectorType::get(truncTy, cast<VectorType>(vertexTy)->getNumElements()))
                   : truncTy;
     vertex = new TruncInst(vertex, truncTy, "", insertPos);
   }

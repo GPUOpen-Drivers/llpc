@@ -1087,7 +1087,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   const ColorExportFormat *colorExportFormat = &getColorExportFormat(location);
   GfxIpVersion gfxIp = getTargetInfo().getGfxIpVersion();
   auto gpuWorkarounds = &getTargetInfo().getGpuWorkarounds();
-  unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<FixedVectorType>(outputTy)->getNumElements()) - 1 : 1;
+  unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<VectorType>(outputTy)->getNumElements()) - 1 : 1;
   const auto cbState = &getColorExportState();
   // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
   const bool enableAlphaToCoverage = (cbState->alphaToCoverageEnable && location == 0);

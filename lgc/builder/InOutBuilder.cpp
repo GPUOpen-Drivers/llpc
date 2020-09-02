@@ -498,7 +498,7 @@ Value *InOutBuilder::adjustIj(Value *value, Value *offset) {
   offset = CreateFPExt(offset, FixedVectorType::get(getFloatTy(), 2));
   Value *offsetX = CreateExtractElement(offset, uint64_t(0));
   Value *offsetY = CreateExtractElement(offset, 1);
-  if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
+  if (auto vecTy = dyn_cast<VectorType>(value->getType())) {
     offsetX = CreateVectorSplat(vecTy->getNumElements(), offsetX);
     offsetY = CreateVectorSplat(vecTy->getNumElements(), offsetY);
   }

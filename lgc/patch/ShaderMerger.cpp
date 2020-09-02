@@ -311,7 +311,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
       if (lsArgTy->isVectorTy()) {
         assert(cast<VectorType>(lsArgTy)->getElementType()->isIntegerTy());
 
-        const unsigned userDataSize = cast<FixedVectorType>(lsArgTy)->getNumElements();
+        const unsigned userDataSize = cast<VectorType>(lsArgTy)->getNumElements();
 
         std::vector<Constant *> shuffleMask;
         for (unsigned i = 0; i < userDataSize; ++i)
@@ -394,7 +394,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
       if (hsArgTy->isVectorTy()) {
         assert(cast<VectorType>(hsArgTy)->getElementType()->isIntegerTy());
 
-        const unsigned userDataSize = cast<FixedVectorType>(hsArgTy)->getNumElements();
+        const unsigned userDataSize = cast<VectorType>(hsArgTy)->getNumElements();
 
         std::vector<Constant *> shuffleMask;
         for (unsigned i = 0; i < userDataSize; ++i)
@@ -745,7 +745,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
       if (esArgTy->isVectorTy()) {
         assert(cast<VectorType>(esArgTy)->getElementType()->isIntegerTy());
 
-        const unsigned userDataSize = cast<FixedVectorType>(esArgTy)->getNumElements();
+        const unsigned userDataSize = cast<VectorType>(esArgTy)->getNumElements();
 
         std::vector<Constant *> shuffleMask;
         for (unsigned i = 0; i < userDataSize; ++i)
@@ -904,7 +904,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
       if (gsArgTy->isVectorTy()) {
         assert(cast<VectorType>(gsArgTy)->getElementType()->isIntegerTy());
 
-        const unsigned userDataSize = cast<FixedVectorType>(gsArgTy)->getNumElements();
+        const unsigned userDataSize = cast<VectorType>(gsArgTy)->getNumElements();
 
         std::vector<Constant *> shuffleMask;
         for (unsigned i = 0; i < userDataSize; ++i)

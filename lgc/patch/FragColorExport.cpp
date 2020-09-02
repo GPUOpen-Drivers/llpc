@@ -112,7 +112,7 @@ Value *FragColorExport::run(Value *output, unsigned hwColorTarget, Instruction *
   Type *outputTy = output->getType();
   const unsigned bitWidth = outputTy->getScalarSizeInBits();
   auto compTy = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getElementType() : outputTy;
-  unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+  unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
 
   Value *comps[4] = {nullptr};
   if (compCount == 1)
@@ -569,7 +569,7 @@ void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValue
   (void(bitWidth)); // unused
 
   auto compTy = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getElementType() : outputTy;
-  unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+  unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
 
   std::vector<Value *> outputComps;
   for (unsigned i = 0; i < compCount; ++i) {

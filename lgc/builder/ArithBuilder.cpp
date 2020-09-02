@@ -230,7 +230,7 @@ Value *ArithBuilder::CreateSMod(Value *dividend, Value *divisor, const Twine &in
         Value *pc = CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
         Value *pcHi = CreateExtractElement(CreateBitCast(pc, FixedVectorType::get(getInt32Ty(), 2)), 1);
         Value *nonConstantZero = CreateLShr(pcHi, getInt32(15));
-        if (auto vecTy = dyn_cast<FixedVectorType>(divisor->getType()))
+        if (auto vecTy = dyn_cast<VectorType>(divisor->getType()))
           nonConstantZero = CreateVectorSplat(vecTy->getNumElements(), nonConstantZero);
         // Add the non-constant 0 to the denominator to disable the optimization.
         divisor = CreateAdd(divisor, nonConstantZero);
@@ -830,7 +830,7 @@ Value *ArithBuilder::CreateExtractExponent(Value *value, const Twine &instName) 
 // @param y : Input value Y
 // @param instName : Name to give instruction(s)
 Value *ArithBuilder::CreateCrossProduct(Value *x, Value *y, const Twine &instName) {
-  assert(x->getType() == y->getType() && cast<FixedVectorType>(x->getType())->getNumElements() == 3);
+  assert(x->getType() == y->getType() && cast<VectorType>(x->getType())->getNumElements() == 3);
 
   Value *left = UndefValue::get(x->getType());
   Value *right = UndefValue::get(x->getType());
@@ -896,7 +896,7 @@ Value *ArithBuilder::CreateFaceForward(Value *n, Value *i, Value *nref, const Tw
 Value *ArithBuilder::CreateReflect(Value *i, Value *n, const Twine &instName) {
   Value *dot = CreateDotProduct(n, i);
   dot = CreateFMul(dot, ConstantFP::get(dot->getType(), 2.0));
-  if (auto vecTy = dyn_cast<FixedVectorType>(n->getType()))
+  if (auto vecTy = dyn_cast<VectorType>(n->getType()))
     dot = CreateVectorSplat(vecTy->getNumElements(), dot);
   return CreateFSub(i, CreateFMul(dot, n), instName);
 }
@@ -924,7 +924,7 @@ Value *ArithBuilder::CreateRefract(Value *i, Value *n, Value *eta, const Twine &
   Value *etaDot = CreateFMul(eta, dot);
   Value *innt = CreateFAdd(etaDot, kSqrt);
 
-  if (auto vecTy = dyn_cast<FixedVectorType>(n->getType())) {
+  if (auto vecTy = dyn_cast<VectorType>(n->getType())) {
     eta = CreateVectorSplat(vecTy->getNumElements(), eta);
     innt = CreateVectorSplat(vecTy->getNumElements(), innt);
   }
@@ -1177,7 +1177,7 @@ Value *ArithBuilder::createCallAmdgcnClass(Value *value, unsigned flags, const T
 Value *ArithBuilder::CreateInsertBitField(Value *base, Value *insert, Value *offset, Value *count,
                                           const Twine &instName) {
   // Make pOffset and pCount vectors of the right integer type if necessary.
-  if (auto vecTy = dyn_cast<FixedVectorType>(base->getType())) {
+  if (auto vecTy = dyn_cast<VectorType>(base->getType())) {
     if (!isa<VectorType>(offset->getType()))
       offset = CreateVectorSplat(vecTy->getNumElements(), offset);
     if (!isa<VectorType>(count->getType()))
@@ -1211,7 +1211,7 @@ Value *ArithBuilder::CreateInsertBitField(Value *base, Value *insert, Value *off
 Value *ArithBuilder::CreateExtractBitField(Value *base, Value *offset, Value *count, bool isSigned,
                                            const Twine &instName) {
   // Make pOffset and pCount vectors of the right integer type if necessary.
-  if (auto vecTy = dyn_cast<FixedVectorType>(base->getType())) {
+  if (auto vecTy = dyn_cast<VectorType>(base->getType())) {
     if (!isa<VectorType>(offset->getType()))
       offset = CreateVectorSplat(vecTy->getNumElements(), offset);
     if (!isa<VectorType>(count->getType()))
@@ -1280,7 +1280,7 @@ Value *ArithBuilder::CreateFindSMsb(Value *value, const Twine &instName) {
 // @param instName : Name to give instruction(s)
 Value *ArithBuilder::createFMix(Value *x, Value *y, Value *a, const Twine &instName) {
   Value *ySubX = CreateFSub(y, x);
-  if (auto vectorResultTy = dyn_cast<FixedVectorType>(ySubX->getType())) {
+  if (auto vectorResultTy = dyn_cast<VectorType>(ySubX->getType())) {
     // pX, pY => vector, but pA => scalar
     if (!isa<VectorType>(a->getType()))
       a = CreateVectorSplat(vectorResultTy->getNumElements(), a);

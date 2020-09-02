@@ -416,7 +416,7 @@ Value *BuilderRecorder::CreateVectorTimesMatrix(Value *const vector, Value *cons
 Value *BuilderRecorder::CreateMatrixTimesVector(Value *const matrix, Value *const vector, const Twine &instName) {
   Type *const columnType = matrix->getType()->getArrayElementType();
   Type *const compType = cast<VectorType>(columnType)->getElementType();
-  const unsigned rowCount = cast<FixedVectorType>(columnType)->getNumElements();
+  const unsigned rowCount = cast<VectorType>(columnType)->getNumElements();
   Type *const vectorType = FixedVectorType::get(compType, rowCount);
   return record(Opcode::MatrixTimesVector, vectorType, {matrix, vector}, instName);
 }
@@ -441,7 +441,7 @@ Value *BuilderRecorder::CreateMatrixTimesMatrix(Value *const matrix1, Value *con
 // @param vector2 : The vector 2
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateOuterProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
-  const unsigned colCount = cast<FixedVectorType>(vector2->getType())->getNumElements();
+  const unsigned colCount = cast<VectorType>(vector2->getType())->getNumElements();
   Type *const resultTy = ArrayType::get(vector1->getType(), colCount);
   return record(Opcode::OuterProduct, resultTy, {vector1, vector2}, instName);
 }

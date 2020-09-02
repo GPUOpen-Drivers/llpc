@@ -236,7 +236,7 @@ bool SpirvLowerResourceCollect::runOnModule(Module &module) {
 
       fsOutInfo.location = location;
       fsOutInfo.location = index;
-      fsOutInfo.componentCount = globalTy->isVectorTy() ? cast<FixedVectorType>(globalTy)->getNumElements() : 1;
+      fsOutInfo.componentCount = globalTy->isVectorTy() ? cast<VectorType>(globalTy)->getNumElements() : 1;
       ;
       fsOutInfo.basicType = basicTy;
       m_fsOutInfos.push_back(fsOutInfo);

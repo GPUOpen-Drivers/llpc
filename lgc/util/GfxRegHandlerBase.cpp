@@ -44,7 +44,7 @@ using namespace llvm;
 void GfxRegHandlerBase::setRegister(Value *newRegister) {
   assert(newRegister->getType()->isIntOrIntVectorTy());
 
-  if (auto vectorTy = dyn_cast<FixedVectorType>(newRegister->getType())) {
+  if (auto vectorTy = dyn_cast<VectorType>(newRegister->getType())) {
     unsigned count = vectorTy->getNumElements();
 
     // Clear previously stored dwords

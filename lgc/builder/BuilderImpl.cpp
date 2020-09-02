@@ -65,7 +65,7 @@ Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vect
   if (!isa<VectorType>(product->getType()))
     return product;
 
-  const unsigned compCount = cast<FixedVectorType>(product->getType())->getNumElements();
+  const unsigned compCount = cast<VectorType>(product->getType())->getNumElements();
   Value *scalar = CreateExtractElement(product, uint64_t(0));
 
   for (unsigned i = 1; i < compCount; ++i)
@@ -276,7 +276,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
 
     Use *useOfNonUniformInst = nullptr;
     Type *waterfallEndTy = resultValue->getType();
-    if (auto vecTy = dyn_cast<FixedVectorType>(waterfallEndTy)) {
+    if (auto vecTy = dyn_cast<VectorType>(waterfallEndTy)) {
       if (vecTy->getElementType()->isIntegerTy(8)) {
         // ISel does not like waterfall.end with vector of i8 type, so cast if necessary.
         assert((vecTy->getNumElements() % 4) == 0);
@@ -312,7 +312,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
 // @param value : Input value
 // @param callback : Callback function
 Value *BuilderImplBase::scalarize(Value *value, std::function<Value *(Value *)> callback) {
-  if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
+  if (auto vecTy = dyn_cast<VectorType>(value->getType())) {
     Value *result0 = callback(CreateExtractElement(value, uint64_t(0)));
     Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
@@ -331,7 +331,7 @@ Value *BuilderImplBase::scalarize(Value *value, std::function<Value *(Value *)> 
 // @param value : Input value
 // @param callback : Callback function
 Value *BuilderImplBase::scalarizeInPairs(Value *value, std::function<Value *(Value *)> callback) {
-  if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
+  if (auto vecTy = dyn_cast<VectorType>(value->getType())) {
     Value *inComps = CreateShuffleVector(value, value, ArrayRef<int>{0, 1});
     Value *resultComps = callback(inComps);
     Value *result =
@@ -366,7 +366,7 @@ Value *BuilderImplBase::scalarizeInPairs(Value *value, std::function<Value *(Val
 // @param value1 : Input value 1
 // @param callback : Callback function
 Value *BuilderImplBase::scalarize(Value *value0, Value *value1, std::function<Value *(Value *, Value *)> callback) {
-  if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
+  if (auto vecTy = dyn_cast<VectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)));
     Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
@@ -389,7 +389,7 @@ Value *BuilderImplBase::scalarize(Value *value0, Value *value1, std::function<Va
 // @param callback : Callback function
 Value *BuilderImplBase::scalarize(Value *value0, Value *value1, Value *value2,
                                   std::function<Value *(Value *, Value *, Value *)> callback) {
-  if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
+  if (auto vecTy = dyn_cast<VectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)),
                               CreateExtractElement(value2, uint64_t(0)));
     Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
