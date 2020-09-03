@@ -4,7 +4,7 @@
 ; SHADERTEST-LABEL: <_amdgpu_ps_main>:
 ; SHADERTEST: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
 ; SHADERTEST-NEXT: R_AMDGPU_REL32_LO    [[fs_data_sym:[.a-z]*]]
-; SHADERTEST-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
+; SHADERTEST-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, {{4|12}}
 ; SHADERTEST-NEXT: R_AMDGPU_REL32_HI    [[fs_data_sym]]
 ; SHADERTEST: 0000000000000000 <[[fs_data_sym]]>:
 ; SHADERTEST-NEXT: 000000000000: 3F800000
@@ -24,9 +24,9 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -D -r %t.elf | FileCheck -check-prefix=SHADERTEST2 %s
 ; SHADERTEST2-LABEL: <_amdgpu_ps_main>:
-; SHADERTEST2: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 0x[[fsdata_offset:[0-9]*]]
+; SHADERTEST2: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 0x[[fsdata_offset:[0-9A-F]*]]
 ; SHADERTEST2-NEXT: R_AMDGPU_REL32_LO    .text
-; SHADERTEST2-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, 0x[[fsdata_offset]]
+; SHADERTEST2-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, 0x
 ; SHADERTEST2-NEXT: R_AMDGPU_REL32_HI    .text
 ; SHADERTEST2-LABEL: <__llpc_global_proxy_>:
 ; SHADERTEST2-NEXT: {{[0-9]*}}: 3F800000
