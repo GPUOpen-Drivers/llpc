@@ -54,6 +54,12 @@ config.test_exec_root = os.path.join(config.test_run_dir, 'test_output')
 if config.llvm_assertions == 'ON' or config.llvm_assertions == '1':
     config.available_features.add('assertions')
 
+if 'Address' in config.xgl_sanitizers:
+    config.available_features.add('asan')
+
+if 'Undefined' in config.xgl_sanitizers:
+    config.available_features.add('ubsan')
+
 if config.llpc_enable_shader_cache == 'ON' or config.llpc_enable_shader_cache == '1':
     config.available_features.add('llpc-shader-cache')
 
