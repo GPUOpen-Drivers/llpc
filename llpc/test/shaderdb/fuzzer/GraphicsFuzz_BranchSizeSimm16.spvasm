@@ -1,6 +1,6 @@
-
+; Summary: This fails and can sometimes compile very slowly. Use timeout to kill after 10s.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: timeout 10 amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; XFAIL: *
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
 ; SHADERTEST: AMDLLPC SUCCESS
