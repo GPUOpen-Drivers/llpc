@@ -1,8 +1,8 @@
 ; Summary: fails with "void llvm::Value::doRAUW(llvm::Value *, llvm::Value::ReplaceMetadataUses):"
 ;          "Assertion `!contains(New, this) && "this->replaceAllUsesWith(expr(this)) is NOT valid!"' failed."
 ; BEGIN_SHADERTEST
-; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; XFAIL: assertions
+; RUN: timeout 10 amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; XFAIL: *
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
