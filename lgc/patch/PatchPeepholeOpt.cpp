@@ -617,6 +617,10 @@ void PatchPeepholeOpt::visitPHINode(PHINode &phiNode) {
 
           PHINode *const otherSubPhiNode = dyn_cast<PHINode>(otherPhiNode->getIncomingValue(1));
 
+          // Skip the sub PHI node we are already looking at.
+          if (otherSubPhiNode == subPhiNode)
+            continue;
+
           // If the other incomings don't match, its not like our PHI node, skip.
           if (otherSubPhiNode != otherPhiNode->getIncomingValue(2))
             continue;
