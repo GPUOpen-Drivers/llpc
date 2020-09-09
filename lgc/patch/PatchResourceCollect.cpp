@@ -3050,7 +3050,7 @@ void InOutLocationMapManager::buildLocationMap(bool checkCompatibility) {
     m_locationMap[origLocation] = newLocation;
 
     // Update component index
-    if (spanIt->compatibilityInfo.is16Bit && isHighHalf || !spanIt->compatibilityInfo.is16Bit)
+    if ((spanIt->compatibilityInfo.is16Bit && isHighHalf) || !spanIt->compatibilityInfo.is16Bit)
       ++compIdx;
     assert(compIdx <= 4);
   }
