@@ -423,7 +423,8 @@ Value *YCbCrConverter::convertColorSpace() {
 void YCbCrConverter::prepareCoord() {
   Value *coords = m_ycbcrSampleInfo->address[Builder::ImageAddressIdxCoordinate];
 
-  assert(Builder::getImageNumCoords(m_ycbcrSampleInfo->dim) == cast<VectorType>(coords->getType())->getNumElements());
+  assert(Builder::getImageNumCoords(m_ycbcrSampleInfo->dim) ==
+         cast<FixedVectorType>(coords->getType())->getNumElements());
 
   m_coordS = m_builder->CreateExtractElement(coords, m_builder->getInt64(0));
   m_coordT = m_builder->CreateExtractElement(coords, m_builder->getInt64(1));
