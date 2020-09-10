@@ -279,17 +279,37 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     return CreateNamedCall(lgcName::SpillTable, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), {}, Attribute::ReadNone);
   };
 
-  auto GetDescriptorSetPtr = [this, resType, descSet]() -> Value * {
+  auto GetDescriptorSetPtr = [this, node, topNode, resType, descSet]() -> Value * {
     // Get the descriptor table pointer for the set, which might be passed as a user SGPR to the shader.
     // The args to the lgc.descriptor.set call are:
     // - descriptor set number
     // - value for high 32 bits of pointer; HighAddrPc to use PC
-    // TODO Shader compilation: For the "shadow" case, the high half of the address needs to be a reloc.
-    unsigned shadowDescriptorTable = m_pipelineState->getOptions().shadowDescriptorTable;
-    bool shadow = resType == ResourceNodeType::DescriptorFmask && shadowDescriptorTable != ShadowDescriptorTableDisable;
-    Value *highHalf = getInt32(shadow ? shadowDescriptorTable : HighAddrPc);
-    return CreateNamedCall(lgcName::DescriptorSet, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                           {getInt32(descSet), highHalf}, Attribute::ReadNone);
+    if (node || topNode || resType != ResourceNodeType::DescriptorFmask) {
+      unsigned shadowDescriptorTable = m_pipelineState->getOptions().shadowDescriptorTable;
+      bool shadow =
+          resType == ResourceNodeType::DescriptorFmask && shadowDescriptorTable != ShadowDescriptorTableDisable;
+      Value *highHalf = getInt32(shadow ? shadowDescriptorTable : HighAddrPc);
+      return CreateNamedCall(lgcName::DescriptorSet, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
+                             {getInt32(descSet), highHalf}, Attribute::ReadNone);
+    } else {
+      // This should be an unlinked shader, and we will use a relocation for the high half of the address.
+      assert(m_pipelineState->isUnlinked() &&
+             "Cannot add shadow descriptor relocations unless building an unlinked shader.");
+
+      // Get the address when the shadow table is disabled.
+      Value *nonShadowAddr = CreateNamedCall(lgcName::DescriptorSet, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
+                                             {getInt32(descSet), getInt32(HighAddrPc)}, Attribute::ReadNone);
+
+      // Get the address using a relocation when the shadow table is enabled.
+      Value *shadowDescriptorReloc = CreateRelocationConstant(reloc::ShadowDescriptorTable);
+      Value *shadowAddr = CreateNamedCall(lgcName::DescriptorSet, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
+                                          {getInt32(descSet), shadowDescriptorReloc}, Attribute::ReadNone);
+
+      // Use a relocation to select between the two.
+      Value *useShadowReloc = CreateRelocationConstant(reloc::ShadowDescriptorTableEnabled);
+      Value *useShadowTable = CreateZExtOrTrunc(useShadowReloc, getInt1Ty());
+      return CreateSelect(useShadowTable, shadowAddr, nonShadowAddr);
+    }
   };
 
   // Get the descriptor table pointer.
