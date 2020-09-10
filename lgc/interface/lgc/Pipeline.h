@@ -519,7 +519,7 @@ public:
 
   // Set and get per-pipeline options
   virtual void setOptions(const Options &options) = 0;
-  virtual const Options &getOptions() = 0;
+  virtual const Options &getOptions() const = 0;
 
   // Set per-shader options
   virtual void setShaderOptions(ShaderStage stage, const ShaderOptions &options) = 0;

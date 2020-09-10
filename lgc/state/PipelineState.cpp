@@ -726,6 +726,9 @@ static bool IsNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType can
 // Returns {topNode, node} where "node" is the found user data node, and "topNode" is the top-level user data
 // node that contains it (or is equal to it).
 //
+// If the node is not found and nodeType == Fmask, then a search will be done for a DescriptorResource at the given
+// descriptor set and binding.
+//
 // @param nodeType : Type of the resource mapping node
 // @param descSet : ID of descriptor set
 // @param binding : ID of descriptor binding
@@ -748,6 +751,13 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
     } else if (node.set == descSet && node.binding == binding && IsNodeTypeCompatible(nodeType, node.type)) {
       return {&node, &node};
     }
+  }
+
+  if (nodeType == ResourceNodeType::DescriptorFmask &&
+      getOptions().shadowDescriptorTable != ShadowDescriptorTableDisable) {
+    // For fmask with -enable-shadow-descriptor-table, if no fmask descriptor is found, look for a resource
+    // (image) one instead.
+    return findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding);
   }
   return {nullptr, nullptr};
 }
