@@ -241,7 +241,7 @@ Module *FetchShader::generate() {
         case static_cast<unsigned>(UserDataMapping::VertexBufferTable): {
           // Need to extend 32-bit vertex buffer table address to 64 bits.
           AddressExtender extender(fetchFunc);
-          unsigned highAddr = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+          Value *highAddr = call->getArgOperand(1);
           builder.SetInsertPoint(&*fetchFunc->front().getFirstInsertionPt());
           replacement = extender.extend(fetchFunc->getArg(m_vsEntryRegInfo.vertexBufferTable), highAddr,
                                         call->getType(), builder);
