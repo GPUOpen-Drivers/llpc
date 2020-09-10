@@ -143,13 +143,6 @@ Value *DescBuilder::CreateGetDescStride(ResourceNodeType descType, unsigned desc
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(descType, descSet, binding);
-    if (!node && descType == ResourceNodeType::DescriptorFmask &&
-        m_pipelineState->getOptions().shadowDescriptorTable != ShadowDescriptorTableDisable) {
-      // For fmask with -enable-shadow-descriptor-table, if no fmask descriptor is found, look for a resource
-      // (image) one instead.
-      std::tie(topNode, node) =
-          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding);
-    }
     if (!node) {
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getInt32Ty());
@@ -179,12 +172,6 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet
 
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(descType, descSet, binding);
-    if (!node && descType == ResourceNodeType::DescriptorFmask && shadow) {
-      // For fmask with -enable-shadow-descriptor-table, if no fmask descriptor is found, look for a resource
-      // (image) one instead.
-      std::tie(topNode, node) =
-          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding);
-    }
     if (!node) {
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getDescPtrTy(descType));
@@ -270,6 +257,8 @@ static StringRef GetRelocTypeSuffix(ResourceNodeType type) {
     return "_b";
   case ResourceNodeType::DescriptorTexelBuffer:
     return "_t";
+  case ResourceNodeType::DescriptorFmask:
+    return "_f";
   default:
     return "_x";
   }

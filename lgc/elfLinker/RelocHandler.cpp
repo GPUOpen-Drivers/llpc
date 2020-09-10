@@ -45,10 +45,10 @@ using namespace llvm;
 // @param str : StringRef containing text of the form "1_2_r"
 // @param [out] descSet : Value of first integer
 // @param [out] binding : Value of second integer
-// @param [out] typeLetter : Value of optional type letter, 0 if none
+// @param [out] type : The type of the resource node
 // @returns : True if parse successful
-static bool parseDescSetBinding(StringRef str, unsigned &descSet, unsigned &binding, int &typeLetter) {
-  typeLetter = 0;
+static bool parseDescSetBinding(StringRef str, unsigned &descSet, unsigned &binding, ResourceNodeType &type) {
+  type = ResourceNodeType::Unknown;
   if (str.consumeInteger(10, descSet) || str.empty() || str[0] != '_')
     return false;
   str = str.drop_front();
@@ -58,7 +58,31 @@ static bool parseDescSetBinding(StringRef str, unsigned &descSet, unsigned &bind
     return true;
   if (str.size() != 2 || str[0] != '_')
     return false;
-  typeLetter = str[1];
+
+  int typeLetter = str[1];
+  switch (typeLetter) {
+  case 's':
+    type = ResourceNodeType::DescriptorSampler;
+    break;
+  case 'r':
+    type = ResourceNodeType::DescriptorResource;
+    break;
+  case 'b':
+    type = ResourceNodeType::DescriptorBuffer;
+    break;
+  case 't':
+    type = ResourceNodeType::DescriptorTexelBuffer;
+    break;
+  case 'f':
+    type = ResourceNodeType::DescriptorFmask;
+    break;
+  case 'x':
+    type = ResourceNodeType::Unknown;
+    break;
+  default:
+    llvm_unreachable("Unexpected resource type in relocation.");
+    break;
+  }
   return true;
 }
 
@@ -73,23 +97,8 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
     // Descriptor offset in bytes in the descriptor table for its set, or in the spill table if in the root table.
     unsigned descSet = 0;
     unsigned binding = 0;
-    int typeLetter = 0;
-    if (parseDescSetBinding(name.drop_front(strlen(reloc::DescriptorOffset)), descSet, binding, typeLetter)) {
-      ResourceNodeType type = ResourceNodeType::Unknown;
-      switch (typeLetter) {
-      case 's':
-        type = ResourceNodeType::DescriptorSampler;
-        break;
-      case 'r':
-        type = ResourceNodeType::DescriptorResource;
-        break;
-      case 'b':
-        type = ResourceNodeType::DescriptorBuffer;
-        break;
-      case 't':
-        type = ResourceNodeType::DescriptorTexelBuffer;
-        break;
-      }
+    ResourceNodeType type = ResourceNodeType::Unknown;
+    if (parseDescSetBinding(name.drop_front(strlen(reloc::DescriptorOffset)), descSet, binding, type)) {
       const ResourceNode *outerNode = nullptr;
       const ResourceNode *node = nullptr;
       std::tie(outerNode, node) = getPipelineState()->findResourceNode(type, descSet, binding);
@@ -112,9 +121,9 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
     unsigned descSet = 0;
     unsigned binding = 0;
     // We don't care about typeLetter. This should always be 'b' for DescriptorBuffers.
-    int typeLetter = 0;
+    ResourceNodeType type = ResourceNodeType::Unknown;
     StringRef suffix = name.drop_front(strlen(reloc::DescriptorUseSpillTable));
-    if (parseDescSetBinding(suffix, descSet, binding, typeLetter)) {
+    if (parseDescSetBinding(suffix, descSet, binding, type)) {
       const ResourceNode *outerNode = nullptr;
       const ResourceNode *node = nullptr;
       std::tie(outerNode, node) =
@@ -139,11 +148,11 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
     // Descriptor stride in bytes.
     unsigned descSet = 0;
     unsigned binding = 0;
-    int typeLetter = 0;
-    if (parseDescSetBinding(name.drop_front(strlen(reloc::DescriptorStride)), descSet, binding, typeLetter)) {
+    ResourceNodeType type = ResourceNodeType::Unknown;
+    if (parseDescSetBinding(name.drop_front(strlen(reloc::DescriptorStride)), descSet, binding, type)) {
       const ResourceNode *outerNode = nullptr;
       const ResourceNode *node = nullptr;
-      std::tie(outerNode, node) = getPipelineState()->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
+      std::tie(outerNode, node) = getPipelineState()->findResourceNode(type, descSet, binding);
       if (!node)
         report_fatal_error("No resource node for " + name);
       value = node->stride * sizeof(uint32_t);

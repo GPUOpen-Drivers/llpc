@@ -136,7 +136,7 @@ public:
 
   // Set and get per-pipeline options
   void setOptions(const Options &options) override final { m_options = options; }
-  const Options &getOptions() override final { return m_options; }
+  const Options &getOptions() const override final { return m_options; }
 
   // Set per-shader options
   void setShaderOptions(ShaderStage stage, const ShaderOptions &options) override final;
