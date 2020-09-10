@@ -50,20 +50,21 @@ Instruction *AddressExtender::getFirstInsertionPt() {
 // Extend an i32 into a 64-bit pointer
 //
 // @param addr32 : Address as 32-bit value
-// @param highHalf : Value to use for high half; HighAddrPc to use PC
+// @param highHalf : Value to use for high half; The constant HighAddrPc to use PC
 // @param ptrTy : Type to cast pointer to
 // @param builder : IRBuilder to use, already set to the required insert point
 // @returns : 64-bit pointer value
-Instruction *AddressExtender::extend(Value *addr32, unsigned highHalf, Type *ptrTy, IRBuilder<> &builder) {
+Instruction *AddressExtender::extend(Value *addr32, Value *highHalf, Type *ptrTy, IRBuilder<> &builder) {
   Value *ptr = nullptr;
-  if (highHalf == HighAddrPc) {
+  ConstantInt *highHalfConst = dyn_cast<ConstantInt>(highHalf);
+  if (highHalfConst && highHalfConst->getZExtValue() == HighAddrPc) {
     // Extend with PC.
     ptr = builder.CreateInsertElement(getPc(), addr32, uint64_t(0));
   } else {
     // Extend with given value
     ptr = builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 2)), addr32,
                                       uint64_t(0));
-    ptr = builder.CreateInsertElement(ptr, builder.getInt32(highHalf), 1);
+    ptr = builder.CreateInsertElement(ptr, highHalf, 1);
   }
   ptr = builder.CreateBitCast(ptr, builder.getInt64Ty());
   return cast<Instruction>(builder.CreateIntToPtr(ptr, ptrTy));

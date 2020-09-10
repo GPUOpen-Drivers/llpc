@@ -55,11 +55,11 @@ public:
   // Extend an i32 into a 64-bit pointer
   //
   // @param addr32 : Address as 32-bit value
-  // @param highHalf : Value to use for high half; HighAddrPc to use PC
+  // @param highHalf : Value to use for high half; The constant HighAddrPc to use PC
   // @param ptrTy : Type to cast pointer to
   // @param builder : IRBuilder to use, already set to the required insert point
   // @returns : 64-bit pointer value
-  llvm::Instruction *extend(llvm::Value *addr32, unsigned highHalf, llvm::Type *ptrTy, llvm::IRBuilder<> &builder);
+  llvm::Instruction *extend(llvm::Value *addr32, llvm::Value *highHalf, llvm::Type *ptrTy, llvm::IRBuilder<> &builder);
 
 private:
   // Get PC value as v2i32.

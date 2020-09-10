@@ -291,7 +291,7 @@ private:
 
   // Get a pointer to a descriptor, as a pointer to i8
   llvm::Value *getDescPtr(ResourceNodeType resType, unsigned descSet, unsigned binding, const ResourceNode *topNode,
-                          const ResourceNode *node, bool shadow);
+                          const ResourceNode *node);
 
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);
 

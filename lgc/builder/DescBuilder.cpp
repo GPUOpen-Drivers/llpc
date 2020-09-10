@@ -92,7 +92,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       }
     } else if (node->type == ResourceNodeType::InlineBuffer) {
       // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
-      Value *descPtr = getDescPtr(node->type, descSet, binding, topNode, node, /*shadow=*/false);
+      Value *descPtr = getDescPtr(node->type, descSet, binding, topNode, node);
       desc = buildInlineBufferDesc(descPtr);
     }
   }
@@ -101,7 +101,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
     // Not handled by either of the special cases above...
     // Get a pointer to the descriptor, as a pointer to i8.
     ResourceNodeType resType = node ? node->type : ResourceNodeType::DescriptorBuffer;
-    Value *descPtr = getDescPtr(resType, descSet, binding, topNode, node, /*shadow=*/false);
+    Value *descPtr = getDescPtr(resType, descSet, binding, topNode, node);
     // Index it.
     if (descIndex != getInt32(0)) {
       descIndex = CreateMul(descIndex, getStride(resType, descSet, binding, node));
@@ -166,10 +166,6 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet
   // look; we will use relocs instead.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
-  bool shadow = false;
-  if (descType == ResourceNodeType::DescriptorFmask)
-    shadow = m_pipelineState->getOptions().shadowDescriptorTable != ShadowDescriptorTableDisable;
-
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(descType, descSet, binding);
     if (!node) {
@@ -194,7 +190,7 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet
     }
   } else {
     // Get a pointer to the descriptor.
-    descPtr = getDescPtr(descType, descSet, binding, topNode, node, shadow);
+    descPtr = getDescPtr(descType, descSet, binding, topNode, node);
   }
 
   // Cast to the right pointer type.
@@ -272,9 +268,8 @@ static StringRef GetRelocTypeSuffix(ResourceNodeType type) {
 // @param binding : Binding
 // @param topNode : Node in top-level descriptor table (nullptr for shader compilation)
 // @param node : The descriptor node itself (nullptr for shader compilation)
-// @param shadow : Whether to load from shadow descriptor table
 Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsigned binding,
-                               const ResourceNode *topNode, const ResourceNode *node, bool shadow) {
+                               const ResourceNode *topNode, const ResourceNode *node) {
   Value *descPtr = nullptr;
 
   auto GetSpillTablePtr = [this]() {
@@ -284,15 +279,17 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     return CreateNamedCall(lgcName::SpillTable, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), {}, Attribute::ReadNone);
   };
 
-  auto GetDescriptorSetPtr = [this, descSet, shadow]() {
+  auto GetDescriptorSetPtr = [this, resType, descSet]() -> Value * {
     // Get the descriptor table pointer for the set, which might be passed as a user SGPR to the shader.
     // The args to the lgc.descriptor.set call are:
     // - descriptor set number
     // - value for high 32 bits of pointer; HighAddrPc to use PC
     // TODO Shader compilation: For the "shadow" case, the high half of the address needs to be a reloc.
-    unsigned highHalf = shadow ? m_pipelineState->getOptions().shadowDescriptorTable : HighAddrPc;
+    unsigned shadowDescriptorTable = m_pipelineState->getOptions().shadowDescriptorTable;
+    bool shadow = resType == ResourceNodeType::DescriptorFmask && shadowDescriptorTable != ShadowDescriptorTableDisable;
+    Value *highHalf = getInt32(shadow ? shadowDescriptorTable : HighAddrPc);
     return CreateNamedCall(lgcName::DescriptorSet, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                           {getInt32(descSet), getInt32(highHalf)}, Attribute::ReadNone);
+                           {getInt32(descSet), highHalf}, Attribute::ReadNone);
   };
 
   // Get the descriptor table pointer.
