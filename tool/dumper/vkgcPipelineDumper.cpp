@@ -1190,6 +1190,7 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData*
         updateHashForResourceMappingNode(&userDataNode->node, true, hasher);
       }
     }
+  }
 }
 #endif
 
