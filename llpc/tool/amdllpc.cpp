@@ -915,7 +915,7 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
       buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &resourceMappingAuto);
       if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
                                         resourceMappingAuto.pUserDataNodes) &&
-          checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoCopy, ParsedGfxIp))
+          checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoAuto, ParsedGfxIp))
         outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " hit\n";
       else
         outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " failed to hit\n";
@@ -1066,7 +1066,8 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
 
       result = decodePipelineBinary(&pipelineOut->pipelineBin, compileInfo, true);
     }
-  } else {
+  }
+  else {
     // Build compute pipeline
     assert(compileInfo->shaderModuleDatas.size() == 1);
     assert(compileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
@@ -1555,7 +1556,7 @@ static Result expandInputFilenames(std::vector<std::string> &expandedFilenames) 
         return Result::ErrorInvalidValue;
       }
     }
-#else // WIN_OS
+#else  // WIN_OS
     expandedFilenames.push_back(inFile);
 #endif
     ++i;

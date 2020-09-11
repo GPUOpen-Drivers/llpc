@@ -105,6 +105,8 @@ bool PatchBufferOp::runOnFunction(Function &function) {
   for (BasicBlock *const block : traversal)
     visit(*block);
 
+  fixIncompletePhis();
+
   // Some instructions can modify the CFG and thus have to be performed after the normal visitors.
   for (Instruction *const inst : m_postVisitInsts) {
     if (MemSetInst *const memSet = dyn_cast<MemSetInst>(inst))
@@ -129,6 +131,7 @@ bool PatchBufferOp::runOnFunction(Function &function) {
   }
 
   m_replacementMap.clear();
+  m_incompletePhis.clear();
   m_invariantSet.clear();
   m_divergenceSet.clear();
 
@@ -733,7 +736,14 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
       const int blockIndex = phiNode.getBasicBlockIndex(block);
       assert(blockIndex >= 0);
 
-      Value *const incomingBufferDesc = m_replacementMap[incomings[blockIndex]].first;
+      Value *incomingBufferDesc = m_replacementMap[incomings[blockIndex]].first;
+
+      if (!incomingBufferDesc) {
+        // If we cannot get an incoming buffer decriptor from the replacement map, it is unvisited yet. Generate an
+        // incomplete phi and fix it later.
+        incomingBufferDesc = UndefValue::get(newPhiNode->getType());
+        m_incompletePhis[{newPhiNode, block}] = incomings[blockIndex];
+      }
 
       newPhiNode->addIncoming(incomingBufferDesc, block);
 
@@ -766,10 +776,9 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
     Value *incomingIndex = m_replacementMap[incomings[blockIndex]].second;
 
     if (!incomingIndex) {
-      if (Instruction *const inst = dyn_cast<Instruction>(incomings[blockIndex])) {
-        visit(*inst);
-        incomingIndex = m_replacementMap[inst].second;
-      }
+      // If we cannot get an incoming index from the replacement map, do the same as buffer descriptor.
+      incomingIndex = UndefValue::get(newPhiNode->getType());
+      m_incompletePhis[{newPhiNode, block}] = incomings[blockIndex];
     }
 
     newPhiNode->addIncoming(incomingIndex, block);
@@ -1662,6 +1671,26 @@ Instruction *PatchBufferOp::makeLoop(Value *const loopStart, Value *const loopEn
   m_builder->SetInsertPoint(newTerminator);
 
   return loopCounter;
+}
+
+// =====================================================================================================================
+// Fix incomplete phi incoming values
+void PatchBufferOp::fixIncompletePhis() {
+  for (auto phi : m_incompletePhis) {
+    PHINode *phiNode = phi.first.first;
+    BasicBlock *incomingBlock = phi.first.second;
+    Value *incoming = phi.second;
+
+    assert(isa<UndefValue>(phiNode->getIncomingValueForBlock(incomingBlock)));
+    assert(phiNode->getType()->isVectorTy() || phiNode->getType()->isPointerTy());
+
+    if (phiNode->getType()->isVectorTy())
+      // It is a buffer descriptor
+      phiNode->setIncomingValueForBlock(incomingBlock, m_replacementMap[incoming].first);
+    else
+      // It is an index
+      phiNode->setIncomingValueForBlock(incomingBlock, m_replacementMap[incoming].second);
+  }
 }
 
 } // namespace lgc

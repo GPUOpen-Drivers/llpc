@@ -159,8 +159,8 @@ static const ResourceMappingNode *findResourceNode(const ResourceMappingNode *us
 //
 // @param userDataNode : ResourceMappingRootNode pointer
 // @param nodeCount : User data node count
-// @param set : find same set in node array
-// @param binding : find same binding in node array
+// @param set : Find same set in node array
+// @param binding : Find same binding in node array
 // @param [out] index : Return node position in node array
 static const ResourceMappingRootNode *findResourceNode(const ResourceMappingRootNode *userDataNode, unsigned nodeCount,
                                                        unsigned set, unsigned binding, unsigned *index) {
@@ -405,7 +405,7 @@ bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipel
 // @param spirvBin : SPIR-V binary
 // @param [in/out] pipelineInfo : Graphics pipeline info, will have dummy information filled in. nullptr if not a
 // graphics pipeline.
-// @param [in/out] shaderInfo : Shader info, will have user data nodes added to it
+// @param [in] shaderInfo : Shader info, used to check entry point name
 // @param [in/out] resNodeSets : Resource map, will have user data nodes added to it
 // @param [in/out] pushConstSize : Cumulative push constant node size
 // @param checkAutoLayoutCompatible : If check AutoLayout Compatiple
@@ -895,8 +895,9 @@ void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &res
 // @param [in] pushConstSize : Push constant node size
 // @param [in/out] shaderInfo : Shader info, will have user data nodes added to it
 // @param [in/out] topLevelOffset : Offset in dwords applied to all root nodes (to avoid overlap between stages)
-void buildTopLevelMapping(ShaderStage shaderStage, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
-                          PipelineShaderInfo *shaderInfo, unsigned &topLevelOffset) {
+void buildTopLevelMapping(ShaderStage shaderStage, const ResourceMappingNodeMap &resNodeSets,
+                          unsigned pushConstSize, PipelineShaderInfo *shaderInfo,
+                          unsigned &topLevelOffset) {
   // Only auto-layout descriptors if -auto-layout-desc is on.
   if (!AutoLayoutDesc)
     return;

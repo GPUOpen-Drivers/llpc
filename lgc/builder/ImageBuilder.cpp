@@ -1845,3 +1845,4 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
 
   return coord;
 }
+

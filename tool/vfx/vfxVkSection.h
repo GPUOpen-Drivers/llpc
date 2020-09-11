@@ -98,6 +98,7 @@ public:
   }
 
 private:
+
   static void *getResourceMapNodeSet(void *obj) {
     SectionResourceMappingNode *castedObj = static_cast<SectionResourceMappingNode *>(obj);
     return static_cast<void *>(&castedObj->m_state.srdRange.set);
@@ -226,13 +227,13 @@ public:
   const char *getEntryPoint() const { return m_entryPoint.empty() ? nullptr : m_entryPoint.c_str(); }
   ShaderStage getShaderStage() { return m_shaderStage; }
 
-  void getSubState(std::vector<Vkgc::ResourceMappingRootNode> &userDataNodes) {
-    for (auto &srcNode : m_userDataNodes)
-      userDataNodes.push_back({srcNode, static_cast<unsigned>(1 << m_shaderStage)});
+  void getSubState(std::vector<Vkgc::ResourceMappingRootNode>& userDataNodes) {
+    for (auto& srcNode : m_userDataNodes)
+      userDataNodes.push_back({ srcNode, static_cast<unsigned>(1 << m_shaderStage) });
   }
 
-  void getSubState(std::vector<Vkgc::StaticDescriptorValue> &descriptorRangeValues) {
-    for (auto &srcValue : m_descriptorRangeValues) {
+  void getSubState(std::vector<Vkgc::StaticDescriptorValue>& descriptorRangeValues) {
+    for (auto& srcValue : m_descriptorRangeValues) {
       Vkgc::StaticDescriptorValue dstValue = {};
       memcpy(&dstValue, &srcValue, sizeof(srcValue));
       dstValue.visibility = 1 << m_shaderStage;
@@ -244,9 +245,9 @@ private:
   static const unsigned MemberCount = 5;
   static StrToMemberAddr m_addrTable[MemberCount];
   SubState m_state;
-  SectionSpecInfo m_specConst;   // Specialization constant info
-  SectionShaderOption m_options; // Pipeline shader options
-  std::string m_entryPoint;      // Entry point name
+  SectionSpecInfo m_specConst;                                         // Specialization constant info
+  SectionShaderOption m_options;                                       // Pipeline shader options
+  std::string m_entryPoint;                                            // Entry point name
 
   // Used for backwards compatibility with Version 1 .pipe files
   std::vector<SectionDescriptorRangeValueItem> m_descriptorRangeValue; // Contains descriptor range vuale
@@ -270,9 +271,10 @@ public:
 
   static void initialAddrTable() {
     StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_staticDescriptorValue, MemberTypeDescriptorRangeValue,
-                                      true);
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_userDataNode, MemberTypeResourceMappingNode, true);
+    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_staticDescriptorValue,
+                                      MemberTypeDescriptorRangeValue, true);
+    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_userDataNode,
+                                      MemberTypeResourceMappingNode, true);
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
@@ -294,7 +296,7 @@ public:
       for (unsigned i = 0; i < state.userDataNodeCount; ++i)
         m_userDataNode[i].getSubState(m_userDataNodes[i]);
       state.pUserDataNodes = &m_userDataNodes[0];
-    }
+      }
 #endif
   };
   SubState &getSubStateRef() { return m_state; };
@@ -304,9 +306,9 @@ private:
   static StrToMemberAddr m_addrTable[MemberCount];
   SubState m_state;
   std::vector<SectionDescriptorRangeValueItem> m_staticDescriptorValue; // Contains descriptor range vuale
-  std::vector<SectionResourceMappingNode> m_userDataNode;               // Contains user data node
+  std::vector<SectionResourceMappingNode>      m_userDataNode;           // Contains user data node
 
-  std::vector<Vkgc::StaticDescriptorValue> m_staticDescriptorValues;
+  std::vector<Vkgc::StaticDescriptorValue>   m_staticDescriptorValues;
   std::vector<Vkgc::ResourceMappingRootNode> m_userDataNodes;
 };
 

@@ -57,8 +57,8 @@ enum SectionType : unsigned {
   SectionTypeImageView,   // Image view section
   SectionTypeSampler,     // Sampler section
   // VKGC pipeline
-  SectionTypeGraphicsState,    // Graphics state section
-  SectionTypeComputeState,     // Compute state section
+  SectionTypeGraphicsState, // Graphics state section
+  SectionTypeComputeState,  // Compute state section
   SectionTypeVertexInputState, // Vertex input state section
   SectionTypeShaderInfo,       // Shader info section
   SectionTypeResourceMapping,  // Resource mapping section
@@ -162,7 +162,7 @@ struct SectionInfo {
 };
 
 // =====================================================================================================================
-inline SectionInfo initSectionItemInfo(SectionType type, uint32_t property) {
+inline SectionInfo initSectionItemInfo(SectionType type, unsigned property) {
   SectionInfo sectionInfo = {};
   sectionInfo.type = type;
   sectionInfo.property = property;
