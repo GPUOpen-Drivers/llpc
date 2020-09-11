@@ -45,20 +45,12 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
 endif()
 
-# imported/metrohash
-if(NOT TARGET metrohash)
-    add_subdirectory(../../imported/metrohash ${PROJECT_BINARY_DIR}/../metrohash)
-    target_link_libraries(dumper PUBLIC llpc_metrohash)
-else()
-    target_link_libraries(dumper PUBLIC metrohash)
-    target_compile_definitions(dumper PUBLIC SINGLE_EXTERNAL_METROHASH)
-endif()
+target_link_libraries(dumper PUBLIC metrohash)
+target_link_libraries(dumper PRIVATE cwpack)
 
 if(LLPC_ENABLE_SHADER_CACHE)
     target_compile_definitions(dumper PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
 endif()
-
-target_link_libraries(dumper PRIVATE cwpack)
 
 target_include_directories(dumper
     PUBLIC
