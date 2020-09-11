@@ -483,6 +483,23 @@ void PalMetadata::finalizePipeline() {
           m_pipelineState->getColorExportState().alphaToCoverageEnable == false;
       setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
     }
+
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
+      auto waveBreakSize = m_pipelineState->getShaderOptions(ShaderStageFragment).waveBreakSize;
+      PA_SC_SHADER_CONTROL paScShaderControl = {};
+      paScShaderControl.gfx10.WAVE_BREAK_REGION_SIZE = static_cast<unsigned int>(waveBreakSize);
+      setRegister(mmPA_SC_SHADER_CONTROL, paScShaderControl.u32All);
+    }
+
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
+      PA_SC_AA_CONFIG paScAaConfig = {};
+      if (m_pipelineState->getRasterizerState().innerCoverage) {
+        paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_INNER_COVERAGE;
+      } else {
+        paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
+      }
+      setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
+    }
   }
 
   // If there are root user data nodes but none of them are used, adjust userDataLimit accordingly.

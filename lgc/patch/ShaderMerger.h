@@ -96,8 +96,6 @@ private:
   llvm::LLVMContext *m_context;   // LLVM context
   GfxIpVersion m_gfxIp;           // Graphics IP version info
 
-  NggPrimShader m_primShader; // Manager of NGG primitive shader
-
   bool m_hasVs;  // Whether the pipeline has vertex shader
   bool m_hasTcs; // Whether the pipeline has tessellation control shader
   bool m_hasTes; // Whether the pipeline has tessellation evaluation shader

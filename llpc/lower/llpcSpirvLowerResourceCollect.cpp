@@ -235,9 +235,8 @@ bool SpirvLowerResourceCollect::runOnModule(Module &module) {
         llvm_unreachable("Should never be called!");
 
       fsOutInfo.location = location;
-      fsOutInfo.location = index;
-      fsOutInfo.componentCount = globalTy->isVectorTy() ? cast<VectorType>(globalTy)->getNumElements() : 1;
-      ;
+      fsOutInfo.index = index;
+      fsOutInfo.componentCount = globalTy->isVectorTy() ? cast<FixedVectorType>(globalTy)->getNumElements() : 1;
       fsOutInfo.basicType = basicTy;
       m_fsOutInfos.push_back(fsOutInfo);
       break;

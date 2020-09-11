@@ -988,8 +988,15 @@ bool PipelineState::isTessOffChip() {
 bool PipelineState::isPackInOut() {
   // Pack input/output requirements:
   // 1) -pack-in-out option is on
-  // 2) It is a VS-FS pipeline
-  return PackInOut && (m_stageMask == (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment)));
+  // 2) It supports VS-FS, VS-TCS-TES-(FS)
+  if (!PackInOut)
+    return false;
+
+  if (hasShaderStage(ShaderStageVertex) && !hasShaderStage(ShaderStageGeometry)) {
+    const unsigned nextStage = getNextShaderStage(ShaderStageVertex);
+    return nextStage == ShaderStageFragment || nextStage == ShaderStageTessControl;
+  }
+  return false;
 }
 
 // =====================================================================================================================
@@ -1087,7 +1094,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   const ColorExportFormat *colorExportFormat = &getColorExportFormat(location);
   GfxIpVersion gfxIp = getTargetInfo().getGfxIpVersion();
   auto gpuWorkarounds = &getTargetInfo().getGpuWorkarounds();
-  unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<VectorType>(outputTy)->getNumElements()) - 1 : 1;
+  unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<FixedVectorType>(outputTy)->getNumElements()) - 1 : 1;
   const auto cbState = &getColorExportState();
   // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
   const bool enableAlphaToCoverage = (cbState->alphaToCoverageEnable && location == 0);

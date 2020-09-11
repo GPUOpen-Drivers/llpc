@@ -121,7 +121,7 @@ Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, bool wqm, con
   if (type->isVectorTy()) {
     Value *result = CreateExtractElement(compare, getInt32(0));
 
-    for (unsigned i = 1, compCount = cast<VectorType>(type)->getNumElements(); i < compCount; i++)
+    for (unsigned i = 1, compCount = cast<FixedVectorType>(type)->getNumElements(); i < compCount; i++)
       result = CreateAnd(result, CreateExtractElement(compare, i));
 
     return CreateSubgroupAll(result, wqm, instName);

@@ -1150,7 +1150,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
             Value *newLoad = UndefValue::get(load->getType());
 
-            for (unsigned i = 0; i < cast<VectorType>(pointerType)->getNumElements(); i++) {
+            for (unsigned i = 0; i < cast<FixedVectorType>(pointerType)->getNumElements(); i++) {
               Value *const pointerElem = getBuilder()->CreateExtractElement(pointer, i);
               Type *const newLoadElemType = pointerElem->getType()->getPointerElementType();
 
@@ -1222,7 +1222,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             Type *const pointerType = pointer->getType();
             assert(pointerType->isVectorTy());
 
-            for (unsigned i = 0; i < cast<VectorType>(pointerType)->getNumElements(); i++) {
+            for (unsigned i = 0; i < cast<FixedVectorType>(pointerType)->getNumElements(); i++) {
               Value *storeValueElem = store->getValueOperand();
 
               if (storeValueElem->getType()->isArrayTy())
@@ -4204,7 +4204,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto scalar = transValue(vts->getScalar(), f, bb);
     auto vector = transValue(vts->getVector(), f, bb);
     assert(vector->getType()->isVectorTy() && "Invalid type");
-    unsigned vecSize = cast<VectorType>(vector->getType())->getNumElements();
+    unsigned vecSize = cast<FixedVectorType>(vector->getType())->getNumElements();
     auto newVec = getBuilder()->CreateVectorSplat(vecSize, scalar, scalar->getName());
     newVec->takeName(scalar);
     auto scale = getBuilder()->CreateFMul(vector, newVec, "scale");
@@ -4252,7 +4252,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
           // NOTE: It is allowed to construct a vector from several "smaller"
           // scalars or vectors, such as vec4 = (vec2, vec2) or vec4 = (float,
           // vec3).
-          auto compCount = cast<VectorType>(constituents[i]->getType())->getNumElements();
+          auto compCount = cast<FixedVectorType>(constituents[i]->getType())->getNumElements();
           for (unsigned j = 0; j < compCount; ++j) {
             auto comp = ExtractElementInst::Create(constituents[i], ConstantInt::get(*m_context, APInt(32, j)), "", bb);
             v = InsertElementInst::Create(v, comp, ConstantInt::get(*m_context, APInt(32, idx)), "", bb);
@@ -4533,7 +4533,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     if (!isa<VectorType>(val->getType()))
       return val;
     Value *result = getBuilder()->CreateExtractElement(val, uint64_t(0));
-    for (unsigned i = 1, e = cast<VectorType>(val->getType())->getNumElements(); i != e; ++i) {
+    for (unsigned i = 1, e = cast<FixedVectorType>(val->getType())->getNumElements(); i != e; ++i) {
       Value *elem = getBuilder()->CreateExtractElement(val, i);
       if (oc == OpAny)
         result = getBuilder()->CreateOr(result, elem);
@@ -5079,7 +5079,7 @@ static void printTypeName(Type *ty, raw_ostream &nameStream) {
     nameStream << "]";
     return;
   }
-  if (auto vecTy = dyn_cast<VectorType>(ty)) {
+  if (auto vecTy = dyn_cast<FixedVectorType>(ty)) {
     nameStream << "v" << vecTy->getNumElements();
     ty = vecTy->getElementType();
   }
@@ -5312,7 +5312,7 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskI
   // SPIR-V allows the coordinate vector to be too wide; chop it down here.
   // Also handle the extra projective component if any.
   Value *coord = addr[lgc::Builder::ImageAddressIdxCoordinate];
-  if (auto coordVecTy = dyn_cast<VectorType>(coord->getType())) {
+  if (auto coordVecTy = dyn_cast<FixedVectorType>(coord->getType())) {
     unsigned numCoords = getBuilder()->getImageNumCoords(imageInfo->dim);
     if (hasProj) {
       addr[lgc::Builder::ImageAddressIdxProjective] = getBuilder()->CreateExtractElement(coord, numCoords);
@@ -5451,11 +5451,11 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *bi, Extracted
     if (isa<VectorType>(coord->getType())) {
       if (!isa<VectorType>(offset->getType())) {
         offset = getBuilder()->CreateInsertElement(Constant::getNullValue(coord->getType()), offset, uint64_t(0));
-      } else if (cast<VectorType>(coord->getType())->getNumElements() !=
-                 cast<VectorType>(offset->getType())->getNumElements()) {
+      } else if (cast<FixedVectorType>(coord->getType())->getNumElements() !=
+                 cast<FixedVectorType>(offset->getType())->getNumElements()) {
         offset = getBuilder()->CreateShuffleVector(
             offset, Constant::getNullValue(offset->getType()),
-            ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<VectorType>(coord->getType())->getNumElements()));
+            ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<FixedVectorType>(coord->getType())->getNumElements()));
       }
     }
     coord = getBuilder()->CreateAdd(coord, offset);
@@ -5600,7 +5600,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
     idxs.push_back(1);
     if (imageInfo.desc->Arrayed)
       idxs.push_back(2);
-    idxs.push_back(cast<VectorType>(coord->getType())->getNumElements());
+    idxs.push_back(cast<FixedVectorType>(coord->getType())->getNumElements());
     coord = getBuilder()->CreateShuffleVector(coord, sampleNum, idxs);
   }
 
@@ -5966,7 +5966,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
       sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
       coord = getBuilder()->CreateShuffleVector(
           coord, sampleNum,
-          ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<VectorType>(coord->getType())->getNumElements() + 1));
+          ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<FixedVectorType>(coord->getType())->getNumElements() + 1));
     }
   }
 
@@ -6014,7 +6014,7 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *bi, BasicBloc
     sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
     coord = getBuilder()->CreateShuffleVector(
         coord, sampleNum,
-        ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<VectorType>(coord->getType())->getNumElements() + 1));
+        ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<FixedVectorType>(coord->getType())->getNumElements() + 1));
   }
 
   // Do the image store.

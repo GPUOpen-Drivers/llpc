@@ -113,7 +113,7 @@ void getTypeName(Type *ty, raw_ostream &nameStream) {
     return;
   }
 
-  if (auto vectorTy = dyn_cast<VectorType>(ty)) {
+  if (auto vectorTy = dyn_cast<FixedVectorType>(ty)) {
     nameStream << "v" << vectorTy->getNumElements();
     ty = vectorTy->getElementType();
   }
@@ -193,8 +193,8 @@ bool canBitCast(const Type *ty1, const Type *ty2) {
     const Type *compTy2 = ty2->isVectorTy() ? cast<VectorType>(ty2)->getElementType() : ty2;
     if ((compTy1->isFloatingPointTy() || compTy1->isIntegerTy()) &&
         (compTy2->isFloatingPointTy() || compTy2->isIntegerTy())) {
-      const unsigned compCount1 = ty1->isVectorTy() ? cast<VectorType>(ty1)->getNumElements() : 1;
-      const unsigned compCount2 = ty2->isVectorTy() ? cast<VectorType>(ty2)->getNumElements() : 1;
+      const unsigned compCount1 = ty1->isVectorTy() ? cast<FixedVectorType>(ty1)->getNumElements() : 1;
+      const unsigned compCount2 = ty2->isVectorTy() ? cast<FixedVectorType>(ty2)->getNumElements() : 1;
 
       valid = compCount1 * compTy1->getScalarSizeInBits() == compCount2 * compTy2->getScalarSizeInBits();
     }

@@ -446,10 +446,12 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
             loc = resUsage->inOutUsage.perPatchInputLocMap[value];
           }
         } else {
-          if ((m_shaderStage == ShaderStageFragment) && m_pipelineState->isPackInOut()) {
+          if (m_pipelineState->isPackInOut() &&
+              (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl)) {
+            // The new InOutLocationInfo is used to map scalarized FS and TCS input import as compact as possible
             InOutLocationInfo origLocInfo = {};
-            origLocInfo.location = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-            const uint32_t elemIdxArgIdx = isInterpolantInputImport ? 2 : 1;
+            origLocInfo.location = value;
+            const uint32_t elemIdxArgIdx = isInterpolantInputImport || m_shaderStage != ShaderStageFragment ? 2 : 1;
             origLocInfo.component = cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue();
             origLocInfo.half = false;
             assert(resUsage->inOutUsage.inOutLocMap.find(origLocInfo.u16All) != resUsage->inOutUsage.inOutLocMap.end());
@@ -471,8 +473,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       case ShaderStageTessControl: {
         assert(callInst.getNumArgOperands() == 4);
 
-        auto elemIdx = callInst.getOperand(2);
-        assert(isDontCareValue(elemIdx) == false);
+        if (!elemIdx) {
+          elemIdx = callInst.getOperand(2);
+          assert(isDontCareValue(elemIdx) == false);
+        }
 
         auto vertexIdx = callInst.getOperand(3);
         assert(isDontCareValue(vertexIdx) == false);
@@ -694,6 +698,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       bool exist = false;
       unsigned loc = InvalidValue;
       Value *locOffset = nullptr;
+      unsigned elemIdx = InvalidValue;
 
       if (m_shaderStage == ShaderStageTessControl) {
         // NOTE: If location offset is a constant, we have to add it to the unmapped location before querying
@@ -729,7 +734,23 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           loc = resUsage->inOutUsage.outputLocMap[outLocInfo.u32All];
         }
       } else {
-        if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end()) {
+        if (m_pipelineState->isPackInOut() && m_shaderStage == ShaderStageVertex &&
+            m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
+          // The new InOutLocationInfo is used to map scalarized VS output export in a VS-TCS-TES-FS to lds as compact
+          // as possible
+          InOutLocationInfo origLocInfo = {};
+          origLocInfo.location = value;
+          origLocInfo.component = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+          origLocInfo.half = false;
+          if (resUsage->inOutUsage.inOutLocMap.find(origLocInfo.u16All) != resUsage->inOutUsage.inOutLocMap.end()) {
+            InOutLocationInfo newLocInfo = {};
+            newLocInfo.u16All = resUsage->inOutUsage.inOutLocMap[origLocInfo.u16All];
+            loc = newLocInfo.location;
+            elemIdx = newLocInfo.component;
+            exist = true;
+          } else
+            exist = false;
+        } else if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end()) {
           exist = true;
           loc = resUsage->inOutUsage.outputLocMap[value];
         }
@@ -742,8 +763,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         switch (m_shaderStage) {
         case ShaderStageVertex: {
           assert(callInst.getNumArgOperands() == 3);
-          const unsigned compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-          patchVsGenericOutputExport(output, loc, compIdx, &callInst);
+          if (elemIdx == InvalidValue)
+            elemIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+          patchVsGenericOutputExport(output, loc, elemIdx, &callInst);
           break;
         }
         case ShaderStageTessControl: {
@@ -759,8 +781,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         }
         case ShaderStageTessEval: {
           assert(callInst.getNumArgOperands() == 3);
-          const unsigned compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-          patchTesGenericOutputExport(output, loc, compIdx, &callInst);
+          if (elemIdx == InvalidValue)
+            elemIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+          patchTesGenericOutputExport(output, loc, elemIdx, &callInst);
           break;
         }
         case ShaderStageGeometry: {
@@ -1342,7 +1365,7 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
                                                          Value *vertexIdx, Instruction *insertPos) {
   assert(vertexIdx);
 
-  const unsigned compCount = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getNumElements() : 1;
+  const unsigned compCount = inputTy->isVectorTy() ? cast<FixedVectorType>(inputTy)->getNumElements() : 1;
   const unsigned bitWidth = inputTy->getScalarSizeInBits();
 
   Type *origInputTy = inputTy;
@@ -1458,7 +1481,7 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
 
   Type *basicTy = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getElementType() : inputTy;
 
-  const unsigned compCout = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getNumElements() : 1;
+  const unsigned compCout = inputTy->isVectorTy() ? cast<FixedVectorType>(inputTy)->getNumElements() : 1;
   const unsigned bitWidth = inputTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
@@ -1638,7 +1661,7 @@ void PatchInOutImportExport::patchVsGenericOutputExport(Value *output, unsigned 
         // For 64-bit data type, the component indexing must multiply by 2
         compIdx *= 2;
 
-        unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() * 2 : 2;
+        unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() * 2 : 2;
 
         outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), compCount);
         output = new BitCastInst(output, outputTy, "", insertPos);
@@ -1687,7 +1710,7 @@ void PatchInOutImportExport::patchTesGenericOutputExport(Value *output, unsigned
       // For 64-bit data type, the component indexing must multiply by 2
       compIdx *= 2;
 
-      unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() * 2 : 2;
+      unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() * 2 : 2;
       outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), compCount);
 
       output = new BitCastInst(output, outputTy, "", insertPos);
@@ -1718,7 +1741,8 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
     compIdx *= 2;
 
     if (outputTy->isVectorTy())
-      outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), cast<VectorType>(outputTy)->getNumElements() * 2);
+      outputTy =
+          FixedVectorType::get(Type::getFloatTy(*m_context), cast<FixedVectorType>(outputTy)->getNumElements() * 2);
     else
       outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), 2);
 
@@ -1726,7 +1750,7 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
   } else
     assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
-  const unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
+  const unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
   // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend byte/word to dword and
   // store dword to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size is based on number of dwords.
   unsigned byteSize = (outputTy->getScalarSizeInBits() / 8) * compCount;
@@ -3296,7 +3320,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
   unsigned xfbStride = xfbStrides[xfbBuffer];
 
   auto outputTy = output->getType();
-  unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
+  unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
   unsigned bitWidth = outputTy->getScalarSizeInBits();
 
   xfbOffset = xfbOffset + xfbExtraOffset;
@@ -3450,7 +3474,7 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(Value *storeValu
 
   auto storeTy = storeValue->getType();
 
-  unsigned compCount = storeTy->isVectorTy() ? cast<VectorType>(storeTy)->getNumElements() : 1;
+  unsigned compCount = storeTy->isVectorTy() ? cast<FixedVectorType>(storeTy)->getNumElements() : 1;
   assert(compCount <= 4);
 
   const uint64_t bitWidth = storeTy->getScalarSizeInBits();
@@ -3681,7 +3705,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
                                                          Instruction *insertPos) {
   auto storeTy = storeValue->getType();
 
-  unsigned compCount = storeTy->isVectorTy() ? cast<VectorType>(storeTy)->getNumElements() : 1;
+  unsigned compCount = storeTy->isVectorTy() ? cast<FixedVectorType>(storeTy)->getNumElements() : 1;
   assert(compCount <= 4);
 
   const uint64_t bitWidth = storeTy->getScalarSizeInBits();
@@ -3773,8 +3797,8 @@ void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned lo
   assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) && (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
 
   if (storeTy->isArrayTy() || storeTy->isVectorTy()) {
-    const unsigned elemCount =
-        storeTy->isArrayTy() ? cast<ArrayType>(storeTy)->getNumElements() : cast<VectorType>(storeTy)->getNumElements();
+    const unsigned elemCount = storeTy->isArrayTy() ? cast<ArrayType>(storeTy)->getNumElements()
+                                                    : cast<FixedVectorType>(storeTy)->getNumElements();
 
     for (unsigned i = 0; i < elemCount; ++i) {
       Value *storeElem = nullptr;
@@ -3865,8 +3889,8 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
   Value *loadValue = UndefValue::get(loadTy);
 
   if (loadTy->isArrayTy() || loadTy->isVectorTy()) {
-    const unsigned elemCount =
-        loadTy->isArrayTy() ? cast<ArrayType>(loadTy)->getNumElements() : cast<VectorType>(loadTy)->getNumElements();
+    const unsigned elemCount = loadTy->isArrayTy() ? cast<ArrayType>(loadTy)->getNumElements()
+                                                   : cast<FixedVectorType>(loadTy)->getNumElements();
 
     for (unsigned i = 0; i < elemCount; ++i) {
       auto loadElem =
@@ -3964,8 +3988,8 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
   }
 
   if (storeTy->isArrayTy() || storeTy->isVectorTy()) {
-    const unsigned elemCount =
-        storeTy->isArrayTy() ? cast<ArrayType>(storeTy)->getNumElements() : cast<VectorType>(storeTy)->getNumElements();
+    const unsigned elemCount = storeTy->isArrayTy() ? cast<ArrayType>(storeTy)->getNumElements()
+                                                    : cast<FixedVectorType>(storeTy)->getNumElements();
 
     for (unsigned i = 0; i < elemCount; ++i) {
       Value *storeElem = nullptr;
@@ -4197,7 +4221,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool isOutput, Type *readTy, Val
   assert(readTy->isSingleValueType());
 
   // Read dwords from LDS
-  const unsigned compCount = readTy->isVectorTy() ? cast<VectorType>(readTy)->getNumElements() : 1;
+  const unsigned compCount = readTy->isVectorTy() ? cast<FixedVectorType>(readTy)->getNumElements() : 1;
   const unsigned bitWidth = readTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
   const unsigned numChannels = compCount * (bitWidth == 64 ? 2 : 1);
@@ -4291,7 +4315,7 @@ void PatchInOutImportExport::writeValueToLds(Value *writeValue, Value *ldsOffset
   auto writeTy = writeValue->getType();
   assert(writeTy->isSingleValueType());
 
-  const unsigned compCout = writeTy->isVectorTy() ? cast<VectorType>(writeTy)->getNumElements() : 1;
+  const unsigned compCout = writeTy->isVectorTy() ? cast<FixedVectorType>(writeTy)->getNumElements() : 1;
   const unsigned bitWidth = writeTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
   const unsigned numChannels = compCout * (bitWidth == 64 ? 2 : 1);
@@ -4975,7 +4999,7 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
 
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
 
-  const unsigned compCount = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getNumElements() : 1;
+  const unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
   const unsigned bitWidth = outputTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 

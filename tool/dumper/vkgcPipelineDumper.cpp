@@ -864,12 +864,13 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   hasher.Update(pipeline->iaState.deviceIndex);
 
   if (stage != ShaderStageFragment) {
-    updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
-    updateHashForNonFragmentState(pipeline, isCacheHash, &hasher);
+    if (!isRelocatableShader)
+      updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
+    updateHashForNonFragmentState(pipeline, isCacheHash, &hasher, isRelocatableShader);
   }
 
   if (stage == ShaderStageFragment || stage == ShaderStageInvalid)
-    updateHashForFragmentState(pipeline, &hasher);
+    updateHashForFragmentState(pipeline, &hasher, isRelocatableShader);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -944,8 +945,9 @@ void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputSt
 // @param pipeline : Info to build a graphics pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param [in/out] hasher : Hasher to generate hash code
+// @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
-                                                   MetroHash64 *hasher) {
+                                                   MetroHash64 *hasher, bool isRelocatableShader) {
   auto iaState = &pipeline->iaState;
   hasher->Update(iaState->topology);
   hasher->Update(iaState->patchControlPoints);
@@ -953,11 +955,13 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   hasher->Update(iaState->switchWinding);
   hasher->Update(iaState->enableMultiView);
 
-  auto vpState = &pipeline->vpState;
-  hasher->Update(vpState->depthClipEnable);
+  if (!isRelocatableShader) {
+    auto vpState = &pipeline->vpState;
+    hasher->Update(vpState->depthClipEnable);
 
-  auto rsState = &pipeline->rsState;
-  hasher->Update(rsState->rasterizerDiscardEnable);
+    auto rsState = &pipeline->rsState;
+    hasher->Update(rsState->rasterizerDiscardEnable);
+  }
 
   auto nggState = &pipeline->nggState;
   bool enableNgg = nggState->enableNgg;
@@ -970,6 +974,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   updateHashFromRs |= (enableNgg && !passthroughMode);
 
   if (updateHashFromRs) {
+    auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
     hasher->Update(rsState->polygonMode);
     hasher->Update(rsState->cullMode);
@@ -979,23 +984,24 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 
   if (isCacheHash) {
     hasher->Update(nggState->enableNgg);
-    hasher->Update(nggState->enableGsUse);
-    hasher->Update(nggState->forceNonPassthrough);
-    hasher->Update(nggState->alwaysUsePrimShaderTable);
-    hasher->Update(nggState->compactMode);
-    hasher->Update(nggState->enableFastLaunch);
-    hasher->Update(nggState->enableVertexReuse);
-    hasher->Update(nggState->enableBackfaceCulling);
-    hasher->Update(nggState->enableFrustumCulling);
-    hasher->Update(nggState->enableBoxFilterCulling);
-    hasher->Update(nggState->enableSphereCulling);
-    hasher->Update(nggState->enableSmallPrimFilter);
-    hasher->Update(nggState->enableCullDistanceCulling);
-    hasher->Update(nggState->backfaceExponent);
-    hasher->Update(nggState->subgroupSizing);
-    hasher->Update(nggState->primsPerSubgroup);
-    hasher->Update(nggState->vertsPerSubgroup);
-
+    if (nggState->enableNgg) {
+      hasher->Update(nggState->enableGsUse);
+      hasher->Update(nggState->forceNonPassthrough);
+      hasher->Update(nggState->alwaysUsePrimShaderTable);
+      hasher->Update(nggState->compactMode);
+      hasher->Update(nggState->enableFastLaunch);
+      hasher->Update(nggState->enableVertexReuse);
+      hasher->Update(nggState->enableBackfaceCulling);
+      hasher->Update(nggState->enableFrustumCulling);
+      hasher->Update(nggState->enableBoxFilterCulling);
+      hasher->Update(nggState->enableSphereCulling);
+      hasher->Update(nggState->enableSmallPrimFilter);
+      hasher->Update(nggState->enableCullDistanceCulling);
+      hasher->Update(nggState->backfaceExponent);
+      hasher->Update(nggState->subgroupSizing);
+      hasher->Update(nggState->primsPerSubgroup);
+      hasher->Update(nggState->vertsPerSubgroup);
+    }
     hasher->Update(pipeline->options.includeDisassembly);
     hasher->Update(pipeline->options.scalarBlockLayout);
     hasher->Update(pipeline->options.includeIr);
@@ -1014,22 +1020,27 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 //
 // @param pipeline : Info to build a graphics pipeline
 // @param [in/out] hasher : Hasher to generate hash code
-void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher) {
+// @param isRelocatableShader : TRUE if we are building relocatable shader
+void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher,
+                                                bool isRelocatableShader) {
   auto rsState = &pipeline->rsState;
-  hasher->Update(rsState->innerCoverage);
   hasher->Update(rsState->perSampleShading);
-  hasher->Update(rsState->numSamples);
-  hasher->Update(rsState->samplePatternIdx);
 
-  auto cbState = &pipeline->cbState;
-  hasher->Update(cbState->alphaToCoverageEnable);
-  hasher->Update(cbState->dualSourceBlendEnable);
-  for (unsigned i = 0; i < MaxColorTargets; ++i) {
-    if (cbState->target[i].format != VK_FORMAT_UNDEFINED) {
-      hasher->Update(cbState->target[i].channelWriteMask);
-      hasher->Update(cbState->target[i].blendEnable);
-      hasher->Update(cbState->target[i].blendSrcAlphaToColor);
-      hasher->Update(cbState->target[i].format);
+  if (!isRelocatableShader) {
+    hasher->Update(rsState->innerCoverage);
+    hasher->Update(rsState->numSamples);
+    hasher->Update(rsState->samplePatternIdx);
+
+    auto cbState = &pipeline->cbState;
+    hasher->Update(cbState->alphaToCoverageEnable);
+    hasher->Update(cbState->dualSourceBlendEnable);
+    for (unsigned i = 0; i < MaxColorTargets; ++i) {
+      if (cbState->target[i].format != VK_FORMAT_UNDEFINED) {
+        hasher->Update(cbState->target[i].channelWriteMask);
+        hasher->Update(cbState->target[i].blendEnable);
+        hasher->Update(cbState->target[i].blendSrcAlphaToColor);
+        hasher->Update(cbState->target[i].format);
+      }
     }
   }
 }
@@ -1094,11 +1105,13 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       }
     }
 
-    hasher->Update(shaderInfo->userDataNodeCount);
-    if (shaderInfo->userDataNodeCount > 0) {
-      for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
-        auto userDataNode = &shaderInfo->pUserDataNodes[i];
-        updateHashForResourceMappingNode(userDataNode, true, hasher, isRelocatableShader);
+    if (!isRelocatableShader) {
+      hasher->Update(shaderInfo->userDataNodeCount);
+      if (shaderInfo->userDataNodeCount > 0) {
+        for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
+          auto userDataNode = &shaderInfo->pUserDataNodes[i];
+          updateHashForResourceMappingNode(userDataNode, true, hasher);
+        }
       }
     }
 #endif
@@ -1114,7 +1127,10 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.maxThreadGroupsPerComputeUnit);
       hasher->Update(options.waveSize);
       hasher->Update(options.wgpMode);
-      hasher->Update(options.waveBreakSize);
+
+      if (!isRelocatableShader)
+        hasher->Update(options.waveBreakSize);
+
       hasher->Update(options.forceLoopUnrollCount);
       hasher->Update(options.useSiScheduler);
       hasher->Update(options.updateDescInElf);
@@ -1161,12 +1177,14 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
     }
   }
 
-  hasher->Update(pResourceMapping->userDataNodeCount);
-  if (pResourceMapping->userDataNodeCount > 0) {
-    for (unsigned i = 0; i < pResourceMapping->userDataNodeCount; ++i) {
-      auto userDataNode = &pResourceMapping->pUserDataNodes[i];
-      hasher->Update(userDataNode->visibility);
-      updateHashForResourceMappingNode(&userDataNode->node, true, hasher, isRelocatableShader);
+  if (!isRelocatableShader) {
+    hasher->Update(pResourceMapping->userDataNodeCount);
+    if (pResourceMapping->userDataNodeCount > 0) {
+      for (unsigned i = 0; i < pResourceMapping->userDataNodeCount; ++i) {
+        auto userDataNode = &pResourceMapping->pUserDataNodes[i];
+        hasher->Update(userDataNode->visibility);
+        updateHashForResourceMappingNode(&userDataNode->node, true, hasher);
+      }
     }
   }
 }
@@ -1180,14 +1198,11 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
 // @param userDataNode : Resource mapping node
 // @param isRootNode : TRUE if the node is in root level
 // @param [in/out] hasher : Haher to generate hash code
-// @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
-                                                      MetroHash64 *hasher, bool isRelocatableShader) {
+                                                      MetroHash64 *hasher) {
   hasher->Update(userDataNode->type);
-  if (!isRelocatableShader) {
-    hasher->Update(userDataNode->sizeInDwords);
-    hasher->Update(userDataNode->offsetInDwords);
-  }
+  hasher->Update(userDataNode->sizeInDwords);
+  hasher->Update(userDataNode->offsetInDwords);
   switch (userDataNode->type) {
   case ResourceMappingNodeType::DescriptorResource:
   case ResourceMappingNodeType::DescriptorSampler:
@@ -1202,7 +1217,7 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   }
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
     for (unsigned i = 0; i < userDataNode->tablePtr.nodeCount; ++i)
-      updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher, isRelocatableShader);
+      updateHashForResourceMappingNode(&userDataNode->tablePtr.pNext[i], false, hasher);
     break;
   }
   case ResourceMappingNodeType::IndirectUserDataVaPtr: {

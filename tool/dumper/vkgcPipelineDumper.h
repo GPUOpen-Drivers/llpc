@@ -105,9 +105,10 @@ public:
   }
 
   static void updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
-                                            MetroHash64 *hasher);
+                                            MetroHash64 *hasher, bool isRelocatableShader);
 
-  static void updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher);
+  static void updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher,
+                                         bool isRelocatableShader);
 
   // Get name of register, or "" if not known
   static const char *getRegisterNameString(unsigned regNumber);
@@ -134,7 +135,7 @@ private:
   static void dumpPipelineOptions(const PipelineOptions *options, std::ostream &dumpFile);
 
   static void updateHashForResourceMappingNode(const ResourceMappingNode *userDataNode, bool isRootNode,
-                                               MetroHash64 *hasher, bool isRelocatableShader);
+                                               MetroHash64 *hasher);
 };
 
 } // namespace Vkgc

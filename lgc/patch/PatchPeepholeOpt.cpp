@@ -170,16 +170,18 @@ void PatchPeepholeOpt::visitBitCast(BitCastInst &bitCast) {
 
     // Bit cast the LHS of the original shuffle.
     Value *const shuffleVectorLhs = shuffleVector->getOperand(0);
-    Type *const bitCastLhsType = FixedVectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
-                                                      cast<VectorType>(shuffleVectorLhs->getType())->getNumElements());
+    Type *const bitCastLhsType =
+        FixedVectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
+                             cast<FixedVectorType>(shuffleVectorLhs->getType())->getNumElements());
     BitCastInst *const bitCastLhs =
         new BitCastInst(shuffleVectorLhs, bitCastLhsType, shuffleVectorLhs->getName() + ".bitcast");
     insertAfter(*bitCastLhs, *shuffleVector);
 
     // Bit cast the RHS of the original shuffle.
     Value *const shuffleVectorRhs = shuffleVector->getOperand(1);
-    Type *const bitCastRhsType = FixedVectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
-                                                      cast<VectorType>(shuffleVectorRhs->getType())->getNumElements());
+    Type *const bitCastRhsType =
+        FixedVectorType::get(cast<VectorType>(bitCast.getDestTy())->getElementType(),
+                             cast<FixedVectorType>(shuffleVectorRhs->getType())->getNumElements());
     BitCastInst *const bitCastRhs =
         new BitCastInst(shuffleVectorRhs, bitCastRhsType, shuffleVectorRhs->getName() + ".bitcast");
     insertAfter(*bitCastRhs, *bitCastLhs);
@@ -460,7 +462,7 @@ void PatchPeepholeOpt::visitPHINode(PHINode &phiNode) {
     Type *const type = phiNode.getType();
 
     // The number of elements in the vector type (which will result in N new scalar PHI nodes).
-    const unsigned numElements = cast<VectorType>(type)->getNumElements();
+    const unsigned numElements = cast<FixedVectorType>(type)->getNumElements();
 
     // The element type of the vector.
     Type *const elementType = cast<VectorType>(type)->getElementType();

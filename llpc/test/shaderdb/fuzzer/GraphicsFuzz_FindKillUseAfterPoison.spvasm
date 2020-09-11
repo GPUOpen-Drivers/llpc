@@ -1,0 +1,211 @@
+; Summary: AddressSanitizer finds use-after-poison llvm-project/llvm/include/llvm/CodeGen/MachineInstr.h:281:43 in getParent
+; BEGIN_SHADERTEST
+; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; XFAIL: asan
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+;
+; Based on https://github.com/GPUOpen-Drivers/llpc/issues/947.
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 10
+; Bound: 132
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %99 %128
+               OpExecutionMode %4 OriginUpperLeft
+               OpSource ESSL 320
+               OpName %4 "main"
+               OpName %13 "trace(vi2;"
+               OpName %12 "pos"
+               OpName %16 "_GLF_global_loop_count"
+               OpName %38 "p"
+               OpName %49 "GLF_live5search_inline_return_value_1"
+               OpName %59 "GLF_live11c"
+               OpName %61 "GLF_live11_looplimiter1"
+               OpName %62 "GLF_live11i"
+               OpName %96 "pos"
+               OpName %99 "gl_FragCoord"
+               OpName %102 "buf0"
+               OpMemberName %102 0 "resolution"
+               OpName %104 ""
+               OpName %118 "ipos"
+               OpName %128 "_GLF_color"
+               OpName %129 "param"
+               OpDecorate %99 BuiltIn FragCoord
+               OpMemberDecorate %102 0 Offset 0
+               OpDecorate %102 Block
+               OpDecorate %104 DescriptorSet 0
+               OpDecorate %104 Binding 0
+               OpDecorate %128 Location 0
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+          %6 = OpTypeInt 32 1
+          %7 = OpTypeVector %6 2
+          %8 = OpTypePointer Function %7
+          %9 = OpTypeFloat 32
+         %10 = OpTypeVector %9 4
+         %11 = OpTypeFunction %10 %8
+         %15 = OpTypePointer Private %6
+         %16 = OpVariable %15 Private
+         %17 = OpConstant %6 0
+         %23 = OpTypeInt 32 0
+         %24 = OpConstant %23 1
+         %25 = OpTypePointer Function %6
+         %28 = OpConstant %6 1
+         %29 = OpTypeBool
+         %32 = OpConstant %6 100
+         %37 = OpTypePointer Function %9
+         %39 = OpConstant %9 1
+         %40 = OpConstant %23 0
+         %44 = OpConstant %9 15
+         %54 = OpConstantComposite %10 %39 %39 %39 %39
+         %57 = OpTypeVector %9 3
+         %58 = OpTypePointer Function %57
+         %60 = OpConstantComposite %57 %39 %39 %39
+         %68 = OpConstantTrue %29
+         %75 = OpConstant %6 5
+         %88 = OpConstant %6 2
+         %94 = OpTypeVector %9 2
+         %95 = OpTypePointer Function %94
+         %97 = OpConstantComposite %94 %39 %39
+         %98 = OpTypePointer Input %10
+         %99 = OpVariable %98 Input
+        %102 = OpTypeStruct %94
+        %103 = OpTypePointer Uniform %102
+        %104 = OpVariable %103 Uniform
+        %105 = OpTypePointer Uniform %94
+        %108 = OpTypeMatrix %94 2
+        %109 = OpConstant %9 0
+        %110 = OpConstantComposite %94 %39 %109
+        %111 = OpConstantComposite %94 %109 %39
+        %112 = OpConstantComposite %108 %110 %111
+        %119 = OpConstantComposite %7 %28 %28
+        %127 = OpTypePointer Output %10
+        %128 = OpVariable %127 Output
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+         %59 = OpVariable %58 Function
+         %61 = OpVariable %25 Function
+         %62 = OpVariable %25 Function
+         %96 = OpVariable %95 Function
+        %118 = OpVariable %8 Function
+        %129 = OpVariable %8 Function
+               OpStore %16 %17
+               OpStore %59 %60
+               OpStore %61 %28
+               OpStore %61 %17
+               OpStore %62 %28
+               OpBranch %63
+         %63 = OpLabel
+               OpLoopMerge %65 %66 None
+               OpBranch %67
+         %67 = OpLabel
+         %69 = OpLoad %6 %16
+         %70 = OpSLessThan %29 %69 %32
+         %71 = OpLogicalAnd %29 %68 %70
+               OpBranchConditional %71 %64 %65
+         %64 = OpLabel
+         %72 = OpLoad %6 %16
+         %73 = OpIAdd %6 %72 %28
+               OpStore %16 %73
+         %74 = OpLoad %6 %61
+         %76 = OpSGreaterThanEqual %29 %74 %75
+               OpSelectionMerge %78 None
+               OpBranchConditional %76 %77 %78
+         %77 = OpLabel
+               OpBranch %65
+         %78 = OpLabel
+         %80 = OpLoad %6 %61
+         %81 = OpIAdd %6 %80 %28
+               OpStore %61 %81
+         %82 = OpAccessChain %37 %59 %24
+         %83 = OpLoad %9 %82
+         %84 = OpFOrdGreaterThanEqual %29 %83 %39
+               OpSelectionMerge %86 None
+               OpBranchConditional %84 %85 %86
+         %85 = OpLabel
+         %87 = OpLoad %6 %62
+         %89 = OpExtInst %6 %1 SClamp %87 %17 %88
+         %90 = OpExtInst %6 %1 SClamp %89 %17 %88
+         %91 = OpAccessChain %37 %59 %90
+               OpStore %91 %39
+               OpBranch %86
+         %86 = OpLabel
+               OpBranch %66
+         %66 = OpLabel
+         %92 = OpLoad %6 %62
+         %93 = OpIAdd %6 %92 %28
+               OpStore %62 %93
+               OpBranch %63
+         %65 = OpLabel
+               OpStore %96 %97
+        %100 = OpLoad %10 %99
+        %101 = OpVectorShuffle %94 %100 %100 0 1
+        %106 = OpAccessChain %105 %104 %17
+        %107 = OpLoad %94 %106
+        %113 = OpLoad %10 %99
+        %114 = OpVectorShuffle %94 %113 %113 0 1
+        %115 = OpMatrixTimesVector %94 %112 %114
+        %116 = OpExtInst %94 %1 FClamp %101 %107 %115
+        %117 = OpExtInst %94 %1 FClamp %97 %97 %116
+               OpStore %96 %117
+               OpStore %118 %119
+        %120 = OpAccessChain %37 %96 %40
+        %121 = OpLoad %9 %120
+        %122 = OpConvertFToS %6 %121
+        %123 = OpAccessChain %37 %96 %24
+        %124 = OpLoad %9 %123
+        %125 = OpConvertFToS %6 %124
+        %126 = OpCompositeConstruct %7 %122 %125
+               OpStore %118 %126
+        %130 = OpLoad %7 %118
+               OpStore %129 %130
+        %131 = OpFunctionCall %10 %13 %129
+               OpStore %128 %131
+               OpReturn
+               OpFunctionEnd
+         %13 = OpFunction %10 None %11
+         %12 = OpFunctionParameter %8
+         %14 = OpLabel
+         %38 = OpVariable %37 Function
+         %49 = OpVariable %25 Function
+               OpBranch %18
+         %18 = OpLabel
+               OpLoopMerge %20 %21 None
+               OpBranch %22
+         %22 = OpLabel
+         %26 = OpAccessChain %25 %12 %24
+         %27 = OpLoad %6 %26
+         %30 = OpINotEqual %29 %27 %28
+         %31 = OpLoad %6 %16
+         %33 = OpSLessThan %29 %31 %32
+         %34 = OpLogicalAnd %29 %30 %33
+               OpBranchConditional %34 %19 %20
+         %19 = OpLabel
+         %35 = OpLoad %6 %16
+         %36 = OpIAdd %6 %35 %28
+               OpStore %16 %36
+               OpStore %38 %39
+         %41 = OpAccessChain %25 %12 %40
+         %42 = OpLoad %6 %41
+         %43 = OpConvertSToF %9 %42
+         %45 = OpFDiv %9 %43 %44
+               OpStore %38 %45
+         %46 = OpLoad %9 %38
+         %47 = OpCompositeConstruct %10 %46 %39 %39 %39
+               OpReturnValue %47
+         %21 = OpLabel
+               OpBranch %18
+         %20 = OpLabel
+               OpStore %49 %28
+         %50 = OpLoad %6 %49
+         %51 = OpConvertSToF %9 %50
+         %52 = OpIsNan %29 %51
+         %53 = OpSelect %9 %52 %39 %39
+               OpReturnValue %54
+               OpFunctionEnd

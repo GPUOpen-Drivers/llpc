@@ -1015,7 +1015,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       auto zero = m_builder->getInt32(0);
 
       // Zero per-wave primitive/vertex count
-      auto zeros = ConstantVector::getSplat({Gfx9::NggMaxWavesPerSubgroup, false}, zero);
+      auto zeros = ConstantVector::getSplat(ElementCount::get(Gfx9::NggMaxWavesPerSubgroup, false), zero);
 
       auto ldsOffset = m_builder->getInt32(regionStart);
       m_ldsManager->writeValueToLds(zeros, ldsOffset);
@@ -2348,7 +2348,7 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
     if (esArgTy->isVectorTy()) {
       assert(cast<VectorType>(esArgTy)->getElementType()->isIntegerTy());
 
-      const unsigned userDataSize = cast<VectorType>(esArgTy)->getNumElements();
+      const unsigned userDataSize = cast<FixedVectorType>(esArgTy)->getNumElements();
 
       std::vector<int> shuffleMask;
       for (unsigned i = 0; i < userDataSize; ++i)
@@ -2519,7 +2519,7 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
     if (esPartialArgTy->isVectorTy()) {
       assert(cast<VectorType>(esPartialArgTy)->getElementType()->isIntegerTy());
 
-      const unsigned userDataSize = cast<VectorType>(esPartialArgTy)->getNumElements();
+      const unsigned userDataSize = cast<FixedVectorType>(esPartialArgTy)->getNumElements();
 
       std::vector<int> shuffleMask;
       for (unsigned i = 0; i < userDataSize; ++i)
@@ -2809,7 +2809,7 @@ void NggPrimShader::runGs(Module *module, Argument *sysValueStart) {
     if (gsArgTy->isVectorTy()) {
       assert(cast<VectorType>(gsArgTy)->getElementType()->isIntegerTy());
 
-      const unsigned userDataSize = cast<VectorType>(gsArgTy)->getNumElements();
+      const unsigned userDataSize = cast<FixedVectorType>(gsArgTy)->getNumElements();
 
       std::vector<int> shuffleMask;
       for (unsigned i = 0; i < userDataSize; ++i)
@@ -3151,13 +3151,13 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
       assert(bitWidth == 16);
       Type *castTy = m_builder->getInt16Ty();
       if (outputTy->isVectorTy())
-        castTy = FixedVectorType::get(m_builder->getInt16Ty(), cast<VectorType>(outputTy)->getNumElements());
+        castTy = FixedVectorType::get(m_builder->getInt16Ty(), cast<FixedVectorType>(outputTy)->getNumElements());
       output = m_builder->CreateBitCast(output, castTy);
     }
 
     Type *extTy = m_builder->getInt32Ty();
     if (outputTy->isVectorTy())
-      extTy = FixedVectorType::get(m_builder->getInt32Ty(), cast<VectorType>(outputTy)->getNumElements());
+      extTy = FixedVectorType::get(m_builder->getInt32Ty(), cast<FixedVectorType>(outputTy)->getNumElements());
     output = m_builder->CreateZExt(output, extTy);
   } else
     assert(bitWidth == 32 || bitWidth == 64);
@@ -3211,7 +3211,7 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
 
   if (origOutputTy != outputTy) {
     assert(origOutputTy->isArrayTy() && outputTy->isVectorTy() &&
-           origOutputTy->getArrayNumElements() == cast<VectorType>(outputTy)->getNumElements());
+           origOutputTy->getArrayNumElements() == cast<FixedVectorType>(outputTy)->getNumElements());
 
     // <n x Ty> -> [n x Ty]
     const unsigned elemCount = origOutputTy->getArrayNumElements();
