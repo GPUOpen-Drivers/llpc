@@ -28,11 +28,12 @@
 * @breif VKGC source file: contains implementation of VKGC pipline dump utility.
 ***********************************************************************************************************************
 */
-#include "vkgcPipelineDumper.h"
-#include "vkgcElfReader.h"
-#include "vkgcUtil.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include "vkgcElfReader.h"
+#include "vkgcPipelineDumper.h"
+#include "vkgcUtil.h"
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
@@ -231,7 +232,8 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
   char fileName[64] = {};
   if (pipelineInfo.pComputeInfo) {
     snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
-  } else {
+  }
+  else {
     assert(pipelineInfo.pGraphicsInfo);
     const char *fileNamePrefix = nullptr;
     if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
@@ -349,6 +351,7 @@ PipelineDumpFile *PipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
 
       if (pipelineInfo.pGraphicsInfo)
         dumpGraphicsPipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pGraphicsInfo);
+
     }
   }
 
@@ -383,7 +386,8 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorTexelBuffer:
   case ResourceMappingNodeType::DescriptorBuffer:
   case ResourceMappingNodeType::DescriptorFmask:
-  case ResourceMappingNodeType::DescriptorBufferCompact: {
+  case ResourceMappingNodeType::DescriptorBufferCompact:
+  {
     dumpFile << prefix << ".set = " << userDataNode->srdRange.set << "\n";
     dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
     break;
@@ -521,42 +525,42 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
 //
 // @param resourceMapping : Pipeline resource mapping data
 // @param [out] dumpFile : Dump file
-void PipelineDumper::dumpResourceMappingInfo(const ResourceMappingData *resourceMapping, std::ostream &dumpFile) {
-  dumpFile << "[ResourceMapping]\n";
+void PipelineDumper::dumpResourceMappingInfo(const ResourceMappingData* resourceMapping, std::ostream &dumpFile) {
+    dumpFile << "[ResourceMapping]\n";
 
-  // Output descriptor range value
-  if (resourceMapping->staticDescriptorValueCount > 0) {
-    for (unsigned i = 0; i < resourceMapping->staticDescriptorValueCount; ++i) {
-      auto staticDescriptorValue = &resourceMapping->pStaticDescriptorValues[i];
-      dumpFile << "descriptorRangeValue[" << i << "].visibility = " << staticDescriptorValue->visibility << "\n";
-      dumpFile << "descriptorRangeValue[" << i << "].type = " << staticDescriptorValue->type << "\n";
-      dumpFile << "descriptorRangeValue[" << i << "].set = " << staticDescriptorValue->set << "\n";
-      dumpFile << "descriptorRangeValue[" << i << "].binding = " << staticDescriptorValue->binding << "\n";
-      dumpFile << "descriptorRangeValue[" << i << "].arraySize = " << staticDescriptorValue->arraySize << "\n";
-      for (unsigned j = 0; j < staticDescriptorValue->arraySize; ++j) {
-        dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
-        const unsigned descriptorSizeInDw =
-            staticDescriptorValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler ? 8 : 4;
+    // Output descriptor range value
+    if (resourceMapping->staticDescriptorValueCount > 0) {
+        for (unsigned i = 0; i < resourceMapping->staticDescriptorValueCount; ++i) {
+            auto staticDescriptorValue = &resourceMapping->pStaticDescriptorValues[i];
+            dumpFile << "descriptorRangeValue[" << i << "].visibility = " << staticDescriptorValue->visibility << "\n";
+            dumpFile << "descriptorRangeValue[" << i << "].type = " << staticDescriptorValue->type << "\n";
+            dumpFile << "descriptorRangeValue[" << i << "].set = " << staticDescriptorValue->set << "\n";
+            dumpFile << "descriptorRangeValue[" << i << "].binding = " << staticDescriptorValue->binding << "\n";
+            dumpFile << "descriptorRangeValue[" << i << "].arraySize = " << staticDescriptorValue->arraySize << "\n";
+            for (unsigned j = 0; j < staticDescriptorValue->arraySize; ++j) {
+                dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
+                const unsigned descriptorSizeInDw =
+                    staticDescriptorValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler ? 8 : 4;
 
-        for (unsigned k = 0; k < descriptorSizeInDw - 1; ++k)
-          dumpFile << staticDescriptorValue->pValue[k] << ", ";
-        dumpFile << staticDescriptorValue->pValue[descriptorSizeInDw - 1] << "\n";
-      }
+                for (unsigned k = 0; k < descriptorSizeInDw - 1; ++k)
+                    dumpFile << staticDescriptorValue->pValue[k] << ", ";
+                dumpFile << staticDescriptorValue->pValue[descriptorSizeInDw - 1] << "\n";
+            }
+        }
+        dumpFile << "\n";
     }
-    dumpFile << "\n";
-  }
 
-  // Output resource node mapping
-  if (resourceMapping->userDataNodeCount > 0) {
-    char prefixBuff[64] = {};
-    for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
-      auto userDataNode = &resourceMapping->pUserDataNodes[i];
-      snprintf(prefixBuff, 64, "userDataNode[%u]", i);
-      dumpFile << prefixBuff << ".visibility = " << userDataNode->visibility << "\n";
-      dumpResourceMappingNode(&userDataNode->node, prefixBuff, dumpFile);
+    // Output resource node mapping
+    if (resourceMapping->userDataNodeCount > 0) {
+        char prefixBuff[64] = {};
+        for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+            auto userDataNode = &resourceMapping->pUserDataNodes[i];
+            snprintf(prefixBuff, 64, "userDataNode[%u]", i);
+            dumpFile << prefixBuff << ".visibility = " << userDataNode->visibility << "\n";
+            dumpResourceMappingNode(&userDataNode->node, prefixBuff, dumpFile);
+        }
+        dumpFile << "\n";
     }
-    dumpFile << "\n";
-  }
 }
 #endif
 
@@ -1152,30 +1156,30 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 // @param resourceMapping : Pipeline resource mapping data
 // @param [in,out] hasher : Haher to generate hash code
 // @param isRelocatableShader : TRUE if we are building relocatable shader
-void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData *pResourceMapping, MetroHash64 *hasher,
-                                                      bool isRelocatableShader) {
-  hasher->Update(pResourceMapping->staticDescriptorValueCount);
-  if (pResourceMapping->staticDescriptorValueCount > 0) {
-    for (unsigned i = 0; i < pResourceMapping->staticDescriptorValueCount; ++i) {
-      auto staticDescriptorValue = &pResourceMapping->pStaticDescriptorValues[i];
-      hasher->Update(staticDescriptorValue->visibility);
-      hasher->Update(staticDescriptorValue->type);
-      hasher->Update(staticDescriptorValue->set);
-      hasher->Update(staticDescriptorValue->binding);
-      hasher->Update(staticDescriptorValue->arraySize);
+void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData* pResourceMapping,
+                                                      MetroHash64 *hasher, bool isRelocatableShader) {
+    hasher->Update(pResourceMapping->staticDescriptorValueCount);
+    if (pResourceMapping->staticDescriptorValueCount > 0) {
+        for (unsigned i = 0; i < pResourceMapping->staticDescriptorValueCount; ++i) {
+            auto staticDescriptorValue = &pResourceMapping->pStaticDescriptorValues[i];
+            hasher->Update(staticDescriptorValue->visibility);
+            hasher->Update(staticDescriptorValue->type);
+            hasher->Update(staticDescriptorValue->set);
+            hasher->Update(staticDescriptorValue->binding);
+            hasher->Update(staticDescriptorValue->arraySize);
 
-      // TODO: We should query descriptor size from patch
+            // TODO: We should query descriptor size from patch
 
-      // The second part of StaticDescriptorValue is YCbCrMetaData, which is 4 dwords.
-      // The hasher should be updated when the content changes, this is because YCbCrMetaData
-      // is engaged in pipeline compiling.
-      const unsigned descriptorSize =
-          staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
+            // The second part of StaticDescriptorValue is YCbCrMetaData, which is 4 dwords.
+            // The hasher should be updated when the content changes, this is because YCbCrMetaData
+            // is engaged in pipeline compiling.
+            const unsigned descriptorSize =
+                staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
 
-      hasher->Update(reinterpret_cast<const uint8_t *>(staticDescriptorValue->pValue),
-                     staticDescriptorValue->arraySize * descriptorSize);
+            hasher->Update(reinterpret_cast<const uint8_t *>(staticDescriptorValue->pValue),
+                staticDescriptorValue->arraySize * descriptorSize);
+        }
     }
-  }
 
   if (!isRelocatableShader) {
     hasher->Update(pResourceMapping->userDataNodeCount);
@@ -1186,7 +1190,6 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
         updateHashForResourceMappingNode(&userDataNode->node, true, hasher);
       }
     }
-  }
 }
 #endif
 

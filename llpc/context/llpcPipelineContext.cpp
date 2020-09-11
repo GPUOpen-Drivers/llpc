@@ -401,7 +401,7 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
   auto allocNodes = std::make_unique<ResourceMappingNode[]>(resourceMapping->userDataNodeCount);
 
   for (unsigned idx = 0; idx < resourceMapping->userDataNodeCount; ++idx)
-    allocNodes[idx] = resourceMapping->pUserDataNodes[idx].node;
+      allocNodes[idx] = resourceMapping->pUserDataNodes[idx].node;
 
   // Translate the resource nodes into the LGC format expected by Pipeline::SetUserDataNodes.
   ArrayRef<ResourceMappingNode> nodes(allocNodes.get(), resourceMapping->userDataNodeCount);

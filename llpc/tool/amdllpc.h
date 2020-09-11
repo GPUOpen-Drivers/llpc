@@ -31,13 +31,14 @@
 #pragma once
 
 #include "llpc.h"
-#include <map>
+
 #include <vector>
+#include <map>
 
 struct ResourceNodeSet {
   std::vector<Llpc::ResourceMappingNode> nodes; // Vector of resource mapping nodes
-  std::map<unsigned, unsigned> bindingMap;      // Map from binding to index in nodes vector
-  unsigned visibility = 0;                      // Mask of shader stages which this set is visible to
+  std::map<unsigned, unsigned> bindingMap; // Map from binding to index in nodes vector
+  unsigned visibility = 0;                 // Mask of shader stages which this set is visible to
 };
 
 using ResourceMappingNodeMap = std::map<unsigned, ResourceNodeSet>;
@@ -47,7 +48,8 @@ using ResourceMappingNodeMap = std::map<unsigned, ResourceNodeSet>;
 // not matter because we are running a short-lived command-line utility.
 void doAutoLayoutDesc(Llpc::ShaderStage shaderStage, Llpc::BinaryData spirvBin,
                       Llpc::GraphicsPipelineBuildInfo *pipelineInfo, Llpc::PipelineShaderInfo *shaderInfo,
-                      ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize, bool checkAutoLayoutCompatible);
+                      ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
+                      bool checkAutoLayoutCompatible);
 
 // Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running amdllpc on a single
 // SPIR-V or GLSL shader, rather than on a .pipe file.
@@ -56,7 +58,8 @@ void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &res
                           Llpc::ResourceMappingData *resourceMapping);
 #else
 void buildTopLevelMapping(Llpc::ShaderStage shaderStage, const ResourceMappingNodeMap &resNodeSets,
-                          unsigned pushConstSize, Llpc::PipelineShaderInfo *shaderInfo, unsigned &topLevelOffset);
+                          unsigned pushConstSize,
+                          Llpc::PipelineShaderInfo *shaderInfo, unsigned &topLevelOffset);
 #endif
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41

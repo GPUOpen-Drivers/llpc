@@ -1066,7 +1066,8 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
 
       result = decodePipelineBinary(&pipelineOut->pipelineBin, compileInfo, true);
     }
-  } else {
+  }
+  else {
     // Build compute pipeline
     assert(compileInfo->shaderModuleDatas.size() == 1);
     assert(compileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
@@ -1555,7 +1556,7 @@ static Result expandInputFilenames(std::vector<std::string> &expandedFilenames) 
         return Result::ErrorInvalidValue;
       }
     }
-#else // WIN_OS
+#else  // WIN_OS
     expandedFilenames.push_back(inFile);
 #endif
     ++i;

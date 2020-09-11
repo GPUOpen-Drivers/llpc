@@ -160,7 +160,7 @@ protected:
   GfxIpVersion m_gfxIp;                  // Graphics IP version info
   MetroHash::Hash m_pipelineHash;        // Pipeline hash code
   MetroHash::Hash m_cacheHash;           // Cache hash code
-  ResourceMappingData m_resourceMapping; // Holds resource mapping nodes and static descriptor values
+  ResourceMappingData m_resourceMapping; // Contains resource mapping nodes and static descriptor values
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
   // Internal storage for the resource mapping data that is passed through the VKGC interface in versions 41+
   std::unique_ptr<llvm::SmallVectorImpl<ResourceMappingRootNode>> m_userDataNodeStorage;

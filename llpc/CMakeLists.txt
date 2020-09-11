@@ -243,7 +243,10 @@ endif()
 # How are these built? Can they be built through CMake?
 
 ### Visual Studio Filters ##############################################################################################
-target_vs_filters(llpc)
+target_find_headers(llpc)
+if(MSVC)
+    target_source_groups(llpc)
+endif()
 
 ### VFX library for Standalone Compiler ###################################################################################
 if(ICD_BUILD_LLPC)
