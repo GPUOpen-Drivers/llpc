@@ -220,14 +220,6 @@ else
 endif
 
 # MetroHash
-# If define METROHASH_PATH, llpc use the external single Metrohash.
-# Otherwise build the imported Metrohash copy.
-ifdef METROHASH_PATH
-    LCXXINCS += -I$(METROHASH_DEPTH)/src
-    LCXXDEFS += -DSINGLE_EXTERNAL_METROHASH
-else
-    METROHASH_DEPTH = $(VKGC_DEPTH)/imported/metrohash
-    LCXXINCS += -I$(METROHASH_DEPTH)/inc
-endif
+LCXXINCS += -I$(METROHASH_DEPTH)/src
 
 .FORCE:
