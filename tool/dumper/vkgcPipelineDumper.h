@@ -33,12 +33,6 @@
 #include "vkgcDefs.h"
 #include "vkgcMetroHash.h"
 #include <fstream>
-#if !defined(SINGLE_EXTERNAL_METROHASH)
-namespace MetroHash {
-class MetroHash64;
-struct Hash;
-}; // namespace MetroHash
-#endif
 
 namespace Vkgc {
 
@@ -59,11 +53,7 @@ enum PipelineDumpFilters : unsigned {
 
 class PipelineDumper {
 public:
-#if defined(SINGLE_EXTERNAL_METROHASH)
   typedef Util::MetroHash64 MetroHash64;
-#else
-  typedef MetroHash::MetroHash64 MetroHash64;
-#endif
 
   static void DumpSpirvBinary(const char *dumpDir, const BinaryData *spirvBin, MetroHash::Hash *hash);
 
