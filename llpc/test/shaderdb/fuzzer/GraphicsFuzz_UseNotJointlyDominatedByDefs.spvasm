@@ -1,7 +1,6 @@
 ; Summary: fails with "Use of $noreg does not have a corresponding definition on every path".
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; XFAIL: assertions
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

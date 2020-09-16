@@ -47,6 +47,7 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
+#include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
 
@@ -225,8 +226,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
 
   // Set up standard optimization passes.
   if (!cl::UseLlvmOpt) {
-    bool disableGvnLoadPre = true;
-
     passMgr.add(createForceFunctionAttrsLegacyPass());
     passMgr.add(createIPSCCPPass());
     passMgr.add(createCalledValuePropagationPass());
@@ -261,7 +260,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createPatchIntrinsicSimplify());
     passMgr.add(createMergedLoadStoreMotionPass());
-    passMgr.add(createGVNPass(disableGvnLoadPre));
+    passMgr.add(createNewGVNPass());
     passMgr.add(createSCCPPass());
     passMgr.add(createBitTrackingDCEPass());
     passMgr.add(createInstructionCombiningPass(2));
