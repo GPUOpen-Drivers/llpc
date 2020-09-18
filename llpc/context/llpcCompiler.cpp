@@ -1458,7 +1458,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, buildingRelocatableElf);
+  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, false);
   pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false);
 
   if (result == Result::Success && EnableOuts()) {
