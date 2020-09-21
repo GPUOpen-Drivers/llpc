@@ -137,7 +137,7 @@ top are the three "top-level" nodes. They are considered the top because the can
 be accessed directly. On the other hand, to access the descriptor for say
 descriptor set 0 and binding 2, the DescriptorTableVaPtr must be loaded first.
 
-Buffer descriptors are placed in the top-level are called "dynamic
+Buffer descriptors that are placed in the top-level are called "dynamic
 descriptors", and they are used to implement the feature where the application
 can modify the start offset of buffer without rebuilding the pipeline state.
 
@@ -191,6 +191,14 @@ unlinked shaders are compiled assuming that there are no compact buffer
 descriptors. If the XGL option `EnableRelocatableShaders` is true, then the
 driver will not use compact buffer descriptors.  Compact buffer descriptors
 can only ever be top-level nodes.
+
+## Immutable Samplers
+
+An unlinked shader compilation where the user data nodes are not available
+cannot tell if a descriptor for a sampler is actaully an "immutable value", so
+the code will be generated the same way it is for any other descriptor. This
+means that pipelines with immutable samplers cannot be compiled using
+relocatable shader.
 
 ## Examples
 
