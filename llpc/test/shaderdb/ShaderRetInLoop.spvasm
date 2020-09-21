@@ -1,0 +1,62 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+               OpCapability Shader
+               OpCapability ImageQuery
+               OpCapability DerivativeControl
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %2 "main" %23
+               OpExecutionMode %2 OriginUpperLeft
+               OpDecorate %23 Location 0
+               OpDecorate %23 Index 0
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+       %void = OpTypeVoid
+         %13 = OpTypeFunction %void
+       %bool = OpTypeBool
+     %v4uint = OpTypeVector %uint 4
+%_ptr_Output_v4uint = OpTypePointer Output %v4uint
+%_ptr_Private_v4float = OpTypePointer Private %v4float
+     %uint_0 = OpConstant %uint 0
+    %float_0 = OpConstant %float 0
+         %23 = OpVariable %_ptr_Output_v4uint Output
+         %38 = OpVariable %_ptr_Private_v4float Private
+         %44 = OpVariable %_ptr_Private_v4float Private
+       %2492 = OpUndef %bool
+         %11 = OpFunction %void None %13
+         %14 = OpLabel
+               OpBranch %1225
+       %1225 = OpLabel
+       %1238 = OpLoad %v4float %38
+       %1239 = OpCompositeExtract %float %1238 3
+       %1240 = OpBitcast %uint %1239
+       %1241 = OpINotEqual %bool %1240 %uint_0
+               OpLoopMerge %1242 %1243 None
+               OpBranchConditional %1241 %1242 %1243
+       %1242 = OpLabel
+               OpSelectionMerge %2379 None
+               OpBranchConditional %2492 %2378 %2379
+       %1243 = OpLabel
+       %1463 = OpCompositeInsert %v4float %float_0 %1238 3
+               OpStore %38 %1463
+               OpBranch %1225
+       %2378 = OpLabel
+       %2385 = OpCompositeInsert %v4float %float_0 %1238 1
+               OpStore %44 %2385
+               OpBranch %2379
+       %2379 = OpLabel
+       %2463 = OpLoad %v4float %44
+       %2464 = OpBitcast %v4uint %2463
+               OpStore %23 %2464
+               OpReturn
+               OpFunctionEnd
+          %2 = OpFunction %void None %13
+       %2465 = OpLabel
+       %2477 = OpFunctionCall %void %11
+               OpReturn
+               OpFunctionEnd
