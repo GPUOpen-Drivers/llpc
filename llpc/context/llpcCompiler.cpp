@@ -917,6 +917,9 @@ static bool hasUnrelocatableDescriptorNode(const ArrayRef<const PipelineShaderIn
       if (isUnrelocatableResourceMappingRootNode(node))
         return true;
     }
+    if (shaderInfo->descriptorRangeValueCount != 0) {
+      return true;
+    }
   }
   return false;
 }
