@@ -38,6 +38,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"
+#include "llvm/Object/SymbolicFile.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -845,7 +846,8 @@ void OutputSection::addSymbol(const object::ELFSymbolRef &elfSymRef, unsigned in
 void OutputSection::addRelocation(object::ELFRelocationRef relocRef, StringRef id, unsigned int relocSectionOffset,
                                   unsigned int targetSectionOffset) {
   ELF::Elf64_Rel newReloc = {};
-  std::string rodataSymName = cantFail(relocRef.getSymbol()->getName()).str();
+  object::ELFSymbolRef relocSymRef(*relocRef.getSymbol());
+  std::string rodataSymName = cantFail(relocSymRef.getName()).str();
   rodataSymName += ".";
   rodataSymName += id;
   unsigned rodataSymIdx = m_linker->findSymbol(rodataSymName);
@@ -856,8 +858,8 @@ void OutputSection::addRelocation(object::ELFRelocationRef relocRef, StringRef i
     newSym.setBinding(ELF::STB_LOCAL);
     newSym.setType(cantFail(object::SymbolRef::ST_Data));
     newSym.st_shndx = getIndex();
-    newSym.st_value = relocSectionOffset;
-    newSym.st_size = 0;
+    newSym.st_value = relocSectionOffset + cantFail(relocSymRef.getValue());
+    newSym.st_size = relocSymRef.getSize();
     rodataSymIdx = m_linker->getSymbols().size();
     m_linker->getSymbols().push_back(newSym);
   }
