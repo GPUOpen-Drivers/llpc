@@ -40,6 +40,8 @@ using namespace llvm;
 
 using namespace spv;
 
+using Vkgc::SpirvHeader;
+
 namespace Llpc {
 // =====================================================================================================================
 // Collect information from SPIR-V binary
@@ -296,59 +298,6 @@ unsigned ShaderModuleHelper::getStageMaskFromSpirvBinary(const BinaryData *spvBi
 }
 
 // =====================================================================================================================
-// Gets the entry-point name from the SPIR-V binary
-//
-// NOTE: This function is for single entry-point. If the SPIR-V binary contains multiple entry-points, we get the name
-// of the first entry-point and ignore others.
-//
-// @param spvBin : SPIR-V binary
-const char *ShaderModuleHelper::getEntryPointNameFromSpirvBinary(const BinaryData *spvBin) {
-  const char *entryName = nullptr;
-
-  const unsigned *code = reinterpret_cast<const unsigned *>(spvBin->pCode);
-  const unsigned *end = code + spvBin->codeSize / sizeof(unsigned);
-
-  if (isSpirvBinary(spvBin)) {
-    // Skip SPIR-V header
-    const unsigned *codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
-
-    while (codePos < end) {
-      unsigned opCode = (codePos[0] & OpCodeMask);
-      unsigned wordCount = (codePos[0] >> WordCountShift);
-
-      if (wordCount == 0 || codePos + wordCount > end) {
-        LLPC_ERRS("Invalid SPIR-V binary\n");
-        break;
-      }
-
-      if (opCode == OpEntryPoint) {
-        assert(wordCount >= 4);
-
-        // The fourth word is start of the name string of the entry-point
-        entryName = reinterpret_cast<const char *>(&codePos[3]);
-        break;
-      }
-
-      // All "OpEntryPoint" are before "OpFunction"
-      if (opCode == OpFunction)
-        break;
-
-      codePos += wordCount;
-    }
-
-    if (!entryName) {
-      LLPC_ERRS("Entry-point not found\n");
-      entryName = "";
-    }
-  } else {
-    LLPC_ERRS("Invalid SPIR-V binary\n");
-    entryName = "";
-  }
-
-  return entryName;
-}
-
-// =====================================================================================================================
 // Verifies if the SPIR-V binary is valid and is supported
 //
 // @param spvBin : SPIR-V binary
@@ -385,21 +334,6 @@ Result ShaderModuleHelper::verifySpirvBinary(const BinaryData *spvBin) {
   }
 
   return result;
-}
-
-// =====================================================================================================================
-// Checks whether input binary data is SPIR-V binary
-//
-// @param shaderBin : Shader binary codes
-bool ShaderModuleHelper::isSpirvBinary(const BinaryData *shaderBin) {
-  bool isSpvBinary = false;
-  if (shaderBin->codeSize > sizeof(SpirvHeader)) {
-    const SpirvHeader *header = reinterpret_cast<const SpirvHeader *>(shaderBin->pCode);
-    if (header->magicNumber == MagicNumber && header->spvVersion <= spv::Version && header->reserved == 0)
-      isSpvBinary = true;
-  }
-
-  return isSpvBinary;
 }
 
 // =====================================================================================================================

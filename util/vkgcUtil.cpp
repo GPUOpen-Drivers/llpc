@@ -29,11 +29,13 @@
  ***********************************************************************************************************************
  */
 #include "vkgcUtil.h"
+#include "spirv.hpp"
 #include "vkgcElfReader.h"
-
 #include <sys/stat.h>
 
 #define DEBUG_TYPE "vkgc-util"
+
+using namespace spv;
 
 namespace Vkgc {
 
@@ -119,6 +121,74 @@ const char *getResourceMappingNodeTypeName(ResourceMappingNodeType type) {
     break;
   }
   return string;
+}
+
+// =====================================================================================================================
+// Checks whether input binary data is SPIR-V binary
+//
+// @param shaderBin : Shader binary codes
+bool isSpirvBinary(const BinaryData *shaderBin) {
+  bool isSpvBinary = false;
+  if (shaderBin->codeSize > sizeof(SpirvHeader)) {
+    const SpirvHeader *header = reinterpret_cast<const SpirvHeader *>(shaderBin->pCode);
+    if (header->magicNumber == MagicNumber && header->spvVersion <= spv::Version && header->reserved == 0)
+      isSpvBinary = true;
+  }
+
+  return isSpvBinary;
+}
+
+// =====================================================================================================================
+// Gets the entry-point name from the SPIR-V binary
+//
+// NOTE: This function is for single entry-point. If the SPIR-V binary contains multiple entry-points, we get the name
+// of the first entry-point and ignore others.
+//
+// @param spvBin : SPIR-V binary
+const char *getEntryPointNameFromSpirvBinary(const BinaryData *spvBin) {
+  const char *entryName = nullptr;
+
+  const unsigned *code = reinterpret_cast<const unsigned *>(spvBin->pCode);
+  const unsigned *end = code + spvBin->codeSize / sizeof(unsigned);
+
+  if (isSpirvBinary(spvBin)) {
+    // Skip SPIR-V header
+    const unsigned *codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
+
+    while (codePos < end) {
+      unsigned opCode = (codePos[0] & OpCodeMask);
+      unsigned wordCount = (codePos[0] >> WordCountShift);
+
+      if (wordCount == 0 || codePos + wordCount > end) {
+        assert("Invalid SPIR-V binary\n");
+        break;
+      }
+
+      if (opCode == OpEntryPoint) {
+        assert(wordCount >= 4);
+
+        // The fourth word is start of the name string of the entry-point
+        entryName = reinterpret_cast<const char *>(&codePos[3]);
+        break;
+      }
+
+      // All "OpEntryPoint" are before "OpFunction"
+      if (opCode == OpFunction)
+        break;
+
+      codePos += wordCount;
+    }
+
+    if (!entryName) {
+      assert("Entry-point not found\n");
+      entryName = "";
+    }
+  } else {
+    assert("Invalid SPIR-V binary\n");
+    entryName = "";
+  }
+
+  return entryName;
 }
 
 } // namespace Vkgc

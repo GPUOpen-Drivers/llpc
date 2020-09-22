@@ -1297,7 +1297,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
       if (result == Result::Success) {
         // NOTE: If the entry target is not specified, we set it to the one gotten from SPIR-V binary.
         if (EntryTarget.empty())
-          EntryTarget.setValue(ShaderModuleHelper::getEntryPointNameFromSpirvBinary(&spvBin));
+          EntryTarget.setValue(Vkgc::getEntryPointNameFromSpirvBinary(&spvBin));
 
         unsigned stageMask = ShaderModuleHelper::getStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
 
