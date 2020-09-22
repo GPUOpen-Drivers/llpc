@@ -35,15 +35,6 @@
 
 namespace Llpc {
 
-// Represents the special header of SPIR-V token stream (the first dword).
-struct SpirvHeader {
-  unsigned magicNumber;    // Magic number of SPIR-V module
-  unsigned spvVersion;     // SPIR-V version number
-  unsigned genMagicNumber; // Generator's magic number
-  unsigned idBound;        // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
-  unsigned reserved;       // Reserved word
-};
-
 // Represents the information of one shader entry in ShaderModuleData
 struct ShaderModuleEntry {
   unsigned entryNameHash[4]; // Hash code of entry name
@@ -73,11 +64,7 @@ public:
 
   static unsigned getStageMaskFromSpirvBinary(const BinaryData *spvBin, const char *entryName);
 
-  static const char *getEntryPointNameFromSpirvBinary(const BinaryData *spvBin);
-
   static Result verifySpirvBinary(const BinaryData *spvBin);
-
-  static bool isSpirvBinary(const BinaryData *shaderBin);
 
   static bool isLlvmBitcode(const BinaryData *shaderBin);
 };

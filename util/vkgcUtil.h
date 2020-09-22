@@ -34,6 +34,15 @@
 
 namespace Vkgc {
 
+// Represents the special header of SPIR-V token stream (the first dword).
+struct SpirvHeader {
+  unsigned magicNumber;    // Magic number of SPIR-V module
+  unsigned spvVersion;     // SPIR-V version number
+  unsigned genMagicNumber; // Generator's magic number
+  unsigned idBound;        // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
+  unsigned reserved;       // Reserved word
+};
+
 // Invalid value
 static const unsigned InvalidValue = ~0u;
 
@@ -45,6 +54,12 @@ bool createDirectory(const char *dir);
 
 // Translate enum "ResourceMappingNodeType" to string
 const char *getResourceMappingNodeTypeName(ResourceMappingNodeType type);
+
+// Checks whether input binary data is SPIR-V binary
+bool isSpirvBinary(const BinaryData *shaderBin);
+
+// Gets the entry-point name from the SPIR-V binary
+const char *getEntryPointNameFromSpirvBinary(const BinaryData *spvBin);
 
 // =====================================================================================================================
 // Increments a pointer by nBytes by first casting it to a uint8_t*.

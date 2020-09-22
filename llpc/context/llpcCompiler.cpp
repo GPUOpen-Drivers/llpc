@@ -478,7 +478,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
                               TimerProfiler::ShaderModuleTimerEnableMask);
 
   // Check the type of input shader binary
-  if (ShaderModuleHelper::isSpirvBinary(&shaderInfo->shaderBin)) {
+  if (Vkgc::isSpirvBinary(&shaderInfo->shaderBin)) {
     unsigned debugInfoSize = 0;
 
     moduleDataEx.common.binType = BinaryType::Spirv;
