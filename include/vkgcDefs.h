@@ -70,7 +70,6 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
-//* |     43.1 | Add disableImageResourceCheck in PipelineOptions                                                      |
 //* |     43.0 | Removed the enumerant WaveBreakSize::DrawTime                                                         |
 //* |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
 //* |     41.0 | Moved resource mapping from ShaderPipeline-level to Pipeline-level                                    |
@@ -326,8 +325,7 @@ struct PipelineOptions {
                                    ///  the out of bounds accesses will be skipped with this setting.
   bool enableRelocatableShaderElf; ///< If set, the pipeline will be compiled by compiling each shader separately, and
                                    ///  then linking them, when possible.  When not possible this option is ignored.
-  bool disableImageResourceCheck;  ///< If set, the pipeline shader will not contain code to check and fix invalid image
-                                   ///  descriptors.
+
   ShadowDescriptorTableUsage shadowDescriptorTableUsage; ///< Controls shadow descriptor table.
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.
   ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the
