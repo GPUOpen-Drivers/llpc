@@ -149,6 +149,7 @@ void LgcContext::initialize() {
 
   // Initialize some command-line option defaults.
   setOptionDefault("filetype", "obj");
+  setOptionDefault("amdgpu-unroll-max-block-to-analyze", "20");
   setOptionDefault("unroll-max-percent-threshold-boost", "1000");
   setOptionDefault("pragma-unroll-threshold", "1000");
   setOptionDefault("unroll-allow-partial", "1");
