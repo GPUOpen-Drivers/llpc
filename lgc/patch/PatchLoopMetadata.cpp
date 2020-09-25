@@ -41,7 +41,10 @@
 using namespace llvm;
 using namespace lgc;
 
-// -strict-unroll-hints annotate loops with metadata to disable the LLVM LICM pass
+// -strict-dont-unroll-hints - always pass on DontUnroll hints as llvm.loop.unroll.disable metadata
+static cl::opt<bool> StrictDontUnrollHints("strict-dont-unroll-hints",
+                                           cl::desc("Strictly observe loop dont-unroll hints"), cl::init(true));
+// -strict-unroll-hints - always pass on Unroll hints as llvm.loop.unroll.full metadata
 static cl::opt<bool> StrictUnrollHints("strict-unroll-hints", cl::desc("Strictly observe loop unroll hints"),
                                        cl::init(true));
 
@@ -175,24 +178,24 @@ bool PatchLoopMetadata::runOnModule(Module &module) {
         MDNode *nonforcedMetaNode = MDNode::get(*m_context, nonforcedMeta);
         loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, nonforcedMetaNode));
         changed = true;
-      } else if (!StrictUnrollHints) {
+      } else if (!StrictDontUnrollHints || !StrictUnrollHints) {
         for (unsigned i = 1, operandCount = loopMetaNode->getNumOperands(); i < operandCount; ++i) {
           Metadata *op = loopMetaNode->getOperand(i);
           if (MDNode *mdNode = dyn_cast<MDNode>(op)) {
             if (const MDString *mdString = dyn_cast<MDString>(mdNode->getOperand(0))) {
-              if (mdString->getString().startswith("llvm.loop.unroll.disable")) {
+              if (!StrictDontUnrollHints && mdString->getString().startswith("llvm.loop.unroll.disable")) {
                 LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.disable\n");
                 // We will use a threshold of 250 to replace the disable hint.
                 const int UnrollThreshold = 250;
                 Metadata *thresholdMeta[] = {
-                    MDString::get(*m_context, "amdgpu.loop.unroll.threshold"),
+                    MDString::get(*m_context, "llvm.loop.unroll.threshold"),
                     ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), UnrollThreshold))};
                 MDNode *thresholdMetaNode = MDNode::get(*m_context, thresholdMeta);
                 loopMetaNode = updateMetadata(loopMetaNode, {"llvm.loop.unroll.disable", "llvm.loop.disable_nonforced"},
                                               thresholdMetaNode, false);
                 changed = true;
                 break;
-              } else if (mdString->getString().startswith("llvm.loop.unroll.full")) {
+              } else if (!StrictUnrollHints && mdString->getString().startswith("llvm.loop.unroll.full")) {
                 LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.full\n");
                 // We will let the heuristics take care of loops with the full hint.
                 MDNode *enableLoopUnrollMetaNode =
