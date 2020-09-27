@@ -282,6 +282,8 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createLoopUnrollPass(cl::OptLevel));
+    // uses DivergenceAnalysis
+    passMgr.add(createPatchReadFirstLane());
     passMgr.add(createInstructionCombiningPass(2));
     passMgr.add(createLICMPass());
     passMgr.add(createStripDeadPrototypesPass());

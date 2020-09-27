@@ -95,7 +95,7 @@ public:
   Value *transImagePointer(SPIRVValue *spvImagePtr);
   Value *getDescPointerAndStride(lgc::ResourceNodeType resType, unsigned descriptorSet, unsigned binding);
   Value *transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessChain);
-  Value *indexDescPtr(Type *elementTy, Value *base, Value *index, bool isNonUniform);
+  Value *indexDescPtr(Type *elementTy, Value *base, Value *index);
   Value *transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue *);
 
   bool transDecoration(SPIRVValue *, Value *);
