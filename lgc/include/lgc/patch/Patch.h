@@ -60,6 +60,7 @@ void initializePatchPreparePipelineAbiPass(PassRegistry &);
 void initializePatchResourceCollectPass(PassRegistry &);
 void initializePatchSetupTargetFeaturesPass(PassRegistry &);
 void initializePatchWorkaroundsPass(PassRegistry &);
+void initializePatchReadFirstLanePass(PassRegistry &);
 
 } // namespace llvm
 
@@ -87,6 +88,7 @@ inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializePatchResourceCollectPass(passRegistry);
   initializePatchSetupTargetFeaturesPass(passRegistry);
   initializePatchWorkaroundsPass(passRegistry);
+  initializePatchReadFirstLanePass(passRegistry);
 }
 
 llvm::ModulePass *createLowerFragColorExport();
@@ -105,6 +107,7 @@ llvm::ModulePass *createPatchPreparePipelineAbi(bool onlySetCallingConvs);
 llvm::ModulePass *createPatchResourceCollect();
 llvm::ModulePass *createPatchSetupTargetFeatures();
 llvm::ModulePass *createPatchWorkarounds();
+llvm::FunctionPass *createPatchReadFirstLane();
 
 class PipelineState;
 

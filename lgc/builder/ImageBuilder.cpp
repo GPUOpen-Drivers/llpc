@@ -493,6 +493,13 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
     result = CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, intrinsicDataTy, args, nullptr, instName);
   }
 
+  // Add a waterfall loop if needed.
+  Instruction *imageInst = cast<Instruction>(result);
+  if (flags & ImageFlagNonUniformImage)
+    result = createWaterfallLoop(imageInst, imageDescArgIndex);
+  else
+    enforceReadFirstLane(imageInst, imageDescArgIndex);
+
   // For 64-bit texel, only the first component is loaded, other components are filled in with (0, 0, 1). This
   // operation could be viewed as supplement of the intrinsic call.
   if (origTexelTy->isIntOrIntVectorTy(64)) {
@@ -526,10 +533,6 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
       result = texel;
     }
   }
-
-  // Add a waterfall loop if needed.
-  if (flags & ImageFlagNonUniformImage)
-    result = createWaterfallLoop(cast<Instruction>(result), imageDescArgIndex);
 
   return result;
 }
@@ -683,6 +686,8 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
   // Add a waterfall loop if needed.
   if (flags & ImageFlagNonUniformImage)
     createWaterfallLoop(imageStore, imageDescArgIndex);
+  else
+    enforceReadFirstLane(imageStore, imageDescArgIndex);
 
   return imageStore;
 }
@@ -1125,8 +1130,15 @@ Value *ImageBuilder::CreateImageSampleGather(Type *resultTy, unsigned dim, unsig
   SmallVector<unsigned, 2> nonUniformArgIndexes;
   if (flags & ImageFlagNonUniformImage)
     nonUniformArgIndexes.push_back(imageDescArgIndex);
+  else
+    enforceReadFirstLane(imageOp, imageDescArgIndex);
+
+  const unsigned samplerDescArgIndex = imageDescArgIndex + 1;
   if (flags & ImageFlagNonUniformSampler)
-    nonUniformArgIndexes.push_back(imageDescArgIndex + 1);
+    nonUniformArgIndexes.push_back(samplerDescArgIndex);
+  else
+    enforceReadFirstLane(imageOp, samplerDescArgIndex);
+
   if (!nonUniformArgIndexes.empty())
     imageOp = createWaterfallLoop(imageOp, nonUniformArgIndexes);
   return imageOp;
@@ -1235,6 +1247,8 @@ Value *ImageBuilder::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, un
   }
   if (flags & ImageFlagNonUniformImage)
     atomicInst = createWaterfallLoop(atomicInst, imageDescArgIndex);
+  else
+    enforceReadFirstLane(atomicInst, imageDescArgIndex);
 
   switch (ordering) {
   case AtomicOrdering::Acquire:
@@ -1464,11 +1478,18 @@ Value *ImageBuilder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imag
   SmallVector<unsigned, 2> nonUniformArgIndexes;
   if (flags & ImageFlagNonUniformImage)
     nonUniformArgIndexes.push_back(imageDescArgIndex);
+  else
+    enforceReadFirstLane(result, imageDescArgIndex);
+
+  const unsigned samplerDescArgIndex = imageDescArgIndex + 1;
   if (flags & ImageFlagNonUniformSampler)
-    nonUniformArgIndexes.push_back(imageDescArgIndex + 1);
+    nonUniformArgIndexes.push_back(samplerDescArgIndex);
+  else
+    enforceReadFirstLane(result, samplerDescArgIndex);
 
   if (!nonUniformArgIndexes.empty())
     result = createWaterfallLoop(result, nonUniformArgIndexes);
+
   return result;
 }
 
@@ -1906,3 +1927,22 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
   return coord;
 }
 
+// =====================================================================================================================
+// Enforce readfirslane on the given descriptor.
+//
+// @param imageInst : the image instruction
+// @param descIdx : the index of the descriptor to put readfirstlane on
+void ImageBuilder::enforceReadFirstLane(Instruction *imageInst, unsigned descIdx) {
+  InsertPoint savedInsertPoint = saveIP();
+  SetInsertPoint(imageInst);
+  Value *origDesc = imageInst->getOperand(descIdx);
+  const unsigned elemCount = cast<FixedVectorType>(origDesc->getType())->getNumElements();
+  Value *newDesc = UndefValue::get(FixedVectorType::get(getInt32Ty(), elemCount));
+  for (unsigned elemIdx = 0; elemIdx < elemCount; ++elemIdx) {
+    Value *elem = CreateExtractElement(origDesc, elemIdx);
+    elem = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, elem);
+    newDesc = CreateInsertElement(newDesc, elem, elemIdx);
+  }
+  imageInst->setOperand(descIdx, newDesc);
+  restoreIP(savedInsertPoint);
+}
