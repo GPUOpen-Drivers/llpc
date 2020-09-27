@@ -76,6 +76,5 @@ def main():
   shutil.rmtree(tmp_dir)
   print(f'Saved the new shaderdb test as: {os.path.realpath(args.output)}')
 
-
 if __name__ == '__main__':
   main()

@@ -1158,28 +1158,28 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 // @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData* pResourceMapping,
                                                       MetroHash64 *hasher, bool isRelocatableShader) {
-    hasher->Update(pResourceMapping->staticDescriptorValueCount);
-    if (pResourceMapping->staticDescriptorValueCount > 0) {
-        for (unsigned i = 0; i < pResourceMapping->staticDescriptorValueCount; ++i) {
-            auto staticDescriptorValue = &pResourceMapping->pStaticDescriptorValues[i];
-            hasher->Update(staticDescriptorValue->visibility);
-            hasher->Update(staticDescriptorValue->type);
-            hasher->Update(staticDescriptorValue->set);
-            hasher->Update(staticDescriptorValue->binding);
-            hasher->Update(staticDescriptorValue->arraySize);
+  hasher->Update(pResourceMapping->staticDescriptorValueCount);
+  if (pResourceMapping->staticDescriptorValueCount > 0) {
+      for (unsigned i = 0; i < pResourceMapping->staticDescriptorValueCount; ++i) {
+          auto staticDescriptorValue = &pResourceMapping->pStaticDescriptorValues[i];
+          hasher->Update(staticDescriptorValue->visibility);
+          hasher->Update(staticDescriptorValue->type);
+          hasher->Update(staticDescriptorValue->set);
+          hasher->Update(staticDescriptorValue->binding);
+          hasher->Update(staticDescriptorValue->arraySize);
 
-            // TODO: We should query descriptor size from patch
+          // TODO: We should query descriptor size from patch
 
-            // The second part of StaticDescriptorValue is YCbCrMetaData, which is 4 dwords.
-            // The hasher should be updated when the content changes, this is because YCbCrMetaData
-            // is engaged in pipeline compiling.
-            const unsigned descriptorSize =
-                staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
+          // The second part of StaticDescriptorValue is YCbCrMetaData, which is 4 dwords.
+          // The hasher should be updated when the content changes, this is because YCbCrMetaData
+          // is engaged in pipeline compiling.
+          const unsigned descriptorSize =
+              staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
 
-            hasher->Update(reinterpret_cast<const uint8_t *>(staticDescriptorValue->pValue),
-                staticDescriptorValue->arraySize * descriptorSize);
-        }
-    }
+          hasher->Update(reinterpret_cast<const uint8_t *>(staticDescriptorValue->pValue),
+                         staticDescriptorValue->arraySize * descriptorSize);
+      }
+  }
 
   if (!isRelocatableShader) {
     hasher->Update(pResourceMapping->userDataNodeCount);
@@ -1190,6 +1190,7 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData*
         updateHashForResourceMappingNode(&userDataNode->node, true, hasher);
       }
     }
+  }
 }
 #endif
 
