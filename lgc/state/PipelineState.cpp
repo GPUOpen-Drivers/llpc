@@ -994,19 +994,15 @@ bool PipelineState::isTessOffChip() {
 }
 
 // =====================================================================================================================
-// Determine whether to use input/output packing
-bool PipelineState::isPackInOut() {
+// Initialize the state of input/output packing
+void PipelineState::initializePackInOut() {
   // Pack input/output requirements:
   // 1) -pack-in-out option is on
   // 2) It supports VS-FS, VS-TCS-TES-(FS)
-  if (!PackInOut)
-    return false;
-
-  if (hasShaderStage(ShaderStageVertex) && !hasShaderStage(ShaderStageGeometry)) {
+  if (PackInOut && hasShaderStage(ShaderStageVertex) && !hasShaderStage(ShaderStageGeometry)) {
     const unsigned nextStage = getNextShaderStage(ShaderStageVertex);
-    return nextStage == ShaderStageFragment || nextStage == ShaderStageTessControl;
+    m_packInOut = nextStage == ShaderStageFragment || nextStage == ShaderStageTessControl;
   }
-  return false;
 }
 
 // =====================================================================================================================

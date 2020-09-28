@@ -101,6 +101,7 @@ bool BuilderReplayer::runOnModule(Module &module) {
   // Set up the pipeline state from the specified linked IR module.
   PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
   pipelineState->readState(&module);
+  pipelineState->initializePackInOut();
 
   // Create the BuilderImpl to replay into, passing it the PipelineState
   LgcContext *builderContext = pipelineState->getLgcContext();

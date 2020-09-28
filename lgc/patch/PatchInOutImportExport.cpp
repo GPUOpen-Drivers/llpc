@@ -446,7 +446,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
             loc = resUsage->inOutUsage.perPatchInputLocMap[value];
           }
         } else {
-          if (m_pipelineState->isPackInOut() &&
+          if (m_pipelineState->canPackInOut() &&
               (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl)) {
             // The new InOutLocationInfo is used to map scalarized FS and TCS input import as compact as possible
             InOutLocationInfo origLocInfo = {};
@@ -734,7 +734,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           loc = resUsage->inOutUsage.outputLocMap[outLocInfo.u32All];
         }
       } else {
-        if (m_pipelineState->isPackInOut() && m_shaderStage == ShaderStageVertex &&
+        if (m_pipelineState->canPackInOut() && m_shaderStage == ShaderStageVertex &&
             m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
           // The new InOutLocationInfo is used to map scalarized VS output export in a VS-TCS-TES-FS to lds as compact
           // as possible

@@ -81,7 +81,7 @@ bool PatchResourceCollect::runOnModule(Module &module) {
   m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
   // If packing {VS, TES} outputs and {TCS, FS} inputs, scalarize those outputs and inputs now.
-  if (m_pipelineState->isPackInOut())
+  if (m_pipelineState->canPackInOut())
     scalarizeForInOutPacking(&module);
 
   // Process each shader stage, in reverse order.
@@ -1289,7 +1289,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     }
   }
 
-  if (m_pipelineState->isPackInOut()) {
+  if (m_pipelineState->canPackInOut()) {
     // Process input import calls with constant location offset in FS (VS-FS, TES-FS) or TCS (VS-TCS)
     // Collect output export calls to re-assemble in VS (VS-FS) or TES (TES-FS)
     const bool isPackIn = m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl;
@@ -1683,7 +1683,7 @@ void PatchResourceCollect::matchGenericInOut() {
     }
   }
 
-  if (m_pipelineState->isPackInOut()) {
+  if (m_pipelineState->canPackInOut()) {
     // Do packing input/output
     packInOutLocation();
   }
@@ -2763,13 +2763,22 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
   SmallVector<CallInst *, 4> outputCalls;
   SmallVector<CallInst *, 4> inputCalls;
   for (Function &func : *module) {
-    if (func.getName().startswith(lgcName::InputImportGeneric) ||
-        func.getName().startswith(lgcName::InputImportInterpolant)) {
+    if (!m_pipelineState->canPackInOut())
+      break;
+    const bool isInterpolant = func.getName().startswith(lgcName::InputImportInterpolant);
+    if (func.getName().startswith(lgcName::InputImportGeneric) || isInterpolant) {
       // This is a generic (possibly interpolated) input. Find its uses in FS (VS-FS, TES-FS) or TCS.
       for (User *user : func.users()) {
         auto call = cast<CallInst>(user);
         ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
         if (shaderStage == ShaderStageFragment || shaderStage == ShaderStageTessControl) {
+          // This is a workaround to disable pack for the pipeline if there exists dynamic component index
+          // TODO: Do partial packing except calls with dynamic component index in future change
+          const unsigned elemArgIdx = (shaderStage == ShaderStageFragment && !isInterpolant) ? 1 : 2;
+          if (!isa<ConstantInt>(call->getOperand(elemArgIdx))) {
+            m_pipelineState->setPackInOut(false);
+            break;
+          }
           // We have a use in FS (VS-FS, TES-FS) or TCS. See if it needs scalarizing.
           if (isa<VectorType>(call->getType()) || call->getType()->getPrimitiveSizeInBits() == 64)
             inputCalls.push_back(call);
@@ -2783,6 +2792,7 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
         if (shaderStage == ShaderStageTessEval || shaderStage == ShaderStageVertex) {
           // We have a use in the last vertex processing stage. See if it needs scalarizing. The output value is
           // always the final argument.
+          assert(isa<ConstantInt>(call->getOperand(1)));
           Type *valueTy = call->getArgOperand(call->getNumArgOperands() - 1)->getType();
           if (isa<VectorType>(valueTy) || valueTy->getPrimitiveSizeInBits() == 64)
             outputCalls.push_back(call);
@@ -2790,12 +2800,13 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
       }
     }
   }
-
-  // Scalarize the gathered inputs and outputs.
-  for (CallInst *call : inputCalls)
-    scalarizeGenericInput(call);
-  for (CallInst *call : outputCalls)
-    scalarizeGenericOutput(call);
+  if (m_pipelineState->canPackInOut()) {
+    // Scalarize the gathered inputs and outputs.
+    for (CallInst *call : inputCalls)
+      scalarizeGenericInput(call);
+    for (CallInst *call : outputCalls)
+      scalarizeGenericOutput(call);
+  }
 }
 
 // =====================================================================================================================
