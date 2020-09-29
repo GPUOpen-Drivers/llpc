@@ -101,6 +101,10 @@ public:
 
   void GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols);
 
+  Result getSectionTextShader(const char *name, const void **ppData, size_t *dataLength);
+
+  void updateSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol> &secSymbols);
+
   void writeToBuffer(ElfPackage *elf);
 
 private:

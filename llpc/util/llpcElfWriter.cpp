@@ -787,6 +787,43 @@ void ElfWriter<Elf>::GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSy
 }
 
 // =====================================================================================================================
+// Update all associated symbols by section index.
+//
+// @param secIdx : Section index
+// @param [out] secSymbols : ELF symbols
+template <class Elf>
+void ElfWriter<Elf>::updateSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol> &secSymbols) {
+  auto newEnd =
+      std::remove_if(m_symbols.begin(), m_symbols.end(), [&secIdx](ElfSymbol &sym) { return sym.secIdx == secIdx; });
+  m_symbols.erase(newEnd, m_symbols.end());
+  for (auto &secSymbol : secSymbols)
+    m_symbols.push_back(secSymbol);
+}
+
+// =====================================================================================================================
+// Get text section shader data
+
+// @param name: Shader stage entry-point names, such as "_amdgpu_vs_main","_amdgpu_gs_main", "_amdgpu_ps_main" etc
+// @param [out] data: Data corresponding to GPU ISA code of this shader stage
+// @param [out] dataLength: Length of the data
+template <class Elf>
+Result ElfWriter<Elf>::getSectionTextShader(const char *name, const void **data, size_t *dataLength) {
+  auto textSectIdx = GetSectionIndex(".text");
+  const ElfSectionBuffer<Elf64::SectionHeader> *textSection = nullptr;
+  getSectionDataBySectionIndex(textSectIdx, &textSection);
+  std::vector<ElfSymbol *> symbols;
+  GetSymbolsBySectionIndex(textSectIdx, symbols);
+  for (auto symbol : symbols) {
+    if (strcmp(symbol->pSymName, name) == 0) {
+      *data = voidPtrInc(textSection->data, symbol->value);
+      *dataLength = symbol->size;
+      break;
+    }
+  }
+  return Result::Success;
+}
+
+// =====================================================================================================================
 // Update descriptor root offset in ELF binary
 //
 // @param pContext : Pipeline context
