@@ -699,7 +699,7 @@ Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBas
   // color format in the metadata.
   m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
 
-  auto retInst = builder.GetInsertPoint()->getParent()->getTerminator();
+  ReturnInst *retInst = cast<ReturnInst>(builder.GetInsertPoint()->getParent()->getTerminator());
 
   // Fisrt build the return type for the fragment shader.
   SmallVector<Type *, 8> outputTypes;
