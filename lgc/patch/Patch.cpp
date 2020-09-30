@@ -258,7 +258,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createScalarizerPass());
     passMgr.add(createPatchLoadScalarizer());
     passMgr.add(createInstSimplifyLegacyPass());
-    passMgr.add(createPatchIntrinsicSimplify());
     passMgr.add(createMergedLoadStoreMotionPass());
     passMgr.add(createNewGVNPass());
     passMgr.add(createSCCPPass());
@@ -318,9 +317,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
                                // identified post running the scalarizer can be folded away before instruction combining
                                // tries to re-create them.
                                passMgr.add(createInstSimplifyLegacyPass());
-
-                               // After we've finished loop optimizations, we run a pass to optimize our intrinsics.
-                               passMgr.add(createPatchIntrinsicSimplify());
                              });
 
     passBuilder.populateModulePassManager(passMgr);
