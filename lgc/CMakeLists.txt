@@ -113,7 +113,6 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchCopyShader.cpp
     patch/PatchEntryPointMutate.cpp
     patch/PatchInOutImportExport.cpp
-    patch/PatchIntrinsicSimplify.cpp
     patch/PatchLlvmIrInclusion.cpp
     patch/PatchLoadScalarizer.cpp
     patch/PatchLoopMetadata.cpp
