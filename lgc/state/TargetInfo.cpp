@@ -298,6 +298,7 @@ static void setGfx1010Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waTessIncorrectRelativeIndex = 1;
   targetInfo->getGpuWorkarounds().gfx10.waSmemFollowedByVopc = 1;
   targetInfo->getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
 }
 
 // gfx1012
@@ -317,6 +318,7 @@ static void setGfx1012Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetchFwd64 = 1;
   targetInfo->getGpuWorkarounds().gfx10.waWarFpAtomicDenormHazard = 1;
   targetInfo->getGpuWorkarounds().gfx10.waNggDisabled = 0;
+  targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
 }
 
 // =====================================================================================================================

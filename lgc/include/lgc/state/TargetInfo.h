@@ -120,6 +120,7 @@ struct WorkaroundFlags {
       unsigned waShaderInstPrefetchFwd64 : 1;
       unsigned waWarFpAtomicDenormHazard : 1;
       unsigned waNggDisabled : 1;
+      unsigned waFixBadImageDescriptor : 1;
       unsigned waLimitedMaxOutputVertexCount : 1;
       unsigned waGeNggMaxVertOutWithGsInstancing : 1;
       unsigned : 1;
