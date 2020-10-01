@@ -843,8 +843,10 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
   const auto &xfbStrides = resUsage->inOutUsage.xfbStrides;
   bool enableXfb = resUsage->inOutUsage.enableXfb;
   if (shaderStage == ShaderStageCopyShader) {
-    // NOTE: For copy shader, we use fixed number of user data registers.
-    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, lgc::CopyShaderUserSgprCount);
+    // NOTE: For copy shader, usually we use fixed number of user data registers.
+    // But in some cases, we may change user data registers, we use variable to keep user sprg count here
+    auto copyShaderUserSprgCount = lgc::CopyShaderUserSgprCount;
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, copyShaderUserSprgCount);
     setNumAvailSgprs(Util::Abi::HardwareStage::Vs, m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable);
     setNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable);
 
