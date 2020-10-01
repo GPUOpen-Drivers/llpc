@@ -130,6 +130,9 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Patch input import and output export operations
   passMgr.add(createPatchInOutImportExport());
 
+  // Add bounds checks to stack accesses
+  passMgr.add(createPatchBoundsCheckMemory());
+
   // Prior to general optimization, do function inlining and dead function removal once again
   passMgr.add(createAlwaysInlinerLegacyPass());
   passMgr.add(createGlobalDCEPass());

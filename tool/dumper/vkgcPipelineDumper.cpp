@@ -665,6 +665,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.scalarBlockLayout = " << options->scalarBlockLayout << "\n";
   dumpFile << "options.includeIr = " << options->includeIr << "\n";
   dumpFile << "options.robustBufferAccess = " << options->robustBufferAccess << "\n";
+  dumpFile << "options.enableScratchBoundsCheck = " << options->enableScratchBoundsCheck << "\n";
   dumpFile << "options.reconfigWorkgroupLayout = " << options->reconfigWorkgroupLayout << "\n";
   dumpFile << "options.shadowDescriptorTableUsage = " << options->shadowDescriptorTableUsage << "\n";
   dumpFile << "options.shadowDescriptorTablePtrHigh = " << options->shadowDescriptorTablePtrHigh << "\n";
@@ -906,6 +907,7 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
   hasher.Update(pipeline->options.scalarBlockLayout);
   hasher.Update(pipeline->options.includeIr);
   hasher.Update(pipeline->options.robustBufferAccess);
+  hasher.Update(pipeline->options.enableScratchBoundsCheck);
   hasher.Update(pipeline->options.shadowDescriptorTableUsage);
   hasher.Update(pipeline->options.shadowDescriptorTablePtrHigh);
   hasher.Update(pipeline->options.extendedRobustness.robustBufferAccess);
@@ -1015,6 +1017,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     hasher->Update(pipeline->options.scalarBlockLayout);
     hasher->Update(pipeline->options.includeIr);
     hasher->Update(pipeline->options.robustBufferAccess);
+    hasher->Update(pipeline->options.enableScratchBoundsCheck);
     hasher->Update(pipeline->options.reconfigWorkgroupLayout);
 
     if (!isRelocatableShader) {

@@ -70,6 +70,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     43.2 | Add enableScratchBoundsCheck in PipelineOptions                                                       |
 //* |     43.1 | Add disableImageResourceCheck in PipelineOptions                                                      |
 //* |     43.0 | Removed the enumerant WaveBreakSize::DrawTime                                                         |
 //* |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
@@ -328,6 +329,8 @@ struct PipelineOptions {
                                    ///  then linking them, when possible.  When not possible this option is ignored.
   bool disableImageResourceCheck;  ///< If set, the pipeline shader will not contain code to check and fix invalid image
                                    ///  descriptors.
+  bool enableScratchBoundsCheck;   ///< If set, accessing a stack object out of bounds will be skipped for stores and
+                                   ///  return zero for loads.
   ShadowDescriptorTableUsage shadowDescriptorTableUsage; ///< Controls shadow descriptor table.
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.
   ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the

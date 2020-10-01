@@ -108,6 +108,7 @@ target_sources(LLVMlgc PRIVATE
     patch/NggLdsManager.cpp
     patch/NggPrimShader.cpp
     patch/Patch.cpp
+    patch/PatchBoundsCheckMemory.cpp
     patch/PatchBufferOp.cpp
     patch/PatchCheckShaderCache.cpp
     patch/PatchCopyShader.cpp

@@ -45,6 +45,7 @@ class PassManager;
 
 void initializeLowerFragColorExportPass(PassRegistry &);
 void initializeLowerVertexFetchPass(PassRegistry &);
+void initializePatchBoundsCheckMemoryPass(PassRegistry &);
 void initializePatchBufferOpPass(PassRegistry &);
 void initializePatchCheckShaderCachePass(PassRegistry &);
 void initializePatchCopyShaderPass(PassRegistry &);
@@ -71,6 +72,7 @@ class PatchCheckShaderCache;
 inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializeLowerFragColorExportPass(passRegistry);
   initializeLowerVertexFetchPass(passRegistry);
+  initializePatchBoundsCheckMemoryPass(passRegistry);
   initializePatchBufferOpPass(passRegistry);
   initializePatchCheckShaderCachePass(passRegistry);
   initializePatchCopyShaderPass(passRegistry);
@@ -88,6 +90,7 @@ inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
 
 llvm::ModulePass *createLowerFragColorExport();
 llvm::ModulePass *createLowerVertexFetch();
+llvm::ModulePass *createPatchBoundsCheckMemory();
 llvm::FunctionPass *createPatchBufferOp();
 PatchCheckShaderCache *createPatchCheckShaderCache();
 llvm::ModulePass *createPatchCopyShader();

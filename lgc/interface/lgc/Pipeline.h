@@ -124,6 +124,8 @@ struct Options {
                                        //   ShadowDescriptorTableDisable to disable shadow descriptor tables
   unsigned allowNullDescriptor;        // Allow and give defined behavior for null descriptor
   unsigned disableImageResourceCheck;  // Don't do image resource type check
+  unsigned enableScratchBoundsCheck;   // If set, accessing a stack object out of bounds will be skipped for stores and
+                                       // return zero for loads.
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

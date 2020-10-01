@@ -312,6 +312,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
+  options.enableScratchBoundsCheck = getPipelineOptions()->enableScratchBoundsCheck;
   pipeline->setOptions(options);
 
   // Give the shader options (including the hash) to the middle-end.
