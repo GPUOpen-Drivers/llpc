@@ -997,6 +997,9 @@ Value *ImageBuilder::postprocessIntegerImageGather(Value *needDescPatch, unsigne
 Value *ImageBuilder::CreateImageSampleGather(Type *resultTy, unsigned dim, unsigned flags, Value *coord,
                                              Value *imageDesc, Value *samplerDesc, ArrayRef<Value *> address,
                                              const Twine &instName, bool isSample) {
+  // Fix up image descriptor (if required).
+  imageDesc = patchInvalidImageDescriptor(imageDesc);
+
   // Set up the mask of address components provided, for use in searching the intrinsic ID table
   unsigned addressMask = 0;
   for (unsigned i = 0; i != ImageAddressCount; ++i) {
@@ -1252,6 +1255,7 @@ Value *ImageBuilder::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, un
 // @param imageDesc : Image descriptor or texel buffer descriptor
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageQueryLevels(unsigned dim, unsigned flags, Value *imageDesc, const Twine &instName) {
+  imageDesc = patchInvalidImageDescriptor(imageDesc);
   dim = dim == DimCubeArray ? DimCube : dim;
   Value *zero = getInt32(0);
   Instruction *resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim], {getFloatTy(), getInt32Ty()},
@@ -1321,6 +1325,7 @@ Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *i
   }
 
   // Proper image.
+  imageDesc = patchInvalidImageDescriptor(imageDesc);
   unsigned modifiedDim = dim == DimCubeArray ? DimCube : change1DTo2DIfNeeded(dim);
   Value *zero = getInt32(0);
   Instruction *resInfo =
@@ -1361,6 +1366,9 @@ Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *i
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imageDesc, Value *samplerDesc, Value *coord,
                                        const Twine &instName) {
+  // Fix up image descriptor (if required).
+  imageDesc = patchInvalidImageDescriptor(imageDesc);
+
   // Remove array from dimension if any.
   switch (dim) {
   case Dim1DArray:
