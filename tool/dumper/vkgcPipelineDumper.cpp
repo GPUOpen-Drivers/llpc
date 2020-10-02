@@ -952,8 +952,12 @@ void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputSt
 // @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
                                                    MetroHash64 *hasher, bool isRelocatableShader) {
+  auto nggState = &pipeline->nggState;
+  bool enableNgg = nggState->enableNgg;
+
   auto iaState = &pipeline->iaState;
-  hasher->Update(iaState->topology);
+  if (enableNgg)
+    hasher->Update(iaState->topology);
   hasher->Update(iaState->patchControlPoints);
   hasher->Update(iaState->disableVertexReuse);
   hasher->Update(iaState->switchWinding);
@@ -967,8 +971,6 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     hasher->Update(rsState->rasterizerDiscardEnable);
   }
 
-  auto nggState = &pipeline->nggState;
-  bool enableNgg = nggState->enableNgg;
   bool passthroughMode = !nggState->enableVertexReuse && !nggState->enableBackfaceCulling &&
                          !nggState->enableFrustumCulling && !nggState->enableBoxFilterCulling &&
                          !nggState->enableSphereCulling && !nggState->enableSmallPrimFilter &&
