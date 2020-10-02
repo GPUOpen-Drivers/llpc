@@ -122,12 +122,6 @@ opt<int> RelocatableShaderElfLimit("relocatable-shader-elf-limit",
                                             "relocatable shader ELF.  -1 means unlimited."),
                                    init(-1));
 
-// -build-relocatable-shader-cache: Populates the shader cache with relocatable shader variants.
-opt<bool> BuildShaderCache("build-shader-cache",
-                           cl::desc("[WIP] Populates shader cache with relocatable shader variants."
-                                    " This is an experimental option."),
-                           init(false));
-
 // -shader-cache-mode: shader cache mode:
 // 0 - Disable
 // 1 - Runtime cache
@@ -787,6 +781,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   Result result = Result::Success;
 
   unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
+  bool isUnlinkedPipeline = context->getPipelineContext()->isUnlinked();
   context->getPipelineContext()->setUnlinked(true);
 
   ElfPackage elf[ShaderStageNativeStageCount];
@@ -862,13 +857,20 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     ReleaseCacheEntry((result == Result::Success), &elfBin, &cacheEntry);
   }
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
+  context->getPipelineContext()->setUnlinked(false);
 
-  if (!cl::BuildShaderCache) {
+  if (!isUnlinkedPipeline) {
     // Link the relocatable shaders into a single pipeline elf file.
-    // Not needed if we are just interested in building the cache.
     linkRelocatableShaderElf(elf, pipelineElf, context);
+  } else {
+    // Return the first relocatable shader, since we can only return one anyway.
+    for (unsigned stage = 0; stage < ShaderStageNativeStageCount; ++stage) {
+      if (elf[stage].empty())
+        continue;
+      *pipelineElf = elf[stage];
+      break;
+    }
   }
-
   return result;
 }
 
@@ -942,13 +944,15 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMa
 // @param pipelineInfo : Pipeline info for the pipeline to be built
 bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfos,
                                                   const GraphicsPipelineBuildInfo *pipelineInfo) {
-  for (unsigned stage = 0; stage < shaderInfos.size(); ++stage) {
-    if (stage != ShaderStageVertex && stage != ShaderStageFragment) {
-      if (shaderInfos[stage] && shaderInfos[stage]->pModuleData)
+  if (!pipelineInfo->unlinked) {
+    for (unsigned stage = 0; stage < shaderInfos.size(); ++stage) {
+      if (stage != ShaderStageVertex && stage != ShaderStageFragment) {
+        if (shaderInfos[stage] && shaderInfos[stage]->pModuleData)
+          return false;
+      } else if (!shaderInfos[stage] || !shaderInfos[stage]->pModuleData) {
+        // TODO: Generate pass-through shaders when the fragment or vertex shaders are missing.
         return false;
-    } else if (!shaderInfos[stage] || !shaderInfos[stage]->pModuleData) {
-      // TODO: Generate pass-through shaders when the fragment or vertex shaders are missing.
-      return false;
+      }
     }
   }
 
@@ -1695,7 +1699,7 @@ MetroHash::Hash Compiler::generateHashForCompileOptions(unsigned optionCount, co
                                        cl::LogFileDbgs.ArgStr,
                                        cl::LogFileOuts.ArgStr,
                                        cl::ExecutableName.ArgStr,
-                                       cl::BuildShaderCache.ArgStr,
+                                       "unlinked",
                                        "o"};
 
   std::set<StringRef> effectingOptions;
@@ -2093,9 +2097,9 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
   assert(shaderElfs[ShaderStageTessControl].empty() && "Cannot link tessellation shaders yet.");
   assert(shaderElfs[ShaderStageTessEval].empty() && "Cannot link tessellation shaders yet.");
   assert(shaderElfs[ShaderStageGeometry].empty() && "Cannot link geometry shaders yet.");
+  assert(!context->getPipelineContext()->isUnlinked() && "Not supposed to link this pipeline.");
 
   // Set up middle-end objects, including setting up pipeline state.
-  context->getPipelineContext()->setUnlinked(false);
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   context->getPipelineContext()->setPipelineState(&*pipeline, /*unlinked=*/false);

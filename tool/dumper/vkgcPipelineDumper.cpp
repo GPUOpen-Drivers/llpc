@@ -867,6 +867,9 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 
   hasher.Update(pipeline->iaState.deviceIndex);
 
+  // Relocatable shaders force an unlinked compilation.
+  hasher.Update(pipeline->unlinked || isRelocatableShader);
+
   if (stage != ShaderStageFragment) {
     if (!isRelocatableShader)
       updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
