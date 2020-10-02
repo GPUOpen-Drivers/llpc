@@ -1,0 +1,119 @@
+; Test that invalid image descriptor patching is applied where required.
+
+; RUN: lgc -mcpu=gfx900 -print-before=lgc-patch-null-frag-shader -o - - <%s 2>&1 | FileCheck --check-prefixes=CHECK,GFX900 %s
+; RUN: lgc -mcpu=gfx1010 -print-before=lgc-patch-null-frag-shader -o - - <%s 2>&1 | FileCheck --check-prefixes=CHECK,GFX1010 %s
+
+; CHECK-LABEL: IR Dump Before Patch LLVM for null fragment shader generation
+
+; GFX900: %.load = call <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15, i32 1, i32 0, <8 x i32> %.desc, i32 0, i32 0)
+; GFX1010: extractelement <8 x i32> %.desc, i64 3
+; GFX1010-NEXT: icmp sge i32
+; GFX1010-NEXT: and i32
+; GFX1010-NEXT: select i1
+; GFX1010-NEXT: [[PATCHED_DESC0:%[0-9]+]] = insertelement <8 x i32> %.desc
+; GFX1010:  %.load = call <4 x float> @llvm.amdgcn.image.load.1d.v4f32.i32(i32 15, i32 1, <8 x i32> [[PATCHED_DESC0]], i32 0, i32 0)
+
+; GFX900: call void @llvm.amdgcn.image.store.2d.v4f32.i32(<4 x float> zeroinitializer, i32 15, i32 0, i32 0, <8 x i32> %.desc, i32 0, i32 0)
+; GFX1010: extractelement <8 x i32> %.desc, i64 3
+; GFX1010-NEXT: icmp sge i32
+; GFX1010-NEXT: and i32
+; GFX1010-NEXT: select i1
+; GFX1010-NEXT: [[PATCHED_DESC1:%[0-9]+]] = insertelement <8 x i32> %.desc
+; GFX1010: call void @llvm.amdgcn.image.store.2d.v4f32.i32(<4 x float> zeroinitializer, i32 15, i32 0, i32 0, <8 x i32> [[PATCHED_DESC1]], i32 0, i32 0)
+
+; GFX900: %.sample = call <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> %.desc, <4 x i32> %.sampler, i1 false, i32 0, i32 0)
+; GFX1010: extractelement <8 x i32> %.desc, i64 3
+; GFX1010-NEXT: icmp sge i32
+; GFX1010-NEXT: and i32
+; GFX1010-NEXT: select i1
+; GFX1010-NEXT: [[PATCHED_DESC2:%[0-9]+]] = insertelement <8 x i32> %.desc
+; GFX1010: %.sample = call <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[PATCHED_DESC2]], <4 x i32> %.sampler, i1 false, i32 0, i32 0)
+
+; GFX900: %.gather = call <4 x float> @llvm.amdgcn.image.gather4.l.2d.v4f32.f32(i32 1, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> %.desc, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
+; GFX1010: extractelement <8 x i32> %.desc, i64 3
+; GFX1010-NEXT: icmp sge i32
+; GFX1010-NEXT: and i32
+; GFX1010-NEXT: select i1
+; GFX1010-NEXT: [[PATCHED_DESC3:%[0-9]+]] = insertelement <8 x i32> %.desc
+; GFX1010: %.gather = call <4 x float> @llvm.amdgcn.image.gather4.l.2d.v4f32.f32(i32 1, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[PATCHED_DESC3]], <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
+
+; GFX900: %.atomic = call i32 @llvm.amdgcn.image.atomic.add.2d.i32.i32(i32 1, i32 0, i32 0, <8 x i32> %.desc, i32 0, i32 0)
+; GFX1010: extractelement <8 x i32> %.desc, i64 3
+; GFX1010-NEXT: icmp sge i32
+; GFX1010-NEXT: and i32
+; GFX1010-NEXT: select i1
+; GFX1010-NEXT: [[PATCHED_DESC4:%[0-9]+]] = insertelement <8 x i32> %.desc
+; GFX1010: %.atomic = call i32 @llvm.amdgcn.image.atomic.add.1d.i32.i32(i32 1, i32 0, <8 x i32> [[PATCHED_DESC4]], i32 0, i32 0)
+
+; GFX900: %.lod = call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0.000000e+00, float 0.000000e+00, <8 x i32> %.desc, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
+; GFX1010: extractelement <8 x i32> %.desc, i64 3
+; GFX1010-NEXT: icmp sge i32
+; GFX1010-NEXT: and i32
+; GFX1010-NEXT: select i1
+; GFX1010-NEXT: [[PATCHED_DESC5:%[0-9]+]] = insertelement <8 x i32> %.desc
+; GFX1010: %.lod = call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[PATCHED_DESC5]], <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
+
+; GFX900: call <4 x float> @llvm.amdgcn.image.getresinfo.2d.v4f32.i32(i32 15, i32 0, <8 x i32> %.desc, i32 0, i32 0)
+; GFX1010: extractelement <8 x i32> %.desc, i64 3
+; GFX1010-NEXT: icmp sge i32
+; GFX1010-NEXT: and i32
+; GFX1010-NEXT: select i1
+; GFX1010-NEXT: [[PATCHED_DESC6:%[0-9]+]] = insertelement <8 x i32> %.desc
+; GFX1010: call <4 x float> @llvm.amdgcn.image.getresinfo.2d.v4f32.i32(i32 15, i32 0, <8 x i32> [[PATCHED_DESC6]], i32 0, i32 0)
+
+; GFX900: call float @llvm.amdgcn.image.getresinfo.2d.f32.i32(i32 8, i32 undef, <8 x i32> %.desc, i32 0, i32 0)
+; GFX1010: extractelement <8 x i32> %.desc, i64 3
+; GFX1010-NEXT: icmp sge i32
+; GFX1010-NEXT: and i32
+; GFX1010-NEXT: select i1
+; GFX1010-NEXT: [[PATCHED_DESC7:%[0-9]+]] = insertelement <8 x i32> %.desc
+; GFX1010: call float @llvm.amdgcn.image.getresinfo.2d.f32.i32(i32 8, i32 undef, <8 x i32> [[PATCHED_DESC7]], i32 0, i32 0)
+
+; ModuleID = 'lgcPipeline'
+source_filename = "lgcPipeline"
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
+target triple = "amdgcn--amdpal"
+
+; Function Attrs: nounwind
+define spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !0 !lgc.shaderstage !0 {
+.entry:
+  %.desc.ptr2 = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 3, i32 3)
+  %.desc.ptr1 = bitcast <8 x i32> addrspace(4)* %.desc.ptr2 to i8 addrspace(4)*
+  %.desc.ptr0 = getelementptr i8, i8 addrspace(4)* %.desc.ptr1, i64 0
+  %.desc.ptr = bitcast i8 addrspace(4)* %.desc.ptr0 to <8 x i32> addrspace(4)*
+  %.desc = load <8 x i32>, <8 x i32> addrspace(4)* %.desc.ptr, align 32
+  %.sampler.ptr = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 0, i32 13)
+  %.sampler = load <4 x i32>, <4 x i32> addrspace(4)* %.sampler.ptr, align 16
+
+  %.load = call <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 0, <8 x i32> %.desc, i32 1)
+  call void (...) @lgc.create.image.store(<4 x float> zeroinitializer, i32 1, i32 0, <8 x i32> %.desc, <2 x i32> zeroinitializer)
+
+  %.sample = call <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 0, <8 x i32> %.desc, <4 x i32> %.sampler, i32 1, <2 x float> zeroinitializer)
+  %.gather = call <4 x float> (...) @lgc.create.image.gather.v4f32(i32 1, i32 0, <8 x i32> %.desc, <4 x i32> %.sampler, i32 37, <2 x float> zeroinitializer, i32 0, float 0.000000e+00)
+
+  %.atomic = call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 0, i32 0, i32 0, <8 x i32> %.desc, i32 0, i32 1) #0
+
+  %.lod = call <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 1, i32 0, <8 x i32> %.desc, <4 x i32> %.sampler, <2 x float> zeroinitializer)
+
+  %.query.size = call <2 x i32> (...) @lgc.create.image.query.size.v2i32(i32 1, i32 0, <8 x i32> %.desc, i32 0)
+  %.query.levels = call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 0, <8 x i32> %.desc)
+
+  ret void
+}
+
+declare <8 x i32> addrspace(4)* @lgc.create.get.desc.ptr.p4v8i32(...) #1
+declare <4 x i32> addrspace(4)* @lgc.create.get.desc.ptr.p4v4i32(...) #1
+declare <4 x float> @lgc.create.image.load.v4f32(...) #1
+declare void @lgc.create.image.store(...) #2
+declare <4 x float> @lgc.create.image.sample.v4f32(...) #1
+declare <4 x float> @lgc.create.image.gather.v4f32(...) #1
+declare i32 @lgc.create.image.atomic.i32(...) #0
+declare <2 x float> @lgc.create.image.get.lod.v2f32(...) #0
+declare <2 x i32> @lgc.create.image.query.size.v2i32(...) #0
+declare i32 @lgc.create.image.query.levels.i32(...) #0
+
+attributes #0 = { nounwind }
+attributes #1 = { nounwind readonly }
+attributes #2 = { nounwind writeonly }
+
+!0 = !{i32 0}
