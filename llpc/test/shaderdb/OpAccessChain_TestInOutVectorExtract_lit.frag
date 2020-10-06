@@ -29,7 +29,7 @@ void main()
 ; SHADERTEST: select i1 %{{[0-9]*}}, float addrspace({{.*}})* %{{.*}}, float addrspace({{.*}})* %{{[0-9]*}}
 ; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 3
 ; SHADERTEST: select i1 %{{[0-9]*}}, float addrspace({{.*}})* %{{.*}}, float addrspace({{.*}})* %{{[0-9]*}}
-; SHADERTEST: store i32 %{{[0-9]*}}, i32 addrspace({{.*}})* %{{[0-9]*}}
+; SHADERTEST: store float %{{[0-9]*}}, float addrspace({{.*}})* %{{[0-9]*}}
 ; SHADERTEST: store float 0x3FD99999A0000000, float addrspace({{.*}})* %{{.*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
