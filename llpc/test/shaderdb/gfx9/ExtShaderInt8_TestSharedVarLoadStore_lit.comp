@@ -44,7 +44,7 @@ void main()
 ; RUN: amdllpc -enable-load-scalarizer=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-COUNT-4: getelementptr inbounds ([4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }], [4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }] addrspace(3)* @{{.*}}, i32 0, i32 {{[0-9]+}}, i32 {{[0-3]}})
+; SHADERTEST-COUNT-4: getelementptr {{.*}}[4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }], [4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }] addrspace(3)* @{{.*}}, i32 0, i32 {{%?[0-9]+}}, i32 {{[0-3]}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: load i8, i8 addrspace(3)* getelementptr inbounds ([4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }], [4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }] addrspace(3)* @{{.*}}, i32 0, i32 0, i32 0), align 16
 ; SHADERTEST: store i8 %{{[0-9]*}}, i8 addrspace(3)* getelementptr inbounds ([4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }], [4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }] addrspace(3)* @{{.*}}, i32 0, i32 0, i32 0), align 16
