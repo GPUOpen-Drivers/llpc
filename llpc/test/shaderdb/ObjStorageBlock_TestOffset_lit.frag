@@ -42,7 +42,6 @@ void main()
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> %{{.*}}, <4 x i32> %{{[0-9]*}}, i32 128
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 256
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v2i32(<2 x i32> %{{.*}}, <4 x i32> %{{[0-9]*}}, i32 512
-; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 256
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
