@@ -88,7 +88,7 @@ bool PatchBufferOp::runOnFunction(Function &function) {
 
   m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(function.getParent());
   m_context = &function.getContext();
-  m_builder.reset(new IRBuilder<>(*m_context));
+  m_builder = std::make_unique<IRBuilder<>>(*m_context);
 
   // Invoke visitation of the target instructions.
   auto pipelineShaders = &getAnalysis<PipelineShaders>();

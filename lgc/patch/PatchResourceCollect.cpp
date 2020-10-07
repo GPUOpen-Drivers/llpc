@@ -66,7 +66,7 @@ ModulePass *createPatchResourceCollect() {
 // =====================================================================================================================
 PatchResourceCollect::PatchResourceCollect()
     : Patch(ID), m_hasDynIndexedInput(false), m_hasDynIndexedOutput(false), m_resUsage(nullptr) {
-  m_locationMapManager.reset(new InOutLocationMapManager);
+  m_locationMapManager = std::make_unique<InOutLocationMapManager>();
 }
 
 // =====================================================================================================================

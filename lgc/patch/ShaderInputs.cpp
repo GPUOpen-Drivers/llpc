@@ -630,6 +630,6 @@ ShaderInputs::ShaderInputsUsage *ShaderInputs::getShaderInputsUsage(ShaderStage 
 ShaderInputs::ShaderInputUsage *ShaderInputs::getShaderInputUsage(ShaderStage stage, unsigned inputKind) {
   ShaderInputsUsage *inputsUsage = getShaderInputsUsage(stage);
   if (!inputsUsage->inputs[inputKind])
-    inputsUsage->inputs[inputKind].reset(new ShaderInputUsage());
+    inputsUsage->inputs[inputKind] = std::make_unique<ShaderInputUsage>();
   return &*inputsUsage->inputs[inputKind];
 }

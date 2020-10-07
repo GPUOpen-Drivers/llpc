@@ -328,7 +328,7 @@ ShaderModes *BuilderRecorder::getShaderModes() {
   if (m_pipelineState)
     return m_pipelineState->getShaderModes();
   if (!m_shaderModes)
-    m_shaderModes.reset(new ShaderModes());
+    m_shaderModes = std::make_unique<ShaderModes>();
   return &*m_shaderModes;
 }
 
