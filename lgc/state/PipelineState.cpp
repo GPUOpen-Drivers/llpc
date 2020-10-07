@@ -1070,7 +1070,7 @@ ResourceUsage *PipelineState::getShaderResourceUsage(ShaderStage shaderStage) {
 
   auto &resUsage = MutableArrayRef<std::unique_ptr<ResourceUsage>>(m_resourceUsage)[shaderStage];
   if (!resUsage) {
-    resUsage.reset(new ResourceUsage(shaderStage));
+    resUsage = std::make_unique<ResourceUsage>(shaderStage);
   }
   return &*resUsage;
 }
@@ -1085,7 +1085,7 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStage shaderStage) {
 
   auto &intfData = MutableArrayRef<std::unique_ptr<InterfaceData>>(m_interfaceData)[shaderStage];
   if (!intfData) {
-    intfData.reset(new InterfaceData());
+    intfData = std::make_unique<InterfaceData>();
   }
   return &*intfData;
 }
@@ -1250,7 +1250,7 @@ StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
 // @param module : IR module
 PipelineState *PipelineStateWrapper::getPipelineState(Module *module) {
   if (!m_pipelineState) {
-    m_allocatedPipelineState.reset(new PipelineState(m_builderContext));
+    m_allocatedPipelineState = std::make_unique<PipelineState>(m_builderContext);
     m_pipelineState = &*m_allocatedPipelineState;
     m_pipelineState->readState(module);
   }

@@ -86,7 +86,7 @@ bool PatchLoadScalarizer::runOnFunction(Function &function) {
   if (m_scalarThreshold == 0)
     return false;
 
-  m_builder.reset(new IRBuilder<>(function.getContext()));
+  m_builder = std::make_unique<IRBuilder<>>(function.getContext());
 
   visit(function);
 
