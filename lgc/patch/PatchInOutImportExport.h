@@ -35,6 +35,8 @@
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/Analysis/PostDominators.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/InstVisitor.h"
 #include <set>
 
@@ -52,6 +54,7 @@ public:
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
     analysisUsage.addRequired<PipelineStateWrapper>();
     analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addRequired<llvm::PostDominatorTreeWrapperPass>();
     analysisUsage.addPreserved<PipelineShaders>();
   }
 
@@ -67,6 +70,7 @@ private:
 
   void initPerShader();
 
+  void markExportDone(llvm::Function *func, llvm::PostDominatorTree &postDomTree);
   void processShader();
 
   llvm::Value *patchTcsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
@@ -200,8 +204,6 @@ private:
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
   FragColorExport *m_fragColorExport; // Fragment color export manager
-
-  llvm::CallInst *m_lastExport; // Last "export" intrinsic for which "done" flag is valid
 
   llvm::Value *m_clipDistance; // Correspond to "out float gl_ClipDistance[]"
   llvm::Value *m_cullDistance; // Correspond to "out float gl_CullDistance[]"
