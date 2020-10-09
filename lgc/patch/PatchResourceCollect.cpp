@@ -32,7 +32,6 @@
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
 #include "NggLdsManager.h"
-#include "NggPrimShader.h"
 #include "lgc/Builder.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
@@ -614,7 +613,11 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     const auto nggControl = m_pipelineState->getNggControl();
 
     if (nggControl->enableNgg) {
-      unsigned esGsRingItemSize = NggPrimShader::calcEsGsRingItemSize(m_pipelineState); // In dwords
+      // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
+      const unsigned esGsRingItemSize = hasGs ? ((4 * std::max(1u,
+                                                               gsResUsage->inOutUsage.inputMapLocCount)) |
+                                                 1)
+                                              : 4; // Always 4 components for NGG when GS is not present
 
       const unsigned gsVsRingItemSize =
           hasGs ? std::max(1u, 4 * gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices) : 0;
@@ -949,11 +952,11 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   LLPC_OUTS("ES vertices per sub-group: " << gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup << "\n");
   LLPC_OUTS("GS primitives per sub-group: " << gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup << "\n");
   LLPC_OUTS("\n");
-  LLPC_OUTS("ES-GS LDS size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize << "\n");
-  LLPC_OUTS("On-chip GS LDS size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << "\n");
+  LLPC_OUTS("ES-GS LDS size: " << gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize << "\n");
+  LLPC_OUTS("On-chip GS LDS size: " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << "\n");
   LLPC_OUTS("\n");
-  LLPC_OUTS("ES-GS ring item size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << "\n");
-  LLPC_OUTS("GS-VS ring item size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << "\n");
+  LLPC_OUTS("ES-GS ring item size: " << gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << "\n");
+  LLPC_OUTS("GS-VS ring item size: " << gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << "\n");
   LLPC_OUTS("\n");
 
   LLPC_OUTS("GS stream item size:\n");

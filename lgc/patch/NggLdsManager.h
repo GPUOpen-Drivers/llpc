@@ -45,14 +45,28 @@ enum NggLdsRegionType {
   //
   // LDS region for ES only (no GS)
   //
-  LdsRegionDistribPrimId,     // Distributed primitive ID (VS only, for both pass-through and culling modes)
-  LdsRegionVertPosData,       // Vertex position data
-  LdsRegionVertCullInfo,      // Vertex cull info
+  LdsRegionDistribPrimId = 0, // Distributed primitive ID (a special region, overlapped with the region of
+                              //   position data in NGG non pass-through mode)
+  LdsRegionPosData,           // Position data to export
+  LdsRegionDrawFlag,          // Draw flag indicating whether the vertex survives
   LdsRegionVertCountInWaves,  // Vertex count accumulated per wave (8 potential waves) and per sub-group
-  LdsRegionVertThreadIdMap,   // Vertex thread ID map (compacted -> uncompacted)
+  LdsRegionCullDistance,      // Aggregated sign value of cull distance (bitmask)
+
+  // Below regions are for vertex compaction
+  LdsRegionVertThreadIdMap,   // Vertex thread ID map (uncompacted -> compacted)
+  LdsRegionCompactVertexId,   // Vertex ID (VS only)
+  LdsRegionCompactInstanceId, // Instance ID (VS only)
+  LdsRegionCompactPrimId,     // Primitive ID (VS only)
+  LdsRegionCompactTessCoordX, // X of tessCoord (U) (TES only)
+  LdsRegionCompactTessCoordY, // Y of tessCoord (V) (TES only)
+  LdsRegionCompactPatchId,    // Patch ID (TES only)
+  LdsRegionCompactRelPatchId, // Relative patch ID (TES only)
+
+  LdsRegionCompactBeginRange = LdsRegionVertThreadIdMap,
+  LdsRegionCompactEndRange = LdsRegionCompactRelPatchId,
 
   LdsRegionEsBeginRange = LdsRegionDistribPrimId,
-  LdsRegionEsEndRange = LdsRegionVertThreadIdMap,
+  LdsRegionEsEndRange = LdsRegionCompactRelPatchId,
 
   //
   // LDS region for ES-GS
@@ -109,6 +123,8 @@ private:
   llvm::GlobalValue *m_lds; // Global variable to model NGG LDS
 
   unsigned m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in bytes)
+
+  unsigned m_waveCountInSubgroup; // Wave count in sub-group
 
   llvm::IRBuilder<> *m_builder; // LLVM IR builder
 };
