@@ -37,19 +37,11 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #define DEBUG_TYPE "lgc-ngg-prim-shader"
 
 using namespace llvm;
-
-// -ngg-small-subgroup-threshold: threshold of vertex count to determine a small subgroup (NGG)
-static cl::opt<unsigned> NggSmallSubgroupThreshold(
-    "ngg-small-subgroup-threshold",
-    cl::desc(
-        "Threshold of vertex count to determine a small subgroup and such small subgroup won't perform NGG culling"),
-    cl::value_desc("threshold"), cl::init(16));
 
 namespace lgc {
 
@@ -756,39 +748,34 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   //     Barrier
   //   }
   //
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Initialize vertex draw flag
+  //   if (threadIdInSubgroup < waveCount + 1)
+  //     Initialize per-wave and per-subgroup count of output vertices
+  //
   //   if (threadIdInWave < vertCountInWave)
-  //     Run ES-partial to fetch vertex cull data
+  //     Write vertex cull data
+  //   Barrier
   //
-  //   if (!runtimePassthrough) {
-  //     if (threadIdInSubgroup < vertCountInSubgroup)
-  //       Initialize vertex draw flag
-  //     if (threadIdInSubgroup < waveCount + 1)
-  //       Initialize per-wave and per-subgroup count of output vertices
-  //
-  //     if (threadIdInWave < vertCountInWave)
-  //       Write vertex cull data
-  //     Barrier
-  //
-  //     if (threadIdInSubgroup < primCountInSubgroup) {
-  //       Do culling (run culling algorithms)
-  //       if (primitive not culled)
-  //         Write draw flags of forming vertices
-  //     }
-  //     Barrier
-  //
-  //     if (threadIdInSubgroup < vertCountInSubgroup)
-  //       Check draw flags of vertices and compute draw mask
-  //
-  //     if (threadIdInWave < waveCount - waveId)
-  //       Accumulate per-wave and per-subgroup count of output vertices
-  //     Barrier
-  //
-  //     if (vertex compacted && vertex drawed) {
-  //       Compact vertex thread ID (map: compacted -> uncompacted)
-  //       Write vertex compaction info
-  //     }
-  //     Update vertCountInSubgroup and primCountInSubgroup
+  //   if (threadIdInSubgroup < primCountInSubgroup) {
+  //     Do culling (run culling algorithms)
+  //     if (primitive not culled)
+  //       Write draw flags of forming vertices
   //   }
+  //   Barrier
+  //
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Check draw flags of vertices and compute draw mask
+  //
+  //   if (threadIdInWave < waveCount - waveId)
+  //     Accumulate per-wave and per-subgroup count of output vertices
+  //   Barrier
+  //
+  //   if (vertex compacted && vertex drawed) {
+  //     Compact vertex thread ID (map: compacted -> uncompacted)
+  //     Write vertex compaction info
+  //   }
+  //   Update vertCountInSubgroup and primCountInSubgroup
   //
   //   if (waveId == 0)
   //     GS allocation request (GS_ALLOC_REQ)
@@ -834,12 +821,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     endReadPrimIdBlock = createBlock(entryPoint, ".endReadPrimId");
   }
 
-  auto fetchVertCullDataBlock = createBlock(entryPoint, ".fetchVertCullData");
-  auto endFetchVertCullDataBlock = createBlock(entryPoint, ".endFetchVertCullData");
-
-  auto runtimePassthroughBlock = createBlock(entryPoint, ".runtimePassthrough");
-  auto noRuntimePassthroughBlock = createBlock(entryPoint, ".noRuntimePassthrough");
-
   auto initVertDrawFlagBlock = createBlock(entryPoint, ".initVertDrawFlag");
   auto endInitVertDrawFlagBlock = createBlock(entryPoint, ".endInitVertDrawFlag");
 
@@ -862,7 +843,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   auto compactVertBlock = createBlock(entryPoint, ".compactVert");
   auto endCompactVertBlock = createBlock(entryPoint, ".endCompactVert");
 
-  auto checkAllocReqBlock = createBlock(entryPoint, ".checkAllocReq");
   auto allocReqBlock = createBlock(entryPoint, ".allocReq");
   auto endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
 
@@ -897,8 +877,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.primCountInWave);
       m_builder->CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
     } else {
-      auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
-      m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
+      auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
+      m_builder->CreateCondBr(vertValid, initVertDrawFlagBlock, endInitVertDrawFlagBlock);
     }
   }
 
@@ -953,59 +933,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-      auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
-      m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
+      auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
+      m_builder->CreateCondBr(vertValid, initVertDrawFlagBlock, endInitVertDrawFlagBlock);
     }
-  }
-
-  // Construct ".fetchVertCullData" block
-  Value *cullData = nullptr;
-  Value *position = nullptr;
-  {
-    m_builder->SetInsertPoint(fetchVertCullDataBlock);
-
-    // Split ES to two parts: fetch cull data before NGG culling; do deferred vertex export after NGG culling
-    splitEs(module);
-
-    // Run ES-partial to fetch cull data
-    auto cullData = runEsPartial(module, entryPoint->arg_begin());
-    position = m_nggControl->enableCullDistanceCulling ? m_builder->CreateExtractValue(cullData, 0) : cullData;
-
-    m_builder->CreateBr(endFetchVertCullDataBlock);
-  }
-
-  // Construct ".endFetchVertCullData" block
-  {
-    m_builder->SetInsertPoint(endFetchVertCullDataBlock);
-
-    PHINode *positionPhi = m_builder->CreatePHI(FixedVectorType::get(m_builder->getFloatTy(), 4), 2, "position");
-    positionPhi->addIncoming(position, fetchVertCullDataBlock);
-    positionPhi->addIncoming(UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 4)),
-                             distributePrimitiveId ? endReadPrimIdBlock : entryBlock);
-    position = positionPhi; // Update vertex position data
-
-    auto runtimePassthrough =
-        m_builder->CreateICmpULT(m_nggFactor.vertCountInSubgroup, m_builder->getInt32(NggSmallSubgroupThreshold));
-    m_builder->CreateCondBr(runtimePassthrough, runtimePassthroughBlock, noRuntimePassthroughBlock);
-  }
-
-  // Construct ".runtimePassthrough" block
-  {
-    m_builder->SetInsertPoint(runtimePassthroughBlock);
-
-    if (!distributePrimitiveId) {
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    }
-
-    m_builder->CreateBr(checkAllocReqBlock);
-  }
-
-  // Construct ".noRuntimePassthrough" block
-  {
-    m_builder->SetInsertPoint(noRuntimePassthroughBlock);
-
-    auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
-    m_builder->CreateCondBr(vertValid, initVertDrawFlagBlock, endInitVertDrawFlagBlock);
   }
 
   // Construct ".initVertDrawFlag" block
@@ -1044,8 +974,16 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   }
 
   // Construct ".writeVertexCullData" block
+  Value *position = nullptr;
   {
     m_builder->SetInsertPoint(writeVertCullDataBlock);
+
+    // Split ES to two parts: fetch cull data before NGG culling; do deferred vertex export after NGG culling
+    splitEs(module);
+
+    // Run ES-partial to fetch cull data
+    auto cullData = runEsPartial(module, entryPoint->arg_begin());
+    position = m_nggControl->enableCullDistanceCulling ? m_builder->CreateExtractValue(cullData, 0) : cullData;
 
     // Write vertex position data
     writePerThreadDataToLds(position, m_nggFactor.threadIdInSubgroup, LdsRegionVertPosData, true);
@@ -1076,6 +1014,12 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   // Construct ".endWriteVertCullData" block
   {
     m_builder->SetInsertPoint(endWriteVertCullDataBlock);
+
+    PHINode *positionPhi = m_builder->CreatePHI(FixedVectorType::get(m_builder->getFloatTy(), 4), 2);
+    positionPhi->addIncoming(position, writeVertCullDataBlock);
+    positionPhi->addIncoming(UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 4)), endInitVertCountBlock);
+    position = positionPhi; // Update vertex position data
+    position->setName("position");
 
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
@@ -1182,7 +1126,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   // Construct ".endAccumVertCount" block
   Value *vertCountInPrevWaves = nullptr;
   Value *vertCountInSubgroup = nullptr;
-  Value *vertCompacted = nullptr;
   {
     m_builder->SetInsertPoint(endAccumVertCountBlock);
 
@@ -1200,7 +1143,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     vertCountInPrevWaves =
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {vertCountInWaves, m_nggFactor.waveIdInSubgroup});
 
-    vertCompacted = m_builder->CreateICmpULT(vertCountInSubgroup, m_nggFactor.vertCountInSubgroup);
+    auto vertCompacted = m_builder->CreateICmpULT(vertCountInSubgroup, m_nggFactor.vertCountInSubgroup);
+
+    // Record vertex compaction flag
+    m_nggFactor.vertCompacted = vertCompacted;
 
     m_builder->CreateCondBr(m_builder->CreateAnd(drawFlag, vertCompacted), compactVertBlock, endCompactVertBlock);
   }
@@ -1261,16 +1207,13 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
   // Construct ".endCompactVert" block
   Value *fullyCulled = nullptr;
-  Value *primCountInSubgroup = nullptr;
   {
     m_builder->SetInsertPoint(endCompactVertBlock);
 
-    // m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
     fullyCulled = m_builder->CreateICmpEQ(vertCountInSubgroup, m_builder->getInt32(0));
 
-    primCountInSubgroup = m_builder->CreateSelect(fullyCulled, m_builder->getInt32(fullyCulledExportCount),
-                                                  m_nggFactor.primCountInSubgroup);
+    Value *primCountInSubgroup = m_builder->CreateSelect(fullyCulled, m_builder->getInt32(fullyCulledExportCount),
+                                                         m_nggFactor.primCountInSubgroup);
 
     // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
     // as an uniform value later. This is similar to the provided primitive count in sub-group that is
@@ -1285,45 +1228,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     // sub-group.
     vertCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInSubgroup);
 
-    m_builder->CreateBr(checkAllocReqBlock);
-  }
-
-  // Construct ".checkAllocReq" block
-  {
-    m_builder->SetInsertPoint(checkAllocReqBlock);
-
-    // NOTE: Here, we make several phi nodes to update some values that are different in runtime passthrough path
-    // and no runtime passthrough path (normal culling path).
-
-    // Update vertex compaction flag
-    auto vertCompactedPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2, "vertCompacted");
-    vertCompactedPhi->addIncoming(vertCompacted, endCompactVertBlock);
-    vertCompactedPhi->addIncoming(m_builder->getFalse(), runtimePassthroughBlock);
-    m_nggFactor.vertCompacted = vertCompactedPhi; // Record vertex compaction flag
-
-    // Update cull flag
-    auto cullFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2, "cullFlag");
-    cullFlagPhi->addIncoming(cullFlag, endCompactVertBlock);
-    cullFlagPhi->addIncoming(m_builder->getFalse(), runtimePassthroughBlock);
-    cullFlag = cullFlagPhi;
-
-    // Update fully-culled flag
-    auto fullyCulledPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2, "fullyCulled");
-    fullyCulledPhi->addIncoming(fullyCulled, endCompactVertBlock);
-    fullyCulledPhi->addIncoming(m_builder->getFalse(), runtimePassthroughBlock);
-    fullyCulled = fullyCulledPhi;
-
-    // Update primitive count in sub-group
-    auto primCountInSubgroupPhi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-    primCountInSubgroupPhi->addIncoming(primCountInSubgroup, endCompactVertBlock);
-    primCountInSubgroupPhi->addIncoming(m_nggFactor.primCountInSubgroup, runtimePassthroughBlock);
-    m_nggFactor.primCountInSubgroup = primCountInSubgroupPhi; // Record primitive count in subgroup
-
-    // Update vertex count in sub-group
-    auto vertCountInSubgroupPhi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-    vertCountInSubgroupPhi->addIncoming(vertCountInSubgroup, endCompactVertBlock);
-    vertCountInSubgroupPhi->addIncoming(m_nggFactor.vertCountInSubgroup, runtimePassthroughBlock);
-    m_nggFactor.vertCountInSubgroup = vertCountInSubgroupPhi; // Record vertex count in subgroup
+    // Update primitive/vertex count in sub-group
+    m_nggFactor.primCountInSubgroup = primCountInSubgroup;
+    m_nggFactor.vertCountInSubgroup = vertCountInSubgroup;
 
     auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
     m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
