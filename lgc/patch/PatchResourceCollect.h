@@ -75,16 +75,17 @@ private:
 
   bool isVertexReuseDisabled();
 
-  void clearInactiveInput();
-  void clearInactiveOutput();
+  void clearInactiveBuiltInInput();
+  void clearInactiveBuiltInOutput();
 
   void matchGenericInOut();
   void mapBuiltInToGenericInOut();
 
   void mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
 
+  void updateInOutLocMap(bool isInput);
   void packInOutLocation();
-  void fillInOutLocInfoMap();
+  void buildInOutLocInfoMap();
   void reassembleOutputExportCalls();
 
   // Input/output scalarizing
@@ -97,22 +98,19 @@ private:
 
   std::vector<llvm::CallInst *> m_deadCalls; // Dead calls
 
-  std::unordered_set<unsigned> m_activeInputLocs;      // Locations of active generic inputs
   std::unordered_set<unsigned> m_activeInputBuiltIns;  // IDs of active built-in inputs
   std::unordered_set<unsigned> m_activeOutputBuiltIns; // IDs of active built-in outputs
 
   std::unordered_set<unsigned> m_importedOutputLocs;     // Locations of imported generic outputs
   std::unordered_set<unsigned> m_importedOutputBuiltIns; // IDs of imported built-in outputs
 
-  std::vector<llvm::CallInst *> m_inputCalls;  // The scalarzied input import calls
-  std::vector<llvm::CallInst *> m_outputCalls; // The scalarized output export calls
+  std::vector<llvm::CallInst *> m_inputCalls;  // The input import calls
+  std::vector<llvm::CallInst *> m_outputCalls; // The output export calls
 
-  bool m_hasDynIndexedInput;  // Whether dynamic indices are used in generic input addressing (valid
-                              // for tessellation shader)
-  bool m_hasDynIndexedOutput; // Whether dynamic indices are used in generic output addressing (valid
-                              // for tessellation control shader)
   ResourceUsage *m_resUsage;  // Pointer to shader resource usage
   std::unique_ptr<InOutLocationMapManager> m_locationMapManager; // Pointer to InOutLocationMapManager instance
+  bool m_inOutPackStates[ShaderStageGfxCount][2] = {
+      {false, false}}; // The input and output packable state of each shader stage, 0-input, 1-output
 };
 
 // Represents the compatibility info of input/output

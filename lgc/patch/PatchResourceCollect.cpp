@@ -64,9 +64,7 @@ ModulePass *createPatchResourceCollect() {
 }
 
 // =====================================================================================================================
-PatchResourceCollect::PatchResourceCollect()
-    : Patch(ID), m_hasDynIndexedInput(false), m_hasDynIndexedOutput(false), m_resUsage(nullptr) {
-  m_locationMapManager = std::make_unique<InOutLocationMapManager>();
+PatchResourceCollect::PatchResourceCollect() : Patch(ID), m_resUsage(nullptr) {
 }
 
 // =====================================================================================================================
@@ -80,9 +78,17 @@ bool PatchResourceCollect::runOnModule(Module &module) {
   m_pipelineShaders = &getAnalysis<PipelineShaders>();
   m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
-  // If packing {VS, TES} outputs and {TCS, FS} inputs, scalarize those outputs and inputs now.
-  if (m_pipelineState->canPackInOut())
+  if (m_pipelineState->canPackInOut()) {
+    m_locationMapManager = std::make_unique<InOutLocationMapManager>();
+    // Supported packing input and ouput
+    m_inOutPackStates[ShaderStageFragment][0] = true;
+    m_inOutPackStates[ShaderStageTessEval][1] = true;
+    m_inOutPackStates[ShaderStageTessControl][0] = true;
+    m_inOutPackStates[ShaderStageVertex][1] = true;
+
+    // If packing {VS, TES} outputs and {TCS, FS} inputs, scalarize those outputs and inputs now.
     scalarizeForInOutPacking(&module);
+  }
 
   // Process each shader stage, in reverse order.
   for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage) {
@@ -1046,15 +1052,13 @@ unsigned PatchResourceCollect::getVerticesPerPrimitive() const {
 // =====================================================================================================================
 // Process a single shader
 void PatchResourceCollect::processShader() {
-  m_hasDynIndexedInput = false;
-  m_hasDynIndexedOutput = false;
   m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
   // Invoke handling of "call" instruction
   visit(m_entryPoint);
 
-  clearInactiveInput();
-  clearInactiveOutput();
+  clearInactiveBuiltInInput();
+  clearInactiveBuiltInOutput();
 
   if (m_pipelineState->isGraphics()) {
     matchGenericInOut();
@@ -1128,78 +1132,12 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
 
   auto mangledName = callee->getName();
 
-  if (mangledName.startswith(lgcName::InputImportGeneric)) {
-    // Generic input import
+  if (mangledName.startswith(lgcName::InputImportGeneric) || mangledName.startswith(lgcName::InputImportInterpolant) ||
+      mangledName.startswith(lgcName::InputImportVertex)) {
     if (isDeadCall)
       m_deadCalls.push_back(&callInst);
-    else {
-      auto inputTy = callInst.getType();
-      assert(inputTy->isSingleValueType());
-
-      auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-
-      if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval) {
-        auto locOffset = callInst.getOperand(1);
-        auto compIdx = callInst.getOperand(2);
-
-        if (isa<ConstantInt>(locOffset)) {
-          // Location offset is constant
-          loc += cast<ConstantInt>(locOffset)->getZExtValue();
-
-          auto bitWidth = inputTy->getScalarSizeInBits();
-          if (bitWidth == 64) {
-            if (isa<ConstantInt>(compIdx)) {
-
-              m_activeInputLocs.insert(loc);
-              if (cast<ConstantInt>(compIdx)->getZExtValue() >= 2) {
-                // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
-                // occupied locations are two.
-                m_activeInputLocs.insert(loc + 1);
-              }
-            } else {
-              // NOTE: If vector component index is not constant, we treat this as dynamic indexing.
-              m_hasDynIndexedInput = true;
-            }
-          } else {
-            // NOTE: For non 64-bit vector/scalar, one location is sufficient regardless of vector component
-            // addressing.
-            assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
-            m_activeInputLocs.insert(loc);
-          }
-        } else {
-          // NOTE: If location offset is not constant, we treat this as dynamic indexing.
-          m_hasDynIndexedInput = true;
-        }
-      } else {
-        m_activeInputLocs.insert(loc);
-        if (inputTy->getPrimitiveSizeInBits() > (8 * SizeOfVec4)) {
-          assert(inputTy->getPrimitiveSizeInBits() <= (8 * 2 * SizeOfVec4));
-          m_activeInputLocs.insert(loc + 1);
-        }
-      }
-    }
-  } else if (mangledName.startswith(lgcName::InputImportInterpolant)) {
-    // Interpolant input import
-    assert(m_shaderStage == ShaderStageFragment);
-
-    if (isDeadCall)
-      m_deadCalls.push_back(&callInst);
-    else {
-      assert(callInst.getType()->isSingleValueType());
-
-      auto locOffset = callInst.getOperand(1);
-      if (isa<ConstantInt>(locOffset)) {
-        // Location offset is constant
-        auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-        loc += cast<ConstantInt>(locOffset)->getZExtValue();
-
-        assert(callInst.getType()->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
-        m_activeInputLocs.insert(loc);
-      } else {
-        // NOTE: If location offset is not constant, we consider dynamic indexing occurs.
-        m_hasDynIndexedInput = true;
-      }
-    }
+    else
+      m_inputCalls.push_back(&callInst);
   } else if (mangledName.startswith(lgcName::InputImportBuiltIn)) {
     // Built-in input import
     if (isDeadCall)
@@ -1218,63 +1156,24 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
     auto locOffset = callInst.getOperand(1);
     auto compIdx = callInst.getOperand(2);
-
-    if (isa<ConstantInt>(locOffset)) {
-      // Location offset is constant
+    // Location offset is constant
+    if (isa<ConstantInt>(locOffset) && isa<ConstantInt>(compIdx)) {
       loc += cast<ConstantInt>(locOffset)->getZExtValue();
-
+      m_importedOutputLocs.insert(loc);
       auto bitWidth = outputTy->getScalarSizeInBits();
-      if (bitWidth == 64) {
-        if (isa<ConstantInt>(compIdx)) {
-          m_importedOutputLocs.insert(loc);
-          if (cast<ConstantInt>(compIdx)->getZExtValue() >= 2) {
-            // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
-            // occupied locations are two.
-            m_importedOutputLocs.insert(loc + 1);
-          }
-        } else {
-          // NOTE: If vector component index is not constant, we treat this as dynamic indexing.
-          m_hasDynIndexedOutput = true;
-        }
-      } else {
-        // NOTE: For non 64-bit vector/scalar, one location is sufficient regardless of vector component
-        // addressing.
-        assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
-        m_importedOutputLocs.insert(loc);
+      if (bitWidth == 64 && cast<ConstantInt>(compIdx)->getZExtValue() >= 2) {
+        // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
+        // occupied locations are two.
+        m_importedOutputLocs.insert(loc + 1);
       }
-    } else {
-      // NOTE: If location offset is not constant, we treat this as dynamic indexing.
-      m_hasDynIndexedOutput = true;
     }
   } else if (mangledName.startswith(lgcName::OutputImportBuiltIn)) {
     // Built-in output import
     assert(m_shaderStage == ShaderStageTessControl);
-
     unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
     m_importedOutputBuiltIns.insert(builtInId);
   } else if (mangledName.startswith(lgcName::OutputExportGeneric)) {
-    // Generic output export
-    if (m_shaderStage == ShaderStageTessControl) {
-      auto output = callInst.getOperand(callInst.getNumArgOperands() - 1);
-      auto outputTy = output->getType();
-      assert(outputTy->isSingleValueType());
-
-      auto locOffset = callInst.getOperand(1);
-      auto compIdx = callInst.getOperand(2);
-
-      if (isa<ConstantInt>(locOffset)) {
-        // Location offset is constant
-        auto bitWidth = outputTy->getScalarSizeInBits();
-        if (bitWidth == 64 && !isa<ConstantInt>(compIdx)) {
-          // NOTE: If vector component index is not constant and it is vector component addressing for
-          // 64-bit vector, we treat this as dynamic indexing.
-          m_hasDynIndexedOutput = true;
-        }
-      } else {
-        // NOTE: If location offset is not constant, we consider dynamic indexing occurs.
-        m_hasDynIndexedOutput = true;
-      }
-    }
+    m_outputCalls.push_back(&callInst);
   } else if (mangledName.startswith(lgcName::OutputExportBuiltIn)) {
     // NOTE: If output value is undefined one, we can safely drop it and remove the output export call.
     // Currently, do this for geometry shader.
@@ -1288,61 +1187,11 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       }
     }
   }
-
-  if (m_pipelineState->canPackInOut()) {
-    if ((m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl) &&
-        (mangledName.startswith(lgcName::InputImportGeneric) ||
-         mangledName.startswith(lgcName::InputImportInterpolant)) &&
-        !isDeadCall) {
-      // Collect active input import (generic/interpolant) call to build inputLocInfoMap in TCS/FS
-      m_inputCalls.push_back(&callInst);
-    } else if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() &&
-               mangledName.startswith(lgcName::OutputExportGeneric)) {
-      // Collect the scalarized output export calls in the last vertex processing stage
-      m_outputCalls.push_back(&callInst);
-    }
-  }
 }
 
 // =====================================================================================================================
 // Clears inactive (those actually unused) inputs.
-void PatchResourceCollect::clearInactiveInput() {
-  // Clear those inactive generic inputs, remove them from location mappings
-  if (m_pipelineState->isGraphics() && !m_hasDynIndexedInput && m_shaderStage != ShaderStageTessEval &&
-      !m_pipelineState->isUnlinked()) {
-    // TODO: Here, we keep all generic inputs of tessellation evaluation shader. This is because corresponding
-    // generic outputs of tessellation control shader might involve in output import and dynamic indexing, which
-    // is easy to cause incorrectness of location mapping.
-
-    // Clear normal inputs
-    std::unordered_set<unsigned> unusedLocs;
-    for (auto locInfoMap : m_resUsage->inOutUsage.inputLocInfoMap) {
-      unsigned origLocInfoInt = locInfoMap.first;
-      unsigned loc = reinterpret_cast<InOutLocationInfo *>(&origLocInfoInt)->location;
-      if (m_activeInputLocs.find(loc) == m_activeInputLocs.end())
-        unusedLocs.insert(locInfoMap.first);
-    }
-
-    for (auto locInfo : unusedLocs)
-      m_resUsage->inOutUsage.inputLocInfoMap.erase(locInfo);
-
-    // Clear per-patch inputs
-    if (m_shaderStage == ShaderStageTessEval) {
-      unusedLocs.clear();
-      for (auto locMap : m_resUsage->inOutUsage.perPatchInputLocMap) {
-        unsigned loc = locMap.first;
-        if (m_activeInputLocs.find(loc) == m_activeInputLocs.end())
-          unusedLocs.insert(loc);
-      }
-
-      for (auto loc : unusedLocs)
-        m_resUsage->inOutUsage.perPatchInputLocMap.erase(loc);
-    } else {
-      // For other stages, must be empty
-      assert(m_resUsage->inOutUsage.perPatchInputLocMap.empty());
-    }
-  }
-
+void PatchResourceCollect::clearInactiveBuiltInInput() {
   // Clear those inactive built-in inputs (some are not checked, whose usage flags do not rely on their
   // actual uses)
   auto &builtInUsage = m_resUsage->builtInUsage;
@@ -1562,7 +1411,7 @@ void PatchResourceCollect::clearInactiveInput() {
 
 // =====================================================================================================================
 // Clears inactive (those actually unused) outputs.
-void PatchResourceCollect::clearInactiveOutput() {
+void PatchResourceCollect::clearInactiveBuiltInOutput() {
   // Clear inactive output builtins
   if (m_shaderStage == ShaderStageGeometry) {
     auto &builtInUsage = m_resUsage->builtInUsage.gs;
@@ -1597,121 +1446,38 @@ void PatchResourceCollect::clearInactiveOutput() {
 // NOTE: This function should be called after the cleanup work of inactive inputs is done.
 void PatchResourceCollect::matchGenericInOut() {
   assert(m_pipelineState->isGraphics());
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
 
+  // Do input/output matching and location remapping
+  for (unsigned idx = 0; idx < 2; ++idx) {
+    // Index 0 indicates input and index 1 indicates output
+    // True means perform packing on input/output, otherwise no packing
+    if (m_inOutPackStates[m_shaderStage][idx])
+      packInOutLocation();
+    else
+      updateInOutLocMap(idx == 0);
+  }
+
+  // Update location count of input/output
+  LLPC_OUTS("===============================================================================\n");
+  LLPC_OUTS("// LLPC location input/output mapping results (" << getShaderStageAbbreviation(m_shaderStage)
+
+                                                              << " shader)\n\n");
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &inLocInfoMap = inOutUsage.inputLocInfoMap;
   auto &outLocInfoMap = inOutUsage.outputLocInfoMap;
-
   auto &perPatchInLocMap = inOutUsage.perPatchInputLocMap;
   auto &perPatchOutLocMap = inOutUsage.perPatchOutputLocMap;
 
-  // Do input/output matching
-  if (!m_pipelineState->isUnlinked() && m_shaderStage != ShaderStageFragment) {
-    const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-
-    // Do normal input/output matching
-    if (nextStage != ShaderStageInvalid) {
-      const auto nextResUsage = m_pipelineState->getShaderResourceUsage(nextStage);
-      const auto &nextInLocInfoMap = nextResUsage->inOutUsage.inputLocInfoMap;
-
-      unsigned availInMapLoc = nextResUsage->inOutUsage.inputMapLocCount;
-
-      // Collect locations of those outputs that are not used by next shader stage
-      std::vector<unsigned> unusedLocInfos;
-      for (auto &locInfoMap : outLocInfoMap) {
-        InOutLocationInfo origLocInfo = {};
-        origLocInfo.u16All = locInfoMap.first;
-        unsigned loc = origLocInfo.location;
-        bool outputXfb = false;
-        if (m_shaderStage == ShaderStageGeometry)
-          outputXfb = inOutUsage.gs.xfbOutsInfo.find(origLocInfo.u16All) != inOutUsage.gs.xfbOutsInfo.end();
-
-        if (nextInLocInfoMap.find(origLocInfo.u16All) == nextInLocInfoMap.end() && !outputXfb) {
-          if (m_hasDynIndexedOutput || m_importedOutputLocs.find(loc) != m_importedOutputLocs.end()) {
-            // NOTE: If either dynamic indexing of generic outputs exists or the generic output involve in
-            // output import, we have to mark it as active. The assigned location must not overlap with
-            // those used by inputs of next shader stage.
-            assert(m_shaderStage == ShaderStageTessControl);
-            InOutLocationInfo newLocInfo = {};
-            newLocInfo.location = availInMapLoc++;
-            locInfoMap.second = newLocInfo.u16All;
-          } else
-            unusedLocInfos.push_back(origLocInfo.u16All);
-        }
-      }
-
-      // Remove those collected locations
-      for (auto locInfo : unusedLocInfos)
-        outLocInfoMap.erase(locInfo);
-    }
-
-    // Do per-patch input/output matching
-    if (m_shaderStage == ShaderStageTessControl) {
-      if (nextStage != ShaderStageInvalid) {
-        const auto nextResUsage = m_pipelineState->getShaderResourceUsage(nextStage);
-        const auto &nextPerPatchInLocMap = nextResUsage->inOutUsage.perPatchInputLocMap;
-
-        unsigned availPerPatchInMapLoc = nextResUsage->inOutUsage.perPatchInputMapLocCount;
-
-        // Collect locations of those outputs that are not used by next shader stage
-        std::vector<unsigned> unusedLocs;
-        for (auto &locMap : perPatchOutLocMap) {
-          const unsigned loc = locMap.first;
-          if (nextPerPatchInLocMap.find(loc) == nextPerPatchInLocMap.end()) {
-            // NOTE: If either dynamic indexing of generic outputs exists or the generic output involve in
-            // output import, we have to mark it as active. The assigned location must not overlap with
-            // those used by inputs of next shader stage.
-            if (m_hasDynIndexedOutput || m_importedOutputLocs.find(loc) != m_importedOutputLocs.end()) {
-              assert(m_shaderStage == ShaderStageTessControl);
-              locMap.second = availPerPatchInMapLoc++;
-            } else
-              unusedLocs.push_back(loc);
-          }
-        }
-
-        // Remove those collected locations
-        for (auto loc : unusedLocs)
-          perPatchOutLocMap.erase(loc);
-      }
-    } else {
-      // For other stages, must be empty
-      assert(perPatchOutLocMap.empty());
-    }
-  }
-
-  if (m_pipelineState->canPackInOut()) {
-    // Do packing input/output
-    packInOutLocation();
-  }
-
-  // Do location mapping
-  LLPC_OUTS("===============================================================================\n");
-  LLPC_OUTS("// LLPC location input/output mapping results (" << getShaderStageAbbreviation(m_shaderStage)
-                                                              << " shader)\n\n");
-  unsigned nextMapLoc = 0;
   if (!inLocInfoMap.empty()) {
     assert(inOutUsage.inputMapLocCount == 0);
-    // Update the value of inLocInfoMap for non pack case
-    // Note: The value of inLocInfoMap should be filled in packing code path
-    for (auto &locInfoMap : inLocInfoMap) {
-      InOutLocationInfo origLocInfo = {};
-      origLocInfo.u16All = locInfoMap.first;
-      InOutLocationInfo newLocInfo = {};
-
-      // NOTE: For vertex shader, the input location mapping is actually trivial.
-      if (m_shaderStage == ShaderStageVertex) {
-        locInfoMap.second = origLocInfo.u16All;
-        newLocInfo.u16All = origLocInfo.u16All;
-      } else if (locInfoMap.second == InvalidValue) {
-        newLocInfo.location = nextMapLoc++;
-        locInfoMap.second = newLocInfo.u16All;
-      } else {
-        newLocInfo.u16All = locInfoMap.second;
-      }
-      inOutUsage.inputMapLocCount =
-          std::max(inOutUsage.inputMapLocCount, static_cast<unsigned>(newLocInfo.location) + 1);
-      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc = " << origLocInfo.location
-                    << "  =>  Mapped = " << newLocInfo.location << "\n");
+    for (auto locInfoMap : inLocInfoMap) {
+      const unsigned newLoc = reinterpret_cast<InOutLocationInfo *>(&locInfoMap.second)->location;
+      assert(newLoc != InvalidValue);
+      inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, newLoc + 1);
+      unsigned origLoc = locInfoMap.first;
+      origLoc = reinterpret_cast<InOutLocationInfo *>(&origLoc)->location;
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc = " << origLoc
+                    << "  =>  Mapped = " << newLoc << "\n");
     }
     LLPC_OUTS("\n");
   }
@@ -1721,10 +1487,7 @@ void PatchResourceCollect::matchGenericInOut() {
     if (m_shaderStage == ShaderStageFragment)
       memset(&outOrigLocs, InvalidValue, sizeof(inOutUsage.fs.outputOrigLocs));
 
-    nextMapLoc = 0;
     assert(inOutUsage.outputMapLocCount == 0);
-    bool generatingColorExportShader = m_shaderStage == ShaderStageFragment;
-    generatingColorExportShader &= m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();
 
     // Update the value of outLocMap for non pack case
     // Note: The value of outLocMap should be filled in packing code path
@@ -1733,22 +1496,10 @@ void PatchResourceCollect::matchGenericInOut() {
       InOutLocationInfo origLocInfo = {};
       origLocInfo.u16All = locInfoMap.first;
       InOutLocationInfo newLocInfo = {};
-
-      if (m_shaderStage == ShaderStageFragment) {
-        if (!generatingColorExportShader &&
-            m_pipelineState->getColorExportFormat(origLocInfo.location).dfmt == BufDataFormatInvalid) {
-          locInfoMapIt = outLocInfoMap.erase(locInfoMapIt);
-          continue;
-        }
-      }
+      newLocInfo.u16All = locInfoMapIt->second;
 
       if (m_shaderStage == ShaderStageGeometry) {
-        // TODO: pack GS outputs
-        assert(locInfoMap.second == InvalidValue);
-        newLocInfo.location = inOutUsage.gs.outLocCount[origLocInfo.streamId]++;
-        newLocInfo.streamId = origLocInfo.streamId;
-        locInfoMap.second = newLocInfo.u16All;
-
+        assert(locInfoMap.second != InvalidValue);
         unsigned assignedLocCount = inOutUsage.gs.outLocCount[0] + inOutUsage.gs.outLocCount[1] +
                                     inOutUsage.gs.outLocCount[2] + inOutUsage.gs.outLocCount[3];
 
@@ -1757,12 +1508,6 @@ void PatchResourceCollect::matchGenericInOut() {
                       << ", "
                       << " loc = " << origLocInfo.location << "  =>  Mapped = " << newLocInfo.location << "\n");
       } else {
-        if (locInfoMap.second == InvalidValue) {
-          newLocInfo.location = nextMapLoc++;
-          locInfoMap.second = newLocInfo.u16All;
-        } else {
-          newLocInfo.u16All = locInfoMap.second;
-        }
         inOutUsage.outputMapLocCount =
             std::max(inOutUsage.outputMapLocCount, static_cast<unsigned>(newLocInfo.location) + 1);
         LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: loc = " << origLocInfo.location
@@ -1778,11 +1523,9 @@ void PatchResourceCollect::matchGenericInOut() {
   }
 
   if (!perPatchInLocMap.empty()) {
-    nextMapLoc = 0;
     assert(inOutUsage.perPatchInputMapLocCount == 0);
-    for (auto &locMap : perPatchInLocMap) {
-      assert(locMap.second == InvalidValue);
-      locMap.second = nextMapLoc++;
+    for (auto locMap : perPatchInLocMap) {
+      assert(m_shaderStage == ShaderStageTessEval && locMap.second != InvalidValue);
       inOutUsage.perPatchInputMapLocCount = std::max(inOutUsage.perPatchInputMapLocCount, locMap.second + 1);
       LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  loc = " << locMap.first
                     << "  =>  Mapped = " << locMap.second << "\n");
@@ -1791,14 +1534,9 @@ void PatchResourceCollect::matchGenericInOut() {
   }
 
   if (!perPatchOutLocMap.empty()) {
-    nextMapLoc = 0;
     assert(inOutUsage.perPatchOutputMapLocCount == 0);
-    for (auto &locMap : perPatchOutLocMap) {
-      if (locMap.second == InvalidValue) {
-        // Only do location mapping if the per-patch output has not been mapped
-        locMap.second = nextMapLoc++;
-      } else
-        assert(m_shaderStage == ShaderStageTessControl);
+    for (auto locMap : perPatchOutLocMap) {
+      assert(m_shaderStage == ShaderStageTessControl && locMap.second != InvalidValue);
       inOutUsage.perPatchOutputMapLocCount = std::max(inOutUsage.perPatchOutputMapLocCount, locMap.second + 1);
       LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): loc = " << locMap.first
                     << "  =>  Mapped = " << locMap.second << "\n");
@@ -2577,13 +2315,178 @@ void PatchResourceCollect::mapGsBuiltInOutput(unsigned builtInId, unsigned elemC
 }
 
 // =====================================================================================================================
+// Update the inputLocInfoMap/outputLocInfoMap and perPatchInputLocMap/perPatchOutputLocMap
+// @param isInput: Whether it is input
+void PatchResourceCollect::updateInOutLocMap(bool isInput) {
+  if (isInput) {
+    auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
+    if (!m_pipelineState->isUnlinked() && m_shaderStage != ShaderStageTessEval) {
+      // Clear inputLocInfoMap and rebuild it with active calls
+      // TODO: Here, we keep all generic inputs of tessellation evaluation shader. This is because corresponding
+      // generic outputs of tessellation control shader might involve in output import and dynamic indexing, which
+      // is easy to cause incorrectness of location mapping.
+      inputLocInfoMap.clear();
+      for (auto call : m_inputCalls) {
+        InOutLocationInfo origLocInfo = {};
+        origLocInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+        if (inputLocInfoMap.find(origLocInfo.u16All) == inputLocInfoMap.end())
+          inputLocInfoMap[origLocInfo.u16All] = InvalidValue;
+      }
+    }
+
+    if (m_shaderStage == ShaderStageVertex) {
+      // NOTE: For vertex shader, the input location mapping is actually trivial
+      for (auto &locInfoMap : inputLocInfoMap)
+        locInfoMap.second = locInfoMap.first;
+    } else {
+      // Remmap locations to be continuous
+      unsigned mappedLoc = 0;
+      for (auto &locInfo : inputLocInfoMap) {
+        InOutLocationInfo newLocInfo = {};
+        newLocInfo.location = mappedLoc++;
+        locInfo.second = newLocInfo.u16All;
+      }
+      if (m_shaderStage == ShaderStageTessEval) {
+        auto &perPatchInputLocMap = inOutUsage.perPatchInputLocMap;
+        mappedLoc = 0;
+        for (auto &locMap : perPatchInputLocMap)
+          locMap.second = mappedLoc++;
+      }
+    }
+    m_inputCalls.clear();
+  } else {
+    // Output
+    ShaderStage nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+    auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
+    auto &perPatchOutputLocMap = inOutUsage.perPatchOutputLocMap;
+    if (m_shaderStage == ShaderStageFragment) {
+      const bool generatingColorExportShader =
+          m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();
+      for (auto locInfoMapIt = outputLocInfoMap.begin(); locInfoMapIt != outputLocInfoMap.end();) {
+        unsigned locInfoInt = locInfoMapIt->first;
+        unsigned origLoc = reinterpret_cast<InOutLocationInfo *>(&locInfoInt)->location;
+        if (!generatingColorExportShader &&
+            m_pipelineState->getColorExportFormat(origLoc).dfmt == BufDataFormatInvalid) {
+          locInfoMapIt = outputLocInfoMap.erase(locInfoMapIt);
+        } else {
+          ++locInfoMapIt;
+        }
+      }
+    }
+
+    // For unlinked staged or FS, remmap locations to be continuous
+    if (m_pipelineState->isUnlinked() || m_shaderStage == ShaderStageFragment) {
+      unsigned mappedLoc = 0;
+      for (auto &locInfoMap : outputLocInfoMap) {
+        InOutLocationInfo newLocInfo = {};
+        newLocInfo.location = mappedLoc++;
+        locInfoMap.second = newLocInfo.u16All;
+      }
+      if (m_shaderStage == ShaderStageTessControl) {
+        mappedLoc = 0;
+        for (auto &locMap : perPatchOutputLocMap)
+          locMap.second = mappedLoc++;
+      }
+    } else {
+      // For VS and TES, the outputLocInfoMap is the same as the inputLocInfoMap of the next stage
+      // For GS, remove unused locations and then remap locations in each stream
+      // For TCS, remove unused locations and then remap locations to be continuous
+      const auto nextResUsage = m_pipelineState->getShaderResourceUsage(nextStage);
+      const auto &nextStageInLocInfoMap = nextResUsage->inOutUsage.inputLocInfoMap;
+      if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval)
+        outputLocInfoMap = nextStageInLocInfoMap;
+
+      if (m_shaderStage == ShaderStageGeometry) {
+        // Remove the unused locations that are not used by next stage and are not exported to transform feedback
+        const auto &xfbOutInfoMap = inOutUsage.gs.xfbOutsInfo;
+        for (auto locInfoMapIt = outputLocInfoMap.begin(); locInfoMapIt != outputLocInfoMap.end();) {
+          const bool unusedForNextStage =
+              nextStageInLocInfoMap.find(locInfoMapIt->first) == nextStageInLocInfoMap.end();
+          const bool unusedForOutXfb = xfbOutInfoMap.find(locInfoMapIt->first) == xfbOutInfoMap.end();
+          if (unusedForNextStage && unusedForOutXfb)
+            locInfoMapIt = outputLocInfoMap.erase(locInfoMapIt);
+          else
+            ++locInfoMapIt;
+        }
+        // Remap locations to be continous in each stream
+        for (auto &locInfoMap : outputLocInfoMap) {
+          unsigned locInfoInt = locInfoMap.first;
+          unsigned streamId = reinterpret_cast<InOutLocationInfo *>(&locInfoInt)->streamId;
+          InOutLocationInfo newLocInfo = {};
+          newLocInfo.location = inOutUsage.gs.outLocCount[streamId]++;
+          newLocInfo.streamId = streamId;
+          locInfoMap.second = newLocInfo.u16All;
+        }
+      }
+
+      if (m_shaderStage == ShaderStageTessControl) {
+        // Find unused locations and remove them from inputLocInfoMap or perPatchInputLocMap
+        const auto &nextPerPatchInLocMap =
+            m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.perPatchInputLocMap;
+        DenseSet<unsigned> unusedLocs;
+        DenseSet<unsigned> visitedLocs;
+        for (auto call : m_outputCalls) {
+          const unsigned origLoc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+          if (visitedLocs.find(origLoc) != visitedLocs.end())
+            continue;
+          visitedLocs.insert(origLoc);
+
+          InOutLocationInfo origLocInfo = {};
+          origLocInfo.location = origLoc;
+          const bool usedForNextStage = nextStageInLocInfoMap.find(origLocInfo.u16All) != nextStageInLocInfoMap.end();
+          const bool usedForNextPerPatch =
+              nextPerPatchInLocMap.find(origLocInfo.location) != nextPerPatchInLocMap.end();
+          if (usedForNextStage || usedForNextPerPatch)
+            continue;
+          const bool hasConstIndex = isa<ConstantInt>(call->getOperand(1)) && isa<ConstantInt>(call->getOperand(2));
+          if (hasConstIndex && m_importedOutputLocs.find(origLocInfo.location) == m_importedOutputLocs.end())
+            unusedLocs.insert(origLoc);
+        }
+        // Remove unused InOutLocationInfo from outputLocInfoMap
+        for (auto loc : unusedLocs) {
+          InOutLocationInfo origLocInfo = {};
+          origLocInfo.location = loc;
+          outputLocInfoMap.erase(origLocInfo.u16All);
+        }
+        // Remap locations to be continous
+        // NOTE: If either dynamic indexing of generic outputs exists or the generic output involve in
+        // output import, we have to mark it as active. The assigned location must not overlap with
+        // those used by inputs of next shader stage.
+        unsigned mappedLoc = 0;
+        unsigned availInMapLoc = nextResUsage->inOutUsage.inputMapLocCount;
+        for (auto &locInfoMap : outputLocInfoMap) {
+          InOutLocationInfo newLocInfo = {};
+          newLocInfo.location = (nextStageInLocInfoMap.find(locInfoMap.first) != nextStageInLocInfoMap.end())
+                                    ? mappedLoc++
+                                    : availInMapLoc++;
+          locInfoMap.second = newLocInfo.u16All;
+        }
+        // Remove unsed locations from perPatchOutputLocMap
+        for (auto loc : unusedLocs)
+          perPatchOutputLocMap.erase(loc);
+        // Remap locations to be continous
+        mappedLoc = 0;
+        unsigned availPerPatchInMapLoc = nextResUsage->inOutUsage.perPatchInputMapLocCount;
+        for (auto &locMap : perPatchOutputLocMap)
+          locMap.second = (nextPerPatchInLocMap.find(locMap.first) != nextPerPatchInLocMap.end())
+                              ? mappedLoc++
+                              : availPerPatchInMapLoc++;
+      }
+    }
+    m_outputCalls.clear();
+  }
+}
+
+// =====================================================================================================================
 // The process of packing input/output
 void PatchResourceCollect::packInOutLocation() {
   if (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl) {
-    // Build location map based on FS (VS-FS, TES-FS) and TCS spans
-    fillInOutLocInfoMap();
+    buildInOutLocInfoMap();
   } else {
-    reassembleOutputExportCalls();
+    if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage())
+      reassembleOutputExportCalls();
 
     // Copy the outputLocInfoMap of the next stage to that of the current stage for computing the shader hash and
     // looking remapped location
@@ -2596,8 +2499,8 @@ void PatchResourceCollect::packInOutLocation() {
 }
 
 // =====================================================================================================================
-// Fill inputLocInfoMap based on FS or TCS input import calls
-void PatchResourceCollect::fillInOutLocInfoMap() {
+// Update inputLocInfoMap based on FS or TCS input import calls
+void PatchResourceCollect::buildInOutLocInfoMap() {
   if (m_inputCalls.empty())
     return;
   const bool isTcs = m_shaderStage == ShaderStageTessControl;
@@ -2616,34 +2519,30 @@ void PatchResourceCollect::fillInOutLocInfoMap() {
   // Mark unpackable calls with dynamic location offset and component index
   DenseSet<unsigned> unpackedLocs;
   std::vector<CallInst *> unpackedCalls;
-  std::vector<bool> isPackedCalls(m_inputCalls.size(), true);
-  unsigned callIdx = 0;
   for (auto call : m_inputCalls) {
     const unsigned compIdxArgIdx = isFs && call->getNumArgOperands() == 4 ? 1 : 2;
     if (!isa<ConstantInt>(call->getOperand(compIdxArgIdx)) ||
         (compIdxArgIdx == 2 && !isa<ConstantInt>(call->getOperand(compIdxArgIdx - 1)))) {
       unpackedLocs.insert(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
       unpackedCalls.push_back(call);
-      isPackedCalls[callIdx] = false;
     }
-    ++callIdx;
   }
 
   // Create LocationSpans based on the packable input calls
-  callIdx = 0;
   for (auto call : m_inputCalls) {
-    if (!isPackedCalls[callIdx++])
-      continue;
-    m_locationMapManager->addSpan(call, m_shaderStage);
+    const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+    if (unpackedLocs.find(loc) == unpackedLocs.end())
+      m_locationMapManager->addSpan(call, m_shaderStage);
   }
   // Build locationMap according to the collected LocationSpans
   m_locationMapManager->clearMap();
   m_locationMapManager->buildLocationMap(m_shaderStage);
 
   unsigned unpackedLocStartIdx = 0;
-  callIdx = 0;
   for (auto call : m_inputCalls) {
-    if (!isPackedCalls[callIdx++])
+    const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+    // Skip unpackable input
+    if (unpackedLocs.find(loc) != unpackedLocs.end())
       continue;
     const bool isInterpolant = isFs && call->getNumArgOperands() == 5;
     unsigned locOffset = 0;
@@ -2659,28 +2558,27 @@ void PatchResourceCollect::fillInOutLocInfoMap() {
     InOutLocation origInLoc = {};
     origInLoc.locationInfo.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset;
     origInLoc.locationInfo.component = cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue();
+    if (inputLocInfoMap.find(origInLoc.asIndex()) == inputLocInfoMap.end()) {
+      // Get the packed InOutLocation from locationMap
+      const InOutLocation *newInLoc = nullptr;
+      assert(m_locationMapManager->findMap(origInLoc, newInLoc));
+      m_locationMapManager->findMap(origInLoc, newInLoc);
 
-    // Get the packed InOutLocation from locationMap
-    const InOutLocation *newInLoc = nullptr;
-    assert(m_locationMapManager->findMap(origInLoc, newInLoc));
-    m_locationMapManager->findMap(origInLoc, newInLoc);
-
-    inputLocInfoMap[origInLoc.asIndex()] = newInLoc->asIndex();
-    unpackedLocStartIdx = std::max(unpackedLocStartIdx, static_cast<unsigned>(newInLoc->locationInfo.location) + 1);
+      inputLocInfoMap[origInLoc.asIndex()] = newInLoc->asIndex();
+      unpackedLocStartIdx = std::max(unpackedLocStartIdx, static_cast<unsigned>(newInLoc->locationInfo.location) + 1);
+    }
   }
   m_inputCalls.clear();
 
   // Fill inputLocInfoMap for the unpacked calls
-  DenseSet<unsigned> visitedLocs;
   for (auto call : unpackedCalls) {
     InOutLocationInfo origInLoc = {};
     origInLoc.location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-    if (visitedLocs.count(origInLoc.location) > 0)
-      continue;
-    visitedLocs.insert(origInLoc.location);
-    InOutLocationInfo newInLoc = origInLoc;
-    newInLoc.location = unpackedLocStartIdx++;
-    inputLocInfoMap[origInLoc.u16All] = newInLoc.u16All;
+    if (inputLocInfoMap.find(origInLoc.u16All) == inputLocInfoMap.end()) {
+      InOutLocationInfo newInLoc = origInLoc;
+      newInLoc.location = unpackedLocStartIdx++;
+      inputLocInfoMap[origInLoc.u16All] = newInLoc.u16All;
+    }
   }
 }
 
@@ -2689,7 +2587,6 @@ void PatchResourceCollect::fillInOutLocInfoMap() {
 void PatchResourceCollect::reassembleOutputExportCalls() {
   if (m_outputCalls.empty())
     return;
-
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(m_outputCalls.back());
 
@@ -2861,16 +2758,22 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
   // Scalarize the gathered inputs and outputs.
   for (CallInst *call : inputCalls) {
     // The intput import calls with dynamic indexing of TCS are not scalarized
-    const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-    if (unpackableLocs.count(loc) == 0)
-      scalarizeGenericInput(call);
+    ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
+    if (shaderStage == ShaderStageTessControl) {
+      const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+      if (unpackableLocs.find(loc) != unpackableLocs.end())
+        continue;
+    }
+    scalarizeGenericInput(call);
   }
   for (CallInst *call : outputCalls) {
-    // The corresponding calls of VS should not be scalarized
+    // TCS has dynamic indexing and the corresponding calls of VS are not scalarized
     ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
-    const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-    if (shaderStage == ShaderStageVertex && unpackableLocs.count(loc) > 0)
-      continue;
+    if (shaderStage == ShaderStageVertex) {
+      const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+      if (unpackableLocs.find(loc) != unpackableLocs.end())
+        continue;
+    }
     scalarizeGenericOutput(call);
   }
 }
