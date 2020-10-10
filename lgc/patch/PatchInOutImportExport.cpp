@@ -436,11 +436,14 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           }
         }
 
+        InOutLocationInfo origLocInfo = {};
+        origLocInfo.location = value;
+        auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo.u16All);
         if (m_shaderStage == ShaderStageTessEval) {
           // NOTE: For generic inputs of tessellation evaluation shader, they could be per-patch ones.
-          if (resUsage->inOutUsage.inputLocMap.find(value) != resUsage->inOutUsage.inputLocMap.end())
-            loc = resUsage->inOutUsage.inputLocMap[value];
-          else {
+          if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
+            loc = reinterpret_cast<InOutLocationInfo *>(&locInfoMapIt->second)->location;
+          } else {
             assert(resUsage->inOutUsage.perPatchInputLocMap.find(value) !=
                    resUsage->inOutUsage.perPatchInputLocMap.end());
             loc = resUsage->inOutUsage.perPatchInputLocMap[value];
@@ -449,21 +452,24 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           if (m_pipelineState->canPackInOut() &&
               (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl)) {
             // The new InOutLocationInfo is used to map scalarized FS and TCS input import as compact as possible
-            InOutLocationInfo origLocInfo = {};
-            origLocInfo.location = value;
-            const uint32_t elemIdxArgIdx = isInterpolantInputImport || m_shaderStage != ShaderStageFragment ? 2 : 1;
-            origLocInfo.component = cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue();
-            origLocInfo.half = false;
-            assert(resUsage->inOutUsage.inOutLocMap.find(origLocInfo.u16All) != resUsage->inOutUsage.inOutLocMap.end());
-
+            const uint32_t elemIdxArgIdx = isInterpolantInputImport || m_shaderStage == ShaderStageTessControl ? 2 : 1;
+            bool hasDynIndexedInput = false;
+            if (m_shaderStage == ShaderStageTessControl && (!isa<ConstantInt>(callInst.getOperand(elemIdxArgIdx - 1)) ||
+                                                            !isa<ConstantInt>(callInst.getOperand(elemIdxArgIdx))))
+              hasDynIndexedInput = true;
+            if (!hasDynIndexedInput)
+              origLocInfo.component = cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue();
+            auto packedLocInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo.u16All);
+            assert(packedLocInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
             InOutLocationInfo newLocInfo = {};
-            newLocInfo.u16All = resUsage->inOutUsage.inOutLocMap[origLocInfo.u16All];
+            newLocInfo.u16All = packedLocInfoMapIt->second;
             loc = newLocInfo.location;
-            elemIdx = builder.getInt32(newLocInfo.component);
+            if (!hasDynIndexedInput)
+              elemIdx = builder.getInt32(newLocInfo.component);
             highHalf = newLocInfo.half;
           } else {
-            assert(resUsage->inOutUsage.inputLocMap.find(value) != resUsage->inOutUsage.inputLocMap.end());
-            loc = resUsage->inOutUsage.inputLocMap[value];
+            assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
+            loc = reinterpret_cast<InOutLocationInfo *>(&locInfoMapIt->second)->location;
           }
         }
       }
@@ -584,8 +590,11 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
 
       // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
-      if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end())
-        loc = resUsage->inOutUsage.outputLocMap[value];
+      InOutLocationInfo origLocInfo = {};
+      origLocInfo.location = value;
+      auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo.u16All);
+      if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end())
+        loc = reinterpret_cast<InOutLocationInfo *>(&locInfoMapIt->second)->location;
       else {
         assert(resUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
                resUsage->inOutUsage.perPatchOutputLocMap.end());
@@ -699,6 +708,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       unsigned loc = InvalidValue;
       Value *locOffset = nullptr;
       unsigned elemIdx = InvalidValue;
+      InOutLocationInfo origLocInfo = {};
+      origLocInfo.location = value;
+      auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo.u16All);
 
       if (m_shaderStage == ShaderStageTessControl) {
         // NOTE: If location offset is a constant, we have to add it to the unmapped location before querying
@@ -710,9 +722,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         }
 
         // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
-        if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end()) {
+        if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
           exist = true;
-          loc = resUsage->inOutUsage.outputLocMap[value];
+          loc = reinterpret_cast<InOutLocationInfo *>(&locInfoMapIt->second)->location;
         } else if (resUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
                    resUsage->inOutUsage.perPatchOutputLocMap.end()) {
           exist = true;
@@ -723,36 +735,27 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         loc = value;
       } else if (m_shaderStage == ShaderStageGeometry) {
         assert(callInst.getNumArgOperands() == 4);
-
-        GsOutLocInfo outLocInfo = {};
-        outLocInfo.location = value;
-        outLocInfo.isBuiltIn = false;
-        outLocInfo.streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
-
-        if (resUsage->inOutUsage.outputLocMap.find(outLocInfo.u32All) != resUsage->inOutUsage.outputLocMap.end()) {
+        origLocInfo.streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
+        auto gsLocInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo.u16All);
+        if (gsLocInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
           exist = true;
-          loc = resUsage->inOutUsage.outputLocMap[outLocInfo.u32All];
+          loc = reinterpret_cast<InOutLocationInfo *>(&gsLocInfoMapIt->second)->location;
         }
       } else {
-        if (m_pipelineState->canPackInOut() && m_shaderStage == ShaderStageVertex &&
-            m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
-          // The new InOutLocationInfo is used to map scalarized VS output export in a VS-TCS-TES-FS to lds as compact
-          // as possible
-          InOutLocationInfo origLocInfo = {};
-          origLocInfo.location = value;
+        if (m_pipelineState->canPackInOut()) {
+          assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval);
           origLocInfo.component = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-          origLocInfo.half = false;
-          if (resUsage->inOutUsage.inOutLocMap.find(origLocInfo.u16All) != resUsage->inOutUsage.inOutLocMap.end()) {
+          auto packedLocInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo.u16All);
+          if (packedLocInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
             InOutLocationInfo newLocInfo = {};
-            newLocInfo.u16All = resUsage->inOutUsage.inOutLocMap[origLocInfo.u16All];
+            newLocInfo.u16All = packedLocInfoMapIt->second;
             loc = newLocInfo.location;
             elemIdx = newLocInfo.component;
             exist = true;
-          } else
-            exist = false;
-        } else if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end()) {
+          }
+        } else if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
           exist = true;
-          loc = resUsage->inOutUsage.outputLocMap[value];
+          loc = reinterpret_cast<InOutLocationInfo *>(&locInfoMapIt->second)->location;
         }
       }
 
@@ -1284,8 +1287,9 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       // generic outputs that are not written to.  We need to count them in
       // the export count.
       auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
-      for (auto locMap : resUsage->inOutUsage.outputLocMap) {
-        if (m_expLocs.count(locMap.second) != 0)
+      for (auto locInfoMap : resUsage->inOutUsage.outputLocInfoMap) {
+        const unsigned loc = reinterpret_cast<InOutLocationInfo *>(&locInfoMap.second)->location;
+        if (m_expLocs.count(loc) != 0)
           continue;
         ++inOutUsage.expCount;
       }

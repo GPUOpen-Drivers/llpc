@@ -287,22 +287,23 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
 
   // Mark the input or output locations as in use.
-  std::map<unsigned, unsigned> *inOutLocMap = nullptr;
+  std::map<unsigned, unsigned> *inOutLocInfoMap = nullptr;
+  std::map<unsigned, unsigned> *perPatchInOutLocMap = nullptr;
   if (!isOutput) {
     if (m_shaderStage != ShaderStageTessEval || vertexIndex) {
       // Normal input
-      inOutLocMap = &resUsage->inOutUsage.inputLocMap;
+      inOutLocInfoMap = &resUsage->inOutUsage.inputLocInfoMap;
     } else {
       // TES per-patch input
-      inOutLocMap = &resUsage->inOutUsage.perPatchInputLocMap;
+      perPatchInOutLocMap = &resUsage->inOutUsage.perPatchInputLocMap;
     }
   } else {
     if (m_shaderStage != ShaderStageTessControl || vertexIndex) {
       // Normal output
-      inOutLocMap = &resUsage->inOutUsage.outputLocMap;
+      inOutLocInfoMap = &resUsage->inOutUsage.outputLocInfoMap;
     } else {
       // TCS per-patch output
-      inOutLocMap = &resUsage->inOutUsage.perPatchOutputLocMap;
+      perPatchInOutLocMap = &resUsage->inOutUsage.perPatchOutputLocMap;
     }
   }
 
@@ -316,15 +317,24 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
     }
     unsigned startLocation = (keepAllLocations ? 0 : location);
     // Non-GS-output case.
-    for (unsigned i = startLocation; i < location + locationCount; ++i)
-      (*inOutLocMap)[i] = InvalidValue;
+    if (inOutLocInfoMap) {
+      for (unsigned i = startLocation; i < location + locationCount; ++i) {
+        InOutLocationInfo origLocInfo = {};
+        origLocInfo.location = i;
+        (*inOutLocInfoMap)[origLocInfo.u16All] = InvalidValue;
+      }
+    }
+    if (perPatchInOutLocMap) {
+      for (unsigned i = startLocation; i < location + locationCount; ++i)
+        (*perPatchInOutLocMap)[i] = InvalidValue;
+    }
   } else {
     // GS output. We include the stream ID with the location in the map key.
     for (unsigned i = 0; i < locationCount; ++i) {
-      GsOutLocInfo outLocInfo = {};
+      InOutLocationInfo outLocInfo = {};
       outLocInfo.location = location + i;
       outLocInfo.streamId = inOutInfo.getStreamId();
-      (*inOutLocMap)[outLocInfo.u32All] = InvalidValue;
+      (*inOutLocInfoMap)[outLocInfo.u16All] = InvalidValue;
     }
   }
 
@@ -555,7 +565,7 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
 
   if (m_shaderStage == ShaderStageGeometry) {
     // Mark the XFB output for copy shader generation.
-    GsOutLocInfo outLocInfo = {};
+    InOutLocationInfo outLocInfo = {};
     outLocInfo.location = location;
     outLocInfo.isBuiltIn = isBuiltIn;
     outLocInfo.streamId = streamId;
@@ -567,11 +577,11 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
     xfbOutInfo.xfbExtraOffset = 0;
 
     auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageGeometry);
-    resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+    resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u16All] = xfbOutInfo.u32All;
     if (valueToWrite->getType()->getPrimitiveSizeInBits() > 128) {
       ++outLocInfo.location;
       xfbOutInfo.xfbOffset += 32;
-      resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+      resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u16All] = xfbOutInfo.u32All;
     }
   }
 

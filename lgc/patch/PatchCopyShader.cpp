@@ -299,19 +299,16 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
         Value *output = callInst->getOperand(callInst->getNumArgOperands() - 1); // Last argument
         auto outputTy = output->getType();
 
-        unsigned value = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
+        InOutLocationInfo outLocInfo = {};
+        outLocInfo.location = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
         const unsigned streamId = cast<ConstantInt>(callInst->getOperand(2))->getZExtValue();
-
-        GsOutLocInfo outLocInfo = {};
-        outLocInfo.location = value;
-        outLocInfo.isBuiltIn = false;
         outLocInfo.streamId = streamId;
 
-        auto locMapIt = resUsage->inOutUsage.outputLocMap.find(outLocInfo.u32All);
-        if (locMapIt == resUsage->inOutUsage.outputLocMap.end())
+        auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(outLocInfo.u16All);
+        if (locInfoMapIt == resUsage->inOutUsage.outputLocInfoMap.end())
           continue;
 
-        unsigned location = locMapIt->second;
+        unsigned location = reinterpret_cast<InOutLocationInfo *>(&locInfoMapIt->second)->location;
         const unsigned compIdx = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
 
         unsigned compCount = 1;
@@ -559,20 +556,20 @@ void PatchCopyShader::exportGenericOutput(Value *outputValue, unsigned location,
                                           BuilderBase &builder) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
   if (resUsage->inOutUsage.enableXfb) {
-    auto &outLocMap = resUsage->inOutUsage.outputLocMap;
+    auto &outLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
     auto &xfbOutsInfo = resUsage->inOutUsage.gs.xfbOutsInfo;
 
-    // Find original location in outLocMap which equals used location in copy shader
-    auto locIter =
-        find_if(outLocMap.begin(), outLocMap.end(), [location, streamId](const std::pair<unsigned, unsigned> &outLoc) {
-          unsigned outLocInfo = outLoc.first;
-          bool isStreamId = (reinterpret_cast<GsOutLocInfo *>(&outLocInfo))->streamId == streamId;
-          return outLoc.second == location && isStreamId;
-        });
+    // Find original location in outLocInfoMap which equals used location in copy shader
+    auto locInfoIter = find_if(outLocInfoMap.begin(), outLocInfoMap.end(),
+                               [location, streamId](const std::pair<unsigned, unsigned> &outLocInfo) {
+                                 InOutLocationInfo newLocInfo = {};
+                                 newLocInfo.u16All = outLocInfo.second;
+                                 return newLocInfo.location == location && newLocInfo.streamId == streamId;
+                               });
 
-    assert(locIter != outLocMap.end());
-    if (xfbOutsInfo.find(locIter->first) != xfbOutsInfo.end()) {
-      XfbOutInfo *xfbOutInfo = reinterpret_cast<XfbOutInfo *>(&xfbOutsInfo[locIter->first]);
+    assert(locInfoIter != outLocInfoMap.end());
+    if (xfbOutsInfo.find(locInfoIter->first) != xfbOutsInfo.end()) {
+      XfbOutInfo *xfbOutInfo = reinterpret_cast<XfbOutInfo *>(&xfbOutsInfo[locInfoIter->first]);
 
       if (xfbOutInfo->is16bit) {
         // NOTE: For 16-bit transform feedback output, the value is 32-bit dword loaded from GS-VS ring
@@ -625,13 +622,13 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
   if (resUsage->inOutUsage.enableXfb) {
-    GsOutLocInfo outLocInfo = {};
+    InOutLocationInfo outLocInfo = {};
     outLocInfo.location = builtInId;
     outLocInfo.isBuiltIn = true;
     outLocInfo.streamId = streamId;
 
     auto &xfbOutsInfo = resUsage->inOutUsage.gs.xfbOutsInfo;
-    auto locIter = xfbOutsInfo.find(outLocInfo.u32All);
+    auto locIter = xfbOutsInfo.find(outLocInfo.u16All);
     if (locIter != xfbOutsInfo.end()) {
       XfbOutInfo *xfbOutInfo = reinterpret_cast<XfbOutInfo *>(&xfbOutsInfo[locIter->first]);
 

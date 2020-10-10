@@ -81,11 +81,10 @@ private:
   void matchGenericInOut();
   void mapBuiltInToGenericInOut();
 
-  void mapGsGenericOutput(GsOutLocInfo outLocInfo);
   void mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
 
   void packInOutLocation();
-  void fillInOutLocMap();
+  void fillInOutLocInfoMap();
   void reassembleOutputExportCalls();
 
   // Input/output scalarizing
@@ -105,10 +104,11 @@ private:
   std::unordered_set<unsigned> m_importedOutputLocs;     // Locations of imported generic outputs
   std::unordered_set<unsigned> m_importedOutputBuiltIns; // IDs of imported built-in outputs
 
-  std::vector<llvm::CallInst *> m_inOutCalls; // The import or export calls
+  std::vector<llvm::CallInst *> m_inputCalls;  // The scalarzied input import calls
+  std::vector<llvm::CallInst *> m_outputCalls; // The scalarized output export calls
 
   bool m_hasDynIndexedInput;  // Whether dynamic indices are used in generic input addressing (valid
-                              // for tessellation shader, fragment shader with input interpolation)
+                              // for tessellation shader)
   bool m_hasDynIndexedOutput; // Whether dynamic indices are used in generic output addressing (valid
                               // for tessellation control shader)
   ResourceUsage *m_resUsage;  // Pointer to shader resource usage
@@ -146,6 +146,7 @@ public:
   void buildLocationMap(bool checkCompatibility);
 
   bool findMap(const InOutLocation &originalLocation, const InOutLocation *&newLocation);
+  void clearMap() { m_locationMap.clear(); }
 
   struct LocationSpan {
     uint16_t getCompatibilityKey() const { return compatibilityInfo.u16All; }
