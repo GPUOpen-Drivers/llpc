@@ -37,7 +37,6 @@
 #include "lgc/state/TargetInfo.h"
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/InstVisitor.h"
 #include <set>
 
 namespace lgc {
@@ -46,7 +45,7 @@ class FragColorExport;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for input import and output export.
-class PatchInOutImportExport : public Patch, public llvm::InstVisitor<PatchInOutImportExport> {
+class PatchInOutImportExport : public Patch {
 public:
   PatchInOutImportExport();
   ~PatchInOutImportExport();
@@ -72,6 +71,8 @@ private:
 
   void markExportDone(llvm::Function *func, llvm::PostDominatorTree &postDomTree);
   void processShader();
+  void visitCallInsts(llvm::ArrayRef<llvm::Function *> calleeFuncs);
+  void visitReturnInsts();
 
   llvm::Value *patchTcsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
                                           llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
