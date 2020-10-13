@@ -100,6 +100,13 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0;
   m_hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
 
+  SmallVector<Function *, 16> candidateCallees;
+  for (auto &func : module.functions()) {
+    auto name = func.getName();
+    if (name.startswith("lgc.input") || name.startswith("lgc.output") || name == "llvm.amdgcn.s.sendmsg")
+      candidateCallees.push_back(&func);
+  }
+
   // Create the global variable that is to model LDS
   // NOTE: ES -> GS ring is always on-chip on GFX9.
   if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)))
@@ -119,7 +126,8 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
       processShader();
 
       // Now process the call and return instructions.
-      visit(*m_entryPoint);
+      visitCallInsts(candidateCallees);
+      visitReturnInsts();
 
       markExportDone(m_entryPoint, postDomTree);
       delete m_fragColorExport;
@@ -344,6 +352,29 @@ void PatchInOutImportExport::processShader() {
       LLPC_OUTS(")\n\n");
     }
   }
+}
+
+// =====================================================================================================================
+// Visits all "call" instructions against the callee functions in current entry-point function.
+//
+// @param calleeFuncs : a list of candidate callee functions to check
+void PatchInOutImportExport::visitCallInsts(ArrayRef<Function *> calleeFuncs) {
+  for (auto callee : calleeFuncs) {
+    for (auto user : callee->users()) {
+      if (CallInst *callInst = dyn_cast<CallInst>(user)) {
+        if (callInst->getFunction() == m_entryPoint)
+          visitCallInst(*callInst);
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
+// Visits all "ret" instructions in current entry-point function.
+void PatchInOutImportExport::visitReturnInsts() {
+  for (auto &block : *m_entryPoint)
+    if (auto *retInst = dyn_cast<ReturnInst>(block.getTerminator()))
+      visitReturnInst(*retInst);
 }
 
 // =====================================================================================================================
