@@ -894,9 +894,10 @@ Value *SPIRVToLLVM::transValue(SPIRVValue *bv, Function *f, BasicBlock *bb, bool
 Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb) {
   SPIRVUnary *bc = static_cast<SPIRVUnary *>(bv);
   auto src = transValue(bc->getOperand(0), f, bb, bb != nullptr);
-  auto dst = transType(bc->getType());
+  auto srcType = src->getType();
+  auto dstType = transType(bc->getType());
   CastInst::CastOps co = Instruction::BitCast;
-  bool isExt = dst->getScalarSizeInBits() > src->getType()->getScalarSizeInBits();
+  bool isExt = dstType->getScalarSizeInBits() > srcType->getScalarSizeInBits();
   switch (bc->getOpCode()) {
   case OpSConvert:
     co = isExt ? Instruction::SExt : Instruction::Trunc;
@@ -911,13 +912,38 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
     co = static_cast<CastInst::CastOps>(OpCodeMap::rmap(bc->getOpCode()));
   }
 
-  if (dst == src->getType())
+  if (dstType == srcType)
     return src;
   else {
     assert(CastInst::isCast(co) && "Invalid cast op code");
-    if (bb)
-      return CastInst::Create(co, src, dst, bv->getName(), bb);
-    return ConstantExpr::getCast(co, dyn_cast<Constant>(src), dst);
+    if (bb) {
+
+      bool srcIsPtr = srcType->isPtrOrPtrVectorTy();
+      bool dstIsPtr = dstType->isPtrOrPtrVectorTy();
+      // OpBitcast in SPIR-V allows casting between pointers and integers (and integer vectors),
+      // but LLVM BitCast does not allow converting pointers to other types, PtrToInt and IntToPtr
+      // should be used instead.
+      if (co == Instruction::BitCast && srcIsPtr != dstIsPtr) {
+        auto int64Ty = Type::getInt64Ty(*m_context);
+        if (srcIsPtr) {
+          assert(dstType->isIntOrIntVectorTy());
+          Instruction *ret = new PtrToIntInst(src, int64Ty, bv->getName(), bb);
+          if (dstType != int64Ty)
+            ret = new BitCastInst(ret, dstType, bv->getName(), bb);
+          return ret;
+        }
+
+        if (dstIsPtr) {
+          assert(srcType->isIntOrIntVectorTy());
+          if (srcType != int64Ty)
+            src = new BitCastInst(src, int64Ty, bv->getName(), bb);
+          return new IntToPtrInst(src, dstType, bv->getName(), bb);
+        }
+      } else {
+        return CastInst::Create(co, src, dstType, bv->getName(), bb);
+      }
+    }
+    return ConstantExpr::getCast(co, dyn_cast<Constant>(src), dstType);
   }
 }
 
