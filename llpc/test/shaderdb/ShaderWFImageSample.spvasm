@@ -1,0 +1,74 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; Make sure that there's a waterfall.readfirstlane for both the image resource desc and sample desc
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-DAG: call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane.v8i32.v8i32
+; SHADERTEST-DAG: call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+               OpCapability Shader
+               OpCapability ShaderNonUniform
+               OpCapability RuntimeDescriptorArray
+               OpCapability SampledImageArrayNonUniformIndexing
+               OpExtension "SPV_EXT_descriptor_indexing"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %9 %17 %28 %30 %31 %32 %33 %34
+               OpExecutionMode %4 OriginUpperLeft
+               OpDecorate %9 Location 0
+               OpDecorate %14 DescriptorSet 0
+               OpDecorate %14 Binding 7
+               OpDecorate %17 Flat
+               OpDecorate %17 Location 3
+               OpDecorate %19 NonUniform
+               OpDecorate %21 NonUniform
+               OpDecorate %22 NonUniform
+               OpDecorate %28 Flat
+               OpDecorate %28 Location 0
+               OpDecorate %30 Flat
+               OpDecorate %30 Location 1
+               OpDecorate %31 Flat
+               OpDecorate %31 Location 2
+               OpDecorate %32 Flat
+               OpDecorate %32 Location 4
+               OpDecorate %33 Flat
+               OpDecorate %33 Location 5
+               OpDecorate %34 Flat
+               OpDecorate %34 Location 6
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+          %9 = OpVariable %_ptr_Output_v4float Output
+         %10 = OpTypeImage %float 2D 0 0 0 1 Unknown
+         %11 = OpTypeSampledImage %10
+%_runtimearr_11 = OpTypeRuntimeArray %11
+%_ptr_UniformConstant__runtimearr_11 = OpTypePointer UniformConstant %_runtimearr_11
+         %14 = OpVariable %_ptr_UniformConstant__runtimearr_11 UniformConstant
+        %int = OpTypeInt 32 1
+%_ptr_Input_int = OpTypePointer Input %int
+         %17 = OpVariable %_ptr_Input_int Input
+%_ptr_UniformConstant_11 = OpTypePointer UniformConstant %11
+    %v2float = OpTypeVector %float 2
+    %float_0 = OpConstant %float 0
+         %25 = OpConstantComposite %v2float %float_0 %float_0
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+         %28 = OpVariable %_ptr_Input_v4float Input
+%_ptr_Input_v2float = OpTypePointer Input %v2float
+         %30 = OpVariable %_ptr_Input_v2float Input
+         %31 = OpVariable %_ptr_Input_int Input
+         %32 = OpVariable %_ptr_Input_int Input
+         %33 = OpVariable %_ptr_Input_int Input
+         %34 = OpVariable %_ptr_Input_int Input
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+         %18 = OpLoad %int %17
+         %19 = OpCopyObject %int %18
+         %21 = OpAccessChain %_ptr_UniformConstant_11 %14 %19
+         %22 = OpLoad %11 %21
+         %26 = OpImageSampleImplicitLod %v4float %22 %25
+               OpStore %9 %26
+               OpReturn
+               OpFunctionEnd

@@ -5230,8 +5230,11 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *desc) {
 // Get image and/or sampler descriptors, and get information from the image
 // type.
 void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info) {
-  if (bImageInst->hasDecorate(DecorationNonUniformEXT))
+  if (bImageInst->hasDecorate(DecorationNonUniformEXT)) {
     info->flags |= lgc::Builder::ImageFlagNonUniformImage;
+    if (bImageInst->getType()->getOpCode() == OpTypeSampledImage)
+      info->flags |= lgc::Builder::ImageFlagNonUniformSampler;
+  }
 
   if (bImageInst->getOpCode() == OpImageTexelPointer) {
     // We are looking at the OpImageTexelPointer for an image atomic. Load the
