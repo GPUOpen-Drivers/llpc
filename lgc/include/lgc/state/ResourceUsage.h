@@ -418,8 +418,9 @@ struct InterfaceData {
   static const unsigned MaxSpillTableSize = 512;
   static const unsigned MaxDynDescCount = 32;
   static const unsigned MaxEsGsOffsetCount = 6;
-  static const unsigned MaxCsUserDataCount = 10;
-  static const unsigned CsStartUserData = 2;
+  static const unsigned MaxCsUserDataCount = 16;
+  static const unsigned MaxCsFixedLayoutUserDataCount = 10;
+  static const unsigned CsFixedLayoutStartUserData = 2;
 
   unsigned userDataCount = 0;                  // User data count
 
