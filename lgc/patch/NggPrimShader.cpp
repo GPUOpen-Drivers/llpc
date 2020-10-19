@@ -802,20 +802,27 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   //   if (threadIdInSubgroup < primCountInSubgroup)
   //     Do primitive connectivity data export
   //
-  //   if (threadIdInSubgroup < vertCountInSubgroup)
-  //     Run ES-partial to do deferred vertex export
+  //   if (threadIdInSubgroup < vertCountInSubgroup) {
+  //     if (vertex compactionless && empty wave)
+  //       Do dummy vertex export
+  //     else
+  //       Run ES-partial to do deferred vertex export
+  //   }
   // }
   //
 
   // Export count when the entire sub-group is fully culled
-  const unsigned fullyCulledExportCount =
-      m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups ? 1 : 0;
+  const bool waNggCullingNoEmptySubgroups =
+      m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups;
+  const unsigned fullyCulledExportCount = waNggCullingNoEmptySubgroups ? 1 : 0;
 
   const unsigned esGsRingItemSize =
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
 
   // NOTE: Make sure vertex position data is 16-byte alignment because we will use 128-bit LDS read/write for it.
   assert(m_ldsManager->getLdsRegionStart(LdsRegionVertPosData) % SizeOfVec4 == 0);
+
+  const bool disableCompact = m_nggControl->compactMode == NggCompactDisable;
 
   // Define basic blocks
   auto entryBlock = createBlock(entryPoint, ".entry");
@@ -859,18 +866,34 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   auto accumVertCountBlock = createBlock(entryPoint, ".accumVertCount");
   auto endAccumVertCountBlock = createBlock(entryPoint, ".endAccumVertCount");
 
-  auto compactVertBlock = createBlock(entryPoint, ".compactVert");
+  auto compactVertBlock = disableCompact ? nullptr : createBlock(entryPoint, ".compactVert"); // Conditionally created
   auto endCompactVertBlock = createBlock(entryPoint, ".endCompactVert");
 
   auto checkAllocReqBlock = createBlock(entryPoint, ".checkAllocReq");
   auto allocReqBlock = createBlock(entryPoint, ".allocReq");
   auto endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
 
-  auto earlyExitBlock = createBlock(entryPoint, ".earlyExit");
-  auto noEarlyExitBlock = createBlock(entryPoint, ".noEarlyExit");
+  // NOTE: Those basic blocks are conditionally created according to the enablement of a workaround flag that handles
+  // empty subgroup.
+  BasicBlock *earlyExitBlock = nullptr;
+  BasicBlock *noEarlyExitBlock = nullptr;
+  if (waNggCullingNoEmptySubgroups) {
+    earlyExitBlock = createBlock(entryPoint, ".earlyExit");
+    noEarlyExitBlock = createBlock(entryPoint, ".noEarlyExit");
+  }
 
   auto expPrimBlock = createBlock(entryPoint, ".expPrim");
   auto endExpPrimBlock = createBlock(entryPoint, ".endExpPrim");
+
+  // NOTE: Those basic blocks are conditionally created according to the enablement of vertex compactionless mode.
+  BasicBlock *checkEmptyWaveBlock = nullptr;
+  BasicBlock *emptyWaveExpBlock = nullptr;
+  BasicBlock *noEmptyWaveExpBlock = nullptr;
+  if (disableCompact) {
+    checkEmptyWaveBlock = createBlock(entryPoint, ".checkEmptyWave");
+    emptyWaveExpBlock = createBlock(entryPoint, ".emptyWaveExp");
+    noEmptyWaveExpBlock = createBlock(entryPoint, ".noEmptyWaveExp");
+  }
 
   auto expVertBlock = createBlock(entryPoint, ".expVert");
   auto endExpVertBlock = createBlock(entryPoint, ".endExpVert");
@@ -1196,66 +1219,72 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     vertCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
                                                      {vertCountInWaves, m_builder->getInt32(waveCountInSubgroup)});
 
-    // Get vertex count for all waves prior to this wave
-    vertCountInPrevWaves =
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {vertCountInWaves, m_nggFactor.waveIdInSubgroup});
+    if (disableCompact) {
+      m_builder->CreateBr(endCompactVertBlock);
+    } else {
+      // Get vertex count for all waves prior to this wave
+      vertCountInPrevWaves =
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {vertCountInWaves, m_nggFactor.waveIdInSubgroup});
 
-    vertCompacted = m_builder->CreateICmpULT(vertCountInSubgroup, m_nggFactor.vertCountInSubgroup);
-    m_builder->CreateCondBr(m_builder->CreateAnd(drawFlag, vertCompacted), compactVertBlock, endCompactVertBlock);
+      vertCompacted = m_builder->CreateICmpULT(vertCountInSubgroup, m_nggFactor.vertCountInSubgroup);
+      m_builder->CreateCondBr(m_builder->CreateAnd(drawFlag, vertCompacted), compactVertBlock, endCompactVertBlock);
+    }
   }
 
-  // Construct ".compactVert" block
-  {
-    m_builder->SetInsertPoint(compactVertBlock);
+  if (!disableCompact) {
+    // Construct ".compactVert" block
+    {
+      m_builder->SetInsertPoint(compactVertBlock);
 
-    auto drawMaskVec = m_builder->CreateBitCast(drawMask, FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
+      auto drawMaskVec = m_builder->CreateBitCast(drawMask, FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
 
-    auto drawMaskLow = m_builder->CreateExtractElement(drawMaskVec, static_cast<uint64_t>(0));
-    Value *compactVertexId =
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {drawMaskLow, m_builder->getInt32(0)});
+      auto drawMaskLow = m_builder->CreateExtractElement(drawMaskVec, static_cast<uint64_t>(0));
+      Value *compactVertexId =
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {drawMaskLow, m_builder->getInt32(0)});
 
-    if (waveSize == 64) {
-      auto drawMaskHigh = m_builder->CreateExtractElement(drawMaskVec, 1);
-      compactVertexId = m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {drawMaskHigh, compactVertexId});
-    }
-
-    // Setup the map: compacted -> uncompacted
-    compactVertexId = m_builder->CreateAdd(vertCountInPrevWaves, compactVertexId);
-    writePerThreadDataToLds(m_nggFactor.threadIdInSubgroup, compactVertexId, LdsRegionVertThreadIdMap);
-
-    // Write compacted thread ID
-    writeVertexCullInfoToLds(compactVertexId, vertexItemOffset, m_vertCullInfoOffsets.compactThreadId);
-
-    if (hasTs) {
-      // Write X/Y of tessCoord (U/V)
-      if (resUsage->builtInUsage.tes.tessCoord) {
-        writeVertexCullInfoToLds(tessCoordX, vertexItemOffset, m_vertCullInfoOffsets.tessCoordX);
-        writeVertexCullInfoToLds(tessCoordY, vertexItemOffset, m_vertCullInfoOffsets.tessCoordY);
+      if (waveSize == 64) {
+        auto drawMaskHigh = m_builder->CreateExtractElement(drawMaskVec, 1);
+        compactVertexId = m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {drawMaskHigh, compactVertexId});
       }
 
-      // Write relative patch ID
-      writeVertexCullInfoToLds(relPatchId, vertexItemOffset, m_vertCullInfoOffsets.relPatchId);
+      // Setup the map: compacted -> uncompacted
+      compactVertexId = m_builder->CreateAdd(vertCountInPrevWaves, compactVertexId);
+      writePerThreadDataToLds(m_nggFactor.threadIdInSubgroup, compactVertexId, LdsRegionVertThreadIdMap);
 
-      // Write patch ID
-      if (resUsage->builtInUsage.tes.primitiveId)
-        writeVertexCullInfoToLds(patchId, vertexItemOffset, m_vertCullInfoOffsets.patchId);
-    } else {
-      // Write vertex ID
-      if (resUsage->builtInUsage.vs.vertexIndex)
-        writeVertexCullInfoToLds(vertexId, vertexItemOffset, m_vertCullInfoOffsets.vertexId);
+      // Write compacted thread ID
+      writeVertexCullInfoToLds(compactVertexId, vertexItemOffset, m_vertCullInfoOffsets.compactThreadId);
 
-      // Write instance ID
-      if (resUsage->builtInUsage.vs.instanceIndex)
-        writeVertexCullInfoToLds(instanceId, vertexItemOffset, m_vertCullInfoOffsets.instanceId);
+      if (hasTs) {
+        // Write X/Y of tessCoord (U/V)
+        if (resUsage->builtInUsage.tes.tessCoord) {
+          writeVertexCullInfoToLds(tessCoordX, vertexItemOffset, m_vertCullInfoOffsets.tessCoordX);
+          writeVertexCullInfoToLds(tessCoordY, vertexItemOffset, m_vertCullInfoOffsets.tessCoordY);
+        }
 
-      // Write primitive ID
-      if (resUsage->builtInUsage.vs.primitiveId) {
-        assert(m_nggFactor.primitiveId);
-        writeVertexCullInfoToLds(m_nggFactor.primitiveId, vertexItemOffset, m_vertCullInfoOffsets.primitiveId);
+        // Write relative patch ID
+        writeVertexCullInfoToLds(relPatchId, vertexItemOffset, m_vertCullInfoOffsets.relPatchId);
+
+        // Write patch ID
+        if (resUsage->builtInUsage.tes.primitiveId)
+          writeVertexCullInfoToLds(patchId, vertexItemOffset, m_vertCullInfoOffsets.patchId);
+      } else {
+        // Write vertex ID
+        if (resUsage->builtInUsage.vs.vertexIndex)
+          writeVertexCullInfoToLds(vertexId, vertexItemOffset, m_vertCullInfoOffsets.vertexId);
+
+        // Write instance ID
+        if (resUsage->builtInUsage.vs.instanceIndex)
+          writeVertexCullInfoToLds(instanceId, vertexItemOffset, m_vertCullInfoOffsets.instanceId);
+
+        // Write primitive ID
+        if (resUsage->builtInUsage.vs.primitiveId) {
+          assert(m_nggFactor.primitiveId);
+          writeVertexCullInfoToLds(m_nggFactor.primitiveId, vertexItemOffset, m_vertCullInfoOffsets.primitiveId);
+        }
       }
-    }
 
-    m_builder->CreateBr(endCompactVertBlock);
+      m_builder->CreateBr(endCompactVertBlock);
+    }
   }
 
   // Construct ".endCompactVert" block
@@ -1275,7 +1304,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     primCountInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCountInSubgroup);
 
     vertCountInSubgroup =
-        m_builder->CreateSelect(fullyCulled, m_builder->getInt32(fullyCulledExportCount), vertCountInSubgroup);
+        m_builder->CreateSelect(fullyCulled, m_builder->getInt32(fullyCulledExportCount),
+                                disableCompact ? m_nggFactor.vertCountInSubgroup : vertCountInSubgroup);
 
     // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
     // an uniform value later, similar to what we have done for the revised primitive count in
@@ -1292,11 +1322,15 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     // NOTE: Here, we make several phi nodes to update some values that are different in runtime passthrough path
     // and no runtime passthrough path (normal culling path).
 
-    // Update vertex compaction flag
-    auto vertCompactedPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2, "vertCompacted");
-    vertCompactedPhi->addIncoming(vertCompacted, endCompactVertBlock);
-    vertCompactedPhi->addIncoming(m_builder->getFalse(), runtimePassthroughBlock);
-    m_nggFactor.vertCompacted = vertCompactedPhi; // Record vertex compaction flag
+    if (!disableCompact) {
+      // Update vertex compaction flag
+      auto vertCompactedPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2, "vertCompacted");
+      vertCompactedPhi->addIncoming(vertCompacted, endCompactVertBlock);
+      vertCompactedPhi->addIncoming(m_builder->getFalse(), runtimePassthroughBlock);
+      m_nggFactor.vertCompacted = vertCompactedPhi; // Record vertex compaction flag
+    } else {
+      assert(!m_nggFactor.vertCompacted); // Must be null
+    }
 
     // Update cull flag
     auto cullFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2, "cullFlag");
@@ -1322,6 +1356,20 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     vertCountInSubgroupPhi->addIncoming(m_nggFactor.vertCountInSubgroup, runtimePassthroughBlock);
     m_nggFactor.vertCountInSubgroup = vertCountInSubgroupPhi; // Record vertex count in subgroup
 
+    if (disableCompact) {
+      // Update draw flag
+      auto drawFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2);
+      drawFlagPhi->addIncoming(drawFlag, endCompactVertBlock);
+      drawFlagPhi->addIncoming(m_builder->getTrue(), runtimePassthroughBlock);
+      drawFlag = drawFlagPhi;
+
+      // Update vertex count in wave
+      auto vertCountInWavePhi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
+      vertCountInWavePhi->addIncoming(vertCountInWave, endCompactVertBlock);
+      vertCountInWavePhi->addIncoming(m_nggFactor.vertCountInWave, runtimePassthroughBlock);
+      vertCountInWave = vertCountInWavePhi;
+    }
+
     auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
     m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
   }
@@ -1340,22 +1388,29 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-    m_builder->CreateCondBr(fullyCulled, earlyExitBlock, noEarlyExitBlock);
+    if (waNggCullingNoEmptySubgroups)
+      m_builder->CreateCondBr(fullyCulled, earlyExitBlock, noEarlyExitBlock);
+    else {
+      auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
+      m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
+    }
   }
 
-  // Construct ".earlyExit" block
-  {
-    m_builder->SetInsertPoint(earlyExitBlock);
+  if (waNggCullingNoEmptySubgroups) {
+    // Construct ".earlyExit" block
+    {
+      m_builder->SetInsertPoint(earlyExitBlock);
 
-    doEarlyExit(fullyCulledExportCount);
-  }
+      doEarlyExit(fullyCulledExportCount);
+    }
 
-  // Construct ".noEarlyExit" block
-  {
-    m_builder->SetInsertPoint(noEarlyExitBlock);
+    // Construct ".noEarlyExit" block
+    {
+      m_builder->SetInsertPoint(noEarlyExitBlock);
 
-    auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
-    m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
+      auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
+      m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
+    }
   }
 
   // Construct ".expPrim" block
@@ -1372,7 +1427,45 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     m_builder->SetInsertPoint(endExpPrimBlock);
 
     auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
-    m_builder->CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
+    if (disableCompact)
+      m_builder->CreateCondBr(vertValid, checkEmptyWaveBlock, endExpVertBlock);
+    else
+      m_builder->CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
+  }
+
+  if (disableCompact) {
+    // Construct ".checkEmptyWave" block
+    {
+      m_builder->SetInsertPoint(checkEmptyWaveBlock);
+
+      auto emptyWave = m_builder->CreateICmpEQ(vertCountInWave, m_builder->getInt32(0));
+      m_builder->CreateCondBr(emptyWave, emptyWaveExpBlock, noEmptyWaveExpBlock);
+    }
+
+    // Construct ".emptyWaveExp" block
+    {
+      m_builder->SetInsertPoint(emptyWaveExpBlock);
+
+      auto undef = UndefValue::get(m_builder->getFloatTy());
+      m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
+                                 {
+                                     m_builder->getInt32(EXP_TARGET_POS_0), // tgt
+                                     m_builder->getInt32(0x0),              // en
+                                     // src0 ~ src3
+                                     undef, undef, undef, undef,
+                                     m_builder->getTrue(), // done
+                                     m_builder->getFalse() // vm
+                                 });
+
+      m_builder->CreateRetVoid();
+    }
+
+    // Construct ".noEmptyWaveExp" block
+    {
+      m_builder->SetInsertPoint(noEmptyWaveExpBlock);
+
+      m_builder->CreateCondBr(drawFlag, expVertBlock, endExpVertBlock);
+    }
   }
 
   // Construct ".expVert" block
