@@ -58,6 +58,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcSpirvLowerMath.cpp                  \
         llpcSpirvLowerMemoryOp.cpp              \
         llpcSpirvLowerResourceCollect.cpp       \
+        llpcSpirvLowerTerminator.cpp            \
         llpcSpirvLowerTranslator.cpp            \
         llpcSpirvLowerUtil.cpp
 
