@@ -724,14 +724,14 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       } else if (m_shaderStage == ShaderStageGeometry) {
         assert(callInst.getNumArgOperands() == 4);
 
-        GsOutLocInfo outLocInfo = {};
+        InOutLocationInfo outLocInfo = {};
         outLocInfo.location = value;
         outLocInfo.isBuiltIn = false;
         outLocInfo.streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
 
-        if (resUsage->inOutUsage.outputLocMap.find(outLocInfo.u32All) != resUsage->inOutUsage.outputLocMap.end()) {
+        if (resUsage->inOutUsage.outputLocMap.find(outLocInfo.u16All) != resUsage->inOutUsage.outputLocMap.end()) {
           exist = true;
-          loc = resUsage->inOutUsage.outputLocMap[outLocInfo.u32All];
+          loc = resUsage->inOutUsage.outputLocMap[outLocInfo.u16All];
         }
       } else {
         if (m_pipelineState->canPackInOut() && m_shaderStage == ShaderStageVertex &&

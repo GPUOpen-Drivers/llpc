@@ -81,7 +81,7 @@ private:
   void matchGenericInOut();
   void mapBuiltInToGenericInOut();
 
-  void mapGsGenericOutput(GsOutLocInfo outLocInfo);
+  void mapGsGenericOutput(InOutLocationInfo outLocInfo);
   void mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
 
   void packInOutLocation();
