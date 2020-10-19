@@ -171,6 +171,7 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerMath.cpp
         lower/llpcSpirvLowerMemoryOp.cpp
         lower/llpcSpirvLowerResourceCollect.cpp
+        lower/llpcSpirvLowerTerminator.cpp
         lower/llpcSpirvLowerTranslator.cpp
         lower/llpcSpirvLowerUtil.cpp
     )

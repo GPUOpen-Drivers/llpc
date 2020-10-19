@@ -55,6 +55,7 @@ void initializeSpirvLowerMemoryOpPass(PassRegistry &);
 void initializeSpirvLowerGlobalPass(PassRegistry &);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry &);
 void initializeSpirvLowerResourceCollectPass(PassRegistry &);
+void initializeSpirvLowerTerminatorPass(PassRegistry &);
 void initializeSpirvLowerTranslatorPass(PassRegistry &);
 } // namespace llvm
 
@@ -78,6 +79,7 @@ inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
   initializeSpirvLowerGlobalPass(passRegistry);
   initializeSpirvLowerInstMetaRemovePass(passRegistry);
   initializeSpirvLowerResourceCollectPass(passRegistry);
+  initializeSpirvLowerTerminatorPass(passRegistry);
   initializeSpirvLowerTranslatorPass(passRegistry);
 }
 
@@ -91,6 +93,7 @@ llvm::ModulePass *createSpirvLowerMemoryOp();
 llvm::ModulePass *createSpirvLowerGlobal();
 llvm::ModulePass *createSpirvLowerInstMetaRemove();
 llvm::ModulePass *createSpirvLowerResourceCollect(bool collectDetailUsage);
+llvm::ModulePass *createSpirvLowerTerminator();
 llvm::ModulePass *createSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo);
 
 // =====================================================================================================================

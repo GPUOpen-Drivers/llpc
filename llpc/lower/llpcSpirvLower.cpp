@@ -166,6 +166,9 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   // Lower SPIR-V access chain
   passMgr.add(createSpirvLowerAccessChain());
 
+  // Lower SPIR-V terminators
+  passMgr.add(createSpirvLowerTerminator());
+
   // Lower SPIR-V global variables, inputs, and outputs
   passMgr.add(createSpirvLowerGlobal());
 
