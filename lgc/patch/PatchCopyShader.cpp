@@ -302,12 +302,12 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
         unsigned value = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
         const unsigned streamId = cast<ConstantInt>(callInst->getOperand(2))->getZExtValue();
 
-        GsOutLocInfo outLocInfo = {};
+        InOutLocationInfo outLocInfo = {};
         outLocInfo.location = value;
         outLocInfo.isBuiltIn = false;
         outLocInfo.streamId = streamId;
 
-        auto locMapIt = resUsage->inOutUsage.outputLocMap.find(outLocInfo.u32All);
+        auto locMapIt = resUsage->inOutUsage.outputLocMap.find(outLocInfo.u16All);
         if (locMapIt == resUsage->inOutUsage.outputLocMap.end())
           continue;
 
@@ -566,7 +566,7 @@ void PatchCopyShader::exportGenericOutput(Value *outputValue, unsigned location,
     auto locIter =
         find_if(outLocMap.begin(), outLocMap.end(), [location, streamId](const std::pair<unsigned, unsigned> &outLoc) {
           unsigned outLocInfo = outLoc.first;
-          bool isStreamId = (reinterpret_cast<GsOutLocInfo *>(&outLocInfo))->streamId == streamId;
+          bool isStreamId = (reinterpret_cast<InOutLocationInfo *>(&outLocInfo))->streamId == streamId;
           return outLoc.second == location && isStreamId;
         });
 
@@ -625,13 +625,13 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
   if (resUsage->inOutUsage.enableXfb) {
-    GsOutLocInfo outLocInfo = {};
+    InOutLocationInfo outLocInfo = {};
     outLocInfo.location = builtInId;
     outLocInfo.isBuiltIn = true;
     outLocInfo.streamId = streamId;
 
     auto &xfbOutsInfo = resUsage->inOutUsage.gs.xfbOutsInfo;
-    auto locIter = xfbOutsInfo.find(outLocInfo.u32All);
+    auto locIter = xfbOutsInfo.find(outLocInfo.u16All);
     if (locIter != xfbOutsInfo.end()) {
       XfbOutInfo *xfbOutInfo = reinterpret_cast<XfbOutInfo *>(&xfbOutsInfo[locIter->first]);
 

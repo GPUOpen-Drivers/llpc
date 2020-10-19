@@ -65,20 +65,6 @@ union DescriptorPair {
   uint64_t u64All;
 };
 
-// Represents GS output location info (including location, built-in ID, and vertex stream ID)
-//
-// NOTE: Be careful to add new fields in this structure. It will be used as 32-bit hash map key in doing
-// location map for GS. The change of 32-bit value has impacts on ordering of entries. Thus, the mapping
-// result is changed accordingly.
-union GsOutLocInfo {
-  struct {
-    unsigned location : 16; // Location of the output
-    unsigned isBuiltIn : 1; // Whether location is actually built-in ID
-    unsigned streamId : 2;  // Output vertex stream ID
-  };
-  unsigned u32All;
-};
-
 // Represents transform feedback output info
 union XfbOutInfo {
   struct {
@@ -108,7 +94,9 @@ union InOutLocationInfo {
   struct {
     uint16_t half : 1;      // High half in case of 16-bit attriburtes
     uint16_t component : 2; // The component index
-    uint16_t location : 13; // The location
+    uint16_t location : 10; // The location
+    uint16_t isBuiltIn : 1; // Whether location is actually built-in ID
+    uint16_t streamId : 2;  // Output vertex stream ID
   };
   uint16_t u16All;
 };
