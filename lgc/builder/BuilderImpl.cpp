@@ -166,9 +166,29 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
 #else
   assert(operandIdxs.empty() == false);
 
-  // For each non-uniform input, try and trace back through a descriptor load to find the non-uniform index
-  // used in it. If that fails, we just use the operand value as the index.
+  // For each non-uniform input, try and trace back through a descriptor load to
+  // find the non-uniform index used in it. If that fails, we just use the
+  // operand value as the index.
+  //
+  // Note: this code has to cope with relocs as well, this is why we have to
+  // have a worklist of instructions to trace back
+  // through. Something like this:
+  // %1 = call .... @lgc.descriptor.set(...)          ;; Known uniform base
+  // %2 = call .... @llvm.amdgcn.reloc.constant(...)  ;; Known uniform reloc constant
+  // %3 = ptrtoint ... %1 to i64
+  // %4 = zext ... %2 to i64
+  // %5 = add i64 %3, %4
+  // %6 = inttoptr i64 %5 to ....
+  // %7 = bitcast .... %6 to ....
+  // %8 = getelementptr .... %7, i64 %offset
+  //
+  // As long as the base pointer %7 can be traced back to a descriptor set and
+  // reloc we can infer that it is truly uniform and use the gep index as the waterfall index safely
+  //
+
   SmallVector<Value *, 2> nonUniformIndices;
+  SmallVector<Value *, 2> worklist;
+
   for (unsigned operandIdx : operandIdxs) {
     Value *nonUniformVal = nonUniformInst->getOperand(operandIdx);
     if (auto load = dyn_cast<LoadInst>(nonUniformVal)) {
@@ -209,12 +229,43 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
           }
           break;
         }
+        if (auto intToPtr = dyn_cast<IntToPtrInst>(base)) {
+          base = intToPtr->getOperand(0);
+          continue;
+        }
+        if (auto ptrToInt = dyn_cast<PtrToIntInst>(base)) {
+          base = ptrToInt->getOperand(0);
+          continue;
+        }
+        if (auto zExt = dyn_cast<ZExtInst>(base)) {
+          base = zExt->getOperand(0);
+          continue;
+        }
         if (auto call = dyn_cast<CallInst>(base)) {
           if (index) {
             if (auto calledFunc = call->getCalledFunction()) {
-              if (calledFunc->getName().startswith(lgcName::DescriptorSet))
+              if (calledFunc->getName().startswith(lgcName::DescriptorSet) ||
+                  calledFunc->getName().startswith("llvm.amdgcn.reloc.constant")) {
+                if (worklist.size()) {
+                  base = worklist.pop_back_val();
+                  continue;
+                }
                 nonUniformVal = index;
+                break;
+              }
             }
+          }
+        }
+        if (auto addInst = dyn_cast<Instruction>(base)) {
+          // In this case we have to trace back both operands
+          // Set one to base for continued processing and put the other onto the worklist
+          // Give up if the worklist already has an entry - too complicated
+          if (addInst->isBinaryOp() && addInst->getOpcode() == Instruction::BinaryOps::Add) {
+            if (worklist.size())
+              break;
+            base = addInst->getOperand(0);
+            worklist.push_back(addInst->getOperand(1));
+            continue;
           }
         }
         break;
