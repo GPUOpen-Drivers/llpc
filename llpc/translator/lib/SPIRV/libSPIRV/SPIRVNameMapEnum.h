@@ -191,6 +191,8 @@ template <> inline void SPIRVMap<ImageFormat, std::string>::init() {
   add(ImageFormatRg8ui, "Rg8ui");
   add(ImageFormatR16ui, "R16ui");
   add(ImageFormatR8ui, "R8ui");
+  add(ImageFormatR64ui, "R64ui");
+  add(ImageFormatR64i, "R64i");
 }
 SPIRV_DEF_NAMEMAP(ImageFormat, SPIRVImageFormatNameMap)
 
@@ -422,6 +424,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityImageGatherBiasLodAMD, "ImageGatherBiasLodAMD");
   add(CapabilityFragmentMaskAMD, "FragmentMaskAMD");
   add(CapabilityFloat16ImageAMD, "Float16ImageAMD");
+  add(CapabilityInt64ImageAtomicsEXT, "Float16ImageAMD");
   add(CapabilityShaderClockKHR, "ShaderClockKHR");
   add(CapabilityVariablePointersStorageBuffer, "VariablePointersStorageBuffer");
   add(CapabilityVariablePointers, "VariablePointers");
