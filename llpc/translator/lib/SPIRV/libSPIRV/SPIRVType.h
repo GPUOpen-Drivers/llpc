@@ -481,6 +481,10 @@ protected:
     assert(Desc.Depth <= 2);
     assert(Desc.Arrayed <= 1);
     assert(Desc.MS <= 1);
+    if (getSampledType()->isTypeVectorOrScalarInt(64))
+      assert(getDescriptor().Format == ImageFormatR64i ||
+             getDescriptor().Format == ImageFormatR64ui ||
+             getDescriptor().Format == ImageFormatUnknown);
   }
   void setWordCount(SPIRVWord TheWC) override {
     WordCount = TheWC;

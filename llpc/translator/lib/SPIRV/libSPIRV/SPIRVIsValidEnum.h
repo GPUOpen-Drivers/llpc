@@ -236,6 +236,8 @@ inline bool isValid(spv::ImageFormat V) {
   case ImageFormatRg8ui:
   case ImageFormatR16ui:
   case ImageFormatR8ui:
+  case ImageFormatR64ui:
+  case ImageFormatR64i:
     return true;
   default:
     return false;
@@ -508,6 +510,7 @@ inline bool isValid(spv::Capability V) {
   case CapabilityShaderClockKHR:
   case CapabilityVariablePointersStorageBuffer:
   case CapabilityVariablePointers:
+  case CapabilityInt64ImageAtomicsEXT:
 #if SPV_VERSION >= 0x10500
   case CapabilityShaderNonUniform:
   case CapabilityRuntimeDescriptorArray:
