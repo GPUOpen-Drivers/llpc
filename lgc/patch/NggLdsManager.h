@@ -49,7 +49,7 @@ enum NggLdsRegionType {
   LdsRegionVertPosData,       // Vertex position data
   LdsRegionVertCullInfo,      // Vertex cull info
   LdsRegionVertCountInWaves,  // Vertex count accumulated per wave (8 potential waves) and per sub-group
-  LdsRegionVertThreadIdMap,   // Vertex thread ID map (compacted -> uncompacted)
+  LdsRegionVertThreadIdMap,   // Vertex thread ID map (compacted -> uncompacted), for vertex compaction
 
   LdsRegionEsBeginRange = LdsRegionDistribPrimId,
   LdsRegionEsEndRange = LdsRegionVertThreadIdMap,
@@ -60,7 +60,7 @@ enum NggLdsRegionType {
   LdsRegionEsGsRing,            // ES-GS ring
   LdsRegionOutPrimData,         // GS output primitive data
   LdsRegionOutVertCountInWaves, // GS output vertex count accumulated per wave (8 potential waves) and per sub-group
-  LdsRegionOutVertThreadIdMap,  // GS output vertex thread ID map (compacted -> uncompacted)
+  LdsRegionOutVertThreadIdMap,  // GS output vertex thread ID map (compacted -> uncompacted), for vertex compaction
   LdsRegionGsVsRing,            // GS-VS ring
 
   LdsRegionGsBeginRange = LdsRegionEsGsRing,
