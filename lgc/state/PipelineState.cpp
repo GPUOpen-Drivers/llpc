@@ -999,7 +999,7 @@ void PipelineState::initializePackInOut() {
   // Pack input/output requirements:
   // 1) -pack-in-out option is on
   // 2) It supports VS-FS, VS-TCS-TES-(FS)
-  if (PackInOut && hasShaderStage(ShaderStageVertex) && !hasShaderStage(ShaderStageGeometry)) {
+  if (PackInOut && !m_unlinked && hasShaderStage(ShaderStageVertex) && !hasShaderStage(ShaderStageGeometry)) {
     const unsigned nextStage = getNextShaderStage(ShaderStageVertex);
     m_packInOut = nextStage == ShaderStageFragment || nextStage == ShaderStageTessControl;
   }

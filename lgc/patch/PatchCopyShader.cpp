@@ -302,16 +302,15 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
         unsigned value = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
         const unsigned streamId = cast<ConstantInt>(callInst->getOperand(2))->getZExtValue();
 
-        InOutLocationInfo outLocInfo = {};
-        outLocInfo.location = value;
-        outLocInfo.isBuiltIn = false;
-        outLocInfo.streamId = streamId;
+        InOutLocationInfo outLocInfo;
+        outLocInfo.setLocation(value);
+        outLocInfo.setStreamId(streamId);
 
-        auto locMapIt = resUsage->inOutUsage.outputLocMap.find(outLocInfo.u16All);
-        if (locMapIt == resUsage->inOutUsage.outputLocMap.end())
+        auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(outLocInfo);
+        if (locInfoMapIt == resUsage->inOutUsage.outputLocInfoMap.end())
           continue;
 
-        unsigned location = locMapIt->second;
+        unsigned location = locInfoMapIt->second.getLocation();
         const unsigned compIdx = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
 
         unsigned compCount = 1;
@@ -559,20 +558,20 @@ void PatchCopyShader::exportGenericOutput(Value *outputValue, unsigned location,
                                           BuilderBase &builder) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
   if (resUsage->inOutUsage.enableXfb) {
-    auto &outLocMap = resUsage->inOutUsage.outputLocMap;
+    auto &outLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
     auto &xfbOutsInfo = resUsage->inOutUsage.gs.xfbOutsInfo;
 
-    // Find original location in outLocMap which equals used location in copy shader
-    auto locIter =
-        find_if(outLocMap.begin(), outLocMap.end(), [location, streamId](const std::pair<unsigned, unsigned> &outLoc) {
-          unsigned outLocInfo = outLoc.first;
-          bool isStreamId = (reinterpret_cast<InOutLocationInfo *>(&outLocInfo))->streamId == streamId;
-          return outLoc.second == location && isStreamId;
-        });
+    // Find original location in outLocInfoMap which equals used location in copy shader
+    auto locInfoIter =
+        find_if(outLocInfoMap.begin(), outLocInfoMap.end(),
+                [location, streamId](const std::pair<InOutLocationInfo, InOutLocationInfo> &outLocInfo) {
+                  const auto &newLocationInfo = outLocInfo.second;
+                  return newLocationInfo.getLocation() == location && newLocationInfo.getStreamId() == streamId;
+                });
 
-    assert(locIter != outLocMap.end());
-    if (xfbOutsInfo.find(locIter->first) != xfbOutsInfo.end()) {
-      XfbOutInfo *xfbOutInfo = reinterpret_cast<XfbOutInfo *>(&xfbOutsInfo[locIter->first]);
+    assert(locInfoIter != outLocInfoMap.end());
+    if (xfbOutsInfo.find(locInfoIter->first) != xfbOutsInfo.end()) {
+      XfbOutInfo *xfbOutInfo = reinterpret_cast<XfbOutInfo *>(&xfbOutsInfo[locInfoIter->first]);
 
       if (xfbOutInfo->is16bit) {
         // NOTE: For 16-bit transform feedback output, the value is 32-bit dword loaded from GS-VS ring
@@ -625,13 +624,13 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
   if (resUsage->inOutUsage.enableXfb) {
-    InOutLocationInfo outLocInfo = {};
-    outLocInfo.location = builtInId;
-    outLocInfo.isBuiltIn = true;
-    outLocInfo.streamId = streamId;
+    InOutLocationInfo outLocInfo;
+    outLocInfo.setLocation(builtInId);
+    outLocInfo.setBuiltIn(true);
+    outLocInfo.setStreamId(streamId);
 
     auto &xfbOutsInfo = resUsage->inOutUsage.gs.xfbOutsInfo;
-    auto locIter = xfbOutsInfo.find(outLocInfo.u16All);
+    auto locIter = xfbOutsInfo.find(outLocInfo);
     if (locIter != xfbOutsInfo.end()) {
       XfbOutInfo *xfbOutInfo = reinterpret_cast<XfbOutInfo *>(&xfbOutsInfo[locIter->first]);
 

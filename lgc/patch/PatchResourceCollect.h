@@ -39,6 +39,7 @@
 namespace lgc {
 
 class InOutLocationMapManager;
+typedef std::map<InOutLocationInfo, InOutLocationInfo> InOutLocationInfoMap;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for resource collecting
@@ -81,11 +82,11 @@ private:
   void matchGenericInOut();
   void mapBuiltInToGenericInOut();
 
-  void mapGsGenericOutput(InOutLocationInfo outLocInfo);
+  void mapGsGenericOutput(const InOutLocationInfo &outLocInfo);
   void mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
 
   void packInOutLocation();
-  void fillInOutLocMap();
+  void fillInOutLocInfoMap();
   void reassembleOutputExportCalls();
 
   // Input/output scalarizing
@@ -127,15 +128,6 @@ union InOutCompatibilityInfo {
   uint16_t u16All;
 };
 
-// Represents the wrapper of input/output locatoin info, along with handlers
-struct InOutLocation {
-  uint16_t asIndex() const { return locationInfo.u16All; }
-
-  bool operator<(const InOutLocation &rhs) const { return this->asIndex() < rhs.asIndex(); }
-
-  InOutLocationInfo locationInfo; // The location info of an input or output
-};
-
 // =====================================================================================================================
 // Represents the manager of input/output locationMap generation
 class InOutLocationMapManager {
@@ -145,18 +137,18 @@ public:
   void addSpan(llvm::CallInst *call, ShaderStage shaderStage);
   void buildLocationMap(bool checkCompatibility);
 
-  bool findMap(const InOutLocation &originalLocation, const InOutLocation *&newLocation);
+  bool findMap(const InOutLocationInfo &origLocInfo, InOutLocationInfoMap::const_iterator &mapIt);
 
   struct LocationSpan {
     uint16_t getCompatibilityKey() const { return compatibilityInfo.u16All; }
 
-    unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocation.asIndex()); }
+    unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocation.getData()); }
 
     bool operator==(const LocationSpan &rhs) const { return this->asIndex() == rhs.asIndex(); }
 
     bool operator<(const LocationSpan &rhs) const { return this->asIndex() < rhs.asIndex(); }
 
-    InOutLocation firstLocation;
+    InOutLocationInfo firstLocation;
     InOutCompatibilityInfo compatibilityInfo;
   };
 
@@ -169,7 +161,7 @@ private:
   }
 
   std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space
-  std::map<InOutLocation, InOutLocation> m_locationMap; // The map between original location and new location
+  InOutLocationInfoMap m_locationMap;        // The map between original location and new location
 };
 
 } // namespace lgc
