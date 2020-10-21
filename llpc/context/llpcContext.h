@@ -30,7 +30,6 @@
  */
 #pragma once
 
-#include "llpcEmuLib.h"
 #include "llpcPipelineContext.h"
 #include "spirvExt.h"
 #include "lgc/LgcContext.h"
@@ -138,11 +137,10 @@ private:
   Context(const Context &) = delete;
   Context &operator=(const Context &) = delete;
 
-  GfxIpVersion m_gfxIp;                                  // Graphics IP version info
-  PipelineContext *m_pipelineContext;                    // Pipeline-specific context
-  EmuLib m_glslEmuLib;                                   // LLVM library for GLSL emulation
-  bool m_isInUse = false;                                // Whether this context is in use
-  lgc::Builder *m_builder = nullptr;                     // LLPC builder object
+  GfxIpVersion m_gfxIp;                              // Graphics IP version info
+  PipelineContext *m_pipelineContext;                // Pipeline-specific context
+  bool m_isInUse = false;                            // Whether this context is in use
+  lgc::Builder *m_builder = nullptr;                 // LLPC builder object
   std::unique_ptr<lgc::LgcContext> m_builderContext; // Builder context
 
   std::unique_ptr<llvm::TargetMachine> m_targetMachine; // Target machine
