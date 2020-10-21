@@ -29,11 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "GlueShader.h"
+#include "lgc/AbiMetadata.h"
 #include "lgc/BuilderBase.h"
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/patch/VertexFetch.h"
-#include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PassManagerCache.h"
 #include "lgc/state/ShaderStage.h"
 #include "lgc/state/TargetInfo.h"

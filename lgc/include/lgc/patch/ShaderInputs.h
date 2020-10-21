@@ -38,8 +38,8 @@
  */
 #pragma once
 
+#include "lgc/AbiMetadata.h"
 #include "lgc/CommonDefs.h"
-#include "lgc/state/AbiMetadata.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {

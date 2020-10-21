@@ -35,9 +35,9 @@
  */
 #pragma once
 
+#include "lgc/AbiMetadata.h"
 #include "lgc/CommonDefs.h"
 #include "lgc/Pipeline.h"
-#include "lgc/state/AbiMetadata.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 
 namespace llvm {

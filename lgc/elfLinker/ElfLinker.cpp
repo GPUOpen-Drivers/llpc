@@ -31,7 +31,7 @@
 #include "lgc/ElfLinker.h"
 #include "GlueShader.h"
 #include "RelocHandler.h"
-#include "lgc/state/AbiMetadata.h"
+#include "lgc/AbiMetadata.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"

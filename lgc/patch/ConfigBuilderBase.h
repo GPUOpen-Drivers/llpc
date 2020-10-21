@@ -30,8 +30,8 @@
  */
 #pragma once
 
+#include "lgc/AbiMetadata.h"
 #include "lgc/CommonDefs.h"
-#include "lgc/state/AbiMetadata.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 

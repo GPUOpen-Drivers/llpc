@@ -34,7 +34,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/state/PalMetadata.h"
-#include "lgc/state/AbiMetadata.h"
+#include "lgc/AbiMetadata.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
