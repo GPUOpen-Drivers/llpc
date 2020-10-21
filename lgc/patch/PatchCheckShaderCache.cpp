@@ -123,9 +123,8 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
     raw_string_ostream stream(inOutUsageStreams[stage]);
 
     // Update input/output usage
-    streamMapEntries(resUsage->inOutUsage.inputLocMap, stream);
-    streamMapEntries(resUsage->inOutUsage.outputLocMap, stream);
-    streamMapEntries(resUsage->inOutUsage.inOutLocMap, stream);
+    streamMapEntries(resUsage->inOutUsage.inputLocInfoMap, stream);
+    streamMapEntries(resUsage->inOutUsage.outputLocInfoMap, stream);
     streamMapEntries(resUsage->inOutUsage.perPatchInputLocMap, stream);
     streamMapEntries(resUsage->inOutUsage.perPatchOutputLocMap, stream);
     streamMapEntries(resUsage->inOutUsage.builtInInputLocMap, stream);

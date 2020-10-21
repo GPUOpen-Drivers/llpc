@@ -144,13 +144,16 @@ bool PatchNullFragShader::runOnModule(Module &module) {
   // Add usage info for dummy input
   FsInterpInfo interpInfo = {0, false, false, false, false, false};
   resUsage->builtInUsage.fs.smooth = true;
-  resUsage->inOutUsage.inputLocMap[0] = InvalidValue;
+  InOutLocationInfo origLocInfo(0);
+  auto &newInLocInfo = resUsage->inOutUsage.inputLocInfoMap[origLocInfo];
+  newInLocInfo.setData(InvalidValue);
   resUsage->inOutUsage.fs.interpInfo.push_back(interpInfo);
 
   // Add usage info for dummy output
   resUsage->inOutUsage.fs.cbShaderMask = 0;
   resUsage->inOutUsage.fs.isNullFs = true;
-  resUsage->inOutUsage.outputLocMap[0] = InvalidValue;
+  auto &newOutLocInfo = resUsage->inOutUsage.outputLocInfoMap[origLocInfo];
+  newOutLocInfo.setData(InvalidValue);
 
   return true;
 }

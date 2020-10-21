@@ -89,16 +89,45 @@ struct FsInterpInfo {
 // Invalid interpolation info
 static const FsInterpInfo InvalidFsInterpInfo = {InvalidValue, false, false, false, false, false};
 
-// Represents the location info of input/output
-union InOutLocationInfo {
-  struct {
-    uint16_t half : 1;      // High half in case of 16-bit attriburtes
-    uint16_t component : 2; // The component index
-    uint16_t location : 10; // The location
-    uint16_t isBuiltIn : 1; // Whether location is actually built-in ID
-    uint16_t streamId : 2;  // Output vertex stream ID
-  };
-  uint16_t u16All;
+// Represents the location information on an input or output
+class InOutLocationInfo {
+public:
+  InOutLocationInfo() { m_data.u16All = 0; }
+  InOutLocationInfo(unsigned data) { this->m_data.u16All = static_cast<uint16_t>(data); }
+  InOutLocationInfo(const InOutLocationInfo &inOutLocInfo) { m_data.u16All = inOutLocInfo.getData(); }
+
+  unsigned getData() const { return static_cast<uint16_t>(m_data.u16All); }
+  void setData(unsigned data) { m_data.u16All = static_cast<uint16_t>(data); }
+  bool isInvalid() const { return m_data.u16All == 0xFFFF; }
+
+  bool isHighHalf() const { return m_data.bits.isHighHalf; }
+  void setHighHalf(bool isHighHalf) { m_data.bits.isHighHalf = isHighHalf; }
+
+  unsigned getComponent() const { return m_data.bits.component; }
+  void setComponent(unsigned compIdx) { m_data.bits.component = static_cast<uint16_t>(compIdx); }
+
+  unsigned getLocation() const { return m_data.bits.location; }
+  void setLocation(unsigned loc) { m_data.bits.location = static_cast<uint16_t>(loc); }
+
+  bool isBuiltIn() const { return m_data.bits.isBuiltIn; }
+  void setBuiltIn(bool isBuiltIn) { m_data.bits.isBuiltIn = isBuiltIn; }
+
+  unsigned getStreamId() const { return m_data.bits.streamId; }
+  void setStreamId(unsigned streamId) { m_data.bits.streamId = static_cast<uint16_t>(streamId); }
+
+  bool operator<(const InOutLocationInfo &rhs) const { return this->getData() < rhs.getData(); }
+
+private:
+  union {
+    struct {
+      uint16_t isHighHalf : 1; // High half in case of 16-bit attriburtes
+      uint16_t component : 2;  // The component index
+      uint16_t location : 10;  // The location
+      uint16_t isBuiltIn : 1;  // Whether location is actually built-in ID
+      uint16_t streamId : 2;   // Output vertex stream ID
+    } bits;
+    uint16_t u16All;
+  } m_data;
 };
 
 // Enumerate the workgroup layout options.
@@ -262,12 +291,9 @@ struct ResourceUsage {
 
   // Usage of generic input/output
   struct {
-    // Map from shader specified locations to tightly packed locations
-    std::map<unsigned, unsigned> inputLocMap;
-    std::map<unsigned, unsigned> outputLocMap;
-
-    // The original and new InOutLocations for shader cache
-    std::map<unsigned, unsigned> inOutLocMap;
+    // Map from shader specified InOutLocations to tightly packed InOutLocations
+    std::map<InOutLocationInfo, InOutLocationInfo> inputLocInfoMap;
+    std::map<InOutLocationInfo, InOutLocationInfo> outputLocInfoMap;
 
     std::map<unsigned, unsigned> perPatchInputLocMap;
     std::map<unsigned, unsigned> perPatchOutputLocMap;
@@ -343,7 +369,7 @@ struct ResourceUsage {
       std::unordered_map<unsigned, std::vector<unsigned>> genericOutByteSizes[MaxGsStreams];
 
       // Map from output location to the transform feedback info
-      std::map<unsigned, unsigned> xfbOutsInfo;
+      std::map<InOutLocationInfo, unsigned> xfbOutsInfo;
 
       // ID of the vertex stream sent to rasterizor
       unsigned rasterStream = 0;

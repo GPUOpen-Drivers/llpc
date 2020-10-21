@@ -509,10 +509,12 @@ void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValue
   const unsigned compIdx = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
   Value *output = callInst->getOperand(2);
 
-  auto it = m_resUsage->inOutUsage.outputLocMap.find(location);
-  if (it == m_resUsage->inOutUsage.outputLocMap.end())
+  InOutLocationInfo origLocInfo(0);
+  origLocInfo.setLocation(location);
+  auto locInfoMapIt = m_resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+  if (locInfoMapIt == m_resUsage->inOutUsage.outputLocInfoMap.end())
     return;
-  unsigned hwColorTarget = it->second;
+  unsigned hwColorTarget = locInfoMapIt->second.getLocation();
 
   Type *outputTy = output->getType();
 

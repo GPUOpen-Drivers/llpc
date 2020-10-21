@@ -524,11 +524,14 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           }
         }
 
+        InOutLocationInfo origLocInfo(0);
+        origLocInfo.setLocation(value);
+        auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
         if (m_shaderStage == ShaderStageTessEval) {
           // NOTE: For generic inputs of tessellation evaluation shader, they could be per-patch ones.
-          if (resUsage->inOutUsage.inputLocMap.find(value) != resUsage->inOutUsage.inputLocMap.end())
-            loc = resUsage->inOutUsage.inputLocMap[value];
-          else {
+          if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
+            loc = locInfoMapIt->second.getLocation();
+          } else {
             assert(resUsage->inOutUsage.perPatchInputLocMap.find(value) !=
                    resUsage->inOutUsage.perPatchInputLocMap.end());
             loc = resUsage->inOutUsage.perPatchInputLocMap[value];
@@ -537,21 +540,16 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           if (m_pipelineState->canPackInOut() &&
               (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl)) {
             // The new InOutLocationInfo is used to map scalarized FS and TCS input import as compact as possible
-            InOutLocationInfo origLocInfo = {};
-            origLocInfo.location = value;
             const uint32_t elemIdxArgIdx = isInterpolantInputImport || m_shaderStage != ShaderStageFragment ? 2 : 1;
-            origLocInfo.component = cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue();
-            origLocInfo.half = false;
-            assert(resUsage->inOutUsage.inOutLocMap.find(origLocInfo.u16All) != resUsage->inOutUsage.inOutLocMap.end());
-
-            InOutLocationInfo newLocInfo = {};
-            newLocInfo.u16All = resUsage->inOutUsage.inOutLocMap[origLocInfo.u16All];
-            loc = newLocInfo.location;
-            elemIdx = builder.getInt32(newLocInfo.component);
-            highHalf = newLocInfo.half;
+            origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
+            locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+            assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
+            loc = locInfoMapIt->second.getLocation();
+            elemIdx = builder.getInt32(locInfoMapIt->second.getComponent());
+            highHalf = locInfoMapIt->second.isHighHalf();
           } else {
-            assert(resUsage->inOutUsage.inputLocMap.find(value) != resUsage->inOutUsage.inputLocMap.end());
-            loc = resUsage->inOutUsage.inputLocMap[value];
+            assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
+            loc = locInfoMapIt->second.getLocation();
           }
         }
       }
@@ -672,9 +670,12 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
 
       // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
-      if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end())
-        loc = resUsage->inOutUsage.outputLocMap[value];
-      else {
+      InOutLocationInfo origLocInfo(0);
+      origLocInfo.setLocation(value);
+      auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+      if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
+        loc = locInfoMapIt->second.getLocation();
+      } else {
         assert(resUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
                resUsage->inOutUsage.perPatchOutputLocMap.end());
         loc = resUsage->inOutUsage.perPatchOutputLocMap[value];
@@ -788,6 +789,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       Value *locOffset = nullptr;
       unsigned elemIdx = InvalidValue;
 
+      InOutLocationInfo origLocInfo(0);
+      origLocInfo.setLocation(value);
+      auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+
       if (m_shaderStage == ShaderStageTessControl) {
         // NOTE: If location offset is a constant, we have to add it to the unmapped location before querying
         // the mapped location. Meanwhile, we have to adjust the location offset to 0 (rebase it).
@@ -798,9 +803,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         }
 
         // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
-        if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end()) {
+        if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
           exist = true;
-          loc = resUsage->inOutUsage.outputLocMap[value];
+          loc = locInfoMapIt->second.getLocation();
         } else if (resUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
                    resUsage->inOutUsage.perPatchOutputLocMap.end()) {
           exist = true;
@@ -812,35 +817,27 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       } else if (m_shaderStage == ShaderStageGeometry) {
         assert(callInst.getNumArgOperands() == 4);
 
-        InOutLocationInfo outLocInfo = {};
-        outLocInfo.location = value;
-        outLocInfo.isBuiltIn = false;
-        outLocInfo.streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
-
-        if (resUsage->inOutUsage.outputLocMap.find(outLocInfo.u16All) != resUsage->inOutUsage.outputLocMap.end()) {
+        origLocInfo.setStreamId(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
+        locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+        if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
           exist = true;
-          loc = resUsage->inOutUsage.outputLocMap[outLocInfo.u16All];
+          loc = locInfoMapIt->second.getLocation();
         }
       } else {
-        if (m_pipelineState->canPackInOut() && m_shaderStage == ShaderStageVertex &&
-            m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
-          // The new InOutLocationInfo is used to map scalarized VS output export in a VS-TCS-TES-FS to lds as compact
-          // as possible
-          InOutLocationInfo origLocInfo = {};
-          origLocInfo.location = value;
-          origLocInfo.component = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-          origLocInfo.half = false;
-          if (resUsage->inOutUsage.inOutLocMap.find(origLocInfo.u16All) != resUsage->inOutUsage.inOutLocMap.end()) {
-            InOutLocationInfo newLocInfo = {};
-            newLocInfo.u16All = resUsage->inOutUsage.inOutLocMap[origLocInfo.u16All];
-            loc = newLocInfo.location;
-            elemIdx = newLocInfo.component;
+        if (m_pipelineState->canPackInOut()) {
+          assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval);
+          origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
+          locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+          if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
+            loc = locInfoMapIt->second.getLocation();
+            elemIdx = locInfoMapIt->second.getComponent();
             exist = true;
-          } else
+          } else {
             exist = false;
-        } else if (resUsage->inOutUsage.outputLocMap.find(value) != resUsage->inOutUsage.outputLocMap.end()) {
+          }
+        } else if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
           exist = true;
-          loc = resUsage->inOutUsage.outputLocMap[value];
+          loc = locInfoMapIt->second.getLocation();
         }
       }
 
@@ -1312,10 +1309,11 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       // generic outputs that are not written to.  We need to count them in
       // the export count.
       auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
-      for (auto locMap : resUsage->inOutUsage.outputLocMap) {
-        if (m_expLocs.count(locMap.second) != 0)
+      for (const auto &locInfoPair : resUsage->inOutUsage.outputLocInfoMap) {
+        const unsigned newLoc = locInfoPair.second.getLocation();
+        if (m_expLocs.count(newLoc) != 0)
           continue;
-        inOutUsage.expCount = std::max(inOutUsage.expCount, locMap.second + 1); // Update export count
+        inOutUsage.expCount = std::max(inOutUsage.expCount, newLoc + 1); // Update export count
       }
     }
   } else if (m_shaderStage == ShaderStageGeometry) {
