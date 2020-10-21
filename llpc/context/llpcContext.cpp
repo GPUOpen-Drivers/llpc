@@ -61,7 +61,7 @@ namespace Llpc {
 // =====================================================================================================================
 //
 // @param gfxIp : Graphics IP version info
-Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp), m_glslEmuLib(this) {
+Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
   reset();
 }
 
