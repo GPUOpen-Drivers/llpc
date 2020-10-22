@@ -424,7 +424,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityImageGatherBiasLodAMD, "ImageGatherBiasLodAMD");
   add(CapabilityFragmentMaskAMD, "FragmentMaskAMD");
   add(CapabilityFloat16ImageAMD, "Float16ImageAMD");
-  add(CapabilityInt64ImageAtomicsEXT, "Float16ImageAMD");
+  add(CapabilityInt64ImageEXT, "Int64ImageEXT");
   add(CapabilityShaderClockKHR, "ShaderClockKHR");
   add(CapabilityVariablePointersStorageBuffer, "VariablePointersStorageBuffer");
   add(CapabilityVariablePointers, "VariablePointers");

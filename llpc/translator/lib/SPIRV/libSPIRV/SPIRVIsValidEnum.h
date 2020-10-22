@@ -510,7 +510,7 @@ inline bool isValid(spv::Capability V) {
   case CapabilityShaderClockKHR:
   case CapabilityVariablePointersStorageBuffer:
   case CapabilityVariablePointers:
-  case CapabilityInt64ImageAtomicsEXT:
+  case CapabilityInt64ImageEXT:
 #if SPV_VERSION >= 0x10500
   case CapabilityShaderNonUniform:
   case CapabilityRuntimeDescriptorArray:
