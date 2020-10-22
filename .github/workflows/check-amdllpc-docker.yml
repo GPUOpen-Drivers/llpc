@@ -31,8 +31,7 @@ jobs:
           FEATURES_LOWER=$(echo "${{ matrix.feature-set }}" | tr "+" "_")
           ASSERTS_LOWER=$(echo "${{ matrix.assertions }}" | tr "[:upper:]" "[:lower:]")
           TAG=$(printf "${{ matrix.base-image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER" "$ASSERTS_LOWER")
-          echo "IMAGE_TAG: $TAG"
-          echo "::set-env name=IMAGE_TAG::$TAG"
+          echo "IMAGE_TAG=$TAG" | tee -a $GITHUB_ENV
       - name: Fetch the latest prebuilt AMDVLK
         run: docker pull "$IMAGE_TAG"
       - name: Build and Test with Docker
