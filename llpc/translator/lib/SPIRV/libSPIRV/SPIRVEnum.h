@@ -202,7 +202,7 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityInputAttachmentArrayNonUniformIndexingEXT, { CapabilityInputAttachment });
   ADD_VEC_INIT(CapabilityUniformTexelBufferArrayNonUniformIndexingEXT, { CapabilitySampledBuffer });
   ADD_VEC_INIT(CapabilityStorageTexelBufferArrayNonUniformIndexingEXT, { CapabilityImageBuffer });
-  ADD_VEC_INIT(CapabilityInt64ImageAtomicsEXT, { CapabilityShader });
+  ADD_VEC_INIT(CapabilityInt64ImageEXT, {CapabilityShader});
 }
 
 template <> inline void SPIRVMap<SPIRVExecutionModelKind, SPIRVCapVec>::init() {
@@ -316,8 +316,8 @@ template <> inline void SPIRVMap<ImageFormat, SPIRVCapVec>::init() {
   ADD_VEC_INIT(ImageFormatRg16ui, {CapabilityStorageImageExtendedFormats});
   ADD_VEC_INIT(ImageFormatR16ui, {CapabilityStorageImageExtendedFormats});
   ADD_VEC_INIT(ImageFormatR8ui, {CapabilityStorageImageExtendedFormats});
-  ADD_VEC_INIT(ImageFormatR64ui, {CapabilityInt64ImageAtomicsEXT});
-  ADD_VEC_INIT(ImageFormatR64i, { CapabilityInt64ImageAtomicsEXT });
+  ADD_VEC_INIT(ImageFormatR64ui, {CapabilityInt64ImageEXT});
+  ADD_VEC_INIT(ImageFormatR64i, {CapabilityInt64ImageEXT});
 }
 
 template <> inline void SPIRVMap<ImageOperandsMask, SPIRVCapVec>::init() {
