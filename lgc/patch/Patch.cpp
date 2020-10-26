@@ -111,6 +111,9 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
   passMgr.add(createPatchResourceCollect());
 
+  // Patch workarounds
+  passMgr.add(createPatchWorkarounds());
+
   // Generate copy shader if necessary.
   passMgr.add(createPatchCopyShader());
 
