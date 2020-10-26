@@ -285,23 +285,19 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
       nonUniformVal = CreateTrunc(nonUniformVal, getInt32Ty());
   }
 
-  // Get the waterfall index. If there are two indices (image resource+sampler case), join them into
-  // a single struct.
-  Value *waterfallIndex = nonUniformIndices[0];
-  if (nonUniformIndices.size() > 1) {
-    assert(nonUniformIndices.size() == 2);
-    SmallVector<Type *, 2> indexTys;
-    for (Value *nonUniformIndex : nonUniformIndices)
-      indexTys.push_back(nonUniformIndex->getType());
-    auto waterfallIndexTy = StructType::get(getContext(), indexTys);
-    waterfallIndex = UndefValue::get(waterfallIndexTy);
-    for (unsigned structIndex = 0; structIndex < nonUniformIndices.size(); ++structIndex)
-      waterfallIndex = CreateInsertValue(waterfallIndex, nonUniformIndices[structIndex], structIndex);
+  bool first = true;
+  Value *waterfallBegin = nullptr;
+  for (auto nonUniformVal : nonUniformIndices) {
+    // Start the waterfall loop using the waterfall index.
+    if (first) {
+      waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, nonUniformVal->getType(), nonUniformVal,
+                                       nullptr, instName);
+      first = false;
+    } else {
+      waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin_cont, nonUniformVal->getType(),
+                                       {waterfallBegin, nonUniformVal}, nullptr, instName);
+    }
   }
-
-  // Start the waterfall loop using the waterfall index.
-  Value *waterfallBegin =
-      CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, waterfallIndex->getType(), waterfallIndex, nullptr, instName);
 
   // Scalarize each non-uniform operand of the instruction.
   for (unsigned operandIdx : operandIdxs) {

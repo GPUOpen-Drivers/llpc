@@ -24,7 +24,8 @@ void main()
 ; Make sure that the begin indices chosen are the non-uniform offsets rather than the whole resource desc
 ; Make sure that there's a waterfall.readfirstlane for both the image resource desc and sample desc
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST-DAG: call i32 @llvm.amdgcn.waterfall.begin.sl_i32i32s
+; SHADERTEST-DAG: call i32 @llvm.amdgcn.waterfall.begin.i32
+; SHADERTEST-DAG: call i32 @llvm.amdgcn.waterfall.begin.cont.i32
 ; SHADERTEST-DAG: call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane.v8i32.v8i32
 ; SHADERTEST-DAG: call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32
 ; SHADERTEST: AMDLLPC SUCCESS
