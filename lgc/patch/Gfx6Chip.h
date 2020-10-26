@@ -59,9 +59,6 @@ using namespace Pal::Gfx6::Chip;
     _reg##_VAL.u32All = 0;                                                                                             \
   }
 
-// Adds an entry for the map from register ID to its name string
-#define ADD_REG_MAP(_reg) RegNameMap[mm##_reg * 4] = #_reg;
-
 // Gets register value
 #define GET_REG(_stage, _reg) ((_stage)->_reg##_VAL.u32All)
 
@@ -272,12 +269,6 @@ struct CsRegConfig {
 
   CsRegConfig();
 };
-
-// Map from register ID to its name string
-static std::unordered_map<unsigned, const char *> RegNameMap;
-
-// Adds entries to register name map.
-void initRegisterNameMap(GfxIpVersion gfxIp);
 
 } // namespace Gfx6
 
