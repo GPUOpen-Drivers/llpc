@@ -1083,8 +1083,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         auto cullDistanceVal = m_builder->CreateExtractValue(cullDistance, i);
         cullDistanceVal = m_builder->CreateBitCast(cullDistanceVal, m_builder->getInt32Ty());
 
-        Value *signBit = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                    {cullDistanceVal, m_builder->getInt32(31), m_builder->getInt32(1)});
+        Value *signBit = CreateUBfe(cullDistanceVal, 31, 1);
         signBit = m_builder->CreateShl(signBit, i);
 
         signMask = m_builder->CreateOr(signMask, signBit);
@@ -1969,22 +1968,11 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {m_builder->getInt32(-1), threadIdInWave});
   }
 
-  auto primCountInSubgroup =
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                 {mergedGroupInfo, m_builder->getInt32(22), m_builder->getInt32(9)});
-
-  auto vertCountInSubgroup =
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                 {mergedGroupInfo, m_builder->getInt32(12), m_builder->getInt32(9)});
-
-  auto vertCountInWave = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                    {mergedWaveInfo, m_builder->getInt32(0), m_builder->getInt32(8)});
-
-  auto primCountInWave = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                    {mergedWaveInfo, m_builder->getInt32(8), m_builder->getInt32(8)});
-
-  auto waveIdInSubgroup = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                     {mergedWaveInfo, m_builder->getInt32(24), m_builder->getInt32(4)});
+  auto primCountInSubgroup = CreateUBfe(mergedGroupInfo, 22, 9);
+  auto vertCountInSubgroup = CreateUBfe(mergedGroupInfo, 12, 9);
+  auto vertCountInWave = CreateUBfe(mergedWaveInfo, 0, 8);
+  auto primCountInWave = CreateUBfe(mergedWaveInfo, 8, 8);
+  auto waveIdInSubgroup = CreateUBfe(mergedWaveInfo, 24, 4);
 
   auto threadIdInSubgroup = m_builder->CreateMul(waveIdInSubgroup, m_builder->getInt32(waveSize));
   threadIdInSubgroup = m_builder->CreateAdd(threadIdInSubgroup, threadIdInWave);
@@ -4000,12 +3988,10 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     auto frontFace = m_builder->CreateXor(paClVportXscale, paClVportYscale);
 
     // signbit(xScale ^ yScale)
-    frontFace = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                           {frontFace, m_builder->getInt32(31), m_builder->getInt32(1)});
+    frontFace = CreateUBfe(frontFace, 31, 1);
 
     // face = (FACE, PA_SU_SC_MODE_CNTL[2], 0 = CCW, 1 = CW)
-    auto face = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                           {paSuScModeCntl, m_builder->getInt32(2), m_builder->getInt32(1)});
+    auto face = CreateUBfe(paSuScModeCntl, 2, 1);
 
     // frontFace = face ^ signbit(xScale ^ yScale)
     frontFace = m_builder->CreateXor(face, frontFace);
@@ -4024,8 +4010,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     cullFront = m_builder->CreateTrunc(cullFront, m_builder->getInt1Ty());
 
     // cullBack = (CULL_BACK, PA_SU_SC_MODE_CNTL[1], 0 = DONT CULL, 1 = CULL)
-    Value *cullBack = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                 {paSuScModeCntl, m_builder->getInt32(1), m_builder->getInt32(1)});
+    Value *cullBack = CreateUBfe(paSuScModeCntl, 1, 1);
     cullBack = m_builder->CreateTrunc(cullBack, m_builder->getInt1Ty());
 
     // cullFront = cullFront ? frontFace : false
@@ -4085,12 +4070,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     cullFlagPhi->addIncoming(cullFlag2, backfaceExponentBlock);
 
     // polyMode = (POLY_MODE, PA_SU_SC_MODE_CNTL[4:3], 0 = DISABLE, 1 = DUAL)
-    auto polyMode = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                               {
-                                                   paSuScModeCntl,
-                                                   m_builder->getInt32(3),
-                                                   m_builder->getInt32(2),
-                                               });
+    auto polyMode = CreateUBfe(paSuScModeCntl, 3, 2);
 
     // polyMode == 1
     auto wireFrameMode = m_builder->CreateICmpEQ(polyMode, m_builder->getInt32(1));
@@ -4182,8 +4162,7 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
     //
 
     // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
-    Value *clipSpaceDef = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                     {paClClipCntl, m_builder->getInt32(19), m_builder->getInt32(1)});
+    Value *clipSpaceDef = CreateUBfe(paClClipCntl, 19, 1);
     clipSpaceDef = m_builder->CreateTrunc(clipSpaceDef, m_builder->getInt1Ty());
 
     // zNear = clipSpaceDef ? -1.0 : 0.0, zFar = 1.0
@@ -4441,18 +4420,15 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
-    Value *vtxXyFmt = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                 {paClVteCntl, m_builder->getInt32(8), m_builder->getInt32(1)});
+    Value *vtxXyFmt = CreateUBfe(paClVteCntl, 8, 1);
     vtxXyFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // vtxZFmt = (VTX_Z_FMT, PA_CL_VTE_CNTL[9], 0 = 1/W0, 1 = none)
-    Value *vtxZFmt = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {paClVteCntl, m_builder->getInt32(9), m_builder->getInt32(1)});
+    Value *vtxZFmt = CreateUBfe(paClVteCntl, 9, 1);
     vtxZFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
-    Value *clipSpaceDef = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                     {paClClipCntl, m_builder->getInt32(19), m_builder->getInt32(1)});
+    Value *clipSpaceDef = CreateUBfe(paClClipCntl, 19, 1);
     clipSpaceDef = m_builder->CreateTrunc(clipSpaceDef, m_builder->getInt1Ty());
 
     // zNear = clipSpaceDef ? -1.0 : 0.0, zFar = 1.0
@@ -4671,18 +4647,15 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
-    Value *vtxXyFmt = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                 {paClVteCntl, m_builder->getInt32(8), m_builder->getInt32(1)});
+    Value *vtxXyFmt = CreateUBfe(paClVteCntl, 8, 1);
     vtxXyFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // vtxZFmt = (VTX_Z_FMT, PA_CL_VTE_CNTL[9], 0 = 1/W0, 1 = none)
-    Value *vtxZFmt = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {paClVteCntl, m_builder->getInt32(9), m_builder->getInt32(1)});
+    Value *vtxZFmt = CreateUBfe(paClVteCntl, 9, 1);
     vtxZFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
-    Value *clipSpaceDef = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                     {paClClipCntl, m_builder->getInt32(19), m_builder->getInt32(1)});
+    Value *clipSpaceDef = CreateUBfe(paClClipCntl, 19, 1);
     clipSpaceDef = m_builder->CreateTrunc(clipSpaceDef, m_builder->getInt1Ty());
 
     // zNear = clipSpaceDef ? -1.0 : 0.0
@@ -5054,8 +5027,7 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
-    Value *vtxXyFmt = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                 {paClVteCntl, m_builder->getInt32(8), m_builder->getInt32(1)});
+    Value *vtxXyFmt = CreateUBfe(paClVteCntl, 8, 1);
     vtxXyFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // xScale = (VPORT_XSCALE, PA_CL_VPORT_XSCALE[31:0])
@@ -5501,8 +5473,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexId) {
     auto cullDistance = m_builder->CreateExtractValue(cullDistances, i);
     cullDistance = m_builder->CreateBitCast(cullDistance, m_builder->getInt32Ty());
 
-    Value *signBit = m_builder->CreateIntrinsic(Intrinsic::amdgcn_ubfe, m_builder->getInt32Ty(),
-                                                {cullDistance, m_builder->getInt32(31), m_builder->getInt32(1)});
+    Value *signBit = CreateUBfe(cullDistance, 31, 1);
     signBit = m_builder->CreateShl(signBit, i);
     signMask = m_builder->CreateOr(signMask, signBit);
   }
