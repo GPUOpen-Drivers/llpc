@@ -31,7 +31,6 @@
 #include "PatchInOutImportExport.h"
 #include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
-#include "lgc/patch/FragColorExport.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/util/Debug.h"
@@ -65,13 +64,11 @@ PatchInOutImportExport::PatchInOutImportExport() : Patch(ID), m_lds(nullptr) {
 
 // =====================================================================================================================
 PatchInOutImportExport::~PatchInOutImportExport() {
-  assert(!m_fragColorExport);
 }
 
 // =====================================================================================================================
 // Initialize per-shader members
 void PatchInOutImportExport::initPerShader() {
-  m_fragColorExport = nullptr;
   m_clipDistance = nullptr;
   m_cullDistance = nullptr;
   m_primitiveId = nullptr;
@@ -130,8 +127,6 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
       visitReturnInsts();
 
       markExportDone(m_entryPoint, postDomTree);
-      delete m_fragColorExport;
-      m_fragColorExport = nullptr;
     }
   }
 
@@ -147,8 +142,6 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   }
   m_exportCalls.clear();
 
-  for (auto &fragColors : m_expFragColors)
-    fragColors.clear();
   m_pipelineSysValues.clear();
 
   return true;
@@ -202,11 +195,6 @@ void PatchInOutImportExport::markExportDone(Function *func, PostDominatorTree &p
 // =====================================================================================================================
 // Process a single shader
 void PatchInOutImportExport::processShader() {
-  if (m_shaderStage == ShaderStageFragment) {
-    // Create fragment color export manager
-    m_fragColorExport = new FragColorExport(m_context);
-  }
-
   // Initialize the output value for gl_PrimitiveID
   const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->builtInUsage;
   const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs;
