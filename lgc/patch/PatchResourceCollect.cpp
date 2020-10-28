@@ -1637,7 +1637,7 @@ void PatchResourceCollect::matchGenericInOut() {
             assert(m_shaderStage == ShaderStageTessControl);
             locMap.second = availInMapLoc++;
           } else
-            unusedLocs.push_back(loc);
+            unusedLocs.push_back(locMap.first);
         }
       }
 
