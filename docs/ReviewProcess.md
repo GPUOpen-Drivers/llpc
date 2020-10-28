@@ -6,7 +6,7 @@ This file documents the review process of LLPC pull requests, proposing
 several suggestions to speed up the review process and make it work more
 efficiently. Given LLPC is heavily based on LLVM, review interactions here
 should follow [LLVM Community Code of Conduct](https://llvm.org/docs/CodeOfConduct.html),
-which prohibits unacceptable language and behavior.  
+which prohibits unacceptable language and behavior.
 
 ## For authors
 
@@ -75,7 +75,6 @@ the 4th revision to the pull request):
 V4: Pulled out common code into ConvertFooToBar helper method
 ```
 Reviewers therefore could easily track those revisions.
-
 
 ### Request review and approval
 
