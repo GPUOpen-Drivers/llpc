@@ -61,6 +61,7 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+
 #include <mutex>
 #include <set>
 #include <unordered_set>
@@ -376,6 +377,7 @@ Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *
 
   ++m_instanceCount;
   ++m_outRedirectCount;
+
 }
 
 // =====================================================================================================================

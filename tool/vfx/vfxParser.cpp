@@ -390,10 +390,16 @@ bool Document::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Sectio
           result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &(value.iVec4[0]));
         break;
       }
-      case MemberTypeFloat: {
+      case MemberTypeFloat16: {
         result = parseFloat16(valueStr, lineNum, &value);
         if (result)
           result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &(value.f16Vec4[0]));
+        break;
+      }
+      case MemberTypeFloat: {
+        result = parseFloat(valueStr, lineNum, &value);
+        if (result)
+          result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &(value.fVec4[0]));
         break;
       }
       case MemberTypeDouble: {
