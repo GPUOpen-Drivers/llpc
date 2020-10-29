@@ -186,7 +186,7 @@ private:
 
   llvm::Function *mutateGs(llvm::Module *module);
 
-  void runCopyShader(llvm::Module *module, llvm::Value *vertCompacted);
+  void runCopyShader(llvm::Module *module);
 
   llvm::Function *mutateCopyShader(llvm::Module *module);
 

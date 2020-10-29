@@ -153,6 +153,10 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
     unsigned ldsRegionStart = 0;
 
     for (unsigned region = LdsRegionGsBeginRange; region <= LdsRegionGsEndRange; ++region) {
+      // NOTE: For vertex compactionless mode, this region is unnecessary
+      if (region == LdsRegionOutVertThreadIdMap && nggControl->compactMode == NggCompactDisable)
+        continue;
+
       unsigned ldsRegionSize = LdsRegionSizes[region];
 
       // NOTE: LDS size of ES-GS ring is calculated (by rounding it up to 16-byte alignment)
@@ -271,7 +275,7 @@ unsigned NggLdsManager::calcGsExtraLdsSize(PipelineState *pipelineState) {
   }
 
   return LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutVertCountInWaves] +
-         LdsRegionSizes[LdsRegionOutVertThreadIdMap];
+         (nggControl->compactMode == NggCompactDisable ? 0 : LdsRegionSizes[LdsRegionOutVertThreadIdMap]);
 }
 
 // =====================================================================================================================
