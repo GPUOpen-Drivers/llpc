@@ -85,23 +85,21 @@ private:
   // A shader entry-point user data argument
   struct UserDataArg {
     UserDataArg(Type *argTy, unsigned userDataValue = static_cast<unsigned>(UserDataMapping::Invalid),
-                unsigned *argIndex = nullptr, bool isPadding = false)
-        : argTy(argTy), userDataValue(userDataValue), argIndex(argIndex), isPadding(isPadding), mustSpill(false) {
+                unsigned *argIndex = nullptr)
+        : argTy(argTy), userDataValue(userDataValue), argIndex(argIndex) {
       if (isa<PointerType>(argTy))
         argDwordSize = argTy->getPointerAddressSpace() == ADDR_SPACE_CONST_32BIT ? 1 : 2;
       else
         argDwordSize = argTy->getPrimitiveSizeInBits() / 32;
     }
 
-    UserDataArg(Type *argTy, UserDataMapping userDataValue, unsigned *argIndex = nullptr, bool isPadding = false)
-        : UserDataArg(argTy, static_cast<unsigned>(userDataValue), argIndex, isPadding) {}
+    UserDataArg(Type *argTy, UserDataMapping userDataValue, unsigned *argIndex = nullptr)
+        : UserDataArg(argTy, static_cast<unsigned>(userDataValue), argIndex) {}
 
     Type *argTy;            // IR type of the argument
     unsigned argDwordSize;  // Size of argument in dwords
     unsigned userDataValue; // PAL metadata user data value, ~0U (UserDataMapping::Invalid) for none
     unsigned *argIndex;     // Where to store arg index once it is allocated, nullptr for none
-    bool isPadding;         // Whether this is a padding arg to maintain fixed layout
-    bool mustSpill;         // Whether this is an arg that must be spilled
   };
 
   // User data usage for one user data node
@@ -154,8 +152,8 @@ private:
   void addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
                               SmallVectorImpl<UserDataArg> &specialUserDataArgs, IRBuilder<> &builder);
   void addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder);
-  unsigned addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue, unsigned sizeInDwords,
-                          unsigned *argIndex, unsigned userDataSize, IRBuilder<> &builder);
+  void addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue, unsigned sizeInDwords,
+                      unsigned *argIndex, IRBuilder<> &builder);
 
   void determineUnspilledUserDataArgs(ArrayRef<UserDataArg> userDataArgs, ArrayRef<UserDataArg> specialUserDataArgs,
                                       IRBuilder<> &builder, SmallVectorImpl<UserDataArg> &unspilledArgs);
@@ -173,8 +171,6 @@ private:
   PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
   // Per-HW-shader-stage gathered user data usage information.
   SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
-  // Whether the current shader stage is a fixed-layout compute shader.
-  bool m_useFixedLayout;
 };
 
 } // anonymous namespace
@@ -221,10 +217,10 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
     m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
     if (m_entryPoint) {
       m_shaderStage = static_cast<ShaderStage>(shaderStage);
-      m_useFixedLayout = false;
       if (m_shaderStage == ShaderStageCompute) {
-        // Compute shader fixed layout is only needed before PAL interface version 624.
-        m_useFixedLayout = m_pipelineState->getLgcContext()->getPalAbiVersion() < 624;
+        // We no longer support compute shader fixed layout required before PAL interface version 624.
+        if (m_pipelineState->getLgcContext()->getPalAbiVersion() < 624)
+          report_fatal_error("Compute shader not supported before PAL version 624");
       }
       processShader(&shaderInputs);
     }
@@ -724,16 +720,9 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
 //   - The "global information table", containing various descriptors such as the inter-shader rings
 //   - The "per-shader table", which is added here but appears to be unused
 //   - The streamout table if needed
-//   - Nodes from the root user data layout, including pointers to descriptor sets. In a fixed-layout compute shader,
-//     these must have the same layout as the root user data layout, even if that would mean leaving gaps in register
-//     usage, and are limited to 10 SGPRs s2-s11
-//   - For a fixed-layout compute shader, the spill table pointer if needed, which always goes into s12. (This
-//     is possibly not a strict requirement of PAL, but it might avoid extraneous HW register writes.)
-//   - For a fixed-layout compute shader, the NumWorkgroupsPtr register pair if needed, which must start at a
-//     2-aligned register number, although it can be earlier than s14 if there is no spill table pointer
+//   - Nodes from the root user data layout, including pointers to descriptor sets.
 //   - Various other system values set up by PAL, such as the vertex buffer table and the vertex base index
-//   - For a graphics shader, or a non-fixed-layout compute shader, the spill table pointer if needed. This is
-//     typically in the last register (s15 or s31), but not necessarily.
+//   - The spill table pointer if needed. This is typically in the last register (s15 or s31), but not necessarily.
 // * The system value SGPRs and VGPRs determined by hardware, some of which are enabled or disabled by bits in SPI
 //   registers.
 //
@@ -756,8 +745,8 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
 
   // First we collect the user data args in two vectors:
   // - userDataArgs: global table, per-shader table and streamout table, followed by the nodes from the root user
-  //   data layout (excluding vertex buffer and streamout tables). Some of these are marked mustSpill; some of them
-  //   may need to be spilled anyway due to running out of entry SGPRs
+  //   data layout (excluding vertex buffer and streamout tables). Some of them may need to be spilled due to
+  //   running out of entry SGPRs
   // - specialUserDataArgs: special values that go at the end, such as ViewId.
   //
   // The UserDataArg for each arg pushed into these vectors contains:
@@ -765,8 +754,6 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   // - argDwordSize: Size of the arg in dwords
   // - userDataValue: The PAL metadata value to be passed to PalMetadata::setUserDataEntry, or Invalid for none
   // - argIndex: Pointer to the location where we will store the actual arg number, or nullptr
-  // - isPadding: Whether this is a padding argument for compute shader fixed layout
-  // - mustSpill: The node must be loaded from the spill table; do not attempt to unspill
 
   SmallVector<UserDataArg, 8> userDataArgs;
   SmallVector<UserDataArg, 4> specialUserDataArgs;
@@ -970,9 +957,6 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 // =====================================================================================================================
 // Add a UserDataArg to the vector for each user data node needed in user data SGPRs.
 //
-// This function handles CS "fixed layout" by inserting an extra padding arg before a real user data arg if
-// necessary.
-//
 // @param userDataArgs : Vector to add args to
 // @param builder : IRBuilder to get types from
 void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder) {
@@ -1022,7 +1006,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       assert(dwordOffset + pushConstOffset.dwordSize - 1 <=
              static_cast<unsigned>(UserDataMapping::PushConstMax) - static_cast<unsigned>(UserDataMapping::PushConst0));
       addUserDataArg(userDataArgs, static_cast<unsigned>(UserDataMapping::PushConst0) + dwordOffset,
-                     pushConstOffset.dwordSize, &pushConstOffset.entryArgIdx, /*userDataSize=*/0, builder);
+                     pushConstOffset.dwordSize, &pushConstOffset.entryArgIdx, builder);
     }
 
     return;
@@ -1030,11 +1014,6 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
 
   // We do have user data layout.
   // Add entries from the root user data layout (not vertex buffer or streamout, and not unused ones).
-
-  // userDataSize counts how many SGPRs we have already added, so we can tell if we need padding before
-  // an arg in a compute shader. We initialize with userDataArgs.size(), relying on the fact that all the
-  // ones added so far (global table, per-shader table, streamout table for graphics) use one register each.
-  unsigned userDataSize = userDataArgs.size();
 
   for (unsigned i = 0; i != m_pipelineState->getUserDataNodes().size(); ++i) {
     const ResourceNode &node = m_pipelineState->getUserDataNodes()[i];
@@ -1064,25 +1043,11 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
         userDataValue = DescRelocMagic | node.innerTable[0].set;
       }
       // Add the arg (descriptor set pointer) that we can potentially unspill.
-      userDataSize = addUserDataArg(userDataArgs, userDataValue, node.sizeInDwords, &descSetUsage.entryArgIdx,
-                                    userDataSize, builder);
+      addUserDataArg(userDataArgs, userDataValue, node.sizeInDwords, &descSetUsage.entryArgIdx, builder);
       break;
     }
 
     case ResourceNodeType::PushConst: {
-      // For CS fixed layout, only attempt to unspill the push constant if uses of it use the whole push constant.
-      // Trying to do anything else runs into problems with the push constant being split between unspilled parts
-      // and spilled parts, which PAL does not like.
-      if (m_useFixedLayout && (userDataUsage->pushConstOffsets.size() != 1 ||
-                               userDataUsage->pushConstOffsets[0].dwordSize != node.sizeInDwords)) {
-        // Add an arg entry with "mustSpill". In CS fixed layout, that causes later entries to be spilled too.
-        userDataSize =
-            addUserDataArg(userDataArgs, node.offsetInDwords, node.sizeInDwords, nullptr, userDataSize, builder);
-        userDataArgs.back().mustSpill = true;
-        userDataUsage->pushConstSpill = true;
-        break;
-      }
-
       // We add a potential unspilled arg for each separate dword offset of the push const at which there is a load.
       // We already know that loads we have on our pushConstOffsets lists are at dword-aligned offset and dword-aligned
       // size. We need to ensure that all loads are the same size, by removing ones that are bigger than the
@@ -1122,8 +1087,8 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
         }
 
         // Add the arg (part of the push const) that we can potentially unspill.
-        userDataSize = addUserDataArg(userDataArgs, node.offsetInDwords + dwordOffset, pushConstOffset.dwordSize,
-                                      &pushConstOffset.entryArgIdx, userDataSize, builder);
+        addUserDataArg(userDataArgs, node.offsetInDwords + dwordOffset, pushConstOffset.dwordSize,
+                       &pushConstOffset.entryArgIdx, builder);
       }
 
       // Ensure we mark the push constant's part of the spill table as used.
@@ -1134,23 +1099,6 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
     }
 
     default:
-      // Descriptor in the root table. If it is an array of descriptors, there could be multiple entries in
-      // the rootDescriptors array.
-      // For CS fixed layout, only attempt to unspill if it is a single descriptor, not an array. Trying to
-      // do anything else runs into problems with the array being split between unspilled parts and spilled
-      // parts, which PAL does not like.
-      if (m_useFixedLayout &&
-          (userDataUsage->rootDescriptors.size() <= node.offsetInDwords ||
-           userDataUsage->rootDescriptors[node.offsetInDwords].users.empty() ||
-           userDataUsage->rootDescriptors[node.offsetInDwords].users[0]->getType()->getPrimitiveSizeInBits() / 32 !=
-               node.sizeInDwords)) {
-        // Add an arg entry with "mustSpill". In CS fixed layout, that causes later entries to be spilled too.
-        userDataSize =
-            addUserDataArg(userDataArgs, node.offsetInDwords, node.sizeInDwords, nullptr, userDataSize, builder);
-        userDataArgs.back().mustSpill = true;
-        break;
-      }
-
       for (unsigned dwordOffset = node.offsetInDwords; dwordOffset != node.offsetInDwords + node.sizeInDwords;
            ++dwordOffset) {
         if (userDataUsage->rootDescriptors.size() <= dwordOffset)
@@ -1160,8 +1108,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
           continue;
         unsigned dwordSize = rootDescUsage.users[0]->getType()->getPrimitiveSizeInBits() / 32;
         // Add the arg (root descriptor) that we can potentially unspill.
-        userDataSize =
-            addUserDataArg(userDataArgs, dwordOffset, dwordSize, &rootDescUsage.entryArgIdx, userDataSize, builder);
+        addUserDataArg(userDataArgs, dwordOffset, dwordSize, &rootDescUsage.entryArgIdx, builder);
       }
       break;
     }
@@ -1169,34 +1116,19 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
 }
 
 // =====================================================================================================================
-// Add a single UserDataArg, preceded by padding if needed for CS fixed layout
+// Add a single UserDataArg
 //
 // @param userDataArgs : Vector to add UserDataArg to
 // @param userDataValue : PAL metadata user data value, ~0U (UserDataMapping::Invalid) for none
 // @param sizeInDwords : Size of argument in dwords
 // @param argIndex : Where to store arg index once it is allocated, nullptr for none
-// @param userDataSize : Size so far of user data in dwords
 // @param builder : IRBuilder (just for getting types)
-// @returns : Updated size so far of user data in dwords
-unsigned PatchEntryPointMutate::addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue,
-                                               unsigned sizeInDwords, unsigned *argIndex, unsigned userDataSize,
-                                               IRBuilder<> &builder) {
-  if (m_useFixedLayout && userDataSize != userDataValue + InterfaceData::CsFixedLayoutStartUserData) {
-    // With useFixedLayout, we need a padding arg before the node's arg.
-    assert(userDataValue + InterfaceData::CsFixedLayoutStartUserData > userDataSize);
-    userDataArgs.push_back(
-        UserDataArg(FixedVectorType::get(builder.getInt32Ty(),
-                                         userDataValue + InterfaceData::CsFixedLayoutStartUserData - userDataSize),
-                    UserDataMapping::Invalid, nullptr, /*isPadding=*/true));
-    userDataSize = userDataValue + InterfaceData::CsFixedLayoutStartUserData;
-  }
-  // Now the node arg itself.
+void PatchEntryPointMutate::addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue,
+                                           unsigned sizeInDwords, unsigned *argIndex, IRBuilder<> &builder) {
   Type *argTy = builder.getInt32Ty();
   if (sizeInDwords != 1)
     argTy = FixedVectorType::get(argTy, sizeInDwords);
   userDataArgs.push_back(UserDataArg(argTy, userDataValue, argIndex));
-  userDataSize += sizeInDwords;
-  return userDataSize;
 }
 
 // =====================================================================================================================
@@ -1208,7 +1140,7 @@ unsigned PatchEntryPointMutate::addUserDataArg(SmallVectorImpl<UserDataArg> &use
 // @param builder : IRBuilder to get types from
 // @param [out] unspilledArgs : Output vector of UserDataArg structs that will be "unspilled". Mostly these are
 //                              copied from the input arrays, plus an extra one for the spill table pointer if
-//                              needed. For compute shader fixed layout there may be extra nodes for padding.
+//                              needed.
 void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg> userDataArgs,
                                                            ArrayRef<UserDataArg> specialUserDataArgs,
                                                            IRBuilder<> &builder,
@@ -1220,8 +1152,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
   if (!userDataUsage->spillTable.users.empty() || userDataUsage->pushConstSpill ||
       userDataUsage->spillUsage != UINT_MAX) {
     // Spill table is already in use by code added in DescBuilder, or by uses of the push const pointer not
-    // all being of the form that can be unspilled, or by push const uses or descriptor array entries not even
-    // being considered for unspilling in CS fixed layout.
+    // all being of the form that can be unspilled.
     spillTableArg.push_back(
         UserDataArg(builder.getInt32Ty(), UserDataMapping::SpillTable, &userDataUsage->spillTable.entryArgIdx));
 
@@ -1256,37 +1187,27 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
 
   // Figure out how many sgprs we have available for userDataArgs.
   unsigned userDataEnd = 0;
-  if (m_useFixedLayout) {
-    // For a compute shader with fixed layout, s0-s1 are taken by the global table, and we need to get the user
-    // data nodes into s2-s11. There are enough registers available after that for the spill table arg and
-    // specialUserDataArgs up to s15, so we can ignore them here.
-    userDataEnd = InterfaceData::CsFixedLayoutStartUserData + InterfaceData::MaxCsFixedLayoutUserDataCount;
-  } else {
-    // We have s0-s31 (s0-s15 for <=GFX8, or for a compute shader on any chip) for everything, so take off the number
-    // of registers used by specialUserDataArgs.
-    userDataEnd = m_shaderStage == ShaderStageCompute
-                      ? InterfaceData::MaxCsUserDataCount
-                      : m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
-    for (auto &userDataArg : specialUserDataArgs)
-      userDataEnd -= userDataArg.argDwordSize;
-    // ... and the one used by the spill table if already added.
-    userDataEnd -= spillTableArg.size();
-  }
+  // We have s0-s31 (s0-s15 for <=GFX8, or for a compute shader on any chip) for everything, so take off the number
+  // of registers used by specialUserDataArgs.
+  userDataEnd = m_shaderStage == ShaderStageCompute
+                    ? InterfaceData::MaxCsUserDataCount
+                    : m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
+  for (auto &userDataArg : specialUserDataArgs)
+    userDataEnd -= userDataArg.argDwordSize;
+  // ... and the one used by the spill table if already added.
+  userDataEnd -= spillTableArg.size();
 
   // See if we need to spill any user data nodes in userDataArgs, copying the unspilled ones across to unspilledArgs.
   unsigned userDataIdx = 0;
 
   for (const UserDataArg &userDataArg : userDataArgs) {
     unsigned afterUserDataIdx = userDataIdx + userDataArg.argDwordSize;
-    if (userDataArg.mustSpill || afterUserDataIdx > userDataEnd) {
+    if (afterUserDataIdx > userDataEnd) {
       // Spill this node. Allocate the spill table arg.
       if (spillTableArg.empty()) {
         spillTableArg.push_back(
             UserDataArg(builder.getInt32Ty(), UserDataMapping::SpillTable, &userDataUsage->spillTable.entryArgIdx));
-        // Only decrement the number of available sgprs in a non-fixed-layout shader. In a fixed-layout compute
-        // shader, the spill table arg goes in s12, beyond the s2-s11 range allowed for user data.
-        if (!m_useFixedLayout)
-          --userDataEnd;
+        --userDataEnd;
 
         if (userDataIdx > userDataEnd) {
           // We over-ran the available SGPRs by filling them up and then realizing we needed a spill table pointer.
@@ -1295,22 +1216,11 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
           userDataIdx -= unspilledArgs.back().argDwordSize;
           userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, unspilledArgs.back().userDataValue);
           unspilledArgs.pop_back();
-          if (!unspilledArgs.empty() && unspilledArgs.back().isPadding) {
-            userDataIdx -= unspilledArgs.back().argDwordSize;
-            unspilledArgs.pop_back();
-          }
         }
       }
       // Ensure that spillUsage includes this offset. (We might be on a compute shader padding node, in which
       // case userDataArg.userDataValue is Invalid, and this call has no effect.)
       userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, userDataArg.userDataValue);
-
-      if (m_useFixedLayout) {
-        // On a fixed-layout compute shader, on spilling, stop trying to allocate nodes to SGPRs. If we didn't do
-        // this, a later node that is smaller than the current one might succeed in not spilling, but that would be
-        // wrong because it would not have the right padding before it for fixed layout.
-        break;
-      }
 
       continue;
     }
@@ -1319,39 +1229,9 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
     unspilledArgs.push_back(userDataArg);
   }
 
-  // Remove trailing padding nodes (compute shader).
-  while (!unspilledArgs.empty() && unspilledArgs.back().isPadding) {
-    userDataIdx -= unspilledArgs.back().argDwordSize;
-    unspilledArgs.pop_back();
-  }
-
-  // Add the spill table pointer and the special args to unspilledArgs. How that is done is different between
-  // a fixed-layout compute shader and a non-fixed-layout shader.
-  if (m_useFixedLayout) {
-    // For a fixed-layout compute shader:
-    // If we need the spill table pointer, it must go into s12. Insert padding if necessary.
-    if (!spillTableArg.empty()) {
-      if (userDataIdx != userDataEnd) {
-        assert(userDataIdx <= userDataEnd);
-        unspilledArgs.push_back(UserDataArg(FixedVectorType::get(builder.getInt32Ty(), userDataEnd - userDataIdx),
-                                            UserDataMapping::Invalid, nullptr, /*padding=*/true));
-      }
-      unspilledArgs.push_back(spillTableArg.front());
-      userDataIdx = userDataEnd + 1;
-    }
-    if (!specialUserDataArgs.empty()) {
-      // The special args start with workgroupSize, which needs to start at a 2-aligned reg. Insert a single padding
-      // reg if needed.
-      if (userDataIdx & 1) {
-        unspilledArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::Invalid, nullptr, /*padding=*/true));
-      }
-      unspilledArgs.insert(unspilledArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
-    }
-  } else {
-    // For a non-fixed-layout shader: add the special user data args, then the spill table pointer (if any).
-    unspilledArgs.insert(unspilledArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
-    unspilledArgs.insert(unspilledArgs.end(), spillTableArg.begin(), spillTableArg.end());
-  }
+  // Add the special args and the spill table pointer (if any) to unspilledArgs.
+  unspilledArgs.insert(unspilledArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
+  unspilledArgs.insert(unspilledArgs.end(), spillTableArg.begin(), spillTableArg.end());
 }
 
 // =====================================================================================================================
