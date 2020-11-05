@@ -106,11 +106,13 @@ void PatchWorkarounds::applyImageDescWorkaround(void) {
       if (isImage || isLastUse) {
         for (auto &use : func.uses()) {
           if (auto *callInst = dyn_cast<CallInst>(use.getUser())) {
-            if (callInst->isCallee(&use))
-              if (isLastUse)
+            if (callInst->isCallee(&use)) {
+              if (isLastUse) {
                 useWorkListLastUse.push_back(callInst);
-              else
+              } else {
                 useWorkListImage.push_back(callInst);
+              }
+            }
           }
         }
       }
