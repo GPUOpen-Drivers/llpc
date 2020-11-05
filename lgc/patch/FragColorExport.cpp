@@ -81,9 +81,9 @@ private:
   Value *generateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder);
   Value *generateReturn(Function *fragEntryPoint, BuilderBase &builder);
 
-  LLVMContext *m_context;         // The context the pass is being run in.
-  PipelineState *m_pipelineState; // The pipeline state
-  ResourceUsage *m_resUsage;      // The resource usage object from the pipeline state.
+  LLVMContext *m_context;                  // The context the pass is being run in.
+  PipelineState *m_pipelineState;          // The pipeline state
+  ResourceUsage *m_resUsage;               // The resource usage object from the pipeline state.
   SmallVector<ColorExportInfo, 8> m_info;  // The color export information for each export.
   SmallVector<Value *, 10> m_exportValues; // The value to be exported indexed by the hw render target.
 };
@@ -100,222 +100,171 @@ FragColorExport::FragColorExport(LLVMContext *context) : m_context(context) {
 }
 
 // =====================================================================================================================
+// Extract all the scalar elements of a scalar or vector type (with at-most four elements) input. Return an array of
+// elements, padded with null values at the end when the input vector has less than 4 elements.
+//
+// @param input : The value we want to extract elements from
+// @param builder : The IR builder for inserting instructions
+// @param [out] results : The returned elements
+static void extractElements(Value *input, BuilderBase &builder, SmallVectorImpl<Value *> &results) {
+  Type *valueTy = input->getType();
+  unsigned compCount = valueTy->isVectorTy() ? cast<FixedVectorType>(valueTy)->getNumElements() : 1;
+  assert(compCount <= 4 && "At-most four elements allowed\n");
+
+  std::fill(results.begin(), results.end(), Constant::getNullValue(valueTy->getScalarType()));
+
+  results[0] = input;
+  if (!valueTy->isVectorTy())
+    return;
+
+  for (unsigned i = 0; i < compCount; i++) {
+    results[i] = builder.CreateExtractElement(input, builder.getInt32(i));
+  }
+}
+
+// =====================================================================================================================
 // Executes fragment color export operations based on the specified output type and its location.
 //
 // @param output : Fragment color output
 // @param hwColorTarget : The render target (MRT) of fragment color output
-// @param insertPos : Where to insert fragment color export instructions
+// @param builder : The IR builder for inserting instructions
 // @param expFmt: The format for the given render target
 // @param signedness: If output should be interpreted as a signed integer
-Value *FragColorExport::run(Value *output, unsigned hwColorTarget, Instruction *insertPos, ExportFormat expFmt,
-                            const bool signedness) {
+Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hwColorTarget, BuilderBase &builder,
+                                                      ExportFormat expFmt, const bool signedness) {
   Type *outputTy = output->getType();
   const unsigned bitWidth = outputTy->getScalarSizeInBits();
-  auto compTy = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getElementType() : outputTy;
   unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+  Type *floatTy = builder.getFloatTy();
+  Type *halfTy = builder.getHalfTy();
+  Type *exportTypeMapping[] = {
+      floatTy, //  EXP_FORMAT_ZERO = 0,
+      floatTy, //  EXP_FORMAT_32_R = 1,
+      floatTy, //  EXP_FORMAT_32_GR = 2,
+      floatTy, //  EXP_FORMAT_32_AR = 3,
+      halfTy,  //  EXP_FORMAT_FP16_ABGR = 4,
+      halfTy,  //  EXP_FORMAT_UNORM16_ABGR = 5,
+      halfTy,  //  EXP_FORMAT_SNORM16_ABGR = 6,
+      halfTy,  //  EXP_FORMAT_UINT16_ABGR = 7,
+      halfTy,  //  EXP_FORMAT_SINT16_ABGR = 8,
+      floatTy, //  EXP_FORMAT_32_ABGR = 9,
+  };
 
-  Value *comps[4] = {nullptr};
-  if (compCount == 1)
-    comps[0] = output;
-  else {
-    for (unsigned i = 0; i < compCount; ++i) {
-      comps[i] = ExtractElementInst::Create(output, ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
+  if (expFmt == EXP_FORMAT_ZERO)
+    return nullptr;
+
+  SmallVector<Value *, 4> comps(4);
+
+  Type *exportTy = exportTypeMapping[expFmt];
+
+  // For 32bit output, we always to scalarize, but for 16bit output we may just operate on vector.
+  if (exportTy->isFloatTy()) {
+    if (compCount == 1) {
+      comps[0] = output;
+    } else {
+      for (unsigned i = 0; i < compCount; ++i)
+        comps[i] = builder.CreateExtractElement(output, builder.getInt32(i));
     }
   }
 
-  bool comprExp = false;
-  bool needPack = false;
-
-  const auto undefFloat = UndefValue::get(Type::getFloatTy(*m_context));
-  const auto undefFloat16 = UndefValue::get(Type::getHalfTy(*m_context));
-  const auto undefFloat16x2 = UndefValue::get(FixedVectorType::get(Type::getHalfTy(*m_context), 2));
+  const auto undefFloat = UndefValue::get(builder.getFloatTy());
+  const auto undefFloat16x2 = UndefValue::get(FixedVectorType::get(builder.getHalfTy(), 2));
 
   switch (expFmt) {
-  case EXP_FORMAT_ZERO: {
-    break;
-  }
   case EXP_FORMAT_32_R: {
     compCount = 1;
-    comps[0] = convertToFloat(comps[0], signedness, insertPos);
-    comps[1] = undefFloat;
-    comps[2] = undefFloat;
-    comps[3] = undefFloat;
+    comps[0] = convertToFloat(comps[0], signedness, builder);
     break;
   }
   case EXP_FORMAT_32_GR: {
     if (compCount >= 2) {
       compCount = 2;
-      comps[0] = convertToFloat(comps[0], signedness, insertPos);
-      comps[1] = convertToFloat(comps[1], signedness, insertPos);
-      comps[2] = undefFloat;
-      comps[3] = undefFloat;
+      comps[0] = convertToFloat(comps[0], signedness, builder);
+      comps[1] = convertToFloat(comps[1], signedness, builder);
     } else {
       compCount = 1;
-      comps[0] = convertToFloat(comps[0], signedness, insertPos);
-      comps[1] = undefFloat;
-      comps[2] = undefFloat;
-      comps[3] = undefFloat;
+      comps[0] = convertToFloat(comps[0], signedness, builder);
     }
     break;
   }
   case EXP_FORMAT_32_AR: {
     if (compCount == 4) {
       compCount = 2;
-      comps[0] = convertToFloat(comps[0], signedness, insertPos);
-      comps[1] = convertToFloat(comps[3], signedness, insertPos);
-      comps[2] = undefFloat;
-      comps[3] = undefFloat;
+      comps[0] = convertToFloat(comps[0], signedness, builder);
+      comps[1] = convertToFloat(comps[3], signedness, builder);
     } else {
       compCount = 1;
-      comps[0] = convertToFloat(comps[0], signedness, insertPos);
-      comps[1] = undefFloat;
-      comps[2] = undefFloat;
-      comps[3] = undefFloat;
+      comps[0] = convertToFloat(comps[0], signedness, builder);
     }
     break;
   }
   case EXP_FORMAT_32_ABGR: {
     for (unsigned i = 0; i < compCount; ++i)
-      comps[i] = convertToFloat(comps[i], signedness, insertPos);
+      comps[i] = convertToFloat(comps[i], signedness, builder);
 
     for (unsigned i = compCount; i < 4; ++i)
       comps[i] = undefFloat;
     break;
   }
   case EXP_FORMAT_FP16_ABGR: {
-    comprExp = true;
-
-    if (bitWidth == 8) {
-      needPack = true;
-
-      // Cast i8 to float16
-      assert(compTy->isIntegerTy());
-      for (unsigned i = 0; i < compCount; ++i) {
-        if (signedness) {
-          // %comp = sext i8 %comp to i16
-          comps[i] = new SExtInst(comps[i], Type::getInt16Ty(*m_context), "", insertPos);
-        } else {
-          // %comp = zext i8 %comp to i16
-          comps[i] = new ZExtInst(comps[i], Type::getInt16Ty(*m_context), "", insertPos);
-        }
-
-        // %comp = bitcast i16 %comp to half
-        comps[i] = new BitCastInst(comps[i], Type::getHalfTy(*m_context), "", insertPos);
+    // convert to half type
+    if (bitWidth <= 16) {
+      output = convertToHalf(output, signedness, builder);
+      extractElements(output, builder, comps);
+      // re-pack
+      comps[0] = builder.CreateInsertElement(undefFloat16x2, comps[0], builder.getInt32(0));
+      comps[0] = builder.CreateInsertElement(comps[0], comps[1], builder.getInt32(1));
+      if (compCount > 2) {
+        comps[1] = builder.CreateInsertElement(undefFloat16x2, comps[2], builder.getInt32(0));
+        comps[1] = builder.CreateInsertElement(comps[1], comps[3], builder.getInt32(1));
       }
-
-      for (unsigned i = compCount; i < 4; ++i)
-        comps[i] = undefFloat16;
-    } else if (bitWidth == 16) {
-      needPack = true;
-
-      if (compTy->isIntegerTy()) {
-        // Cast i16 to float16
-        for (unsigned i = 0; i < compCount; ++i) {
-          // %comp = bitcast i16 %comp to half
-          comps[i] = new BitCastInst(comps[i], Type::getHalfTy(*m_context), "", insertPos);
-        }
-      }
-
-      for (unsigned i = compCount; i < 4; ++i)
-        comps[i] = undefFloat16;
     } else {
-      if (compTy->isIntegerTy()) {
-        // Cast i32 to float
-        for (unsigned i = 0; i < compCount; ++i) {
-          // %comp = bitcast i32 %comp to float
-          comps[i] = new BitCastInst(comps[i], Type::getFloatTy(*m_context), "", insertPos);
-        }
-      }
-
-      for (unsigned i = compCount; i < 4; ++i)
-        comps[i] = undefFloat;
+      if (outputTy->isIntOrIntVectorTy())
+        output = builder.CreateBitCast(output, outputTy->isVectorTy()
+                                                   ? builder.getFloatTy()
+                                                   : FixedVectorType::get(builder.getFloatTy(), compCount));
+      extractElements(output, builder, comps);
 
       Attribute::AttrKind attribs[] = {Attribute::ReadNone};
-
-      // Do packing
-      comps[0] = emitCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(Type::getHalfTy(*m_context), 2),
-                          {comps[0], comps[1]}, attribs, insertPos);
-
-      if (compCount > 2) {
-        comps[1] = emitCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(Type::getHalfTy(*m_context), 2),
-                            {comps[2], comps[3]}, attribs, insertPos);
-      } else
-        comps[1] = undefFloat16x2;
+      comps[0] = builder.CreateNamedCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(builder.getHalfTy(), 2),
+                                         {comps[0], comps[1]}, attribs);
+      if (compCount > 2)
+        comps[1] = builder.CreateNamedCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(builder.getHalfTy(), 2),
+                                           {comps[2], comps[3]}, attribs);
     }
-
     break;
   }
   case EXP_FORMAT_UNORM16_ABGR:
   case EXP_FORMAT_SNORM16_ABGR: {
-    comprExp = true;
-    needPack = true;
-
-    for (unsigned i = 0; i < compCount; ++i) {
-      // Convert the components to float value if necessary
-      comps[i] = convertToFloat(comps[i], signedness, insertPos);
-    }
-
-    assert(compCount <= 4);
-    // Make even number of components;
-    if ((compCount % 2) != 0) {
-      comps[compCount] = ConstantFP::get(Type::getFloatTy(*m_context), 0.0);
-      compCount++;
-    }
+    output = convertToFloat(output, signedness, builder);
+    extractElements(output, builder, comps);
 
     StringRef funcName =
         expFmt == EXP_FORMAT_SNORM16_ABGR ? "llvm.amdgcn.cvt.pknorm.i16" : "llvm.amdgcn.cvt.pknorm.u16";
 
-    for (unsigned i = 0; i < compCount; i += 2) {
-      Value *packedComps = emitCall(funcName, FixedVectorType::get(Type::getInt16Ty(*m_context), 2),
-                                    {comps[i], comps[i + 1]}, {}, insertPos);
+    for (unsigned idx = 0; idx < (compCount + 1) / 2; idx++) {
+      Value *packedComps = builder.CreateNamedCall(funcName, FixedVectorType::get(builder.getInt16Ty(), 2),
+                                                   {comps[2 * idx], comps[2 * idx + 1]}, {});
 
-      packedComps = new BitCastInst(packedComps, FixedVectorType::get(Type::getHalfTy(*m_context), 2), "", insertPos);
-
-      comps[i] =
-          ExtractElementInst::Create(packedComps, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
-
-      comps[i + 1] =
-          ExtractElementInst::Create(packedComps, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
+      comps[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
     }
-
-    for (unsigned i = compCount; i < 4; ++i)
-      comps[i] = undefFloat16;
 
     break;
   }
   case EXP_FORMAT_UINT16_ABGR:
   case EXP_FORMAT_SINT16_ABGR: {
-    comprExp = true;
-    needPack = true;
-
-    for (unsigned i = 0; i < compCount; ++i) {
-      // Convert the components to int value if necessary
-      comps[i] = convertToInt(comps[i], signedness, insertPos);
-    }
-
     assert(compCount <= 4);
-    // Make even number of components;
-    if ((compCount % 2) != 0) {
-      comps[compCount] = ConstantInt::get(Type::getInt32Ty(*m_context), 0), compCount++;
-    }
+    output = convertToInt(output, signedness, builder);
+    extractElements(output, builder, comps);
 
     StringRef funcName = expFmt == EXP_FORMAT_SINT16_ABGR ? "llvm.amdgcn.cvt.pk.i16" : "llvm.amdgcn.cvt.pk.u16";
 
-    for (unsigned i = 0; i < compCount; i += 2) {
-      Value *packedComps = emitCall(funcName, FixedVectorType::get(Type::getInt16Ty(*m_context), 2),
-                                    {comps[i], comps[i + 1]}, {}, insertPos);
+    for (unsigned idx = 0; idx < (compCount + 1) / 2; idx++) {
+      Value *packedComps = builder.CreateNamedCall(funcName, FixedVectorType::get(builder.getInt16Ty(), 2),
+                                                   {comps[2 * idx], comps[2 * idx + 1]}, {});
 
-      packedComps = new BitCastInst(packedComps, FixedVectorType::get(Type::getHalfTy(*m_context), 2), "", insertPos);
-
-      comps[i] =
-          ExtractElementInst::Create(packedComps, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
-
-      comps[i + 1] =
-          ExtractElementInst::Create(packedComps, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
+      comps[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
     }
-
-    for (unsigned i = compCount; i < 4; ++i)
-      comps[i] = undefFloat16;
 
     break;
   }
@@ -327,107 +276,114 @@ Value *FragColorExport::run(Value *output, unsigned hwColorTarget, Instruction *
 
   Value *exportCall = nullptr;
 
-  if (expFmt == EXP_FORMAT_ZERO) {
-    // Do nothing
-  } else if (comprExp) {
+  if (exportTy->isHalfTy()) {
     // 16-bit export (compressed)
-    if (needPack) {
-      // Do packing
-
-      // %comp[0] = insertelement <2 x half> undef, half %comp[0], i32 0
-      comps[0] = InsertElementInst::Create(undefFloat16x2, comps[0], ConstantInt::get(Type::getInt32Ty(*m_context), 0),
-                                           "", insertPos);
-
-      // %comp[0] = insertelement <2 x half> %comp[0], half %comp[1], i32 1
-      comps[0] = InsertElementInst::Create(comps[0], comps[1], ConstantInt::get(Type::getInt32Ty(*m_context), 1), "",
-                                           insertPos);
-
-      if (compCount > 2) {
-        // %comp[1] = insertelement <2 x half> undef, half %comp[2], i32 0
-        comps[1] = InsertElementInst::Create(undefFloat16x2, comps[2],
-                                             ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
-
-        // %comp[1] = insertelement <2 x half> %comp[1], half %comp[3], i32 1
-        comps[1] = InsertElementInst::Create(comps[1], comps[3], ConstantInt::get(Type::getInt32Ty(*m_context), 1), "",
-                                             insertPos);
-      } else
-        comps[1] = undefFloat16x2;
-    }
-
+    if (compCount <= 2)
+      comps[1] = undefFloat16x2;
     Value *args[] = {
-        ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_MRT_0 + hwColorTarget), // tgt
-        ConstantInt::get(Type::getInt32Ty(*m_context), compCount > 2 ? 0xF : 0x3),        // en
-        comps[0],                                                                         // src0
-        comps[1],                                                                         // src1
-        ConstantInt::get(Type::getInt1Ty(*m_context), false),                             // done
-        ConstantInt::get(Type::getInt1Ty(*m_context), true)                               // vm
+        builder.getInt32(EXP_TARGET_MRT_0 + hwColorTarget), // tgt
+        builder.getInt32(compCount > 2 ? 0xF : 0x3),        // en
+        comps[0],                                           // src0
+        comps[1],                                           // src1
+        builder.getFalse(),                                 // done
+        builder.getTrue()                                   // vm
     };
 
-    exportCall = emitCall("llvm.amdgcn.exp.compr.v2f16", Type::getVoidTy(*m_context), args, {}, insertPos);
+    exportCall = builder.CreateNamedCall("llvm.amdgcn.exp.compr.v2f16", Type::getVoidTy(*m_context), args, {});
   } else {
     // 32-bit export
+    for (unsigned i = compCount; i < 4; i++)
+      comps[i] = undefFloat;
+
     Value *args[] = {
-        ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_MRT_0 + hwColorTarget), // tgt
-        ConstantInt::get(Type::getInt32Ty(*m_context), (1 << compCount) - 1),             // en
-        comps[0],                                                                         // src0
-        comps[1],                                                                         // src1
-        comps[2],                                                                         // src2
-        comps[3],                                                                         // src3
-        ConstantInt::get(Type::getInt1Ty(*m_context), false),                             // done
-        ConstantInt::get(Type::getInt1Ty(*m_context), true)                               // vm
+        builder.getInt32(EXP_TARGET_MRT_0 + hwColorTarget), // tgt
+        builder.getInt32((1 << compCount) - 1),             // en
+        comps[0],                                           // src0
+        comps[1],                                           // src1
+        comps[2],                                           // src2
+        comps[3],                                           // src3
+        builder.getFalse(),                                 // done
+        builder.getTrue()                                   // vm
     };
 
-    exportCall = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+    exportCall = builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {});
   }
 
   return exportCall;
 }
 
 // =====================================================================================================================
-// Converts an output component value to its floating-point representation. This function is a "helper" in computing
+// Converts an output value to its half floating-point representation. This function is a "helper" in computing
 // the export value based on shader export format.
 //
-// @param value : Output component value
+// @param value : Output value
 // @param signedness : Whether the type is signed (valid for integer type)
-// @param insertPos : Where to insert conversion instructions
-Value *FragColorExport::convertToFloat(Value *value, bool signedness, Instruction *insertPos) const {
+// @param builder : The IR builder for inserting instructions
+Value *FragColorExport::convertToHalf(Value *value, bool signedness, BuilderBase &builder) const {
   Type *valueTy = value->getType();
-  assert(valueTy->isFloatingPointTy() || valueTy->isIntegerTy()); // Should be floating-point/integer scalar
-
+  unsigned numElements = valueTy->isVectorTy() ? cast<FixedVectorType>(valueTy)->getNumElements() : 1;
   const unsigned bitWidth = valueTy->getScalarSizeInBits();
-  if (bitWidth == 8) {
-    assert(valueTy->isIntegerTy());
-    if (signedness) {
-      // %value = sext i8 %value to i32
-      value = new SExtInst(value, Type::getInt32Ty(*m_context), "", insertPos);
-    } else {
-      // %value = zext i8 %value to i32
-      value = new ZExtInst(value, Type::getInt32Ty(*m_context), "", insertPos);
-    }
+  Type *int16Ty = builder.getInt16Ty();
+  Type *halfTy = builder.getHalfTy();
+  if (valueTy->isVectorTy()) {
+    int16Ty = FixedVectorType::get(builder.getInt16Ty(), numElements);
+    halfTy = FixedVectorType::get(builder.getHalfTy(), numElements);
+  }
+  assert(bitWidth <= 16 && "we do not support 32bit here");
+  if (bitWidth < 16) {
+    if (signedness)
+      value = builder.CreateSExt(value, int16Ty);
+    else
+      value = builder.CreateZExt(value, int16Ty);
+  }
+  if (valueTy->isIntOrIntVectorTy()) {
+    // This is very corner-case that writing un-matching integer to half color buffer, the behavior is undefined.
+    // I think here we should do a convert. But I am not quite sure on that. So I just keep the old behavior.
+    value = builder.CreateBitCast(value, halfTy);
+  }
 
-    // %value = bitcast i32 %value to float
-    value = new BitCastInst(value, Type::getFloatTy(*m_context), "", insertPos);
-  } else if (bitWidth == 16) {
-    if (valueTy->isFloatingPointTy()) {
-      // %value = fpext half %value to float
-      value = new FPExtInst(value, Type::getFloatTy(*m_context), "", insertPos);
-    } else {
+  return value;
+}
+
+// =====================================================================================================================
+// Converts an output value to its floating-point representation. This function is a "helper" in computing
+// the export value based on shader export format.
+//
+// @param value : Output value
+// @param signedness : Whether the type is signed (valid for integer type)
+// @param builder : The IR builder for inserting instructions
+Value *FragColorExport::convertToFloat(Value *value, bool signedness, BuilderBase &builder) const {
+  Type *valueTy = value->getType();
+  const unsigned bitWidth = valueTy->getScalarSizeInBits();
+  unsigned numElements = valueTy->isVectorTy() ? cast<FixedVectorType>(valueTy)->getNumElements() : 1;
+  Type *int32Ty = builder.getInt32Ty();
+  Type *floatTy = builder.getFloatTy();
+  if (valueTy->isVectorTy()) {
+    int32Ty = FixedVectorType::get(builder.getInt32Ty(), numElements);
+    floatTy = FixedVectorType::get(builder.getFloatTy(), numElements);
+  }
+
+  if (bitWidth <= 16) {
+    if (valueTy->isIntOrIntVectorTy()) {
       if (signedness) {
-        // %value = sext i16 %value to i32
-        value = new SExtInst(value, Type::getInt32Ty(*m_context), "", insertPos);
+        // %value = sext i8/i16 %value to i32
+        value = builder.CreateSExt(value, int32Ty);
       } else {
-        // %value = zext i16 %value to i32
-        value = new ZExtInst(value, Type::getInt32Ty(*m_context), "", insertPos);
+        // %value = zext i8/i16 %value to i32
+        value = builder.CreateZExt(value, int32Ty);
       }
-
       // %value = bitcast i32 %value to float
-      value = new BitCastInst(value, Type::getFloatTy(*m_context), "", insertPos);
+      value = builder.CreateBitCast(value, floatTy);
+    } else {
+      assert(bitWidth == 16);
+      // %value = fpext half %value to float
+      value = builder.CreateFPExt(value, floatTy);
     }
   } else {
-    assert(bitWidth == 32); // The valid bit width is 16 or 32
+    assert(bitWidth == 32);
     if (valueTy->isIntegerTy()) {
       // %value = bitcast i32 %value to float
-      value = new BitCastInst(value, Type::getFloatTy(*m_context), "", insertPos);
+      value = builder.CreateBitCast(value, floatTy);
     }
   }
 
@@ -440,40 +396,36 @@ Value *FragColorExport::convertToFloat(Value *value, bool signedness, Instructio
 //
 // @param value : Output component value
 // @param signedness : Whether the type is signed (valid for integer type)
-// @param insertPos : Where to insert conversion instructions
-Value *FragColorExport::convertToInt(Value *value, bool signedness, Instruction *insertPos) const {
+// @param builder : The IR builder for inserting instructions
+Value *FragColorExport::convertToInt(Value *value, bool signedness, BuilderBase &builder) const {
   Type *valueTy = value->getType();
-  assert(valueTy->isFloatingPointTy() || valueTy->isIntegerTy()); // Should be floating-point/integer scalar
-
   const unsigned bitWidth = valueTy->getScalarSizeInBits();
-  if (bitWidth == 8) {
-    assert(valueTy->isIntegerTy());
+  unsigned numElements = valueTy->isVectorTy() ? cast<FixedVectorType>(valueTy)->getNumElements() : 1;
 
-    if (signedness) {
-      // %value = sext i8 %value to i32
-      value = new SExtInst(value, Type::getInt32Ty(*m_context), "", insertPos);
-    } else {
-      // %value = zext i8 %value to i32
-      value = new ZExtInst(value, Type::getInt32Ty(*m_context), "", insertPos);
-    }
-  } else if (bitWidth == 16) {
+  Type *int32Ty = builder.getInt32Ty();
+  Type *int16Ty = builder.getInt16Ty();
+  if (valueTy->isVectorTy()) {
+    int32Ty = FixedVectorType::get(builder.getInt32Ty(), numElements);
+    int16Ty = FixedVectorType::get(builder.getInt16Ty(), numElements);
+  }
+  if (bitWidth <= 16) {
     if (valueTy->isFloatingPointTy()) {
       // %value = bicast half %value to i16
-      value = new BitCastInst(value, Type::getInt16Ty(*m_context), "", insertPos);
+      value = builder.CreateBitCast(value, int16Ty);
     }
 
     if (signedness) {
-      // %value = sext i16 %value to i32
-      value = new SExtInst(value, Type::getInt32Ty(*m_context), "", insertPos);
+      // %value = sext i16/i8 %value to i32
+      value = builder.CreateSExt(value, int32Ty);
     } else {
-      // %value = zext i16 %value to i32
-      value = new ZExtInst(value, Type::getInt32Ty(*m_context), "", insertPos);
+      // %value = zext i16/i8 %value to i32
+      value = builder.CreateZExt(value, int32Ty);
     }
   } else {
     assert(bitWidth == 32); // The valid bit width is 16 or 32
     if (valueTy->isFloatingPointTy()) {
       // %value = bitcast float %value to i32
-      value = new BitCastInst(value, Type::getInt32Ty(*m_context), "", insertPos);
+      value = builder.CreateBitCast(value, int32Ty);
     }
   }
 
@@ -876,7 +828,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
     Value *output = values[exp.hwColorTarget];
     if (exp.hwColorTarget != MaxColorTargets) {
       ExportFormat expFmt = exportFormat[exp.hwColorTarget];
-      Value *currentExport = run(output, exp.hwColorTarget, &*builder.GetInsertPoint(), expFmt, exp.isSigned);
+      Value *currentExport = handleColorExportInstructions(output, exp.hwColorTarget, builder, expFmt, exp.isSigned);
       if (currentExport) {
         lastExport = currentExport;
       }
