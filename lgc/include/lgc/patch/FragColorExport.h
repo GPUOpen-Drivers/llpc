@@ -57,8 +57,8 @@ class FragColorExport {
 public:
   FragColorExport(llvm::LLVMContext *context);
 
-  llvm::Value *run(llvm::Value *output, unsigned int hwColorTarget, llvm::Instruction *insertPos, ExportFormat expFmt,
-                   const bool signedness);
+  llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorTarget, BuilderBase &builder,
+                                             ExportFormat expFmt, const bool signedness);
 
   void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
                                   llvm::ArrayRef<ExportFormat> exportFormat, bool dummyExport, BuilderBase &builder);
@@ -70,10 +70,11 @@ private:
   FragColorExport(const FragColorExport &) = delete;
   FragColorExport &operator=(const FragColorExport &) = delete;
 
-  llvm::Value *convertToFloat(llvm::Value *value, bool signedness, llvm::Instruction *insertPos) const;
-  llvm::Value *convertToInt(llvm::Value *value, bool signedness, llvm::Instruction *insertPos) const;
+  llvm::Value *convertToHalf(llvm::Value *value, bool signedness, BuilderBase &builder) const;
+  llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;
+  llvm::Value *convertToInt(llvm::Value *value, bool signedness, BuilderBase &builder) const;
 
-  llvm::LLVMContext *m_context;   // LLVM context
+  llvm::LLVMContext *m_context; // LLVM context
 };
 
 } // namespace lgc
