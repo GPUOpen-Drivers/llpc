@@ -2862,7 +2862,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(SPIRVV
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(spvInst->getOperands()[0]);
   const spv::Scope scope = static_cast<spv::Scope>(spvScope->getZExtIntValue());
-  assert(scope == spv::ScopeDevice || scope == spv::ScopeWorkgroup);
+  assert(scope == spv::ScopeDevice || scope == spv::ScopeSubgroup);
 
   Value *const readClock = getBuilder()->CreateReadClock(scope == spv::ScopeDevice);
 

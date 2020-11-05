@@ -1774,9 +1774,19 @@ Value *ImageBuilder::patchCubeDescriptor(Value *desc, unsigned dim) {
   elem4 = CreateOr(elem4, depth);
 
   // Change resource type to 2D array (0xD)
-  Value *elem3 = CreateExtractElement(desc, 3);
+  Value *originalElem3 = CreateExtractElement(desc, 3);
+  Value *elem3 = originalElem3;
   elem3 = CreateAnd(elem3, getInt32(0x0FFFFFFF));
   elem3 = CreateOr(elem3, getInt32(0xD0000000));
+
+  // If allowNullDescriptor is on and image descriptor is a null descriptor, keep elem3 and elem4 be zero
+  if (m_pipelineState->getOptions().allowNullDescriptor) {
+    // Check dword3 against 0 for a null descriptor
+    Value *zero = getInt32(0);
+    Value *isNullDesc = CreateICmpEQ(originalElem3, zero);
+    elem3 = CreateSelect(isNullDesc, zero, elem3);
+    elem4 = CreateSelect(isNullDesc, zero, elem4);
+  }
 
   // Reassemble descriptor.
   desc = CreateInsertElement(desc, elem4, 4);

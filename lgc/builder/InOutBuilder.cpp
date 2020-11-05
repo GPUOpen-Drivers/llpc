@@ -321,10 +321,10 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
   } else {
     // GS output. We include the stream ID with the location in the map key.
     for (unsigned i = 0; i < locationCount; ++i) {
-      GsOutLocInfo outLocInfo = {};
+      InOutLocationInfo outLocInfo = {};
       outLocInfo.location = location + i;
       outLocInfo.streamId = inOutInfo.getStreamId();
-      (*inOutLocMap)[outLocInfo.u32All] = InvalidValue;
+      (*inOutLocMap)[outLocInfo.u16All] = InvalidValue;
     }
   }
 
@@ -555,7 +555,7 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
 
   if (m_shaderStage == ShaderStageGeometry) {
     // Mark the XFB output for copy shader generation.
-    GsOutLocInfo outLocInfo = {};
+    InOutLocationInfo outLocInfo = {};
     outLocInfo.location = location;
     outLocInfo.isBuiltIn = isBuiltIn;
     outLocInfo.streamId = streamId;
@@ -567,11 +567,11 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
     xfbOutInfo.xfbExtraOffset = 0;
 
     auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageGeometry);
-    resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+    resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u16All] = xfbOutInfo.u32All;
     if (valueToWrite->getType()->getPrimitiveSizeInBits() > 128) {
       ++outLocInfo.location;
       xfbOutInfo.xfbOffset += 32;
-      resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+      resUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u16All] = xfbOutInfo.u32All;
     }
   }
 

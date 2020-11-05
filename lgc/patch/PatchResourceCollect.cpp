@@ -1625,7 +1625,7 @@ void PatchResourceCollect::matchGenericInOut() {
         bool outputXfb = false;
         if (m_shaderStage == ShaderStageGeometry) {
           unsigned outLocInfo = locMap.first;
-          loc = reinterpret_cast<GsOutLocInfo *>(&outLocInfo)->location;
+          loc = reinterpret_cast<InOutLocationInfo *>(&outLocInfo)->location;
           outputXfb = inOutUsage.gs.xfbOutsInfo.find(outLocInfo) != inOutUsage.gs.xfbOutsInfo.end();
         }
 
@@ -1726,7 +1726,7 @@ void PatchResourceCollect::matchGenericInOut() {
       if (m_shaderStage == ShaderStageGeometry) {
         if (locMap.second == InvalidValue) {
           unsigned outLocInfo = locMap.first;
-          mapGsGenericOutput(*(reinterpret_cast<GsOutLocInfo *>(&outLocInfo)));
+          mapGsGenericOutput(*(reinterpret_cast<InOutLocationInfo *>(&outLocInfo)));
         }
       } else {
         if (locMap.second == InvalidValue) {
@@ -2528,13 +2528,13 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 // Map locations of generic outputs of geometry shader to tightly packed ones.
 //
 // @param outLocInfo : GS output location info
-void PatchResourceCollect::mapGsGenericOutput(GsOutLocInfo outLocInfo) {
+void PatchResourceCollect::mapGsGenericOutput(InOutLocationInfo outLocInfo) {
   assert(m_shaderStage == ShaderStageGeometry);
   unsigned streamId = outLocInfo.streamId;
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   auto &inOutUsage = resUsage->inOutUsage.gs;
 
-  resUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = inOutUsage.outLocCount[streamId]++;
+  resUsage->inOutUsage.outputLocMap[outLocInfo.u16All] = inOutUsage.outLocCount[streamId]++;
 
   unsigned assignedLocCount =
       inOutUsage.outLocCount[0] + inOutUsage.outLocCount[1] + inOutUsage.outLocCount[2] + inOutUsage.outLocCount[3];
@@ -2543,7 +2543,7 @@ void PatchResourceCollect::mapGsGenericOutput(GsOutLocInfo outLocInfo) {
 
   LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: stream = " << outLocInfo.streamId << ", "
                 << " loc = " << outLocInfo.location
-                << "  =>  Mapped = " << resUsage->inOutUsage.outputLocMap[outLocInfo.u32All] << "\n");
+                << "  =>  Mapped = " << resUsage->inOutUsage.outputLocMap[outLocInfo.u16All] << "\n");
 }
 
 // =====================================================================================================================
