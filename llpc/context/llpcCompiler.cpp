@@ -329,7 +329,8 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(VkFormat format) {
 // @param cache : Pointer to ICache implemented in client
 Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash,
                    ICache *cache)
-    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0) {
+    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0)
+{
   for (unsigned i = 0; i < optionCount; ++i)
     m_options.push_back(options[i]);
 
@@ -377,7 +378,6 @@ Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *
 
   ++m_instanceCount;
   ++m_outRedirectCount;
-
 }
 
 // =====================================================================================================================
@@ -1229,7 +1229,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
     }
 #endif
   }
-
   if (checkPerStageCache) {
     // For graphics, update shader caches with results of compile, and merge ELF outputs if necessary.
     graphicsShaderCacheChecker.updateAndMerge(result, pipelineElf);
@@ -1434,7 +1433,6 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                                bool buildingRelocatableElf, ElfPackage *pipelineElf) {
   Context *context = acquireContext();
   context->attachPipelineContext(graphicsContext);
-
   Result result = Result::Success;
   if (buildingRelocatableElf)
     result = buildPipelineWithRelocatableElf(context, shaderInfo, pipelineElf);
