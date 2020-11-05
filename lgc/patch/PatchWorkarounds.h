@@ -65,7 +65,7 @@ private:
   bool m_changed;
 
   void applyImageDescWorkaround(void);
-  void processImageDescWorkaround(llvm::CallInst &callInst);
+  void processImageDescWorkaround(llvm::CallInst &callInst, bool isLastUse);
 };
 
 } // namespace lgc

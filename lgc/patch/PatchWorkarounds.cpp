@@ -89,21 +89,39 @@ void PatchWorkarounds::applyImageDescWorkaround(void) {
   if (!m_pipelineState->getOptions().disableImageResourceCheck &&
       m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waFixBadImageDescriptor) {
 
+    // We have to consider waterfall.last.use as this may be used on a resource
+    // descriptor that is then used by an image instruction.
+    // waterfall.last.use needs to then be proceesed first due to the nature of
+    // the intrinsic (dst needs to go into the processed list to prevent it
+    // being processed twice, plus the workaround breaks the last.use if not
+    // handled like this)
+
+    // Build up a list of uses (since we modify we can't process them immediately)
+    SmallVector<CallInst *, 8> useWorkListLastUse;
+    SmallVector<CallInst *, 8> useWorkListImage;
+
     for (const Function &func : m_module->getFunctionList()) {
-      if (func.getName().startswith("llvm.amdgcn.image")) {
-        // Build up a list of uses (since we modify we can't process them immediately)
-        SmallVector<CallInst *, 8> useWorkList;
+      bool isImage = func.getName().startswith("llvm.amdgcn.image");
+      bool isLastUse = func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_waterfall_last_use;
+      if (isImage || isLastUse) {
         for (auto &use : func.uses()) {
           if (auto *callInst = dyn_cast<CallInst>(use.getUser())) {
             if (callInst->isCallee(&use))
-              useWorkList.push_back(callInst);
+              if (isLastUse)
+                useWorkListLastUse.push_back(callInst);
+              else
+                useWorkListImage.push_back(callInst);
           }
         }
-        // Process the uses
-        for (auto imgInst : useWorkList) {
-          processImageDescWorkaround(*imgInst);
-        }
       }
+    }
+
+    // Process the uses
+    for (auto lastUseInst : useWorkListLastUse) {
+      processImageDescWorkaround(*lastUseInst, true /* isLastUse */);
+    }
+    for (auto imgInst : useWorkListImage) {
+      processImageDescWorkaround(*imgInst, false /* isLastUse */);
     }
   }
 }
@@ -111,8 +129,9 @@ void PatchWorkarounds::applyImageDescWorkaround(void) {
 // =====================================================================================================================
 // Process calls to image instrinsics and apply buffer descriptor should be image descriptor workaround
 //
-// @param callInst : The image intrinsic call instruction
-void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst) {
+// @param callInst  : The image intrinsic call instruction
+// @param isLastUse : The intrinsic being considered is a waterfall.last.use
+void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLastUse) {
   Function *const calledFunc = callInst.getCalledFunction();
   if (!calledFunc)
     return;
@@ -132,6 +151,23 @@ void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst) {
         if (m_processed.count(arg) > 0)
           // Already processed this one
           break;
+
+        // If we are processing waterfall.last.use then additionally check that
+        // the use of the descriptor is for a image intrinsic
+        if (isLastUse) {
+          bool requiresWorkaround = false;
+          for (auto &use : callInst.uses()) {
+            if (auto *useCallInst = dyn_cast<CallInst>(use.getUser())) {
+              if (useCallInst->getCalledFunction()->getName().startswith("llvm.amdgcn.image")) {
+                // We need to process this intrinsic
+                requiresWorkaround = true;
+                break;
+              }
+            }
+          }
+          if (!requiresWorkaround)
+            return;
+        }
 
         Instruction *rsrcInstr = cast<Instruction>(arg);
 
@@ -161,6 +197,12 @@ void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst) {
         // Record the new argument as already processed. If we encounter it in
         // another image intrinsic call we can skip
         m_processed.insert(newArg);
+
+        // Additionally, if this is a last.use intrinsic, we can add the dest
+        // register to the already processed list too (in fact, this is
+        // required)
+        if (isLastUse)
+          m_processed.insert(&callInst);
 
         m_changed = true;
         break;
