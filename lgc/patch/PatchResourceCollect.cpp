@@ -1297,10 +1297,10 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     if (isPackIn && !m_hasDynIndexedInput && !isDeadCall &&
         (mangledName.startswith(lgcName::InputImportGeneric) ||
          mangledName.startswith(lgcName::InputImportInterpolant))) {
-      m_inOutCalls.push_back(&callInst);
+      m_inputCalls.push_back(&callInst);
     } else if (isPackOut && mangledName.startswith(lgcName::OutputExportGeneric)) {
       // Collect outputs of VS or TES
-      m_inOutCalls.push_back(&callInst);
+      m_outputCalls.push_back(&callInst);
       m_deadCalls.push_back(&callInst);
     }
   }
@@ -2535,20 +2535,18 @@ void PatchResourceCollect::packInOutLocation() {
           m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.inputLocInfoMap;
     }
   }
-  // Clear it to hold previous calls
-  m_inOutCalls.clear();
 }
 
 // =====================================================================================================================
 // Fill inputLocInfoMap based on FS or TCS input import calls
 void PatchResourceCollect::fillInOutLocInfoMap() {
-  if (m_inOutCalls.empty())
+  if (m_inputCalls.empty())
     return;
 
   assert(m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl);
 
   // Create locationInfoMap according to the packed calls
-  m_locationInfoMapManager->createMap(m_inOutCalls, m_shaderStage);
+  m_locationInfoMapManager->createMap(m_inputCalls, m_shaderStage);
 
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
@@ -2559,7 +2557,7 @@ void PatchResourceCollect::fillInOutLocInfoMap() {
   //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
   //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
   const bool isTcs = m_shaderStage == ShaderStageTessControl;
-  for (auto call : m_inOutCalls) {
+  for (auto call : m_inputCalls) {
     const bool isInterpolant = !isTcs && call->getNumArgOperands() != 4;
     unsigned locOffset = 0;
     unsigned compIdxArgIdx = 1;
@@ -2580,16 +2578,17 @@ void PatchResourceCollect::fillInOutLocInfoMap() {
     m_locationInfoMapManager->findMap(origLocInfo, mapIter);
     inputLocInfoMap.insert({origLocInfo, mapIter->second});
   }
+  m_inputCalls.clear();
 }
 
 // =====================================================================================================================
 // Re-assemble output export functions based on the locationInfoMap
 void PatchResourceCollect::reassembleOutputExportCalls() {
-  if (m_inOutCalls.empty())
+  if (m_outputCalls.empty())
     return;
 
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(m_inOutCalls.back());
+  builder.SetInsertPoint(m_outputCalls.back());
 
   // ElementsInfo represents the info of composing a vector in a location
   struct ElementsInfo {
@@ -2605,9 +2604,9 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
 
   // Collect ElementsInfo in each packed location
   ElementsInfo elemsInfo = {{nullptr}, {nullptr}, 0, 0};
-  std::vector<ElementsInfo> elementsInfoArray(m_inOutCalls.size(), elemsInfo);
-  for (auto call : m_inOutCalls) {
-    InOutLocationInfo origLocInfo(0);
+  std::vector<ElementsInfo> elementsInfoArray(m_outputCalls.size(), elemsInfo);
+  for (auto call : m_outputCalls) {
+    InOutLocationInfo origLocInfo;
     origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
     origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
 
@@ -2642,6 +2641,7 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
     else
       ++elementsInfo.elemCountOf32bit;
   }
+  m_outputCalls.clear();
 
   // Re-assamble XX' output export calls for each packed location
   Value *args[3] = {};
