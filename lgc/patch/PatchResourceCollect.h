@@ -38,7 +38,7 @@
 
 namespace lgc {
 
-class InOutLocationMapManager;
+class InOutLocationInfoMapManager;
 typedef std::map<InOutLocationInfo, InOutLocationInfo> InOutLocationInfoMap;
 
 // =====================================================================================================================
@@ -112,7 +112,8 @@ private:
   bool m_hasDynIndexedOutput; // Whether dynamic indices are used in generic output addressing (valid
                               // for tessellation control shader)
   ResourceUsage *m_resUsage;  // Pointer to shader resource usage
-  std::unique_ptr<InOutLocationMapManager> m_locationMapManager; // Pointer to InOutLocationMapManager instance
+  std::unique_ptr<InOutLocationInfoMapManager>
+      m_locationInfoMapManager; // Pointer to InOutLocationInfoMapManager instance
 };
 
 // Represents the compatibility info of input/output
@@ -128,39 +129,40 @@ union InOutCompatibilityInfo {
 };
 
 // =====================================================================================================================
-// Represents the manager of input/output locationMap generation
-class InOutLocationMapManager {
+// Represents the manager of input/output locationInfoMap generation
+class InOutLocationInfoMapManager {
 public:
-  InOutLocationMapManager() {}
+  InOutLocationInfoMapManager() {}
 
-  void addSpan(llvm::CallInst *call, ShaderStage shaderStage);
-  void buildLocationMap(bool checkCompatibility);
-
+  void createMap(const std::vector<llvm::CallInst *> &calls, ShaderStage shaderStage);
   bool findMap(const InOutLocationInfo &origLocInfo, InOutLocationInfoMap::const_iterator &mapIt);
 
   struct LocationSpan {
     uint16_t getCompatibilityKey() const { return compatibilityInfo.u16All; }
 
-    unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocation.getData()); }
+    unsigned asIndex() const { return ((getCompatibilityKey() << 16) | firstLocationInfo.getData()); }
 
     bool operator==(const LocationSpan &rhs) const { return this->asIndex() == rhs.asIndex(); }
 
     bool operator<(const LocationSpan &rhs) const { return this->asIndex() < rhs.asIndex(); }
 
-    InOutLocationInfo firstLocation;
+    InOutLocationInfo firstLocationInfo;
     InOutCompatibilityInfo compatibilityInfo;
   };
 
 private:
-  InOutLocationMapManager(const InOutLocationMapManager &) = delete;
-  InOutLocationMapManager &operator=(const InOutLocationMapManager &) = delete;
+  InOutLocationInfoMapManager(const InOutLocationInfoMapManager &) = delete;
+  InOutLocationInfoMapManager &operator=(const InOutLocationInfoMapManager &) = delete;
+
+  void addSpan(llvm::CallInst *call, ShaderStage shaderStage);
+  void buildMap(bool checkCompatibility);
 
   bool isCompatible(const LocationSpan &rSpan, const LocationSpan &lSpan) const {
     return rSpan.getCompatibilityKey() == lSpan.getCompatibilityKey();
   }
 
   std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space
-  InOutLocationInfoMap m_locationMap;        // The map between original location and new location
+  InOutLocationInfoMap m_locationInfoMap;    // The map between original location and new location
 };
 
 } // namespace lgc
