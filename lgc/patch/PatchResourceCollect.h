@@ -105,7 +105,8 @@ private:
   std::unordered_set<unsigned> m_importedOutputLocs;     // Locations of imported generic outputs
   std::unordered_set<unsigned> m_importedOutputBuiltIns; // IDs of imported built-in outputs
 
-  std::vector<llvm::CallInst *> m_inOutCalls; // The import or export calls
+  std::vector<llvm::CallInst *> m_inputCalls;  // The scalarzied input import calls
+  std::vector<llvm::CallInst *> m_outputCalls; // The scalarized output export calls
 
   bool m_hasDynIndexedInput;  // Whether dynamic indices are used in generic input addressing (valid
                               // for tessellation shader, fragment shader with input interpolation)
