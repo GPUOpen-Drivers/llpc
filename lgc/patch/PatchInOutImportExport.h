@@ -199,6 +199,9 @@ private:
   llvm::Value *getInLocalInvocationId(llvm::Instruction *insertPos);
   llvm::Value *getDeviceIndex(llvm::Instruction *insertPos);
 
+  void recordVertexAttribExport(unsigned location, llvm::ArrayRef<llvm::Value *> attribValues);
+  void exportVertexAttribs(llvm::Instruction *insertPos);
+
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
@@ -222,9 +225,11 @@ private:
   llvm::GlobalVariable *m_lds; // Global variable to model LDS
   llvm::Value *m_threadId;     // Thread ID
 
-  std::vector<llvm::CallInst *> m_importCalls;                 // List of "call" instructions to import inputs
-  std::vector<llvm::CallInst *> m_exportCalls;                 // List of "call" instructions to export outputs
-  PipelineState *m_pipelineState = nullptr;                    // Pipeline state from PipelineStateWrapper pass
+  std::vector<llvm::CallInst *> m_importCalls; // List of "call" instructions to import inputs
+  std::vector<llvm::CallInst *> m_exportCalls; // List of "call" instructions to export outputs
+  llvm::SmallDenseMap<unsigned, std::array<llvm::Value *, 4>>
+      m_attribExports;                      // Export info of vertex attributes: <attrib loc, attrib values>
+  PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
 
   std::set<unsigned> m_expLocs; // The locations that already have an export instruction for the vertex shader.
 };
