@@ -1137,33 +1137,13 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           }
         }
 
-        Value *args[] = {
-            ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + loc), // tgt
-            ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),                      // en
-            clipCullDistance[0],                                                      // src0
-            clipCullDistance[1],                                                      // src1
-            clipCullDistance[2],                                                      // src2
-            clipCullDistance[3],                                                      // src3
-            ConstantInt::get(Type::getInt1Ty(*m_context), false),                     // done
-            ConstantInt::get(Type::getInt1Ty(*m_context), false)                      // vm
-        };
-        emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-        ++inOutUsage.expCount;
+        recordVertexAttribExport(loc,
+                                 {clipCullDistance[0], clipCullDistance[1], clipCullDistance[2], clipCullDistance[3]});
 
         if (clipCullDistance.size() > 4) {
           // Do the second exporting
-          Value *args[] = {
-              ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + loc + 1), // tgt
-              ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),                          // en
-              clipCullDistance[4],                                                          // src0
-              clipCullDistance[5],                                                          // src1
-              clipCullDistance[6],                                                          // src2
-              clipCullDistance[7],                                                          // src3
-              ConstantInt::get(Type::getInt1Ty(*m_context), false),                         // done
-              ConstantInt::get(Type::getInt1Ty(*m_context), false)                          // vm
-          };
-          emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-          ++inOutUsage.expCount;
+          recordVertexAttribExport(
+              loc + 1, {clipCullDistance[4], clipCullDistance[5], clipCullDistance[6], clipCullDistance[7]});
         }
       }
     }
@@ -1194,18 +1174,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         assert(m_primitiveId);
         Value *primitiveId = new BitCastInst(m_primitiveId, Type::getFloatTy(*m_context), "", insertPos);
 
-        Value *args[] = {
-            ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + loc), // tgt
-            ConstantInt::get(Type::getInt32Ty(*m_context), 0x1),                      // en
-            primitiveId,                                                              // src0
-            undef,                                                                    // src1
-            undef,                                                                    // src2
-            undef,                                                                    // src3
-            ConstantInt::get(Type::getInt1Ty(*m_context), false),                     // done
-            ConstantInt::get(Type::getInt1Ty(*m_context), false)                      // vm
-        };
-        emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-        ++inOutUsage.expCount;
+        recordVertexAttribExport(loc, {primitiveId, undef, undef, undef});
       }
     }
     // NOTE: If multi-view is enabled, always do exporting for gl_Layer.
@@ -1265,18 +1234,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
           Value *viewportIndex = new BitCastInst(m_viewportIndex, Type::getFloatTy(*m_context), "", insertPos);
 
-          Value *args[] = {
-              ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + loc), // tgt
-              ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),                      // en
-              viewportIndex,                                                            // src0
-              undef,                                                                    // src1
-              undef,                                                                    // src2
-              undef,                                                                    // src3
-              ConstantInt::get(Type::getInt1Ty(*m_context), false),                     // done
-              ConstantInt::get(Type::getInt1Ty(*m_context), false)                      // vm
-          };
-          emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-          ++inOutUsage.expCount;
+          recordVertexAttribExport(loc, {viewportIndex, undef, undef, undef});
         }
       }
 
@@ -1307,18 +1265,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
           Value *layer = new BitCastInst(m_layer, Type::getFloatTy(*m_context), "", insertPos);
 
-          Value *args[] = {
-              ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + loc), // tgt
-              ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),                      // en
-              layer,                                                                    // src0
-              undef,                                                                    // src1
-              undef,                                                                    // src2
-              undef,                                                                    // src3
-              ConstantInt::get(Type::getInt1Ty(*m_context), false),                     // done
-              ConstantInt::get(Type::getInt1Ty(*m_context), false)                      // vm
-          };
-          emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-          ++inOutUsage.expCount;
+          recordVertexAttribExport(loc, {layer, undef, undef, undef});
         }
       }
     }
@@ -1327,21 +1274,12 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     // will control the behavior.
     if (m_gfxIp.major <= 9) {
       // NOTE: If no generic outputs is present in this shader, we have to export a dummy one
-      if (inOutUsage.expCount == 0) {
-        Value *args[] = {
-            ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0), // tgt
-            ConstantInt::get(Type::getInt32Ty(*m_context), 0),                  // en
-            undef,                                                              // src0
-            undef,                                                              // src1
-            undef,                                                              // src2
-            undef,                                                              // src3
-            ConstantInt::get(Type::getInt1Ty(*m_context), false),               // done
-            ConstantInt::get(Type::getInt1Ty(*m_context), false)                // vm
-        };
-        emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-        ++inOutUsage.expCount;
-      }
+      if (inOutUsage.expCount == 0)
+        recordVertexAttribExport(0, {undef, undef, undef, undef});
     }
+
+    // Export vertex attributes that were recorded previously
+    exportVertexAttribs(insertPos);
 
     if (m_pipelineState->isUnlinked()) {
       // If we are building unlinked relocatable shaders, it is possible there are
@@ -1351,7 +1289,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       for (auto locMap : resUsage->inOutUsage.outputLocMap) {
         if (m_expLocs.count(locMap.second) != 0)
           continue;
-        ++inOutUsage.expCount;
+        inOutUsage.expCount = std::max(inOutUsage.expCount, locMap.second + 1); // Update export count
       }
     }
   } else if (m_shaderStage == ShaderStageGeometry) {
@@ -1370,7 +1308,6 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     // Fragment shader export are handled in LowerFragColorExport.
     return;
   }
-
 }
 
 // =====================================================================================================================
@@ -1700,8 +1637,6 @@ Value *PatchInOutImportExport::patchTcsGenericOutputImport(Type *outputTy, unsig
 void PatchInOutImportExport::patchVsGenericOutputExport(Value *output, unsigned location, unsigned compIdx,
                                                         Instruction *insertPos) {
   auto outputTy = output->getType();
-
-  m_expLocs.insert(location);
 
   if (m_hasTs) {
     auto ldsOffset = calcLdsOffsetForVsOutput(outputTy, location, compIdx, insertPos);
@@ -5051,8 +4986,6 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
 
   auto outputTy = output->getType();
 
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
-
   const unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
   const unsigned bitWidth = outputTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
@@ -5106,76 +5039,30 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
     }
   }
 
-  std::vector<Value *> args;
-
+  auto undef = UndefValue::get(Type::getFloatTy(*m_context));
   if (numChannels <= 4) {
     assert(startChannel + numChannels <= 4);
-    const unsigned channelMask = ((1 << (startChannel + numChannels)) - 1) - ((1 << startChannel) - 1);
 
-    args.clear();
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + location)); // tgt
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), channelMask));                   // en
-
-    // src0 ~ src3
-    for (unsigned i = 0; i < startChannel; ++i) {
-      // Inactive components (dummy)
-      args.push_back(UndefValue::get(Type::getFloatTy(*m_context)));
-    }
-
+    Value *attribValues[4] = {undef, undef, undef, undef};
     for (unsigned i = startChannel; i < startChannel + numChannels; ++i)
-      args.push_back(exportValues[i - startChannel]);
+      attribValues[i] = exportValues[i - startChannel];
 
-    for (unsigned i = startChannel + numChannels; i < 4; ++i) {
-      // Inactive components (dummy)
-      args.push_back(UndefValue::get(Type::getFloatTy(*m_context)));
-    }
-
-    args.push_back(ConstantInt::get(Type::getInt1Ty(*m_context), false)); // done
-    args.push_back(ConstantInt::get(Type::getInt1Ty(*m_context), false)); // vm
-
-    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-    ++inOutUsage.expCount;
+    m_expLocs.insert(location);
+    recordVertexAttribExport(location, {attribValues[0], attribValues[1], attribValues[2], attribValues[3]});
   } else {
     // We have to do exporting twice for this output
     assert(startChannel == 0); // Other values are disallowed according to GLSL spec
     assert(numChannels == 6 || numChannels == 8);
 
-    // Do the first exporting
-    args.clear();
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + location)); // tgt
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0xF));                           // en
+    Value *attribValues[8] = {undef, undef, undef, undef, undef, undef, undef, undef};
+    for (unsigned i = 0; i < numChannels; ++i)
+      attribValues[i] = exportValues[i];
 
-    // src0 ~ src3
-    for (unsigned i = 0; i < 4; ++i)
-      args.push_back(exportValues[i]);
+    m_expLocs.insert(location); // First export
+    recordVertexAttribExport(location, {attribValues[0], attribValues[1], attribValues[2], attribValues[3]});
 
-    args.push_back(ConstantInt::get(Type::getInt1Ty(*m_context), false)); // done
-    args.push_back(ConstantInt::get(Type::getInt1Ty(*m_context), false)); // vm
-
-    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-    ++inOutUsage.expCount;
-
-    // Do the second exporting
-    const unsigned channelMask = ((1 << (numChannels - 4)) - 1);
-
-    args.clear();
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + location + 1)); // tgt
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), channelMask));                       // en
-
-    // src0 ~ src3
-    for (unsigned i = 4; i < numChannels; ++i)
-      args.push_back(exportValues[i]);
-
-    for (unsigned i = numChannels; i < 8; ++i) {
-      // Inactive components (dummy)
-      args.push_back(UndefValue::get(Type::getFloatTy(*m_context)));
-    }
-
-    args.push_back(ConstantInt::get(Type::getInt1Ty(*m_context), false)); // done
-    args.push_back(ConstantInt::get(Type::getInt1Ty(*m_context), false)); // vm
-
-    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-    ++inOutUsage.expCount;
+    m_expLocs.insert(location + 1); // Second export
+    recordVertexAttribExport(location + 1, {attribValues[4], attribValues[5], attribValues[6], attribValues[7]});
   }
 }
 
@@ -5277,18 +5164,7 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
                               : inOutUsage.builtInOutputLocMap[BuiltInLayer];
       }
 
-      Value *args[] = {
-          ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + loc), // tgt
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),                      // en
-          layer,                                                                    // src0
-          undef,                                                                    // src1
-          undef,                                                                    // src2
-          undef,                                                                    // src3
-          ConstantInt::get(Type::getInt1Ty(*m_context), false),                     // done
-          ConstantInt::get(Type::getInt1Ty(*m_context), false)                      // vm
-      };
-      emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-      ++inOutUsage.expCount;
+      recordVertexAttribExport(loc, {layer, undef, undef, undef});
     }
 
     break;
@@ -5327,18 +5203,7 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
         loc = inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
       }
 
-      Value *args[] = {
-          ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_PARAM_0 + loc), // tgt
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),                      // en
-          viewportIndex,                                                            // src0
-          undef,                                                                    // src1
-          undef,                                                                    // src2
-          undef,                                                                    // src3
-          ConstantInt::get(Type::getInt1Ty(*m_context), false),                     // done
-          ConstantInt::get(Type::getInt1Ty(*m_context), false)                      // vm
-      };
-      emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-      ++inOutUsage.expCount;
+      recordVertexAttribExport(loc, {viewportIndex, undef, undef, undef});
     }
 
     break;
@@ -5664,6 +5529,85 @@ Value *PatchInOutImportExport::getDeviceIndex(Instruction *insertPos) {
     return builder.CreateRelocationConstant(reloc::DeviceIdx);
   } else {
     return ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
+  }
+}
+
+// =====================================================================================================================
+// Records export info of vertex attributes
+//
+// @param location : Vertex attribute location
+// @param attribValues : Values of this vertex attribute to export
+void PatchInOutImportExport::recordVertexAttribExport(unsigned location, ArrayRef<Value *> attribValues) {
+  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
+         m_shaderStage == ShaderStageCopyShader); // Valid shader stages
+  assert(location <= MaxInOutLocCount);           // 32 attributes at most
+  assert(attribValues.size() == 4);               // Must have 4 elements, corresponds to <4 x float>
+
+  auto undef = UndefValue::get(Type::getFloatTy(*m_context));
+
+  // Vertex attribute not existing, insert a new one and initialize it
+  if (m_attribExports.count(location) == 0) {
+    for (unsigned i = 0; i < 4; ++i)
+      m_attribExports[location][i] = undef;
+  }
+
+  for (unsigned i = 0; i < 4; ++i) {
+    assert(attribValues[i]);
+    if (isa<UndefValue>(attribValues[i]))
+      continue; // Here, we only record new attribute values that are valid (not undefined ones)
+
+    // NOTE: The existing values must have been initialized to undefined ones already. Overlapping is disallowed (see
+    // such cases):
+    //   - Valid:
+    //       Existing: attrib0, <1.0, 2.0, undef, undef>
+    //       New:      attrib0, <undef, undef, 3.0, 4.0>
+    //   - Invalid:
+    //       Existing: attrib0, <1.0, 2.0, 3.0, undef>
+    //       New:      attrib0, <undef, undef, 4.0, 5.0>
+    assert(isa<UndefValue>(m_attribExports[location][i]));
+    m_attribExports[location][i] = attribValues[i]; // Update values that are valid
+  }
+
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  inOutUsage.expCount = std::max(inOutUsage.expCount, location + 1); // Update export count
+}
+
+// =====================================================================================================================
+// Exports vertex attributes that were recorded previously
+//
+// @param insertPos : Where to insert instructions.
+void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
+  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
+         m_shaderStage == ShaderStageCopyShader); // Valid shader stages
+  if (m_attribExports.empty()) {
+    assert(m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.expCount == 0);
+    return;
+  }
+
+  IRBuilder<> builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+
+  for (auto &attribExport : m_attribExports) {
+    if (m_gfxIp.major <= 10) {
+      unsigned channelMask = 0;
+      for (unsigned i = 0; i < 4; ++i) {
+        assert(attribExport.second[i]);
+        if (!isa<UndefValue>(attribExport.second[i]))
+          channelMask |= (1u << i); // Update channel mask if the value is valid (not undef)
+      }
+
+      builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
+                              {builder.getInt32(EXP_TARGET_PARAM_0 + attribExport.first), // tgt
+                               builder.getInt32(channelMask),                             // en
+                               attribExport.second[0],                                    // src0
+                               attribExport.second[1],                                    // src1
+                               attribExport.second[2],                                    // src2
+                               attribExport.second[3],                                    // src3
+                               builder.getFalse(),                                        // done
+                               builder.getFalse()});                                      // src0
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
   }
 }
 

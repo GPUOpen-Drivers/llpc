@@ -8,8 +8,8 @@
 ; SHADERTEST: or i32 %{{[0-9]*}}, 2
 ; SHADERTEST: getelementptr [16384 x i32], [16384 x i32] addrspace(3)* @lds, i32 0, i32 %{{[0-9]*}}
 ; SHADERTEST: add nuw nsw i32 %{{[0-9]*}}, 384
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 32, i32 immarg 15, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, i1 immarg false, i1 immarg false)
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 33, i32 immarg 3, float %{{[0-9]*}}, float %{{[0-9]*}}, float undef, float undef, i1 immarg false, i1 immarg false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}15, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, i1 {{.*}}false, i1 {{.*}}false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[0-9]*}}, float %{{[0-9]*}}, float undef, float undef, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[.i0-9]*}}, i32 immarg 1, i32 immarg 1, i32 %2)
 ; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[.i0-9]*}}, i32 immarg 2, i32 immarg 0, i32 %2)
 ; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[.i0-9]*}}, i32 immarg 3, i32 immarg 0, i32 %2)
