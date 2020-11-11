@@ -144,7 +144,8 @@ bool PatchNullFragShader::runOnModule(Module &module) {
   // Add usage info for dummy input
   FsInterpInfo interpInfo = {0, false, false, false, false, false};
   resUsage->builtInUsage.fs.smooth = true;
-  InOutLocationInfo origLocInfo(0);
+  InOutLocationInfo origLocInfo;
+  origLocInfo.setLocation(0);
   auto &newInLocInfo = resUsage->inOutUsage.inputLocInfoMap[origLocInfo];
   newInLocInfo.setData(InvalidValue);
   resUsage->inOutUsage.fs.interpInfo.push_back(interpInfo);

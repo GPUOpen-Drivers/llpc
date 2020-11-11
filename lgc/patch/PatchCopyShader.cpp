@@ -303,7 +303,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
         unsigned value = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
         const unsigned streamId = cast<ConstantInt>(callInst->getOperand(2))->getZExtValue();
 
-        InOutLocationInfo outLocInfo(0);
+        InOutLocationInfo outLocInfo;
         outLocInfo.setLocation(value);
         outLocInfo.setStreamId(streamId);
 
@@ -628,7 +628,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
   if (resUsage->inOutUsage.enableXfb) {
-    InOutLocationInfo outLocInfo(0);
+    InOutLocationInfo outLocInfo;
     outLocInfo.setLocation(builtInId);
     outLocInfo.setBuiltIn(true);
     outLocInfo.setStreamId(streamId);

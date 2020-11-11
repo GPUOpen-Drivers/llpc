@@ -93,7 +93,6 @@ static const FsInterpInfo InvalidFsInterpInfo = {InvalidValue, false, false, fal
 class InOutLocationInfo {
 public:
   InOutLocationInfo() { m_data.u16All = 0; }
-  InOutLocationInfo(unsigned data) { this->m_data.u16All = static_cast<uint16_t>(data); }
   InOutLocationInfo(const InOutLocationInfo &inOutLocInfo) { m_data.u16All = inOutLocInfo.getData(); }
 
   unsigned getData() const { return static_cast<uint16_t>(m_data.u16All); }

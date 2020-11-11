@@ -509,7 +509,7 @@ void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValue
   const unsigned compIdx = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
   Value *output = callInst->getOperand(2);
 
-  InOutLocationInfo origLocInfo(0);
+  InOutLocationInfo origLocInfo;
   origLocInfo.setLocation(location);
   auto locInfoMapIt = m_resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
   if (locInfoMapIt == m_resUsage->inOutUsage.outputLocInfoMap.end())
