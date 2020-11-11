@@ -320,7 +320,7 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
     // Non-GS-output case.
     if (inOutLocInfoMap) {
       for (unsigned i = startLocation; i < location + locationCount; ++i) {
-        InOutLocationInfo origLocationInfo(0);
+        InOutLocationInfo origLocationInfo;
         origLocationInfo.setLocation(i);
         auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
         newLocationInfo.setData(InvalidValue);
@@ -333,7 +333,7 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
   } else {
     // GS output. We include the stream ID with the location in the map key.
     for (unsigned i = 0; i < locationCount; ++i) {
-      InOutLocationInfo outLocationInfo(0);
+      InOutLocationInfo outLocationInfo;
       outLocationInfo.setLocation(location + i);
       outLocationInfo.setStreamId(inOutInfo.getStreamId());
       auto &newLocationInfo = (*inOutLocInfoMap)[outLocationInfo];
@@ -568,7 +568,7 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
 
   if (m_shaderStage == ShaderStageGeometry) {
     // Mark the XFB output for copy shader generation.
-    InOutLocationInfo outLocationInfo(0);
+    InOutLocationInfo outLocationInfo;
     outLocationInfo.setLocation(location);
     outLocationInfo.setBuiltIn(isBuiltIn);
     outLocationInfo.setStreamId(streamId);

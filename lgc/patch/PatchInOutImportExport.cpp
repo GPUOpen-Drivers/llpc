@@ -524,7 +524,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           }
         }
 
-        InOutLocationInfo origLocInfo(0);
+        InOutLocationInfo origLocInfo;
         origLocInfo.setLocation(value);
         auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
         if (m_shaderStage == ShaderStageTessEval) {
@@ -670,7 +670,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
 
       // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
-      InOutLocationInfo origLocInfo(0);
+      InOutLocationInfo origLocInfo;
       origLocInfo.setLocation(value);
       auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
       if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
@@ -789,7 +789,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       Value *locOffset = nullptr;
       unsigned elemIdx = InvalidValue;
 
-      InOutLocationInfo origLocInfo(0);
+      InOutLocationInfo origLocInfo;
       origLocInfo.setLocation(value);
       auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
 
