@@ -540,12 +540,34 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           if (m_pipelineState->canPackInOut() &&
               (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl)) {
             // The new InOutLocationInfo is used to map scalarized FS and TCS input import as compact as possible
-            const uint32_t elemIdxArgIdx = isInterpolantInputImport || m_shaderStage != ShaderStageFragment ? 2 : 1;
-            origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
-            locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+            const bool isTcs = m_shaderStage == ShaderStageTessControl;
+            const uint32_t elemIdxArgIdx = (isInterpolantInputImport || isTcs) ? 2 : 1;
+            bool hasDynIndex = false;
+            if (isTcs) {
+              hasDynIndex = !isa<ConstantInt>(callInst.getOperand(1)) || !isa<ConstantInt>(callInst.getOperand(2));
+              if (!hasDynIndex) {
+                // TCS input calls at the same location may have dynamic indexing or not
+                // Try the key as combination of location and component at first
+                origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
+                locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+                if (locInfoMapIt == resUsage->inOutUsage.inputLocInfoMap.end()) {
+                  // Try the key as the plain location
+                  origLocInfo.setComponent(0);
+                  locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+                  hasDynIndex = true;
+                }
+              } else {
+                locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+              }
+            } else {
+              origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
+              locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+            }
             assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
+
             loc = locInfoMapIt->second.getLocation();
-            elemIdx = builder.getInt32(locInfoMapIt->second.getComponent());
+            if (!hasDynIndex)
+              elemIdx = builder.getInt32(locInfoMapIt->second.getComponent());
             highHalf = locInfoMapIt->second.isHighHalf();
           } else {
             assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
@@ -825,12 +847,24 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         }
       } else {
         if (m_pipelineState->canPackInOut()) {
-          assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval);
+          const bool isVs = m_shaderStage == ShaderStageVertex;
+          assert(isVs || m_shaderStage == ShaderStageTessEval);
           origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
           locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+          bool relateDynIndex = false;
+          const bool checkDynIndex = (isVs && m_pipelineState->hasShaderStage(ShaderStageTessControl));
+          if (checkDynIndex && locInfoMapIt == resUsage->inOutUsage.outputLocInfoMap.end()) {
+            // The location in TCS may be used with dynamic indexing, try location as the key for a search
+            origLocInfo.setComponent(0);
+            locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+            relateDynIndex = true;
+          }
+
           if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
             loc = locInfoMapIt->second.getLocation();
-            elemIdx = locInfoMapIt->second.getComponent();
+            // Dynamic indexing related locations just use the location for mapping
+            if (!relateDynIndex)
+              elemIdx = locInfoMapIt->second.getComponent();
             exist = true;
           } else {
             exist = false;

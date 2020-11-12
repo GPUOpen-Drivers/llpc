@@ -1382,7 +1382,7 @@ void PatchResourceCollect::matchGenericInOut() {
   // Do input/output matching and location remapping
   for (unsigned idx = 0; idx < 2; ++idx) {
     // True means perform packing on input/output, otherwise no packing
-    if (m_pipelineState->canPackInOut() && m_inOutPackStates[m_shaderStage][idx]) {
+    if (m_inOutPackStates[m_shaderStage][idx]) {
       packInOutLocation();
     } else {
       if (idx == 0)
@@ -2473,23 +2473,47 @@ void PatchResourceCollect::packInOutLocation() {
 void PatchResourceCollect::fillInOutLocInfoMap() {
   if (m_inputCalls.empty())
     return;
-
-  assert(m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl);
-
-  // Create locationInfoMap according to the packed calls
-  m_locationInfoMapManager->createMap(m_inputCalls, m_shaderStage);
-
+  const bool isTcs = m_shaderStage == ShaderStageTessControl;
+  const bool isFs = m_shaderStage == ShaderStageFragment;
+  assert(isTcs || isFs);
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
-  auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
-  inputLocInfoMap.clear();
 
   // TCS: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
   // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
   //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
   //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
-  const bool isTcs = m_shaderStage == ShaderStageTessControl;
-  for (auto call : m_inputCalls) {
-    const bool isInterpolant = !isTcs && call->getNumArgOperands() != 4;
+
+  // The locations of TCS with dynamic indexing (locOffset/elemIdx) cannot be unpacked
+  // NOTE: Dynamic indexing in FS is processed to be constant in the lower pass.
+  std::vector<CallInst *> packableCalls;
+  DenseSet<unsigned> unpackableLocs;
+  if (isTcs) {
+    for (auto call : m_inputCalls) {
+      const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+      if (!isa<ConstantInt>(call->getOperand(1)) || !isa<ConstantInt>(call->getOperand(2)))
+        unpackableLocs.insert(loc);
+    }
+  }
+  if (unpackableLocs.empty()) {
+    packableCalls = std::move(m_inputCalls);
+  } else {
+    for (auto call : m_inputCalls) {
+      const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+      if (unpackableLocs.count(loc) == 0)
+        packableCalls.push_back(call);
+    }
+    m_inputCalls.clear();
+  }
+
+  auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
+
+  // Create locationMap according to the packable calls
+  m_locationInfoMapManager->createMap(packableCalls, m_shaderStage);
+
+  // Fill inputLocInfoMap of TCS/FS for the packable calls
+  unsigned newLocIdx = 0;
+  for (auto call : packableCalls) {
+    const bool isInterpolant = isFs && call->getNumArgOperands() == 5;
     unsigned locOffset = 0;
     unsigned compIdxArgIdx = 1;
     if (isInterpolant || isTcs) {
@@ -2497,19 +2521,26 @@ void PatchResourceCollect::fillInOutLocInfoMap() {
       locOffset = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
       compIdxArgIdx = 2;
     }
+    assert(isa<ConstantInt>(call->getOperand(compIdxArgIdx)));
 
-    // Construct original InOutLocationInfo from the location and elemIdx operands of the FS' or TCS' input import call
+    // Get the packed InOutLocationInfo from locationInfoMap
     InOutLocationInfo origLocInfo;
     origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset);
     origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue());
-
-    // Get the packed InOutLocationInfo from locationInfoMap
     InOutLocationInfoMap::const_iterator mapIter;
     assert(m_locationInfoMapManager->findMap(origLocInfo, mapIter));
     m_locationInfoMapManager->findMap(origLocInfo, mapIter);
-    inputLocInfoMap.insert({origLocInfo, mapIter->second});
+    inputLocInfoMap[origLocInfo] = mapIter->second;
+    newLocIdx = std::max(newLocIdx, mapIter->second.getLocation() + 1);
   }
-  m_inputCalls.clear();
+
+  // Fill inputLocInfoMap for the unpackable calls
+  for (auto &locInfo : inputLocInfoMap) {
+    if (locInfo.second.isInvalid()) {
+      locInfo.second.setData(0);
+      locInfo.second.setLocation(newLocIdx++);
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -2536,16 +2567,28 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   // Collect ElementsInfo in each packed location
   ElementsInfo elemsInfo = {{nullptr}, {nullptr}, 0, 0};
   std::vector<ElementsInfo> elementsInfoArray(m_outputCalls.size(), elemsInfo);
+
+  const auto &tcsInputLocInfoMap =
+      m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.inputLocInfoMap;
+  const bool checkDynIndex =
+      (m_shaderStage == ShaderStageVertex && m_pipelineState->hasShaderStage(ShaderStageTessControl));
   for (auto call : m_outputCalls) {
     InOutLocationInfo origLocInfo;
     origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
     origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
 
-    m_deadCalls.push_back(call);
     InOutLocationInfoMap::const_iterator mapIter;
     if (!m_locationInfoMapManager->findMap(origLocInfo, mapIter)) {
-      // An unused export call
+      // No change on the VS output export call corresponding to dynamic indexing TCS input import call
+      origLocInfo.setComponent(0);
+      if (checkDynIndex && tcsInputLocInfoMap.count(origLocInfo) == 0) {
+        // An unused export call
+        m_deadCalls.push_back(call);
+      }
       continue;
+    } else {
+      // To be re-assembaled call
+      m_deadCalls.push_back(call);
     }
 
     const unsigned newLoc = mapIter->second.getLocation();
@@ -2632,9 +2675,8 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
   // First gather the input/output calls that need scalarizing.
   SmallVector<CallInst *, 4> outputCalls;
   SmallVector<CallInst *, 4> inputCalls;
+  DenseSet<unsigned> dynamicLocs;
   for (Function &func : *module) {
-    if (!m_pipelineState->canPackInOut())
-      break;
     const bool isInterpolant = func.getName().startswith(lgcName::InputImportInterpolant);
     if (func.getName().startswith(lgcName::InputImportGeneric) || isInterpolant) {
       // This is a generic (possibly interpolated) input. Find its uses in FS (VS-FS, TES-FS) or TCS.
@@ -2644,19 +2686,17 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
         const bool isFs = shaderStage == ShaderStageFragment;
         const bool isTcs = shaderStage == ShaderStageTessControl;
         if (isFs || isTcs) {
-          // This is a workaround to disable pack for the pipeline if there exists dynamic index in TCS
-          // TODO: Do partial packing except calls with dynamic index in future change
-          // NOTE: Dynamic index (location offset or component) in FS is processed to be constant in lower pass.
+          // NOTE: Dynamic indexing (location offset or component) in FS is processed to be constant in lower pass.
           assert(!isInterpolant ||
                  (isInterpolant && isa<ConstantInt>(call->getOperand(1)) && isa<ConstantInt>(call->getOperand(2))));
-          const bool hasDynIdx =
-              isTcs && (!isa<ConstantInt>(call->getOperand(1)) || !isa<ConstantInt>(call->getOperand(2)));
-          if (hasDynIdx) {
-            m_pipelineState->setPackInOut(false);
-            break;
-          }
-          // We have a use in FS (VS-FS, TES-FS) or TCS. See if it needs scalarizing.
-          if (isa<VectorType>(call->getType()) || call->getType()->getPrimitiveSizeInBits() == 64)
+
+          // Collect input calls without dynamic indexing that need scalarize
+          const bool hasDynIndex =
+              isTcs ? (!isa<ConstantInt>(call->getOperand(1)) || !isa<ConstantInt>(call->getOperand(2))) : false;
+          if (hasDynIndex)
+            dynamicLocs.insert(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
+          if (!hasDynIndex &&
+              (isa<FixedVectorType>(call->getType()) || call->getType()->getPrimitiveSizeInBits() == 64))
             inputCalls.push_back(call);
         }
       }
@@ -2676,13 +2716,16 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
       }
     }
   }
-  if (m_pipelineState->canPackInOut()) {
-    // Scalarize the gathered inputs and outputs.
-    for (CallInst *call : inputCalls)
-      scalarizeGenericInput(call);
-    for (CallInst *call : outputCalls)
-      scalarizeGenericOutput(call);
+  // Scalarize the gathered inputs and outputs.
+  for (CallInst *call : inputCalls) {
+    const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+    // Don't scalarize the location of the call that has dynamic indexing in TCS
+    if (m_shaderStage == ShaderStageTessControl && dynamicLocs.count(loc) == 0)
+      continue;
+    scalarizeGenericInput(call);
   }
+  for (CallInst *call : outputCalls)
+    scalarizeGenericOutput(call);
 }
 
 // =====================================================================================================================

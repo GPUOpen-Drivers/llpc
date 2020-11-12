@@ -1,13 +1,26 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: shl i32 %3, 3
-; SHADERTEST: or i32 %{{[0-9]*}}, 4
-; SHADERTEST: getelementptr [16384 x i32], [16384 x i32] addrspace(3)* @lds, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: shl nuw nsw i32 %{{[0-9]*}}, 3
-; SHADERTEST: or i32 %{{[0-9]*}}, 2
-; SHADERTEST: getelementptr [16384 x i32], [16384 x i32] addrspace(3)* @lds, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: add nuw nsw i32 %{{[0-9]*}}, 384
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 40
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 1
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 2
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 3
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 8
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 12
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 16
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 20
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 4
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 24
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 28
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 32
+; SHADERTEST: %{{[0-9]*}} = add i32 %{{[0-9]*}}, 36
+; SHADERTEST: %{{[0-9]*}} = add nuw nsw i32 %{{[0-9]*}}, 4
+; SHADERTEST: %{{[0-9]*}} = add nuw nsw i32 %{{[0-9]*}}, 10
+; SHADERTEST: %{{[0-9]*}} = add nuw nsw i32 %{{[0-9]*}}, 12
+; SHADERTEST: %{{[0-9]*}} = add nuw nsw i32 %{{[0-9]*}}, 8
+; SHADERTEST: %{{[0-9]*}} = add nuw nsw i32 %{{[0-9]*}}, 52
+; SHADERTEST: %{{[0-9]*}} = add nuw nsw i32 %{{[0-9]*}}, 96
+; SHADERTEST: %{{[0-9]*}} = add nuw nsw i32 %{{[0-9]*}}, 24
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}15, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[0-9]*}}, float %{{[0-9]*}}, float undef, float undef, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[.i0-9]*}}, i32 immarg 1, i32 immarg 1, i32 %2)
@@ -28,15 +41,26 @@ version = 40
 layout(location = 0) in vec4 inV0;
 layout(location = 1) in vec2 inV1;
 layout(location = 2) in vec2 inV2;
+layout(location = 3) in vec3 inV3;
 
 layout(location = 0) out vec2 out1;
 layout(location = 1) out vec2 out2;
+layout(location = 2) out vec3 out3;
+layout(location = 3) out float out4[3];
+layout(location = 6) out int index;
+layout(location = 7) out dvec3 out5[2];
+
 
 void main(void)
 {
     gl_Position = inV0;
     out1 = inV1;
     out2 = inV2;
+    out3 = inV3;
+    out4[0] = out4[1] = out4[2] = inV0.x;
+    index = 1;
+    out5[0] = dvec3(1.0, 1.0, 1.0);
+    out5[1] = dvec3(2.0, 2.0, 2.0);
 }
 
 [VsInfo]
@@ -48,6 +72,10 @@ entryPoint = main
 layout(vertices=3) out;
 layout(location = 0) in vec2 inArray1[];
 layout(location = 1) in vec2 inArray2[];
+layout(location = 2) in vec3 inArray3[];
+layout(location = 3) in float inArray4[][3];
+layout(location = 6) in int indexArr[];
+layout(location = 7) in dvec3 inArray5[][2];
 
 layout(location = 0) out vec4 outArray[];
 
@@ -59,7 +87,12 @@ void main(void)
     gl_TessLevelInner[0] = 4.0;
 
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
-    outArray[gl_InvocationID] = vec4(inArray2[gl_InvocationID].xy, inArray1[gl_InvocationID].xy);
+    int index = indexArr[gl_InvocationID];
+    float z = inArray3[gl_InvocationID].z + inArray4[gl_InvocationID][index];
+    float w = inArray3[0][gl_InvocationID] + inArray3[1][gl_InvocationID] + inArray3[2][gl_InvocationID];
+    dvec3 dv = inArray5[0][index];
+    w += float(dv.x + dv.y + dv.z);
+    outArray[gl_InvocationID] = vec4(inArray2[gl_InvocationID].xy + inArray1[gl_InvocationID].xy, z, w);
 }
 [TcsInfo]
 entryPoint = main
@@ -161,7 +194,7 @@ options.extendedRobustness.nullDescriptor = 0
 
 [VertexInputState]
 binding[0].binding = 0
-binding[0].stride = 16
+binding[0].stride = 64
 binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
 attribute[0].location = 0
 attribute[0].binding = 0
@@ -170,8 +203,12 @@ attribute[0].offset = 0
 attribute[1].location = 1
 attribute[1].binding = 0
 attribute[1].format = VK_FORMAT_R32G32_SFLOAT
-attribute[1].offset = 0
+attribute[1].offset = 16
 attribute[2].location = 2
 attribute[2].binding = 0
 attribute[2].format = VK_FORMAT_R32G32_SFLOAT
-attribute[2].offset = 0
+attribute[2].offset = 24
+attribute[3].location = 3
+attribute[3].binding = 0
+attribute[3].format = VK_FORMAT_R32G32B32_SFLOAT
+attribute[3].offset = 32
