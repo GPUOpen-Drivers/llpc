@@ -1,0 +1,86 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+;
+; Based on https://github.com/GPUOpen-Drivers/llpc/issues/1034.
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 10
+; Bound: 1347
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %243 %369
+               OpExecutionMode %4 OriginUpperLeft
+               OpDecorate %243 BuiltIn FragCoord
+               OpDecorate %369 Location 0
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+          %6 = OpTypeInt 32 1
+         %22 = OpConstant %6 1
+         %31 = OpTypeBool
+         %37 = OpTypeInt 32 0
+        %157 = OpTypeFloat 32
+        %241 = OpTypeVector %157 4
+        %242 = OpTypePointer Input %241
+        %243 = OpVariable %242 Input
+        %244 = OpConstant %37 1
+        %245 = OpTypePointer Input %157
+        %253 = OpTypePointer Function %157
+        %255 = OpConstant %157 0.5
+        %356 = OpConstant %6 270
+        %368 = OpTypePointer Output %241
+        %369 = OpVariable %368 Output
+        %373 = OpConstant %157 1
+        %715 = OpConstant %157 0
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+        %254 = OpVariable %253 Function
+               OpSelectionMerge %182 None
+               OpSwitch %22 %182 0 %172 1 %173 2 %174 3 %175 4 %176 5 %177 6 %178 7 %179 8 %180 9 %181
+        %172 = OpLabel
+               OpBranch %182
+        %173 = OpLabel
+               OpBranch %182
+        %174 = OpLabel
+               OpBranch %182
+        %175 = OpLabel
+               OpBranch %182
+        %176 = OpLabel
+               OpBranch %182
+        %177 = OpLabel
+               OpBranch %182
+        %178 = OpLabel
+               OpBranch %182
+        %179 = OpLabel
+               OpBranch %182
+        %180 = OpLabel
+               OpBranch %182
+        %181 = OpLabel
+               OpBranch %182
+        %182 = OpLabel
+               OpStore %254 %373
+        %353 = OpAccessChain %245 %243 %244
+        %354 = OpLoad %157 %353
+        %355 = OpConvertFToS %6 %354
+        %357 = OpSLessThan %31 %355 %356
+               OpSelectionMerge %359 None
+               OpBranchConditional %357 %358 %366
+        %358 = OpLabel
+               OpStore %254 %255
+               OpBranch %359
+        %366 = OpLabel
+        %718 = OpFUnordGreaterThanEqual %31 %715 %354
+               OpBranchConditional %718 %359 %499
+        %499 = OpLabel
+               OpKill
+        %359 = OpLabel
+        %370 = OpLoad %157 %254
+        %377 = OpCompositeConstruct %241 %255 %255 %370 %373
+               OpStore %369 %377
+               OpReturn
+               OpFunctionEnd
