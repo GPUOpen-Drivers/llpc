@@ -285,18 +285,12 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
       nonUniformVal = CreateTrunc(nonUniformVal, getInt32Ty());
   }
 
-  bool first = true;
-  Value *waterfallBegin = nullptr;
+  // The first begin contains a null token for the previous token argument
+  Value *waterfallBegin = ConstantInt::get(getInt32Ty(), 0);
   for (auto nonUniformVal : nonUniformIndices) {
     // Start the waterfall loop using the waterfall index.
-    if (first) {
-      waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, nonUniformVal->getType(), nonUniformVal,
-                                       nullptr, instName);
-      first = false;
-    } else {
-      waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin_cont, nonUniformVal->getType(),
-                                       {waterfallBegin, nonUniformVal}, nullptr, instName);
-    }
+    waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, nonUniformVal->getType(),
+                                     {waterfallBegin, nonUniformVal}, nullptr, instName);
   }
 
   // Scalarize each non-uniform operand of the instruction.
