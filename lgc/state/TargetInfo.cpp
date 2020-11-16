@@ -92,10 +92,6 @@ static void setGfx6Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx6.shaderVcczScalarReadBranchFailure = 1;
 
   targetInfo->getGpuWorkarounds().gfx6.shaderMinMaxFlushDenorm = 1;
-
-  // NOTE: We only need workaround it in Tahiti, Pitcairn, Capeverde, to simplify the design, we set this
-  // flag for all gfxIp.major == 6
-  targetInfo->getGpuWorkarounds().gfx6.shaderZExport = 1;
 }
 
 // gfx600
@@ -104,12 +100,22 @@ static void setGfx6Info(TargetInfo *targetInfo) {
 static void setGfx600Info(TargetInfo *targetInfo) {
   setGfx6Info(targetInfo);
   targetInfo->getGpuProperty().numShaderEngines = 2;
+  targetInfo->getGpuWorkarounds().gfx6.shaderZExport = 1;
 }
 
 // gfx601
 //
 // @param [in/out] targetInfo : Target info
 static void setGfx601Info(TargetInfo *targetInfo) {
+  setGfx6Info(targetInfo);
+  targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuWorkarounds().gfx6.shaderZExport = 1;
+}
+
+// gfx602
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx602Info(TargetInfo *targetInfo) {
   setGfx6Info(targetInfo);
   targetInfo->getGpuProperty().numShaderEngines = 1;
 }
@@ -170,6 +176,14 @@ static void setGfx703Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx6.shaderSpiCsRegAllocFragmentation = 1;
 }
 
+// gfx705
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx705Info(TargetInfo *targetInfo) {
+  setGfx703Info(targetInfo);
+  targetInfo->getGpuWorkarounds().gfx6.shaderSpiCsRegAllocFragmentation = 0;
+}
+
 // gfx8+
 //
 // @param [in/out] targetInfo : Target info
@@ -199,7 +213,7 @@ static void setGfx800Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 1;
 }
 
-// gfx802
+// gfx802/gfx805
 //
 // @param [in/out] targetInfo : Target info
 static void setGfx802Info(TargetInfo *targetInfo) {
@@ -210,7 +224,7 @@ static void setGfx802Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx6.miscSpiSgprsNum = 1;
 }
 
-// gfx803+
+// gfx803/gfx804
 //
 // @param [in/out] targetInfo : Target info
 static void setGfx803Info(TargetInfo *targetInfo) {
@@ -332,28 +346,32 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
   };
 
   static const GpuNameStringMap GpuNameMap[] = {
-    {"gfx600", &setGfx600Info},   // gfx600, tahiti
-    {"gfx601", &setGfx601Info},   // gfx601, pitcairn, verde, oland, hainan
-    {"gfx700", &setGfx700Info},   // gfx700, kaveri
-    {"gfx701", &setGfx701Info},   // gfx701, hawaii
-    {"gfx702", &setGfx7Info},     // gfx702
-    {"gfx703", &setGfx703Info},   // gfx703, kabini, mullins
-    {"gfx704", &setGfx703Info},   // gfx704, bonaire
-    {"gfx800", &setGfx800Info},   // gfx800, iceland
-    {"gfx801", &setGfx800Info},   // gfx801, carrizo
-    {"gfx802", &setGfx802Info},   // gfx802, tonga
-    {"gfx803", &setGfx803Info},   // gfx803, fiji, polaris10, polaris11
-    {"gfx804", &setGfx803Info},   // gfx804
-    {"gfx810", &setGfx81Info},    // gfx810, stoney
-    {"gfx900", &setGfx900Info},   // gfx900
-    {"gfx901", &setGfx9Info},     // gfx901
-    {"gfx902", &setGfx900Info},   // gfx902
-    {"gfx903", &setGfx9Info},     // gfx903
-    {"gfx904", &setGfx9Info},     // gfx904, vega12
-    {"gfx906", &setGfx9Info},     // gfx906, vega20
-    {"gfx909", &setGfx9Info},     // gfx909, raven2
-    {"gfx1010", &setGfx1010Info}, // gfx1010
-    {"gfx1012", &setGfx1012Info}, // gfx1012, navi14
+      {"gfx600", &setGfx600Info},   // gfx600, tahiti
+      {"gfx601", &setGfx601Info},   // gfx601, pitcairn, verde
+      {"gfx602", &setGfx602Info},   // gfx601, oland, hainan
+      {"gfx700", &setGfx700Info},   // gfx700, kaveri
+      {"gfx701", &setGfx701Info},   // gfx701, hawaii
+      {"gfx702", &setGfx7Info},     // gfx702
+      {"gfx703", &setGfx703Info},   // gfx703, kabini, mullins
+      {"gfx704", &setGfx703Info},   // gfx704, bonaire
+      {"gfx705", &setGfx705Info},   // gfx705
+      {"gfx800", &setGfx800Info},   // gfx800, iceland
+      {"gfx801", &setGfx800Info},   // gfx801, carrizo
+      {"gfx802", &setGfx802Info},   // gfx802, tonga
+      {"gfx803", &setGfx803Info},   // gfx803, fiji, polaris10, polaris11
+      {"gfx804", &setGfx803Info},   // gfx804
+      {"gfx805", &setGfx802Info},   // gfx805, tongapro
+      {"gfx810", &setGfx81Info},    // gfx810, stoney
+      {"gfx900", &setGfx900Info},   // gfx900
+      {"gfx901", &setGfx9Info},     // gfx901
+      {"gfx902", &setGfx900Info},   // gfx902
+      {"gfx903", &setGfx9Info},     // gfx903
+      {"gfx904", &setGfx9Info},     // gfx904, vega12
+      {"gfx906", &setGfx9Info},     // gfx906, vega20
+      {"gfx909", &setGfx9Info},     // gfx909, raven2
+      {"gfx90c", &setGfx9Info},     // gfx90c
+      {"gfx1010", &setGfx1010Info}, // gfx1010
+      {"gfx1012", &setGfx1012Info}, // gfx1012, navi14
   };
 
   void (*setTargetInfoFunc)(TargetInfo * targetInfo) = nullptr;
