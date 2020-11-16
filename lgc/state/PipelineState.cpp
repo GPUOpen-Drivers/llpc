@@ -296,7 +296,7 @@ void PipelineState::record(Module *module) {
   recordVertexInputDescriptions(module);
   recordColorExportState(module);
   recordGraphicsState(module);
-  if (m_palMetadata && !isComputeLibrary())
+  if (m_palMetadata)
     m_palMetadata->record(module);
 }
 
