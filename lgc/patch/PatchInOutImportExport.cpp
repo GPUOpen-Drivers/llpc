@@ -117,22 +117,18 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage) {
     auto entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
     if (entryPoint) {
-      PostDominatorTree &postDomTree = getAnalysis<PostDominatorTreeWrapperPass>(*entryPoint).getPostDomTree();
-
-      initPerShader();
-      m_entryPoint = entryPoint;
-      m_shaderStage = static_cast<ShaderStage>(shaderStage);
-      processShader();
-
-      // We process input first, because we cache lots of arguments to output during visit for later processing.
-      // It will be a disaster if we visit output intrinsics first, and the cached value for output was invalidated
-      // after we process input intrinsics (consider a value read from input was exported to output).
-      visitCallInsts(inputCallees);
-      visitCallInsts(otherCallees);
-      visitReturnInsts();
-
-      markExportDone(m_entryPoint, postDomTree);
+      processFunction(*entryPoint, static_cast<ShaderStage>(shaderStage), inputCallees, otherCallees);
     }
+  }
+
+  // Process non-entry-point shaders
+  for (Function &func : module) {
+    if (func.isDeclaration())
+      continue;
+    auto shaderStage = getShaderStage(&func);
+    if (shaderStage == ShaderStage::ShaderStageInvalid || &func == pipelineShaders->getEntryPoint(shaderStage))
+      continue;
+    processFunction(func, shaderStage, inputCallees, otherCallees);
   }
 
   for (auto callInst : m_importCalls) {
@@ -150,6 +146,26 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   m_pipelineSysValues.clear();
 
   return true;
+}
+
+void PatchInOutImportExport::processFunction(Function &func, ShaderStage shaderStage,
+                                             SmallVectorImpl<Function *> &inputCallees,
+                                             SmallVectorImpl<Function *> &otherCallees) {
+  PostDominatorTree &postDomTree = getAnalysis<PostDominatorTreeWrapperPass>(func).getPostDomTree();
+
+  initPerShader();
+  m_entryPoint = &func;
+  m_shaderStage = shaderStage;
+  processShader();
+
+  // We process input first, because we cache lots of arguments to output during visit for later processing.
+  // It will be a disaster if we visit output intrinsics first, and the cached value for output was invalidated
+  // after we process input intrinsics (consider a value read from input was exported to output).
+  visitCallInsts(inputCallees);
+  visitCallInsts(otherCallees);
+  visitReturnInsts();
+
+  markExportDone(m_entryPoint, postDomTree);
 }
 
 // =====================================================================================================================
