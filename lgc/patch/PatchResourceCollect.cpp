@@ -101,6 +101,17 @@ bool PatchResourceCollect::runOnModule(Module &module) {
     }
   }
 
+  // Process non-entry-point shaders
+  for (Function &func : module) {
+    if (func.isDeclaration())
+      continue;
+    m_shaderStage = getShaderStage(&func);
+    if (m_shaderStage == ShaderStage::ShaderStageInvalid || &func == m_pipelineShaders->getEntryPoint(m_shaderStage))
+      continue;
+    m_entryPoint = &func;
+    processShader();
+  }
+
   if (m_pipelineState->isGraphics()) {
     // Set NGG control settings
     setNggControl(&module);

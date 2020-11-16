@@ -174,6 +174,7 @@ private:
 
   void processShader(ShaderInputs *shaderInputs);
   void processComputeFuncs(ShaderInputs *shaderInputs, Module &module);
+  void processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys, uint64_t inRegMask);
   void setFuncAttrs(Function *entryPoint);
 
   uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys);
@@ -242,6 +243,7 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
   // Create ShaderInputs object and gather shader input usage.
   ShaderInputs shaderInputs(&module.getContext());
   shaderInputs.gatherUsage(module);
+  setupComputeWithCalls(&module);
 
   if (m_pipelineState->isGraphics()) {
     // Process each shader in turn, but not the copy shader.
@@ -254,7 +256,6 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
       }
     }
   } else {
-    setupComputeWithCalls(&module);
     processComputeFuncs(&shaderInputs, module);
   }
 
@@ -279,8 +280,6 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
 // @param module : IR module
 void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
   m_computeWithCalls = false;
-  if (m_pipelineState->getShaderStageMask() != shaderStageToMask(ShaderStageCompute))
-    return;
   if (m_pipelineState->isComputeLibrary()) {
     m_computeWithCalls = true;
     return;
@@ -290,7 +289,7 @@ void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
   // functions and intrinsics).
   for (Function &func : *module) {
     if (func.isDeclaration() && func.getIntrinsicID() == Intrinsic::not_intrinsic &&
-        !func.getName().startswith(lgcName::InternalCallPrefix)) {
+        !func.getName().startswith(lgcName::InternalCallPrefix) && !func.user_empty()) {
       m_computeWithCalls = true;
       break;
     }
@@ -700,6 +699,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
 
   // Remove original entry-point
   origEntryPoint->eraseFromParent();
+  processCalls(*entryPoint, argTys, inRegMask);
 }
 
 // =====================================================================================================================
@@ -747,67 +747,77 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
   if (!isComputeWithCalls())
     return;
 
+  for (Function &func : module) {
+    if (func.isDeclaration())
+      continue;
+    processCalls(func, shaderInputTys, inRegMask);
+  }
+}
+
+// =====================================================================================================================
+// Process all real function calls and passes arguments to them.
+//
+// @param [in/out] module : Module
+void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys, uint64_t inRegMask) {
   // This is one of:
   // - a compute pipeline with non-inlined functions;
   // - a compute pipeline with calls to library functions;
   // - a compute library.
   // We need to scan the code and modify each call to prepend the extra args.
-  IRBuilder<> builder(module.getContext());
-  for (Function &func : module) {
-    if (func.isDeclaration())
-      continue;
-    for (BasicBlock &block : func) {
-      for (auto it = block.begin(), end = block.end(); it != end;) {
-        // Get the instruction and increment the iterator beyond it, so we can safely erase the instruction.
-        Instruction *inst = &*it;
-        ++it;
-        auto call = dyn_cast<CallInst>(inst);
-        if (!call)
+  IRBuilder<> builder(func.getContext());
+  for (BasicBlock &block : func) {
+    for (auto it = block.begin(), end = block.end(); it != end;) {
+      // Get the instruction and increment the iterator beyond it, so we can safely erase the instruction.
+      Instruction *inst = &*it;
+      ++it;
+      auto call = dyn_cast<CallInst>(inst);
+      if (!call)
+        continue;
+      // Got a call. Skip it if it calls an intrinsic or an internal lgc.* function.
+      Value *calledVal = call->getCalledOperand();
+      if (auto calledFunc = dyn_cast<Function>(calledVal)) {
+        if (calledFunc->isIntrinsic() || calledFunc->getName().startswith(lgcName::InternalCallPrefix))
           continue;
-        // Got a call. Skip it if it calls an intrinsic or an internal lgc.* function.
-        Value *calledVal = call->getCalledOperand();
-        if (auto calledFunc = dyn_cast<Function>(calledVal)) {
-          if (calledFunc->isIntrinsic() || calledFunc->getName().startswith(lgcName::InternalCallPrefix))
-            continue;
-        }
-        // Build a new arg list, made of the ABI args shared by all functions (user data and hardware shader
-        // inputs), plus the original args on the call.
-        SmallVector<Type *, 20> argTys;
-        SmallVector<Value *, 20> args;
-        for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
-          argTys.push_back(func.getArg(idx)->getType());
-          args.push_back(func.getArg(idx));
-        }
-        for (unsigned idx = 0; idx != call->getNumArgOperands(); ++idx) {
-          argTys.push_back(call->getArgOperand(idx)->getType());
-          args.push_back(call->getArgOperand(idx));
-        }
-        // Get the new called value as a bitcast of the old called value. If the old called value is already
-        // the inverse bitcast, just drop that bitcast.
-        // If the old called value was a function declaration, we did not insert a bitcast
-        FunctionType *calledTy = FunctionType::get(call->getType(), argTys, false);
-        builder.SetInsertPoint(call);
-        Type *calledPtrTy = calledTy->getPointerTo(calledVal->getType()->getPointerAddressSpace());
-        auto bitCast = dyn_cast<BitCastOperator>(calledVal);
-        Value *newCalledVal = nullptr;
-        if (bitCast && bitCast->getOperand(0)->getType() == calledPtrTy)
-          newCalledVal = bitCast->getOperand(0);
-        else
-          newCalledVal = builder.CreateBitCast(calledVal, calledPtrTy);
-        // Create the call.
-        CallInst *newCall = builder.CreateCall(calledTy, newCalledVal, args);
-        newCall->setCallingConv(call->getCallingConv());
-
-        // Mark sgpr arguments as inreg
-        for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
-          if ((inRegMask >> idx) & 1)
-            newCall->addParamAttr(idx, Attribute::InReg);
-        }
-
-        // Replace and erase the old one.
-        call->replaceAllUsesWith(newCall);
-        call->eraseFromParent();
+      } else if (call->isInlineAsm()) {
+        continue;
       }
+      // Build a new arg list, made of the ABI args shared by all functions (user data and hardware shader
+      // inputs), plus the original args on the call.
+      SmallVector<Type *, 20> argTys;
+      SmallVector<Value *, 20> args;
+      for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
+        argTys.push_back(func.getArg(idx)->getType());
+        args.push_back(func.getArg(idx));
+      }
+      for (unsigned idx = 0; idx != call->getNumArgOperands(); ++idx) {
+        argTys.push_back(call->getArgOperand(idx)->getType());
+        args.push_back(call->getArgOperand(idx));
+      }
+      // Get the new called value as a bitcast of the old called value. If the old called value is already
+      // the inverse bitcast, just drop that bitcast.
+      // If the old called value was a function declaration, we did not insert a bitcast
+      FunctionType *calledTy = FunctionType::get(call->getType(), argTys, false);
+      builder.SetInsertPoint(call);
+      Type *calledPtrTy = calledTy->getPointerTo(calledVal->getType()->getPointerAddressSpace());
+      auto bitCast = dyn_cast<BitCastOperator>(calledVal);
+      Value *newCalledVal = nullptr;
+      if (bitCast && bitCast->getOperand(0)->getType() == calledPtrTy)
+        newCalledVal = bitCast->getOperand(0);
+      else
+        newCalledVal = builder.CreateBitCast(calledVal, calledPtrTy);
+      // Create the call.
+      CallInst *newCall = builder.CreateCall(calledTy, newCalledVal, args);
+      newCall->setCallingConv(call->getCallingConv());
+
+      // Mark sgpr arguments as inreg
+      for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
+        if ((inRegMask >> idx) & 1)
+          newCall->addParamAttr(idx, Attribute::InReg);
+      }
+
+      // Replace and erase the old one.
+      call->replaceAllUsesWith(newCall);
+      call->eraseFromParent();
     }
   }
 }
@@ -1203,10 +1213,12 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
     case ResourceNodeType::DescriptorTableVaPtr: {
       // Check if the descriptor set is in use. For compute with calls, enable it anyway.
       UserDataNodeUsage *descSetUsage = nullptr;
-      if (userDataUsage->descriptorSets.size() > node.innerTable[0].set)
-        descSetUsage = &userDataUsage->descriptorSets[node.innerTable[0].set];
-      if (!isComputeWithCalls() && (!descSetUsage || descSetUsage->users.empty()))
-        break;
+      if (!isComputeWithCalls()) {
+        if (userDataUsage->descriptorSets.size() > node.innerTable[0].set)
+          descSetUsage = &userDataUsage->descriptorSets[node.innerTable[0].set];
+        if (!descSetUsage || descSetUsage->users.empty())
+          break;
+      }
 
       unsigned userDataValue = node.offsetInDwords;
       if (m_pipelineState->getShaderOptions(m_shaderStage).updateDescInElf && m_shaderStage == ShaderStageFragment) {
@@ -1280,13 +1292,18 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
     }
 
     default:
+      if (isComputeWithCalls()) {
+        // Always spill for compute libraries.
+        break;
+      }
+
       for (unsigned dwordOffset = node.offsetInDwords; dwordOffset != node.offsetInDwords + node.sizeInDwords;
            ++dwordOffset) {
         if (userDataUsage->rootDescriptors.size() <= dwordOffset)
           break;
         auto &rootDescUsage = userDataUsage->rootDescriptors[dwordOffset];
-        // Skip unused descriptor, except for compute-with-calls.
-        if (rootDescUsage.users.empty() && !isComputeWithCalls())
+        // Skip unused descriptor.
+        if (rootDescUsage.users.empty())
           continue;
         unsigned dwordSize = rootDescUsage.users[0]->getType()->getPrimitiveSizeInBits() / 32;
         // Add the arg (root descriptor) that we can potentially unspill.
@@ -1372,15 +1389,20 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
   // needed in the pipeline. Thus we cannot use s15 for anything else. Using the single-arg UserDataArg
   // constructor like this means that the arg is not used, so it will not be set up in PAL metadata.
   if (m_computeWithCalls && !spillTableArg.hasValue())
-    spillTableArg = UserDataArg(builder.getInt32Ty());
+    spillTableArg =
+        UserDataArg(builder.getInt32Ty(), UserDataMapping::SpillTable, &userDataUsage->spillTable.entryArgIdx);
 
   // Figure out how many sgprs we have available for userDataArgs.
-  unsigned userDataEnd = 0;
   // We have s0-s31 (s0-s15 for <=GFX8, or for a compute shader on any chip) for everything, so take off the number
   // of registers used by specialUserDataArgs.
-  userDataEnd = m_shaderStage == ShaderStageCompute
-                    ? InterfaceData::MaxCsUserDataCount
-                    : m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
+  unsigned userDataEnd = m_shaderStage == ShaderStageCompute
+                             ? InterfaceData::MaxCsUserDataCount
+                             : m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
+
+  // FIXME Restricting user data as the backend does not support more sgprs as arguments
+  if (isComputeWithCalls() && userDataEnd > 16)
+    userDataEnd = 16;
+
   for (auto &userDataArg : specialUserDataArgs)
     userDataEnd -= userDataArg.argDwordSize;
   // ... and the one used by the spill table if already added.

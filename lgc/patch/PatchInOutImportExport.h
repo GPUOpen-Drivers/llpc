@@ -65,6 +65,9 @@ private:
   PatchInOutImportExport(const PatchInOutImportExport &) = delete;
   PatchInOutImportExport &operator=(const PatchInOutImportExport &) = delete;
 
+  void processFunction(llvm::Function &func, ShaderStage shaderStage,
+                       llvm::SmallVectorImpl<llvm::Function *> &inputCallees,
+                       llvm::SmallVectorImpl<llvm::Function *> &otherCallees);
   void initPerShader();
 
   void markExportDone(llvm::Function *func, llvm::PostDominatorTree &postDomTree);

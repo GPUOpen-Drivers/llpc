@@ -66,6 +66,8 @@ private:
 
   void setCallingConvs(Module &module);
 
+  void setRemainingCallingConvs(Module &module);
+
   void mergeShaderAndSetCallingConvs(Module &module);
 
   void setCallingConv(ShaderStage stage, CallingConv::ID callingConv);
@@ -121,11 +123,13 @@ bool PatchPreparePipelineAbi::runOnModule(Module &module) {
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   // If we've only to set the calling conventions, do that now.
-  if (MOnlySetCallingConvs)
+  if (MOnlySetCallingConvs) {
     setCallingConvs(module);
-  else {
+    setRemainingCallingConvs(module);
+  } else {
     if (m_gfxIp.major >= 9)
       mergeShaderAndSetCallingConvs(module);
+    setRemainingCallingConvs(module);
 
     setAbiEntryNames(module);
 
@@ -172,6 +176,19 @@ void PatchPreparePipelineAbi::setCallingConvs(Module &module) {
   } else if (m_hasVs) {
     // VS-FS pipeine
     setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
+  }
+}
+
+// =====================================================================================================================
+// Set calling convention for the non-entry-points that do not yet have a calling convention set.
+//
+// @param module : LLVM module
+void PatchPreparePipelineAbi::setRemainingCallingConvs(Module &module) {
+  for (Function &func : module) {
+    if (func.isDeclaration())
+      continue;
+    if (func.getCallingConv() == CallingConv::SPIR_FUNC)
+      func.setCallingConv(CallingConv::AMDGPU_Gfx);
   }
 }
 

@@ -32,7 +32,6 @@
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/state/IntrinsDefs.h"
-#include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -73,8 +72,6 @@ PatchBufferOp::PatchBufferOp() : FunctionPass(ID) {
 void PatchBufferOp::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.addRequired<LegacyDivergenceAnalysis>();
   analysisUsage.addRequired<PipelineStateWrapper>();
-  analysisUsage.addRequired<PipelineShaders>();
-  analysisUsage.addPreserved<PipelineShaders>();
   analysisUsage.addRequired<TargetTransformInfoWrapperPass>();
   analysisUsage.addPreserved<TargetTransformInfoWrapperPass>();
 }
@@ -91,11 +88,11 @@ bool PatchBufferOp::runOnFunction(Function &function) {
   m_builder = std::make_unique<IRBuilder<>>(*m_context);
 
   // Invoke visitation of the target instructions.
-  auto pipelineShaders = &getAnalysis<PipelineShaders>();
 
   // If the function is not a valid shader stage, bail.
-  if (pipelineShaders->getShaderStage(&function) == ShaderStageInvalid)
+  if (lgc::getShaderStage(&function) == ShaderStageInvalid) {
     return false;
+  }
 
   m_divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
 
@@ -1700,6 +1697,5 @@ void PatchBufferOp::fixIncompletePhis() {
 // Initializes the pass of LLVM patch operations for buffer operations.
 INITIALIZE_PASS_BEGIN(PatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)
 INITIALIZE_PASS_DEPENDENCY(LegacyDivergenceAnalysis)
-INITIALIZE_PASS_DEPENDENCY(PipelineShaders)
 INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
 INITIALIZE_PASS_END(PatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)
