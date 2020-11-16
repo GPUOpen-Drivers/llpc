@@ -105,10 +105,6 @@ private:
                                          llvm::Instruction *insertPos);
   llvm::Value *getSamplePosOffset(llvm::Type *inputTy, llvm::Value *sampleId, llvm::Instruction *insertPos);
   llvm::Value *getSamplePosition(llvm::Type *inputTy, llvm::Instruction *insertPos);
-  llvm::Value *patchCsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Instruction *insertPos);
-  llvm::Value *getGlobalInvocationId(llvm::Type *inputTy, llvm::Instruction *insertPos);
-  llvm::Value *getLocalInvocationIndex(llvm::Type *inputTy, llvm::Instruction *insertPos);
-  llvm::Value *getSubgroupId(llvm::Type *inputTy, llvm::Instruction *insertPos);
 
   llvm::Value *patchTcsBuiltInOutputImport(llvm::Type *outputTy, unsigned builtInId, llvm::Value *elemIdx,
                                            llvm::Value *vertexIdx, llvm::Instruction *insertPos);
@@ -195,9 +191,6 @@ private:
 
   WorkgroupLayout calculateWorkgroupLayout();
   llvm::Value *reconfigWorkgroup(llvm::Value *localInvocationId, llvm::Instruction *insertPos);
-  llvm::Value *getWorkgroupSize();
-  llvm::Value *getInLocalInvocationId(llvm::Instruction *insertPos);
-  llvm::Value *getDeviceIndex(llvm::Instruction *insertPos);
 
   void recordVertexAttribExport(unsigned location, llvm::ArrayRef<llvm::Value *> attribValues);
   void exportVertexAttribs(llvm::Instruction *insertPos);

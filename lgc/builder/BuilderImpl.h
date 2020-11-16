@@ -85,6 +85,10 @@ protected:
   llvm::Value *scalarize(llvm::Value *value0, llvm::Value *value1, llvm::Value *value2,
                          std::function<llvm::Value *(llvm::Value *, llvm::Value *, llvm::Value *)> callback);
 
+  // Create code to get the lane number within the wave. This depends on whether the shader is wave32 or wave64,
+  // and thus on the shader stage it is used from.
+  llvm::Value *CreateGetLaneNumber();
+
   PipelineState *m_pipelineState = nullptr; // Pipeline state
 
 private:
@@ -501,8 +505,14 @@ private:
   llvm::Value *readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo inOutInfo, llvm::Value *vertexIndex,
                            llvm::Value *index, const llvm::Twine &instName);
 
+  // Read and directly handle certain built-ins that are common between shader stages
+  llvm::Value *readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy, const llvm::Twine &instName = "");
+
+  // Read compute shader input
+  llvm::Value *readCsBuiltIn(BuiltInKind builtIn, const llvm::Twine &instName = "");
+
   // Read vertex shader input
-  llvm::Value *readVsBuiltIn(BuiltInKind builtIn, const llvm::Twine &instName);
+  llvm::Value *readVsBuiltIn(BuiltInKind builtIn, const llvm::Twine &instName = "");
 
   // Get the type of a built-in. This overrides the one in Builder to additionally recognize the internal built-ins.
   llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);

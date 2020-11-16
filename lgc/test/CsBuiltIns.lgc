@@ -102,7 +102,7 @@ attributes #0 = { nounwind }
 
 ; RUN: lgc -extract=4 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK4 %s
 ; CHECK4-LABEL: _amdgpu_cs_main:
-; CHECK4: s_load_dwordx4 s{{\[}}[[SREGNUM:[0-9]+]]:
+; CHECK4: s_load_dwordx4 s{{\[}}[[SREGNUM:[0-9]+]]:{{[0-9]+}}], s[2:3]
 ; CHECK4: v_mov_b32_e32 v0, s[[SREGNUM]]
 ; CHECK4: buffer_store_dwordx3 v[0:2],
 ; CHECK4: COMPUTE_USER_DATA_2): 0x10000006

@@ -1000,9 +1000,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 
   auto userDataUsage = getUserDataUsage(m_shaderStage);
   auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-  auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
   auto &entryArgIdxs = intfData->entryArgIdxs;
-  auto &builtInUsage = resUsage->builtInUsage;
   bool enableNgg = m_pipelineState->isGraphics() ? m_pipelineState->getNggControl()->enableNgg : false;
 
   if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessControl ||
@@ -1100,11 +1098,9 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     // Unlike all the special user data values above, which go after the user data node args, this goes before.
     // That is to ensure that, with a compute pipeline using a library, library code knows where to find it
     // even if it thinks that the user data layout is a prefix of what the pipeline thinks it is.
-    if (isComputeWithCalls() || builtInUsage.cs.numWorkgroups ||
-        userDataUsage->isSpecialUserDataUsed(UserDataMapping::Workgroup)) {
+    if (isComputeWithCalls() || userDataUsage->isSpecialUserDataUsed(UserDataMapping::Workgroup)) {
       auto numWorkgroupsPtrTy = PointerType::get(FixedVectorType::get(builder.getInt32Ty(), 3), ADDR_SPACE_CONST);
-      userDataArgs.push_back(
-          UserDataArg(numWorkgroupsPtrTy, UserDataMapping::Workgroup, &entryArgIdxs.cs.numWorkgroupsPtr));
+      userDataArgs.push_back(UserDataArg(numWorkgroupsPtrTy, UserDataMapping::Workgroup, nullptr));
     }
   }
 

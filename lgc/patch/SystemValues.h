@@ -92,9 +92,6 @@ public:
   // Get internal per shader table pointer as pointer to i8.
   llvm::Value *getInternalPerShaderTablePtr();
 
-  // Get number of workgroups value
-  llvm::Value *getNumWorkgroups();
-
   // Get stream-out buffer descriptor
   llvm::Value *getStreamOutBufDesc(unsigned xfbBuffer);
 
@@ -132,7 +129,6 @@ private:
   llvm::Value *m_tessCoord = nullptr;                               // Tessellated coordinate (TES)
   llvm::Value *m_esGsOffsets = nullptr;                             // ES -> GS offsets (GS in)
   llvm::SmallVector<llvm::Value *, MaxGsStreams> m_emitCounterPtrs; // Pointers to emit counters (GS)
-  llvm::Value *m_numWorkgroups = nullptr;                           // NumWorkgroups
 
   llvm::SmallVector<llvm::Value *, 8> m_descTablePtrs;       // Descriptor table pointers
   llvm::SmallVector<llvm::Value *, 8> m_shadowDescTablePtrs; // Shadow descriptor table pointers

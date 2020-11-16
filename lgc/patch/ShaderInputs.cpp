@@ -74,6 +74,8 @@ CallInst *ShaderInputs::getSpecialUserData(UserDataMapping kind, BuilderBase &bu
   Type *ty = builder.getInt32Ty();
   if (kind == UserDataMapping::NggCullingData)
     ty = builder.getInt64Ty();
+  else if (kind == UserDataMapping::Workgroup)
+    ty = FixedVectorType::get(builder.getInt32Ty(), 3)->getPointerTo(ADDR_SPACE_CONST);
   return builder.CreateNamedCall((Twine(lgcName::SpecialUserData) + getSpecialUserDataName(kind)).str(), ty,
                                  builder.getInt32(static_cast<unsigned>(kind)), Attribute::ReadNone);
 }
@@ -411,7 +413,7 @@ static const ShaderInputDesc FsSgprInputs[] = {
 
 // SGPRs: CS
 static const ShaderInputDesc CsSgprInputs[] = {
-    {ShaderInput::WorkgroupId, offsetof(InterfaceData, entryArgIdxs.cs.workgroupId), true},
+    {ShaderInput::WorkgroupId, 0, true},
     {ShaderInput::MultiDispatchInfo, 0, true},
 };
 
@@ -471,7 +473,7 @@ static const ShaderInputDesc FsVgprInputs[] = {
 
 // VGPRs: CS
 static const ShaderInputDesc CsVgprInputs[] = {
-    {ShaderInput::LocalInvocationId, offsetof(InterfaceData, entryArgIdxs.cs.localInvocationId), true},
+    {ShaderInput::LocalInvocationId, 0, true},
 };
 
 // =====================================================================================================================

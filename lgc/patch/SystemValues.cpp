@@ -314,23 +314,6 @@ Value *ShaderSystemValues::getInternalPerShaderTablePtr() {
 }
 
 // =====================================================================================================================
-// Get number of workgroups value
-Value *ShaderSystemValues::getNumWorkgroups() {
-  if (!m_numWorkgroups) {
-    Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
-    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-
-    auto numWorkgroupPtr =
-        getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.cs.numWorkgroupsPtr, "numWorkgroupsPtr");
-    auto numWorkgroupTy = numWorkgroupPtr->getType()->getPointerElementType();
-    auto numWorkgroups = new LoadInst(numWorkgroupTy, numWorkgroupPtr, "", insertPos);
-    numWorkgroups->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(insertPos->getContext(), {}));
-    m_numWorkgroups = numWorkgroups;
-  }
-  return m_numWorkgroups;
-}
-
-// =====================================================================================================================
 // Get stream-out buffer descriptor
 //
 // @param xfbBuffer : Transform feedback buffer ID
