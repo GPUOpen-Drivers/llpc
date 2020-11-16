@@ -22,11 +22,11 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call i32 @lgc.input.import.builtin.LocalInvocationIndex{{.*}}
-; SHADERTEST: call <3 x i32> @lgc.input.import.builtin.LocalInvocationId.v3i32{{.*}}
-; SHADERTEST: call <3 x i32> @lgc.input.import.builtin.WorkgroupId.v3i32{{.*}}
-; SHADERTEST: call <3 x i32> @lgc.input.import.builtin.GlobalInvocationId.v3i32{{.*}}
-; SHADERTEST: call <3 x i32> @lgc.input.import.builtin.NumWorkgroups.v3i32{{.*}}
+; SHADERTEST: call i32 (...) @lgc.create.read.builtin.input.i32(i32 29,
+; SHADERTEST: call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 27,
+; SHADERTEST: call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 26,
+; SHADERTEST: call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 28,
+; SHADERTEST: call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 24,
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

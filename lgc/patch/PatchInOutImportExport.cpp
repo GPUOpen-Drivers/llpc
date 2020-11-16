@@ -345,6 +345,27 @@ void PatchInOutImportExport::processShader() {
       LLPC_OUTS(")\n\n");
     }
   }
+
+  if (m_shaderStage == ShaderStageCompute) {
+    // In a compute shader, process lgc.reconfigure.local.invocation.id calls.
+    // This does not particularly have to be done here; it could be done anywhere after BuilderImpl.
+    for (Function &func : *m_module) {
+      if (func.isDeclaration() && func.getName().startswith(lgcName::ReconfigureLocalInvocationId)) {
+        WorkgroupLayout workgroupLayout = calculateWorkgroupLayout();
+        while (!func.use_empty()) {
+          CallInst *reconfigCall = cast<CallInst>(*func.user_begin());
+          Value *localInvocationId = reconfigCall->getArgOperand(0);
+
+          // If we do not need to configure our workgroup in linear layout and the layout info is not specified, we
+          // do the reconfiguration for this workgroup.
+          if (workgroupLayout != WorkgroupLayout::Unknown && workgroupLayout != WorkgroupLayout::Linear)
+            localInvocationId = reconfigWorkgroup(localInvocationId, reconfigCall);
+          reconfigCall->replaceAllUsesWith(localInvocationId);
+          reconfigCall->eraseFromParent();
+        }
+      }
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -472,10 +493,6 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         if (callInst.getNumArgOperands() >= 2)
           sampleId = callInst.getArgOperand(1);
         input = patchFsBuiltInInputImport(inputTy, builtInId, sampleId, &callInst);
-        break;
-      }
-      case ShaderStageCompute: {
-        input = patchCsBuiltInInputImport(inputTy, builtInId, &callInst);
         break;
       }
       default: {
@@ -1781,12 +1798,6 @@ Value *PatchInOutImportExport::patchVsBuiltInInputImport(Type *inputTy, unsigned
   // now handled in InOutBuilder.
   case BuiltInViewIndex:
     return getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
-  case BuiltInSubgroupSize:
-    return ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getShaderWaveSize(m_shaderStage));
-  case BuiltInSubgroupLocalInvocationId:
-    return getSubgroupLocalInvocationId(insertPos);
-  case BuiltInDeviceIndex:
-    return getDeviceIndex(insertPos);
   default:
     llvm_unreachable("Should never be called!");
     return UndefValue::get(inputTy);
@@ -1862,18 +1873,6 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
   }
   case BuiltInInvocationId: {
     input = m_pipelineSysValues.get(m_entryPoint)->getInvocationId();
-    break;
-  }
-  case BuiltInSubgroupSize: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getShaderWaveSize(m_shaderStage));
-    break;
-  }
-  case BuiltInSubgroupLocalInvocationId: {
-    input = getSubgroupLocalInvocationId(insertPos);
-    break;
-  }
-  case BuiltInDeviceIndex: {
-    input = getDeviceIndex(insertPos);
     break;
   }
   default: {
@@ -1999,18 +1998,6 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
     input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
     break;
   }
-  case BuiltInSubgroupSize: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getShaderWaveSize(m_shaderStage));
-    break;
-  }
-  case BuiltInSubgroupLocalInvocationId: {
-    input = getSubgroupLocalInvocationId(insertPos);
-    break;
-  }
-  case BuiltInDeviceIndex: {
-    input = getDeviceIndex(insertPos);
-    break;
-  }
   default: {
     llvm_unreachable("Should never be called!");
     break;
@@ -2055,18 +2042,6 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
   }
   case BuiltInViewIndex: {
     input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
-    break;
-  }
-  case BuiltInSubgroupSize: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getShaderWaveSize(m_shaderStage));
-    break;
-  }
-  case BuiltInSubgroupLocalInvocationId: {
-    input = getSubgroupLocalInvocationId(insertPos);
-    break;
-  }
-  case BuiltInDeviceIndex: {
-    input = getDeviceIndex(insertPos);
     break;
   }
   // Handle internal-use built-ins
@@ -2316,18 +2291,6 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     input = getShadingRate(insertPos);
     break;
   }
-  case BuiltInSubgroupSize: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getShaderWaveSize(m_shaderStage));
-    break;
-  }
-  case BuiltInSubgroupLocalInvocationId: {
-    input = getSubgroupLocalInvocationId(insertPos);
-    break;
-  }
-  case BuiltInDeviceIndex: {
-    input = getDeviceIndex(insertPos);
-    break;
-  }
   // Handle internal-use built-ins for sample position emulation
   case BuiltInNumSamples: {
     if (m_pipelineState->isUnlinked()) {
@@ -2442,128 +2405,6 @@ Value *PatchInOutImportExport::getSamplePosition(Type *inputTy, Instruction *ins
   Value *sampleId = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInSampleId, nullptr, insertPos);
   Value *input = patchFsBuiltInInputImport(inputTy, BuiltInSamplePosOffset, sampleId, insertPos);
   return builder.CreateFAdd(input, ConstantFP::get(inputTy, 0.5));
-}
-
-// =====================================================================================================================
-// Patches import calls for built-in inputs of compute shader.
-//
-// @param inputTy : Type of input value
-// @param builtInId : ID of the built-in variable
-// @param insertPos : Where to insert the patch instruction
-Value *PatchInOutImportExport::patchCsBuiltInInputImport(Type *inputTy, unsigned builtInId, Instruction *insertPos) {
-  Value *input = nullptr;
-
-  auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageCompute);
-  auto &entryArgIdxs = intfData->entryArgIdxs.cs;
-
-  switch (builtInId) {
-  case BuiltInWorkgroupSize: {
-    input = getWorkgroupSize();
-    break;
-  }
-  case BuiltInNumWorkgroups: {
-    input = m_pipelineSysValues.get(m_entryPoint)->getNumWorkgroups();
-    break;
-  }
-  case BuiltInWorkgroupId: {
-    input = getFunctionArgument(m_entryPoint, entryArgIdxs.workgroupId);
-    break;
-  }
-  case BuiltInLocalInvocationId: {
-    input = getInLocalInvocationId(insertPos);
-    break;
-  }
-  case BuiltInSubgroupSize: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getShaderWaveSize(m_shaderStage));
-    break;
-  }
-  case BuiltInSubgroupLocalInvocationId: {
-    input = getSubgroupLocalInvocationId(insertPos);
-    break;
-  }
-  case BuiltInDeviceIndex: {
-    input = getDeviceIndex(insertPos);
-    break;
-  }
-  case BuiltInNumSubgroups: {
-    // workgroupSize = gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z
-    auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
-    const unsigned workgroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
-
-    // gl_NumSubgroups = (workgroupSize + gl_SubGroupSize - 1) / gl_SubgroupSize
-    const unsigned subgroupSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
-    const unsigned numSubgroups = (workgroupSize + subgroupSize - 1) / subgroupSize;
-
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), numSubgroups);
-    break;
-  }
-  case BuiltInGlobalInvocationId: {
-    input = getGlobalInvocationId(inputTy, insertPos);
-    break;
-  }
-  case BuiltInLocalInvocationIndex: {
-    input = getLocalInvocationIndex(inputTy, insertPos);
-    break;
-  }
-  case BuiltInSubgroupId: {
-    input = getSubgroupId(inputTy, insertPos);
-    break;
-  }
-  default: {
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-  }
-
-  return input;
-}
-
-// =====================================================================================================================
-// Get GlobalInvocationId
-//
-// @param inputTy : Type of GlobalInvocationId
-// @param insertPos : Insert position
-Value *PatchInOutImportExport::getGlobalInvocationId(Type *inputTy, Instruction *insertPos) {
-  IRBuilder<> builder(*m_context);
-  builder.SetInsertPoint(insertPos);
-  Value *workgroupSize = patchCsBuiltInInputImport(inputTy, BuiltInWorkgroupSize, insertPos);
-  Value *workgroupId = patchCsBuiltInInputImport(inputTy, BuiltInWorkgroupId, insertPos);
-  Value *localInvocationId = patchCsBuiltInInputImport(inputTy, BuiltInLocalInvocationId, insertPos);
-  Value *input = builder.CreateMul(workgroupSize, workgroupId);
-  input = builder.CreateAdd(input, localInvocationId);
-  return input;
-}
-
-// =====================================================================================================================
-// Get LocalInvocationIndex
-//
-// @param inputTy : Type of LocalInvocationIndex
-// @param insertPos : Insert position
-Value *PatchInOutImportExport::getLocalInvocationIndex(Type *inputTy, Instruction *insertPos) {
-  IRBuilder<> builder(*m_context);
-  builder.SetInsertPoint(insertPos);
-  Value *workgroupSize = patchCsBuiltInInputImport(inputTy, BuiltInWorkgroupSize, insertPos);
-  Value *localInvocationId = patchCsBuiltInInputImport(inputTy, BuiltInLocalInvocationId, insertPos);
-  Value *input = builder.CreateMul(builder.CreateExtractElement(workgroupSize, 1),
-                                   builder.CreateExtractElement(localInvocationId, 2));
-  input = builder.CreateAdd(input, builder.CreateExtractElement(localInvocationId, 1));
-  input = builder.CreateMul(builder.CreateExtractElement(workgroupSize, uint64_t(0)), input);
-  input = builder.CreateAdd(input, builder.CreateExtractElement(localInvocationId, uint64_t(0)));
-  return input;
-}
-
-// =====================================================================================================================
-// Get SubgroupId
-//
-// @param inputTy : Type of LocalInvocationIndex
-// @param insertPos : Insert position
-Value *PatchInOutImportExport::getSubgroupId(Type *inputTy, Instruction *insertPos) {
-  // gl_SubgroupID = gl_LocationInvocationIndex / gl_SubgroupSize
-  IRBuilder<> builder(*m_context);
-  builder.SetInsertPoint(insertPos);
-  Value *localInvocationIndex = patchCsBuiltInInputImport(inputTy, BuiltInLocalInvocationIndex, insertPos);
-  unsigned subgroupSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
-  return builder.CreateLShr(localInvocationIndex, builder.getInt32(Log2_32(subgroupSize)));
 }
 
 // =====================================================================================================================
@@ -5542,69 +5383,6 @@ Value *PatchInOutImportExport::reconfigWorkgroup(Value *localInvocationId, Instr
   remappedId = InsertElementInst::Create(remappedId, newY, ConstantInt::get(int32Ty, 1), "", insertPos);
 
   return remappedId;
-}
-
-// =====================================================================================================================
-// Get the value of compute shader built-in WorkgroupSize
-Value *PatchInOutImportExport::getWorkgroupSize() {
-  assert(m_shaderStage == ShaderStageCompute);
-
-  auto &builtInUsage = m_pipelineState->getShaderModes()->getComputeShaderMode();
-  auto workgroupSizeX = ConstantInt::get(Type::getInt32Ty(*m_context), builtInUsage.workgroupSizeX);
-  auto workgroupSizeY = ConstantInt::get(Type::getInt32Ty(*m_context), builtInUsage.workgroupSizeY);
-  auto workgroupSizeZ = ConstantInt::get(Type::getInt32Ty(*m_context), builtInUsage.workgroupSizeZ);
-
-  return ConstantVector::get({workgroupSizeX, workgroupSizeY, workgroupSizeZ});
-}
-
-// =====================================================================================================================
-// Get the value of compute shader built-in LocalInvocationId
-//
-// @param insertPos : Where to insert instructions.
-Value *PatchInOutImportExport::getInLocalInvocationId(Instruction *insertPos) {
-  assert(m_shaderStage == ShaderStageCompute);
-
-  auto &builtInUsage = m_pipelineState->getShaderModes()->getComputeShaderMode();
-  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;
-  Value *locaInvocatioId = getFunctionArgument(m_entryPoint, entryArgIdxs.localInvocationId);
-
-  WorkgroupLayout workgroupLayout = calculateWorkgroupLayout();
-
-  // If we do not need to configure our workgroup in linear layout and the layout info is not specified, we
-  // do the reconfiguration for this workgroup.
-  if (workgroupLayout != WorkgroupLayout::Unknown && workgroupLayout != WorkgroupLayout::Linear)
-    locaInvocatioId = reconfigWorkgroup(locaInvocatioId, insertPos);
-  else {
-    if (builtInUsage.workgroupSizeZ > 1) {
-      // XYZ, do nothing
-    } else if (builtInUsage.workgroupSizeY > 1) {
-      // XY
-      locaInvocatioId = InsertElementInst::Create(locaInvocatioId, ConstantInt::get(Type::getInt32Ty(*m_context), 0),
-                                                  ConstantInt::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
-    } else {
-      // X
-      locaInvocatioId = InsertElementInst::Create(locaInvocatioId, ConstantInt::get(Type::getInt32Ty(*m_context), 0),
-                                                  ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
-
-      locaInvocatioId = InsertElementInst::Create(locaInvocatioId, ConstantInt::get(Type::getInt32Ty(*m_context), 0),
-                                                  ConstantInt::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
-    }
-  }
-  return locaInvocatioId;
-}
-
-// =====================================================================================================================
-// Get device index from pipeline state
-//
-// @param insertPos : Where to insert instructions.
-Value *PatchInOutImportExport::getDeviceIndex(Instruction *insertPos) {
-  if (m_pipelineState->isUnlinked()) {
-    BuilderBase builder(*m_context);
-    builder.SetInsertPoint(insertPos);
-    return builder.CreateRelocationConstant(reloc::DeviceIdx);
-  } else {
-    return ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getDeviceIndex());
-  }
 }
 
 // =====================================================================================================================

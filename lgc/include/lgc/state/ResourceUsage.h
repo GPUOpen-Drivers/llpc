@@ -255,26 +255,8 @@ struct ResourceUsage {
       struct {
         // Workgroup layout
         unsigned workgroupLayout : 2; // The layout of the workgroup
-        // Input
-        unsigned numWorkgroups : 1;     // Whether gl_NumWorkGroups is used
-        unsigned localInvocationId : 1; // Whether gl_LocalInvocationID is used
-        unsigned workgroupId : 1;       // Whether gl_WorkGroupID is used
-        unsigned numSubgroups : 1;      // Whether gl_NumSubgroups is used
-        unsigned subgroupId : 1;        // Whether gl_SubgroupID is used
       } cs;
     };
-
-    // Common built-in usage
-    struct {
-      unsigned subgroupSize : 1;              // Whether gl_SubGroupSize is used
-      unsigned subgroupLocalInvocationId : 1; // Whether gl_SubGroupInvocation is used
-      unsigned subgroupEqMask : 1;            // Whether gl_SubGroupEqMask is used
-      unsigned subgroupGeMask : 1;            // Whether gl_SubGroupGeMask is used
-      unsigned subgroupGtMask : 1;            // Whether gl_SubGroupGtMask is used
-      unsigned subgroupLeMask : 1;            // Whether gl_SubGroupLeMask is used
-      unsigned subgroupLtMask : 1;            // Whether gl_SubGroupLtMask is used
-      unsigned deviceIndex : 1;               // Whether gl_DeviceIndex is used
-    } common;
 
   } builtInUsage;
 
@@ -517,13 +499,6 @@ struct InterfaceData {
         unsigned ancillary;      // Ancillary
         unsigned sampleCoverage; // Sample coverage
       } fs;
-
-      // Compute shader
-      struct {
-        unsigned numWorkgroupsPtr;  // Pointer of NumWorkGroups
-        unsigned localInvocationId; // LocalInvocationID
-        unsigned workgroupId;       // WorkGroupID
-      } cs;
     };
 
     bool initialized;                          // Whether entryArgIdxs has been initialized

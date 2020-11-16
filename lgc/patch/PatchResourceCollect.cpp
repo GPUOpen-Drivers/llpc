@@ -1505,65 +1505,7 @@ void PatchResourceCollect::clearInactiveInput() {
     if (builtInUsage.fs.baryCoordPullModel &&
         m_activeInputBuiltIns.find(BuiltInBaryCoordPullModel) == m_activeInputBuiltIns.end())
       builtInUsage.fs.baryCoordPullModel = false;
-  } else if (m_shaderStage == ShaderStageCompute) {
-    if (builtInUsage.cs.numWorkgroups &&
-        m_activeInputBuiltIns.find(BuiltInNumWorkgroups) == m_activeInputBuiltIns.end())
-      builtInUsage.cs.numWorkgroups = false;
-
-    if (builtInUsage.cs.localInvocationId &&
-        (m_activeInputBuiltIns.find(BuiltInLocalInvocationId) == m_activeInputBuiltIns.end() &&
-         m_activeInputBuiltIns.find(BuiltInGlobalInvocationId) == m_activeInputBuiltIns.end() &&
-         m_activeInputBuiltIns.find(BuiltInLocalInvocationIndex) == m_activeInputBuiltIns.end() &&
-         m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end()))
-      builtInUsage.cs.localInvocationId = false;
-
-    if (builtInUsage.cs.workgroupId &&
-        (m_activeInputBuiltIns.find(BuiltInWorkgroupId) == m_activeInputBuiltIns.end() &&
-         m_activeInputBuiltIns.find(BuiltInGlobalInvocationId) == m_activeInputBuiltIns.end() &&
-         m_activeInputBuiltIns.find(BuiltInLocalInvocationIndex) == m_activeInputBuiltIns.end() &&
-         m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end()))
-      builtInUsage.cs.workgroupId = false;
-
-    if (builtInUsage.cs.subgroupId && m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end())
-      builtInUsage.cs.subgroupId = false;
-
-    if (builtInUsage.cs.numSubgroups && m_activeInputBuiltIns.find(BuiltInNumSubgroups) == m_activeInputBuiltIns.end())
-      builtInUsage.cs.numSubgroups = false;
   }
-
-  // Check common built-in usage
-  if (builtInUsage.common.subgroupSize &&
-      (m_activeInputBuiltIns.find(BuiltInSubgroupSize) == m_activeInputBuiltIns.end() &&
-       m_activeInputBuiltIns.find(BuiltInNumSubgroups) == m_activeInputBuiltIns.end() &&
-       m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end()))
-    builtInUsage.common.subgroupSize = false;
-
-  if (builtInUsage.common.subgroupLocalInvocationId &&
-      m_activeInputBuiltIns.find(BuiltInSubgroupLocalInvocationId) == m_activeInputBuiltIns.end())
-    builtInUsage.common.subgroupLocalInvocationId = false;
-
-  if (builtInUsage.common.subgroupEqMask &&
-      m_activeInputBuiltIns.find(BuiltInSubgroupEqMask) == m_activeInputBuiltIns.end())
-    builtInUsage.common.subgroupEqMask = false;
-
-  if (builtInUsage.common.subgroupGeMask &&
-      m_activeInputBuiltIns.find(BuiltInSubgroupGeMask) == m_activeInputBuiltIns.end())
-    builtInUsage.common.subgroupGeMask = false;
-
-  if (builtInUsage.common.subgroupGtMask &&
-      m_activeInputBuiltIns.find(BuiltInSubgroupGtMask) == m_activeInputBuiltIns.end())
-    builtInUsage.common.subgroupGtMask = false;
-
-  if (builtInUsage.common.subgroupLeMask &&
-      m_activeInputBuiltIns.find(BuiltInSubgroupLeMask) == m_activeInputBuiltIns.end())
-    builtInUsage.common.subgroupLeMask = false;
-
-  if (builtInUsage.common.subgroupLtMask &&
-      m_activeInputBuiltIns.find(BuiltInSubgroupLtMask) == m_activeInputBuiltIns.end())
-    builtInUsage.common.subgroupLtMask = false;
-
-  if (builtInUsage.common.deviceIndex && m_activeInputBuiltIns.find(BuiltInDeviceIndex) == m_activeInputBuiltIns.end())
-    builtInUsage.common.deviceIndex = false;
 }
 
 // =====================================================================================================================

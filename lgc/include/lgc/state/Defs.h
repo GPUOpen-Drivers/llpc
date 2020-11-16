@@ -65,6 +65,7 @@ const static char OutputExportBuiltIn[] = "lgc.output.export.builtin.";
 const static char OutputExportXfb[] = "lgc.output.export.xfb.";
 const static char TfBufferStore[] = "lgc.tfbuffer.store.f32";
 const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
+const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 
 // Get pointer to spill table (as pointer to i8)
 const static char SpillTable[] = "lgc.spill.table";

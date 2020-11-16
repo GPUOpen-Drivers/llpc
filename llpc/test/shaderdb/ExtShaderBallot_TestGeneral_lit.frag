@@ -41,7 +41,7 @@ void main(void)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.broadcast.f32(
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.broadcast.first.f32(
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: call i32 @lgc.input.import.builtin.SubgroupLocalInvocationId.i32.i32
+; SHADERTEST: mbcnt_lo
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

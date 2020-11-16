@@ -31,6 +31,7 @@
 #include "BuilderImpl.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/ShaderInputs.h"
+#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/Internal.h"
 
@@ -653,42 +654,13 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
       resultTy = cast<VectorType>(resultTy)->getElementType();
   }
 
-  // Handle the subgroup mask built-ins directly.
-  if (builtIn == BuiltInSubgroupEqMask || builtIn == BuiltInSubgroupGeMask || builtIn == BuiltInSubgroupGtMask ||
-      builtIn == BuiltInSubgroupLeMask || builtIn == BuiltInSubgroupLtMask) {
-    Value *result = nullptr;
-    Value *localInvocationId = readBuiltIn(false, BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr, "");
-    if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
-      localInvocationId = CreateZExt(localInvocationId, getInt64Ty());
-
-    switch (builtIn) {
-    case BuiltInSubgroupEqMask:
-      result = CreateShl(ConstantInt::get(localInvocationId->getType(), 1), localInvocationId);
-      break;
-    case BuiltInSubgroupGeMask:
-      result = CreateShl(ConstantInt::get(localInvocationId->getType(), -1), localInvocationId);
-      break;
-    case BuiltInSubgroupGtMask:
-      result = CreateShl(ConstantInt::get(localInvocationId->getType(), -2), localInvocationId);
-      break;
-    case BuiltInSubgroupLeMask:
-      result = CreateSub(CreateShl(ConstantInt::get(localInvocationId->getType(), 2), localInvocationId),
-                         ConstantInt::get(localInvocationId->getType(), 1));
-      break;
-    case BuiltInSubgroupLtMask:
-      result = CreateSub(CreateShl(ConstantInt::get(localInvocationId->getType(), 1), localInvocationId),
-                         ConstantInt::get(localInvocationId->getType(), 1));
-      break;
-    default:
-      llvm_unreachable("Should never be called!");
-    }
-    if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64) {
-      result = CreateInsertElement(Constant::getNullValue(FixedVectorType::get(getInt64Ty(), 2)), result, uint64_t(0));
-      result = CreateBitCast(result, resultTy);
-    } else
-      result = CreateInsertElement(ConstantInt::getNullValue(resultTy), result, uint64_t(0));
-    result->setName(instName);
+  // Handle certain common built-ins directly.
+  if (Value *result = readCommonBuiltIn(builtIn, resultTy, instName))
     return result;
+
+  if (m_shaderStage == ShaderStageCompute && !isOutput) {
+    // We handle compute shader inputs directly.
+    return readCsBuiltIn(builtIn, instName);
   }
 
   if (m_shaderStage == ShaderStageVertex && !isOutput) {
@@ -740,6 +712,172 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
     result->setName(instName);
 
   return result;
+}
+
+// =====================================================================================================================
+// Read and directly handle certain built-ins that are common between shader stages
+//
+// @param builtIn : Built-in kind, one of the BuiltIn* constants
+// @param resultTy : Expected result type
+// @param instName : Name to give instruction(s)
+// @returns : Value of input; nullptr if not handled here
+Value *InOutBuilder::readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy, const Twine &instName) {
+  switch (builtIn) {
+
+  case BuiltInSubgroupEqMask:
+  case BuiltInSubgroupGeMask:
+  case BuiltInSubgroupGtMask:
+  case BuiltInSubgroupLeMask:
+  case BuiltInSubgroupLtMask: {
+    // Handle the subgroup mask built-ins directly.
+    Value *result = nullptr;
+    Value *localInvocationId = readBuiltIn(false, BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr, "");
+    if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
+      localInvocationId = CreateZExt(localInvocationId, getInt64Ty());
+
+    switch (builtIn) {
+    case BuiltInSubgroupEqMask:
+      result = CreateShl(ConstantInt::get(localInvocationId->getType(), 1), localInvocationId);
+      break;
+    case BuiltInSubgroupGeMask:
+      result = CreateShl(ConstantInt::get(localInvocationId->getType(), -1), localInvocationId);
+      break;
+    case BuiltInSubgroupGtMask:
+      result = CreateShl(ConstantInt::get(localInvocationId->getType(), -2), localInvocationId);
+      break;
+    case BuiltInSubgroupLeMask:
+      result = CreateSub(CreateShl(ConstantInt::get(localInvocationId->getType(), 2), localInvocationId),
+                         ConstantInt::get(localInvocationId->getType(), 1));
+      break;
+    case BuiltInSubgroupLtMask:
+      result = CreateSub(CreateShl(ConstantInt::get(localInvocationId->getType(), 1), localInvocationId),
+                         ConstantInt::get(localInvocationId->getType(), 1));
+      break;
+    default:
+      llvm_unreachable("Should never be called!");
+    }
+    if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64) {
+      result = CreateInsertElement(Constant::getNullValue(FixedVectorType::get(getInt64Ty(), 2)), result, uint64_t(0));
+      result = CreateBitCast(result, resultTy);
+    } else
+      result = CreateInsertElement(ConstantInt::getNullValue(resultTy), result, uint64_t(0));
+    result->setName(instName);
+    return result;
+  }
+
+  case BuiltInSubgroupSize:
+    // SubgroupSize is a constant.
+    return getInt32(getPipelineState()->getShaderWaveSize(m_shaderStage));
+
+  case BuiltInSubgroupLocalInvocationId:
+    // SubgroupLocalInvocationId is the lane number within the wave.
+    return CreateGetLaneNumber();
+
+  case BuiltInDeviceIndex:
+    // DeviceId is a constant from the pipeline state normally, or a reloc to get that constant
+    // at link time for an unlinked shader.
+    if (m_pipelineState->isUnlinked())
+      return CreateRelocationConstant(reloc::DeviceIdx);
+    return getInt32(getPipelineState()->getDeviceIndex());
+
+  default:
+    // Built-in not handled here.
+    return nullptr;
+  }
+}
+
+// =====================================================================================================================
+// Read compute shader input
+//
+// @param builtIn : Built-in kind, one of the BuiltIn* constants
+// @param instName : Name to give instruction(s)
+// @returns : Value of input; nullptr if not handled here
+Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
+  auto &shaderMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+  switch (builtIn) {
+
+  case BuiltInWorkgroupSize:
+    // WorkgroupSize is a constant vector supplied by shader mode.
+    return ConstantVector::get({getInt32(shaderMode.workgroupSizeX), getInt32(shaderMode.workgroupSizeY),
+                                getInt32(shaderMode.workgroupSizeZ)});
+
+  case BuiltInNumWorkgroups: {
+    // NumWorkgroups is a v3i32 loaded from an address pointed to by a special user data item.
+    Value *numWorkgroupPtr = ShaderInputs::getSpecialUserData(UserDataMapping::Workgroup, *this);
+    LoadInst *load = CreateLoad(FixedVectorType::get(getInt32Ty(), 3), numWorkgroupPtr);
+    load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
+    return load;
+  }
+
+  case BuiltInWorkgroupId:
+    // WorkgroupId is a v3i32 shader input (three SGPRs set up by hardware).
+    return ShaderInputs::getInput(ShaderInput::WorkgroupId, *this);
+
+  case BuiltInLocalInvocationId: {
+    // LocalInvocationId is a v3i32 shader input (three VGPRs set up in hardware).
+    Value *localInvocationId = ShaderInputs::getInput(ShaderInput::LocalInvocationId, *this);
+    // Unused dimensions need zero-initializing.
+    if (shaderMode.workgroupSizeZ <= 1) {
+      if (shaderMode.workgroupSizeY <= 1)
+        localInvocationId = CreateInsertElement(localInvocationId, getInt32(0), 1);
+      localInvocationId = CreateInsertElement(localInvocationId, getInt32(0), 2);
+    }
+
+    // If the option is enabled, we might want to reconfigure the workgroup layout later, which
+    // means the value of LocalInvocationId needs modifying. We can't do that now, as we need to
+    // know whether the shader uses images. Detect here that we can't do that optimization in
+    // a compute library. We don't detect here that we can't do the optimization in a compute shader
+    // with calls, as that detection is slightly more expensive.
+    if (m_pipelineState->getOptions().reconfigWorkgroupLayout && !getPipelineState()->isComputeLibrary()) {
+      // Insert a call that later on might get lowered to code to reconfigure the workgroup.
+      localInvocationId = CreateNamedCall(lgcName::ReconfigureLocalInvocationId, localInvocationId->getType(),
+                                          localInvocationId, Attribute::ReadNone);
+    }
+    return localInvocationId;
+  }
+
+  case BuiltInNumSubgroups: {
+    // workgroupSize = gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z
+    // gl_NumSubgroups = (workgroupSize + gl_SubGroupSize - 1) / gl_SubgroupSize
+    auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+    unsigned workgroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
+    unsigned subgroupSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
+    unsigned numSubgroups = (workgroupSize + subgroupSize - 1) / subgroupSize;
+    return getInt32(numSubgroups);
+  }
+
+  case BuiltInGlobalInvocationId: {
+    // GlobalInvocationId is WorkgroupId * WorkgroupSize + LocalInvocationId
+    Value *result = CreateMul(readCsBuiltIn(BuiltInWorkgroupId), readCsBuiltIn(BuiltInWorkgroupSize));
+    return CreateAdd(result, readCsBuiltIn(BuiltInLocalInvocationId));
+  }
+
+  case BuiltInLocalInvocationIndex: {
+    // LocalInvocationIndex is
+    // (WorkgroupSize.Y * LocalInvocationId.Z + LocalInvocationId.Y) * WorkGroupSize.X + LocalInvocationId.X
+    Value *workgroupSize = readCsBuiltIn(BuiltInWorkgroupSize);
+    Value *localInvocationId = readCsBuiltIn(BuiltInLocalInvocationId);
+    Value *input = CreateMul(CreateExtractElement(workgroupSize, 1), CreateExtractElement(localInvocationId, 2));
+    input = CreateAdd(input, CreateExtractElement(localInvocationId, 1));
+    input = CreateMul(CreateExtractElement(workgroupSize, uint64_t(0)), input);
+    input = CreateAdd(input, CreateExtractElement(localInvocationId, uint64_t(0)));
+    return input;
+  }
+
+  case BuiltInSubgroupId: {
+    // gl_SubgroupID = gl_LocationInvocationIndex / gl_SubgroupSize
+    Value *localInvocationIndex = readCsBuiltIn(BuiltInLocalInvocationIndex);
+    unsigned subgroupSize = getPipelineState()->getShaderWaveSize(m_shaderStage);
+    return CreateLShr(localInvocationIndex, getInt32(Log2_32(subgroupSize)));
+  }
+
+  default:
+    // Not handled. This should never happen; we need to handle all CS built-ins here because the old way of
+    // handling them (caller will handle with lgc.input.import.builtin, which is then lowered in
+    // PatchInOutImportExport) does not work with compute-with-calls.
+    llvm_unreachable("Unhandled CS built-in");
+    return nullptr;
+  }
 }
 
 // =====================================================================================================================
@@ -1068,58 +1206,6 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize
     break;
   }
 
-  case ShaderStageCompute: {
-    switch (builtIn) {
-    case BuiltInNumWorkgroups:
-      usage.cs.numWorkgroups = true;
-      break;
-    case BuiltInLocalInvocationId:
-      usage.cs.localInvocationId = true;
-      break;
-    case BuiltInWorkgroupId:
-      usage.cs.workgroupId = true;
-      break;
-    case BuiltInNumSubgroups:
-      usage.cs.numSubgroups = true;
-      break;
-    case BuiltInSubgroupId:
-      usage.cs.subgroupId = true;
-      break;
-    default:
-      break;
-    }
-    break;
-  }
-
-  default:
-    break;
-  }
-
-  switch (builtIn) {
-  case BuiltInSubgroupSize:
-    usage.common.subgroupSize = true;
-    break;
-  case BuiltInSubgroupLocalInvocationId:
-    usage.common.subgroupLocalInvocationId = true;
-    break;
-  case BuiltInSubgroupEqMask:
-    usage.common.subgroupEqMask = true;
-    break;
-  case BuiltInSubgroupGeMask:
-    usage.common.subgroupGeMask = true;
-    break;
-  case BuiltInSubgroupGtMask:
-    usage.common.subgroupGtMask = true;
-    break;
-  case BuiltInSubgroupLeMask:
-    usage.common.subgroupLeMask = true;
-    break;
-  case BuiltInSubgroupLtMask:
-    usage.common.subgroupLtMask = true;
-    break;
-  case BuiltInDeviceIndex:
-    usage.common.deviceIndex = true;
-    break;
   default:
     break;
   }

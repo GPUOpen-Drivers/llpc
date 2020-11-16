@@ -446,3 +446,13 @@ Value *BuilderImplBase::scalarize(Value *value0, Value *value1, Value *value2,
   Value *result = callback(value0, value1, value2);
   return result;
 }
+
+// =====================================================================================================================
+// Create code to get the lane number within the wave. This depends on whether the shader is wave32 or wave64,
+// and thus on the shader stage it is used from.
+Value *BuilderImplBase::CreateGetLaneNumber() {
+  Value *result = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {getInt32(-1), getInt32(0)});
+  if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
+    result = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {getInt32(-1), result});
+  return result;
+}
