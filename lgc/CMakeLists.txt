@@ -121,6 +121,7 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchPreparePipelineAbi.cpp
     patch/PatchResourceCollect.cpp
     patch/PatchSetupTargetFeatures.cpp
+    patch/PatchWorkarounds.cpp
     patch/ShaderInputs.cpp
     patch/ShaderMerger.cpp
     patch/SystemValues.cpp

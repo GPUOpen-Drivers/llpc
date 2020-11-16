@@ -35,16 +35,15 @@
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
-#include "llvm/IR/InstVisitor.h"
+#include "llvm/Analysis/PostDominators.h"
+#include "llvm/IR/Function.h"
 #include <set>
 
 namespace lgc {
 
-class FragColorExport;
-
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for input import and output export.
-class PatchInOutImportExport : public Patch, public llvm::InstVisitor<PatchInOutImportExport> {
+class PatchInOutImportExport : public Patch {
 public:
   PatchInOutImportExport();
   ~PatchInOutImportExport();
@@ -52,6 +51,7 @@ public:
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
     analysisUsage.addRequired<PipelineStateWrapper>();
     analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addRequired<llvm::PostDominatorTreeWrapperPass>();
     analysisUsage.addPreserved<PipelineShaders>();
   }
 
@@ -67,7 +67,10 @@ private:
 
   void initPerShader();
 
+  void markExportDone(llvm::Function *func, llvm::PostDominatorTree &postDomTree);
   void processShader();
+  void visitCallInsts(llvm::ArrayRef<llvm::Function *> calleeFuncs);
+  void visitReturnInsts();
 
   llvm::Value *patchTcsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
                                           llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
@@ -199,10 +202,6 @@ private:
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
-  FragColorExport *m_fragColorExport; // Fragment color export manager
-
-  llvm::CallInst *m_lastExport; // Last "export" intrinsic for which "done" flag is valid
-
   llvm::Value *m_clipDistance; // Correspond to "out float gl_ClipDistance[]"
   llvm::Value *m_cullDistance; // Correspond to "out float gl_CullDistance[]"
   llvm::Value *m_primitiveId;  // Correspond to "out int gl_PrimitiveID"
@@ -223,7 +222,6 @@ private:
   llvm::GlobalVariable *m_lds; // Global variable to model LDS
   llvm::Value *m_threadId;     // Thread ID
 
-  std::vector<llvm::Value *> m_expFragColors[MaxColorTargets]; // Exported fragment colors
   std::vector<llvm::CallInst *> m_importCalls;                 // List of "call" instructions to import inputs
   std::vector<llvm::CallInst *> m_exportCalls;                 // List of "call" instructions to export outputs
   PipelineState *m_pipelineState = nullptr;                    // Pipeline state from PipelineStateWrapper pass

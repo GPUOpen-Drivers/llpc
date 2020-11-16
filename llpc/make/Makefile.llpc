@@ -82,7 +82,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     CPPFILES +=                             \
         llpcDebug.cpp                       \
         llpcElfWriter.cpp                   \
-        llpcEmuLib.cpp                      \
         llpcFile.cpp                        \
         llpcShaderModuleHelper.cpp          \
         llpcTimerProfiler.cpp               \

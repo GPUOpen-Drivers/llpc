@@ -199,7 +199,6 @@ if(ICD_BUILD_LLPC)
     target_sources(llpc PRIVATE
         util/llpcDebug.cpp
         util/llpcElfWriter.cpp
-        util/llpcEmuLib.cpp
         util/llpcFile.cpp
         util/llpcShaderModuleHelper.cpp
         util/llpcTimerProfiler.cpp
@@ -221,8 +220,6 @@ target_link_libraries(llpc PRIVATE cwpack)
 
 ### LLPC Auto-generated Files ##########################################################################################
 if(ICD_BUILD_LLPC)
-set(OP_EMU_LIB_GEN_DIR ${PROJECT_SOURCE_DIR}/patch/generate)
-set(GEN_GLSL_OP_EMU_LIB_SCRIPT ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py)
 
 if(UNIX)
     set(BUILD_OS lnx)

@@ -188,7 +188,7 @@ bool PatchLoopMetadata::runOnModule(Module &module) {
                 // We will use a threshold of 250 to replace the disable hint.
                 const int UnrollThreshold = 250;
                 Metadata *thresholdMeta[] = {
-                    MDString::get(*m_context, "llvm.loop.unroll.threshold"),
+                    MDString::get(*m_context, "amdgpu.loop.unroll.threshold"),
                     ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), UnrollThreshold))};
                 MDNode *thresholdMetaNode = MDNode::get(*m_context, thresholdMeta);
                 loopMetaNode = updateMetadata(loopMetaNode, {"llvm.loop.unroll.disable", "llvm.loop.disable_nonforced"},

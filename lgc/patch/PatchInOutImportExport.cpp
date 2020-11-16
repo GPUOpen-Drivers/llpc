@@ -31,7 +31,6 @@
 #include "PatchInOutImportExport.h"
 #include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
-#include "lgc/patch/FragColorExport.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/util/Debug.h"
@@ -65,14 +64,11 @@ PatchInOutImportExport::PatchInOutImportExport() : Patch(ID), m_lds(nullptr) {
 
 // =====================================================================================================================
 PatchInOutImportExport::~PatchInOutImportExport() {
-  assert(!m_fragColorExport);
 }
 
 // =====================================================================================================================
 // Initialize per-shader members
 void PatchInOutImportExport::initPerShader() {
-  m_fragColorExport = nullptr;
-  m_lastExport = nullptr;
   m_clipDistance = nullptr;
   m_cullDistance = nullptr;
   m_primitiveId = nullptr;
@@ -101,6 +97,13 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0;
   m_hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
 
+  SmallVector<Function *, 16> candidateCallees;
+  for (auto &func : module.functions()) {
+    auto name = func.getName();
+    if (name.startswith("lgc.input") || name.startswith("lgc.output") || name == "llvm.amdgcn.s.sendmsg")
+      candidateCallees.push_back(&func);
+  }
+
   // Create the global variable that is to model LDS
   // NOTE: ES -> GS ring is always on-chip on GFX9.
   if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)))
@@ -112,16 +115,18 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage) {
     auto entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
     if (entryPoint) {
+      PostDominatorTree &postDomTree = getAnalysis<PostDominatorTreeWrapperPass>(*entryPoint).getPostDomTree();
+
       initPerShader();
       m_entryPoint = entryPoint;
       m_shaderStage = static_cast<ShaderStage>(shaderStage);
       processShader();
 
       // Now process the call and return instructions.
-      visit(*m_entryPoint);
+      visitCallInsts(candidateCallees);
+      visitReturnInsts();
 
-      delete m_fragColorExport;
-      m_fragColorExport = nullptr;
+      markExportDone(m_entryPoint, postDomTree);
     }
   }
 
@@ -137,21 +142,59 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   }
   m_exportCalls.clear();
 
-  for (auto &fragColors : m_expFragColors)
-    fragColors.clear();
   m_pipelineSysValues.clear();
 
   return true;
 }
 
 // =====================================================================================================================
-// Process a single shader
-void PatchInOutImportExport::processShader() {
-  if (m_shaderStage == ShaderStageFragment) {
-    // Create fragment color export manager
-    m_fragColorExport = new FragColorExport(m_context);
+// Mark the 'done' flag to the very last position export instruction.
+//
+// @param [in/out] func : LLVM function to be run on
+// @param postDomTree : The PostDominatorTree of the \p func
+void PatchInOutImportExport::markExportDone(Function *func, PostDominatorTree &postDomTree) {
+  SmallVector<CallInst *, 4> expInsts;
+
+  Function *expDecl = m_module->getFunction("llvm.amdgcn.exp.f32");
+  if (!expDecl)
+    return;
+
+  // Get the export call instructions
+  for (auto user : expDecl->users()) {
+    if (CallInst *callInst = dyn_cast<CallInst>(user)) {
+      if (callInst->getFunction() == func) {
+        if (ConstantInt *target = dyn_cast<ConstantInt>(callInst->getOperand(0))) {
+          uint64_t targetValue = target->getZExtValue();
+          if (targetValue >= EXP_TARGET_POS_0 && targetValue <= EXP_TARGET_POS_3)
+            expInsts.push_back(callInst);
+        }
+      }
+    }
   }
 
+  if (expInsts.empty())
+    return;
+
+  CallInst *lastExport = expInsts[0];
+
+  // Here we are trying to find the position-export that post-dominates all the other position exports (i.e. the last
+  // export). And apply the 'done' flag to that position-export. Although in practice user can easily write a program
+  // that put the gl_Position output inside a if-else, in which case it is hard for us to find the last export. But we
+  // already handled such situation in previous pass to put the real position export call into the last return block. So
+  // it would be safe for us to do like this. The reason I didn't do a simple backward traverse in return block to find
+  // the very last export is because the copy-shader, in which case the position export is not in the return block.
+  for (unsigned i = 1; i < expInsts.size(); i++) {
+    if (postDomTree.dominates(expInsts[i], lastExport))
+      lastExport = expInsts[i];
+    else
+      assert(postDomTree.dominates(lastExport, expInsts[i]));
+  }
+  lastExport->setOperand(6, ConstantInt::getTrue(*m_context));
+}
+
+// =====================================================================================================================
+// Process a single shader
+void PatchInOutImportExport::processShader() {
   // Initialize the output value for gl_PrimitiveID
   const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->builtInUsage;
   const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs;
@@ -297,6 +340,29 @@ void PatchInOutImportExport::processShader() {
       LLPC_OUTS(")\n\n");
     }
   }
+}
+
+// =====================================================================================================================
+// Visits all "call" instructions against the callee functions in current entry-point function.
+//
+// @param calleeFuncs : a list of candidate callee functions to check
+void PatchInOutImportExport::visitCallInsts(ArrayRef<Function *> calleeFuncs) {
+  for (auto callee : calleeFuncs) {
+    for (auto user : callee->users()) {
+      if (CallInst *callInst = dyn_cast<CallInst>(user)) {
+        if (callInst->getFunction() == m_entryPoint)
+          visitCallInst(*callInst);
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
+// Visits all "ret" instructions in current entry-point function.
+void PatchInOutImportExport::visitReturnInsts() {
+  for (auto &block : *m_entryPoint)
+    if (auto *retInst = dyn_cast<ReturnInst>(block.getTerminator()))
+      visitReturnInst(*retInst);
 }
 
 // =====================================================================================================================
@@ -950,7 +1016,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
           ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
       };
-      m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+      emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
     }
 
     // Export gl_ClipDistance[] and gl_CullDistance[] before entry-point returns
@@ -1000,8 +1066,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           ConstantInt::get(Type::getInt1Ty(*m_context), false)  // vm
       };
 
-      // "Done" flag is valid for exporting position 0 ~ 3
-      m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+      emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
 
       if (clipCullDistance.size() > 4) {
         // Do the second exporting
@@ -1015,7 +1080,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
             ConstantInt::get(Type::getInt1Ty(*m_context), false),    // done
             ConstantInt::get(Type::getInt1Ty(*m_context), false)     // vm
         };
-        m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+        emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
       }
 
       // NOTE: We have to export gl_ClipDistance[] or gl_CullDistancep[] via generic outputs as well.
@@ -1177,8 +1242,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
       };
 
-      // "Done" flag is valid for exporting position 0 ~ 3
-      m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+      emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
 
       // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
       if (useViewportIndex) {
@@ -1307,16 +1371,6 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     return;
   }
 
-  if (m_lastExport) {
-    // Set "done" flag
-    auto exportName = m_lastExport->getCalledFunction()->getName();
-    if (exportName == "llvm.amdgcn.exp.f32")
-      m_lastExport->setOperand(6, ConstantInt::get(Type::getInt1Ty(*m_context), true));
-    else {
-      assert(exportName == "llvm.amdgcn.exp.compr.v2f16");
-      m_lastExport->setOperand(4, ConstantInt::get(Type::getInt1Ty(*m_context), true));
-    }
-  }
 }
 
 // =====================================================================================================================
@@ -5164,8 +5218,7 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
       args[2 + i] = compValue;
     }
 
-    // "Done" flag is valid for exporting position 0 ~ 3
-    m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
     break;
   }
   case BuiltInPointSize: {
@@ -5179,8 +5232,7 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
         ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
         ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
     };
-    // "Done" flag is valid for exporting position 0 ~ 3
-    m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
     break;
   }
   case BuiltInLayer: {
@@ -5200,8 +5252,7 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
         ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
         ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
     };
-    // "Done" flag is valid for exporting position 0 ~ 3
-    m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
 
     // NOTE: We have to export gl_Layer via generic outputs as well.
     bool hasLayerExport = true;
@@ -5256,8 +5307,7 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
         ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
         ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
     };
-    // "Done" flag is valid for exporting position 0 ~ 3
-    m_lastExport = emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
 
     // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
     bool hasViewportIndexExport = true;

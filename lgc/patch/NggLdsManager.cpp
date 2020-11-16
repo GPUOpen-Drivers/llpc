@@ -197,6 +197,10 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
         if (region == LdsRegionDistribPrimId)
           continue;
 
+        // NOTE: For vertex compactionless mode, this region is unnecessary
+        if (region == LdsRegionVertThreadIdMap && nggControl->compactMode == NggCompactDisable)
+          continue;
+
         unsigned ldsRegionSize = LdsRegionSizes[region];
 
         // NOTE: LDS size of vertex cull info (ES-GS ring) is calculated
@@ -248,7 +252,7 @@ unsigned NggLdsManager::calcEsExtraLdsSize(PipelineState *pipelineState) {
   }
 
   return LdsRegionSizes[LdsRegionVertPosData] + LdsRegionSizes[LdsRegionVertCountInWaves] +
-         LdsRegionSizes[LdsRegionVertThreadIdMap];
+         (nggControl->compactMode == NggCompactDisable ? 0 : LdsRegionSizes[LdsRegionVertThreadIdMap]);
 }
 
 // =====================================================================================================================
