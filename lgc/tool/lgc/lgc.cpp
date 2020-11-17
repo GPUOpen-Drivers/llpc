@@ -38,6 +38,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Target/TargetMachine.h"
 
 using namespace lgc;
 using namespace llvm;
@@ -177,8 +178,9 @@ int main(int argc, char **argv) {
     StringRef bufferName = bufferRef.getBufferIdentifier();
 
     // Split the input into multiple LLVM IR modules. We assume that a new module starts with
-    // a "target" line to set the datalayout or triple, but not until after we have seen at least
-    // one line starting with '!' (metadata declaration) in the previous module.
+    // a "target" line to set the datalayout or triple, or a "define" line for a new function,
+    // but not until after we have seen at least one line starting with '!' (metadata declaration)
+    // in the previous module.
     SmallVector<StringRef, 4> separatedAsms;
     StringRef remaining = bufferRef.getBuffer();
     separatedAsms.push_back(remaining);
@@ -188,7 +190,8 @@ int main(int argc, char **argv) {
       if (notSpacePos != StringRef::npos) {
         if (remaining[notSpacePos] == '!')
           hadMetadata = true;
-        else if (hadMetadata && remaining.slice(notSpacePos, StringRef::npos).startswith("target")) {
+        else if (hadMetadata && (remaining.slice(notSpacePos, StringRef::npos).startswith("target") ||
+                                 remaining.slice(notSpacePos, StringRef::npos).startswith("define"))) {
           // End the current split module and go on to the next one.
           separatedAsms.back() = separatedAsms.back().slice(0, remaining.data() - separatedAsms.back().data());
           separatedAsms.push_back(remaining);
@@ -238,6 +241,11 @@ int main(int argc, char **argv) {
         errs() << progName << ": " << bufferName << ": IR verification errors in module " << idx << "\n";
         return 1;
       }
+
+      // Set the triple and data layout, so you can write tests without bothering to specify them.
+      TargetMachine *targetMachine = lgcContext->getTargetMachine();
+      module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
+      module->setDataLayout(targetMachine->createDataLayout());
 
       // Determine whether we are outputting to a file.
       bool outputToFile = OutFileName != "-";
