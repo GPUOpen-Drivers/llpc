@@ -190,8 +190,8 @@ int main(int argc, char **argv) {
       if (notSpacePos != StringRef::npos) {
         if (remaining[notSpacePos] == '!')
           hadMetadata = true;
-        else if (hadMetadata && (remaining.slice(notSpacePos, StringRef::npos).startswith("target") ||
-                                 remaining.slice(notSpacePos, StringRef::npos).startswith("define"))) {
+        else if (hadMetadata && (remaining.drop_front(notSpacePos).startswith("target") ||
+                                 remaining.drop_front(notSpacePos).startswith("define"))) {
           // End the current split module and go on to the next one.
           separatedAsms.back() = separatedAsms.back().slice(0, remaining.data() - separatedAsms.back().data());
           separatedAsms.push_back(remaining);
