@@ -421,6 +421,8 @@ static Type *convertToFloatingPointType(Type *origTy) {
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
                                      Value *mipLevel, const Twine &instName) {
+  // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
+  getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceRead = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
   imageDesc = patchCubeDescriptor(imageDesc, dim);
@@ -599,6 +601,8 @@ Value *ImageBuilder::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsi
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
                                       Value *mipLevel, const Twine &instName) {
+  // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
+  getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
   imageDesc = patchCubeDescriptor(imageDesc, dim);
@@ -735,6 +739,8 @@ Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsi
 Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescArray,
                                                    Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                                    const Twine &instName) {
+  // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
+  getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
   Value *result = nullptr;
 
   // Helper function to extract YCbCr meta data from ycbcrSamplerDesc
@@ -995,6 +1001,8 @@ Value *ImageBuilder::postprocessIntegerImageGather(Value *needDescPatch, unsigne
 Value *ImageBuilder::CreateImageSampleGather(Type *resultTy, unsigned dim, unsigned flags, Value *coord,
                                              Value *imageDesc, Value *samplerDesc, ArrayRef<Value *> address,
                                              const Twine &instName, bool isSample) {
+  // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
+  getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
   // Set up the mask of address components provided, for use in searching the intrinsic ID table
   unsigned addressMask = 0;
   for (unsigned i = 0; i != ImageAddressCount; ++i) {

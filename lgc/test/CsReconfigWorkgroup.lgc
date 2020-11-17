@@ -1,0 +1,128 @@
+; ----------------------------------------------------------------------
+; Extract 1: Reconfiguring of workgroup size disabled
+
+; RUN: lgc -extract=1 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK1 %s
+; CHECK1-LABEL: _amdgpu_cs_main:
+; CHECK1: COMPUTE_NUM_THREAD_X): 0x5
+; CHECK1: COMPUTE_NUM_THREAD_Y): 0x6
+; CHECK1: COMPUTE_NUM_THREAD_Z): 0x7
+
+define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
+.entry:
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %1 = call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 27, i32 0, i32 undef, i32 undef)
+  %2 = bitcast i8 addrspace(7)* %0 to <3 x i32> addrspace(7)*
+  store <3 x i32> %1, <3 x i32> addrspace(7)* %2, align 4
+  ret void
+}
+
+declare <3 x i32> @lgc.create.read.builtin.input.v3i32(...) local_unnamed_addr #0
+declare i8 addrspace(7)* @lgc.create.load.buffer.desc.p7i8(...) local_unnamed_addr #0
+
+attributes #0 = { nounwind }
+
+!lgc.user.data.nodes = !{!1, !2}
+!llpc.compute.mode = !{!3}
+
+; ShaderStageCompute
+!0 = !{i32 5}
+; type, offset, size, count
+!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+; type, offset, size, set, binding, stride
+!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+; Compute mode, containing workgroup size
+!3 = !{i32 5, i32 6, i32 7}
+
+; ----------------------------------------------------------------------
+; Extract 2: Reconfiguring of workgroup size uses 8x8
+
+; RUN: lgc -extract=2 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK2 %s
+; CHECK2-LABEL: _amdgpu_cs_main:
+; CHECK2: COMPUTE_NUM_THREAD_X): 0x50
+; CHECK2: COMPUTE_NUM_THREAD_Y): 0x6
+; CHECK2: COMPUTE_NUM_THREAD_Z): 0x1
+
+define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
+.entry:
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %1 = call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 27, i32 0, i32 undef, i32 undef)
+  %2 = bitcast i8 addrspace(7)* %0 to <3 x i32> addrspace(7)*
+  store <3 x i32> %1, <3 x i32> addrspace(7)* %2, align 4
+  %imgdescptr = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.v8i32(i32 1, i32 0, i32 1)
+  %imgdesc = load <8 x i32>, <8 x i32> addrspace(4)* %imgdescptr
+  %imgload = call <2 x float> (...) @lgc.create.image.load.v2f32(i32 1, i32 0, <8 x i32> %imgdesc, <2 x i32><i32 1, i32 2>)
+  %storeptr = getelementptr i8, i8 addrspace(7)* %0, i64 16
+  %storeptrcast = bitcast i8 addrspace(7)* %storeptr to <2 x float> addrspace(7)*
+  store <2 x float> %imgload, <2 x float> addrspace(7)* %storeptrcast
+  ret void
+}
+
+declare <3 x i32> @lgc.create.read.builtin.input.v3i32(...) local_unnamed_addr #0
+declare i8 addrspace(7)* @lgc.create.load.buffer.desc.p7i8(...) local_unnamed_addr #0
+declare <8 x i32> addrspace(4)* @lgc.create.get.desc.ptr.v8i32(...) local_unnamed_addr #0
+declare <2 x float> @lgc.create.image.load.v2f32(...) local_unnamed_addr #0
+
+attributes #0 = { nounwind }
+
+!lgc.user.data.nodes = !{!1, !2, !3}
+!llpc.compute.mode = !{!4}
+!lgc.options = !{!5}
+
+; ShaderStageCompute
+!0 = !{i32 5}
+; type, offset, size, count
+!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+; type, offset, size, set, binding, stride
+!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!3 = !{!"DescriptorResource", i32 4, i32 8, i32 0, i32 1, i32 8}
+; Compute mode, containing workgroup size
+!4 = !{i32 8, i32 10, i32 6}
+; Pipeline options. The sixth int is the reconfigWorkgroupLayout option
+!5 = !{i32 0, i32 0, i32 0, i32 0, i32 0, i32 1}
+
+; ----------------------------------------------------------------------
+; Extract 3: Reconfiguring of workgroup size uses 2x2
+
+; RUN: lgc -extract=3 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK3 %s
+; CHECK3-LABEL: _amdgpu_cs_main:
+; CHECK3: COMPUTE_NUM_THREAD_X): 0x24
+; CHECK3: COMPUTE_NUM_THREAD_Y): 0x5
+; CHECK3: COMPUTE_NUM_THREAD_Z): 0x1
+
+define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
+.entry:
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %1 = call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 27, i32 0, i32 undef, i32 undef)
+  %2 = bitcast i8 addrspace(7)* %0 to <3 x i32> addrspace(7)*
+  store <3 x i32> %1, <3 x i32> addrspace(7)* %2, align 4
+  %imgdescptr = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.v8i32(i32 1, i32 0, i32 1)
+  %imgdesc = load <8 x i32>, <8 x i32> addrspace(4)* %imgdescptr
+  %imgload = call <2 x float> (...) @lgc.create.image.load.v2f32(i32 1, i32 0, <8 x i32> %imgdesc, <2 x i32><i32 1, i32 2>)
+  %storeptr = getelementptr i8, i8 addrspace(7)* %0, i64 16
+  %storeptrcast = bitcast i8 addrspace(7)* %storeptr to <2 x float> addrspace(7)*
+  store <2 x float> %imgload, <2 x float> addrspace(7)* %storeptrcast
+  ret void
+}
+
+declare <3 x i32> @lgc.create.read.builtin.input.v3i32(...) local_unnamed_addr #0
+declare i8 addrspace(7)* @lgc.create.load.buffer.desc.p7i8(...) local_unnamed_addr #0
+declare <8 x i32> addrspace(4)* @lgc.create.get.desc.ptr.v8i32(...) local_unnamed_addr #0
+declare <2 x float> @lgc.create.image.load.v2f32(...) local_unnamed_addr #0
+
+attributes #0 = { nounwind }
+
+!lgc.user.data.nodes = !{!1, !2, !3}
+!llpc.compute.mode = !{!4}
+!lgc.options = !{!5}
+
+; ShaderStageCompute
+!0 = !{i32 5}
+; type, offset, size, count
+!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+; type, offset, size, set, binding, stride
+!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!3 = !{!"DescriptorResource", i32 4, i32 8, i32 0, i32 1, i32 8}
+; Compute mode, containing workgroup size
+!4 = !{i32 6, i32 6, i32 5}
+; Pipeline options. The sixth int is the reconfigWorkgroupLayout option
+!5 = !{i32 0, i32 0, i32 0, i32 0, i32 0, i32 1}
