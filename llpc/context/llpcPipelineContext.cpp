@@ -730,7 +730,7 @@ void PipelineContext::setColorExportState(Pipeline *pipeline) const {
 // @param format : Vulkan API format code
 // @param isColorExport : True for looking up color export format, false for vertex input format
 std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat format, bool isColorExport) {
-  static const struct FormatEntry {
+  struct FormatEntry {
 #ifndef NDEBUG
     VkFormat format;
 #endif
@@ -738,7 +738,9 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
     BufNumFormat nfmt;
     unsigned validVertexFormat : 1;
     unsigned validExportFormat : 1;
-  } FormatTable[] = {
+  };
+
+  static const FormatEntry FormatTable[] = {
 #ifndef NDEBUG
 #define INVALID_FORMAT_ENTRY(format)                                                                                   \
   { format, BufDataFormatInvalid, BufNumFormatUnorm, false, false }
@@ -945,6 +947,46 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
       INVALID_FORMAT_ENTRY(VK_FORMAT_ASTC_12x12_SRGB_BLOCK),
   };
 
+  static const DenseMap<unsigned, FormatEntry> FormatTableExt = {
+#ifndef NDEBUG
+#define INVALID_FORMAT_ENTRY_EXT(format)                                                                               \
+  {                                                                                                                    \
+    format, { format, BufDataFormatInvalid, BufNumFormatUnorm, false, false }                                          \
+  }
+#define VERTEX_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                    \
+  {                                                                                                                    \
+    format, { format, dfmt, nfmt, true, false }                                                                        \
+  }
+#define COLOR_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                     \
+  {                                                                                                                    \
+    format, { format, dfmt, nfmt, false, true }                                                                        \
+  }
+#define BOTH_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                      \
+  {                                                                                                                    \
+    format, { format, dfmt, nfmt, true, true }                                                                         \
+  }
+#else
+#define INVALID_FORMAT_ENTRY_EXT(format)                                                                               \
+  {                                                                                                                    \
+    format, { BufDataFormatInvalid, BufNumFormatUnorm, false, false }                                                  \
+  }
+#define VERTEX_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                    \
+  {                                                                                                                    \
+    format, { dfmt, nfmt, true, false }                                                                                \
+  }
+#define COLOR_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                     \
+  {                                                                                                                    \
+    format, { dfmt, nfmt, false, true }                                                                                \
+  }
+#define BOTH_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                      \
+  {                                                                                                                    \
+    format, { dfmt, nfmt, true, true }                                                                                 \
+  }
+#endif
+      COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT, BufDataFormat4_4_4_4, BufNumFormatUnorm),
+      COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT, BufDataFormat4_4_4_4, BufNumFormatUnorm),
+  };
+
   BufDataFormat dfmt = BufDataFormatInvalid;
   BufNumFormat nfmt = BufNumFormatUnorm;
   if (format < ArrayRef<FormatEntry>(FormatTable).size()) {
@@ -953,6 +995,15 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
         (!isColorExport && FormatTable[format].validVertexFormat)) {
       dfmt = FormatTable[format].dfmt;
       nfmt = FormatTable[format].nfmt;
+    }
+  } else {
+    // Formats defined by Vulkan extensions
+    if (FormatTableExt.count(format) != 0) {
+      auto formatEntry = FormatTableExt.lookup(format);
+      if ((isColorExport && formatEntry.validExportFormat) || (!isColorExport && formatEntry.validVertexFormat)) {
+        dfmt = formatEntry.dfmt;
+        nfmt = formatEntry.nfmt;
+      }
     }
   }
   return {dfmt, nfmt};
