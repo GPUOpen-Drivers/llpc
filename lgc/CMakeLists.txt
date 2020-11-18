@@ -33,6 +33,8 @@ add_dependencies(LLVMlgc
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_RENOIR  "LLPC support for Renoir?"    ON)
+option(LLPC_BUILD_NAVI21 "LLPC support for NAVI21?" OFF)
+option(LLPC_BUILD_GFX103 "LLPC support for GFX103?" OFF)
 option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 ### Compiler Options ###################################################################################################
@@ -56,6 +58,17 @@ if (LLPC_BUILD_RENOIR)
     target_compile_definitions(LLVMlgc PRIVATE LLPC_BUILD_RENOIR)
     target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
 endif()
+  if(LLPC_BUILD_NAVI21)
+    target_compile_definitions(LLVMlgc PRIVATE
+        LLPC_BUILD_NAVI21
+        CHIP_HDR_NAVI21
+    )
+  endif()
+  if(LLPC_BUILD_GFX103)
+    target_compile_definitions(LLVMlgc PRIVATE
+        LLPC_BUILD_GFX103
+    )
+  endif()
 
 if(WIN32)
     target_compile_definitions(LLVMlgc PRIVATE

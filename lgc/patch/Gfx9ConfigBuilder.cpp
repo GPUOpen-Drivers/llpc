@@ -918,6 +918,7 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
   bool usePrimitiveId = false;
   bool useLayer = false;
   bool useViewportIndex = false;
+  bool useShadingRate = false;
   unsigned clipDistanceCount = 0;
   unsigned cullDistanceCount = 0;
 
@@ -926,6 +927,7 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     usePrimitiveId = builtInUsage.vs.primitiveId;
     useLayer = builtInUsage.vs.layer;
     useViewportIndex = builtInUsage.vs.viewportIndex;
+    useShadingRate = builtInUsage.vs.primitiveShadingRate;
     clipDistanceCount = builtInUsage.vs.clipDistance;
     cullDistanceCount = builtInUsage.vs.cullDistance;
 
@@ -959,6 +961,7 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     usePrimitiveId = builtInUsage.gs.primitiveIdIn;
     useLayer = builtInUsage.gs.layer;
     useViewportIndex = builtInUsage.gs.viewportIndex;
+    useShadingRate = builtInUsage.gs.primitiveShadingRate;
     clipDistanceCount = builtInUsage.gs.clipDistance;
     cullDistanceCount = builtInUsage.gs.cullDistance;
 
@@ -1001,6 +1004,7 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
   useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
 
   bool miscExport = usePointSize || useLayer || useViewportIndex;
+  miscExport |= useShadingRate;
   if (miscExport) {
     SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
     SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
@@ -1013,6 +1017,9 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     } else
       llvm_unreachable("Not implemented!");
 
+    if (gfxIp.major == 10 && gfxIp.minor >= 3) {
+      SET_REG_GFX10_2_PLUS_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VRS_RATE, useShadingRate);
+    }
   }
 
   if (clipDistanceCount > 0 || cullDistanceCount > 0) {
@@ -1606,6 +1613,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   bool usePrimitiveId = false;
   bool useLayer = false;
   bool useViewportIndex = false;
+  bool useShadingRate = false;
   unsigned clipDistanceCount = 0;
   unsigned cullDistanceCount = 0;
 
@@ -1616,6 +1624,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     usePrimitiveId = gsBuiltInUsage.primitiveIdIn;
     useLayer = gsBuiltInUsage.layer;
     useViewportIndex = gsBuiltInUsage.viewportIndex;
+    useShadingRate = gsBuiltInUsage.primitiveShadingRate;
     clipDistanceCount = gsBuiltInUsage.clipDistance;
     cullDistanceCount = gsBuiltInUsage.cullDistance;
 
@@ -1640,6 +1649,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
       usePrimitiveId = vsBuiltInUsage.primitiveId;
       useLayer = vsBuiltInUsage.layer;
       useViewportIndex = vsBuiltInUsage.viewportIndex;
+      useShadingRate = vsBuiltInUsage.primitiveShadingRate;
       clipDistanceCount = vsBuiltInUsage.clipDistance;
       cullDistanceCount = vsBuiltInUsage.cullDistance;
 
@@ -1683,12 +1693,16 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
 
   bool miscExport = usePointSize || useLayer || useViewportIndex;
+  miscExport |= useShadingRate;
   if (miscExport) {
     SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
     SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
     SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
     SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
     SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
+    if (gfxIp.major == 10 && gfxIp.minor >= 3) {
+      SET_REG_GFX10_2_PLUS_FIELD(&pConfig->primShaderRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VRS_RATE, useShadingRate);
+    }
   }
 
   if (clipDistanceCount > 0 || cullDistanceCount > 0) {

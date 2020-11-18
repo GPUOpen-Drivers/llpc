@@ -51,6 +51,10 @@ target_sources(vfx PRIVATE
     vfxVkSection.cpp
 )
 
+if(VKI_BUILD_GFX103)
+  target_compile_definitions(dumper PRIVATE VKI_BUILD_GFX103)
+endif()
+
 target_compile_definitions(vfx PRIVATE VFX_SUPPORT_VK_PIPELINE)
 
 target_include_directories(vfx

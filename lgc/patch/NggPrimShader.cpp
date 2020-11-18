@@ -2294,6 +2294,7 @@ void NggPrimShader::doEarlyExit(unsigned fullyCulledExportCount) {
         const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
 
         bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+        miscExport |= builtInUsage.primitiveShadingRate;
         if (miscExport)
           ++posExpCount;
 
@@ -2310,6 +2311,7 @@ void NggPrimShader::doEarlyExit(unsigned fullyCulledExportCount) {
         const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.vs;
 
         bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+        miscExport |= builtInUsage.primitiveShadingRate;
         if (miscExport)
           ++posExpCount;
 
@@ -2757,6 +2759,7 @@ void NggPrimShader::splitEs(Module *module) {
       const auto &builtInUsage = resUsage->builtInUsage.vs;
 
       bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+      miscExport |= builtInUsage.primitiveShadingRate;
       clipCullPos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;

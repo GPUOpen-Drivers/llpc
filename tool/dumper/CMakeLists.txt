@@ -45,6 +45,10 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
 endif()
 
+if(VKI_BUILD_GFX103)
+  target_compile_definitions(dumper PRIVATE VKI_BUILD_GFX103)
+endif()
+
 target_link_libraries(dumper PUBLIC metrohash)
 target_link_libraries(dumper PRIVATE cwpack)
 

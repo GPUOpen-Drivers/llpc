@@ -106,3 +106,5 @@ BUILTIN(ViewIndex, 4440, N, VHDGP, i32)     // View index
 BUILTIN(ViewportIndex, 10, MVDG, P, i32)    // Viewport index
 BUILTIN(WorkgroupId, 26, N, TMC, v3i32)     // ID of global workgroup
 BUILTIN(WorkgroupSize, 25, N, C, v3i32)     // Size of global workgroup
+BUILTIN(PrimitiveShadingRate, 4432, MVG, N, i32) // Shading rate used for fragments generated for this primitive
+BUILTIN(ShadingRate, 4444, N, P, i32)            // Current fragment's shading rate

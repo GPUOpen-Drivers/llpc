@@ -1474,6 +1474,10 @@ void PatchResourceCollect::clearInactiveInput() {
         m_activeInputBuiltIns.find(BuiltInHelperInvocation) == m_activeInputBuiltIns.end())
       builtInUsage.fs.helperInvocation = false;
 
+    if (builtInUsage.fs.shadingRate &&
+        m_activeInputBuiltIns.find(BuiltInShadingRate) == m_activeInputBuiltIns.end())
+      builtInUsage.fs.shadingRate = false;
+
     if (builtInUsage.fs.baryCoordNoPersp &&
         m_activeInputBuiltIns.find(BuiltInBaryCoordNoPersp) == m_activeInputBuiltIns.end())
       builtInUsage.fs.baryCoordNoPersp = false;
@@ -1590,6 +1594,8 @@ void PatchResourceCollect::clearInactiveOutput() {
     if (builtInUsage.viewportIndex && m_activeOutputBuiltIns.find(BuiltInViewportIndex) == m_activeOutputBuiltIns.end())
       builtInUsage.viewportIndex = false;
 
+    if (builtInUsage.primitiveShadingRate && m_activeOutputBuiltIns.find(BuiltInPrimitiveShadingRate) == m_activeOutputBuiltIns.end())
+      builtInUsage.primitiveShadingRate = false;
   }
 }
 
@@ -1898,6 +1904,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 
       builtInUsage.vs.layer = false;
       builtInUsage.vs.viewportIndex = false;
+      builtInUsage.vs.primitiveShadingRate = false;
     } else if (nextStage == ShaderStageGeometry) {
       // VS  ==>  GS
       const auto &nextBuiltInUsage = nextResUsage->builtInUsage.gs;
@@ -1937,6 +1944,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 
       builtInUsage.vs.layer = false;
       builtInUsage.vs.viewportIndex = false;
+      builtInUsage.vs.primitiveShadingRate = false;
     } else if (nextStage == ShaderStageInvalid) {
       // VS only
       if (builtInUsage.vs.clipDistance > 0 || builtInUsage.vs.cullDistance > 0) {
@@ -2343,6 +2351,9 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 
     if (builtInUsage.gs.viewportIndex)
       mapGsBuiltInOutput(BuiltInViewportIndex, 1);
+
+    if (builtInUsage.gs.primitiveShadingRate)
+      mapGsBuiltInOutput(BuiltInPrimitiveShadingRate, 1);
 
     // Map built-in outputs to generic ones (for copy shader)
     auto &builtInOutLocs = inOutUsage.gs.builtInOutLocs;

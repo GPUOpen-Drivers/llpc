@@ -655,6 +655,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
     spiPsInputAddr.bits.posWFloatEna = builtInUsage.fragCoord;
     spiPsInputAddr.bits.frontFaceEna = builtInUsage.frontFacing;
     spiPsInputAddr.bits.ancillaryEna = builtInUsage.sampleId;
+    spiPsInputAddr.bits.ancillaryEna |= builtInUsage.shadingRate;
     spiPsInputAddr.bits.sampleCoverageEna = builtInUsage.sampleMaskIn;
 
     builder.addAttribute("InitialPSInputAddr", std::to_string(spiPsInputAddr.u32All));
