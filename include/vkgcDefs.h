@@ -552,6 +552,9 @@ struct PipelineShaderOptions {
   /// Forcibly disable loop unrolling - overrides any explicit unroll directives
   bool disableLoopUnroll;
 
+  /// Whether enable adjustment of the fragment shader depth import for the variable shading rate
+  bool adjustDepthImportVrs;
+
   /// Override FP32 denormal handling.
   DenormalMode fp32DenormalMode;
 };

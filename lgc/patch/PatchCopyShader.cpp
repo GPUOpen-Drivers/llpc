@@ -395,6 +395,9 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
   if (builtInUsage.viewportIndex)
     builtInPairs.push_back(std::make_pair(BuiltInViewportIndex, builder.getInt32Ty()));
 
+  if (builtInUsage.primitiveShadingRate)
+    builtInPairs.push_back(std::make_pair(BuiltInPrimitiveShadingRate, builder.getInt32Ty()));
+
   for (auto &builtInPair : builtInPairs) {
     auto builtInId = builtInPair.first;
     Type *builtInTy = builtInPair.second;

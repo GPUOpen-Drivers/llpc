@@ -950,6 +950,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     bool usePrimitiveId = false;
     bool useLayer = false;
     bool useViewportIndex = false;
+    bool useShadingRate = false;
     unsigned clipDistanceCount = 0;
     unsigned cullDistanceCount = 0;
 
@@ -966,6 +967,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       usePrimitiveId = builtInUsage.primitiveId;
       useLayer = builtInUsage.layer;
       useViewportIndex = builtInUsage.viewportIndex;
+      useShadingRate = builtInUsage.primitiveShadingRate;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
 
@@ -998,6 +1000,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       usePrimitiveId = builtInUsage.primitiveId;
       useLayer = builtInUsage.layer;
       useViewportIndex = builtInUsage.viewportIndex;
+      useShadingRate = builtInUsage.primitiveShadingRate;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
     }
@@ -1053,6 +1056,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       }
 
       bool miscExport = usePointSize || useLayer || useViewportIndex;
+      miscExport |= useShadingRate;
       // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
       unsigned pos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
       Value *args[] = {
@@ -2127,6 +2131,35 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.z),
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.w),
     };
+    // Adjust gl_FragCoord.z value for the shading rate X,
+    //
+    // adjustedFragCoordZ = gl_FragCood.z + dFdxFine(gl_FragCood.z) * 1/16
+    // adjustedFragCoordZ = gl_ShadingRate.x == 1? adjustedFragCoordZ : gl_FragCood.z
+    if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waAdjustDepthImportVrs &&
+        m_pipelineState->getShaderOptions(ShaderStageFragment).adjustDepthImportVrs) {
+      const unsigned firstDppCtrl = 0xF5; // FineX:   [0,1,2,3]->[1,1,3,3]
+      const unsigned secondDppCtrl = 0xA0; // FineX:  [0,1,2,3]->[0,0,2,2]
+      Value *fragCoordZAsInt = builder.CreateBitCast(fragCoord[2], builder.getInt32Ty());
+      Value *firstDppValue = builder.CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
+                                                {fragCoordZAsInt, builder.getInt32(firstDppCtrl), builder.getInt32(15),
+                                                 builder.getInt32(15), builder.getTrue()});
+      firstDppValue = builder.CreateBitCast(firstDppValue, builder.getFloatTy());
+      Value *secondDppValue = builder.CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
+                                                {fragCoordZAsInt, builder.getInt32(secondDppCtrl), builder.getInt32(15),
+                                                 builder.getInt32(15), builder.getTrue()});
+      secondDppValue = builder.CreateBitCast(secondDppValue, builder.getFloatTy());
+      Value *adjustedFragCoordZ = builder.CreateFSub(firstDppValue, secondDppValue);
+      adjustedFragCoordZ = builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, adjustedFragCoordZ, nullptr);
+      Value *sixteenth = ConstantFP::get(builder.getFloatTy(), 1.0 / 16.0f);
+      adjustedFragCoordZ = builder.CreateIntrinsic(Intrinsic::fma, builder.getFloatTy(), {adjustedFragCoordZ, sixteenth, fragCoord[2]});
+      auto ancillary = getFunctionArgument(m_entryPoint, entryArgIdxs.ancillary);
+      Value *xRate = builder.CreateAnd(ancillary, 0xC);
+      xRate = builder.CreateLShr(xRate, 2);
+      // xRate = xRate == 0x1 ? Horizontal2Pixels : None
+      auto xRate2Pixels = builder.CreateICmpEQ(xRate, builder.getInt32(1));
+      adjustedFragCoordZ = builder.CreateSelect(xRate2Pixels, adjustedFragCoordZ, fragCoord[2]);
+      fragCoord[2] = adjustedFragCoordZ;
+    }
 
     fragCoord[3] = emitCall("llvm.amdgcn.rcp.f32", Type::getFloatTy(*m_context), {fragCoord[3]}, attribs, insertPos);
 
@@ -2269,6 +2302,13 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
                      ConstantInt::get(Type::getInt32Ty(*m_context), 4)};
     input = emitCall("llvm.amdgcn.ubfe.i32", inputTy, args, {}, insertPos);
 
+    break;
+  }
+  case BuiltInShadingRate: {
+    // gl_ShadingRate is not supported on pre-GFX10.3
+    assert(m_gfxIp.major > 10 || (m_gfxIp.major == 10 && m_gfxIp.minor >= 3));
+
+    input = getShadingRate(insertPos);
     break;
   }
   case BuiltInSubgroupSize: {
@@ -2809,6 +2849,19 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
 
     break;
   }
+  case BuiltInPrimitiveShadingRate: {
+    if (!static_cast<bool>(builtInUsage.primitiveShadingRate))
+      return;
+
+    // NOTE: Only last non-fragment shader stage has to export the value of gl_PrimitiveShadingRate.
+    if (!m_hasTs && !m_hasGs) {
+      // gl_PrimitiveShadingRate is not supported on pre-GFX10.3
+      assert(m_gfxIp.major > 10 || (m_gfxIp.major == 10 && m_gfxIp.minor >= 3));
+      addExportInstForBuiltInOutput(output, builtInId, insertPos);
+    }
+
+    break;
+  }
   default: {
     llvm_unreachable("Should never be called!");
     break;
@@ -3181,6 +3234,9 @@ void PatchInOutImportExport::patchGsBuiltInOutputExport(Value *output, unsigned 
   case BuiltInViewportIndex:
     assert(builtInUsage.viewportIndex);
     break;
+  case BuiltInPrimitiveShadingRate:
+    assert(builtInUsage.primitiveShadingRate);
+    break;
   default:
     llvm_unreachable("Should never be called!");
     break;
@@ -3280,6 +3336,13 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(Value *output, u
       // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
       m_viewportIndex = output;
     }
+
+    break;
+  }
+  case BuiltInPrimitiveShadingRate: {
+    // gl_PrimitiveShadingRate is not supported on pre-GFX10.3
+    assert(m_gfxIp.major > 10 || (m_gfxIp.major == 10 && m_gfxIp.minor >= 3));
+    addExportInstForBuiltInOutput(output, builtInId, insertPos);
 
     break;
   }
@@ -5208,6 +5271,13 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
 
     break;
   }
+  case BuiltInPrimitiveShadingRate: {
+    // gl_PrimitiveShadingRate is not supported on pre-GFX10.3
+    assert(m_gfxIp.major > 10 || (m_gfxIp.major == 10 && m_gfxIp.minor >= 3));
+
+    exportShadingRate(output, insertPos);
+    break;
+  }
   default: {
     llvm_unreachable("Should never be called!");
     break;
@@ -5609,6 +5679,99 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
       llvm_unreachable("Not implemented!");
     }
   }
+}
+
+// =====================================================================================================================
+// Exports HW shading rate, extracting the values from LGC shading rate (a mask of ShadingRateFlags)
+//
+// @param shadingRate : LGC shading rate
+// @param insertPos : Where to insert instructions.
+void PatchInOutImportExport::exportShadingRate(llvm::Value *shadingRate, llvm::Instruction *insertPos) {
+  IRBuilder<> builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+
+  // TODO: Current shading rate interpretation is based on GFX10.3.
+  assert(m_gfxIp.major == 10 && m_gfxIp.minor == 3);
+
+  // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
+  // and 4-pixel mode is not supported. But the spec requires us to accept unsupported rates and clamp them to
+  // maxFragmentSize of HW. The mapping is therefore as follow:
+  //
+  //   VRS X rate: MaskNone -> 0b00, Horizontal2Pixels | Horizontal4Pixels -> 0b01
+  //   VRS Y rate: MaskNone -> 0b00, Vertical2Pixels | Vertical4Pixels -> 0b01
+  //
+
+  // xRate = (shadingRate & (Horizontal2Pixels | Horizontal4Pixels) ? 0x1 : 0x0
+  Value *xRate2Pixels =
+      builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels));
+  xRate2Pixels = builder.CreateICmpNE(xRate2Pixels, builder.getInt32(0));
+  Value *xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(1), builder.getInt32(0));
+
+  // yRate = (shadingRate & (Vertical2Pixels | Vertical4Pixels)) ? 0x1 : 0x0
+  Value *yRate2Pixels =
+      builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
+  yRate2Pixels = builder.CreateICmpNE(yRate2Pixels, builder.getInt32(0));
+  Value *yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(1), builder.getInt32(0));
+
+  // [5:4] = Y rate, [3:2] = X rate
+  // hwShadingRate = (xRate << 2) | (yRate << 4)
+  xRate = builder.CreateShl(xRate, 2);
+  yRate = builder.CreateShl(yRate, 4);
+  auto hwShadingRate = builder.CreateOr(xRate, yRate);
+  hwShadingRate = builder.CreateBitCast(hwShadingRate, builder.getFloatTy());
+
+  auto undef = UndefValue::get(builder.getFloatTy());
+  // "Done" flag is valid for exporting position 0 ~ 3
+  builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
+                          {builder.getInt32(EXP_TARGET_POS_1), // tgt
+                           builder.getInt32(0x2),              // en
+                           undef,                              // src0
+                           hwShadingRate,                      // src1
+                           undef,                              // src2
+                           undef,                              // src3
+                           builder.getFalse(),                 // done
+                           builder.getFalse()});               // src0
+}
+
+// =====================================================================================================================
+// Gets HW shading rate and converts them to LGC definitions.
+//
+// @param insertPos : Where to insert instructions.
+llvm::Value *PatchInOutImportExport::getShadingRate(llvm::Instruction *insertPos) {
+  IRBuilder<> builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+
+  // TODO: Current shading rate interpretation is based on GFX10.3.
+  assert(m_gfxIp.major == 10 && m_gfxIp.minor == 3);
+
+  assert(m_shaderStage == ShaderStageFragment);
+  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
+  auto ancillary = getFunctionArgument(m_entryPoint, entryArgIdxs.ancillary);
+
+  // Y rate = Ancillary[5:4], X rate = Ancillary[3:2]
+  Value *xRate = builder.CreateAnd(ancillary, 0xC);
+  xRate = builder.CreateLShr(xRate, 2);
+  Value *yRate = builder.CreateAnd(ancillary, 0x30);
+  yRate = builder.CreateLShr(yRate, 4);
+
+  // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
+  // and 4-pixel mode is not supported. The mapping is as follow:
+  //
+  //   VRS X rate: 0b00 -> MaskNone, 0b01 -> Horizontal2Pixels
+  //   VRS Y rate: 0b00 -> MaskNone, 0b01 -> Vertical2Pixels
+  //
+
+  // xRate = xRate == 0x1 ? Horizontal2Pixels : None
+  auto xRate2Pixels = builder.CreateICmpEQ(xRate, builder.getInt32(1));
+  xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(ShadingRateHorizontal2Pixels),
+                               builder.getInt32(ShadingRateNone));
+
+  // yRate = yRate == 0x1 ? Vertical2Pixels : None
+  auto yRate2Pixels = builder.CreateICmpEQ(yRate, builder.getInt32(1));
+  yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(ShadingRateVertical2Pixels),
+                               builder.getInt32(ShadingRateNone));
+
+  return builder.CreateOr(xRate, yRate);
 }
 
 } // namespace lgc

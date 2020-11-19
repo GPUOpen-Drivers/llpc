@@ -123,7 +123,7 @@ struct WorkaroundFlags {
       unsigned waFixBadImageDescriptor : 1;
       unsigned waLimitedMaxOutputVertexCount : 1;
       unsigned waGeNggMaxVertOutWithGsInstancing : 1;
-      unsigned : 1;
+      unsigned waAdjustDepthImportVrs : 1;
       unsigned : 1;
       unsigned reserved : 11;
     };

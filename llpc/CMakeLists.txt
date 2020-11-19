@@ -169,6 +169,10 @@ target_include_directories(llpc
 # CMAKE-TODO: Figure out a better way to do this.
 target_include_directories(llpc PRIVATE ${XGL_ICD_PATH}/api/include/khronos)
 
+if(VKI_BUILD_GFX103)
+  target_compile_definitions(llpc PRIVATE LLPC_BUILD_GFX103)
+endif()
+
 if(WIN32)
     target_compile_definitions(llpc PRIVATE VK_USE_PLATFORM_WIN32_KHR)
 endif()

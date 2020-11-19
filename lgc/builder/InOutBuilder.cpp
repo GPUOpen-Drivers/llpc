@@ -1018,6 +1018,9 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize
     case BuiltInViewportIndex:
       usage.fs.viewportIndex = true;
       break;
+    case BuiltInShadingRate:
+      usage.fs.shadingRate = true;
+      break;
     case BuiltInHelperInvocation:
       usage.fs.helperInvocation = true;
       break;
@@ -1153,6 +1156,9 @@ void InOutBuilder::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySiz
     case BuiltInLayer:
       usage.vs.layer = true;
       break;
+    case BuiltInPrimitiveShadingRate:
+      usage.vs.primitiveShadingRate = true;
+      break;
     default:
       break;
     }
@@ -1233,6 +1239,9 @@ void InOutBuilder::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySiz
       break;
     case BuiltInLayer:
       usage.gs.layer = true;
+      break;
+    case BuiltInPrimitiveShadingRate:
+      usage.gs.primitiveShadingRate = true;
       break;
     default:
       break;

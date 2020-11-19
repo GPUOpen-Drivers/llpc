@@ -175,7 +175,8 @@ struct ShaderOptions {
   /// Override FP32 denormal handling.
   DenormalMode fp32DenormalMode;
 
-  bool reserved;
+  /// Whether enable adjustment of the fragment shader depth import for the variable shading rate
+  bool adjustDepthImportVrs;
 
   // Unroll loops by specified amount. 0 is default, 1 is no unroll.
   unsigned forceLoopUnrollCount;
@@ -364,6 +365,15 @@ enum CullModeFlags : unsigned {
   CullModeFront = 1,
   CullModeBack = 2,
   CullModeFrontAndBack = 3,
+};
+
+// Shading rate flags. These happen to have the same values as the corresponding SPIR-V enum.
+enum ShadingRateFlags : unsigned {
+  ShadingRateNone = 0,
+  ShadingRateVertical2Pixels = 1,
+  ShadingRateVertical4Pixels = 2,
+  ShadingRateHorizontal2Pixels = 4,
+  ShadingRateHorizontal4Pixels = 8,
 };
 
 // Struct to pass to SetRasterizerState

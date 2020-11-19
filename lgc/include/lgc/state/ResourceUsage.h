@@ -142,7 +142,7 @@ struct ResourceUsage {
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
         unsigned : 1; // Reserved
-        unsigned : 1; // Reserved
+        unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
       } vs;
 
       // Tessellation control shader
@@ -206,7 +206,7 @@ struct ResourceUsage {
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
         unsigned : 1; // Reserved
-        unsigned : 1; // Reserved
+        unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
       } gs;
 
       // Fragment shader
@@ -234,7 +234,7 @@ struct ResourceUsage {
         unsigned viewportIndex : 1;    // Whether gl_ViewportIndex is used
         unsigned helperInvocation : 1; // Whether gl_HelperInvocation is used
         unsigned viewIndex : 1;        // Whether gl_ViewIndex is used
-        unsigned : 1; // Reserved
+        unsigned shadingRate : 1; // Whether gl_ShadingRate is used
         unsigned baryCoordNoPersp : 1;         // Whether gl_BaryCoordNoPersp is used (AMD extension)
         unsigned baryCoordNoPerspCentroid : 1; // Whether gl_BaryCoordNoPerspCentroid is used (AMD extension)
         unsigned baryCoordNoPerspSample : 1;   // Whether gl_BaryCoordNoPerspSample is used (AMD extension)

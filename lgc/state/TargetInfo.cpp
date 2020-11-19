@@ -335,6 +335,24 @@ static void setGfx1012Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
 }
 
+// gfx103
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx103Info(TargetInfo *targetInfo) {
+  // Hardware workarounds for GFX10.3 based GPU's:
+  targetInfo->getGpuWorkarounds().gfx10.waAdjustDepthImportVrs = 1;
+}
+
+// gfx1030
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1030Info(TargetInfo *targetInfo) {
+  setGfx10Info(targetInfo);
+  setGfx103Info(targetInfo);
+
+  targetInfo->getGpuProperty().numShaderEngines = 4;
+}
+
 // =====================================================================================================================
 // Set TargetInfo. Returns false if the GPU name is not found or not supported.
 //
@@ -372,6 +390,7 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
       {"gfx90c", &setGfx9Info},     // gfx90c
       {"gfx1010", &setGfx1010Info}, // gfx1010
       {"gfx1012", &setGfx1012Info}, // gfx1012, navi14
+      {"gfx1030", &setGfx1030Info}, // gfx1030, navi21
   };
 
   void (*setTargetInfoFunc)(TargetInfo * targetInfo) = nullptr;

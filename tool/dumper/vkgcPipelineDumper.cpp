@@ -516,6 +516,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.scalarThreshold = " << shaderInfo->options.scalarThreshold << "\n";
   dumpFile << "options.disableLoopUnroll = " << shaderInfo->options.disableLoopUnroll << "\n";
   dumpFile << "options.fp32DenormalMode = " << shaderInfo->options.fp32DenormalMode << "\n";
+  dumpFile << "options.adjustDepthImportVrs = " << shaderInfo->options.adjustDepthImportVrs << "\n";
   dumpFile << "\n";
 }
 
@@ -1154,6 +1155,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.scalarThreshold);
       hasher->Update(options.disableLoopUnroll);
       hasher->Update(options.fp32DenormalMode);
+      hasher->Update(options.adjustDepthImportVrs);
     }
   }
 }
