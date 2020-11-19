@@ -195,6 +195,10 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
             destRsrc1.u32All = origRsrc1.u32All | srcRsrc1.u32All;
             destRsrc1.bits.VGPRS = std::max(origRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
             destRsrc1.bits.SGPRS = std::max(origRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
+            if (isGlueCode) {
+              // The float mode should come from the body of the shader and not the glue code.
+              destRsrc1.bits.FLOAT_MODE = origRsrc1.bits.FLOAT_MODE;
+            }
             *destNode = srcNode.getDocument()->getNode(destRsrc1.u32All);
             return 0;
           }

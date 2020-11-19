@@ -253,7 +253,9 @@ union SPI_SHADER_PGM_RSRC1 {
   struct {
     unsigned int VGPRS : 6;
     unsigned int SGPRS : 4;
-    unsigned int : 22;
+    unsigned int : 2;
+    unsigned int FLOAT_MODE : 8;
+    unsigned int : 12;
   } bits, bitfields;
   unsigned int u32All;
 };

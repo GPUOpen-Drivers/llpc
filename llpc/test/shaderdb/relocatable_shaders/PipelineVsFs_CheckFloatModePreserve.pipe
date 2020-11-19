@@ -1,0 +1,50 @@
+// This test case checks that the denormal mode is correctly set in the pal metadata.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: PalMetadata
+; SHADERTEST: SPI_SHADER_PGM_RSRC1_PS 0x00000000002F
+; END_SHADERTEST
+
+[Version]
+version = 41
+
+[VsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %4 "main"
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+               OpReturn
+               OpFunctionEnd
+
+[VsInfo]
+entryPoint = main
+
+[FsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %9
+               OpExecutionMode %4 OriginUpperLeft
+               OpDecorate %9 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+          %9 = OpVariable %_ptr_Output_v4float Output
+         %23 = OpUndef %v4float
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+               OpStore %9 %23
+               OpReturn
+               OpFunctionEnd
+
+[FsInfo]
+entryPoint = main
+options.fp32DenormalMode = Preserve
