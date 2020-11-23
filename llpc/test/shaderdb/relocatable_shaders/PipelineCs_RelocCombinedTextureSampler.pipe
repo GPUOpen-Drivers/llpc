@@ -1,5 +1,3 @@
-; XFAIL: *
-
 // This test case checks that two relocation entries are generated for a combined texture sampler descriptor,
 // one for the resource handle offset, and another for the sampler handle offset.
 ; BEGIN_SHADERTEST
