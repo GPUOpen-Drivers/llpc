@@ -911,8 +911,12 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
   hasher.Update(pipeline->options.scalarBlockLayout);
   hasher.Update(pipeline->options.includeIr);
   hasher.Update(pipeline->options.robustBufferAccess);
-  hasher.Update(pipeline->options.shadowDescriptorTableUsage);
-  hasher.Update(pipeline->options.shadowDescriptorTablePtrHigh);
+
+  if (!isRelocatableShader) {
+    hasher.Update(pipeline->options.shadowDescriptorTableUsage);
+    hasher.Update(pipeline->options.shadowDescriptorTablePtrHigh);
+  }
+
   hasher.Update(pipeline->options.extendedRobustness.robustBufferAccess);
   hasher.Update(pipeline->options.extendedRobustness.robustImageAccess);
   hasher.Update(pipeline->options.extendedRobustness.nullDescriptor);
