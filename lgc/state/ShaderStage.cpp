@@ -69,7 +69,6 @@ void lgc::setShaderStage(Function *func, ShaderStage stage) {
   unsigned mdKindId = func->getContext().getMDKindID(ShaderStageMetadata);
   auto stageMetaNode = MDNode::get(
       func->getContext(), {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(func->getContext()), stage))});
-  assert(!func->isDeclaration());
   func->setMetadata(mdKindId, stageMetaNode);
 }
 
