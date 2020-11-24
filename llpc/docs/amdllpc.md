@@ -3,7 +3,7 @@
 LLPC can be built into a standalone offline compiler (amdllpc). It supports GLSL, SPIR-V binary and SPIR-V assemble file as input and output GPU ISA code and related register settings.
 
 ### Build Instruction
-Please refer to the [Build Instructions](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) of amdvlk. By default, amdllpc is built together with Vulkan driver. You can use "make amdllpc" to build amdllpc only.
+Please refer to the [Build Instructions](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) of amdvlk. By default, amdllpc is built together with Vulkan driver. You can use "ninja amdllpc" to build amdllpc only.
 
 ### Usage
 ```
@@ -114,14 +114,13 @@ By integrating with [lit](http://llvm.org/docs/CommandGuide/lit.html), the test 
 First, enable LLVM utils build when you [build](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) Vulkan driver and amdllpc:
 ```
 cd <vulkandriver_path>/drivers/xgl
-cmake -H. -Bbuilds/Release64 -DXGL_BUILD_LIT=ON
+cmake -H. -Bbuilds/Release64 -DXGL_BUILD_LIT=ON -DLLVM_BUILD_UTILS=ON
 cd builds/Release64
-make -j$(nproc)
 ```
 
 Now, the tests can be run in the same directory using:
 ```
-make -j$(nproc) check-amdllpc
+ninja check-amdllpc
 ```
 
 That command (re)builds amdllpc and spvgen.so if necessary. If the spvgen.so build fails with
@@ -134,7 +133,7 @@ then you need to fetch the external sources (glslang and SPIRV-Tools) used by SP
 ```
 (cd ../../../spvgen/external && python fetch_external_sources.py)
 ```
-and then retry the `check-amdllpc`.
+and then retry the `ninja check-amdllpc`.
 
 When you need to investigate a test failure, run a single test from that same build directory like this example:
 ```
