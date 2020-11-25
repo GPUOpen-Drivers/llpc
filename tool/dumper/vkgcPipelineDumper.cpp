@@ -742,7 +742,11 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
 
   dumpFile << "nggState.enableNgg = " << pipelineInfo->nggState.enableNgg << "\n";
   dumpFile << "nggState.enableGsUse = " << pipelineInfo->nggState.enableGsUse << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
   dumpFile << "nggState.forceNonPassthrough = " << pipelineInfo->nggState.forceNonPassthrough << "\n";
+#else
+  dumpFile << "nggState.forceCullingMode = " << pipelineInfo->nggState.forceCullingMode << "\n";
+#endif
   dumpFile << "nggState.alwaysUsePrimShaderTable = " << pipelineInfo->nggState.alwaysUsePrimShaderTable << "\n";
   dumpFile << "nggState.compactMode = " << pipelineInfo->nggState.compactMode << "\n";
   dumpFile << "nggState.enableFastLaunch = " << pipelineInfo->nggState.enableFastLaunch << "\n";
@@ -996,7 +1000,11 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     hasher->Update(nggState->enableNgg);
     if (nggState->enableNgg) {
       hasher->Update(nggState->enableGsUse);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
       hasher->Update(nggState->forceNonPassthrough);
+#else
+      hasher->Update(nggState->forceCullingMode);
+#endif
       hasher->Update(nggState->alwaysUsePrimShaderTable);
       hasher->Update(nggState->compactMode);
       hasher->Update(nggState->enableFastLaunch);

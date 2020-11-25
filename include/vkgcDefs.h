@@ -70,6 +70,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     44.0 | Rename the member 'forceNonPassthrough' of NGG state to 'forceCullingMode'
 //* |     43.1 | Add disableImageResourceCheck in PipelineOptions                                                      |
 //* |     43.0 | Removed the enumerant WaveBreakSize::DrawTime                                                         |
 //* |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
@@ -455,9 +456,13 @@ enum NggCompactMode : unsigned {
 
 /// Represents NGG tuning options
 struct NggState {
-  bool enableNgg;                ///< Enable NGG mode, use an implicit primitive shader
-  bool enableGsUse;              ///< Enable NGG use on geometry shader
-  bool forceNonPassthrough;      ///< Force NGG to run in non pass-through mode
+  bool enableNgg;   ///< Enable NGG mode, use an implicit primitive shader
+  bool enableGsUse; ///< Enable NGG use on geometry shader
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
+  bool forceNonPassthrough; ///< Force NGG to run in non pass-through mode
+#else
+  bool forceCullingMode;          ///< Force NGG to run in culling mode
+#endif
   bool alwaysUsePrimShaderTable; ///< Always use primitive shader table to fetch culling-control registers
   NggCompactMode compactMode;    ///< Compaction mode after culling operations
 

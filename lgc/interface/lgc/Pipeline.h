@@ -55,7 +55,7 @@ class LgcContext;
 enum NggFlag : unsigned {
   NggFlagDisable = 0x0001,                      // Disable NGG
   NggFlagEnableGsUse = 0x0002,                  // Enable NGG when pipeline has GS
-  NggFlagForceNonPassthrough = 0x0004,          // Force NGG to run in non-passthrough mode
+  NggFlagForceCullingMode = 0x0004,             // Force NGG to run in culling mode
   NggFlagDontAlwaysUsePrimShaderTable = 0x0008, // Don't always use primitive shader table to fetch culling-control
                                                 //   registers
   NggFlagCompactDisable = 0x0010,               // Vertex compaction is disabled
