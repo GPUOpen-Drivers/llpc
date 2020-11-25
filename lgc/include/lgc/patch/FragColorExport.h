@@ -64,6 +64,9 @@ public:
                                   llvm::ArrayRef<ExportFormat> exportFormat, bool dummyExport, BuilderBase &builder);
   static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
   static llvm::CallInst *addDummyExport(BuilderBase &builder);
+  static llvm::Function *generateNullFragmentShader(llvm::Module &module, llvm::StringRef entryPointName);
+  static llvm::Function *generateNullFragmentEntryPoint(llvm::Module &module, llvm::StringRef entryPointName);
+  static void generateNullFragmentShaderBody(llvm::Function *entryPoint);
 
 private:
   FragColorExport() = delete;

@@ -32,6 +32,7 @@
 #include "GlueShader.h"
 #include "ColorExportShader.h"
 #include "FetchShader.h"
+#include "NullFragmentShader.h"
 #include "lgc/state/PassManagerCache.h"
 
 using namespace lgc;
@@ -69,4 +70,10 @@ std::unique_ptr<GlueShader> GlueShader::createFetchShader(PipelineState *pipelin
 std::unique_ptr<GlueShader> GlueShader::createColorExportShader(PipelineState *pipelineState,
                                                                 ArrayRef<ColorExportInfo> exports) {
   return std::make_unique<ColorExportShader>(pipelineState, exports);
+}
+
+// =====================================================================================================================
+// Create a null fragment shader object
+std::unique_ptr<GlueShader> GlueShader::createNullFragmentShader(PipelineState *pipelineState) {
+  return std::make_unique<NullFragmentShader>(pipelineState);
 }

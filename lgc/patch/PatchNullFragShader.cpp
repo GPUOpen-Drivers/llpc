@@ -120,7 +120,7 @@ bool PatchNullFragShader::runImpl(Module &module, PipelineState *pipelineState) 
   if (hasFs || !pipelineState->isGraphics())
     return false;
 
-  generateNullFragmentShader(module);
+  FragColorExport::generateNullFragmentShader(module, lgcName::NullFsEntryPoint);
   updatePipelineState(pipelineState);
   return true;
 }
@@ -140,39 +140,6 @@ void PatchNullFragShader::updatePipelineState(PipelineState *pipelineState) cons
   origLocInfo.setLocation(0);
   auto &newOutLocInfo = resUsage->inOutUsage.outputLocInfoMap[origLocInfo];
   newOutLocInfo.setData(InvalidValue);
-}
-
-// =====================================================================================================================
-// Generate a new fragment shader that has the minimum code needed to make PAL happy.
-//
-// @param [in/out] module : The LLVM module in which to add the shader.
-void PatchNullFragShader::generateNullFragmentShader(Module &module) {
-  Function *entryPoint = generateNullFragmentEntryPoint(module);
-  generateNullFragmentShaderBody(entryPoint);
-}
-
-// =====================================================================================================================
-// Generate a new entry point for a null fragment shader.
-//
-// @param [in/out] module : The LLVM module in which to add the entry point.
-// @returns : The new entry point.
-Function *PatchNullFragShader::generateNullFragmentEntryPoint(Module &module) {
-  FunctionType *entryPointTy = FunctionType::get(Type::getVoidTy(module.getContext()), ArrayRef<Type *>(), false);
-  Function *entryPoint =
-      Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::NullFsEntryPoint, &module);
-  entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-  setShaderStage(entryPoint, ShaderStageFragment);
-  return entryPoint;
-}
-
-// =====================================================================================================================
-// Generate the body of the null fragment shader.
-//
-// @param [in/out] entryPoint : The function in which the code will be inserted.
-void PatchNullFragShader::generateNullFragmentShaderBody(llvm::Function *entryPoint) {
-  BasicBlock *block = BasicBlock::Create(entryPoint->getContext(), "", entryPoint);
-  BuilderBase builder(block);
-  builder.CreateRetVoid();
 }
 
 // =====================================================================================================================

@@ -888,5 +888,40 @@ Value *LowerFragColorExport::generateValueForOutput(Value *value, Type *outputTy
 }
 
 // =====================================================================================================================
+// Generate a new fragment shader that has the minimum code needed to make PAL happy.
+//
+// @param [in/out] module : The LLVM module in which to add the shader.
+// @returns : the entry point for the null fragment shader.
+Function *FragColorExport::generateNullFragmentShader(Module &module, StringRef entryPointName) {
+  Function *entryPoint = generateNullFragmentEntryPoint(module, entryPointName);
+  generateNullFragmentShaderBody(entryPoint);
+  return entryPoint;
+}
+
+// =====================================================================================================================
+// Generate a new entry point for a null fragment shader.
+//
+// @param [in/out] module : The LLVM module in which to add the entry point.
+// @returns : The new entry point.
+Function *FragColorExport::generateNullFragmentEntryPoint(Module &module, StringRef entryPointName) {
+  FunctionType *entryPointTy = FunctionType::get(Type::getVoidTy(module.getContext()), ArrayRef<Type *>(), false);
+  Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, entryPointName, &module);
+  entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  setShaderStage(entryPoint, ShaderStageFragment);
+  entryPoint->setCallingConv(CallingConv::AMDGPU_PS);
+  return entryPoint;
+}
+
+// =====================================================================================================================
+// Generate the body of the null fragment shader.
+//
+// @param [in/out] entryPoint : The function in which the code will be inserted.
+void FragColorExport::generateNullFragmentShaderBody(llvm::Function *entryPoint) {
+  BasicBlock *block = BasicBlock::Create(entryPoint->getContext(), "", entryPoint);
+  BuilderBase builder(block);
+  builder.CreateRetVoid();
+}
+
+// =====================================================================================================================
 // Initialize the lower fragment color export pass
 INITIALIZE_PASS(LowerFragColorExport, DEBUG_TYPE, "Lower fragment color export calls", false, false)
