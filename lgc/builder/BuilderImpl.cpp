@@ -244,7 +244,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
         if (auto call = dyn_cast<CallInst>(base)) {
           if (index) {
             if (auto calledFunc = call->getCalledFunction()) {
-              if (calledFunc->getName().startswith(lgcName::DescriptorSet) ||
+              if (calledFunc->getName().startswith(lgcName::DescriptorTableAddr) ||
                   calledFunc->getName().startswith("llvm.amdgcn.reloc.constant")) {
                 if (worklist.size()) {
                   base = worklist.pop_back_val();

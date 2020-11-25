@@ -74,9 +74,9 @@ const static char PushConst[] = "lgc.push.const";
 // Get a descriptor that is in the root user data (as descriptor type indicated by the return type).
 // The arg is the dword offset of the node in the root user data layout.
 const static char RootDescriptor[] = "lgc.root.descriptor";
-// Get pointer to a descriptor set table. First arg is the descriptor set number; second arg is the value to use
-// for the high half of the address, or HighAddrPc to use PC.
-const static char DescriptorSet[] = "lgc.descriptor.set";
+// Get pointer to the descriptor table for the given resource. First arg is the descriptor set number; second arg
+// is the binding number; third arg is the value to use for the high half of the address, or HighAddrPc to use PC.
+const static char DescriptorTableAddr[] = "lgc.descriptor.table.addr";
 // Get special user data input. Arg is UserDataMapping enum value. The optional second arg causes the 32-bit
 // value to be extended to 64-bit pointer and specifies the value to use for the high half, or
 // ShadowDescriptorTable::Disable to use PC.

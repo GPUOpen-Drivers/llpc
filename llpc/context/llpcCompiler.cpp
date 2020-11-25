@@ -48,6 +48,7 @@
 #include "lgc/Builder.h"
 #include "lgc/ElfLinker.h"
 #include "lgc/PassManager.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -61,7 +62,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-
 #include <mutex>
 #include <set>
 #include <unordered_set>
@@ -949,6 +949,18 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMa
     if (isUnrelocatableResourceMappingRootNode(&resourceMapping->pUserDataNodes[i].node))
       return true;
   }
+
+  // If there is no 1-to-1 mapping between descriptor sets and descriptor tables, then relocatable shaders will fail.
+  llvm::SmallSet<unsigned, 8> descriptorSetsSeen;
+  for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+    const ResourceMappingNode *node = &resourceMapping->pUserDataNodes[i].node;
+    if (node->type != ResourceMappingNodeType::DescriptorTableVaPtr)
+      continue;
+    const ResourceMappingNode *innerNode = node->tablePtr.pNext;
+    if (!descriptorSetsSeen.insert(innerNode->srdRange.set).second)
+      return true;
+  }
+
   return false;
 }
 #endif

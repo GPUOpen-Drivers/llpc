@@ -153,8 +153,12 @@ private:
     SmallVector<UserDataNodeUsage, 8> pushConstOffsets;
     // Per-user-data-offset lists of lgc.root.descriptor calls
     SmallVector<UserDataNodeUsage, 8> rootDescriptors;
-    // Per-descriptor-set lists of lgc.descriptor.set calls
-    SmallVector<UserDataNodeUsage, 8> descriptorSets;
+    // Per-table lists of lgc.descriptor.table.addr calls
+    // When the user data nodes are available, a table is identifed by its
+    // index in the user data nodes.  Using this index allows for the possibility that a descriptor
+    // set is split over multiple tables.  When it is not available, a table is identified by the
+    // descriptor set it contains, which is consistent with the Vulkan binding model.
+    SmallVector<UserDataNodeUsage, 8> descriptorTables;
     // Per-UserDataMapping lists of lgc.special.user.data calls
     SmallVector<UserDataNodeUsage, 18> specialUserData;
     // Minimum offset at which spill table is used.
@@ -426,15 +430,30 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
       continue;
     }
 
-    if (func.getName().startswith(lgcName::DescriptorSet)) {
+    if (func.getName().startswith(lgcName::DescriptorTableAddr)) {
       for (User *user : func.users()) {
         CallInst *call = cast<CallInst>(user);
         unsigned set = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+        unsigned binding = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
         ShaderStage stage = getShaderStage(call->getFunction());
         assert(stage != ShaderStageCopyShader);
-        auto &descriptorSets = getUserDataUsage(stage)->descriptorSets;
-        descriptorSets.resize(std::max(descriptorSets.size(), size_t(set + 1)));
-        descriptorSets[set].users.push_back(call);
+        auto &descriptorTable = getUserDataUsage(stage)->descriptorTables;
+
+        if (m_pipelineState->isUnlinked() && m_pipelineState->getUserDataNodes().empty()) {
+          // The user data nodes are not available, so we use the set as the
+          // index.
+          descriptorTable.resize(std::max(descriptorTable.size(), size_t(set + 1)));
+          descriptorTable[set].users.push_back(call);
+        } else {
+          // The user data nodes are available, so we use the offset of the node as the
+          // index.
+          const ResourceNode *node;
+          node = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, set, binding).first;
+          assert(node && "Could not find resource node");
+          uint32_t descTableIndex = node - &m_pipelineState->getUserDataNodes().front();
+          descriptorTable.resize(std::max(descriptorTable.size(), size_t(descTableIndex + 1)));
+          descriptorTable[descTableIndex].users.push_back(call);
+        }
       }
     } else if (func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) {
       auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
@@ -593,18 +612,19 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
       }
     }
 
-    // Descriptor sets.
-    for (unsigned descSetIdx = 0; descSetIdx != userDataUsage->descriptorSets.size(); ++descSetIdx) {
-      auto &descriptorSet = userDataUsage->descriptorSets[descSetIdx];
+    // Descriptor tables
+    for (unsigned userDataIdx = 0; userDataIdx != userDataUsage->descriptorTables.size(); ++userDataIdx) {
+      auto &descriptorTable = userDataUsage->descriptorTables[userDataIdx];
       Instruction *load = nullptr;
-      for (Instruction *&inst : descriptorSet.users) {
-        Value *descSetVal = nullptr;
+      for (Instruction *&inst : descriptorTable.users) {
+        Value *descTableVal = nullptr;
         if (inst && inst->getFunction() == &func) {
           auto call = cast<CallInst>(inst);
-          Value *highHalf = call->getArgOperand(1);
-          if (descriptorSet.entryArgIdx != 0) {
+          Value *highHalf = call->getArgOperand(2);
+          std::string namePrefix = "descTable";
+          if (descriptorTable.entryArgIdx != 0) {
             // The descriptor set is unspilled, and uses an entry arg.
-            descSetVal = func.getArg(descriptorSet.entryArgIdx);
+            descTableVal = func.getArg(descriptorTable.entryArgIdx);
             if (isa<ConstantInt>(highHalf)) {
               // Set builder to insert the 32-to-64 extension code at the start of the function.
               builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
@@ -614,42 +634,38 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
               builder.SetInsertPoint(highHalfInst->getNextNode());
             }
           } else {
-            // The descriptor set is spilled, so we to GEP an offset from the spill table and load from that. For all
+            // The descriptor table is spilled, so we GEP an offset from the spill table and load from that. For all
             // users, we share a single load at the start of the function.
             if (!load) {
               // This is the first use we have seen in this function. Create the GEP and load, straight after the
               // code at the start of the function that extends the spill table pointer.
               builder.SetInsertPoint(spillTable->getNextNode());
-              const ResourceNode *node;
-              const ResourceNode *innerNode;
-              std::tie(node, innerNode) =
-                  m_pipelineState->findResourceNode(ResourceNodeType::DescriptorTableVaPtr, descSetIdx, 0);
-              ((void)innerNode);
               Value *offset = nullptr;
-              if (node) {
-                // We have the user data node for the desciptor set. Use the offset from that.
+              if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
+                const ResourceNode *node = &m_pipelineState->getUserDataNodes()[userDataIdx];
                 m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
                 offset = builder.getInt32(node->offsetInDwords * 4);
               } else {
-                // Shader compilation. Use a reloc.
-                assert(m_pipelineState->isUnlinked());
-                offset = builder.CreateRelocationConstant("descset_" + Twine(descSetIdx));
+                // Shader compilation. Use a relocation to get the descriptor
+                // table offset for the descriptor set userDataIdx.
+                offset = builder.CreateRelocationConstant("descset_" + Twine(userDataIdx));
+                namePrefix = "descSet";
               }
               Value *addr = builder.CreateGEP(builder.getInt8Ty(), spillTable, offset);
               addr = builder.CreateBitCast(addr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
               load = builder.CreateLoad(builder.getInt32Ty(), addr);
             }
-            descSetVal = load;
+            descTableVal = load;
             // Set builder to insert the 32-to-64 extension code just after the load.
             builder.SetInsertPoint(load->getNextNode());
           }
-          descSetVal->setName("descSet" + Twine(descSetIdx));
+          descTableVal->setName(namePrefix + Twine(userDataIdx));
 
           // Now we want to extend the loaded 32-bit value to a 64-bit pointer, using either PC or the provided
           // high half.
-          descSetVal = addressExtender.extend(descSetVal, highHalf, call->getType(), builder);
+          descTableVal = addressExtender.extend(descTableVal, highHalf, call->getType(), builder);
           // Replace uses of the call and erase it.
-          call->replaceAllUsesWith(descSetVal);
+          call->replaceAllUsesWith(descTableVal);
           call->eraseFromParent();
           inst = nullptr;
         }
@@ -1169,14 +1185,14 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
   if (m_pipelineState->isUnlinked() && m_pipelineState->getUserDataNodes().empty()) {
     // Shader compilation with no user data layout. Add descriptor sets directly from the user data usage
     // gathered at the start of this pass.
-    for (unsigned descSetIdx = 0; descSetIdx != userDataUsage->descriptorSets.size(); ++descSetIdx) {
-      auto &descriptorSet = userDataUsage->descriptorSets[descSetIdx];
-      if (!descriptorSet.users.empty()) {
+    for (unsigned descSetIdx = 0; descSetIdx != userDataUsage->descriptorTables.size(); ++descSetIdx) {
+      auto &descriptorTable = userDataUsage->descriptorTables[descSetIdx];
+      if (!descriptorTable.users.empty()) {
         // Set the PAL metadata user data value to indicate that it needs modifying at link time.
         assert(descSetIdx <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
                                  static_cast<unsigned>(UserDataMapping::DescriptorSet0));
         unsigned userDataValue = static_cast<unsigned>(UserDataMapping::DescriptorSet0) + descSetIdx;
-        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue, &descriptorSet.entryArgIdx));
+        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue, &descriptorTable.entryArgIdx));
       }
     }
 
@@ -1219,8 +1235,8 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
   // We do have user data layout.
   // Add entries from the root user data layout (not vertex buffer or streamout, and not unused ones).
 
-  for (unsigned i = 0; i != m_pipelineState->getUserDataNodes().size(); ++i) {
-    const ResourceNode &node = m_pipelineState->getUserDataNodes()[i];
+  for (unsigned userDataNodeIdx = 0; userDataNodeIdx != m_pipelineState->getUserDataNodes().size(); ++userDataNodeIdx) {
+    const ResourceNode &node = m_pipelineState->getUserDataNodes()[userDataNodeIdx];
     switch (node.type) {
 
     case ResourceNodeType::IndirectUserDataVaPtr:
@@ -1231,8 +1247,8 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       // Check if the descriptor set is in use. For compute with calls, enable it anyway.
       UserDataNodeUsage *descSetUsage = nullptr;
       if (!isComputeWithCalls()) {
-        if (userDataUsage->descriptorSets.size() > node.innerTable[0].set)
-          descSetUsage = &userDataUsage->descriptorSets[node.innerTable[0].set];
+        if (userDataUsage->descriptorTables.size() > userDataNodeIdx)
+          descSetUsage = &userDataUsage->descriptorTables[userDataNodeIdx];
         if (!descSetUsage || descSetUsage->users.empty())
           break;
       }
