@@ -609,8 +609,12 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       endReadPrimIdBlock = createBlock(entryPoint, ".endReadPrimId");
     }
 
-    auto allocReqBlock = createBlock(entryPoint, ".allocReq");
-    auto endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
+    BasicBlock *allocReqBlock = nullptr;
+    BasicBlock *endAllocReqBlock = nullptr;
+    if (m_gfxIp.major <= 10) {
+      allocReqBlock = createBlock(entryPoint, ".allocReq");
+      endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
+    }
 
     auto expPrimBlock = createBlock(entryPoint, ".expPrim");
     auto endExpPrimBlock = createBlock(entryPoint, ".endExpPrim");
@@ -633,8 +637,12 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       } else {
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-        auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
-        m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
+        if (m_gfxIp.major <= 10) {
+          auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
+          m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
+        } else {
+          llvm_unreachable("Not implemented!");
+        }
       }
     }
 
@@ -691,25 +699,31 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-        auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
-        m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
+        if (m_gfxIp.major <= 10) {
+          auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
+          m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
+        } else {
+          llvm_unreachable("Not implemented!");
+        }
       }
     }
 
-    // Construct ".allocReq" block
-    {
-      m_builder->SetInsertPoint(allocReqBlock);
+    if (m_gfxIp.major <= 10) {
+      // Construct ".allocReq" block
+      {
+        m_builder->SetInsertPoint(allocReqBlock);
 
-      doParamCacheAllocRequest();
-      m_builder->CreateBr(endAllocReqBlock);
-    }
+        doParamCacheAllocRequest();
+        m_builder->CreateBr(endAllocReqBlock);
+      }
 
-    // Construct ".endAllocReq" block
-    {
-      m_builder->SetInsertPoint(endAllocReqBlock);
+      // Construct ".endAllocReq" block
+      {
+        m_builder->SetInsertPoint(endAllocReqBlock);
 
-      auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
-      m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
+        auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
+        m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
+      }
     }
 
     // Construct ".expPrim" block
