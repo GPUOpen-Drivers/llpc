@@ -276,7 +276,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       options.nggFlags |= NggFlagDisable;
     else {
       options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
-                         (nggState.forceNonPassthrough ? NggFlagForceNonPassthrough : 0) |
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
+                         (nggState.forceNonPassthrough ? NggFlagForceCullingMode : 0) |
+#else
+                         (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
+#endif
                          (nggState.alwaysUsePrimShaderTable ? 0 : NggFlagDontAlwaysUsePrimShaderTable) |
                          (nggState.compactMode == NggCompactDisable ? NggFlagCompactDisable : 0) |
                          (nggState.enableFastLaunch ? NggFlagEnableFastLaunch : 0) |

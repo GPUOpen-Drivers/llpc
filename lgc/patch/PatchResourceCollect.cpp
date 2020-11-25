@@ -162,7 +162,7 @@ void PatchResourceCollect::setNggControl(Module *module) {
   nggControl.vertsPerSubgroup = std::min(options.nggVertsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
 
   if (nggControl.enableNgg) {
-    if (options.nggFlags & NggFlagForceNonPassthrough)
+    if (options.nggFlags & NggFlagForceCullingMode)
       nggControl.passthroughMode = false;
     else {
       nggControl.passthroughMode = !nggControl.enableVertexReuse && !nggControl.enableBackfaceCulling &&

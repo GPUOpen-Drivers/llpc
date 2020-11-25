@@ -139,9 +139,9 @@ static cl::opt<bool> EnableNgg("enable-ngg", cl::desc("Enable implicit primitive
 static cl::opt<bool> NggEnableGsUse("ngg-enable-gs-use", cl::desc("Enable NGG use on geometry shader"),
                                     cl::init(false));
 
-// -ngg-force-non-passthrough: force NGG to run in non pass-through mode
-static cl::opt<bool> NggForceNonPassThrough("ngg-force-non-passthrough",
-                                            cl::desc("Force NGG to run in non pass-through mode"), cl::init(false));
+// -ngg-force-culling-mode: force NGG to run in culling mode
+static cl::opt<bool> NggForceCullingMode("ngg-force-culling-mode", cl::desc("Force NGG to run in culling mode"),
+                                         cl::init(false));
 
 // -ngg-always-use-prim-shader-table: always use primitive shader table to fetch culling-control registers
 static cl::opt<bool>
@@ -472,7 +472,11 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 
     nggState.enableNgg = EnableNgg;
     nggState.enableGsUse = NggEnableGsUse;
-    nggState.forceNonPassthrough = NggForceNonPassThrough;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
+    nggState.forceNonPassthrough = NggForceCullingMode;
+#else
+    nggState.forceCullingMode = NggForceCullingMode;
+#endif
     nggState.alwaysUsePrimShaderTable = NggAlwaysUsePrimShaderTable;
     nggState.compactMode = static_cast<NggCompactMode>(NggCompactionMode.getValue());
     nggState.enableFastLaunch = NggEnableFastLaunchRate;
