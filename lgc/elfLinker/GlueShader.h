@@ -53,6 +53,9 @@ public:
   static std::unique_ptr<GlueShader> createColorExportShader(PipelineState *pipelineState,
                                                              llvm::ArrayRef<ColorExportInfo> exports);
 
+  // Create a null fragment shader
+  static std::unique_ptr<GlueShader> createNullFragmentShader(PipelineState *pipelineState);
+
   // Get the string for this glue shader. This is some encoding or hash of the inputs to the create*Shader function
   // that the front-end client can use as a cache key to avoid compiling the same glue shader more than once.
   virtual llvm::StringRef getString() = 0;

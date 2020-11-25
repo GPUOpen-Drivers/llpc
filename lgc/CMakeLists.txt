@@ -135,6 +135,7 @@ target_sources(LLVMlgc PRIVATE
     elfLinker/ElfLinker.cpp
     elfLinker/FetchShader.cpp
     elfLinker/GlueShader.cpp
+    elfLinker/NullFragmentShader.cpp
     elfLinker/RelocHandler.cpp
 )
 

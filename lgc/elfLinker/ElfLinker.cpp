@@ -312,6 +312,11 @@ void ElfLinkerImpl::createGlueShaders() {
     m_glueShaders.push_back(GlueShader::createFetchShader(m_pipelineState, fetches, vsEntryRegInfo));
   }
 
+  if (m_pipelineState->isGraphics() &&
+      !(this->m_pipelineState->getShaderStageMask() & shaderStageToMask(ShaderStageFragment))) {
+    m_glueShaders.push_back(GlueShader::createNullFragmentShader(m_pipelineState));
+  }
+
   // Create a color export shader if we need one.
   SmallVector<ColorExportInfo, 8> exports;
   m_pipelineState->getPalMetadata()->getColorExportInfo(exports);
@@ -741,6 +746,14 @@ bool ElfLinkerImpl::insertGlueShaders() {
     // Find the input ELF containing the main shader that the glue shader wants to attach to.
     StringRef mainName = glueShader->getMainShaderName();
     unsigned insertPos = UINT_MAX;
+
+    if (mainName == glueShader->getGlueShaderName()) {
+      // In this case, the glue shader is a stand alone shader.  The null fragment shader is an example.
+      mergePalMetadataFromElf(*glueElfInput.objectFile, false);
+      m_elfInputs.push_back(std::move(glueElfInput));
+      return true;
+    }
+
     for (unsigned idx = 0; idx != m_elfInputs.size(); ++idx) {
       ElfInput &elfInput = m_elfInputs[idx];
       for (auto sym : elfInput.objectFile->symbols()) {

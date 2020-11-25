@@ -908,13 +908,6 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMa
 // @param pipelineInfo : Pipeline info for the pipeline to be built
 bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfos,
                                                   const GraphicsPipelineBuildInfo *pipelineInfo) {
-  if (!pipelineInfo->unlinked) {
-    if (!shaderInfos[ShaderStageFragment] || !shaderInfos[ShaderStageFragment]->pModuleData) {
-      // TODO: Generate a null fragment shader when linking.
-      return false;
-    }
-  }
-
   // Check user data nodes for unsupported Descriptor types.
   if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
     return false;
