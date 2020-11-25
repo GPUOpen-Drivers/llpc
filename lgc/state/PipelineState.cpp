@@ -725,6 +725,31 @@ static bool IsNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType can
 }
 
 // =====================================================================================================================
+// Returns true when type is one that has a binding.
+// @param nodeType : Resource node type
+static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
+  switch (nodeType) {
+  case ResourceNodeType::DescriptorResource:
+  case ResourceNodeType::DescriptorSampler:
+  case ResourceNodeType::DescriptorCombinedTexture:
+  case ResourceNodeType::DescriptorTexelBuffer:
+  case ResourceNodeType::DescriptorFmask:
+  case ResourceNodeType::DescriptorBuffer:
+  case ResourceNodeType::DescriptorTableVaPtr:
+  case ResourceNodeType::DescriptorBufferCompact:
+  case ResourceNodeType::InlineBuffer:
+    return true;
+  case ResourceNodeType::IndirectUserDataVaPtr:
+  case ResourceNodeType::PushConst:
+  case ResourceNodeType::StreamOutTableVaPtr:
+    return false;
+  default:
+    LLVM_BUILTIN_UNREACHABLE;
+  }
+  return false;
+}
+
+// =====================================================================================================================
 // Find the resource node for the given {set,binding} compatible with nodeType.
 //
 // For nodeType == DescriptorTableVaPtr, the node whose first child matches descSet is returned.
@@ -740,6 +765,9 @@ static bool IsNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType can
 std::pair<const ResourceNode *, const ResourceNode *>
 PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, unsigned binding) const {
   for (const ResourceNode &node : getUserDataNodes()) {
+    if (!nodeTypeHasBinding(node.type))
+      continue;
+
     if (node.type == ResourceNodeType::DescriptorTableVaPtr) {
       if (nodeType == ResourceNodeType::DescriptorTableVaPtr) {
         assert(!node.innerTable.empty());
