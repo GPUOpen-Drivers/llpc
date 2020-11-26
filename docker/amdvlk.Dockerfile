@@ -59,6 +59,7 @@ RUN apt-get update \
 # The /vulkandriver/env.sh file is for extra env variables used by later commands.
 WORKDIR /vulkandriver
 RUN repo init -u https://github.com/GPUOpen-Drivers/AMDVLK.git -b "$BRANCH" \
+    && cp /vulkandriver/.repo/repo/repo /usr/bin/repo \
     && repo sync -c --no-clone-bundle -j$(nproc) \
     && touch ./env.sh \
     && cd /vulkandriver/drivers/spvgen/external \
@@ -105,5 +106,10 @@ RUN EXTRA_FLAGS="" \
 # Run the lit test suite.
 RUN source /vulkandriver/env.sh \
     && cmake --build . --target check-amdllpc -- -v \
-    && cmake --build . --target check-lgc -- -v \
-    && (echo "Base image built on $(date)" | tee /vulkandriver/build_info.txt)
+    && cmake --build . --target check-lgc -- -v
+
+# Save build info to /vulkandriver/build_info.txt.
+RUN cd /vulkandriver \
+    && (printf "Base image built on $(date)\n\n" | tee build_info.txt) \
+    && (repo forall -p -c "git log -1 --pretty=format:'%H %s by %an <%ae>'" | tee -a build_info.txt) \
+    && (echo | tee -a build_info.txt)
