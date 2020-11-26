@@ -59,7 +59,6 @@ public:
 
 private:
   void setupTargetFeatures(Module *module);
-  ShaderStage getShaderStageFromCallingConv(CallingConv::ID callConv);
 
   PipelineState *m_pipelineState;
 };
@@ -100,12 +99,20 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     globalFeatures += ",+DumpCode";
 
   for (auto func = module->begin(), end = module->end(); func != end; ++func) {
+    if (func->isDeclaration())
+      continue;
+
+    std::string targetFeatures(globalFeatures);
+    AttrBuilder builder;
+
+    ShaderStage shaderStage = lgc::getShaderStage(&*func);
+
+    if (shaderStage == ShaderStage::ShaderStageInvalid) {
+      errs() << "Invalid shader stage for function " << func->getName() << "\n";
+      report_fatal_error("Got invalid shader stage when setting up features for function");
+    }
+
     if (isShaderEntryPoint(&*func)) {
-      std::string targetFeatures(globalFeatures);
-      AttrBuilder builder;
-
-      ShaderStage shaderStage = getShaderStageFromCallingConv(func->getCallingConv());
-
       bool useSiScheduler = m_pipelineState->getShaderOptions(shaderStage).useSiScheduler;
       if (useSiScheduler) {
         // It was found that enabling both SIScheduler and SIFormClauses was bad on one particular
@@ -113,123 +120,78 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
         targetFeatures += ",+si-scheduler";
         builder.addAttribute("amdgpu-max-memory-clause", "1");
       }
+    }
 
-      if (func->getCallingConv() == CallingConv::AMDGPU_GS) {
-        // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
-        // read/write. This usage must enable the feature of using CI+ additional instructions.
-        const auto nggControl = m_pipelineState->getNggControl();
-        if (nggControl->enableNgg && !nggControl->passthroughMode)
-          targetFeatures += ",+ci-insts,+enable-ds128";
-      }
+    if (func->getCallingConv() == CallingConv::AMDGPU_GS) {
+      // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
+      // read/write. This usage must enable the feature of using CI+ additional instructions.
+      const auto nggControl = m_pipelineState->getNggControl();
+      if (nggControl->enableNgg && !nggControl->passthroughMode)
+        targetFeatures += ",+ci-insts,+enable-ds128";
+    }
 
-      if (func->getCallingConv() == CallingConv::AMDGPU_HS) {
-        // Force s_barrier to be present (ignore optimization)
-        builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
-      }
-      if (func->getCallingConv() == CallingConv::AMDGPU_CS) {
-        // Set the work group size
-        const auto &csBuiltInUsage = m_pipelineState->getShaderModes()->getComputeShaderMode();
-        unsigned flatWorkGroupSize =
-            csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
-        auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
-        builder.addAttribute("amdgpu-flat-work-group-size", flatWorkGroupSizeString + "," + flatWorkGroupSizeString);
-      }
+    if (func->getCallingConv() == CallingConv::AMDGPU_HS) {
+      // Force s_barrier to be present (ignore optimization)
+      builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
+    }
+    if (func->getCallingConv() == CallingConv::AMDGPU_CS) {
+      // Set the work group size
+      const auto &csBuiltInUsage = m_pipelineState->getShaderModes()->getComputeShaderMode();
+      unsigned flatWorkGroupSize =
+          csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
+      auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
+      builder.addAttribute("amdgpu-flat-work-group-size", flatWorkGroupSizeString + "," + flatWorkGroupSizeString);
+    }
 
-      auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+    auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
 #warning[!amd-gfx] Scratch bounds checks not supported
 #else
-      if (gfxIp.major >= 9)
-        targetFeatures += ",+enable-scratch-bounds-checks";
+    // The backend currently only supports bounds checks for entry points
+    if (gfxIp.major >= 9 && isShaderEntryPoint(&*func))
+      targetFeatures += ",+enable-scratch-bounds-checks";
 #endif
 
-      if (gfxIp.major >= 10) {
-        // Setup wavefront size per shader stage
-        unsigned waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
+    if (gfxIp.major >= 10) {
+      // Setup wavefront size per shader stage
+      unsigned waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
 
-        targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
+      targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
 
-        // Allow driver setting for WGP by forcing backend to set 0
-        // which is then OR'ed with the driver set value
-        targetFeatures += ",+cumode";
-      }
+      // Allow driver setting for WGP by forcing backend to set 0
+      // which is then OR'ed with the driver set value
+      targetFeatures += ",+cumode";
+    }
 
-      // Set up denormal mode attributes.
+    // Set up denormal mode attributes.
 
-      // In the backend, f32 denormals are handled by default, so request denormal flushing behavior.
-      builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
+    // In the backend, f32 denormals are handled by default, so request denormal flushing behavior.
+    builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
 
-      if (shaderStage != ShaderStageCopyShader) {
-        const auto &shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
-        if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone ||
-            shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||
-            shaderMode.fp64DenormMode == FpDenormMode::FlushNone || shaderMode.fp64DenormMode == FpDenormMode::FlushIn) {
-          builder.addAttribute("denormal-fp-math", "ieee");
-        }
-        else if (shaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
+    if (shaderStage != ShaderStageCopyShader) {
+      const auto &shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
+      if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone || shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||
+          shaderMode.fp64DenormMode == FpDenormMode::FlushNone || shaderMode.fp64DenormMode == FpDenormMode::FlushIn) {
+        builder.addAttribute("denormal-fp-math", "ieee");
+      } else if (shaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
                  shaderMode.fp16DenormMode == FpDenormMode::FlushInOut ||
                  shaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
                  shaderMode.fp64DenormMode == FpDenormMode::FlushInOut) {
-          builder.addAttribute("denormal-fp-math", "preserve-sign");
-        }
-        if (shaderMode.fp32DenormMode == FpDenormMode::FlushNone || shaderMode.fp32DenormMode == FpDenormMode::FlushIn) {
-          builder.addAttribute("denormal-fp-math-f32", "ieee");
-        }
-        else if (shaderMode.fp32DenormMode == FpDenormMode::FlushOut ||
-                 shaderMode.fp32DenormMode == FpDenormMode::FlushInOut) {
-          builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
-        }
+        builder.addAttribute("denormal-fp-math", "preserve-sign");
       }
-
-      builder.addAttribute("target-features", targetFeatures);
-      AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
-      func->addAttributes(attribIdx, builder);
+      if (shaderMode.fp32DenormMode == FpDenormMode::FlushNone || shaderMode.fp32DenormMode == FpDenormMode::FlushIn) {
+        builder.addAttribute("denormal-fp-math-f32", "ieee");
+      } else if (shaderMode.fp32DenormMode == FpDenormMode::FlushOut ||
+                 shaderMode.fp32DenormMode == FpDenormMode::FlushInOut) {
+        builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
+      }
     }
+
+    builder.addAttribute("target-features", targetFeatures);
+    AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
+    func->addAttributes(attribIdx, builder);
   }
-}
-
-// =====================================================================================================================
-// Gets the shader stage from the specified calling convention.
-//
-// @param callConv : Calling convention
-ShaderStage PatchSetupTargetFeatures::getShaderStageFromCallingConv(CallingConv::ID callConv) {
-  ShaderStage shaderStage = ShaderStageInvalid;
-  auto stageMask = m_pipelineState->getShaderStageMask();
-
-  bool hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
-  bool hasTs = ((stageMask & shaderStageToMask(ShaderStageTessControl)) != 0 ||
-                (stageMask & shaderStageToMask(ShaderStageTessEval)) != 0);
-
-  switch (callConv) {
-  case CallingConv::AMDGPU_PS:
-    shaderStage = ShaderStageFragment;
-    break;
-  case CallingConv::AMDGPU_LS:
-    shaderStage = ShaderStageVertex;
-    break;
-  case CallingConv::AMDGPU_HS:
-    shaderStage = ShaderStageTessControl;
-    break;
-  case CallingConv::AMDGPU_ES:
-    shaderStage = hasTs ? ShaderStageTessEval : ShaderStageVertex;
-    break;
-  case CallingConv::AMDGPU_GS:
-    // NOTE: If GS is not present, this must be NGG.
-    shaderStage = hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
-    break;
-  case CallingConv::AMDGPU_VS:
-    shaderStage = hasGs ? ShaderStageCopyShader : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
-    break;
-  case CallingConv::AMDGPU_CS:
-    shaderStage = ShaderStageCompute;
-    break;
-  default:
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-
-  return shaderStage;
 }
 
 // =====================================================================================================================
