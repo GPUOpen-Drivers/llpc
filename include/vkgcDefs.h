@@ -43,7 +43,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 41
+#define LLPC_INTERFACE_MAJOR_VERSION 44
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
