@@ -43,7 +43,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 44
+#define LLPC_INTERFACE_MAJOR_VERSION 45
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -70,7 +70,8 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
-//* |     44.0 | Rename the member 'forceNonPassthrough' of NGG state to 'forceCullingMode'
+//* |     45.0 | Remove the member 'enableFastLaunch' of NGG state                                                     |
+//* |     44.0 | Rename the member 'forceNonPassthrough' of NGG state to 'forceCullingMode'                            |
 //* |     43.1 | Add disableImageResourceCheck in PipelineOptions                                                      |
 //* |     43.0 | Removed the enumerant WaveBreakSize::DrawTime                                                         |
 //* |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
@@ -466,7 +467,9 @@ struct NggState {
   bool alwaysUsePrimShaderTable; ///< Always use primitive shader table to fetch culling-control registers
   NggCompactMode compactMode;    ///< Compaction mode after culling operations
 
-  bool enableFastLaunch;          ///< Enable the hardware to launch subgroups of work at a faster rate
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
+  bool enableFastLaunch; ///< Enable the hardware to launch subgroups of work at a faster rate
+#endif
   bool enableVertexReuse;         ///< Enable optimization to cull duplicate vertices
   bool enableBackfaceCulling;     ///< Enable culling of primitives that don't meet facing criteria
   bool enableFrustumCulling;      ///< Enable discarding of primitives outside of view frustum

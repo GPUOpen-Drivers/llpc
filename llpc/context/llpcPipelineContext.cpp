@@ -283,7 +283,6 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 #endif
                          (nggState.alwaysUsePrimShaderTable ? 0 : NggFlagDontAlwaysUsePrimShaderTable) |
                          (nggState.compactMode == NggCompactDisable ? NggFlagCompactDisable : 0) |
-                         (nggState.enableFastLaunch ? NggFlagEnableFastLaunch : 0) |
                          (nggState.enableVertexReuse ? NggFlagEnableVertexReuse : 0) |
                          (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
                          (nggState.enableFrustumCulling ? NggFlagEnableFrustumCulling : 0) |
