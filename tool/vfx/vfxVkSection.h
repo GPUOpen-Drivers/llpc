@@ -400,7 +400,9 @@ public:
 #endif
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, alwaysUsePrimShaderTable, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, compactMode, MemberTypeEnum, false);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableFastLaunch, MemberTypeBool, false);
+#endif
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableVertexReuse, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableBackfaceCulling, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableFrustumCulling, MemberTypeBool, false);

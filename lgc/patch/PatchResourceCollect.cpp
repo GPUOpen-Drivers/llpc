@@ -147,7 +147,7 @@ void PatchResourceCollect::setNggControl(Module *module) {
   nggControl.alwaysUsePrimShaderTable = (options.nggFlags & NggFlagDontAlwaysUsePrimShaderTable) == 0;
   nggControl.compactMode = (options.nggFlags & NggFlagCompactDisable) ? NggCompactDisable : NggCompactVertices;
 
-  nggControl.enableFastLaunch = (options.nggFlags & NggFlagEnableFastLaunch);
+  nggControl.enableFastLaunch = false; // Currently, always false
   nggControl.enableVertexReuse = (options.nggFlags & NggFlagEnableVertexReuse);
   nggControl.enableBackfaceCulling = (options.nggFlags & NggFlagEnableBackfaceCulling);
   nggControl.enableFrustumCulling = (options.nggFlags & NggFlagEnableFrustumCulling);

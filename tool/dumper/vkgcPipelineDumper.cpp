@@ -749,7 +749,9 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
 #endif
   dumpFile << "nggState.alwaysUsePrimShaderTable = " << pipelineInfo->nggState.alwaysUsePrimShaderTable << "\n";
   dumpFile << "nggState.compactMode = " << pipelineInfo->nggState.compactMode << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
   dumpFile << "nggState.enableFastLaunch = " << pipelineInfo->nggState.enableFastLaunch << "\n";
+#endif
   dumpFile << "nggState.enableVertexReuse = " << pipelineInfo->nggState.enableVertexReuse << "\n";
   dumpFile << "nggState.enableBackfaceCulling = " << pipelineInfo->nggState.enableBackfaceCulling << "\n";
   dumpFile << "nggState.enableFrustumCulling = " << pipelineInfo->nggState.enableFrustumCulling << "\n";
@@ -1011,7 +1013,9 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 #endif
       hasher->Update(nggState->alwaysUsePrimShaderTable);
       hasher->Update(nggState->compactMode);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
       hasher->Update(nggState->enableFastLaunch);
+#endif
       hasher->Update(nggState->enableVertexReuse);
       hasher->Update(nggState->enableBackfaceCulling);
       hasher->Update(nggState->enableFrustumCulling);

@@ -156,12 +156,6 @@ static cl::opt<unsigned> NggCompactionMode("ngg-compaction-mode",
                                                     "1: Compaction is based on vertices"),
                                            cl::value_desc("mode"), cl::init(static_cast<unsigned>(NggCompactVertices)));
 
-// -ngg-enable-fast-launch-rate: enable the hardware to launch subgroups of work at a faster rate (NGG)
-static cl::opt<bool>
-    NggEnableFastLaunchRate("ngg-enable-fast-launch-rate",
-                            cl::desc("Enable the hardware to launch subgroups of work at a faster rate (NGG)"),
-                            cl::init(false));
-
 // -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
 static cl::opt<bool> NggEnableVertexReuse("ngg-enable-vertex-reuse",
                                           cl::desc("Enable optimization to cull duplicate vertices (NGG)"),
@@ -479,7 +473,9 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 #endif
     nggState.alwaysUsePrimShaderTable = NggAlwaysUsePrimShaderTable;
     nggState.compactMode = static_cast<NggCompactMode>(NggCompactionMode.getValue());
-    nggState.enableFastLaunch = NggEnableFastLaunchRate;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
+    nggState.enableFastLaunch = false;
+#endif
     nggState.enableVertexReuse = NggEnableVertexReuse;
     nggState.enableBackfaceCulling = NggEnableBackfaceCulling;
     nggState.enableFrustumCulling = NggEnableFrustumCulling;

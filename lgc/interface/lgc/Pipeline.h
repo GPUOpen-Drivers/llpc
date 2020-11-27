@@ -59,14 +59,13 @@ enum NggFlag : unsigned {
   NggFlagDontAlwaysUsePrimShaderTable = 0x0008, // Don't always use primitive shader table to fetch culling-control
                                                 //   registers
   NggFlagCompactDisable = 0x0010,               // Vertex compaction is disabled
-  NggFlagEnableFastLaunch = 0x0020,             // Enable the hardware to launch subgroups of work at a faster rate
-  NggFlagEnableVertexReuse = 0x0040,            // Enable optimization to cull duplicate vertices
-  NggFlagEnableBackfaceCulling = 0x0080,        // Enable culling of primitives that don't meet facing criteria
-  NggFlagEnableFrustumCulling = 0x0100,         // Enable discarding of primitives outside of view frustum
-  NggFlagEnableBoxFilterCulling = 0x0200,       // Enable simpler frustum culler that is less accurate
-  NggFlagEnableSphereCulling = 0x0400,          // Enable frustum culling based on a sphere
-  NggFlagEnableSmallPrimFilter = 0x0800,        // Enable trivial sub-sample primitive culling
-  NggFlagEnableCullDistanceCulling = 0x1000,    // Enable culling when "cull distance" exports are present
+  NggFlagEnableVertexReuse = 0x0020,            // Enable optimization to cull duplicate vertices
+  NggFlagEnableBackfaceCulling = 0x0040,        // Enable culling of primitives that don't meet facing criteria
+  NggFlagEnableFrustumCulling = 0x0080,         // Enable discarding of primitives outside of view frustum
+  NggFlagEnableBoxFilterCulling = 0x0100,       // Enable simpler frustum culler that is less accurate
+  NggFlagEnableSphereCulling = 0x0200,          // Enable frustum culling based on a sphere
+  NggFlagEnableSmallPrimFilter = 0x0400,        // Enable trivial sub-sample primitive culling
+  NggFlagEnableCullDistanceCulling = 0x0800,    // Enable culling when "cull distance" exports are present
 };
 
 // Enumerates various sizing options of sub-group size for NGG primitive shader.
