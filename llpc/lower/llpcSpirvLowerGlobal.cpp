@@ -1663,33 +1663,23 @@ void SpirvLowerGlobal::lowerBufferBlock() {
         // We need to run over the users of the global, find the GEPs, and add a load for each.
         for (User *const user : global.users()) {
           // Skip over non-instructions.
-          if (!isa<Instruction>(user))
-            continue;
+          if (auto *inst = dyn_cast<Instruction>(user)) {
+            // Skip instructions in other functions.
+            if (inst->getFunction() != func)
+              continue;
 
-          GetElementPtrInst *getElemPtr = dyn_cast<GetElementPtrInst>(user);
-
-          if (!getElemPtr) {
-            // Skip all bitcasts, looking for a GEP.
-            for (BitCastInst *bitCast = dyn_cast<BitCastInst>(user); bitCast;
-                 bitCast = dyn_cast<BitCastInst>(bitCast->getOperand(0)))
-              getElemPtr = dyn_cast<GetElementPtrInst>(bitCast);
-
-            // If even after we've stripped away all the bitcasts we did not find a GEP, we need to modify
-            // the bitcast instead.
-            if (!getElemPtr) {
-              BitCastInst *const bitCast = dyn_cast<BitCastInst>(user);
+            // We have a user of the global, expect either a GEP or a bitcast.
+            if (auto *getElemPtr = dyn_cast<GetElementPtrInst>(inst)) {
+              getElemPtrsToReplace.push_back(getElemPtr);
+            } else {
+              // We need to modify the bitcast if we did not find a GEP.
+              BitCastInst *const bitCast = dyn_cast<BitCastInst>(inst);
               assert(bitCast);
+              assert(bitCast->getOperand(0) == &global);
 
               bitCastsToModify.push_back(bitCast);
-              continue;
             }
           }
-
-          // Skip instructions in other functions.
-          if (getElemPtr->getFunction() != func)
-            continue;
-
-          getElemPtrsToReplace.push_back(getElemPtr);
         }
 
         // All bitcasts recorded here are for GEPs that indexed by 0, 0 into the arrayed resource, and LLVM
