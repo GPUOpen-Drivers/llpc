@@ -97,11 +97,13 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0;
   m_hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
 
-  SmallVector<Function *, 16> candidateCallees;
+  SmallVector<Function *, 16> inputCallees, otherCallees;
   for (auto &func : module.functions()) {
     auto name = func.getName();
-    if (name.startswith("lgc.input") || name.startswith("lgc.output") || name == "llvm.amdgcn.s.sendmsg")
-      candidateCallees.push_back(&func);
+    if (name.startswith("lgc.input"))
+      inputCallees.push_back(&func);
+    else if (name.startswith("lgc.output") || name == "llvm.amdgcn.s.sendmsg")
+      otherCallees.push_back(&func);
   }
 
   // Create the global variable that is to model LDS
@@ -122,8 +124,11 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
       m_shaderStage = static_cast<ShaderStage>(shaderStage);
       processShader();
 
-      // Now process the call and return instructions.
-      visitCallInsts(candidateCallees);
+      // We process input first, because we cache lots of arguments to output during visit for later processing.
+      // It will be a disaster if we visit output intrinsics first, and the cached value for output was invalidated
+      // after we process input intrinsics (consider a value read from input was exported to output).
+      visitCallInsts(inputCallees);
+      visitCallInsts(otherCallees);
       visitReturnInsts();
 
       markExportDone(m_entryPoint, postDomTree);
