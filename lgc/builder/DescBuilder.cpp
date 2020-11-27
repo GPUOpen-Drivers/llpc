@@ -234,6 +234,7 @@ Value *DescBuilder::getStride(ResourceNodeType descType, unsigned descSet, unsig
     return CreateRelocationConstant(reloc::DescriptorStride + Twine(descSet) + "_" + Twine(binding));
   }
   // Pipeline compilation: Get the stride from the node.
+  assert(node);
   return getInt32(node->stride * sizeof(uint32_t));
 }
 

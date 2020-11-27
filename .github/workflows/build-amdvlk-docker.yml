@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host-os:        ["ubuntu-18.04"]
+        host-os:        ["ubuntu-20.04"]
         image-template: ["gcr.io/stadia-open-source/amdvlk_%s%s_%s:nightly"]
         branch:         [dev]
         config:         [Release]
@@ -25,12 +25,13 @@ jobs:
         run: |
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
           git checkout ${GITHUB_SHA}
-      - name: Setup Google Cloud CLI
-        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@master
         with:
-          version: '270.0.0'
+          version: '290.0.1'
           service_account_email: ${{ secrets.GCR_USER }}
           service_account_key: ${{ secrets.GCR_KEY }}
+          export_default_credentials: true
       - name: Setup Docker to use the GCR
         run: |
           gcloud auth configure-docker
