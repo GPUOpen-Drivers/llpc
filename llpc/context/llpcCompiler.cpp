@@ -777,8 +777,12 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 // @param context : Acquired context
 // @param shaderInfo : Shader info of this pipeline
 // @param [out] pipelineElf : Output Elf package
+// @param [out] stageCacheAccesses : Stage cache access result. All elements
+//                                   must be initialized in the caller as
+//                                   CacheAccessInfo::CacheNotChecked
 Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                                 ElfPackage *pipelineElf) {
+                                                 ElfPackage *pipelineElf,
+                                                 MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
   LLPC_OUTS("Building pipeline with relocatable shader elf.\n")
   Result result = Result::Success;
 
@@ -787,6 +791,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   context->getPipelineContext()->setUnlinked(true);
 
   ElfPackage elf[ShaderStageNativeStageCount];
+  assert(stageCacheAccesses.size() >= shaderInfo.size());
   for (unsigned stage = 0; stage < shaderInfo.size() && result == Result::Success; ++stage) {
     if (!shaderInfo[stage] || !shaderInfo[stage]->pModuleData)
       continue;
@@ -826,6 +831,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       // Release Entry
       ReleaseCacheEntry(false, nullptr, &cacheEntry);
       LLPC_OUTS("Cache hit for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
+      stageCacheAccesses[stage] = CacheAccessInfo::CacheHit;
       continue;
     }
 
@@ -837,9 +843,11 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       auto data = reinterpret_cast<const char *>(elfBin.pCode);
       elf[stage].assign(data, data + elfBin.codeSize);
       LLPC_OUTS("Cache hit for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
+      stageCacheAccesses[stage] = CacheAccessInfo::CacheHit;
       continue;
     }
     LLPC_OUTS("Cache miss for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
+    stageCacheAccesses[stage] = CacheAccessInfo::CacheMiss;
 
     // There was a cache miss, so we need to build the relocatable shader for
     // this stage.
@@ -1424,16 +1432,21 @@ unsigned Compiler::ConvertColorBufferFormatToExportFormat(const ColorTarget *tar
 // @param shaderInfo : Shader info of this graphics pipeline
 // @param buildingRelocatableElf : Build the pipeline by linking relocatable elf
 // @param [out] pipelineElf : Output Elf package
+// @param [out] stageCacheAccesses : Stage cache access result. All elements
+//                                   must be initialized in the caller as
+//                                   CacheAccessInfo::CacheNotChecked
 Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                                ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                               bool buildingRelocatableElf, ElfPackage *pipelineElf) {
+                                               bool buildingRelocatableElf, ElfPackage *pipelineElf,
+                                               MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
   Context *context = acquireContext();
   context->attachPipelineContext(graphicsContext);
   Result result = Result::Success;
-  if (buildingRelocatableElf)
-    result = buildPipelineWithRelocatableElf(context, shaderInfo, pipelineElf);
-  else
+  if (buildingRelocatableElf) {
+    result = buildPipelineWithRelocatableElf(context, shaderInfo, pipelineElf, stageCacheAccesses);
+  } else {
     result = buildPipelineInternal(context, shaderInfo, /*unlinked=*/false, pipelineElf);
+  }
   releaseContext(context);
   return result;
 }
@@ -1508,6 +1521,11 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
       cacheResult = lookUpCaches(userCache, &hashId, &elfBin, &cacheEntry);
     else
       cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
+
+    if ((cacheEntryState == ShaderEntryState::Ready) || (m_cache && (cacheResult == Result::Success)))
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheHit;
+    else
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
   } else {
     cacheEntryState = ShaderEntryState::Compiling;
   }
@@ -1517,7 +1535,8 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   if (cacheEntryState == ShaderEntryState::Compiling || (m_cache && cacheResult != Result::Success)) {
 
     GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
-    result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildingRelocatableElf, &candidateElf);
+    result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildingRelocatableElf, &candidateElf,
+                                           pipelineOut->stageCacheAccesses);
 
     if (result == Result::Success) {
       elfBin.codeSize = candidateElf.size();
@@ -1559,9 +1578,10 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 // @param pipelineInfo : Pipeline info of this compute pipeline
 // @param buildingRelocatableElf : Build the pipeline by linking relocatable elf
 // @param [out] pipelineElf : Output Elf package
+// @param [out] stageCacheAccess : Compute shader stage cache access result
 Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
                                               const ComputePipelineBuildInfo *pipelineInfo, bool buildingRelocatableElf,
-                                              ElfPackage *pipelineElf) {
+                                              ElfPackage *pipelineElf, CacheAccessInfo *stageCacheAccess) {
   Context *context = acquireContext();
   context->attachPipelineContext(computeContext);
 
@@ -1569,10 +1589,13 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
       nullptr, nullptr, nullptr, nullptr, nullptr, &pipelineInfo->cs,
   };
   Result result;
-  if (buildingRelocatableElf)
-    result = buildPipelineWithRelocatableElf(context, shadersInfo, pipelineElf);
-  else
+  if (buildingRelocatableElf) {
+    CacheAccessInfo stageCacheAccesses[ShaderStageCount] = {};
+    result = buildPipelineWithRelocatableElf(context, shadersInfo, pipelineElf, stageCacheAccesses);
+    *stageCacheAccess = stageCacheAccesses[ShaderStageCompute];
+  } else {
     result = buildPipelineInternal(context, shadersInfo, /*unlinked=*/false, pipelineElf);
+  }
   releaseContext(context);
   return result;
 }
@@ -1637,6 +1660,11 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
       cacheResult = lookUpCaches(userCache, &hashId, &elfBin, &cacheEntry);
     else
       cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
+
+    if ((cacheEntryState == ShaderEntryState::Ready) || (m_cache && (cacheResult == Result::Success)))
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheHit;
+    else
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
   } else
     cacheEntryState = ShaderEntryState::Compiling;
 
@@ -1646,7 +1674,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 
     ComputeContext computeContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
 
-    result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildingRelocatableElf, &candidateElf);
+    result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildingRelocatableElf, &candidateElf,
+                                          &pipelineOut->stageCacheAccess);
 
     if (result == Result::Success) {
       elfBin.codeSize = candidateElf.size();
