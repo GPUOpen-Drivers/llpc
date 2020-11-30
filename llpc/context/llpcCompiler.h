@@ -122,13 +122,16 @@ public:
                                       ComputePipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr);
   Result buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                        llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                       bool buildingRelocatableElf, ElfPackage *pipelineElf);
+                                       bool buildingRelocatableElf, ElfPackage *pipelineElf,
+                                       llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
 
   Result buildComputePipelineInternal(ComputeContext *computeContext, const ComputePipelineBuildInfo *pipelineInfo,
-                                      bool buildingRelocatableElf, ElfPackage *pipelineElf);
+                                      bool buildingRelocatableElf, ElfPackage *pipelineElf,
+                                      CacheAccessInfo *stageCacheAccess);
 
   Result buildPipelineWithRelocatableElf(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                         ElfPackage *pipelineElf);
+                                         ElfPackage *pipelineElf,
+                                         llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
 
   Result buildPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
                                ElfPackage *pipelineElf);

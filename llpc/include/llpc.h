@@ -109,14 +109,24 @@ struct ShaderModuleBuildOut {
   ShaderModuleData *pModuleData; ///< Output shader module data (opaque)
 };
 
+enum CacheAccessInfo : uint8_t {
+  CacheNotChecked = 0, ///< Stage cache is not checked.
+  CacheMiss,           ///< Stage cache miss.
+  CacheHit,            ///< Stage cache hit.
+};
+
 /// Represents output of building a graphics pipeline.
 struct GraphicsPipelineBuildOut {
   BinaryData pipelineBin; ///< Output pipeline binary data
+  CacheAccessInfo pipelineCacheAccess; ///< Pipeline cache access status i.e., hit, miss, or not checked
+  CacheAccessInfo stageCacheAccesses[ShaderStageCount]; ///< Shader cache access status i.e., hit, miss, or not checked
 };
 
 /// Represents output of building a compute pipeline.
 struct ComputePipelineBuildOut {
   BinaryData pipelineBin; ///< Output pipeline binary data
+  CacheAccessInfo pipelineCacheAccess; ///< Pipeline cache access status i.e., hit, miss, or not checked
+  CacheAccessInfo stageCacheAccess;    ///< Shader cache access status i.e., hit, miss, or not checked
 };
 
 /// Defines callback function used to lookup shader cache info in an external cache
