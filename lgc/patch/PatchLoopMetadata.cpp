@@ -31,6 +31,7 @@
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -52,11 +53,11 @@ namespace {
 
 // =====================================================================================================================
 // Represents the LLVM pass for patching loop metadata.
-class PatchLoopMetadata : public Patch {
+class PatchLoopMetadata : public LoopPass {
 public:
   PatchLoopMetadata();
 
-  bool runOnModule(Module &module) override;
+  bool runOnLoop(Loop *loop, LPPassManager &loopPassMgr) override;
 
   static char ID; // ID of this pass
 
@@ -67,6 +68,7 @@ public:
   MDNode *updateMetadata(MDNode *loopId, ArrayRef<StringRef> prefixesToRemove, Metadata *addMetadata, bool conditional);
 
 private:
+  llvm::LLVMContext *m_context;    // Associated LLVM context of the LLVM module that passes run on
   unsigned m_forceLoopUnrollCount; // Force loop unroll count
   bool m_disableLicm;              // Disable LLVM LICM pass
   bool m_disableLoopUnroll;        // Forcibly disable loop unroll
@@ -118,109 +120,111 @@ MDNode *PatchLoopMetadata::updateMetadata(MDNode *loopId, ArrayRef<StringRef> pr
 
 // =====================================================================================================================
 // Pass creator, creates the pass for patching loop metadata
-ModulePass *lgc::createPatchLoopMetadata() {
+LoopPass *lgc::createPatchLoopMetadata() {
   return new PatchLoopMetadata();
 }
 
 // =====================================================================================================================
 PatchLoopMetadata::PatchLoopMetadata()
-    : Patch(ID), m_forceLoopUnrollCount(0), m_disableLicm(false), m_disableLoopUnroll(false) {
+    : LoopPass(ID), m_context(nullptr), m_forceLoopUnrollCount(0), m_disableLicm(false), m_disableLoopUnroll(false) {
 }
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchLoopMetadata::runOnModule(Module &module) {
+bool PatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) {
   LLVM_DEBUG(dbgs() << "Run the pass lgc-patch-loop-metadata\n");
 
-  Patch::init(&module);
-  PipelineState *m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  if (skipLoop(loop))
+    return false;
+
+  Module *module = loop->getHeader()->getModule();
+  Function *func = loop->getHeader()->getFirstNonPHI()->getFunction();
+  PipelineState *m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(module);
+  m_context = &loop->getHeader()->getContext();
+
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   bool changed = false;
 
-  for (Function &func : module) {
-    ShaderStage stage = getShaderStage(&func);
-    if (stage == -1)
-      continue;
-    if (auto shaderOptions = &m_pipelineState->getShaderOptions(stage)) {
-      m_disableLoopUnroll = shaderOptions->disableLoopUnroll;
-      m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
-      m_disableLicm = shaderOptions->disableLicm;
-    }
+  ShaderStage stage = getShaderStage(func);
+  if (stage == ShaderStageInvalid)
+    return false;
+  if (auto shaderOptions = &m_pipelineState->getShaderOptions(stage)) {
+    m_disableLoopUnroll = shaderOptions->disableLoopUnroll;
+    m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
+    m_disableLicm = shaderOptions->disableLicm;
+  }
 
-    for (auto &block : func) {
-      auto terminator = block.getTerminator();
-      MDNode *loopMetaNode = terminator->getMetadata("llvm.loop");
-      if (!loopMetaNode || loopMetaNode->getOperand(0) != loopMetaNode)
-        continue;
+  MDNode *loopMetaNode = loop->getLoopID();
+  if (!loopMetaNode || loopMetaNode->getOperand(0) != loopMetaNode)
+    return false;
 
-      if (m_disableLoopUnroll) {
-        LLVM_DEBUG(dbgs() << "  disabling loop unroll\n");
-        // The disableLoopUnroll option overrides any existing loop metadata (so is subtly different to
-        // forceLoopUnrollCount=1 which defers to any existing metadata).
-        MDNode *disableLoopUnrollMetaNode =
-            MDNode::get(*m_context, MDString::get(*m_context, "llvm.loop.unroll.disable"));
-        loopMetaNode = updateMetadata(loopMetaNode, {"llvm.loop"}, disableLoopUnrollMetaNode, false);
-        changed = true;
-      } else if (m_forceLoopUnrollCount && loopMetaNode->getNumOperands() <= 1) {
-        LLVM_DEBUG(dbgs() << "  forcing loop unroll count to " << m_forceLoopUnrollCount << "\n");
-        // We have a loop backedge with !llvm.loop metadata containing just one
-        // operand pointing to itself, meaning that the SPIR-V did not have an
-        // unroll directive, so we can add the force unroll count metadata.
-        Metadata *unrollCountMeta[] = {
-            MDString::get(*m_context, "llvm.loop.unroll.count"),
-            ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), m_forceLoopUnrollCount))};
-        MDNode *loopUnrollCountMetaNode = MDNode::get(*m_context, unrollCountMeta);
-        loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, loopUnrollCountMetaNode));
-        // We also disable all nonforced loop transformations to ensure our transformation is not blocked
-        Metadata *nonforcedMeta[] = {MDString::get(*m_context, "llvm.loop.disable_nonforced")};
-        MDNode *nonforcedMetaNode = MDNode::get(*m_context, nonforcedMeta);
-        loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, nonforcedMetaNode));
-        changed = true;
-      } else if (!StrictDontUnrollHints || !StrictUnrollHints) {
-        for (unsigned i = 1, operandCount = loopMetaNode->getNumOperands(); i < operandCount; ++i) {
-          Metadata *op = loopMetaNode->getOperand(i);
-          if (MDNode *mdNode = dyn_cast<MDNode>(op)) {
-            if (const MDString *mdString = dyn_cast<MDString>(mdNode->getOperand(0))) {
-              if (!StrictDontUnrollHints && mdString->getString().startswith("llvm.loop.unroll.disable")) {
-                LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.disable\n");
-                // We will use a threshold of 250 to replace the disable hint.
-                const int UnrollThreshold = 250;
-                Metadata *thresholdMeta[] = {
-                    MDString::get(*m_context, "amdgpu.loop.unroll.threshold"),
-                    ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), UnrollThreshold))};
-                MDNode *thresholdMetaNode = MDNode::get(*m_context, thresholdMeta);
-                loopMetaNode = updateMetadata(loopMetaNode, {"llvm.loop.unroll.disable", "llvm.loop.disable_nonforced"},
-                                              thresholdMetaNode, false);
-                changed = true;
-                break;
-              } else if (!StrictUnrollHints && mdString->getString().startswith("llvm.loop.unroll.full")) {
-                LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.full\n");
-                // We will let the heuristics take care of loops with the full hint.
-                MDNode *enableLoopUnrollMetaNode =
-                    MDNode::get(*m_context, MDString::get(*m_context, "llvm.loop.unroll.enable"));
-                loopMetaNode = updateMetadata(loopMetaNode, {"llvm.loop.unroll.full", "llvm.loop.disable_nonforced"},
-                                              enableLoopUnrollMetaNode, false);
-                changed = true;
-                break;
-              }
-            }
+  if (m_disableLoopUnroll) {
+    LLVM_DEBUG(dbgs() << "  disabling loop unroll\n");
+    // The disableLoopUnroll option overrides any existing loop metadata (so is
+    // subtly different to forceLoopUnrollCount=1 which defers to any existing
+    // metadata).
+    MDNode *disableLoopUnrollMetaNode = MDNode::get(*m_context, MDString::get(*m_context, "llvm.loop.unroll.disable"));
+    loopMetaNode = updateMetadata(loopMetaNode, {"llvm.loop"}, disableLoopUnrollMetaNode, false);
+    changed = true;
+  } else if (m_forceLoopUnrollCount && loopMetaNode->getNumOperands() <= 1) {
+    LLVM_DEBUG(dbgs() << "  forcing loop unroll count to " << m_forceLoopUnrollCount << "\n");
+    // We have a loop backedge with !llvm.loop metadata containing just one
+    // operand pointing to itself, meaning that the SPIR-V did not have an
+    // unroll directive, so we can add the force unroll count metadata.
+    Metadata *unrollCountMeta[] = {
+        MDString::get(*m_context, "llvm.loop.unroll.count"),
+        ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), m_forceLoopUnrollCount))};
+    MDNode *loopUnrollCountMetaNode = MDNode::get(*m_context, unrollCountMeta);
+    loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, loopUnrollCountMetaNode));
+    // We also disable all nonforced loop transformations to ensure our
+    // transformation is not blocked
+    Metadata *nonforcedMeta[] = {MDString::get(*m_context, "llvm.loop.disable_nonforced")};
+    MDNode *nonforcedMetaNode = MDNode::get(*m_context, nonforcedMeta);
+    loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, nonforcedMetaNode));
+    changed = true;
+  } else if (!StrictDontUnrollHints || !StrictUnrollHints) {
+    for (unsigned i = 1, operandCount = loopMetaNode->getNumOperands(); i < operandCount; ++i) {
+      Metadata *op = loopMetaNode->getOperand(i);
+      if (MDNode *mdNode = dyn_cast<MDNode>(op)) {
+        if (const MDString *mdString = dyn_cast<MDString>(mdNode->getOperand(0))) {
+          if (!StrictDontUnrollHints && mdString->getString().startswith("llvm.loop.unroll.disable")) {
+            LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.disable\n");
+            // We will use a threshold of 250 to replace the disable hint.
+            const int UnrollThreshold = 250;
+            Metadata *thresholdMeta[] = {
+                MDString::get(*m_context, "amdgpu.loop.unroll.threshold"),
+                ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_context), UnrollThreshold))};
+            MDNode *thresholdMetaNode = MDNode::get(*m_context, thresholdMeta);
+            loopMetaNode = updateMetadata(loopMetaNode, {"llvm.loop.unroll.disable", "llvm.loop.disable_nonforced"},
+                                          thresholdMetaNode, false);
+            changed = true;
+            break;
+          } else if (!StrictUnrollHints && mdString->getString().startswith("llvm.loop.unroll.full")) {
+            LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.full\n");
+            // We will let the heuristics take care of loops with the full hint.
+            MDNode *enableLoopUnrollMetaNode =
+                MDNode::get(*m_context, MDString::get(*m_context, "llvm.loop.unroll.enable"));
+            loopMetaNode = updateMetadata(loopMetaNode, {"llvm.loop.unroll.full", "llvm.loop.disable_nonforced"},
+                                          enableLoopUnrollMetaNode, false);
+            changed = true;
+            break;
           }
         }
       }
-
-      if (m_disableLicm) {
-        LLVM_DEBUG(dbgs() << "  disabling LICM\n");
-        MDNode *licmDisableNode = MDNode::get(*m_context, MDString::get(*m_context, "llvm.licm.disable"));
-        loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, licmDisableNode));
-        changed = true;
-      }
-      if (changed) {
-        loopMetaNode->replaceOperandWith(0, loopMetaNode);
-        terminator->setMetadata("llvm.loop", loopMetaNode);
-      }
     }
+  }
+
+  if (m_disableLicm) {
+    LLVM_DEBUG(dbgs() << "  disabling LICM\n");
+    MDNode *licmDisableNode = MDNode::get(*m_context, MDString::get(*m_context, "llvm.licm.disable"));
+    loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, licmDisableNode));
+    changed = true;
+  }
+  if (changed) {
+    loopMetaNode->replaceOperandWith(0, loopMetaNode);
+    loop->setLoopID(loopMetaNode);
   }
 
   return changed;
