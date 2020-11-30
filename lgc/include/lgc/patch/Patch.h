@@ -31,6 +31,7 @@
 #pragma once
 
 #include "lgc/Pipeline.h"
+#include "llvm/Analysis/LoopPass.h"
 #include "llvm/Pass.h"
 
 namespace llvm {
@@ -97,7 +98,7 @@ llvm::ModulePass *createPatchEntryPointMutate();
 llvm::ModulePass *createPatchInOutImportExport();
 llvm::ModulePass *createPatchLlvmIrInclusion();
 llvm::FunctionPass *createPatchLoadScalarizer();
-llvm::ModulePass *createPatchLoopMetadata();
+llvm::LoopPass *createPatchLoopMetadata();
 llvm::ModulePass *createPatchNullFragShader();
 llvm::FunctionPass *createPatchPeepholeOpt();
 llvm::ModulePass *createPatchPreparePipelineAbi(bool onlySetCallingConvs);
