@@ -788,7 +788,8 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
         continue;
       // Got a call. Skip it if it calls an intrinsic or an internal lgc.* function.
       Value *calledVal = call->getCalledOperand();
-      if (auto calledFunc = dyn_cast<Function>(calledVal)) {
+      Function *calledFunc = dyn_cast<Function>(calledVal);
+      if (calledFunc) {
         if (calledFunc->isIntrinsic() || calledFunc->getName().startswith(lgcName::InternalCallPrefix))
           continue;
       } else if (call->isInlineAsm()) {
@@ -820,7 +821,10 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
         newCalledVal = builder.CreateBitCast(calledVal, calledPtrTy);
       // Create the call.
       CallInst *newCall = builder.CreateCall(calledTy, newCalledVal, args);
-      newCall->setCallingConv(call->getCallingConv());
+      newCall->setCallingConv(CallingConv::AMDGPU_Gfx);
+      // Prevent calling convention mismatch
+      if (calledFunc)
+        calledFunc->setCallingConv(CallingConv::AMDGPU_Gfx);
 
       // Mark sgpr arguments as inreg
       for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
