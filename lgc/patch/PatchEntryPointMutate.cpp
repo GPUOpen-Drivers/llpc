@@ -291,7 +291,20 @@ void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
     if (func.isDeclaration() && func.getIntrinsicID() == Intrinsic::not_intrinsic &&
         !func.getName().startswith(lgcName::InternalCallPrefix) && !func.user_empty()) {
       m_computeWithCalls = true;
-      break;
+      return;
+    }
+
+    // Search for indirect calls
+    for (const BasicBlock &block : func) {
+      for (const Instruction &inst : block) {
+        if (auto *call = dyn_cast<CallInst>(&inst)) {
+          Value *calledVal = call->getCalledOperand();
+          if (isa<Function>(calledVal) || call->isInlineAsm())
+            continue;
+          m_computeWithCalls = true;
+          return;
+        }
+      }
     }
   }
 }
