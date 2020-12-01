@@ -50,6 +50,8 @@ namespace lgc {
 // - Remove PHI nodes whose incoming values can be proven to be identical in the parent blocks (most commonly seen with
 //   multiple extract elements that are identical).
 // - Optimize PHI nodes that are confusingly non-PHIs by deducing these complicated cases and removing the PHIs.
+// - Change inttoptr ( add x, const ) -> gep ( inttoptr x, const ) to improve value tracking and load/store
+//   vectorization.
 //
 class PatchPeepholeOpt final : public llvm::FunctionPass, public llvm::InstVisitor<PatchPeepholeOpt> {
 public:
@@ -63,6 +65,7 @@ public:
   void visitICmp(llvm::ICmpInst &iCmp);
   void visitExtractElement(llvm::ExtractElementInst &extractElement);
   void visitPHINode(llvm::PHINode &phiNode);
+  void visitIntToPtr(llvm::IntToPtrInst &intToPtr);
 
   void moveAfter(llvm::Instruction &move, llvm::Instruction &after) const;
   void insertAfter(llvm::Instruction &insert, llvm::Instruction &after) const;
