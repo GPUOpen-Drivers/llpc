@@ -138,6 +138,34 @@ public:
   // Set TargetInfo. Returns false if the GPU name is not found or not supported.
   bool setTargetInfo(llvm::StringRef gpuName);
 
+  // GFX IP checkers (we use -1 to denote this info is a don't-care value)
+  bool isGfx(unsigned major, unsigned minor = -1, unsigned stepping = -1) const { // == GFX
+    // Check (major, minor, stepping)
+    if (minor != -1 && stepping != -1)
+      return std::tie(m_gfxIp.major, m_gfxIp.major, m_gfxIp.stepping) == std::tie(major, minor, stepping);
+    // Check (major, minor)
+    if (minor != -1)
+      return std::tie(m_gfxIp.major, m_gfxIp.major) == std::tie(major, minor);
+    // Just check major
+    return m_gfxIp.major == major;
+  }
+  bool isGfxAbove(unsigned major, unsigned minor = -1, unsigned stepping = -1) const { // > GFX
+    // Check (major, minor, stepping)
+    if (minor != -1 && stepping != -1)
+      return std::tie(m_gfxIp.major, m_gfxIp.major, m_gfxIp.stepping) > std::tie(major, minor, stepping);
+    // Check (major, minor)
+    if (minor != -1)
+      return std::tie(m_gfxIp.major, m_gfxIp.major) > std::tie(major, minor);
+    // Just check major
+    return m_gfxIp.major > major;
+  }
+  bool isGfxBelow(unsigned major, unsigned minor = -1, unsigned stepping = -1) const { // < GFX
+    return !isGfx(major, minor, stepping) && !isGfxAbove(major, minor, stepping);
+  }
+  bool isGfxPlus(unsigned major, unsigned minor = -1, unsigned stepping = -1) const { // >= GFX, GFX+
+    return isGfx(major, minor, stepping) || isGfxAbove(major, minor, stepping);
+  }
+
   // Accessors.
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
   GpuProperty &getGpuProperty() { return m_gpuProperty; }
