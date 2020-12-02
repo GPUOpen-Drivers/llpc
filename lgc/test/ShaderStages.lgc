@@ -1,0 +1,530 @@
+; ----------------------------------------------------------------------
+; Extract 1: CS
+
+; RUN: lgc -extract=1 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK1,CHECK-NO-NGG1 %s
+; RUN: lgc -extract=1 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK1,CHECK-NGG1 %s
+; CHECK1: define dllexport amdgpu_cs void @_amdgpu_cs_main{{.*}} !lgc.shaderstage !3 {
+; CHECK1: !3 = !{i32 5}
+
+define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
+.entry:
+  ret void
+}
+
+attributes #0 = { nounwind }
+
+!lgc.user.data.nodes = !{!1, !2}
+!lgc.device.index = !{!3}
+
+; ShaderStageCompute
+!0 = !{i32 5}
+; type, offset, size, count
+!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+; type, offset, size, set, binding, stride
+!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+; DeviceIndex
+!3 = !{i32 12345678}
+
+; ----------------------------------------------------------------------
+; Extract 2: VS/FS
+
+; RUN: lgc -extract=2 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK2,CHECK-NO-NGG2 %s
+; RUN: lgc -extract=2 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK2,CHECK-NGG2 %s
+; CHECK-NO-NGG2: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !3 {
+; CHECK-NO-NGG2: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !4 {
+; CHECK-NO-NGG2: !3 = !{i32 0}
+; CHECK-NO-NGG2: !4 = !{i32 4}
+
+; CHECK-NGG2: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} {
+; CHECK-NGG2: define internal void @lgc.ngg.ES.main{{.*}} !lgc.shaderstage !3 {
+; CHECK-NGG2: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !4 {
+; CHECK-NGG2: !3 = !{i32 0}
+; CHECK-NGG2: !4 = !{i32 4}
+
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
+.entry:
+  ret void
+}
+
+define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !lgc.shaderstage !4 {
+.entry:
+  ret void
+}
+
+attributes #0 = { nounwind }
+
+!lgc.user.data.nodes = !{!1, !2}
+!lgc.device.index = !{!3}
+
+; ShaderStageVertex
+!0 = !{i32 0}
+; ShaderStageFragment
+!4 = !{i32 4}
+; type, offset, size, count
+!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+; type, offset, size, set, binding, stride
+!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+; DeviceIndex
+!3 = !{i32 12345678}
+
+; ----------------------------------------------------------------------
+; Extract 3: GS/VS
+
+; RUN: lgc -extract=3 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK3,CHECK-NO-NGG3 %s
+; RUN: lgc -extract=3 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK3,CHECK-NGG3 %s
+; RUN: lgc -extract=3 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK3,CHECK-NGG3 %s
+; CHECK-NO-NGG3: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !6 {
+; CHECK-NO-NGG3: define dllexport amdgpu_es void @_amdgpu_es_main{{.*}} !lgc.shaderstage !7 {
+; CHECK-NO-NGG3: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage !8 {
+; CHECK-NO-NGG3: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !9 {
+; CHECK-NO-NGG3: !6 = !{i32 6}
+; CHECK-NO-NGG3: !7 = !{i32 0}
+; CHECK-NO-NGG3: !8 = !{i32 3}
+; CHECK-NO-NGG3: !9 = !{i32 4}
+
+; CHECK-NGG3: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !6 {
+; CHECK-NGG3: define internal dllexport amdgpu_es void @_amdgpu_es_main{{.*}} !lgc.shaderstage !7 {
+; CHECK-NGG3: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} {
+; CHECK-NGG3: define internal dllexport amdgpu_gs void @_amdgpu_gs_main.1{{.*}} {
+; CHECK-NGG3: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !9 {
+; CHECK-NGG3: !6 = !{i32 6}
+; CHECK-NGG3: !7 = !{i32 0}
+; CHECK-NGG3: !8 = !{i32 3}
+; CHECK-NGG3: !9 = !{i32 4}
+
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !6 {
+.entry:
+  ret void
+}
+
+define dllexport spir_func void @lgc.shader.GS.main() local_unnamed_addr #0 !lgc.shaderstage !7 {
+.entry:
+  call void @lgc.output.export.builtin.Position.i32.i32.v4f32(i32 0, i32 0, <4 x float> undef) #0
+  call void @lgc.output.export.builtin.PointSize.i32.i32.f32(i32 1, i32 0, float undef) #0
+  call void @lgc.output.export.builtin.ClipDistance.i32.i32.a1f32(i32 3, i32 0, [1 x float] undef) #0
+  call void @lgc.output.export.builtin.CullDistance.i32.i32.a1f32(i32 4, i32 0, [1 x float] undef) #0
+  %0 = call i32 @lgc.input.import.builtin.GsWaveId.i32.i32(i32 268435466) #0
+  call void @llvm.amdgcn.s.sendmsg(i32 34, i32 %0)
+  ret void
+}
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.CullDistance.i32.i32.a1f32(i32, i32, [1 x float]) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.ClipDistance.i32.i32.a1f32(i32, i32, [1 x float]) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.PointSize.i32.i32.f32(i32, i32, float) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.Position.i32.i32.v4f32(i32, i32, <4 x float>) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.CullDistance.i32.a1f32(i32, [1 x float]) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.ClipDistance.i32.a1f32(i32, [1 x float]) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.PointSize.i32.f32(i32, float) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.Position.i32.v4f32(i32, <4 x float>) #0
+
+; Function Attrs: nounwind readonly
+declare float @lgc.input.import.generic.f32.i32.i32.i32(i32, i32, i32) #1
+
+; Function Attrs: nounwind readonly
+declare <4 x double> @lgc.input.import.generic.v4f64.i32.i32.i32(i32, i32, i32) #1
+
+; Function Attrs: nounwind
+declare i32 @lgc.input.import.builtin.GsWaveId.i32.i32(i32) #0
+
+; Function Attrs: nounwind
+declare void @llvm.amdgcn.s.sendmsg(i32 immarg, i32) #0
+
+attributes #0 = { nounwind }
+
+!llpc.geometry.mode = !{!0}
+!lgc.options = !{!1}
+!lgc.options.VS = !{!2}
+!lgc.options.GS = !{!3}
+!lgc.color.export.formats = !{!4}
+!lgc.input.assembly.state = !{!5}
+
+!0 = !{i32 3, i32 2, i32 1, i32 3}
+!1 = !{i32 -457359926, i32 -978576021, i32 1254748154, i32 908319681, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
+!2 = !{i32 561009537, i32 1279541660, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!3 = !{i32 -2101593, i32 1179029646, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!4 = !{i32 16}
+!5 = !{i32 0, i32 3}
+; ShaderStageVertex
+!6 = !{i32 0}
+; ShaderStageGeometry
+!7 = !{i32 3}
+!8 = distinct !{!8}
+
+; ----------------------------------------------------------------------
+; Extract 4: TCS/TES
+
+; RUN: lgc -extract=4 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK4,CHECK-NO-NGG4 %s
+; RUN: lgc -extract=4 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK4,CHECK-GFX94 %s
+; RUN: lgc -extract=4 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK4,CHECK-NGG4 %s
+; CHECK-NO-NGG4: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !5 {
+; CHECK-NO-NGG4: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !6 {
+; CHECK-NO-NGG4: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !7 {
+; CHECK-NO-NGG4: !5 = !{i32 1}
+; CHECK-NO-NGG4: !6 = !{i32 2}
+; CHECK-NO-NGG4: !7 = !{i32 4}
+
+; CHECK-GFX94: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} {
+; CHECK-GFX94: define internal dllexport amdgpu_hs void @_amdgpu_hs_main.1{{.*}} !lgc.shaderstage !5 {
+; CHECK-GFX94: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !6 {
+; CHECK-GFX94: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !7 {
+; CHECK-GFX94: !5 = !{i32 1}
+; CHECK-GFX94: !6 = !{i32 2}
+; CHECK-GFX94: !7 = !{i32 4}
+
+; CHECK-NGG4: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} {
+; CHECK-NGG4: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} {
+; CHECK-NGG4: define internal dllexport amdgpu_hs void @_amdgpu_hs_main.1{{.*}} !lgc.shaderstage !5 {
+; CHECK-NGG4: define internal void @lgc.ngg.ES.main{{.*}} !lgc.shaderstage !6 {
+; CHECK-NGG4: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !7 {
+; CHECK-NGG4: !5 = !{i32 1}
+; CHECK-NGG4: !6 = !{i32 2}
+; CHECK-NGG4: !7 = !{i32 4}
+
+define dllexport spir_func void @lgc.shader.TCS.main() local_unnamed_addr #0 !spirv.ExecutionModel !5 !lgc.shaderstage !5 {
+.entry:
+  %0 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 undef, i32 undef)
+  %1 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 %0, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> %1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 %0)
+  %2 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> <float 1.500000e+00, float 1.500000e+00, float 1.500000e+00, float 1.500000e+00>, i32 3, i32 1, i32 0, i32 0, i32 0, i32 %2)
+  %3 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> <float 3.000000e+00, float 3.000000e+00, float 3.000000e+00, float 3.000000e+00>, i32 3, i32 3, i32 0, i32 0, i32 0, i32 %3)
+  call void (...) @lgc.create.write.builtin.output(float 1.000000e+00, i32 12, i32 8192, i32 undef, i32 1)
+  call void (...) @lgc.create.write.builtin.output(float 2.000000e+00, i32 11, i32 16384, i32 undef, i32 1)
+  ret void
+}
+
+define dllexport spir_func void @lgc.shader.TES.main() local_unnamed_addr #0 !spirv.ExecutionModel !6 !lgc.shaderstage !6 {
+.entry:
+  %0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0)
+  %1 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 1)
+  %2 = fadd reassoc nnan nsz arcp contract afn <4 x float> %0, %1
+  %3 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 2)
+  %4 = fadd reassoc nnan nsz arcp contract afn <4 x float> %2, %3
+  %5 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 3, i32 3, i32 0, i32 0, i32 0, i32 0)
+  %6 = fadd reassoc nnan nsz arcp contract afn <4 x float> %4, %5
+  call void (...) @lgc.create.write.generic.output(<4 x float> %6, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  ret void
+}
+
+; Function Attrs: nounwind readonly
+declare i32 @lgc.create.read.builtin.input.i32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind readonly
+declare <4 x float> @lgc.create.read.builtin.input.v4f32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.builtin.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind readonly
+declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr #1
+
+attributes #0 = { nounwind }
+attributes #1 = { nounwind readonly }
+
+!llpc.tessellation.mode = !{!0}
+!lgc.options = !{!1}
+!lgc.options.TCS = !{!2}
+!lgc.options.TES = !{!3}
+!lgc.input.assembly.state = !{!4}
+
+!0 = !{i32 1, i32 1, i32 1, i32 0, i32 3}
+!1 = !{i32 1296810225, i32 -909790650, i32 1814881111, i32 -530888175, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
+!2 = !{i32 -54767410, i32 1894092071, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!3 = !{i32 1718189868, i32 -1767688178, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!4 = !{i32 0, i32 3}
+!5 = !{i32 1}
+!6 = !{i32 2}
+
+; ----------------------------------------------------------------------
+; Extract 5: TCS
+
+; RUN: lgc -extract=5 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK5,CHECK-NO-NGG5 %s
+; RUN: lgc -extract=5 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK5,CHECK-NGG5 %s
+; RUN: lgc -extract=5 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK5,CHECK-NGG5 %s
+; CHECK-NO-NGG5: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !5 {
+; CHECK-NO-NGG5: !5 = !{i32 1}
+
+; CHECK-NGG5: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} {
+; CHECK-NGG5: define internal dllexport amdgpu_hs void @_amdgpu_hs_main.1{{.*}} !lgc.shaderstage !5 {
+; CHECK-NGG5: !5 = !{i32 1}
+
+define dllexport spir_func void @lgc.shader.TCS.main() local_unnamed_addr #0 !spirv.ExecutionModel !5 !lgc.shaderstage !5 {
+.entry:
+  %0 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 undef, i32 undef)
+  %1 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 %0, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> %1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 %0)
+  %2 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> <float 1.500000e+00, float 1.500000e+00, float 1.500000e+00, float 1.500000e+00>, i32 3, i32 1, i32 0, i32 0, i32 0, i32 %2)
+  %3 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> <float 3.000000e+00, float 3.000000e+00, float 3.000000e+00, float 3.000000e+00>, i32 3, i32 3, i32 0, i32 0, i32 0, i32 %3)
+  call void (...) @lgc.create.write.builtin.output(float 1.000000e+00, i32 12, i32 8192, i32 undef, i32 1)
+  call void (...) @lgc.create.write.builtin.output(float 2.000000e+00, i32 11, i32 16384, i32 undef, i32 1)
+  ret void
+}
+
+; Function Attrs: nounwind readonly
+declare i32 @lgc.create.read.builtin.input.i32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind readonly
+declare <4 x float> @lgc.create.read.builtin.input.v4f32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.builtin.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind readonly
+declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr #1
+
+attributes #0 = { nounwind }
+attributes #1 = { nounwind readonly }
+
+!llpc.tessellation.mode = !{!0}
+!lgc.options = !{!1}
+!lgc.options.TCS = !{!2}
+!lgc.options.TES = !{!3}
+!lgc.input.assembly.state = !{!4}
+
+!0 = !{i32 1, i32 1, i32 1, i32 0, i32 3}
+!1 = !{i32 1296810225, i32 -909790650, i32 1814881111, i32 -530888175, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
+!2 = !{i32 -54767410, i32 1894092071, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!3 = !{i32 1718189868, i32 -1767688178, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!4 = !{i32 0, i32 3}
+!5 = !{i32 1}
+
+; ----------------------------------------------------------------------
+; Extract 6: TES
+
+; RUN: lgc -extract=6 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK6,CHECK-NO-NGG6 %s
+; RUN: lgc -extract=6 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK6,CHECK-GFX96 %s
+; RUN: lgc -extract=6 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK6,CHECK-NGG6 %s
+; CHECK-NO-NGG6: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !5 {
+; CHECK-NO-NGG6: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !6 {
+; CHECK-NO-NGG6: !5 = !{i32 2}
+; CHECK-NO-NGG6: !6 = !{i32 4}
+
+; CHECK-GFX96: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !5 {
+; CHECK-GFX96: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !6 {
+; CHECK-GFX96: !5 = !{i32 2}
+; CHECK-GFX96: !6 = !{i32 4}
+
+; CHECK-NGG6: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} {
+; CHECK-NGG6: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !6 {
+; CHECK-NGG6: !5 = !{i32 2}
+; CHECK-NGG6: !6 = !{i32 4}
+
+define dllexport spir_func void @lgc.shader.TES.main() local_unnamed_addr #0 !spirv.ExecutionModel !5 !lgc.shaderstage !5 {
+.entry:
+  %0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0)
+  %1 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 1)
+  %2 = fadd reassoc nnan nsz arcp contract afn <4 x float> %0, %1
+  %3 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 2)
+  %4 = fadd reassoc nnan nsz arcp contract afn <4 x float> %2, %3
+  %5 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 3, i32 3, i32 0, i32 0, i32 0, i32 0)
+  %6 = fadd reassoc nnan nsz arcp contract afn <4 x float> %4, %5
+  call void (...) @lgc.create.write.generic.output(<4 x float> %6, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  ret void
+}
+
+; Function Attrs: nounwind readonly
+declare i32 @lgc.create.read.builtin.input.i32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind readonly
+declare <4 x float> @lgc.create.read.builtin.input.v4f32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.builtin.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind readonly
+declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr #1
+
+attributes #0 = { nounwind }
+attributes #1 = { nounwind readonly }
+
+!llpc.tessellation.mode = !{!0}
+!lgc.options = !{!1}
+!lgc.options.TCS = !{!2}
+!lgc.options.TES = !{!3}
+!lgc.input.assembly.state = !{!4}
+
+!0 = !{i32 1, i32 1, i32 1, i32 0, i32 3}
+!1 = !{i32 1296810225, i32 -909790650, i32 1814881111, i32 -530888175, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
+!2 = !{i32 -54767410, i32 1894092071, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!3 = !{i32 1718189868, i32 -1767688178, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!4 = !{i32 0, i32 3}
+!5 = !{i32 2}
+
+; ----------------------------------------------------------------------
+; Extract 7: TCS/TES/GS
+
+; RUN: lgc -extract=7 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK7,CHECK-NO-NGG7 %s
+; RUN: lgc -extract=7 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK7,CHECK-NGG7 %s
+; RUN: lgc -extract=7 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK7,CHECK-NGG7 %s
+; CHECK-NO-NGG7: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !7 {
+; CHECK-NO-NGG7: define dllexport amdgpu_ls void @_amdgpu_ls_main{{.*}} !lgc.shaderstage !8 {
+; CHECK-NO-NGG7: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !9 {
+; CHECK-NO-NGG7: define dllexport amdgpu_es void @_amdgpu_es_main{{.*}} !lgc.shaderstage !10 {
+; CHECK-NO-NGG7: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage !11 {
+; CHECK-NO-NGG7: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !12 {
+; CHECK-NO-NGG7: !7 = !{i32 6}
+; CHECK-NO-NGG7: !8 = !{i32 0}
+; CHECK-NO-NGG7: !9 = !{i32 1}
+; CHECK-NO-NGG7: !10 = !{i32 2}
+; CHECK-NO-NGG7: !11 = !{i32 3}
+; CHECK-NO-NGG7: !12 = !{i32 4}
+
+; CHECK-NGG7: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !7 {
+; CHECK-NGG7: define internal dllexport amdgpu_ls void @_amdgpu_ls_main{{.*}} !lgc.shaderstage !8 {
+; CHECK-NGG7: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} {
+; CHECK-NGG7: define internal dllexport amdgpu_hs void @_amdgpu_hs_main.1{{.*}} !lgc.shaderstage !9 {
+; CHECK-NGG7: define internal dllexport amdgpu_es void @_amdgpu_es_main{{.*}} !lgc.shaderstage !10 {
+; CHECK-NGG7: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} {
+; CHECK-NGG7: define internal dllexport amdgpu_gs void @_amdgpu_gs_main.2{{.*}} !lgc.shaderstage !11 {
+; CHECK-NGG7: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !12 {
+; CHECK-NGG7: !7 = !{i32 6}
+; CHECK-NGG7: !8 = !{i32 0}
+; CHECK-NGG7: !9 = !{i32 1}
+; CHECK-NGG7: !10 = !{i32 2}
+; CHECK-NGG7: !11 = !{i32 3}
+; CHECK-NGG7: !12 = !{i32 4}
+
+define dllexport spir_func void @lgc.shader.TCS.main() local_unnamed_addr #0 !spirv.ExecutionModel !5 !lgc.shaderstage !6 {
+.entry:
+  %0 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 undef, i32 undef)
+  %1 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 %0, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> %1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 %0)
+  %2 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> <float 1.500000e+00, float 1.500000e+00, float 1.500000e+00, float 1.500000e+00>, i32 3, i32 1, i32 0, i32 0, i32 0, i32 %2)
+  %3 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> <float 3.000000e+00, float 3.000000e+00, float 3.000000e+00, float 3.000000e+00>, i32 3, i32 3, i32 0, i32 0, i32 0, i32 %3)
+  call void (...) @lgc.create.write.builtin.output(float 1.000000e+00, i32 12, i32 8192, i32 undef, i32 1)
+  call void (...) @lgc.create.write.builtin.output(float 2.000000e+00, i32 11, i32 16384, i32 undef, i32 1)
+  ret void
+}
+
+define dllexport spir_func void @lgc.shader.TES.main() local_unnamed_addr #0 !spirv.ExecutionModel !6 !lgc.shaderstage !7 {
+.entry:
+  %0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0)
+  %1 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 1)
+  %2 = fadd reassoc nnan nsz arcp contract afn <4 x float> %0, %1
+  %3 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 2)
+  %4 = fadd reassoc nnan nsz arcp contract afn <4 x float> %2, %3
+  %5 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 3, i32 3, i32 0, i32 0, i32 0, i32 0)
+  %6 = fadd reassoc nnan nsz arcp contract afn <4 x float> %4, %5
+  call void (...) @lgc.create.write.generic.output(<4 x float> %6, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  ret void
+}
+
+define dllexport spir_func void @lgc.shader.GS.main() local_unnamed_addr #0 !lgc.shaderstage !8 {
+.entry:
+  call void @lgc.output.export.builtin.Position.i32.i32.v4f32(i32 0, i32 0, <4 x float> undef) #0
+  call void @lgc.output.export.builtin.PointSize.i32.i32.f32(i32 1, i32 0, float undef) #0
+  call void @lgc.output.export.builtin.ClipDistance.i32.i32.a1f32(i32 3, i32 0, [1 x float] undef) #0
+  call void @lgc.output.export.builtin.CullDistance.i32.i32.a1f32(i32 4, i32 0, [1 x float] undef) #0
+  %0 = call i32 @lgc.input.import.builtin.GsWaveId.i32.i32(i32 268435466) #0
+  call void @llvm.amdgcn.s.sendmsg(i32 34, i32 %0)
+  ret void
+}
+
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !9 {
+.entry:
+  ret void
+}
+
+; Function Attrs: nounwind readonly
+declare i32 @lgc.create.read.builtin.input.i32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind readonly
+declare <4 x float> @lgc.create.read.builtin.input.v4f32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.builtin.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind readonly
+declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.CullDistance.i32.i32.a1f32(i32, i32, [1 x float]) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.ClipDistance.i32.i32.a1f32(i32, i32, [1 x float]) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.PointSize.i32.i32.f32(i32, i32, float) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.Position.i32.i32.v4f32(i32, i32, <4 x float>) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.CullDistance.i32.a1f32(i32, [1 x float]) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.ClipDistance.i32.a1f32(i32, [1 x float]) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.PointSize.i32.f32(i32, float) #0
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.builtin.Position.i32.v4f32(i32, <4 x float>) #0
+
+; Function Attrs: nounwind readonly
+declare float @lgc.input.import.generic.f32.i32.i32.i32(i32, i32, i32) #1
+
+; Function Attrs: nounwind readonly
+declare <4 x double> @lgc.input.import.generic.v4f64.i32.i32.i32(i32, i32, i32) #1
+
+; Function Attrs: nounwind
+declare i32 @lgc.input.import.builtin.GsWaveId.i32.i32(i32) #0
+
+; Function Attrs: nounwind
+declare void @llvm.amdgcn.s.sendmsg(i32 immarg, i32) #0
+
+attributes #0 = { nounwind }
+attributes #1 = { nounwind readonly }
+
+!llpc.tessellation.mode = !{!0}
+!llpc.geometry.mode = !{!0}
+!lgc.options = !{!1}
+!lgc.options.TCS = !{!2}
+!lgc.options.TES = !{!3}
+!lgc.options.GS = !{!4}
+!lgc.options.VS = !{!10}
+!lgc.input.assembly.state = !{!5}
+
+!0 = !{i32 1, i32 1, i32 1, i32 0, i32 3}
+!1 = !{i32 1296810225, i32 -909790650, i32 1814881111, i32 -530888175, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
+!2 = !{i32 -54767410, i32 1894092071, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!3 = !{i32 1718189868, i32 -1767688178, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!4 = !{i32 -2101593, i32 1179029646, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
+!5 = !{i32 0, i32 3}
+!6 = !{i32 1}
+!7 = !{i32 2}
+!8 = !{i32 3}
+!9 = !{i32 0}
+!10 = !{i32 561009537, i32 1279541660, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
