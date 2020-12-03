@@ -572,53 +572,6 @@ void PatchPeepholeOpt::visitPHINode(PHINode &phiNode) {
 }
 
 // =====================================================================================================================
-// Visit an inttoptr instruction.
-//
-// Change inttoptr ( add x, const ) -> gep ( inttoptr x, const ) to improve value tracking and load/store vectorization.
-//
-// Note: we decided to implement this transformation here and not in LLVM. From the point of view of alias analysis, the
-// pointer returned by inttoptr ( add x, const ) is different from the pointer returned by gep ( inttoptr x, const ):
-// the former is associated with whatever x AND const are associated with; the latter is associated ONLY with whatever x
-// is associated with.
-//
-// We can assume in LLPC that const is not associated with any object (which makes this transformation valid) but that's
-// not an assumption that can be made in general in LLVM with all its different front-ends.
-//
-// @param intToPtr: The "inttoptr" instruction to visit.
-void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
-  // Check if we are using add to do pointer arithmetic.
-  BinaryOperator *const binaryOperator = dyn_cast<BinaryOperator>(intToPtr.getOperand(0));
-  if (!binaryOperator || binaryOperator->getOpcode() != Instruction::Add)
-    return;
-
-  // Check that we have a constant offset.
-  const ConstantInt *const constOffset = dyn_cast<ConstantInt>(binaryOperator->getOperand(1));
-  if (!constOffset)
-    return;
-
-  // Change inttoptr ( add x, const ) -> gep ( inttoptr x, const )
-  IntToPtrInst *const newIntToPtr = new IntToPtrInst(binaryOperator->getOperand(0), intToPtr.getType());
-  insertAfter(*newIntToPtr, *binaryOperator);
-
-  // Create a getelementptr instruction (using offset / size).
-  const DataLayout dataLayout = newIntToPtr->getModule()->getDataLayout();
-  const uint64_t size = dataLayout.getTypeAllocSize(newIntToPtr->getType()->getPointerElementType());
-  APInt index = constOffset->getValue().udiv(size);
-  assert(constOffset->getValue().urem(size) == 0);
-
-  GetElementPtrInst *const getElementPtr =
-      GetElementPtrInst::Create(nullptr, newIntToPtr, ConstantInt::get(newIntToPtr->getContext(), index));
-  insertAfter(*getElementPtr, *newIntToPtr);
-
-  // Set every instruction to use the newly calculated pointer.
-  intToPtr.replaceAllUsesWith(getElementPtr);
-
-  // If the add instruction has no other users then mark to erase.
-  if (binaryOperator->getNumUses() == 0)
-    m_instsToErase.push_back(binaryOperator);
-}
-
-// =====================================================================================================================
 // Helper function to move an instruction after another.
 //
 // @param move : Instruction to move.
