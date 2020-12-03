@@ -94,6 +94,10 @@ class InOutLocationInfo {
 public:
   InOutLocationInfo() { m_data.u16All = 0; }
   InOutLocationInfo(const InOutLocationInfo &inOutLocInfo) { m_data.u16All = inOutLocInfo.getData(); }
+  InOutLocationInfo &operator=(const InOutLocationInfo &InOutLocationInfo) {
+    m_data.u16All = InOutLocationInfo.getData();
+    return *this;
+  }
 
   unsigned getData() const { return static_cast<uint16_t>(m_data.u16All); }
   void setData(unsigned data) { m_data.u16All = static_cast<uint16_t>(data); }
