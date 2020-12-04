@@ -42,6 +42,8 @@ if(ICD_BUILD_LLPC)
     )
 
     add_subdirectory(llpc ${PROJECT_BINARY_DIR}/llpc)
+    # Export the LLVM build path so that it's available in XGL.
+    set(XGL_LLVM_BUILD_PATH ${XGL_LLVM_BUILD_PATH} PARENT_SCOPE)
 
     target_link_libraries(vkgc INTERFACE llpc)
 endif()
