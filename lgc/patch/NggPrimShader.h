@@ -285,7 +285,7 @@ private:
     llvm::Value *primitiveId;   // Primitive ID (for VS)
     llvm::Value *vertCompacted; // Whether vertex compaction is performed (for culling mode)
 
-    // System values, not used in pass-through mode (SGPRs)
+    // System values (SGPRs)
     llvm::Value *primShaderTableAddrLow;  // Primitive shader table address low
     llvm::Value *primShaderTableAddrHigh; // Primitive shader table address high
 

@@ -396,7 +396,7 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   Value *mergedGroupInfo = (arg + EsGsSysValueMergedGroupInfo);
   Value *mergedWaveInfo = (arg + EsGsSysValueMergedWaveInfo);
   Value *offChipLdsBase = (arg + EsGsSysValueOffChipLdsBase);
-  Value *sharedScratchOffset = (arg + EsGsSysValueSharedScratchOffset);
+  Value *sharedScratchOffset = m_gfxIp.major <= 10 ? (arg + EsGsSysValueSharedScratchOffset) : nullptr;
   Value *primShaderTableAddrLow = (arg + EsGsSysValuePrimShaderTableAddrLow);
   Value *primShaderTableAddrHigh = (arg + EsGsSysValuePrimShaderTableAddrHigh);
 
@@ -425,7 +425,10 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   mergedGroupInfo->setName("mergedGroupInfo");
   mergedWaveInfo->setName("mergedWaveInfo");
   offChipLdsBase->setName("offChipLdsBase");
-  sharedScratchOffset->setName("sharedScratchOffset");
+  if (m_gfxIp.major <= 10) {
+    assert(sharedScratchOffset);
+    sharedScratchOffset->setName("sharedScratchOffset");
+  }
   primShaderTableAddrLow->setName("primShaderTableAddrLow");
   primShaderTableAddrHigh->setName("primShaderTableAddrHigh");
 
@@ -2724,7 +2727,7 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
   std::vector<Value *> args;
 
   if (deferredVertexExport)
-    args.push_back(position); // Setup vertex position data as the first argument
+    args.push_back(position); // Setup vertex position data as the additional argument
 
   auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
   const unsigned userDataCount = intfData->userDataCount;
@@ -2899,26 +2902,28 @@ void NggPrimShader::splitEs(Module *module) {
 
       assert(call->getParent() == retBlock); // Must in return block
 
-      unsigned exportTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-      if (exportTarget == EXP_TARGET_POS_0) {
-        // Get position value
-        for (unsigned i = 0; i < 4; ++i)
-          position = m_builder->CreateInsertElement(position, call->getArgOperand(2 + i), i);
-      } else if (exportTarget == clipCullPos) {
-        // Get clip/cull distance value
-        if (m_nggControl->enableCullDistanceCulling) {
-          clipCullDistance[0] = call->getArgOperand(2);
-          clipCullDistance[1] = call->getArgOperand(3);
-          clipCullDistance[2] = call->getArgOperand(4);
-          clipCullDistance[3] = call->getArgOperand(5);
-        }
-      } else if (exportTarget == clipCullPos + 1 && clipDistanceCount + cullDistanceCount > 4) {
-        // Get clip/cull distance value
-        if (m_nggControl->enableCullDistanceCulling) {
-          clipCullDistance[4] = call->getArgOperand(2);
-          clipCullDistance[5] = call->getArgOperand(3);
-          clipCullDistance[6] = call->getArgOperand(4);
-          clipCullDistance[7] = call->getArgOperand(5);
+      if (func->isIntrinsic() && func->getIntrinsicID() == Intrinsic::amdgcn_exp) {
+        unsigned exportTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+        if (exportTarget == EXP_TARGET_POS_0) {
+          // Get position value
+          for (unsigned i = 0; i < 4; ++i)
+            position = m_builder->CreateInsertElement(position, call->getArgOperand(2 + i), i);
+        } else if (exportTarget == clipCullPos) {
+          // Get clip/cull distance value
+          if (m_nggControl->enableCullDistanceCulling) {
+            clipCullDistance[0] = call->getArgOperand(2);
+            clipCullDistance[1] = call->getArgOperand(3);
+            clipCullDistance[2] = call->getArgOperand(4);
+            clipCullDistance[3] = call->getArgOperand(5);
+          }
+        } else if (exportTarget == clipCullPos + 1 && clipDistanceCount + cullDistanceCount > 4) {
+          // Get clip/cull distance value
+          if (m_nggControl->enableCullDistanceCulling) {
+            clipCullDistance[4] = call->getArgOperand(2);
+            clipCullDistance[5] = call->getArgOperand(3);
+            clipCullDistance[6] = call->getArgOperand(4);
+            clipCullDistance[7] = call->getArgOperand(5);
+          }
         }
       }
 
@@ -2944,7 +2949,7 @@ void NggPrimShader::splitEs(Module *module) {
   //
 
   // NOTE: Here, we just mutate original ES to do deferred vertex export. We add vertex position data as an additional
-  // input (the first argument). This could avoid re-fetching it since we already get the data before NGG culling.
+  // argument. This could avoid re-fetching it since we already get the data before NGG culling.
   auto esDeferredVertexExportFunc = addFunctionArgs(esEntryPoint, nullptr, positionTy);
   esDeferredVertexExportFunc->setName(lgcName::NggEsDeferredVertexExport);
 
@@ -2959,14 +2964,16 @@ void NggPrimShader::splitEs(Module *module) {
       if (call->getParent()->getParent() != esDeferredVertexExportFunc)
         continue; // Export call doesn't belong to targeted function, skip
 
-      unsigned exportTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-      if (exportTarget == EXP_TARGET_POS_0) {
-        // Replace vertex position data
-        m_builder->SetInsertPoint(call);
-        call->setArgOperand(2, m_builder->CreateExtractElement(position, static_cast<uint64_t>(0)));
-        call->setArgOperand(3, m_builder->CreateExtractElement(position, 1));
-        call->setArgOperand(4, m_builder->CreateExtractElement(position, 2));
-        call->setArgOperand(5, m_builder->CreateExtractElement(position, 3));
+      if (func->isIntrinsic() && func->getIntrinsicID() == Intrinsic::amdgcn_exp) {
+        unsigned exportTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+        if (exportTarget == EXP_TARGET_POS_0) {
+          // Replace vertex position data
+          m_builder->SetInsertPoint(call);
+          call->setArgOperand(2, m_builder->CreateExtractElement(position, static_cast<uint64_t>(0)));
+          call->setArgOperand(3, m_builder->CreateExtractElement(position, 1));
+          call->setArgOperand(4, m_builder->CreateExtractElement(position, 2));
+          call->setArgOperand(5, m_builder->CreateExtractElement(position, 3));
+        }
       }
     }
   }
@@ -3262,8 +3269,8 @@ void NggPrimShader::runCopyShader(Module *module) {
 // Mutates copy shader to handle the importing GS outputs from GS-VS ring.
 //
 // @param module : LLVM module
-Function *NggPrimShader::mutateCopyShader(Module *pModule) {
-  auto copyShaderEntryPoint = pModule->getFunction(lgcName::NggCopyShaderEntryPoint);
+Function *NggPrimShader::mutateCopyShader(Module *module) {
+  auto copyShaderEntryPoint = module->getFunction(lgcName::NggCopyShaderEntryPoint);
   assert(copyShaderEntryPoint != nullptr);
 
   auto savedInsertPos = m_builder->saveIP();
@@ -3272,7 +3279,7 @@ Function *NggPrimShader::mutateCopyShader(Module *pModule) {
 
   std::vector<Instruction *> removeCalls;
 
-  for (auto &func : pModule->functions()) {
+  for (auto &func : module->functions()) {
     if (func.getName().startswith(lgcName::NggGsOutputImport)) {
       // Import GS outputs from GS-VS ring
       for (auto pUser : func.users()) {
