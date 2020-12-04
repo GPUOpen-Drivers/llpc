@@ -72,6 +72,8 @@ if(ICD_BUILD_LLPC)
 
     add_subdirectory(${XGL_LLVM_SRC_PATH} ${PROJECT_BINARY_DIR}/llvm)
     set(XGL_LLVM_BUILD_PATH ${PROJECT_BINARY_DIR}/llvm)
+    # Export the LLVM build path so that it's available in XGL.
+    set(XGL_LLVM_BUILD_PATH ${XGL_LLVM_BUILD_PATH} PARENT_SCOPE)
 
     llvm_map_components_to_libnames(llvm_libs
         lgc
