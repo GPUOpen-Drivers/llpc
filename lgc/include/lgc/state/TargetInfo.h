@@ -40,6 +40,11 @@ struct GfxIpVersion {
   unsigned major;    // Major version
   unsigned minor;    // Minor version
   unsigned stepping; // Stepping info
+
+  // GFX+ checker
+  bool operator>=(const GfxIpVersion &rhs) const {
+    return std::tie(major, minor, stepping) >= std::tie(rhs.major, rhs.minor, rhs.stepping);
+  }
 };
 
 // Represents the properties of GPU device.
