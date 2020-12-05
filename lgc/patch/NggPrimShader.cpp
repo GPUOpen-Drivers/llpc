@@ -830,6 +830,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   assert(m_ldsManager->getLdsRegionStart(LdsRegionVertPosData) % SizeOfVec4 == 0);
 
   const bool disableCompact = m_nggControl->compactMode == NggCompactDisable;
+  if (disableCompact)
+    assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   // Define basic blocks
   auto entryBlock = createBlock(entryPoint, ".entry");
@@ -1503,6 +1505,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   assert(waveSize == 32 || waveSize == 64);
 
   const bool disableCompact = m_nggControl->compactMode == NggCompactDisable;
+  if (disableCompact)
+    assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
   const bool cullingMode = !m_nggControl->passthroughMode;

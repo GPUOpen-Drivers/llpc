@@ -402,6 +402,16 @@ static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
       break;
     }
 
+    // Change defaults of NGG options according to GFX IP
+    if (ParsedGfxIp >= GfxIpVersion({10, 3})) {
+      // For GFX10.3+, we always prefer to enable NGG. Backface culling and small primitive filter are enabled as
+      // well. Also, the compaction mode is set to compactionless.
+      EnableNgg.setValue(true);
+      NggCompactionMode.setValue(static_cast<unsigned>(NggCompactDisable));
+      NggEnableBackfaceCulling.setValue(true);
+      NggEnableSmallPrimFilter.setValue(true);
+    }
+
     // Provide a default for -shader-cache-file-dir, as long as the environment variables below are
     // not set.
     // TODO: Was this code intended to set the default of -shader-cache-file-dir in the case that it
