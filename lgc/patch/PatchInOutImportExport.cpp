@@ -2782,121 +2782,63 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
 
     break;
   }
-  case BuiltInTessLevelOuter: {
-    if (builtInUsage.tessLevelOuter) {
-      // Extract tessellation factors
-      std::vector<Value *> tessFactors;
-      if (!elemIdx) {
-        assert(outputTy->isArrayTy());
-
-        unsigned tessFactorCount = 0;
-
-        auto primitiveMode = m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
-        switch (primitiveMode) {
-        case PrimitiveMode::Isolines:
-          tessFactorCount = 2;
-          break;
-        case PrimitiveMode::Triangles:
-          tessFactorCount = 3;
-          break;
-        case PrimitiveMode::Quads:
-          tessFactorCount = 4;
-          break;
-        default:
-          llvm_unreachable("Should never be called!");
-          break;
-        }
-
-        for (unsigned i = 0; i < tessFactorCount; ++i) {
-          Value *elem = ExtractValueInst::Create(output, {i}, "", insertPos);
-          tessFactors.push_back(elem);
-        }
-
-        if (primitiveMode == PrimitiveMode::Isolines) {
-          assert(tessFactorCount == 2);
-          std::swap(tessFactors[0], tessFactors[1]);
-        }
-      } else {
-        assert(outputTy->isFloatTy());
-        tessFactors.push_back(output);
-      }
-
-      Value *tessFactorOffset = calcTessFactorOffset(true, elemIdx, insertPos);
-      storeTessFactorToBuffer(tessFactors, tessFactorOffset, insertPos);
-
-      assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
-      unsigned loc = perPatchBuiltInOutLocMap[builtInId];
-
-      if (!elemIdx) {
-        // gl_TessLevelOuter[4] is treated as vec4
-        assert(outputTy->isArrayTy());
-
-        for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-          auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
-          auto elemIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
-          auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, insertPos);
-          writeValueToLds(elem, ldsOffset, insertPos);
-        }
-      } else {
-        auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, nullptr, insertPos);
-        writeValueToLds(output, ldsOffset, insertPos);
-      }
-    }
-    break;
-  }
+  case BuiltInTessLevelOuter:
   case BuiltInTessLevelInner: {
-    if (builtInUsage.tessLevelInner) {
-      // Extract tessellation factors
-      std::vector<Value *> tessFactors;
-      if (!elemIdx) {
-        unsigned tessFactorCount = 0;
-
-        switch (m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode) {
-        case PrimitiveMode::Isolines:
-          tessFactorCount = 0;
-          break;
-        case PrimitiveMode::Triangles:
-          tessFactorCount = 1;
-          break;
-        case PrimitiveMode::Quads:
-          tessFactorCount = 2;
-          break;
-        default:
-          llvm_unreachable("Should never be called!");
-          break;
-        }
-
-        for (unsigned i = 0; i < tessFactorCount; ++i) {
-          Value *elem = ExtractValueInst::Create(output, {i}, "", insertPos);
-          tessFactors.push_back(elem);
-        }
-      } else {
-        assert(outputTy->isFloatTy());
-        tessFactors.push_back(output);
+    // Extract tessellation factors
+    std::vector<Value *> tessFactors;
+    const bool isOuter = BuiltInTessLevelOuter == builtInId;
+    if (!elemIdx) {
+      assert(outputTy->isArrayTy());
+      unsigned tessFactorCount = 0;
+      const unsigned adjust = isOuter ? 2 : 0;
+      auto primitiveMode = m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
+      switch (primitiveMode) {
+      case PrimitiveMode::Isolines:
+        tessFactorCount = 0 + adjust;
+        break;
+      case PrimitiveMode::Triangles:
+        tessFactorCount = 1 + adjust;
+        break;
+      case PrimitiveMode::Quads:
+        tessFactorCount = 2 + adjust;
+        break;
+      default:
+        llvm_unreachable("Should never be called!");
+        break;
       }
-
-      Value *tessFactorOffset = calcTessFactorOffset(false, elemIdx, insertPos);
-      storeTessFactorToBuffer(tessFactors, tessFactorOffset, insertPos);
-
-      assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
-      unsigned loc = perPatchBuiltInOutLocMap[builtInId];
-
-      if (!elemIdx) {
-        // gl_TessLevelInner[2] is treated as vec2
-        assert(outputTy->isArrayTy());
-
-        for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-          auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
-          auto elemIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
-          auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, insertPos);
-          writeValueToLds(elem, ldsOffset, insertPos);
-        }
-      } else {
-        auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, nullptr, insertPos);
-        writeValueToLds(output, ldsOffset, insertPos);
+      for (unsigned i = 0; i < tessFactorCount; ++i) {
+        Value *elem = ExtractValueInst::Create(output, {i}, "", insertPos);
+        tessFactors.push_back(elem);
       }
+      if (isOuter && primitiveMode == PrimitiveMode::Isolines) {
+        assert(tessFactorCount == 2);
+        std::swap(tessFactors[0], tessFactors[1]);
+      }
+    } else {
+      assert(outputTy->isFloatTy());
+      tessFactors.push_back(output);
     }
+    Value *tessFactorOffset = calcTessFactorOffset(isOuter, elemIdx, insertPos);
+    storeTessFactorToBuffer(tessFactors, tessFactorOffset, insertPos);
 
+    assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
+    unsigned loc = perPatchBuiltInOutLocMap[builtInId];
+
+    if (!elemIdx) {
+      // gl_TessLevelOuter[4] is treated as vec4
+      // gl_TessLevelInner[2] is treated as vec2
+      assert(outputTy->isArrayTy());
+
+      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
+        auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
+        auto elemIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
+        auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, insertPos);
+        writeValueToLds(elem, ldsOffset, insertPos);
+      }
+    } else {
+      auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, nullptr, insertPos);
+      writeValueToLds(output, ldsOffset, insertPos);
+    }
     break;
   }
   default: {
