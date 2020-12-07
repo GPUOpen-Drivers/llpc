@@ -630,9 +630,9 @@ void ElfLinkerImpl::mergePalMetadataFromElf(object::ObjectFile &objectFile, bool
       // This is a .note section. Find the PAL metadata note and merge it into the PalMetadata object
       // in the PipelineState.
       Error err = ErrorSuccess();
-      auto elfFile = cast<object::ELFObjectFile<object::ELF64LE>>(&objectFile)->getELFFile();
-      auto shdr = cantFail(elfFile->getSection(elfSection.getIndex()));
-      for (auto note : elfFile->notes(*shdr, err)) {
+      auto &elfFile = cast<object::ELFObjectFile<object::ELF64LE>>(&objectFile)->getELFFile();
+      auto shdr = cantFail(elfFile.getSection(elfSection.getIndex()));
+      for (auto note : elfFile.notes(*shdr, err)) {
         if (note.getName() == Util::Abi::AmdGpuArchName && note.getType() == ELF::NT_AMDGPU_METADATA) {
           ArrayRef<uint8_t> desc = note.getDesc();
           m_pipelineState->mergePalMetadataFromBlob(StringRef(reinterpret_cast<const char *>(desc.data()), desc.size()),
