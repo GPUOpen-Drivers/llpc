@@ -163,7 +163,7 @@ private:
 
   llvm::Value *calcTessFactorOffset(bool isOuter, llvm::Value *elemIdx, llvm::Instruction *insertPos);
 
-  void storeTessFactorToBuffer(const std::vector<llvm::Value *> &tessFactors, llvm::Value *tessFactorOffset,
+  void storeTessFactorToBuffer(const llvm::SmallVectorImpl<llvm::Value *> &tessFactors, llvm::Value *tessFactorOffset,
                                llvm::Instruction *insertPos);
 
   void createTessBufferStoreFunction();
