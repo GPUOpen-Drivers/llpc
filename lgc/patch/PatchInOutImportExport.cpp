@@ -555,8 +555,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           }
         } else {
           if (m_pipelineState->canPackInOut() &&
-              (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl)) {
-            // The new InOutLocationInfo is used to map scalarized FS and TCS input import as compact as possible
+              (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl ||
+               m_shaderStage == ShaderStageGeometry)) {
+            // The inputLocInfoMap of {TCS, GS, FS} maps original InOutLocationInfo to tightly compact InOutLocationInfo
             const bool isTcs = m_shaderStage == ShaderStageTessControl;
             const uint32_t elemIdxArgIdx = (isInterpolantInputImport || isTcs) ? 2 : 1;
             bool hasDynIndex = false;
@@ -622,8 +623,11 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       case ShaderStageGeometry: {
         assert(callInst.getNumArgOperands() == 3);
+        if (!elemIdx)
+          elemIdx = cast<ConstantInt>(callInst.getOperand(1));
 
-        const unsigned compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+        const unsigned compIdx = cast<ConstantInt>(elemIdx)->getZExtValue();
+        assert(isDontCareValue(elemIdx) == false);
 
         Value *vertexIdx = callInst.getOperand(2);
         assert(isDontCareValue(vertexIdx) == false);
@@ -853,20 +857,14 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       } else if (m_shaderStage == ShaderStageCopyShader) {
         exist = true;
         loc = value;
-      } else if (m_shaderStage == ShaderStageGeometry) {
-        assert(callInst.getNumArgOperands() == 4);
-
-        origLocInfo.setStreamId(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
-        locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
-        if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
-          exist = true;
-          loc = locInfoMapIt->second.getLocation();
-        }
       } else {
         if (m_pipelineState->canPackInOut()) {
-          const bool isVs = m_shaderStage == ShaderStageVertex;
-          assert(isVs || m_shaderStage == ShaderStageTessEval);
+          const bool isVs = (m_shaderStage == ShaderStageVertex);
+          const bool isGs = (m_shaderStage == ShaderStageGeometry);
+          assert(isVs || isGs || m_shaderStage == ShaderStageTessEval);
           origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
+          if (isGs)
+            origLocInfo.setStreamId(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
           locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
           bool relateDynIndex = false;
           const bool checkDynIndex = (isVs && m_pipelineState->hasShaderStage(ShaderStageTessControl));
@@ -924,9 +922,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         }
         case ShaderStageGeometry: {
           assert(callInst.getNumArgOperands() == 4);
-          const unsigned compIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+          if (elemIdx == InvalidValue)
+            elemIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
           const unsigned streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
-          patchGsGenericOutputExport(output, loc, compIdx, streamId, &callInst);
+          patchGsGenericOutputExport(output, loc, elemIdx, streamId, &callInst);
           break;
         }
         case ShaderStageFragment: {
@@ -1890,13 +1889,6 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
     byteSize *= (32 / bitWidth);
 
   assert(compIdx <= 4);
-
-  // Field "genericOutByteSizes" now gets set when generating the copy shader. Just assert that we agree on the
-  // byteSize.
-  auto &genericOutByteSizes =
-      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.genericOutByteSizes;
-  assert(genericOutByteSizes[streamId][location][compIdx] == byteSize);
-  (void(genericOutByteSizes)); // unused
 
   storeValueToGsVsRing(output, location, compIdx, streamId, insertPos);
 }
