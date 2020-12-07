@@ -85,10 +85,11 @@ private:
 
   void mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount);
 
-  void updateInputLocInfoMap();
-  void updateOutputLocInfoMap();
-  void packInOutLocation();
-  void fillInOutLocInfoMap();
+  void updateInputLocInfoMapWithUnpack();
+  void updateOutputLocInfoMapWithUnpack();
+  void packInOutLocation(bool isInput);
+  void updateInputLocInfoMapWithPack();
+  void updateOutputLocInfoMapWithPack();
   void reassembleOutputExportCalls();
 
   // Input/output scalarizing
@@ -135,8 +136,9 @@ class InOutLocationInfoMapManager {
 public:
   InOutLocationInfoMapManager() {}
 
-  void createMap(const std::vector<llvm::CallInst *> &calls, ShaderStage shaderStage);
+  void createMap(const std::vector<llvm::CallInst *> &calls, ShaderStage shaderStage, bool requireDword);
   bool findMap(const InOutLocationInfo &origLocInfo, InOutLocationInfoMap::const_iterator &mapIt);
+  InOutLocationInfoMap &getMap() { return m_locationInfoMap; }
 
   struct LocationSpan {
     uint16_t getCompatibilityKey() const { return compatibilityInfo.u16All; }
@@ -155,11 +157,14 @@ private:
   InOutLocationInfoMapManager(const InOutLocationInfoMapManager &) = delete;
   InOutLocationInfoMapManager &operator=(const InOutLocationInfoMapManager &) = delete;
 
-  void addSpan(llvm::CallInst *call, ShaderStage shaderStage);
-  void buildMap(bool checkCompatibility);
+  void addSpan(llvm::CallInst *call, ShaderStage shaderStage, bool requireDword);
+  void buildMap(ShaderStage shaderStage);
 
-  bool isCompatible(const LocationSpan &rSpan, const LocationSpan &lSpan) const {
-    return rSpan.getCompatibilityKey() == lSpan.getCompatibilityKey();
+  bool isCompatible(const LocationSpan &rSpan, const LocationSpan &lSpan, const bool isGs) const {
+    bool isCompatible = rSpan.getCompatibilityKey() == lSpan.getCompatibilityKey();
+    if (isGs)
+      isCompatible &= rSpan.firstLocationInfo.getStreamId() == lSpan.firstLocationInfo.getStreamId();
+    return isCompatible;
   }
 
   std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space

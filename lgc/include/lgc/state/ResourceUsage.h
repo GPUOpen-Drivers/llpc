@@ -371,8 +371,8 @@ struct ResourceUsage {
       //   <location, <component, byteSize>>
       std::unordered_map<unsigned, std::vector<unsigned>> genericOutByteSizes[MaxGsStreams];
 
-      // Map from output location to the transform feedback info
-      std::map<InOutLocationInfo, unsigned> xfbOutsInfo;
+      // Map from output location info to the transform feedback info
+      std::map<InOutLocationInfo, XfbOutInfo> locInfoXfbOutInfoMap;
 
       // ID of the vertex stream sent to rasterizor
       unsigned rasterStream = 0;
