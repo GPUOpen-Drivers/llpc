@@ -166,7 +166,7 @@ private:
   void storeTessFactorToBuffer(const llvm::SmallVectorImpl<llvm::Value *> &tessFactors, llvm::Value *tessFactorOffset,
                                llvm::Instruction *insertPos);
 
-  void createTessBufferStoreFunction();
+  void createTessBufferStoreFunction(llvm::StringRef funcName, unsigned compCount);
 
   unsigned calcPatchCountPerThreadGroup(unsigned inVertexCount, unsigned inVertexStride, unsigned outVertexCount,
                                         unsigned outVertexStride, unsigned patchConstCount,

@@ -4311,48 +4311,29 @@ Value *PatchInOutImportExport::calcTessFactorOffset(bool isOuter, Value *elemIdx
 
   Value *tessFactorOffset = ConstantInt::get(Type::getInt32Ty(*m_context), tessFactorStart);
   if (elemIdxVal) {
-    if (isa<ConstantInt>(elemIdxVal)) {
-      // Constant element indexing
-      unsigned elemIdx = cast<ConstantInt>(elemIdxVal)->getZExtValue();
-      if (elemIdx < tessFactorCount) {
-        if (primitiveMode == PrimitiveMode::Isolines && isOuter) {
-          // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
-          // TF, the second is density TF. The order is reversed, different from GLSL spec.
-          assert(tessFactorCount == 2);
-          elemIdx = 1 - elemIdx;
-        }
+    if (primitiveMode == PrimitiveMode::Isolines && isOuter) {
+      // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
+      // TF, the second is density TF. The order is reversed, different from GLSL spec.
+      assert(tessFactorCount == 2);
 
-        tessFactorOffset = ConstantInt::get(Type::getInt32Ty(*m_context), tessFactorStart + elemIdx);
-      } else {
-        // Out of range, drop it
-        tessFactorOffset = ConstantInt::get(Type::getInt32Ty(*m_context), InvalidValue);
-      }
-    } else {
-      // Dynamic element indexing
-      if (primitiveMode == PrimitiveMode::Isolines && isOuter) {
-        // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
-        // TF, the second is density TF. The order is reversed, different from GLSL spec.
-        assert(tessFactorCount == 2);
+      // elemIdx = (elemIdx <= 1) ? 1 - elemIdx : elemIdx
+      auto cond = new ICmpInst(insertPos, ICmpInst::ICMP_ULE, elemIdxVal,
+                               ConstantInt::get(Type::getInt32Ty(*m_context), 1), "");
 
-        // elemIdx = (elemIdx <= 1) ? 1 - elemIdx : elemIdx
-        auto cond = new ICmpInst(insertPos, ICmpInst::ICMP_ULE, elemIdxVal,
-                                 ConstantInt::get(Type::getInt32Ty(*m_context), 1), "");
+      auto swapElemIdx =
+          BinaryOperator::CreateSub(ConstantInt::get(Type::getInt32Ty(*m_context), 1), elemIdxVal, "", insertPos);
 
-        auto swapElemIdx =
-            BinaryOperator::CreateSub(ConstantInt::get(Type::getInt32Ty(*m_context), 1), elemIdxVal, "", insertPos);
-
-        elemIdxVal = SelectInst::Create(cond, swapElemIdx, elemIdxVal, "", insertPos);
-      }
-
-      // tessFactorOffset = (elemIdx < tessFactorCount) ? (tessFactorStart + elemIdx) : invalidValue
-      tessFactorOffset = BinaryOperator::CreateAdd(tessFactorOffset, elemIdxVal, "", insertPos);
-
-      auto cond = new ICmpInst(insertPos, ICmpInst::ICMP_ULT, elemIdxVal,
-                               ConstantInt::get(Type::getInt32Ty(*m_context), tessFactorCount), "");
-
-      tessFactorOffset = SelectInst::Create(
-          cond, tessFactorOffset, ConstantInt::get(Type::getInt32Ty(*m_context), InvalidValue), "", insertPos);
+      elemIdxVal = SelectInst::Create(cond, swapElemIdx, elemIdxVal, "", insertPos);
     }
+
+    // tessFactorOffset = (elemIdx < tessFactorCount) ? (tessFactorStart + elemIdx) : invalidValue
+    tessFactorOffset = BinaryOperator::CreateAdd(tessFactorOffset, elemIdxVal, "", insertPos);
+
+    auto cond = new ICmpInst(insertPos, ICmpInst::ICMP_ULT, elemIdxVal,
+                             ConstantInt::get(Type::getInt32Ty(*m_context), tessFactorCount), "");
+
+    tessFactorOffset = SelectInst::Create(cond, tessFactorOffset,
+                                          ConstantInt::get(Type::getInt32Ty(*m_context), InvalidValue), "", insertPos);
   }
 
   return tessFactorOffset;
@@ -4381,68 +4362,54 @@ void PatchInOutImportExport::storeTessFactorToBuffer(const SmallVectorImpl<Value
 
   auto tessFactorStride = ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.tessFactorStride);
 
-  if (isa<ConstantInt>(tessFactorOffsetVal)) {
-    unsigned tessFactorOffset = cast<ConstantInt>(tessFactorOffsetVal)->getZExtValue();
-    if (tessFactorOffset == InvalidValue) {
-      // Out of range, drop it
-      return;
-    }
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(insertPos);
 
-    auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
-    Value *tfBufferOffset = BinaryOperator::CreateMul(relativeId, tessFactorStride, "", insertPos);
-    tfBufferOffset =
-        BinaryOperator::CreateMul(tfBufferOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
-
-    auto tfBufDesc = m_pipelineSysValues.get(m_entryPoint)->getTessFactorBufDesc();
-    std::vector<Value *> tfValues(tessFactors.size());
-    for (unsigned i = 0; i < tessFactors.size(); i++)
-      tfValues[i] = new BitCastInst(tessFactors[i], Type::getInt32Ty(*m_context), "", insertPos);
-
-    CoherentFlag coherent = {};
-    coherent.bits.glc = true;
-
-    for (unsigned i = 0, combineCount = 0; i < tessFactors.size(); i += combineCount) {
-      unsigned tfValueOffset = i + tessFactorOffset;
-      if (m_gfxIp.major <= 8) {
-        // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
-        tfValueOffset += (m_pipelineState->isTessOffChip() ? 1 : 0);
-      }
-      combineCount =
-          combineBufferStore(tfValues, i, tfValueOffset, tfBufDesc, tfBufferOffset, tfBufferBase, coherent, insertPos);
-    }
+  // Mangle the call name according t the count of tessellation factors.
+  std::string callName(lgcName::TfBufferStore);
+  const unsigned compCount = tessFactors.size();
+  Value *tfValue = nullptr;
+  if (compCount == 1) {
+    tfValue = builder.CreateBitCast(tessFactors[0], builder.getInt32Ty());
   } else {
-    // Must be element indexing of tessellation level array
-    assert(tessFactors.size() == 1);
-
-    if (!m_module->getFunction(lgcName::TfBufferStore))
-      createTessBufferStoreFunction();
-
-    if (m_pipelineState->isTessOffChip()) {
-      if (m_gfxIp.major <= 8) {
-        // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
-        tfBufferBase =
-            BinaryOperator::CreateAdd(tfBufferBase, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
-      }
+    tfValue = UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), compCount));
+    for (unsigned compIdx = 0; compIdx < compCount; ++compIdx) {
+      Value *comp = builder.CreateBitCast(tessFactors[compIdx], builder.getInt32Ty());
+      tfValue = builder.CreateInsertElement(tfValue, comp, compIdx);
     }
-
-    Value *args[] = {
-        m_pipelineSysValues.get(m_entryPoint)->getTessFactorBufDesc(), // tfBufferDesc
-        tfBufferBase,                                                  // tfBufferBase
-        m_pipelineSysValues.get(m_entryPoint)->getRelativeId(),        // relPatchId
-        tessFactorStride,                                              // tfStride
-        tessFactorOffsetVal,                                           // tfOffset
-        tessFactors[0]                                                 // tfValue
-    };
-    emitCall(lgcName::TfBufferStore, Type::getVoidTy(*m_context), args, {}, insertPos);
   }
+  callName += getTypeName(tfValue->getType());
+  if (!m_module->getFunction(callName))
+    createTessBufferStoreFunction(callName, compCount);
+
+  if (m_pipelineState->isTessOffChip()) {
+    if (m_gfxIp.major <= 8) {
+      // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
+      tfBufferBase =
+          BinaryOperator::CreateAdd(tfBufferBase, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
+    }
+  }
+
+  Value *args[] = {
+      m_pipelineSysValues.get(m_entryPoint)->getTessFactorBufDesc(), // tfBufferDesc
+      tfBufferBase,                                                  // tfBufferBase
+      m_pipelineSysValues.get(m_entryPoint)->getRelativeId(),        // relPatchId
+      tessFactorStride,                                              // tfStride
+      tessFactorOffsetVal,                                           // tfOffset
+      tfValue                                                        // tfValue
+  };
+  builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
 }
 
 // =====================================================================================================================
-// Creates the LLPC intrinsic "llpc.tfbuffer.store.f32" to store tessellation factor (dynamic element indexing for
-// tessellation level array).
-void PatchInOutImportExport::createTessBufferStoreFunction() {
-  // define void @llpc.tfbuffer.store.f32(
-  //     <4 x i32> %tfBufferDesc, i32 %tfBufferBase, i32 %relPatchId, i32 %tfStride, i32 %tfOffset, float %tfValue)
+// Creates the LLPC intrinsic "llpc.tfbuffer.store.%tfValueType" to store tessellation factor.
+//
+// param@ compCount : The component count of the store value
+void PatchInOutImportExport::createTessBufferStoreFunction(StringRef funcName, unsigned compCount) {
+  // %tfValueType could be one of {i32, v2i32, v3i32, v4i32}
+  // define void @llpc.tfbuffer.store.%tfValueType(
+  //     <4 x i32> %tfBufferDesc, i32 %tfBufferBase, i32 %relPatchId, i32 %tfStride, i32 %tfOffset, %tfValueType
+  //     %tfValue)
   // {
   //     %1 = icmp ne i32 %tfOffset, -1 (invalidValue)
   //     br i1 %1, label %.tfstore, label %.end
@@ -4452,24 +4419,29 @@ void PatchInOutImportExport::createTessBufferStoreFunction() {
   //     %3 = mul i32 %relPatchId, %2
   //     %4 = mul i32 %tfOffset, 4
   //     %5 = add i32 %3, %4
-  //     %6 = add i32 %tfBufferBase, %5
-  //     call void @llvm.amdgcn.raw.buffer.store.f32(
-  //         float %tfValue, <4 x i32> %tfBufferDesc, i32 %6, i32 0, i32 1)
+  //     call void @llvm.amdgcn.raw.tbuffer.store.%tfValueType(
+  //         tfValueType %tfValue, <4 x i32> %tfBufferDesc, i32 %5, i32 %tfBufferBase, i32 1)
   //     br label %.end
   //
   // .end:
   //     ret void
   // }
+
+  BuilderBase builder(*m_context);
+  Type *tfValueTy = builder.getInt32Ty();
+  if (compCount > 1)
+    tfValueTy = FixedVectorType::get(builder.getInt32Ty(), compCount);
+
   Type *argTys[] = {
       FixedVectorType::get(Type::getInt32Ty(*m_context), 4), // TF buffer descriptor
-      Type::getInt32Ty(*m_context),                          // TF buffer base
-      Type::getInt32Ty(*m_context),                          // Relative patch ID
-      Type::getInt32Ty(*m_context),                          // TF stride
-      Type::getInt32Ty(*m_context),                          // TF offset
-      Type::getFloatTy(*m_context)                           // TF value
+      builder.getInt32Ty(),                                  // TF buffer base
+      builder.getInt32Ty(),                                  // Relative patch ID
+      builder.getInt32Ty(),                                  // TF stride
+      builder.getInt32Ty(),                                  // TF offset
+      tfValueTy                                              // TF value
   };
   auto funcTy = FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::TfBufferStore, m_module);
+  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, funcName, m_module);
 
   func->setCallingConv(CallingConv::C);
   func->addFnAttr(Attribute::NoUnwind);
@@ -4510,18 +4482,39 @@ void PatchInOutImportExport::createTessBufferStoreFunction() {
   Value *tfBufferOffset = BinaryOperator::CreateMul(relPatchId, tfByteStride, "", tfStoreBlock);
 
   tfBufferOffset = BinaryOperator::CreateAdd(tfBufferOffset, tfByteOffset, "", tfStoreBlock);
-  tfBufferOffset = BinaryOperator::CreateAdd(tfBufferOffset, tfBufferBase, "", tfStoreBlock);
 
   auto branch = BranchInst::Create(endBlock, tfStoreBlock);
 
+  // Create llvm.amdgcn.raw.tbuffer.store.
+  SmallVector<unsigned> formats;
+  if (m_gfxIp.major <= 9) {
+    formats = {
+        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32)),
+        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32)),
+        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32_32)),
+        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32_32_32)),
+    };
+  } else if (m_gfxIp.major == 10) {
+    formats = {BUF_FORMAT_32_FLOAT, BUF_FORMAT_32_32_FLOAT, BUF_FORMAT_32_32_32_FLOAT, BUF_FORMAT_32_32_32_32_FLOAT};
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
+
+  CoherentFlag coherent = {};
+  coherent.bits.glc = true;
+
   Value *args[] = {
-      tfValue,                                           // vdata
-      tfBufferDesc,                                      // rsrc
-      tfBufferOffset,                                    // offset
-      ConstantInt::get(Type::getInt32Ty(*m_context), 0), // soffset
-      ConstantInt::get(Type::getInt32Ty(*m_context), 1)  // cachepolicy: glc = 1
+      tfValue,                                  // vdata
+      tfBufferDesc,                             // rsrc
+      tfBufferOffset,                           // voffset
+      tfBufferBase,                             // soffset
+      builder.getInt32(formats[compCount - 1]), // format
+      builder.getInt32(coherent.u32All)         // glc
   };
-  emitCall("llvm.amdgcn.raw.buffer.store.f32", Type::getVoidTy(*m_context), args, {}, branch);
+
+  builder.SetInsertPoint(branch);
+  builder.CreateNamedCall((Twine("llvm.amdgcn.raw.tbuffer.store.") + getTypeName(tfValueTy)).str(), builder.getVoidTy(),
+                          args, {});
 
   // Create entry block
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func, tfStoreBlock);
