@@ -950,11 +950,10 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     return;
 
   const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-  const bool enableXfb = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
 
   // Whether this shader stage has to use "exp" instructions to export outputs
   const bool useExpInst = ((m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
-                            (m_shaderStage == ShaderStageCopyShader && !enableXfb)) &&
+                            m_shaderStage == ShaderStageCopyShader) &&
                            (nextStage == ShaderStageInvalid || nextStage == ShaderStageFragment));
 
   auto zero = ConstantFP::get(Type::getFloatTy(*m_context), 0.0);
