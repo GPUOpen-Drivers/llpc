@@ -18,7 +18,7 @@
 # - GENERATOR: CMake generator to use (e.g., "Unix Makefiles", Ninja)
 #
 
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 ARG BRANCH
 ARG CONFIG
@@ -32,7 +32,8 @@ SHELL ["/bin/bash", "-c"]
 # Install required packages.
 # Use pip to install an up-to-date version of CMake. The apt package is
 # too old for LLVM.
-RUN apt-get update \
+RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
+    && apt-get update \
     && TOOLCHAIN_PACKAGES="gcc g++ binutils-gold" \
     && if echo "$FEATURES" | grep -q "+clang" ; then \
          TOOLCHAIN_PACKAGES="clang-9 libclang-common-9-dev lld-9"; \
@@ -40,11 +41,11 @@ RUN apt-get update \
     && apt-get install -yqq --no-install-recommends \
        build-essential pkg-config ninja-build \
        $TOOLCHAIN_PACKAGES \
-       python3 python3-distutils python3-pip \
+       python python3 python3-distutils python3-pip \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
        libwayland-dev \
-       git repo curl \
+       git curl wget \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir --upgrade cmake \
@@ -58,8 +59,9 @@ RUN apt-get update \
 # Checkout all repositories. Replace llpc with the version in LLPC_SOURCE_DIR.
 # The /vulkandriver/env.sh file is for extra env variables used by later commands.
 WORKDIR /vulkandriver
-RUN repo init -u https://github.com/GPUOpen-Drivers/AMDVLK.git -b "$BRANCH" \
-    && cp /vulkandriver/.repo/repo/repo /usr/bin/repo \
+RUN wget -P /usr/bin/ https://storage.googleapis.com/git-repo-downloads/repo \
+    && chmod +x /usr/bin/repo \
+    && repo init -u https://github.com/GPUOpen-Drivers/AMDVLK.git -b "$BRANCH" \
     && repo sync -c --no-clone-bundle -j$(nproc) \
     && touch ./env.sh \
     && cd /vulkandriver/drivers/spvgen/external \
