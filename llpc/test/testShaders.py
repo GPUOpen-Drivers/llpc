@@ -40,7 +40,7 @@ SHADER_SRC = "shaderdb"
 COMPILER = ""
 SPVGEN  = ""
 
-GFX_DIRS = [".", "gfx9"]
+GFX_DIRS = [".", "gfx9", "gfx10"]
 GFXIP = 0
 
 fail_count = 0
