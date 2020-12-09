@@ -403,7 +403,7 @@ static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
     }
 
     // Change defaults of NGG options according to GFX IP
-    if (ParsedGfxIp >= GfxIpVersion({10, 3})) {
+    if (ParsedGfxIp >= GfxIpVersion{10, 3}) {
       // For GFX10.3+, we always prefer to enable NGG. Backface culling and small primitive filter are enabled as
       // well. Also, the compaction mode is set to compactionless.
       EnableNgg.setValue(true);
