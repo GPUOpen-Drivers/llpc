@@ -185,10 +185,11 @@ void PatchPreparePipelineAbi::setCallingConvs(Module &module) {
 // @param module : LLVM module
 void PatchPreparePipelineAbi::setRemainingCallingConvs(Module &module) {
   for (Function &func : module) {
-    if (func.isDeclaration())
+    if (func.isDeclaration() || func.getIntrinsicID() != Intrinsic::not_intrinsic ||
+        func.getName().startswith(lgcName::InternalCallPrefix) ||
+        func.getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
       continue;
-    if (func.getCallingConv() == CallingConv::SPIR_FUNC)
-      func.setCallingConv(CallingConv::AMDGPU_Gfx);
+    func.setCallingConv(CallingConv::AMDGPU_Gfx);
   }
 }
 
