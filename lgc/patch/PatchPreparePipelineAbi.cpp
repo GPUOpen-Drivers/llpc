@@ -217,11 +217,11 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
         auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
 
         if (hsEntryPoint) {
+          if (lsEntryPoint)
+            lgc::setShaderStage(lsEntryPoint, ShaderStageTessControl);
           auto lsHsEntryPoint = shaderMerger.generateLsHsEntryPoint(lsEntryPoint, hsEntryPoint);
           lsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
           lgc::setShaderStage(lsHsEntryPoint, ShaderStageTessControl);
-          if (lsEntryPoint)
-            lgc::setShaderStage(lsEntryPoint, ShaderStageTessControl);
         }
       }
 
@@ -230,22 +230,22 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
 
       if (enableNgg) {
         if (gsEntryPoint) {
+          if (esEntryPoint)
+            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
           auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
+          if (copyShaderEntryPoint)
+            lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(primShaderEntryPoint, ShaderStageGeometry);
-          if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
-          if (copyShaderEntryPoint)
-            lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
         }
       } else {
         if (gsEntryPoint) {
+          if (esEntryPoint)
+            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
           auto esGsEntryPoint = shaderMerger.generateEsGsEntryPoint(esEntryPoint, gsEntryPoint);
           esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(esGsEntryPoint, ShaderStageGeometry);
-          if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
         }
 
         setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
@@ -257,11 +257,11 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
         auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
 
         if (hsEntryPoint) {
+          if (lsEntryPoint)
+            lgc::setShaderStage(lsEntryPoint, ShaderStageTessControl);
           auto lsHsEntryPoint = shaderMerger.generateLsHsEntryPoint(lsEntryPoint, hsEntryPoint);
           lsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
           lgc::setShaderStage(lsHsEntryPoint, ShaderStageTessControl);
-          if (lsEntryPoint)
-            lgc::setShaderStage(lsEntryPoint, ShaderStageTessControl);
         }
       }
 
@@ -270,10 +270,10 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
         auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
 
         if (esEntryPoint) {
+          lgc::setShaderStage(esEntryPoint, ShaderStageTessEval);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, nullptr, nullptr);
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(primShaderEntryPoint, ShaderStageTessEval);
-          lgc::setShaderStage(esEntryPoint, ShaderStageTessEval);
         }
       } else {
         setCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
@@ -285,22 +285,22 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
 
       if (enableNgg) {
         if (gsEntryPoint) {
+          if (esEntryPoint)
+            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
           auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
+          if (copyShaderEntryPoint)
+            lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(primShaderEntryPoint, ShaderStageGeometry);
-          if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
-          if (copyShaderEntryPoint)
-            lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
         }
       } else {
         if (gsEntryPoint) {
+          if (esEntryPoint)
+            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
           auto esGsEntryPoint = shaderMerger.generateEsGsEntryPoint(esEntryPoint, gsEntryPoint);
           esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(esGsEntryPoint, ShaderStageGeometry);
-          if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
         }
 
         setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
@@ -311,11 +311,11 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
         // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
         auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
         if (esEntryPoint) {
+          if (esEntryPoint)
+            lgc::setShaderStage(esEntryPoint, ShaderStageVertex);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, nullptr, nullptr);
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(primShaderEntryPoint, ShaderStageVertex);
-          if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageVertex);
         }
       } else
         setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
