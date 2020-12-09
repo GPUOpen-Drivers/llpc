@@ -1761,10 +1761,9 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelOuter];
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = mapLoc;
         availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
-      } else {
-        // NOTE: We have to map gl_TessLevelOuter to generic per-patch output as long as it is used.
-        if (builtInUsage.tcs.tessLevelOuter)
-          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = InvalidValue;
+      } else if (builtInUsage.tcs.tessLevelOuter && m_importedOutputBuiltIns.count(BuiltInTessLevelOuter) > 0) {
+        // NOTE: We have to map gl_TessLevelOuter to generic per-patch output if it is used for output import.
+        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
       }
 
       if (nextBuiltInUsage.tessLevelInner) {
@@ -1773,10 +1772,9 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelInner];
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = mapLoc;
         availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
-      } else {
-        // NOTE: We have to map gl_TessLevelInner to generic per-patch output as long as it is used.
-        if (builtInUsage.tcs.tessLevelInner)
-          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = InvalidValue;
+      } else if (builtInUsage.tcs.tessLevelInner && m_importedOutputBuiltIns.count(BuiltInTessLevelInner) > 0) {
+        // NOTE: We have to map gl_TessLevelInner to generic per-patch output if it is used for output import.
+        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
       }
 
       // Revisit built-in outputs and map those unmapped to generic ones
@@ -1795,16 +1793,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end() &&
           inOutUsage.builtInOutputLocMap[BuiltInCullDistance] == InvalidValue)
         inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
-
-      if (inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelOuter) !=
-              inOutUsage.perPatchBuiltInOutputLocMap.end() &&
-          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] == InvalidValue)
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
-
-      if (inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelInner) !=
-              inOutUsage.perPatchBuiltInOutputLocMap.end() &&
-          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] == InvalidValue)
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
     } else if (nextStage == ShaderStageInvalid) {
       // TCS only
       if (builtInUsage.tcs.position)
@@ -1825,10 +1813,10 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
           ++availOutMapLoc;
       }
 
-      if (builtInUsage.tcs.tessLevelOuter)
+      if (builtInUsage.tcs.tessLevelOuter && m_importedOutputBuiltIns.count(BuiltInTessLevelOuter) > 0)
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
 
-      if (builtInUsage.tcs.tessLevelInner)
+      if (builtInUsage.tcs.tessLevelInner && m_importedOutputBuiltIns.count(BuiltInTessLevelInner) > 0)
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
     }
 

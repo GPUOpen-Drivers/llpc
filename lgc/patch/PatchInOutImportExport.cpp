@@ -2871,7 +2871,9 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
     Value *tessFactorOffset = calcTessFactorOffset(isOuter, elemIdx, insertPos);
     storeTessFactorToBuffer(tessFactors, tessFactorOffset, insertPos);
 
-    assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
+    if (perPatchBuiltInOutLocMap.count(builtInId) == 0)
+      return; // Avoid writing unused tessellation factor to Lds
+
     unsigned loc = perPatchBuiltInOutLocMap[builtInId];
 
     if (!elemIdx) {
