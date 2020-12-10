@@ -183,8 +183,14 @@ struct ShaderOptions {
   // Disable loop unrolling.
   bool disableLoopUnroll = false;
 
-  // Disable LICM pass.
-  bool disableLicm = false;
+  // Threshold for minimum number of blocks in a loop to disable the LICM pass.
+  unsigned disableLicmThreshold = 0;
+
+  // Threshold to use for loops with Unroll hint. 0 to use llvm.loop.unroll.full metadata.
+  unsigned unrollHintThreshold = 0;
+
+  // Threshold to use for loops with DontUnroll hint. 0 to use llvm.loop.unroll.disable metadata.
+  unsigned dontUnrollHintThreshold = 0;
 };
 
 // =====================================================================================================================
