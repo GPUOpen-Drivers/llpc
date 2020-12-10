@@ -87,7 +87,7 @@ RUN EXTRA_FLAGS="" \
     && if echo "$FEATURES" | grep -q "+sanitizers" ; then \
          EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_USE_SANITIZER=Address;Undefined"; \
          echo "export ASAN_OPTIONS=detect_leaks=0" >> /vulkandriver/env.sh; \
-         echo "export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.0/lib/linux/libclang_rt.asan-x86_64.so" >> /vulkandriver/env.sh; \
+         echo "export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.1/lib/linux/libclang_rt.asan-x86_64.so" >> /vulkandriver/env.sh; \
        fi \
     && echo "Extra CMake flags: $EXTRA_FLAGS" \
     && echo "Extra env vars (/vulkandriver/env.sh): " \
