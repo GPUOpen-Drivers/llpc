@@ -215,18 +215,18 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs
     {1, 0, 8},   // BaseAddressHi
     {1, 20, 9},  // Format
     {},          // Width
-    {2, 14, 16}, // Height
+    {2, 14, 14}, // Height
     {3, 0, 12},  // DstSelXYZW
     {3, 20, 5},  // SwizzleMode
-    {4, 0, 16},  // Depth
+    {4, 0, 13},  // Depth
     {},          // Pitch
     {3, 25, 3},  // BcSwizzle
     {3, 12, 4},  // BaseLevel
     {3, 16, 4},  // LastLevel
-    {4, 16, 16}, // BaseArray
+    {4, 16, 13}, // BaseArray
     {},          // LastArray
     {1, 30, 2},  // WidthLo
-    {2, 0, 14},  // WidthHi
+    {2, 0, 12},  // WidthHi
 };
 
 // =====================================================================================================================
