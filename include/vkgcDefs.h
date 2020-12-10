@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 45
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 3
+#define LLPC_INTERFACE_MINOR_VERSION 4
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,6 +71,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     45.4 | Added disableLicmThreshold, unrollHintThreshold, and dontUnrollHintThreshold to PipelineShaderOptions |
 //* |     45.2 | Add GFX IP plus checker to GfxIpVersion                                                               |
 //* |     45.1 | Add pipelineCacheAccess, stageCacheAccess(es) to GraphicsPipelineBuildOut/ComputePipelineBuildOut     |
 //* |     45.0 | Remove the member 'enableFastLaunch' of NGG state                                                     |
@@ -556,7 +557,7 @@ struct PipelineShaderOptions {
   // Whether update descriptor root offset in ELF
   bool updateDescInElf;
 
-  /// Disable the the LLVM backend's LICM pass.
+  /// Disable the the LLVM backend's LICM pass (equivalent to disableLicmThreshold=1).
   bool disableLicm;
 
   /// Default unroll threshold for LLVM.
@@ -573,6 +574,15 @@ struct PipelineShaderOptions {
 
   /// Override FP32 denormal handling.
   DenormalMode fp32DenormalMode;
+
+  /// Threshold number of blocks in a loop for LICM pass to be disabled.
+  unsigned disableLicmThreshold;
+
+  /// Threshold to use for loops with "Unroll" hint (0 = use llvm.llop.unroll.full).
+  unsigned unrollHintThreshold;
+
+  /// Threshold to use for loops with "DontUnroll" hint (0 = use llvm.llop.unroll.disable).
+  unsigned dontUnrollHintThreshold;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor

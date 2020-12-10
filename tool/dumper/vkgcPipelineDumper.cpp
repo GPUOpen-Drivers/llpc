@@ -559,6 +559,9 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.disableLoopUnroll = " << shaderInfo->options.disableLoopUnroll << "\n";
   dumpFile << "options.fp32DenormalMode = " << shaderInfo->options.fp32DenormalMode << "\n";
   dumpFile << "options.adjustDepthImportVrs = " << shaderInfo->options.adjustDepthImportVrs << "\n";
+  dumpFile << "options.disableLicmThreshold = " << shaderInfo->options.disableLicmThreshold << "\n";
+  dumpFile << "options.unrollHintThreshold = " << shaderInfo->options.unrollHintThreshold << "\n";
+  dumpFile << "options.dontUnrollHintThreshold = " << shaderInfo->options.dontUnrollHintThreshold << "\n";
   dumpFile << "\n";
 }
 
@@ -1214,6 +1217,9 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.disableLoopUnroll);
       hasher->Update(options.fp32DenormalMode);
       hasher->Update(options.adjustDepthImportVrs);
+      hasher->Update(options.disableLicmThreshold);
+      hasher->Update(options.unrollHintThreshold);
+      hasher->Update(options.dontUnrollHintThreshold);
     }
   }
 }

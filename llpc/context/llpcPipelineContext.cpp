@@ -84,7 +84,8 @@ static cl::opt<unsigned> ScalarThreshold("scalar-threshold", cl::desc("The thres
 static cl::opt<bool> EnableSiScheduler("enable-si-scheduler", cl::desc("Enable target option si-scheduler"),
                                        cl::init(false));
 
-// -disable-licm: annotate loops with metadata to disable the LLVM LICM pass
+// -disable-licm: annotate loops with metadata to disable the LLVM LICM pass (this is now an alias
+// for -disable-licm-threshold=1 which remains for backwards compatibility)
 static cl::opt<bool> DisableLicm("disable-licm", cl::desc("Disable LLVM LICM pass"), cl::init(false));
 
 // -disable-color-export-shader: disable the color export shader when doing unlinked shaders.
@@ -105,6 +106,21 @@ static cl::opt<unsigned> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
 
 // -force-loop-unroll-count: Force to set the loop unroll count.
 static cl::opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), cl::init(0));
+
+// -disable-licm-threshold: disable LICM for loops with at least the specified number of blocks
+static cl::opt<int>
+    DisableLicmThreshold("disable-licm-threshold",
+                         cl::desc("Disable LICM for loops with at least the specified number of blocks"), cl::init(20));
+
+// -unroll-hint-threshold: loop unroll threshold to use for loops with Unroll hint
+static cl::opt<int> UnrollHintThreshold("unroll-hint-threshold",
+                                        cl::desc("loop unroll threshold to use for loops with Unroll hint"),
+                                        cl::init(0));
+
+// -dontunroll-hint-threshold: loop unroll threshold to use for loops with DontUnroll hint
+static cl::opt<int> DontUnrollHintThreshold("dontunroll-hint-threshold",
+                                            cl::desc("loop unroll threshold to use for loops with DontUnroll hint"),
+                                            cl::init(0));
 
 namespace Llpc {
 
@@ -379,7 +395,6 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       }
 
       shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo->options.useSiScheduler;
-      shaderOptions.disableLicm = DisableLicm || shaderInfo->options.disableLicm;
       shaderOptions.updateDescInElf = shaderInfo->options.updateDescInElf;
       shaderOptions.unrollThreshold = shaderInfo->options.unrollThreshold;
       // A non-zero command line -force-loop-unroll-count value overrides the shaderInfo option value.
@@ -393,6 +408,25 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
                     "Mismatch");
       shaderOptions.fp32DenormalMode = static_cast<lgc::DenormalMode>(shaderInfo->options.fp32DenormalMode);
       shaderOptions.adjustDepthImportVrs = shaderInfo->options.adjustDepthImportVrs;
+      // disableLicmThreshold is set to the first of:
+      // - a non-zero value from the corresponding shaderInfo option
+      // - a value of 1 if DisableLicm or the disableLicm shaderInfo option is true
+      // - the value of DisableLicmThreshold
+      // Default is 0, which does not disable LICM
+      if (shaderInfo->options.disableLicmThreshold > 0)
+        shaderOptions.disableLicmThreshold = shaderInfo->options.disableLicmThreshold;
+      else if (DisableLicm || shaderInfo->options.disableLicm)
+        shaderOptions.disableLicmThreshold = 1;
+      else
+        shaderOptions.disableLicmThreshold = DisableLicmThreshold;
+      if (shaderInfo->options.unrollHintThreshold > 0)
+        shaderOptions.unrollHintThreshold = shaderInfo->options.unrollHintThreshold;
+      else
+        shaderOptions.unrollHintThreshold = UnrollHintThreshold;
+      if (shaderInfo->options.dontUnrollHintThreshold > 0)
+        shaderOptions.dontUnrollHintThreshold = shaderInfo->options.dontUnrollHintThreshold;
+      else
+        shaderOptions.dontUnrollHintThreshold = DontUnrollHintThreshold;
       pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
     }
   }
