@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 45
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 2
+#define LLPC_INTERFACE_MINOR_VERSION 3
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -780,6 +780,16 @@ public:
   /// @returns : The handle of pipeline dump file
   static void *VKAPI_CALL BeginPipelineDump(const PipelineDumpOptions *pDumpOptions, PipelineBuildInfo pipelineInfo);
 
+  /// Begins to dump graphics/compute pipeline info.
+  ///
+  /// @param [in]  pDumpDir                 Directory of pipeline dump
+  /// @param [in]  pipelineInfo             Info of the pipeline to be built
+  /// @param hash64                         Hash code
+  ///
+  /// @returns : The handle of pipeline dump file
+  static void *VKAPI_CALL BeginPipelineDump(const PipelineDumpOptions *pDumpOptions, PipelineBuildInfo pipelineInfo,
+                                            uint64_t hash64);
+
   /// Ends to dump graphics/compute pipeline info.
   ///
   /// @param  [in]  pDumpFile         The handle of pipeline dump file
@@ -834,6 +844,24 @@ public:
   /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
   static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo *pPipelineInfo, char *pPipeName,
                                          const size_t nameBufSize);
+
+  /// Gets graphics pipeline name.
+  ///
+  /// @param [in]  pPipelineInfo   Info to build this graphics pipeline
+  /// @param [out] pPipeName       The full name of this graphics pipeline
+  /// @param [in]  nameBufSize     Size of the buffer to store pipeline name
+  /// @param hashCode64            Precalculated Hash code of pipeline
+  static void VKAPI_CALL GetPipelineName(const GraphicsPipelineBuildInfo *pPipelineInfo, char *pPipeName,
+                                         const size_t nameBufSize, uint64_t hashCode64);
+
+  /// Gets compute pipeline name.
+  ///
+  /// @param [in]  pPipelineInfo  Info to build this compute pipeline
+  /// @param [out] pPipeName      The full name of this compute pipeline
+  /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
+  /// @param hashCode64           Precalculated Hash code of pipeline
+  static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo *pPipelineInfo, char *pPipeName,
+                                         const size_t nameBufSize, uint64_t hashCode64);
 };
 
 /// 128-bit hash compatible structure

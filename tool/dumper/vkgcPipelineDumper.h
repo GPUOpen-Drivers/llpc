@@ -58,7 +58,7 @@ public:
   static void DumpSpirvBinary(const char *dumpDir, const BinaryData *spirvBin, MetroHash::Hash *hash);
 
   static PipelineDumpFile *BeginPipelineDump(const PipelineDumpOptions *dumpOptions, PipelineBuildInfo pipelineInfo,
-                                             const MetroHash::Hash *hash);
+                                             const uint64_t hashCode64);
 
   static void EndPipelineDump(PipelineDumpFile *dumpFile);
 
@@ -72,7 +72,7 @@ public:
   static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline, bool isCacheHash,
                                                         bool isRelocatableShader);
 
-  static std::string getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const MetroHash::Hash *hash);
+  static std::string getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const uint64_t hashCode64);
 
   static void updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo, bool isCacheHash,
                                               MetroHash64 *hasher, bool isRelocatableShader);
