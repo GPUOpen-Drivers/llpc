@@ -123,7 +123,19 @@ void *VKAPI_CALL IPipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
     hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false, false);
   }
 
-  return PipelineDumper::BeginPipelineDump(dumpOptions, pipelineInfo, &hash);
+  return PipelineDumper::BeginPipelineDump(dumpOptions, pipelineInfo, MetroHash::compact64(&hash));
+}
+
+// =====================================================================================================================
+// Begins to dump graphics/compute pipeline info.
+//
+// @param dumpOptions : Pipeline dump options
+// @param pipelineInfo : Info of the pipeline to be built
+// @param hash64 : hash uint64_t code
+void *VKAPI_CALL IPipelineDumper::BeginPipelineDump(const PipelineDumpOptions *dumpOptions,
+                                                    PipelineBuildInfo pipelineInfo, uint64_t hash64) {
+
+  return PipelineDumper::BeginPipelineDump(dumpOptions, pipelineInfo, hash64);
 }
 
 // =====================================================================================================================
@@ -171,6 +183,7 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const GraphicsPipelineBuild
   auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false);
   return MetroHash::compact64(&hash);
 }
+
 // =====================================================================================================================
 // Get graphics pipeline name.
 //
@@ -182,7 +195,7 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(const GraphicsPipelineBuildInfo
   auto hash = PipelineDumper::generateHashForGraphicsPipeline(graphicsPipelineInfo, false, false);
   PipelineBuildInfo pipelineInfo = {};
   pipelineInfo.pGraphicsInfo = graphicsPipelineInfo;
-  std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, &hash);
+  std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, MetroHash::compact64(&hash));
   snprintf(pipeNameOut, nameBufSize, "%s", pipeName.c_str());
 }
 
@@ -198,7 +211,38 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(const ComputePipelineBuildInfo 
   PipelineBuildInfo pipelineInfo = {};
   pipelineInfo.pComputeInfo = computePipelineInfo;
 
-  std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, &hash);
+  std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, MetroHash::compact64(&hash));
+  snprintf(pipeNameOut, nameBufSize, "%s", pipeName.c_str());
+}
+
+// =====================================================================================================================
+// Get graphics pipeline name.
+//
+// @param [In] graphicsPipelineInfo : Info to build this graphics pipeline
+// @param [Out] pipeNameOut : The full name of this graphics pipeline
+// @param nameBufSize : Size of the buffer to store pipeline name
+// @param hashCode64 : Precalculated Hash code of pipeline
+void VKAPI_CALL IPipelineDumper::GetPipelineName(const GraphicsPipelineBuildInfo *graphicsPipelineInfo,
+                                                 char *pipeNameOut, const size_t nameBufSize, uint64_t hashCode64) {
+  PipelineBuildInfo pipelineInfo = {};
+  pipelineInfo.pGraphicsInfo = graphicsPipelineInfo;
+  std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, hashCode64);
+  snprintf(pipeNameOut, nameBufSize, "%s", pipeName.c_str());
+}
+
+// =====================================================================================================================
+// Get compute pipeline name.
+//
+// @param [In] computePipelineInfo : Info to build this compute pipeline
+// @param [Out] pipeNameOut : The full name of this compute pipeline
+// @param nameBufSize : Size of the buffer to store pipeline name
+// @param hashCode64 : Precalculated Hash code of pipeline
+void VKAPI_CALL IPipelineDumper::GetPipelineName(const ComputePipelineBuildInfo *computePipelineInfo, char *pipeNameOut,
+                                                 const size_t nameBufSize, uint64_t hashCode64) {
+  PipelineBuildInfo pipelineInfo = {};
+  pipelineInfo.pComputeInfo = computePipelineInfo;
+
+  std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, hashCode64);
   snprintf(pipeNameOut, nameBufSize, "%s", pipeName.c_str());
 }
 
@@ -227,8 +271,7 @@ std::string PipelineDumper::getSpirvBinaryFileName(const MetroHash::Hash *hash) 
 //
 // @param pipelineInfo : Info of the pipeline to be built
 // @param hash : Pipeline hash code
-std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const MetroHash::Hash *hash) {
-  uint64_t hashCode64 = MetroHash::compact64(hash);
+std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const uint64_t hashCode64) {
   char fileName[64] = {};
   if (pipelineInfo.pComputeInfo) {
     snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
@@ -256,9 +299,9 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
 //
 // @param dumpOptions : Pipeline dump options
 // @param pipelineInfo : Info of the pipeline to be built
-// @param hash : Pipeline hash code
+// @param hash64 : Pipeline hash code
 PipelineDumpFile *PipelineDumper::BeginPipelineDump(const PipelineDumpOptions *dumpOptions,
-                                                    PipelineBuildInfo pipelineInfo, const MetroHash::Hash *hash) {
+                                                    PipelineBuildInfo pipelineInfo, const uint64_t hash64) {
   bool disableLog = false;
   std::string dumpFileName;
   std::string dumpPathName;
@@ -267,14 +310,13 @@ PipelineDumpFile *PipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
 
   // Filter pipeline hash
   if (dumpOptions->filterPipelineDumpByHash != 0) {
-    uint64_t hash64 = MetroHash::compact64(hash);
     if (hash64 != dumpOptions->filterPipelineDumpByHash)
       disableLog = true;
   }
 
   if (!disableLog) {
     // Filter pipeline type
-    dumpFileName = getPipelineInfoFileName(pipelineInfo, hash);
+    dumpFileName = getPipelineInfoFileName(pipelineInfo, hash64);
     if (dumpOptions->filterPipelineDumpByType & PipelineDumpFilterCs) {
       if (dumpFileName.find("Cs") != std::string::npos)
         disableLog = true;
