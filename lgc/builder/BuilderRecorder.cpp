@@ -991,19 +991,17 @@ Value *BuilderRecorder::CreateFindSMsb(Value *value, const Twine &instName) {
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param descIndex : Descriptor index
-// @param isNonUniform : Whether the descriptor index is non-uniform
-// @param isWritten : Whether the buffer is written to
+// @param flags : BufferFlag* bit settings
 // @param pointeeTy : Type that the returned pointer should point to
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, bool isNonUniform,
-                                             bool isWritten, Type *pointeeTy, const Twine &instName) {
+Value *BuilderRecorder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
+                                             Type *pointeeTy, const Twine &instName) {
   return record(Opcode::LoadBufferDesc, getBufferDescTy(pointeeTy),
                 {
                     getInt32(descSet),
                     getInt32(binding),
                     descIndex,
-                    getInt1(isNonUniform),
-                    getInt1(isWritten),
+                    getInt32(flags),
                 },
                 instName);
 }

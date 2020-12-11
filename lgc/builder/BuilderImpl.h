@@ -263,8 +263,8 @@ public:
   DescBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
   // Create a load of a buffer descriptor.
-  llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, bool isNonUniform,
-                                    bool isWritten, llvm::Type *pointeeTy, const llvm::Twine &instName) override final;
+  llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+                                    llvm::Type *pointeeTy, const llvm::Twine &instName) override final;
 
   // Create a get of the stride (in bytes) of a descriptor.
   llvm::Value *CreateGetDescStride(ResourceNodeType descType, unsigned descSet, unsigned binding,

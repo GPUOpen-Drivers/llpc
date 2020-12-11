@@ -8,7 +8,7 @@
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 4438, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to i32 addrspace(7)*
   store i32 %1, i32 addrspace(7)* %2, align 4
@@ -42,7 +42,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 4438, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to i32 addrspace(7)*
   store i32 %1, i32 addrspace(7)* %2, align 4
@@ -73,7 +73,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 25, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to <3 x i32> addrspace(7)*
   store <3 x i32> %1, <3 x i32> addrspace(7)* %2, align 4
@@ -109,7 +109,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 24, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to <3 x i32> addrspace(7)*
   store <3 x i32> %1, <3 x i32> addrspace(7)* %2, align 4
@@ -144,7 +144,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 26, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to <3 x i32> addrspace(7)*
   store <3 x i32> %1, <3 x i32> addrspace(7)* %2, align 4
@@ -177,7 +177,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 27, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to <3 x i32> addrspace(7)*
   store <3 x i32> %1, <3 x i32> addrspace(7)* %2, align 4
@@ -213,7 +213,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 36, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to i32 addrspace(7)*
   store i32 %1, i32 addrspace(7)* %2, align 4
@@ -247,7 +247,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 41, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to i32 addrspace(7)*
   store i32 %1, i32 addrspace(7)* %2, align 4
@@ -280,7 +280,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 38, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to i32 addrspace(7)*
   store i32 %1, i32 addrspace(7)* %2, align 4
@@ -324,7 +324,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 28, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to <3 x i32> addrspace(7)*
   store <3 x i32> %1, <3 x i32> addrspace(7)* %2, align 4
@@ -362,7 +362,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 29, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to i32 addrspace(7)*
   store i32 %1, i32 addrspace(7)* %2, align 4
@@ -406,7 +406,7 @@ attributes #0 = { nounwind }
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
   %1 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 40, i32 0, i32 undef, i32 undef)
   %2 = bitcast i8 addrspace(7)* %0 to i32 addrspace(7)*
   store i32 %1, i32 addrspace(7)* %2, align 4

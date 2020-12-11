@@ -123,6 +123,8 @@ struct Options {
                                        //   ShadowDescriptorTableDisable to disable shadow descriptor tables
   unsigned allowNullDescriptor;        // Allow and give defined behavior for null descriptor
   unsigned disableImageResourceCheck;  // Don't do image resource type check
+  unsigned reserved0f;                 // Reserved for future functionality
+  unsigned reserved10;                 // Reserved for future functionality
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

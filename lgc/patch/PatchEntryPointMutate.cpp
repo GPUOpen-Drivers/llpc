@@ -433,8 +433,9 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
     if (func.getName().startswith(lgcName::DescriptorTableAddr)) {
       for (User *user : func.users()) {
         CallInst *call = cast<CallInst>(user);
-        unsigned set = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-        unsigned binding = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+        ResourceNodeType resType = ResourceNodeType(cast<ConstantInt>(call->getArgOperand(0))->getZExtValue());
+        unsigned set = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+        unsigned binding = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
         ShaderStage stage = getShaderStage(call->getFunction());
         assert(stage != ShaderStageCopyShader);
         auto &descriptorTable = getUserDataUsage(stage)->descriptorTables;
@@ -448,7 +449,7 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
           // The user data nodes are available, so we use the offset of the node as the
           // index.
           const ResourceNode *node;
-          node = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, set, binding).first;
+          node = m_pipelineState->findResourceNode(resType, set, binding).first;
           assert(node && "Could not find resource node");
           uint32_t descTableIndex = node - &m_pipelineState->getUserDataNodes().front();
           descriptorTable.resize(std::max(descriptorTable.size(), size_t(descTableIndex + 1)));
@@ -620,7 +621,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
         Value *descTableVal = nullptr;
         if (inst && inst->getFunction() == &func) {
           auto call = cast<CallInst>(inst);
-          Value *highHalf = call->getArgOperand(2);
+          Value *highHalf = call->getArgOperand(3);
           std::string namePrefix = "descTable";
           if (descriptorTable.entryArgIdx != 0) {
             // The descriptor set is unspilled, and uses an entry arg.

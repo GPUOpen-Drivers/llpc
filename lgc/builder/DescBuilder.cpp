@@ -48,19 +48,19 @@ using namespace llvm;
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param descIndex : Descriptor index
-// @param isNonUniform : Whether the descriptor index is non-uniform
-// @param isWritten : Whether the buffer is (or might be) written to
+// @param flags : BufferFlag* bit settings
 // @param pointeeTy : Type that the returned pointer should point to.
 // @param instName : Name to give instruction(s)
-Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, bool isNonUniform,
-                                         bool isWritten, Type *const pointeeTy, const Twine &instName) {
+Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
+                                         Type *const pointeeTy, const Twine &instName) {
   Value *desc = nullptr;
-  descIndex = scalarizeIfUniform(descIndex, isNonUniform);
+  descIndex = scalarizeIfUniform(descIndex, flags & BufferFlagNonUniform);
 
   // Mark the shader as reading and writing (if applicable) a resource.
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
   resUsage->resourceRead = true;
-  resUsage->resourceWrite |= isWritten;
+  if (flags & BufferFlagWritten)
+    resUsage->resourceWrite = true;
 
   // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
   // look. Later code will use relocs.
@@ -284,6 +284,7 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     // Get the descriptor table pointer for the descriptor at the given set and binding, which might be passed as a
     // user SGPR to the shader.
     // The args to the lgc.descriptor.table.addr call are:
+    // - requested descriptor type
     // - descriptor set number
     // - descriptor binding number
     // - value for high 32 bits of the pointer; HighAddrPc to use PC
@@ -293,7 +294,8 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
           resType == ResourceNodeType::DescriptorFmask && shadowDescriptorTable != ShadowDescriptorTableDisable;
       Value *highHalf = getInt32(shadow ? shadowDescriptorTable : HighAddrPc);
       return CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                             {getInt32(descSet), getInt32(binding), highHalf}, Attribute::ReadNone);
+                             {getInt32(unsigned(resType)), getInt32(descSet), getInt32(binding), highHalf},
+                             Attribute::ReadNone);
     } else {
       // This should be an unlinked shader, and we will use a relocation for the high half of the address.
       assert(m_pipelineState->isUnlinked() &&
@@ -302,13 +304,15 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
       // Get the address when the shadow table is disabled.
       Value *nonShadowAddr =
           CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                          {getInt32(descSet), getInt32(binding), getInt32(HighAddrPc)}, Attribute::ReadNone);
+                          {getInt32(unsigned(resType)), getInt32(descSet), getInt32(binding), getInt32(HighAddrPc)},
+                          Attribute::ReadNone);
 
       // Get the address using a relocation when the shadow table is enabled.
       Value *shadowDescriptorReloc = CreateRelocationConstant(reloc::ShadowDescriptorTable);
       Value *shadowAddr =
           CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                          {getInt32(descSet), getInt32(binding), shadowDescriptorReloc}, Attribute::ReadNone);
+                          {getInt32(unsigned(resType)), getInt32(descSet), getInt32(binding), shadowDescriptorReloc},
+                          Attribute::ReadNone);
 
       // Use a relocation to select between the two.
       Value *useShadowReloc = CreateRelocationConstant(reloc::ShadowDescriptorTableEnabled);
@@ -348,7 +352,8 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
   } else {
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
-    unsigned offsetInBytes = node->offsetInDwords * 4;
+    unsigned offsetInDwords = node->offsetInDwords;
+    unsigned offsetInBytes = offsetInDwords * 4;
     if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
       offsetInBytes += DescriptorSizeResource;
     offset = getInt32(offsetInBytes);
