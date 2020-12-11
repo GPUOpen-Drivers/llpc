@@ -414,8 +414,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateLoadBufferDesc(cast<ConstantInt>(args[0])->getZExtValue(), // descSet
                                            cast<ConstantInt>(args[1])->getZExtValue(), // binding
                                            args[2],                                    // pDescIndex
-                                           cast<ConstantInt>(args[3])->getZExtValue(), // isNonUniform
-                                           cast<ConstantInt>(args[4])->getZExtValue(), // isWritten
+                                           cast<ConstantInt>(args[3])->getZExtValue(), // flags
                                            isa<PointerType>(call->getType()) ? call->getType()->getPointerElementType()
                                                                              : nullptr); // pPointeeTy
   }

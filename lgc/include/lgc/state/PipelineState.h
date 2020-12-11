@@ -395,6 +395,7 @@ private:
   llvm::ArrayRef<llvm::MDString *> getResourceTypeNames();
   llvm::MDString *getResourceTypeName(ResourceNodeType type);
   ResourceNodeType getResourceTypeFromName(llvm::MDString *typeName);
+  bool matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, unsigned descSet, unsigned binding) const;
 
   // Device index handling
   void recordDeviceIndex(llvm::Module *module);
