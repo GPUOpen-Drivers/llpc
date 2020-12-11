@@ -102,7 +102,11 @@ void PatchWorkarounds::applyImageDescWorkaround(void) {
 
     for (const Function &func : m_module->getFunctionList()) {
       bool isImage = func.getName().startswith("llvm.amdgcn.image");
+#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
+      bool isLastUse = false;
+#else
       bool isLastUse = func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_waterfall_last_use;
+#endif
       if (isImage || isLastUse) {
         for (auto &use : func.uses()) {
           if (auto *callInst = dyn_cast<CallInst>(use.getUser())) {
