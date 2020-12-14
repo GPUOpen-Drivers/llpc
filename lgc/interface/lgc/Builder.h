@@ -1155,7 +1155,7 @@ public:
   // @param builtIn : Built-in kind, one of the BuiltIn* constants
   // @param outputInfo : Extra output info (shader-defined array length; GS stream id)
   // @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
-  // @param index : Array or vector index to access part of an input, else nullptr
+  // @param index : For TCS: array or vector index to access part of an output, else nullptr
   virtual llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn,
                                                       InOutInfo outputInfo, llvm::Value *vertexIndex,
                                                       llvm::Value *index) = 0;
