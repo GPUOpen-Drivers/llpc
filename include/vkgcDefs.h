@@ -825,6 +825,16 @@ public:
                                          const size_t nameBufSize);
 };
 
+// =====================================================================================================================
+/// Represents the interfaces of the utility.
+class IUtil {
+public:
+  /// Gets the entry-point name from the SPIR-V binary.
+  ///
+  /// @param [in] spvBin   SPIR-V binary
+  static const char *VKAPI_CALL GetEntryPointNameFromSpirvBinary(const BinaryData *spvBin);
+};
+
 /// 128-bit hash compatible structure
 struct HashId {
   union {

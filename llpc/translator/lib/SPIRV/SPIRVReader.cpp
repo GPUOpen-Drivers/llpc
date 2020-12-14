@@ -1422,7 +1422,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
   Constant *const zero = getBuilder()->getInt32(0);
 
-  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage) {
+  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
+  ) {
     // For structs we lookup the mapping of the elements and use it to reverse map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -1560,7 +1561,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
   Constant *const zero = getBuilder()->getInt32(0);
 
-  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage) {
+  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
+  ) {
     // For structs we lookup the mapping of the elements and use it to map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -3749,6 +3751,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
 
   Type *const ptrType = transType(spvVar->getType());
   Type *const varType = ptrType->getPointerElementType();
+  unsigned addrSpace = ptrType->getPointerAddressSpace();
 
   SPIRVValue *const spvInitializer = spvVar->getInitializer();
 
@@ -3792,6 +3795,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
                storageClass != SPIRVStorageClassKind::StorageClassStorageBuffer;
     break;
   }
+  case StorageClassUniformConstant: {
+    break;
+  }
+
   default: {
     break;
   }
@@ -3815,7 +3822,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
       readOnly = true;
   }
 
-  unsigned addrSpace = ptrType->getPointerAddressSpace();
   string varName = spvVar->getName();
 
   GlobalVariable *const globalVar =
@@ -6524,12 +6530,12 @@ bool SPIRVToLLVM::transMetadata() {
           }
         }
 
-        // Give the workgroup size to the middle-end.
-        ComputeShaderMode computeMode = {};
-        computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
-        computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
-        computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
-        getBuilder()->setComputeShaderMode(computeMode);
+          // Give the workgroup size to the middle-end.
+          ComputeShaderMode computeMode = {};
+          computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
+          computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
+          computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
+          getBuilder()->setComputeShaderMode(computeMode);
       } else
         llvm_unreachable("Invalid execution model");
 

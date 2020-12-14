@@ -26,6 +26,18 @@ LCXXINCS += -I$(VKGC_DEPTH)/util
 LCXXINCS += -I$(VKGC_DEPTH)/tool/dumper
 LCXXINCS += -I$(VKGC_DEPTH)/tool/vfx
 
+# External SPIRV-Headers files
+ifdef SPIRV_HEADERS_DEPTH
+    LCXXINCS += -I$(SPIRV_HEADERS_DEPTH)/include/spirv
+    LCXXDEFS += -DEXTERNAL_SPIRV_HEADERS=1
+endif
+
+# External Vulkan-Headers files
+ifdef VULKAN_HEADERS_DEPTH
+    LCXXINCS += -I$(VULKAN_HEADERS_DEPTH)/include
+    LCXXDEFS += -DEXTERNAL_VULKAN_HEADERS=1
+endif
+
 vpath %.cpp $(LLPC_DEPTH)/tool
 
 CPPFILES +=             \

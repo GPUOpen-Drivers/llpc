@@ -5603,85 +5603,6 @@ Value *PatchInOutImportExport::getDeviceIndex(Instruction *insertPos) {
 }
 
 // =====================================================================================================================
-// Records export info of vertex attributes
-//
-// @param location : Vertex attribute location
-// @param attribValues : Values of this vertex attribute to export
-void PatchInOutImportExport::recordVertexAttribExport(unsigned location, ArrayRef<Value *> attribValues) {
-  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
-         m_shaderStage == ShaderStageCopyShader); // Valid shader stages
-  assert(location <= MaxInOutLocCount);           // 32 attributes at most
-  assert(attribValues.size() == 4);               // Must have 4 elements, corresponds to <4 x float>
-
-  auto undef = UndefValue::get(Type::getFloatTy(*m_context));
-
-  // Vertex attribute not existing, insert a new one and initialize it
-  if (m_attribExports.count(location) == 0) {
-    for (unsigned i = 0; i < 4; ++i)
-      m_attribExports[location][i] = undef;
-  }
-
-  for (unsigned i = 0; i < 4; ++i) {
-    assert(attribValues[i]);
-    if (isa<UndefValue>(attribValues[i]))
-      continue; // Here, we only record new attribute values that are valid (not undefined ones)
-
-    // NOTE: The existing values must have been initialized to undefined ones already. Overlapping is disallowed (see
-    // such cases):
-    //   - Valid:
-    //       Existing: attrib0, <1.0, 2.0, undef, undef>
-    //       New:      attrib0, <undef, undef, 3.0, 4.0>
-    //   - Invalid:
-    //       Existing: attrib0, <1.0, 2.0, 3.0, undef>
-    //       New:      attrib0, <undef, undef, 4.0, 5.0>
-    assert(isa<UndefValue>(m_attribExports[location][i]));
-    m_attribExports[location][i] = attribValues[i]; // Update values that are valid
-  }
-
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
-  inOutUsage.expCount = std::max(inOutUsage.expCount, location + 1); // Update export count
-}
-
-// =====================================================================================================================
-// Exports vertex attributes that were recorded previously
-//
-// @param insertPos : Where to insert instructions.
-void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
-  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
-         m_shaderStage == ShaderStageCopyShader); // Valid shader stages
-  if (m_attribExports.empty()) {
-    assert(m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.expCount == 0);
-    return;
-  }
-
-  IRBuilder<> builder(*m_context);
-  builder.SetInsertPoint(insertPos);
-
-  for (auto &attribExport : m_attribExports) {
-    if (m_gfxIp.major <= 10) {
-      unsigned channelMask = 0;
-      for (unsigned i = 0; i < 4; ++i) {
-        assert(attribExport.second[i]);
-        if (!isa<UndefValue>(attribExport.second[i]))
-          channelMask |= (1u << i); // Update channel mask if the value is valid (not undef)
-      }
-
-      builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
-                              {builder.getInt32(EXP_TARGET_PARAM_0 + attribExport.first), // tgt
-                               builder.getInt32(channelMask),                             // en
-                               attribExport.second[0],                                    // src0
-                               attribExport.second[1],                                    // src1
-                               attribExport.second[2],                                    // src2
-                               attribExport.second[3],                                    // src3
-                               builder.getFalse(),                                        // done
-                               builder.getFalse()});                                      // src0
-    } else {
-      llvm_unreachable("Not implemented!");
-    }
-  }
-}
-
-// =====================================================================================================================
 // Exports HW shading rate, extracting the values from LGC shading rate (a mask of ShadingRateFlags)
 //
 // @param shadingRate : LGC shading rate
@@ -5772,6 +5693,85 @@ llvm::Value *PatchInOutImportExport::getShadingRate(llvm::Instruction *insertPos
                                builder.getInt32(ShadingRateNone));
 
   return builder.CreateOr(xRate, yRate);
+}
+
+// =====================================================================================================================
+// Records export info of vertex attributes
+//
+// @param location : Vertex attribute location
+// @param attribValues : Values of this vertex attribute to export
+void PatchInOutImportExport::recordVertexAttribExport(unsigned location, ArrayRef<Value *> attribValues) {
+  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
+         m_shaderStage == ShaderStageCopyShader); // Valid shader stages
+  assert(location <= MaxInOutLocCount);           // 32 attributes at most
+  assert(attribValues.size() == 4);               // Must have 4 elements, corresponds to <4 x float>
+
+  auto undef = UndefValue::get(Type::getFloatTy(*m_context));
+
+  // Vertex attribute not existing, insert a new one and initialize it
+  if (m_attribExports.count(location) == 0) {
+    for (unsigned i = 0; i < 4; ++i)
+      m_attribExports[location][i] = undef;
+  }
+
+  for (unsigned i = 0; i < 4; ++i) {
+    assert(attribValues[i]);
+    if (isa<UndefValue>(attribValues[i]))
+      continue; // Here, we only record new attribute values that are valid (not undefined ones)
+
+    // NOTE: The existing values must have been initialized to undefined ones already. Overlapping is disallowed (see
+    // such cases):
+    //   - Valid:
+    //       Existing: attrib0, <1.0, 2.0, undef, undef>
+    //       New:      attrib0, <undef, undef, 3.0, 4.0>
+    //   - Invalid:
+    //       Existing: attrib0, <1.0, 2.0, 3.0, undef>
+    //       New:      attrib0, <undef, undef, 4.0, 5.0>
+    assert(isa<UndefValue>(m_attribExports[location][i]));
+    m_attribExports[location][i] = attribValues[i]; // Update values that are valid
+  }
+
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  inOutUsage.expCount = std::max(inOutUsage.expCount, location + 1); // Update export count
+}
+
+// =====================================================================================================================
+// Exports vertex attributes that were recorded previously
+//
+// @param insertPos : Where to insert instructions.
+void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
+  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
+         m_shaderStage == ShaderStageCopyShader); // Valid shader stages
+  if (m_attribExports.empty()) {
+    assert(m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.expCount == 0);
+    return;
+  }
+
+  IRBuilder<> builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+
+  for (auto &attribExport : m_attribExports) {
+    if (m_gfxIp.major <= 10) {
+      unsigned channelMask = 0;
+      for (unsigned i = 0; i < 4; ++i) {
+        assert(attribExport.second[i]);
+        if (!isa<UndefValue>(attribExport.second[i]))
+          channelMask |= (1u << i); // Update channel mask if the value is valid (not undef)
+      }
+
+      builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
+                              {builder.getInt32(EXP_TARGET_PARAM_0 + attribExport.first), // tgt
+                               builder.getInt32(channelMask),                             // en
+                               attribExport.second[0],                                    // src0
+                               attribExport.second[1],                                    // src1
+                               attribExport.second[2],                                    // src2
+                               attribExport.second[3],                                    // src3
+                               builder.getFalse(),                                        // done
+                               builder.getFalse()});                                      // src0
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
+  }
 }
 
 } // namespace lgc

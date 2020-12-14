@@ -314,6 +314,8 @@ template <> inline void SPIRVMap<BuiltIn, std::string>::init() {
   add(BuiltInSubgroupGtMaskKHR, "BuiltInSubgroupGtMaskKHR");
   add(BuiltInSubgroupLeMaskKHR, "BuiltInSubgroupLeMaskKHR");
   add(BuiltInSubgroupLtMaskKHR, "BuiltInSubgroupLtMaskKHR");
+  add(BuiltInPrimitiveShadingRateKHR, "BuiltInPrimitiveShadingRateKHR");
+  add(BuiltInShadingRateKHR, "BuiltInShadingRateKHR");
   add(BuiltInBaryCoordNoPerspAMD, "BuiltInBaryCoordNoPerspAMD");
   add(BuiltInBaryCoordNoPerspCentroidAMD, "BuiltInBaryCoordNoPerspCentroidAMD");
   add(BuiltInBaryCoordNoPerspSampleAMD, "BuiltInBaryCoordNoPerspSampleAMD");
@@ -428,6 +430,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityShaderClockKHR, "ShaderClockKHR");
   add(CapabilityVariablePointersStorageBuffer, "VariablePointersStorageBuffer");
   add(CapabilityVariablePointers, "VariablePointers");
+  add(CapabilityFragmentShadingRateKHR, "FragmentShadingRateKHR");
   add(CapabilityShaderNonUniformEXT, "ShaderNonUniformEXT");
   add(CapabilityRuntimeDescriptorArrayEXT, "RuntimeDescriptorArrayEXT");
   add(CapabilityInputAttachmentArrayDynamicIndexingEXT, "InputAttachmentArrayDynamicIndexingEXT");

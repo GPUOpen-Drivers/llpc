@@ -33,6 +33,13 @@ target_include_directories(vkgc
         ${PROJECT_SOURCE_DIR}/include
 )
 
+### external SPIRV headers #########################################################
+if(EXISTS ${PROJECT_SOURCE_DIR}/../SPIRV-Headers)
+    set(SPIRV_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../SPIRV-Headers CACHE PATH "The path of SPIRV headers.")
+elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers)
+    set(SPIRV_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers CACHE PATH "The path of SPIRV headers.")
+endif()
+
 ### VKGC build LLPC ################################################################
 if(ICD_BUILD_LLPC)
     target_include_directories(vkgc

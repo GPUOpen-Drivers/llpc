@@ -40,6 +40,14 @@ using namespace spv;
 namespace Vkgc {
 
 // =====================================================================================================================
+// Gets the entry-point name from the SPIR-V binary.
+//
+// @param [in] spvBin : SPIR-V binary
+const char *VKAPI_CALL IUtil::GetEntryPointNameFromSpirvBinary(const BinaryData *spvBin) {
+  return getEntryPointNameFromSpirvBinary(spvBin);
+}
+
+// =====================================================================================================================
 // Gets name string of the abbreviation for the specified shader stage
 //
 // @param shaderStage : Shader stage

@@ -66,6 +66,8 @@ enum SectionType : unsigned {
   SectionTypeGlProgramParameter, // GL program parameter section
   SectionTypeGlGraphicsState,    // GL graphic pipeline state section
   SectionTypeGlComputeState,     // GL compute pipeline state section
+  SectionTypeGlFfxPs,            // GL FFX PS state section
+  SectionTypeGlFfxVs,            // GL FFX VS state section
   SectionTypeNameNum,            // Name num section
 };
 
@@ -109,14 +111,15 @@ enum MemberType : unsigned {
   MemberTypePipelineOption,           // VFX member type: SectionPipelineOption
   MemberTypeShaderOption,             // VFX member type: SectionShaderOption
   MemberTypeNggState,                 // VFX member type: SectionNggState
-  MemberTypeExtendedRobustness,       // VFX member type: SectionExtendedRobustness
-  MemberTypeGlAttribLocation,         // GL vertex attribute location
-  MemberTypeGlShaderInfo,             // GL SPIRV parameters
-  MemberTypeGlVertexAttrib,           // GL vertex input attribute
-  MemberTypeGlVertexBinding,          // GL vertex input binding
-  MemberTypeGlVertexFormat,           // GL vertex attribute format
-  MemberTypeGlSpirvPipelineLayout,    // GL SPIRV explicit pipeline layout
-  MemberTypeGlPatchParameter,         // GL program patch parameter
+  MemberTypeExtendedRobustness,    // VFX member type: SectionExtendedRobustness
+  MemberTypeGlAttribLocation,      // GL vertex attribute location
+  MemberTypeGlShaderInfo,          // GL SPIRV parameters
+  MemberTypeGlVertexAttrib,        // GL vertex input attribute
+  MemberTypeGlVertexBinding,       // GL vertex input binding
+  MemberTypeGlVertexFormat,        // GL vertex attribute format
+  MemberTypeGlSpirvPipelineLayout, // GL SPIRV explicit pipeline layout
+  MemberTypeGlPatchParameter,      // GL program patch parameter
+  MemberTypeGlFfxTexturekey,       // GL FFX texture key
 };
 
 // =====================================================================================================================
