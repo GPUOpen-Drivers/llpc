@@ -168,11 +168,24 @@ target_include_directories(llpc
         ${LLVM_INCLUDE_DIRS}
 )
 
+if(EXISTS ${SPIRV_HEADERS_PATH})
+    target_include_directories(llpc PRIVATE ${SPIRV_HEADERS_PATH}/include/spirv)
+    target_compile_definitions(llpc PRIVATE EXTERNAL_SPIRV_HEADERS=1)
+endif()
+
+if(EXISTS ${VULKAN_HEADERS_PATH})
+    target_include_directories(llpc PRIVATE ${VULKAN_HEADERS_PATH}/include)
+    target_compile_definitions(llpc PRIVATE EXTERNAL_VULKAN_HEADERS=1)
+endif()
+
 # CMAKE-TODO: Figure out a better way to do this.
 target_include_directories(llpc PRIVATE ${XGL_ICD_PATH}/api/include/khronos)
 
 if(VKI_BUILD_GFX103)
   target_compile_definitions(llpc PRIVATE LLPC_BUILD_GFX103)
+endif()
+if(VKI_KHR_FRAGMENT_SHADING_RATE)
+  target_compile_definitions(llpc PRIVATE VKI_KHR_FRAGMENT_SHADING_RATE)
 endif()
 
 if(WIN32)
@@ -328,6 +341,16 @@ PRIVATE
     ${XGL_PAL_PATH}/inc/util
     ${LLVM_INCLUDE_DIRS}
 )
+
+if(EXISTS ${SPIRV_HEADERS_PATH})
+    target_include_directories(amdllpc PRIVATE ${SPIRV_HEADERS_PATH}/include/spirv)
+    target_compile_definitions(amdllpc PRIVATE EXTERNAL_SPIRV_HEADERS=1)
+endif()
+
+if(EXISTS ${VULKAN_HEADERS_PATH})
+    target_include_directories(amdllpc PRIVATE ${VULKAN_HEADERS_PATH}/include)
+    target_compile_definitions(amdllpc PRIVATE EXTERNAL_VULKAN_HEADERS=1)
+endif()
 
 set(VULKAN_HEADER_PATH ${XGL_ICD_PATH}/api/include/khronos)
 target_include_directories(amdllpc PRIVATE ${VULKAN_HEADER_PATH})

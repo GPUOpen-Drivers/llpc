@@ -68,6 +68,16 @@ target_include_directories(dumper
         ${XGL_VKGC_PATH}/util
 )
 
+if(EXISTS ${SPIRV_HEADERS_PATH})
+    target_include_directories(dumper PRIVATE ${SPIRV_HEADERS_PATH}/include/spirv)
+    target_compile_definitions(dumper PRIVATE EXTERNAL_SPIRV_HEADERS=1)
+endif()
+
+if(EXISTS ${VULKAN_HEADERS_PATH})
+    target_include_directories(dumper PRIVATE ${VULKAN_HEADERS_PATH}/include)
+    target_compile_definitions(dumper PRIVATE EXTERNAL_VULKAN_HEADERS=1)
+endif()
+
 target_sources(dumper PRIVATE
     ../../util/vkgcUtil.cpp
     ../../util/vkgcElfReader.cpp

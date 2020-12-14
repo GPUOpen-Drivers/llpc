@@ -65,3 +65,8 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/../../include
     ${XGL_ICD_PATH}/api/include/khronos
 )
+
+if(EXISTS ${VULKAN_HEADERS_PATH})
+    target_include_directories(vfx PRIVATE ${VULKAN_HEADERS_PATH}/include)
+    target_compile_definitions(vfx PRIVATE EXTERNAL_VULKAN_HEADERS=1)
+endif()

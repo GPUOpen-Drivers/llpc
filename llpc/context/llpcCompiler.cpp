@@ -479,6 +479,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   TimerProfiler timerProfiler(MetroHash::compact64(&hash), "LLPC ShaderModule",
                               TimerProfiler::ShaderModuleTimerEnableMask);
 
+  bool trimDebugInfo = cl::TrimDebugInfo
+      ;
+
   // Check the type of input shader binary
   if (Vkgc::isSpirvBinary(&shaderInfo->shaderBin)) {
     unsigned debugInfoSize = 0;
@@ -493,7 +496,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
                                                      &debugInfoSize);
     }
     moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
-    if (cl::TrimDebugInfo)
+    if (trimDebugInfo)
       moduleDataEx.common.binCode.codeSize -= debugInfoSize;
   } else if (ShaderModuleHelper::isLlvmBitcode(&shaderInfo->shaderBin)) {
     moduleDataEx.common.binType = BinaryType::LlvmBc;
@@ -508,7 +511,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     }
 
     // Trim debug info
-    if (cl::TrimDebugInfo) {
+    if (trimDebugInfo) {
       trimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
       ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, trimmedCode);
       moduleDataEx.common.binCode.pCode = trimmedCode;

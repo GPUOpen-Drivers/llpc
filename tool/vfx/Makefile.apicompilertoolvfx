@@ -7,6 +7,12 @@ LCXXINCS += -I$(ICD_DEPTH)/api/compiler/imported/spirv
 LCXXINCS += -I$(ICD_DEPTH)/api/compiler/include
 LCXXINCS += -I$(ICD_DEPTH)/api/compiler/tool/vfx
 
+# External Vulkan-Headers files
+ifdef VULKAN_HEADERS_DEPTH
+    LCXXINCS += -I$(VULKAN_HEADERS_DEPTH)/include
+    LCXXDEFS += -DEXTERNAL_VULKAN_HEADERS=1
+endif
+
 vpath %.cpp $(ICD_DEPTH)/api/compiler/tool/vfx
 
 CPPFILES +=              \

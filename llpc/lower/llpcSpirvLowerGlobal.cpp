@@ -146,6 +146,25 @@ static_assert(lgc::BuiltInViewportIndex == static_cast<lgc::BuiltInKind>(spv::Bu
               "Built-in kind mismatch");
 static_assert(lgc::BuiltInWorkgroupId == static_cast<lgc::BuiltInKind>(spv::BuiltInWorkgroupId),
               "Built-in kind mismatch");
+static_assert(lgc::BuiltInPrimitiveShadingRate == static_cast<lgc::BuiltInKind>(spv::BuiltInPrimitiveShadingRateKHR),
+              "Built-in kind mismatch");
+static_assert(lgc::BuiltInShadingRate == static_cast<lgc::BuiltInKind>(spv::BuiltInShadingRateKHR),
+              "Built-in kind mismatch");
+
+static_assert(lgc::ShadingRateNone == static_cast<lgc::ShadingRateFlags>(spv::FragmentShadingRateMaskNone),
+              "Shading rate flag mismatch");
+static_assert(lgc::ShadingRateVertical2Pixels ==
+                  static_cast<lgc::ShadingRateFlags>(spv::FragmentShadingRateVertical2PixelsMask),
+              "Shading rate flag mismatch");
+static_assert(lgc::ShadingRateVertical4Pixels ==
+                  static_cast<lgc::ShadingRateFlags>(spv::FragmentShadingRateVertical4PixelsMask),
+              "Shading rate flag mismatch");
+static_assert(lgc::ShadingRateHorizontal2Pixels ==
+                  static_cast<lgc::ShadingRateFlags>(spv::FragmentShadingRateHorizontal2PixelsMask),
+              "Shading rate flag mismatch");
+static_assert(lgc::ShadingRateHorizontal4Pixels ==
+                  static_cast<lgc::ShadingRateFlags>(spv::FragmentShadingRateHorizontal4PixelsMask),
+              "Shading rate flag mismatch");
 
 // =====================================================================================================================
 // Initializes static members.

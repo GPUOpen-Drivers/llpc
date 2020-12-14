@@ -195,11 +195,11 @@ private:
   WorkgroupLayout calculateWorkgroupLayout();
   llvm::Value *reconfigWorkgroup(llvm::Value *localInvocationId, llvm::Instruction *insertPos);
 
-  void recordVertexAttribExport(unsigned location, llvm::ArrayRef<llvm::Value *> attribValues);
-  void exportVertexAttribs(llvm::Instruction *insertPos);
-
   void exportShadingRate(llvm::Value *shadingRate, llvm::Instruction *insertPos);
   llvm::Value *getShadingRate(llvm::Instruction *insertPos);
+
+  void recordVertexAttribExport(unsigned location, llvm::ArrayRef<llvm::Value *> attribValues);
+  void exportVertexAttribs(llvm::Instruction *insertPos);
 
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
