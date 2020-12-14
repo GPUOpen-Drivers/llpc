@@ -322,7 +322,10 @@ struct VertexInputDescription {
   unsigned location;  // Location of input, as provided to CreateReadGenericInput
   unsigned binding;   // Index of the vertex buffer descriptor in the vertex buffer table
   unsigned offset;    // Byte offset of the input in the binding's vertex buffer
-  unsigned stride;    // Byte stride of per-vertex/per-instance elements in the vertex buffer
+  unsigned stride;    // Byte stride of per-vertex/per-instance elements in the vertex buffer, 0 if unknown.
+                      // The stride is passed only to ensure that a valid load is used, not to actually calculate
+                      // the load address. Instead, we use the index as the index in a structured tbuffer load
+                      // instruction, and rely on the driver setting up the descriptor with the correct stride.
   BufDataFormat dfmt; // Data format of input; one of the BufDataFormat* values
   BufNumFormat nfmt;  // Numeric format of input; one of the BufNumFormat* values
   unsigned inputRate; // Vertex input rate for the binding

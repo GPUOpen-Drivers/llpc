@@ -924,6 +924,10 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderBase
 // =====================================================================================================================
 // Inserts instructions to do vertex fetch operations.
 //
+// The stride is passed only to ensure that a valid load is used, not to actually calculate the load address.
+// Instead, we use the index as the index in a structured tbuffer load instruction, and rely on the driver
+// setting up the descriptor with the correct stride.
+//
 // @param vbDesc : Vertex buffer descriptor
 // @param numChannels : Valid number of channels
 // @param is16bitFetch : Whether it is 16-bit vertex fetch
