@@ -78,6 +78,8 @@ void PatchInOutImportExport::initPerShader() {
   m_viewportIndex = nullptr;
   m_layer = nullptr;
   m_threadId = nullptr;
+
+  m_attribExports.clear();
 }
 
 // =====================================================================================================================
@@ -1000,18 +1002,65 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     return;
 
   const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-  const bool enableXfb = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
 
   // Whether this shader stage has to use "exp" instructions to export outputs
   const bool useExpInst = ((m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
-                            (m_shaderStage == ShaderStageCopyShader && !enableXfb)) &&
+                            m_shaderStage == ShaderStageCopyShader) &&
                            (nextStage == ShaderStageInvalid || nextStage == ShaderStageFragment));
 
   auto zero = ConstantFP::get(Type::getFloatTy(*m_context), 0.0);
   auto one = ConstantFP::get(Type::getFloatTy(*m_context), 1.0);
   auto undef = UndefValue::get(Type::getFloatTy(*m_context));
 
-  auto insertPos = &retInst;
+  Instruction *insertPos = &retInst;
+
+  const bool enableXfb = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
+  if (m_shaderStage == ShaderStageCopyShader && enableXfb) {
+    // NOTE: For copy shader, if transform feedback is enabled for multiple streams, the following processing doesn't
+    // happen in return block. Rather, they happen in the switch-case branch for the raster stream. See the following:
+    //
+    // copyShader() {
+    //   ...
+    //   switch(streamId) {
+    //   case 0:
+    //     export outputs of stream 0
+    //     break
+    //   ...
+    //   case rasterStream:
+    //     export outputs of raster stream
+    //     break
+    //   ...
+    //   case 3:
+    //     export outputs of stream 3
+    //     break
+    //   }
+    //
+    //   return
+    // }
+    //
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
+
+    bool updated = false;
+    for (auto &block : *m_entryPoint) {
+      // Seach blocks to find the switch-case instruction
+      auto switchInst = dyn_cast<SwitchInst>(block.getTerminator());
+      if (switchInst) {
+        for (auto &caseBranch : switchInst->cases()) {
+          if (caseBranch.getCaseValue()->getZExtValue() == resUsage->inOutUsage.gs.rasterStream) {
+            // The insert position is updated to this case branch, before the terminator
+            insertPos = caseBranch.getCaseSuccessor()->getTerminator();
+            updated = true;
+            // We must go to return block from this case branch
+            assert(caseBranch.getCaseSuccessor()->getSingleSuccessor() == retInst.getParent());
+            break;
+          }
+        }
+
+        if (updated)
+          break; // Early exit if we have updated the insert position
+      }
+    }
+  }
 
   if (useExpInst) {
     bool usePosition = false;

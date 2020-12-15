@@ -226,30 +226,24 @@ bool PatchCopyShader::runOnModule(Module &module) {
                                               });
 
     //
-    // .entry:
-    //      switch i32 %streamId, label %.end [ i32 0, lable %stream0
-    //                                          i32 1, label %stream1
-    //                                          i32 2, label %stream2
-    //                                          i32 3, label %stream3 ]
+    // copyShader() {
+    //   ...
+    //   switch(streamId) {
+    //   case 0:
+    //     export outputs of stream 0
+    //     break
+    //   ...
+    //   case rasterStream:
+    //     export outputs of raster stream
+    //     break
+    //   ...
+    //   case 3:
+    //     export outputs of stream 3
+    //     break
+    //   }
     //
-    // .stream0:
-    //      export(0)
-    //      br %label .end
-    //
-    // .stream1:
-    //      export(1)
-    //      br %label .end
-    //
-    // .stream2:
-    //      export(2)
-    //      br %label .end
-    //
-    // .stream3:
-    //      export(3)
-    //      br %label .end
-    //
-    // .end:
-    //      ret void
+    //   return
+    // }
     //
 
     // Add switchInst to entry block
