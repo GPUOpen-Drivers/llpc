@@ -110,9 +110,10 @@ struct ShaderModuleBuildOut {
 };
 
 enum CacheAccessInfo : uint8_t {
-  CacheNotChecked = 0, ///< Stage cache is not checked.
-  CacheMiss,           ///< Stage cache miss.
-  CacheHit,            ///< Stage cache hit.
+  CacheNotChecked = 0, ///< Cache is not checked.
+  CacheMiss,           ///< Cache miss.
+  CacheHit,            ///< Cache hit using VkPipelineCache.
+  InternalCacheHit,    ///< cache hit using internal cache.
 };
 
 /// Represents output of building a graphics pipeline.
