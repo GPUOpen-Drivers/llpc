@@ -2,6 +2,13 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL: {{^// LLPC}} tessellation calculation factor results
+; SHADERTEST: Patch constant count: 0
+; SHADERTEST: Patch constant size: 0
+; SHADERTEST: Patch constant total size: 0
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call void @llvm.amdgcn.raw.tbuffer.store.i32
+; SHADERTEST-NEXT: ret void
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

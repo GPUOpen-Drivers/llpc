@@ -2872,7 +2872,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
     storeTessFactorToBuffer(tessFactors, tessFactorOffset, insertPos);
 
     if (perPatchBuiltInOutLocMap.count(builtInId) == 0)
-      return; // Avoid writing unused tessellation factor to Lds
+      return; // Avoid writing unused tessellation factor to LDS
 
     unsigned loc = perPatchBuiltInOutLocMap[builtInId];
 
@@ -4406,6 +4406,7 @@ void PatchInOutImportExport::storeTessFactorToBuffer(const SmallVectorImpl<Value
 // =====================================================================================================================
 // Creates the LLPC intrinsic "llpc.tfbuffer.store.%tfValueType" to store tessellation factor.
 //
+// param@ funcName : The internal function name
 // param@ compCount : The component count of the store value
 void PatchInOutImportExport::createTessBufferStoreFunction(StringRef funcName, unsigned compCount) {
   // %tfValueType could be one of {i32, v2i32, v3i32, v4i32}
