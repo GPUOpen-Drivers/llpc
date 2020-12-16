@@ -850,7 +850,7 @@ MDNode *SPIRVToLLVMDbgTran::transDebugInstImpl(const SPIRVExtInst *DebugInst) {
 Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugInst, BasicBlock *BB) {
   auto GetLocalVar = [&](SPIRVId Id) -> std::pair<DILocalVariable *, DebugLoc> {
     auto *LV = transDebugInst<DILocalVariable>(BM->get<SPIRVExtInst>(Id));
-    DebugLoc DL = DebugLoc::get(LV->getLine(), 0, LV->getScope());
+    DebugLoc DL = DILocation::get(LV->getContext(), LV->getLine(), 0, LV->getScope());
     return std::make_pair(LV, DL);
   };
   auto GetValue = [&](SPIRVId Id) -> Value * {
@@ -912,7 +912,7 @@ DebugLoc SPIRVToLLVMDbgTran::transDebugScope(const SPIRVInstruction *SpirvInst, 
     Scope = getScope(BM->getEntry(Ops[ScopeIdx]));
     if (Ops.size() > InlinedAtIdx)
       InlinedAt = transDebugInst(BM->get<SPIRVExtInst>(Ops[InlinedAtIdx]));
-    return DebugLoc::get(Line, Col, Scope, InlinedAt);
+    return DILocation::get(Scope->getContext(), Line, Col, Scope, InlinedAt);
   }
 
   auto *SF = SpirvInst->getParent()->getParent();
@@ -940,7 +940,7 @@ DebugLoc SPIRVToLLVMDbgTran::transDebugScope(const SPIRVInstruction *SpirvInst, 
     assert(F->getSubprogram() == Sub || F->getSubprogram() == nullptr);
     F->setSubprogram(Sub);
   }
-  return DebugLoc::get(Line, Col, Sub);
+  return DILocation::get(Sub->getContext(), Line, Col, Sub);
 }
 
 MDNode *SPIRVToLLVMDbgTran::transDebugInlined(const SPIRVExtInst *Inst) {

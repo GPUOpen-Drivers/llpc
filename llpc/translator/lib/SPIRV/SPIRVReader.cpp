@@ -1365,7 +1365,7 @@ DebugLoc SPIRVToLLVM::getDebugLoc(SPIRVInstruction *bi, Function *f) {
   if (!sp) {
     return DebugLoc();
   }
-  return DebugLoc::get(line->getLine(), line->getColumn(), sp);
+  return DILocation::get(sp->getContext(), line->getLine(), line->getColumn(), sp);
 }
 
 void SPIRVToLLVM::updateDebugLoc(SPIRVValue *bv, Function *f) {
