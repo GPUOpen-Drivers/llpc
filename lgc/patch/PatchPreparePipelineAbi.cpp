@@ -51,7 +51,7 @@ namespace lgc {
 class PatchPreparePipelineAbi final : public Patch {
 public:
   static char ID;
-  PatchPreparePipelineAbi(bool onlySetCallingConvs = false) : Patch(ID), MOnlySetCallingConvs(onlySetCallingConvs) {}
+  PatchPreparePipelineAbi(bool onlySetCallingConvs = false) : Patch(ID), m_onlySetCallingConvs(onlySetCallingConvs) {}
 
   bool runOnModule(Module &module) override;
 
@@ -88,7 +88,7 @@ private:
 
   GfxIpVersion m_gfxIp; // Graphics IP version info
 
-  const bool MOnlySetCallingConvs; // Whether to only set the calling conventions
+  const bool m_onlySetCallingConvs; // Whether to only set the calling conventions
 };
 
 char PatchPreparePipelineAbi::ID = 0;
@@ -123,7 +123,7 @@ bool PatchPreparePipelineAbi::runOnModule(Module &module) {
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   // If we've only to set the calling conventions, do that now.
-  if (MOnlySetCallingConvs) {
+  if (m_onlySetCallingConvs) {
     setCallingConvs(module);
     setRemainingCallingConvs(module);
   } else {
