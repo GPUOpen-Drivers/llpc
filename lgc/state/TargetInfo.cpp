@@ -69,7 +69,7 @@ static void setGfx6BaseInfo(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().tessFactorBufferSizePerSe = 4096;
 
   // TODO: Accept gsOnChipDefaultLdsSizePerSubgroup from panel option
-  targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 8192; // GFX6-8 value
+  targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 8192;
 }
 
 // gfx6
