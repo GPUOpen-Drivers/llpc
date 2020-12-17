@@ -661,7 +661,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
           break;
         case NggSubgroupSizing::OptimizeForVerts:
-          esVertsPerSubgroup = hasTs ? 128 : 126;
+          esVertsPerSubgroup = hasTs ? Gfx9::NggMaxThreadsPerSubgroup / 2 : (Gfx9::NggMaxThreadsPerSubgroup / 2 - 2);
           gsPrimsPerSubgroup = hasTs || needsLds ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
           break;
         case NggSubgroupSizing::OptimizeForPrims:
@@ -672,12 +672,18 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           esVertsPerSubgroup = nggControl->vertsPerSubgroup;
           gsPrimsPerSubgroup = nggControl->primsPerSubgroup;
           break;
-        default:
         case NggSubgroupSizing::Auto:
-          esVertsPerSubgroup = 126;
-          gsPrimsPerSubgroup = 128;
+          if (m_pipelineState->getTargetInfo().getGfxIpVersion() == GfxIpVersion{10, 1}) {
+            esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2 - 2;
+            gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+          } else {
+            // Newer hardware performs the decrement on esVertsPerSubgroup for us already.
+            esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+            gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+          }
           break;
         case NggSubgroupSizing::MaximumSize:
+        default:
           esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
           gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
           break;
@@ -725,12 +731,20 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         // by the amplification factor is larger than the supported number of primitives within a subgroup, we
         // need to shrimp the number of gsPrimsPerSubgroup down to a reasonable level to prevent
         // over-allocating LDS.
-        unsigned maxVertOut = hasGs ? geometryMode.outputVertices : 1;
-
+        unsigned maxVertOut = geometryMode.outputVertices;
         assert(maxVertOut >= primAmpFactor);
+        gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup / maxVertOut);
 
-        if ((gsPrimsPerSubgroup * maxVertOut) > Gfx9::NggMaxThreadsPerSubgroup)
-          gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / maxVertOut;
+        const uint32_t gsMaxLdsSize =
+            m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup;
+
+        // The equation for required LDS is:
+        // LDS allocation = (esGsRingItemSize * esVertsPerSubgroup) +
+        //                  (gsVsRingItemSize * gsInstanceCount * gsPrimsPerSubgroup) +
+        //                  extraLdsSize
+        gsPrimsPerSubgroup = std::min(
+            gsPrimsPerSubgroup, (gsMaxLdsSize - esExtraLdsSize - gsExtraLdsSize) /
+                                    ((esGsRingItemSize * vertsPerPrimitive) + (gsVsRingItemSize * gsInstanceCount)));
 
         // Let's take into consideration instancing:
         assert(gsInstanceCount >= 1);
@@ -742,9 +756,11 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           enableMaxVertOut = true;
           gsInstanceCount = 1;
           gsPrimsPerSubgroup = 1;
-        } else
+        } else {
           gsPrimsPerSubgroup /= gsInstanceCount;
-        esVertsPerSubgroup = gsPrimsPerSubgroup * maxVertOut;
+        }
+
+        esVertsPerSubgroup = gsPrimsPerSubgroup * vertsPerPrimitive;
       } else {
         // If GS is not present, instance count must be 1
         assert(gsInstanceCount == 1);
@@ -752,6 +768,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
       // Make sure that we have at least one primitive
       assert(gsPrimsPerSubgroup >= 1);
+
+      // HW has restriction on NGG + Tessellation where gsPrimsPerSubgroup must be >= 3.
+      assert(!hasTs || gsPrimsPerSubgroup >= 3);
 
       unsigned expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
       const unsigned expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
