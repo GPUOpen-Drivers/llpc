@@ -61,6 +61,7 @@ private:
   PatchReadFirstLane(const PatchReadFirstLane &) = delete;
   PatchReadFirstLane &operator=(const PatchReadFirstLane &) = delete;
 
+  bool promoteEqualUniformOps(Function &function);
   bool liftReadFirstLane(Function &function);
   void collectAssumeUniforms(BasicBlock *block, const SmallVectorImpl<Instruction *> &initialReadFirstLanes);
   void findBestInsertLocation(const SmallVectorImpl<Instruction *> &initialReadFirstLanes);
@@ -140,8 +141,8 @@ bool PatchReadFirstLane::runOnFunction(Function &function) {
     m_targetTransformInfo = &targetTransformInfoWrapperPass->getTTI(function);
   assert(m_targetTransformInfo);
 
-  const bool changed = liftReadFirstLane(function);
-
+  bool changed = promoteEqualUniformOps(function);
+  changed |= liftReadFirstLane(function);
   return changed;
 }
 
@@ -152,6 +153,86 @@ bool PatchReadFirstLane::runOnFunction(Function &function) {
 void PatchReadFirstLane::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.addRequired<LegacyDivergenceAnalysis>();
   analysisUsage.setPreservesCFG();
+}
+
+// =====================================================================================================================
+// Use the uniform (non-divergent) node instead of a divergent one if they are equal.
+//
+// Detect a case where a branch condition tests two nodes for equality where one of them
+// is divergent and the other uniform. In the true block replace the divergent
+// use with the uniform one as it helps instruction selection decide what to put in an SGPR.
+//
+// For example, in the code snippet below in BB1, %divergent can be replaced with %uniform.
+//
+// BB0:
+// %uniform = call i32 @llvm.amdgcn.readlane(i32 %divergent, i32 %lane)
+// %cmp = icmp eq i32 %divergent, %uniform
+// br i1 %cmp, label %BB1, label %BB2
+//
+// BB1:
+// ..
+// %use = zext i32 %divergent to i64 ; can use %uniform
+//
+// @param [in,out] function : LLVM function to be run for the optimization.
+bool PatchReadFirstLane::promoteEqualUniformOps(Function &function) {
+
+  bool changed = false;
+  for (auto &bb : function) {
+    // Look for a block that has a single predecessor with conditional branch.
+    const auto *pred = bb.getSinglePredecessor();
+    if (!pred)
+      continue;
+    const auto *branchInst = dyn_cast<BranchInst>(pred->getTerminator());
+    if (!branchInst || !branchInst->isConditional())
+      continue;
+    assert(branchInst->getSuccessor(0) != branchInst->getSuccessor(1));
+
+    // Make sure the condition for entering bb is the equality test passing.
+    bool match = false;
+    const auto *cmpInst = dyn_cast<ICmpInst>(branchInst->getCondition());
+    if (cmpInst) {
+      switch (cmpInst->getPredicate()) {
+      case ICmpInst::ICMP_EQ:
+        match = branchInst->getSuccessor(0) == &bb;
+        break;
+      case ICmpInst::ICMP_NE:
+        match = branchInst->getSuccessor(1) == &bb;
+        break;
+      default:
+        break;
+      }
+    }
+    if (!match)
+      continue;
+
+    // Check if the condition compares a divergent and uniform value.
+    Value *divergentVal = nullptr, *uniformVal = nullptr;
+    for (int i = 0; i < 2; ++i) {
+      const Use &cmpArg = cmpInst->getOperandUse(i);
+      if (m_divergenceAnalysis->isDivergentUse(&cmpArg))
+        divergentVal = cmpArg.get();
+      else
+        uniformVal = cmpArg.get();
+    }
+    if (!divergentVal || !uniformVal)
+      continue;
+
+    // Replace all occurrences of the divergent value with uniform one in bb.
+    SmallVector<User *, 2> users;
+    for (auto *user : divergentVal->users()) {
+      if (auto *uInst = dyn_cast<Instruction>(user)) {
+        if (uInst->getParent() == &bb) {
+          users.push_back(user);
+        }
+      }
+    }
+
+    for (auto *user : users)
+      user->replaceUsesOfWith(divergentVal, uniformVal);
+
+    changed |= !users.empty();
+  }
+  return changed;
 }
 
 // =====================================================================================================================
