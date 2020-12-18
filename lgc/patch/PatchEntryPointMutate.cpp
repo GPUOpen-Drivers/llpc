@@ -924,7 +924,7 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
   AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
   entryPoint->addAttributes(attribIdx, builder);
 
-  // NOTE: Remove "readnone" attribute for entry-point. If GS is emtry, this attribute will allow
+  // NOTE: Remove "readnone" attribute for entry-point. If GS is empty, this attribute will allow
   // LLVM optimization to remove sendmsg(GS_DONE). It is unexpected.
   if (entryPoint->hasFnAttribute(Attribute::ReadNone))
     entryPoint->removeFnAttr(Attribute::ReadNone);
@@ -1246,12 +1246,10 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
     case ResourceNodeType::DescriptorTableVaPtr: {
       // Check if the descriptor set is in use. For compute with calls, enable it anyway.
       UserDataNodeUsage *descSetUsage = nullptr;
-      if (!isComputeWithCalls()) {
-        if (userDataUsage->descriptorTables.size() > userDataNodeIdx)
-          descSetUsage = &userDataUsage->descriptorTables[userDataNodeIdx];
-        if (!descSetUsage || descSetUsage->users.empty())
-          break;
-      }
+      if (userDataUsage->descriptorTables.size() > userDataNodeIdx)
+        descSetUsage = &userDataUsage->descriptorTables[userDataNodeIdx];
+      if (!isComputeWithCalls() && (!descSetUsage || descSetUsage->users.empty()))
+        break;
 
       unsigned userDataValue = node.offsetInDwords;
       if (m_pipelineState->getShaderOptions(m_shaderStage).updateDescInElf && m_shaderStage == ShaderStageFragment) {
