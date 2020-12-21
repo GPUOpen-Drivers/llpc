@@ -148,7 +148,6 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchNullFragShader.cpp
     patch/PatchPeepholeOpt.cpp
     patch/PatchPreparePipelineAbi.cpp
-    patch/PatchReadFirstLane.cpp
     patch/PatchResourceCollect.cpp
     patch/PatchSetupTargetFeatures.cpp
     patch/PatchWorkarounds.cpp

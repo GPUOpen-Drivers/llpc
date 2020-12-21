@@ -2690,6 +2690,7 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
   if (spvIndices.empty())
     return base;
 
+  bool isNonUniform = spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
   Value *index = transValue(spvIndices[0], getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
   spvIndices = spvIndices.slice(1);
   spvElementType = spvElementType->getArrayElementType();
@@ -2698,6 +2699,7 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
     index = getBuilder()->CreateMul(
         index, getBuilder()->getInt32(static_cast<SPIRVTypeArray *>(spvElementType)->getLength()->getZExtIntValue()));
     if (!spvIndices.empty()) {
+      isNonUniform |= spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
       index = getBuilder()->CreateAdd(index, transValue(spvIndices[0], getBuilder()->GetInsertBlock()->getParent(),
                                                         getBuilder()->GetInsertBlock()));
       spvIndices = spvIndices.slice(1);
@@ -2706,7 +2708,7 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
   }
 
   Type *elementTy = transType(spvElementType, 0, false, false, false);
-  return indexDescPtr(elementTy, base, index);
+  return indexDescPtr(elementTy, base, index, isNonUniform);
 }
 
 // =====================================================================================================================
@@ -2718,7 +2720,8 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
 // @param elementTy : Ultimate non-array element type
 // @param base : Base pointer to add index to
 // @param index : Index value
-Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
+// @param isNonUniform : Whether the index is non-uniform
+Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, bool isNonUniform) {
   auto structTy = dyn_cast<StructType>(elementTy);
   if (structTy && !structTy->getElementType(structTy->getNumElements() - 1)->isIntegerTy()) {
     // The element type is a struct containing two image/sampler elements. The cases where this happens are:
@@ -2729,8 +2732,8 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
     assert(structTy->getNumElements() == 2);
     Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
     Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
-    ptr0 = indexDescPtr(structTy->getElementType(0), ptr0, index);
-    ptr1 = indexDescPtr(structTy->getElementType(1), ptr1, index);
+    ptr0 = indexDescPtr(structTy->getElementType(0), ptr0, index, isNonUniform);
+    ptr1 = indexDescPtr(structTy->getElementType(1), ptr1, index, isNonUniform);
     base = getBuilder()->CreateInsertValue(UndefValue::get(base->getType()), ptr0, 0);
     base = getBuilder()->CreateInsertValue(base, ptr1, 1);
     return base;
@@ -2751,6 +2754,10 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
   Value *ptr = getBuilder()->CreateExtractValue(base, 0);
   Value *stride = getBuilder()->CreateExtractValue(base, 1);
   index = getBuilder()->CreateMul(index, stride);
+  if (!isNonUniform && !isa<Constant>(index)) {
+    // For a non-constant but uniform index, mark it uniform.
+    index = getBuilder()->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, index);
+  }
 
   // Do the indexing operation by GEPping as a byte pointer.
   Type *ptrTy = ptr->getType();
