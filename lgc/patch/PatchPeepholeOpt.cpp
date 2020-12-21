@@ -556,8 +556,12 @@ void PatchPeepholeOpt::visitPHINode(PHINode &phiNode) {
   }
 
   // Do not clone allocas, atomics and instructions with side effects.
+  // Also do not clone instructions that may read from memory, because whether the memory content is changed is unknown,
+  // the same load may produce different values in each incoming block.
+  // TODO: Some cases may not be handled, like intrinsics call that does not allow clone. Also, cloning an instruction
+  // may not be beneficial, like an integer division which may be quite slow.
   if (prevIncomingInst && !isa<AllocaInst>(prevIncomingInst) && !prevIncomingInst->isAtomic() &&
-      !prevIncomingInst->mayHaveSideEffects()) {
+      !prevIncomingInst->mayHaveSideEffects() && !prevIncomingInst->mayReadFromMemory()) {
     Instruction *const newInst = prevIncomingInst->clone();
     insertAfter(*newInst, phiNode);
 
