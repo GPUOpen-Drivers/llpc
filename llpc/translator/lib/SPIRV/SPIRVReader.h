@@ -308,6 +308,8 @@ private:
 
   Value *ConvertingSamplerSelectLadderHelper(Value *result, Value *convertingSamplerIdx,
                                              std::function<Value *(Value *)> createImageOp);
+
+  Function *createLibraryEntryFunc();
 }; // class SPIRVToLLVM
 
 } // namespace SPIRV
