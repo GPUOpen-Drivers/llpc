@@ -6136,12 +6136,11 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
 
   // Find the targeted entry-point in this translation
   auto entryPoint = m_bm->getEntryPoint(entryExecModel, entryName);
-  if (!entryPoint)
+
+  if (!entryPoint && !m_bm->hasCapability(CapabilityLinkage))
     return false;
 
-  m_entryTarget = m_bm->get<SPIRVFunction>(entryPoint->getTargetId());
-  if (!m_entryTarget)
-    return false;
+  m_entryTarget = (entryPoint != nullptr) ? m_bm->get<SPIRVFunction>(entryPoint->getTargetId()) : nullptr;
 
   m_execModule = entryExecModel;
   m_fpControlFlags.U32All = 0;
@@ -6150,20 +6149,24 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   static_assert(SPIRVTW_32Bit == (32 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_64Bit == (64 >> 3), "Unexpected value!");
 
-  if (auto em = m_entryTarget->getExecutionMode(ExecutionModeDenormPreserve))
-    m_fpControlFlags.DenormPreserve = em->getLiterals()[0] >> 3;
+  if (m_entryTarget) {
+    if (auto em = m_entryTarget->getExecutionMode(ExecutionModeDenormPreserve))
+      m_fpControlFlags.DenormPreserve = em->getLiterals()[0] >> 3;
 
-  if (auto em = m_entryTarget->getExecutionMode(ExecutionModeDenormFlushToZero))
-    m_fpControlFlags.DenormFlushToZero = em->getLiterals()[0] >> 3;
+    if (auto em = m_entryTarget->getExecutionMode(ExecutionModeDenormFlushToZero))
+      m_fpControlFlags.DenormFlushToZero = em->getLiterals()[0] >> 3;
 
-  if (auto em = m_entryTarget->getExecutionMode(ExecutionModeSignedZeroInfNanPreserve))
-    m_fpControlFlags.SignedZeroInfNanPreserve = em->getLiterals()[0] >> 3;
+    if (auto em = m_entryTarget->getExecutionMode(ExecutionModeSignedZeroInfNanPreserve))
+      m_fpControlFlags.SignedZeroInfNanPreserve = em->getLiterals()[0] >> 3;
 
-  if (auto em = m_entryTarget->getExecutionMode(ExecutionModeRoundingModeRTE))
-    m_fpControlFlags.RoundingModeRTE = em->getLiterals()[0] >> 3;
+    if (auto em = m_entryTarget->getExecutionMode(ExecutionModeRoundingModeRTE))
+      m_fpControlFlags.RoundingModeRTE = em->getLiterals()[0] >> 3;
 
-  if (auto em = m_entryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
-    m_fpControlFlags.RoundingModeRTZ = em->getLiterals()[0] >> 3;
+    if (auto em = m_entryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
+      m_fpControlFlags.RoundingModeRTZ = em->getLiterals()[0] >> 3;
+  } else {
+    createLibraryEntryFunc();
+  }
 
   // Determine any denormal overrides to be applied.
   Vkgc::DenormalMode fp32DenormalMode =
@@ -8119,6 +8122,21 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
     }
     return GlobalValue::ExternalLinkage;
   }
+}
+
+llvm::Function *SPIRVToLLVM::createLibraryEntryFunc() {
+  auto builder = getBuilder();
+  FunctionType *funcTy = FunctionType::get(builder->getVoidTy(), {}, false);
+  auto func = Function::Create(funcTy, GlobalValue::ExternalLinkage, "libraryEntry", m_m);
+  BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
+  builder->SetInsertPoint(entryBlock);
+  builder->CreateRetVoid();
+  std::vector<Metadata *> execModelMDs;
+  execModelMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(builder->getInt32Ty(), ExecutionModelGLCompute)));
+  auto execModelMdNode = MDNode::get(*m_context, execModelMDs);
+  func->addMetadata(gSPIRVMD::ExecutionModel, *execModelMdNode);
+  func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  return func;
 }
 
 } // namespace SPIRV
