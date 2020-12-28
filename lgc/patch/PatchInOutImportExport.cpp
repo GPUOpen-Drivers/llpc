@@ -226,8 +226,7 @@ void PatchInOutImportExport::processShader() {
       m_primitiveId = getFunctionArgument(m_entryPoint, entryArgIdxs.vs.primitiveId);
   } else if (m_shaderStage == ShaderStageTessEval) {
     if (builtInUsage.tes.primitiveId) {
-      // TODO: Support tessellation shader.
-      m_primitiveId = UndefValue::get(Type::getInt32Ty(*m_context));
+      m_primitiveId = getFunctionArgument(m_entryPoint, entryArgIdxs.tes.patchId);
     }
   }
 
