@@ -1315,10 +1315,13 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
           addUserDataArg(userDataArgs, node.offsetInDwords + dwordOffset, pushConstOffset.dwordSize,
                          &pushConstOffset.entryArgIdx, builder);
         }
+      } else {
+        // Mark push constant for spill for compute library.
+        userDataUsage->pushConstSpill = true;
       }
 
       // Ensure we mark the push constant's part of the spill table as used.
-      if (userDataUsage->pushConstSpill || isComputeWithCalls())
+      if (userDataUsage->pushConstSpill)
         userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, node.offsetInDwords);
 
       break;

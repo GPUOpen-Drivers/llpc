@@ -1,0 +1,30 @@
+; Test that push constant is correctly marked for spill in compute library even it is not used.
+
+; RUN: lgc -mcpu=gfx1010 -o - - <%s | FileCheck --check-prefixes=CHECK %s
+
+; CHECK: .spill_threshold: 0x1
+
+; ModuleID = 'lgcPipeline'
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
+target triple = "amdgcn--amdpal"
+
+; Function Attrs: nounwind
+define spir_func void @func() local_unnamed_addr #0 !spirv.ExecutionModel !6 !lgc.shaderstage !6 {
+.entry:
+  ret void
+}
+
+attributes #0 = { nounwind }
+
+!llpc.compute.mode = !{!0}
+!lgc.options = !{!1}
+!lgc.options.CS = !{!2}
+!lgc.user.data.nodes = !{!3, !4, !5}
+
+!0 = !{i32 64, i32 1, i32 1}
+!1 = !{i32 1864795321, i32 1368232169, i32 -1918754832, i32 -2075327836, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
+!2 = !{i32 1108170314, i32 -1466425303, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 -859045888, i32 0, i32 0, i32 -858993664, i32 0, i32 846145024, i32 20}
+!3 = !{!"StreamOutTableVaPtr", i32 0, i32 1, i32 0, i32 -1, i32 -1}
+!4 = !{!"PushConst", i32 1, i32 6, i32 0, i32 -1, i32 0}
+!5 = !{!"DescriptorTableVaPtr", i32 8, i32 1, i32 0, i32 1, i32 4}
+!6 = !{i32 5}
