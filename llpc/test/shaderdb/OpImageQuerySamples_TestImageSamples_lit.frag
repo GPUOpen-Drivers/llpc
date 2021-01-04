@@ -25,7 +25,7 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.query.samples.i32(i32 6, i32 0, {{.*}})
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 1)
-; SHADERTEST: call {{.*}} @lgc.create.image.query.samples.i32(i32 7, i32 0, {{.*}})
+; SHADERTEST: call {{.*}} @lgc.create.image.query.samples.i32(i32 7, i32 128, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS

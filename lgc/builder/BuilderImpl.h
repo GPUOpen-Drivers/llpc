@@ -419,6 +419,9 @@ private:
   // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
   llvm::Value *handleFragCoordViewIndex(llvm::Value *coord, unsigned flags, unsigned &dim);
 
+  // Enforce readfirstlane on the image or sampler descripotrs
+  void enforceReadFirstLane(llvm::Instruction *imageInst, unsigned descIdx);
+
   enum ImgDataFormat {
     IMG_DATA_FORMAT_32 = 4,
     IMG_DATA_FORMAT_8_8_8_8 = 10,

@@ -24,7 +24,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
-; SHADERTEST: call {{.*}} @lgc.create.image.query.size.v2i32(i32 1, i32 0, {{.*}}, i32 3)
+; SHADERTEST: call {{.*}} @lgc.create.image.query.size.v2i32(i32 1, i32 128, {{.*}}, i32 3)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 4)
 ; SHADERTEST: call {{.*}} @lgc.create.image.query.size.v2i32(i32 1, i32 0, {{.*}}, i32 4)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 5)

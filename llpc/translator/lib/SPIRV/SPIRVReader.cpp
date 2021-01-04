@@ -2690,7 +2690,6 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
   if (spvIndices.empty())
     return base;
 
-  bool isNonUniform = spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
   Value *index = transValue(spvIndices[0], getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
   spvIndices = spvIndices.slice(1);
   spvElementType = spvElementType->getArrayElementType();
@@ -2699,7 +2698,6 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
     index = getBuilder()->CreateMul(
         index, getBuilder()->getInt32(static_cast<SPIRVTypeArray *>(spvElementType)->getLength()->getZExtIntValue()));
     if (!spvIndices.empty()) {
-      isNonUniform |= spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
       index = getBuilder()->CreateAdd(index, transValue(spvIndices[0], getBuilder()->GetInsertBlock()->getParent(),
                                                         getBuilder()->GetInsertBlock()));
       spvIndices = spvIndices.slice(1);
@@ -2708,7 +2706,7 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
   }
 
   Type *elementTy = transType(spvElementType, 0, false, false, false);
-  return indexDescPtr(elementTy, base, index, isNonUniform);
+  return indexDescPtr(elementTy, base, index);
 }
 
 // =====================================================================================================================
@@ -2720,8 +2718,7 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
 // @param elementTy : Ultimate non-array element type
 // @param base : Base pointer to add index to
 // @param index : Index value
-// @param isNonUniform : Whether the index is non-uniform
-Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, bool isNonUniform) {
+Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
   auto structTy = dyn_cast<StructType>(elementTy);
   if (structTy && !structTy->getElementType(structTy->getNumElements() - 1)->isIntegerTy()) {
     // The element type is a struct containing two image/sampler elements. The cases where this happens are:
@@ -2732,8 +2729,8 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, boo
     assert(structTy->getNumElements() == 2);
     Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
     Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
-    ptr0 = indexDescPtr(structTy->getElementType(0), ptr0, index, isNonUniform);
-    ptr1 = indexDescPtr(structTy->getElementType(1), ptr1, index, isNonUniform);
+    ptr0 = indexDescPtr(structTy->getElementType(0), ptr0, index);
+    ptr1 = indexDescPtr(structTy->getElementType(1), ptr1, index);
     base = getBuilder()->CreateInsertValue(UndefValue::get(base->getType()), ptr0, 0);
     base = getBuilder()->CreateInsertValue(base, ptr1, 1);
     return base;
@@ -2754,10 +2751,6 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index, boo
   Value *ptr = getBuilder()->CreateExtractValue(base, 0);
   Value *stride = getBuilder()->CreateExtractValue(base, 1);
   index = getBuilder()->CreateMul(index, stride);
-  if (!isNonUniform && !isa<Constant>(index)) {
-    // For a non-constant but uniform index, mark it uniform.
-    index = getBuilder()->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, index);
-  }
 
   // Do the indexing operation by GEPping as a byte pointer.
   Type *ptrTy = ptr->getType();
@@ -5259,12 +5252,14 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
     }
     // We also need to trace back to the OpVariable or OpFunctionParam to find
     // the coherent and volatile decorations.
+    SPIRVValue *imageAccessChain = nullptr;
     while (bImagePtr->getOpCode() == OpAccessChain || bImagePtr->getOpCode() == OpInBoundsAccessChain) {
       std::vector<SPIRVValue *> operands = static_cast<SPIRVInstTemplateBase *>(bImagePtr)->getOperands();
       for (SPIRVValue *operand : operands) {
         if (operand->hasDecorate(DecorationNonUniformEXT))
           info->flags |= lgc::Builder::ImageFlagNonUniformImage;
       }
+      imageAccessChain = bImagePtr;
       bImagePtr = operands[0];
     }
     assert(bImagePtr->getOpCode() == OpVariable || bImagePtr->getOpCode() == OpFunctionParameter);
@@ -5272,16 +5267,32 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
       info->flags |= lgc::Builder::ImageFlagCoherent;
     if (bImageInst->hasDecorate(DecorationVolatile))
       info->flags |= lgc::Builder::ImageFlagVolatile;
+
+    // Set enforce readfirstlane flag for accessing image array
+    if ((info->flags & lgc::Builder::ImageFlagNonUniformImage) == 0 && imageAccessChain) {
+      SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(imageAccessChain);
+      if (!spvAccessChain->getIndices().empty())
+        info->flags |= lgc::Builder::ImageFlagEnforceReadFirstLaneImage;
+    }
     return;
   }
 
+  SPIRVValue *imageLoadSrc = nullptr;
+  SPIRVValue *samplerLoadSrc = nullptr;
   if (bImageInst->getOpCode() == OpLoad) {
     SPIRVLoad *load = static_cast<SPIRVLoad *>(bImageInst);
+    SPIRVValue *const loadSrc = load->getSrc();
 
-    if (load->getSrc()->isCoherent())
+    if (loadSrc->isCoherent())
       info->flags |= lgc::Builder::ImageFlagCoherent;
-    if (load->getSrc()->isVolatile())
+    if (loadSrc->isVolatile())
       info->flags |= lgc::Builder::ImageFlagVolatile;
+    if (load->getType()->getOpCode() == OpTypeSampledImage) {
+      imageLoadSrc = loadSrc;
+      samplerLoadSrc = loadSrc;
+    } else {
+      imageLoadSrc = loadSrc;
+    }
   }
 
   // We need to scan back through OpImage/OpSampledImage just to find any
@@ -5292,10 +5303,27 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
       auto sampler = static_cast<SPIRVInstTemplateBase *>(scanBackInst)->getOpValue(1);
       if (sampler->hasDecorate(DecorationNonUniformEXT))
         info->flags |= lgc::Builder::ImageFlagNonUniformSampler;
+      if (sampler->getOpCode() == OpLoad)
+        samplerLoadSrc = static_cast<SPIRVLoad *>(sampler)->getSrc();
     }
     scanBackInst = static_cast<SPIRVInstTemplateBase *>(scanBackInst)->getOpValue(0);
     if (scanBackInst->hasDecorate(DecorationNonUniformEXT))
       info->flags |= lgc::Builder::ImageFlagNonUniformImage;
+    if (scanBackInst->getOpCode() == OpLoad)
+      imageLoadSrc = static_cast<SPIRVLoad *>(scanBackInst)->getSrc();
+  }
+  // Set enforce readfirstlane flag for accessing image or sampled image array
+  if ((info->flags & lgc::Builder::ImageFlagNonUniformImage) == 0 && imageLoadSrc &&
+      imageLoadSrc->getOpCode() == OpAccessChain) {
+    SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(imageLoadSrc);
+    if (!spvAccessChain->getIndices().empty())
+      info->flags |= lgc::Builder::ImageFlagEnforceReadFirstLaneImage;
+  }
+  if ((info->flags & lgc::Builder::ImageFlagNonUniformSampler) == 0 && samplerLoadSrc &&
+      samplerLoadSrc->getOpCode() == OpAccessChain) {
+    SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(samplerLoadSrc);
+    if (!spvAccessChain->getIndices().empty())
+      info->flags |= lgc::Builder::ImageFlagEnforceReadFirstLaneSampler;
   }
 
   // Get the IR value for the image/sampledimage.

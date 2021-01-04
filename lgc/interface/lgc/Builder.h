@@ -794,15 +794,17 @@ public:
 
   // Bit settings in flags argument for image methods.
   enum {
-    ImageFlagCoherent = 1,             // Coherent memory access
-    ImageFlagVolatile = 2,             // Volatile memory access
-    ImageFlagSignedResult = 4,         // For a gather with integer result, whether it is signed
-    ImageFlagNonUniformImage = 8,      // Whether the image descriptor is non-uniform
-    ImageFlagNonUniformSampler = 0x10, // Whether the sampler descriptor is non-uniform
-    ImageFlagAddFragCoord = 0x20,      // Add FragCoord (converted to signed int) on to coordinate x,y.
-                                       // Image load, store and atomic only.
-    ImageFlagCheckMultiView = 0x40,    // If pipeline state enables multiview, use ViewIndex as coordinate z.
-                                       // Otherwise, acts the same as ImageFlagAddFragCoord
+    ImageFlagCoherent = 1,                       // Coherent memory access
+    ImageFlagVolatile = 2,                       // Volatile memory access
+    ImageFlagSignedResult = 4,                   // For a gather with integer result, whether it is signed
+    ImageFlagNonUniformImage = 8,                // Whether the image descriptor is non-uniform
+    ImageFlagNonUniformSampler = 0x10,           // Whether the sampler descriptor is non-uniform
+    ImageFlagAddFragCoord = 0x20,                // Add FragCoord (converted to signed int) on to coordinate x,y.
+                                                 // Image load, store and atomic only.
+    ImageFlagCheckMultiView = 0x40,              // If pipeline state enables multiview, use ViewIndex as coordinate z.
+                                                 // Otherwise, acts the same as ImageFlagAddFragCoord
+    ImageFlagEnforceReadFirstLaneImage = 0x80,   // Whether enabling readfirstlane on the image descriptor
+    ImageFlagEnforceReadFirstLaneSampler = 0x100 // Whether enabling readfirstlane on the sampler desriptor
   };
 
   // Address array indices for image sample and gather methods. Where an optional entry is missing (either

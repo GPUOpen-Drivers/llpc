@@ -5,28 +5,31 @@
 
 ; CHECK-LABEL: IR Dump After Patch LLVM for workarounds
 
-; GFX900: %.load = call <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15, i32 1, i32 0, <8 x i32> %.desc, i32 0, i32 0)
-; GFX1010: extractelement <8 x i32> %.desc1, i64 3
+; GFX900: extractelement <8 x i32> %.desc, i64 7
+; GFX900: call i32 @llvm.amdgcn.readfirstlane(i32 %{{[0-9]+}})
+; GFX900: insertelement <8 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i64 7
+; GFX900: %.load = call <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15, i32 1, i32 0, <8 x i32> %{{[0-9]+}}, i32 0, i32 0)
+; GFX1010: extractelement <8 x i32> %{{[0-9]+}}, i64 3
 ; GFX1010-NEXT: icmp sge i32
 ; GFX1010-NEXT: and i32
 ; GFX1010-NEXT: select i1
-; GFX1010-NEXT: [[PATCHED_DESC0:%[.a-zA-Z0-9]+]] = insertelement <8 x i32> %.desc1
+; GFX1010-NEXT: [[PATCHED_DESC0:%[.a-zA-Z0-9]+]] = insertelement <8 x i32> %{{[0-9]+}}
 ; GFX1010:  %.load = call <4 x float> @llvm.amdgcn.image.load.1d.v4f32.i32(i32 15, i32 1, <8 x i32> [[PATCHED_DESC0]], i32 0, i32 0)
 
-; GFX900: call void @llvm.amdgcn.image.store.2d.v4f32.i32(<4 x float> zeroinitializer, i32 15, i32 0, i32 0, <8 x i32> %.desc, i32 0, i32 0)
-; GFX1010: call void @llvm.amdgcn.image.store.2d.v4f32.i32(<4 x float> zeroinitializer, i32 15, i32 0, i32 0, <8 x i32> [[PATCHED_DESC0]], i32 0, i32 0)
+; GFX900: call void @llvm.amdgcn.image.store.2d.v4f32.i32(<4 x float> zeroinitializer, i32 15, i32 0, i32 0, <8 x i32> %{{[0-9]+}}, i32 0, i32 0)
+; GFX1010: call void @llvm.amdgcn.image.store.2d.v4f32.i32(<4 x float> zeroinitializer, i32 15, i32 0, i32 0, <8 x i32> %{{[0-9]+}}, i32 0, i32 0)
 
-; GFX900: %.sample = call <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> %.desc, <4 x i32> %.sampler, i1 false, i32 0, i32 0)
-; GFX1010: %.sample = call <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[PATCHED_DESC0]], <4 x i32> %.sampler, i1 false, i32 0, i32 0)
+; GFX900: %.sample = call <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %.sampler, i1 false, i32 0, i32 0)
+; GFX1010: %.sample = call <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %.sampler, i1 false, i32 0, i32 0)
 
-; GFX900: %.gather = call <4 x float> @llvm.amdgcn.image.gather4.l.2d.v4f32.f32(i32 1, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> %.desc, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
-; GFX1010: %.gather = call <4 x float> @llvm.amdgcn.image.gather4.l.2d.v4f32.f32(i32 1, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[PATCHED_DESC0]], <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
+; GFX900: %.gather = call <4 x float> @llvm.amdgcn.image.gather4.l.2d.v4f32.f32(i32 1, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
+; GFX1010: %.gather = call <4 x float> @llvm.amdgcn.image.gather4.l.2d.v4f32.f32(i32 1, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
 
-; GFX900: %.atomic = call i32 @llvm.amdgcn.image.atomic.add.2d.i32.i32(i32 1, i32 0, i32 0, <8 x i32> %.desc, i32 0, i32 0)
-; GFX1010: %.atomic = call i32 @llvm.amdgcn.image.atomic.add.1d.i32.i32(i32 1, i32 0, <8 x i32> [[PATCHED_DESC0]], i32 0, i32 0)
+; GFX900: %.atomic = call i32 @llvm.amdgcn.image.atomic.add.2d.i32.i32(i32 1, i32 0, i32 0, <8 x i32> %{{[0-9]+}}, i32 0, i32 0)
+; GFX1010: %.atomic = call i32 @llvm.amdgcn.image.atomic.add.1d.i32.i32(i32 1, i32 0, <8 x i32> %{{[0-9]+}}, i32 0, i32 0)
 
-; GFX900: %.lod = call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0.000000e+00, float 0.000000e+00, <8 x i32> %.desc, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
-; GFX1010: %.lod = call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[PATCHED_DESC0]], <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
+; GFX900: %.lod = call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
+; GFX1010: %.lod = call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
 
 ; CHECK: [[WFDESC:%[0-9]+]] = call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane
 ; GFX900: [[WFDESC1:%[0-9]+]] = call <8 x i32> @llvm.amdgcn.waterfall.last.use.v8i32(i32 %{{[0-9]+}}, <8 x i32> [[WFDESC]])
@@ -54,18 +57,18 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spi
   %.sampler.ptr = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 0, i32 13)
   %.sampler = load <4 x i32>, <4 x i32> addrspace(4)* %.sampler.ptr, align 16
 
-  %.load = call <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 0, <8 x i32> %.desc, i32 1)
-  call void (...) @lgc.create.image.store(<4 x float> zeroinitializer, i32 1, i32 0, <8 x i32> %.desc, <2 x i32> zeroinitializer)
+  %.load = call <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 128, <8 x i32> %.desc, i32 1)
+  call void (...) @lgc.create.image.store(<4 x float> zeroinitializer, i32 1, i32 128, <8 x i32> %.desc, <2 x i32> zeroinitializer)
 
-  %.sample = call <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 0, <8 x i32> %.desc, <4 x i32> %.sampler, i32 1, <2 x float> zeroinitializer)
-  %.gather = call <4 x float> (...) @lgc.create.image.gather.v4f32(i32 1, i32 0, <8 x i32> %.desc, <4 x i32> %.sampler, i32 37, <2 x float> zeroinitializer, i32 0, float 0.000000e+00)
+  %.sample = call <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 128, <8 x i32> %.desc, <4 x i32> %.sampler, i32 1, <2 x float> zeroinitializer)
+  %.gather = call <4 x float> (...) @lgc.create.image.gather.v4f32(i32 1, i32 128, <8 x i32> %.desc, <4 x i32> %.sampler, i32 37, <2 x float> zeroinitializer, i32 0, float 0.000000e+00)
 
-  %.atomic = call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 0, i32 0, i32 0, <8 x i32> %.desc, i32 0, i32 1) #0
+  %.atomic = call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 0, i32 128, i32 0, <8 x i32> %.desc, i32 0, i32 1) #0
 
-  %.lod = call <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 1, i32 0, <8 x i32> %.desc, <4 x i32> %.sampler, <2 x float> zeroinitializer)
+  %.lod = call <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 1, i32 128, <8 x i32> %.desc, <4 x i32> %.sampler, <2 x float> zeroinitializer)
 
-  %.query.size = call <2 x i32> (...) @lgc.create.image.query.size.v2i32(i32 1, i32 0, <8 x i32> %.desc, i32 0)
-  %.query.levels = call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 0, <8 x i32> %.desc)
+  %.query.size = call <2 x i32> (...) @lgc.create.image.query.size.v2i32(i32 1, i32 128, <8 x i32> %.desc, i32 0)
+  %.query.levels = call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 128, <8 x i32> %.desc)
 
   ; Use a waterfall loop with last.use to test that is also handled correctly
   %.desc2.ptr2 = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 3, i32 4)

@@ -38,7 +38,7 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 0, {{.*}}, {{.*}}, i32 409, float 0x3FB99999A0000000, float 0x3FC99999A0000000, float 0x3FD3333340000000, {{.*}}, i32 2)
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 384, {{.*}}, {{.*}}, i32 409, float 0x3FB99999A0000000, float 0x3FC99999A0000000, float 0x3FD3333340000000, {{.*}}, i32 2)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 409, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, <2 x float> <float 0x3FC99999A0000000, float 0x3FC99999A0000000>, <2 x float> <float 0x3FD3333340000000, float 0x3FD3333340000000>, {{.*}}, <2 x i32> <i32 2, i32 2>)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 2, i32 0)
@@ -50,7 +50,7 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 0, {{.*}}, {{.*}}, i32 409, float 0x3FB99999A0000000, float 0x3FC99999A0000000, float 0x3FD3333340000000, {{.*}}, i32 2)
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 384, {{.*}}, {{.*}}, i32 409, float 0x3FB99999A0000000, float 0x3FC99999A0000000, float 0x3FD3333340000000, {{.*}}, i32 2)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 409, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, <2 x float> <float 0x3FC99999A0000000, float 0x3FC99999A0000000>, <2 x float> <float 0x3FD3333340000000, float 0x3FD3333340000000>, {{.*}}, <2 x i32> <i32 2, i32 2>)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 2, i32 0)
