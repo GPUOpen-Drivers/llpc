@@ -45,7 +45,7 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 0, {{.*}}, {{.*}}, i32 153, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, {{.*}})
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 384, {{.*}}, {{.*}}, i32 153, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, {{.*}})
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 153, <2 x float> %{{[0-9]*}}, <2 x float> %{{[0-9]*}}, <2 x float> %{{[0-9]*}}, {{.*}})
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 2, i32 0)
@@ -61,7 +61,7 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 0, {{.*}}, {{.*}}, i32 153, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, {{.*}})
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 0, i32 384, {{.*}}, {{.*}}, i32 153, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, {{.*}})
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 153, <2 x float> %{{[0-9]*}}, <2 x float> %{{[0-9]*}}, <2 x float> %{{[0-9]*}}, {{.*}})
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 2, i32 0)
