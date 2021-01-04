@@ -36,7 +36,6 @@
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/FileSystem.h"
