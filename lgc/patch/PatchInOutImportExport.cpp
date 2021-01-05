@@ -113,6 +113,19 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)))
     m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
 
+  // Set buffer formats based on specific GFX
+  static const std::array<std::array<unsigned, 4>, 2> BufferFormats = {
+      BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32,
+      BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32,
+      BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32_32,
+      BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32_32_32,
+      BUF_FORMAT_32_FLOAT,
+      BUF_FORMAT_32_32_FLOAT,
+      BUF_FORMAT_32_32_32_FLOAT,
+      BUF_FORMAT_32_32_32_32_FLOAT};
+
+  m_buffFormats = m_gfxIp.major <= 9 ? &BufferFormats[0] : &BufferFormats[1];
+
   // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
   // set by TCS).
   auto pipelineShaders = &getAnalysis<PipelineShaders>();
@@ -3491,21 +3504,6 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(Value *storeValu
 unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &storeValues, unsigned startIdx,
                                                     unsigned valueOffset, Value *bufDesc, Value *storeOffset,
                                                     Value *bufBase, CoherentFlag coherent, Instruction *insertPos) {
-
-  std::vector<unsigned> formats;
-
-  if (m_gfxIp.major <= 9) {
-    formats = {
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32)),
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32)),
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32_32)),
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32_32_32)),
-    };
-  } else if (m_gfxIp.major == 10) {
-    formats = {BUF_FORMAT_32_FLOAT, BUF_FORMAT_32_32_FLOAT, BUF_FORMAT_32_32_32_FLOAT, BUF_FORMAT_32_32_32_32_FLOAT};
-  } else
-    llvm_unreachable("Not implemented!");
-
   Type *storeTys[4] = {
       Type::getInt32Ty(*m_context),
       FixedVectorType::get(Type::getInt32Ty(*m_context), 2),
@@ -3539,12 +3537,12 @@ unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &
       auto writeOffset = BinaryOperator::CreateAdd(
           storeOffset, ConstantInt::get(Type::getInt32Ty(*m_context), valueOffset * 4), "", insertPos);
       Value *args[] = {
-          storeValue,                                                             // vdata
-          bufDesc,                                                                // rsrc
-          writeOffset,                                                            // voffset
-          bufBase,                                                                // soffset
-          ConstantInt::get(Type::getInt32Ty(*m_context), formats[compCount - 1]), // format
-          ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All)         // glc
+          storeValue,                                                                      // vdata
+          bufDesc,                                                                         // rsrc
+          writeOffset,                                                                     // voffset
+          bufBase,                                                                         // soffset
+          ConstantInt::get(Type::getInt32Ty(*m_context), (*m_buffFormats)[compCount - 1]), // format
+          ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All)                  // glc
       };
       emitCall(funcName, Type::getVoidTy(*m_context), args, {}, insertPos);
 
@@ -3568,20 +3566,6 @@ unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &
 unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadValues, unsigned startIdx, Value *bufDesc,
                                                    Value *loadOffset, Value *bufBase, CoherentFlag coherent,
                                                    Instruction *insertPos) {
-  std::vector<unsigned> formats;
-
-  if (m_gfxIp.major <= 9) {
-    formats = {
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32)),
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32)),
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32_32)),
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32_32_32)),
-    };
-  } else if (m_gfxIp.major == 10) {
-    formats = {BUF_FORMAT_32_FLOAT, BUF_FORMAT_32_32_FLOAT, BUF_FORMAT_32_32_32_FLOAT, BUF_FORMAT_32_32_32_32_FLOAT};
-  } else
-    llvm_unreachable("Not implemented!");
-
   Type *loadTyps[4] = {
       Type::getInt32Ty(*m_context),
       FixedVectorType::get(Type::getInt32Ty(*m_context), 2),
@@ -3606,11 +3590,11 @@ unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadVal
       auto writeOffset = BinaryOperator::CreateAdd(
           loadOffset, ConstantInt::get(Type::getInt32Ty(*m_context), startIdx * 4), "", insertPos);
       Value *args[] = {
-          bufDesc,                                                                // rsrc
-          writeOffset,                                                            // voffset
-          bufBase,                                                                // soffset
-          ConstantInt::get(Type::getInt32Ty(*m_context), formats[compCount - 1]), // format
-          ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All)         // glc
+          bufDesc,                                                                         // rsrc
+          writeOffset,                                                                     // voffset
+          bufBase,                                                                         // soffset
+          ConstantInt::get(Type::getInt32Ty(*m_context), (*m_buffFormats)[compCount - 1]), // format
+          ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All)                  // glc
       };
       loadValue = emitCall(funcName, loadTyps[compCount - 1], args, {}, insertPos);
       assert(loadValue);
@@ -3991,7 +3975,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
             ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All) // glc, slc, swz
         };
         emitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_context), args, {}, insertPos);
-      } else if (m_gfxIp.major == 10) {
+      } else {
         CoherentFlag coherent = {};
         coherent.bits.glc = true;
         coherent.bits.slc = true;
@@ -4005,8 +3989,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
             ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All)      // glc, slc, swz
         };
         emitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_context), args, {}, insertPos);
-      } else
-        llvm_unreachable("Not implemented!");
+      }
     }
   }
 }
@@ -4537,30 +4520,16 @@ void PatchInOutImportExport::createTessBufferStoreFunction(StringRef funcName, u
   auto branch = BranchInst::Create(endBlock, tfStoreBlock);
 
   // Create llvm.amdgcn.raw.tbuffer.store.
-  SmallVector<unsigned> formats;
-  if (m_gfxIp.major <= 9) {
-    formats = {
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32)),
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32)),
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32_32)),
-        ((BUF_NUM_FORMAT_FLOAT << 4) | (BUF_DATA_FORMAT_32_32_32_32)),
-    };
-  } else if (m_gfxIp.major == 10) {
-    formats = {BUF_FORMAT_32_FLOAT, BUF_FORMAT_32_32_FLOAT, BUF_FORMAT_32_32_32_FLOAT, BUF_FORMAT_32_32_32_32_FLOAT};
-  } else {
-    llvm_unreachable("Not implemented!");
-  }
-
   CoherentFlag coherent = {};
   coherent.bits.glc = true;
 
   Value *args[] = {
-      tfValue,                                  // vdata
-      tfBufferDesc,                             // rsrc
-      tfBufferOffset,                           // voffset
-      tfBufferBase,                             // soffset
-      builder.getInt32(formats[compCount - 1]), // format
-      builder.getInt32(coherent.u32All)         // glc
+      tfValue,                                           // vdata
+      tfBufferDesc,                                      // rsrc
+      tfBufferOffset,                                    // voffset
+      tfBufferBase,                                      // soffset
+      builder.getInt32((*m_buffFormats)[compCount - 1]), // format
+      builder.getInt32(coherent.u32All)                  // glc
   };
 
   builder.SetInsertPoint(branch);
