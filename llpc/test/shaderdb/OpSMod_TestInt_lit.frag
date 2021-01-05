@@ -22,7 +22,7 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: srem i32
-; SHADERTEST: insertelement <4 x float> <float undef, float 2.000000e+00, float 0.000000e+00, float 1.000000e+00>, float %{{.*}}, i32 0
+; SHADERTEST: insertelement <4 x float> <float {{undef|poison}}, float 2.000000e+00, float 0.000000e+00, float 1.000000e+00>, float %{{.*}}, i32 0
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
