@@ -175,8 +175,9 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Fully prepare the pipeline ABI (must be after optimizations)
   passMgr.add(createPatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
-  if (pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major >= 10 &&
-      (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0) {
+  const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
+                         (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
+  if (canUseNgg) {
     // Stop timer for patching passes and restart timer for optimization passes.
     if (patchTimer) {
       passMgr.add(LgcContext::createStartStopTimer(patchTimer, false));
