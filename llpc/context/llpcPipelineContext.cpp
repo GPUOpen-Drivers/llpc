@@ -288,12 +288,10 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
     // Only set NGG options for a GFX10+ graphics pipeline.
     auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
     const auto &nggState = pipelineInfo->nggState;
-    bool enableNgg = nggState.enableNgg;
-    bool enableGsUse = nggState.enableGsUse;
-    if (!enableNgg)
+    if (!nggState.enableNgg)
       options.nggFlags |= NggFlagDisable;
     else {
-      options.nggFlags = (enableGsUse ? NggFlagEnableGsUse : 0) |
+      options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
                          (nggState.forceNonPassthrough ? NggFlagForceCullingMode : 0) |
 #else
