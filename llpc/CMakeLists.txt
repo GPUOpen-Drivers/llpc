@@ -154,6 +154,7 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/../lgc/interface
     PRIVATE
+        ${PROJECT_SOURCE_DIR}/../include/khronos
         ${PROJECT_SOURCE_DIR}/context
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/lower
@@ -324,6 +325,7 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/../imported/spirv
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/../include
+    ${PROJECT_SOURCE_DIR}/../include/khronos
     ${PROJECT_SOURCE_DIR}/lower
     ${PROJECT_SOURCE_DIR}/patch
     ${PROJECT_SOURCE_DIR}/patch/gfx6/chip

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -1568,11 +1568,8 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
       }
     } else if (strncmp(section->name, Util::Abi::AmdGpuCommentName, sizeof(Util::Abi::AmdGpuCommentName) - 1) == 0) {
       auto name = section->name;
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 475
+
       if (strncmp(name, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)
-#else
-      if (strncmp(name, ".AMDGPU.comment.amdil", sizeof(".AMDGPU.comment.amdil") - 1) == 0)
-#endif
       {
         // Output text based sections
         out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
