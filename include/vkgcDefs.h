@@ -72,6 +72,7 @@
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
 //* |     45.4 | Added disableLicmThreshold, unrollHintThreshold, and dontUnrollHintThreshold to PipelineShaderOptions |
+//* |     45.3 | Add pipelinedump function to enable BeginPipelineDump and GetPipelineName                             |                                                               |
 //* |     45.2 | Add GFX IP plus checker to GfxIpVersion                                                               |
 //* |     45.1 | Add pipelineCacheAccess, stageCacheAccess(es) to GraphicsPipelineBuildOut/ComputePipelineBuildOut     |
 //* |     45.0 | Remove the member 'enableFastLaunch' of NGG state                                                     |

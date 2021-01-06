@@ -1505,6 +1505,57 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
 }
 
 // =====================================================================================================================
+// Translate float type interpolation into corresponding LLVM intrinsics
+//
+// @param builder : The IR builder to to create and insert IR instruction
+// @param attr : The attribute location to access
+// @param channel: The specific attribute channel to access
+// @param coordI: Value of I coordinate
+// @param coordJ: Value of J coordinate
+// @param primMask: Value to fill into m0 register
+Value *PatchInOutImportExport::performFsFloatInterpolation(BuilderBase &builder, Value *attr, Value *channel,
+                                                           Value *coordI, Value *coordJ, Value *primMask) {
+  Value *result = nullptr;
+  Attribute::AttrKind attribs[] = {Attribute::ReadNone};
+  {
+    // llvm.amdgcn.interp.p1(coordI, attr_channel, attr, m0)
+    result = builder.CreateNamedCall("llvm.amdgcn.interp.p1", builder.getFloatTy(), {coordI, channel, attr, primMask},
+                                     attribs);
+
+    // llvm.amdgcn.interp.p2(p1, coordJ, attr_channel, attr, m0)
+    result = builder.CreateNamedCall("llvm.amdgcn.interp.p2", builder.getFloatTy(),
+                                     {result, coordJ, channel, attr, primMask}, attribs);
+  }
+  return result;
+}
+
+// =====================================================================================================================
+// Translate half type interpolation into corresponding LLVM intrinsics
+//
+// @param builder : The IR builder to to create and insert IR instruction
+// @param attr : The attribute location to access
+// @param channel: The specific attribute channel to access
+// @param coordI: Value of I coordinate
+// @param coordJ: Value of J coordinate
+// @param primMask: Value to fill into m0 register
+Value *PatchInOutImportExport::performFsHalfInterpolation(BuilderBase &builder, Value *attr, Value *channel,
+                                                          Value *coordI, Value *coordJ, Value *primMask,
+                                                          Value *highHalf) {
+  Value *result = nullptr;
+  Attribute::AttrKind attribs[] = {Attribute::ReadNone};
+  {
+    // llvm.amdgcn.interp.p1.f16(coordI, attr_channel, attr, highhalf, m0)
+    result = builder.CreateNamedCall("llvm.amdgcn.interp.p1.f16", builder.getFloatTy(),
+                                     {coordI, channel, attr, highHalf, primMask}, attribs);
+
+    // llvm.amdgcn.interp.p2.f16(p1, coordJ, attr_channel, attr, highhalf, m0)
+    result = builder.CreateNamedCall("llvm.amdgcn.interp.p2.f16", builder.getHalfTy(),
+                                     {result, coordJ, channel, attr, highHalf, primMask}, attribs);
+  }
+  return result;
+}
+
+// =====================================================================================================================
 // Patches import calls for generic inputs of fragment shader.
 //
 // @param inputTy : Type of input value
@@ -1520,7 +1571,7 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
 Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned location, Value *locOffset,
                                                          Value *compIdx, Value *auxInterpValue, unsigned interpMode,
                                                          unsigned interpLoc, bool highHalf, Instruction *insertPos) {
-  IRBuilder<> builder(*m_context);
+  BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
   Value *input = UndefValue::get(inputTy);
 
@@ -1556,8 +1607,8 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
   auto primMask = getFunctionArgument(m_entryPoint, entryArgIdxs.primMask);
-  Value *iCoord = nullptr;
-  Value *jCoord = nullptr;
+  Value *coordI = nullptr;
+  Value *coordJ = nullptr;
 
   // Not "flat" and "custom" interpolation
   if (interpMode != InOutInfo::InterpModeFlat && interpMode != InOutInfo::InterpModeCustom) {
@@ -1586,8 +1637,8 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
         }
       }
     }
-    iCoord = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
-    jCoord = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
+    coordI = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
+    coordJ = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
   }
 
   Attribute::AttrKind attribs[] = {Attribute::ReadNone};
@@ -1630,41 +1681,11 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
       (void(basicTy)); // unused
 
       if (bitWidth == 16) {
-        Value *args1[] = {
-            iCoord,                     // i
-            builder.getInt32(i),        // attr_chan
-            loc,                        // attr
-            builder.getInt32(highHalf), // high
-            primMask                    // m0
-        };
-        compValue = emitCall("llvm.amdgcn.interp.p1.f16", Type::getFloatTy(*m_context), args1, attribs, insertPos);
+        compValue = performFsHalfInterpolation(builder, loc, builder.getInt32(i), coordI, coordJ, primMask,
+                                               builder.getInt32(highHalf));
 
-        Value *args2[] = {
-            compValue,                  // p1
-            jCoord,                     // j
-            builder.getInt32(i),        // attr_chan
-            loc,                        // attr
-            builder.getInt32(highHalf), // high
-            primMask                    // m0
-        };
-        compValue = emitCall("llvm.amdgcn.interp.p2.f16", Type::getHalfTy(*m_context), args2, attribs, insertPos);
       } else {
-        Value *args1[] = {
-            iCoord,                                            // i
-            ConstantInt::get(Type::getInt32Ty(*m_context), i), // attr_chan
-            loc,                                               // attr
-            primMask                                           // m0
-        };
-        compValue = emitCall("llvm.amdgcn.interp.p1", Type::getFloatTy(*m_context), args1, attribs, insertPos);
-
-        Value *args2[] = {
-            compValue,                                         // p1
-            jCoord,                                            // j
-            ConstantInt::get(Type::getInt32Ty(*m_context), i), // attr_chan
-            loc,                                               // attr
-            primMask                                           // m0
-        };
-        compValue = emitCall("llvm.amdgcn.interp.p2", Type::getFloatTy(*m_context), args2, attribs, insertPos);
+        compValue = performFsFloatInterpolation(builder, loc, builder.getInt32(i), coordI, coordJ, primMask);
       }
     } else {
       InterpParam interpParam = INTERP_PARAM_P0;
@@ -2342,29 +2363,16 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     auto ij = getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center);
 
     ij = new BitCastInst(ij, FixedVectorType::get(Type::getFloatTy(*m_context), 2), "", insertPos);
-    auto iCoord = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
-    auto jCoord = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
+    auto coordI = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
+    auto coordJ = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
 
     const unsigned elemCount = inputTy->getArrayNumElements();
     assert(elemCount <= MaxClipCullDistanceCount);
 
     for (unsigned i = 0; i < elemCount; ++i) {
-      Value *args1[] = {
-          iCoord,                                                                       // i
-          ConstantInt::get(Type::getInt32Ty(*m_context), (startChannel + i) % 4),       // attr_chan
-          ConstantInt::get(Type::getInt32Ty(*m_context), loc + (startChannel + i) / 4), // attr
-          primMask                                                                      // m0
-      };
-      auto compValue = emitCall("llvm.amdgcn.interp.p1", Type::getFloatTy(*m_context), args1, attribs, insertPos);
-
-      Value *args2[] = {
-          compValue,                                                                    // p1
-          jCoord,                                                                       // j
-          ConstantInt::get(Type::getInt32Ty(*m_context), (startChannel + i) % 4),       // attr_chan
-          ConstantInt::get(Type::getInt32Ty(*m_context), loc + (startChannel + i) / 4), // attr
-          primMask                                                                      // m0
-      };
-      compValue = emitCall("llvm.amdgcn.interp.p2", Type::getFloatTy(*m_context), args2, attribs, insertPos);
+      auto compValue = performFsFloatInterpolation(builder, builder.getInt32(loc + (startChannel + i) / 4) /* attr */,
+                                                   builder.getInt32((startChannel + i) % 4) /* attr_chan */, coordI,
+                                                   coordJ, primMask);
       input = InsertValueInst::Create(input, compValue, {i}, "", insertPos);
     }
 

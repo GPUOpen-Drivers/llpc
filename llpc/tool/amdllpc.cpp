@@ -1156,6 +1156,52 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
 }
 
 // =====================================================================================================================
+// Tries to detect the format of binary data and creates a file extension from it.
+//
+// @param pipelineBin : Data that should be analyzed
+// @returns : The extension of the contained data, e.g. ".elf" or ".s"
+static const char* fileExtFromBinary(const BinaryData &pipelineBin) {
+  if (isElfBinary(pipelineBin.pCode, pipelineBin.codeSize))
+    return ".elf";
+  else if (isLlvmBitcode(pipelineBin.pCode, pipelineBin.codeSize))
+    return ".bc";
+  else if (isIsaText(pipelineBin.pCode, pipelineBin.codeSize))
+    return ".s";
+  else
+    return ".ll";
+}
+
+// =====================================================================================================================
+// Write a binary into a file or to stdout. The file will be overwritten if it exists.
+//
+// @param pipelineBin : Data to be written
+// @param fileName : Name of the file that should be written or "-" for stdout
+static Result writeFile(const BinaryData &pipelineBin, StringRef fileName) {
+  Result result = Result::Success;
+  FILE *outFile = stdout;
+  if (fileName != "-")
+    outFile = fopen(fileName.str().c_str(), "wb");
+
+  if (!outFile) {
+    LLPC_ERRS("Failed to open output file: " << fileName << "\n");
+    result = Result::ErrorUnavailable;
+  }
+
+  if (result == Result::Success) {
+    if (fwrite(pipelineBin.pCode, 1, pipelineBin.codeSize, outFile) != pipelineBin.codeSize)
+      result = Result::ErrorUnavailable;
+
+    if (outFile != stdout && fclose(outFile) != 0)
+      result = Result::ErrorUnavailable;
+
+    if (result != Result::Success) {
+      LLPC_ERRS("Failed to write output file: " << fileName << "\n");
+    }
+  }
+  return result;
+}
+
+// =====================================================================================================================
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 //
 // @param compileInfo : Compilation info of LLPC standalone tool
@@ -1163,49 +1209,18 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
 // appropriate extension; specify "-" to use stdout)
 // @param firstInFile : Name of first input file
 static Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, StringRef firstInFile) {
-  Result result = Result::Success;
-  const BinaryData *pipelineBin = (compileInfo->stageMask & shaderStageToMask(ShaderStageCompute))
-                                      ? &compileInfo->compPipelineOut.pipelineBin
-                                      : &compileInfo->gfxPipelineOut.pipelineBin;
+  const BinaryData &pipelineBin = (compileInfo->stageMask & shaderStageToMask(ShaderStageCompute))
+                                      ? compileInfo->compPipelineOut.pipelineBin
+                                      : compileInfo->gfxPipelineOut.pipelineBin;
   SmallString<64> outFileName(suppliedOutFile);
   if (outFileName.empty()) {
-    // NOTE: The output file name was not specified, so we construct a default file name.  We detect the
-    // output file type and determine the file extension according to it. We are unable to access the
-    // values of the options "-filetype" and "-emit-llvm".
-    const char *ext = ".s";
-    if (isElfBinary(pipelineBin->pCode, pipelineBin->codeSize))
-      ext = ".elf";
-    else if (isLlvmBitcode(pipelineBin->pCode, pipelineBin->codeSize))
-      ext = ".bc";
-    else if (isIsaText(pipelineBin->pCode, pipelineBin->codeSize))
-      ext = ".s";
-    else
-      ext = ".ll";
+    // Detect the data type as we are unable to access the values of the options "-filetype" and "-emit-llvm".
+    const char *ext = fileExtFromBinary(pipelineBin);
     outFileName = sys::path::filename(firstInFile);
     sys::path::replace_extension(outFileName, ext);
   }
 
-  FILE *outFile = stdout;
-  if (outFileName != "-")
-    outFile = fopen(outFileName.c_str(), "wb");
-
-  if (!outFile) {
-    LLPC_ERRS("Failed to open output file: " << outFileName << "\n");
-    result = Result::ErrorUnavailable;
-  }
-
-  if (result == Result::Success) {
-    if (fwrite(pipelineBin->pCode, 1, pipelineBin->codeSize, outFile) != pipelineBin->codeSize)
-      result = Result::ErrorUnavailable;
-
-    if (outFile != stdout && fclose(outFile) != 0)
-      result = Result::ErrorUnavailable;
-
-    if (result != Result::Success) {
-      LLPC_ERRS("Failed to write output file: " << outFileName << "\n");
-    }
-  }
-  return result;
+  return writeFile(pipelineBin, outFileName);
 }
 
 #ifdef WIN_OS

@@ -81,6 +81,13 @@ private:
                                           llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
   llvm::Value *patchGsGenericInputImport(llvm::Type *inputTy, unsigned location, unsigned compIdx,
                                          llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+
+  llvm::Value *performFsFloatInterpolation(BuilderBase &builder, llvm::Value *attr, llvm::Value *channel,
+                                           llvm::Value *coordI, llvm::Value *coordJ, llvm::Value *primMask);
+  llvm::Value *performFsHalfInterpolation(BuilderBase &builder, llvm::Value *attr, llvm::Value *channel,
+                                          llvm::Value *coordI, llvm::Value *coordJ, llvm::Value *primMask,
+                                          llvm::Value *highHalf);
+
   llvm::Value *patchFsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
                                          llvm::Value *compIdx, llvm::Value *auxInterpValue, unsigned interpMode,
                                          unsigned interpLoc, bool highHalf, llvm::Instruction *insertPos);

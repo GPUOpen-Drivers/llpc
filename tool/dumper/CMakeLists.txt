@@ -61,6 +61,7 @@ target_include_directories(dumper
         ${XGL_VKGC_PATH}/include
     PRIVATE
         ${XGL_VKGC_PATH}/include
+        ${XGL_VKGC_PATH}/include/khronos
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
