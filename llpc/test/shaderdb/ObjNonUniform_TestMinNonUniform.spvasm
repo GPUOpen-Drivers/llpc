@@ -1,0 +1,91 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST: call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 2, i32 {{.*}}, i1 true, i1 true)
+
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.4
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 32
+; Schema: 0
+               OpCapability Shader
+               OpCapability ShaderNonUniform
+               OpCapability RuntimeDescriptorArray
+               OpCapability StorageBufferArrayNonUniformIndexing
+               OpExtension "SPV_EXT_descriptor_indexing"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %FragColor %data %rIndex %position %normalpos %vIndex %gIndex %bIndex %aIndex
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 450
+               OpSourceExtension "GL_EXT_nonuniform_qualifier"
+               OpName %main "main"
+               OpName %FragColor "FragColor"
+               OpName %Data "Data"
+               OpMemberName %Data 0 "cnew"
+               OpMemberName %Data 1 "cold"
+               OpName %data "data"
+               OpName %rIndex "rIndex"
+               OpName %position "position"
+               OpName %normalpos "normalpos"
+               OpName %vIndex "vIndex"
+               OpName %gIndex "gIndex"
+               OpName %bIndex "bIndex"
+               OpName %aIndex "aIndex"
+               OpDecorate %FragColor Location 0
+               OpMemberDecorate %Data 0 Offset 0
+               OpMemberDecorate %Data 1 Offset 16
+               OpDecorate %Data Block
+               OpDecorate %data DescriptorSet 0
+               OpDecorate %data Binding 2
+               OpDecorate %rIndex Flat
+               OpDecorate %rIndex Location 3
+               OpDecorate %21 NonUniform
+               OpDecorate %position Flat
+               OpDecorate %position Location 0
+               OpDecorate %normalpos Flat
+               OpDecorate %normalpos Location 1
+               OpDecorate %vIndex Flat
+               OpDecorate %vIndex Location 2
+               OpDecorate %gIndex Flat
+               OpDecorate %gIndex Location 4
+               OpDecorate %bIndex Flat
+               OpDecorate %bIndex Location 5
+               OpDecorate %aIndex Flat
+               OpDecorate %aIndex Location 6
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+  %FragColor = OpVariable %_ptr_Output_v4float Output
+       %Data = OpTypeStruct %v4float %v4float
+%_runtimearr_Data = OpTypeRuntimeArray %Data
+%_ptr_StorageBuffer__runtimearr_Data = OpTypePointer StorageBuffer %_runtimearr_Data
+       %data = OpVariable %_ptr_StorageBuffer__runtimearr_Data StorageBuffer
+        %int = OpTypeInt 32 1
+%_ptr_Input_int = OpTypePointer Input %int
+     %rIndex = OpVariable %_ptr_Input_int Input
+      %int_1 = OpConstant %int 1
+%_ptr_StorageBuffer_v4float = OpTypePointer StorageBuffer %v4float
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+   %position = OpVariable %_ptr_Input_v4float Input
+    %v2float = OpTypeVector %float 2
+%_ptr_Input_v2float = OpTypePointer Input %v2float
+  %normalpos = OpVariable %_ptr_Input_v2float Input
+     %vIndex = OpVariable %_ptr_Input_int Input
+     %gIndex = OpVariable %_ptr_Input_int Input
+     %bIndex = OpVariable %_ptr_Input_int Input
+     %aIndex = OpVariable %_ptr_Input_int Input
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %17 = OpLoad %int %rIndex
+         %18 = OpCopyObject %int %17
+         %21 = OpAccessChain %_ptr_StorageBuffer_v4float %data %18 %int_1
+         %22 = OpLoad %v4float %21
+               OpStore %FragColor %22
+               OpReturn
+               OpFunctionEnd
