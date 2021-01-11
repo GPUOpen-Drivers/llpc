@@ -1737,18 +1737,32 @@ void SpirvLowerGlobal::lowerBufferBlock() {
 
           bool isNonUniform = false;
 
-          // Run the users of the block index to check for any nonuniform calls.
-          for (User *const user : blockIndex->users()) {
+          // Run the users of the GEP to check for any nonuniform calls.
+          for (User *const user : getElemPtr->users()) {
             CallInst *const call = dyn_cast<CallInst>(user);
-
             // If the user is not a call, bail.
             if (!call)
               continue;
-
             // If the call is our non uniform decoration, record we are non uniform.
             if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform)) {
               isNonUniform = true;
               break;
+            }
+          }
+          if (!isNonUniform) {
+            // Run the users of the block index to check for any nonuniform calls.
+            for (User *const user : blockIndex->users()) {
+              CallInst *const call = dyn_cast<CallInst>(user);
+
+              // If the user is not a call, bail.
+              if (!call)
+                continue;
+
+              // If the call is our non uniform decoration, record we are non uniform.
+              if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform)) {
+                isNonUniform = true;
+                break;
+              }
             }
           }
 
