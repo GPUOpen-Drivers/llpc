@@ -494,14 +494,20 @@ template <class Elf> void ElfWriter<Elf>::assembleSymbols() {
   if (m_symSecIdx == InvalidValue)
     return;
   auto strTabSection = &m_sections[m_strtabSecIdx];
-  auto newStrTabSize = 0;
+  unsigned newStrTabSize = 0;
   unsigned symbolCount = 0;
+  ElfSymbol *fragmentIsaSymbol = nullptr;
+  auto fragmentIsaSymbolName =
+      Util::Abi::PipelineAbiSymbolNameStrings[static_cast<unsigned>(Util::Abi::PipelineSymbolType::PsMainEntry)];
   for (auto &symbol : m_symbols) {
     if (symbol.nameOffset == InvalidValue)
       newStrTabSize += strlen(symbol.pSymName) + 1;
 
     if (symbol.secIdx != InvalidValue)
       symbolCount++;
+
+    if (strcmp(symbol.pSymName, fragmentIsaSymbolName) == 0)
+      fragmentIsaSymbol = &symbol;
   }
 
   if (newStrTabSize > 0) {
@@ -551,6 +557,41 @@ template <class Elf> void ElfWriter<Elf>::assembleSymbols() {
 
   assert(symbolSection->secHead.sh_size ==
          static_cast<unsigned>(reinterpret_cast<uint8_t *>(symbolToWrite) - symbolSection->data));
+
+  if (m_relocSecIdx == InvalidValue)
+    return;
+
+  // Update symbol index of relocs and addresses of relocs based on the new offset of fragment section
+  const unsigned fragmentIsaOffset = fragmentIsaSymbol->value;
+  auto relocSection = &m_sections[m_relocSecIdx];
+  auto textSection = &m_sections[m_textSecIdx];
+  auto relocs = reinterpret_cast<typename Elf::Reloc *>(const_cast<uint8_t *>(relocSection->data));
+  const unsigned relocCount = static_cast<unsigned>(relocSection->secHead.sh_size / relocSection->secHead.sh_entsize);
+  for (unsigned idx = 0; idx < relocCount; ++idx) {
+    auto &reloc = relocs[idx];
+    reloc.r_offset += fragmentIsaOffset;
+    // reloc symbol is put at the end of symbol list
+    reloc.r_symbol = symbolCount - 1;
+
+    unsigned *startData = reinterpret_cast<unsigned *>(const_cast<uint8_t *>(textSection->data) + reloc.r_offset);
+    unsigned newData;
+    const unsigned dataSize = sizeof(newData);
+    memcpy(&newData, startData, dataSize);
+    newData += fragmentIsaOffset;
+    memcpy(startData, &newData, dataSize);
+  }
+
+  // Add reloc string to string table
+  unsigned strTabOffset = strTabSection->secHead.sh_size;
+  newStrTabSize = strlen(relocSection->name) + 1;
+  auto strTabBuffer = new uint8_t[strTabSection->secHead.sh_size + newStrTabSize];
+  memcpy(strTabBuffer, strTabSection->data, strTabSection->secHead.sh_size);
+  delete[] strTabSection->data;
+
+  strTabSection->data = strTabBuffer;
+  memcpy(strTabBuffer + strTabOffset, relocSection->name, newStrTabSize);
+  strTabSection->secHead.sh_size += newStrTabSize;
+  relocSection->secHead.sh_name = strTabOffset;
 }
 
 // =====================================================================================================================
@@ -917,13 +958,17 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
     if (!fragmentIsaSymbol)
       continue;
 
-    // Update fragment shader related symbols
-    ElfSymbol *symbol = nullptr;
-    symbol = getSymbol(fragmentSymbol.pSymName);
-    symbol->secIdx = nonFragmentSecIndex;
-    symbol->secName = nullptr;
-    symbol->value = isaOffset + fragmentSymbol.value - fragmentIsaSymbol->value;
-    symbol->size = fragmentSymbol.size;
+    // Create fragment shader related symbols
+    ElfSymbol newSymbol = {};
+    char *newSymName = new char[strlen(fragmentSymbol.pSymName) + 1];
+    strcpy(newSymName, fragmentSymbol.pSymName);
+    newSymbol.pSymName = newSymName;
+    newSymbol.nameOffset = InvalidValue;
+    newSymbol.secIdx = nonFragmentSecIndex;
+    newSymbol.info.all = fragmentSymbol.info.all;
+    newSymbol.secName = nullptr;
+    newSymbol.value = isaOffset + fragmentSymbol.value - fragmentIsaSymbol->value;
+    m_symbols.push_back(newSymbol);
   }
 
   // LLPC doesn't use per pipeline internal table, and LLVM backend doesn't add symbols for disassembly info.
@@ -1018,6 +1063,76 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   fragmentMetaNote = reader.getNote(Util::Abi::MetadataNoteType);
   mergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
   setNote(&newMetaNote);
+
+  // The reloc section of merged Elf comes from fragment Elf
+  if (m_relocSecIdx != InvalidValue) {
+    // Remove reloc section inheriting from nonfragment Elf
+    auto &relocSection = m_sections[m_relocSecIdx];
+    auto relocs = reinterpret_cast<const typename Elf::Reloc *>(relocSection.data);
+    auto symbols = reinterpret_cast<const typename Elf::Symbol *>(m_sections[m_symSecIdx].data);
+    auto relocCount = static_cast<unsigned>(relocSection.secHead.sh_size / relocSection.secHead.sh_entsize);
+    assert(relocCount > 0);
+    const unsigned relocSymIdx = relocs[0].r_symbol;
+    for (unsigned idx = 1; idx < relocCount; ++idx) {
+      assert(relocs[idx].r_symbol == relocSymIdx);
+      (void)(relocSymIdx);
+    }
+
+    const auto &relocSymbol = symbols[relocSymIdx];
+    for (auto symIt = m_symbols.begin(); symIt != m_symbols.end(); ++symIt) {
+      if (symIt->secIdx == relocSymbol.st_shndx && symIt->info.all == relocSymbol.st_info.all &&
+          symIt->nameOffset == relocSymbol.st_name && symIt->size == relocSymbol.st_size &&
+          symIt->value == relocSymbol.st_value) {
+        assert(symIt->nameOffset == 0 && symIt->size == 0 && symIt->value == 0);
+        m_symbols.erase(symIt);
+        break;
+      }
+    }
+
+    delete[] m_sections[m_relocSecIdx].data;
+    m_sections.erase(m_sections.begin() + m_relocSecIdx);
+
+    m_map.clear();
+    for (unsigned secIdx = 0; secIdx < m_sections.size(); ++secIdx) {
+      m_map[m_sections[secIdx].name] = secIdx;
+    }
+    m_symSecIdx = GetSectionIndex(SymTabName);
+    m_strtabSecIdx = GetSectionIndex(StrTabName);
+    m_textSecIdx = GetSectionIndex(TextName);
+    m_noteSecIdx = GetSectionIndex(NoteName);
+    m_relocSecIdx = InvalidValue;
+  }
+
+  auto fragmentRelocSecIndex = reader.GetSectionIndex(RelocName);
+  if (fragmentRelocSecIndex != InvalidValue) {
+    // Append reloc section of fragment Elf to merged section
+    ElfSectionBuffer<Elf64::SectionHeader> *fragmentRelocSection = nullptr;
+    reader.getSectionDataBySectionIndex(fragmentRelocSecIndex, &fragmentRelocSection);
+    assert(fragmentRelocSection);
+    m_relocSecIdx = m_map.size();
+    m_map[RelocName] = m_relocSecIdx;
+    SectionBuffer relocSection = {};
+    relocSection.secHead = fragmentRelocSection->secHead;
+    relocSection.secHead.sh_link = m_symSecIdx;
+    relocSection.name = fragmentRelocSection->name;
+    auto data = new uint8_t[fragmentRelocSection->secHead.sh_size + 1];
+    memcpy(data, fragmentRelocSection->data, fragmentRelocSection->secHead.sh_size);
+    data[fragmentRelocSection->secHead.sh_size] = 0;
+    relocSection.data = data;
+    m_sections.push_back(relocSection);
+
+    auto relocs = reinterpret_cast<const typename Elf::Reloc *>(relocSection.data);
+    auto relocCount = static_cast<unsigned>(relocSection.secHead.sh_size / relocSection.secHead.sh_entsize);
+    assert(relocCount > 0);
+    const unsigned relocSymIdx = relocs[0].r_symbol;
+    for (unsigned idx = 1; idx < relocCount; ++idx) {
+      assert(relocs[idx].r_symbol == relocSymIdx);
+      (void)(relocSymIdx);
+    }
+    ElfSymbol elfSym = {};
+    reader.getSymbol(relocs[0].r_symbol, &elfSym);
+    m_symbols.push_back(elfSym);
+  }
 
   writeToBuffer(pPipelineElf);
 }
