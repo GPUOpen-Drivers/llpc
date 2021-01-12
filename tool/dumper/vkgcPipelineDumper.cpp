@@ -1017,7 +1017,8 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   auto iaState = &pipeline->iaState;
   if (enableNgg)
     hasher->Update(iaState->topology);
-  hasher->Update(iaState->patchControlPoints);
+  if (pipeline->gs.pModuleData || pipeline->tcs.pModuleData || pipeline->tes.pModuleData)
+    hasher->Update(iaState->patchControlPoints);
   hasher->Update(iaState->disableVertexReuse);
   hasher->Update(iaState->switchWinding);
   hasher->Update(iaState->enableMultiView);
