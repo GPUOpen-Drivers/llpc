@@ -7607,14 +7607,12 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
 
   case GLSLstd450UMin: {
     // Unsigned integer minimum
-    Value *cmp = getBuilder()->CreateICmpULT(args[1], args[0]);
-    return getBuilder()->CreateSelect(cmp, args[1], args[0]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::umin, args[0], args[1]);
   }
 
   case GLSLstd450SMin: {
     // Signed integer minimum
-    Value *cmp = getBuilder()->CreateICmpSLT(args[1], args[0]);
-    return getBuilder()->CreateSelect(cmp, args[1], args[0]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::smin, args[0], args[1]);
   }
 
   case GLSLstd450FMax:
@@ -7629,14 +7627,12 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
 
   case GLSLstd450UMax: {
     // Unsigned integer maximum
-    Value *cmp = getBuilder()->CreateICmpULT(args[1], args[0]);
-    return getBuilder()->CreateSelect(cmp, args[0], args[1]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::umax, args[0], args[1]);
   }
 
   case GLSLstd450SMax: {
     // Signed integer maximum
-    Value *cmp = getBuilder()->CreateICmpSLT(args[1], args[0]);
-    return getBuilder()->CreateSelect(cmp, args[0], args[1]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::smax, args[0], args[1]);
   }
 
   case GLSLstd450FClamp:
@@ -7654,18 +7650,14 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
 
   case GLSLstd450UClamp: {
     // Unsigned integer clamp
-    Value *cmp = getBuilder()->CreateICmpUGT(args[1], args[0]);
-    Value *max1 = getBuilder()->CreateSelect(cmp, args[1], args[0]);
-    cmp = getBuilder()->CreateICmpULT(args[2], max1);
-    return getBuilder()->CreateSelect(cmp, args[2], max1);
+    Value *max1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::umax, args[0], args[1]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::umin, args[2], max1);
   }
 
   case GLSLstd450SClamp: {
     // Signed integer clamp
-    Value *cmp = getBuilder()->CreateICmpSGT(args[1], args[0]);
-    Value *max1 = getBuilder()->CreateSelect(cmp, args[1], args[0]);
-    cmp = getBuilder()->CreateICmpSLT(args[2], max1);
-    return getBuilder()->CreateSelect(cmp, args[2], max1);
+    Value *max1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::smax, args[0], args[1]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::smin, args[2], max1);
   }
 
   case GLSLstd450FMix: {
@@ -7929,58 +7921,42 @@ Value *SPIRVToLLVM::transTrinaryMinMaxExtInst(SPIRVExtInst *extInst, BasicBlock 
 
   case UMin3AMD: {
     // Minimum of three unsigned integer values.
-    Value *cond = getBuilder()->CreateICmpULT(args[0], args[1]);
-    Value *min1 = getBuilder()->CreateSelect(cond, args[0], args[1]);
-    cond = getBuilder()->CreateICmpULT(min1, args[2]);
-    return getBuilder()->CreateSelect(cond, min1, args[2]);
+    Value *min1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::umin, args[0], args[1]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::umin, min1, args[2]);
   }
 
   case UMax3AMD: {
     // Maximum of three unsigned integer values.
-    Value *cond = getBuilder()->CreateICmpUGT(args[0], args[1]);
-    Value *max1 = getBuilder()->CreateSelect(cond, args[0], args[1]);
-    cond = getBuilder()->CreateICmpUGT(max1, args[2]);
-    return getBuilder()->CreateSelect(cond, max1, args[2]);
+    Value *max1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::umax, args[0], args[1]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::umax, max1, args[2]);
   }
 
   case UMid3AMD: {
     // Middle of three unsigned integer values.
-    Value *cond = getBuilder()->CreateICmpULT(args[0], args[1]);
-    Value *min1 = getBuilder()->CreateSelect(cond, args[0], args[1]);
-    cond = getBuilder()->CreateICmpUGT(args[0], args[1]);
-    Value *max1 = getBuilder()->CreateSelect(cond, args[0], args[1]);
-    cond = getBuilder()->CreateICmpULT(max1, args[2]);
-    Value *min2 = getBuilder()->CreateSelect(cond, max1, args[2]);
-    cond = getBuilder()->CreateICmpUGT(min1, min2);
-    return getBuilder()->CreateSelect(cond, min1, min2);
+    Value *min1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::umin, args[0], args[1]);
+    Value *max1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::umax, args[0], args[1]);
+    Value *min2 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::umin, max1, args[2]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::umax, min1, min2);
   }
 
   case SMin3AMD: {
     // Minimum of three signed integer values.
-    Value *cond = getBuilder()->CreateICmpSLT(args[0], args[1]);
-    Value *min1 = getBuilder()->CreateSelect(cond, args[0], args[1]);
-    cond = getBuilder()->CreateICmpSLT(min1, args[2]);
-    return getBuilder()->CreateSelect(cond, min1, args[2]);
+    Value *min1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::smin, args[0], args[1]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::smin, min1, args[2]);
   }
 
   case SMax3AMD: {
     // Maximum of three signed integer values.
-    Value *cond = getBuilder()->CreateICmpSGT(args[0], args[1]);
-    Value *max1 = getBuilder()->CreateSelect(cond, args[0], args[1]);
-    cond = getBuilder()->CreateICmpSGT(max1, args[2]);
-    return getBuilder()->CreateSelect(cond, max1, args[2]);
+    Value *max1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::smax, args[0], args[1]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::smax, max1, args[2]);
   }
 
   case SMid3AMD: {
     // Middle of three signed integer values.
-    Value *cond = getBuilder()->CreateICmpSLT(args[0], args[1]);
-    Value *min1 = getBuilder()->CreateSelect(cond, args[0], args[1]);
-    cond = getBuilder()->CreateICmpSGT(args[0], args[1]);
-    Value *max1 = getBuilder()->CreateSelect(cond, args[0], args[1]);
-    cond = getBuilder()->CreateICmpSLT(max1, args[2]);
-    Value *min2 = getBuilder()->CreateSelect(cond, max1, args[2]);
-    cond = getBuilder()->CreateICmpSGT(min1, min2);
-    return getBuilder()->CreateSelect(cond, min1, min2);
+    Value *min1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::smin, args[0], args[1]);
+    Value *max1 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::smax, args[0], args[1]);
+    Value *min2 = getBuilder()->CreateBinaryIntrinsic(Intrinsic::smin, max1, args[2]);
+    return getBuilder()->CreateBinaryIntrinsic(Intrinsic::smax, min1, min2);
   }
 
   default:

@@ -20,10 +20,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = icmp slt i32
-; SHADERTEST: = select i1 %{{.*}}, i32
-; SHADERTEST: = icmp slt <3 x i32>
-; SHADERTEST: = select <3 x i1> %{{.*}}, <3 x i32>
+; SHADERTEST: = call i32 @llvm.smax.i32(i32 %{{[0-9]*}}, i32 %{{[0-9]*}})
+; SHADERTEST: = call <3 x i32> @llvm.smax.v3i32(<3 x i32> %{{[0-9]*}}, <3 x i32> %{{[0-9]*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
