@@ -47,27 +47,19 @@ void main()
 ; SHADERTEST: = call <3 x i64> (...) @lgc.create.sabs.v3i64(<3 x i64>
 ; SHADERTEST: call <3 x i64> (...) @lgc.create.ssign.v3i64(<3 x i64>
 
-; SHADERTEST: %[[UMINCMP:.*]] = icmp ult <3 x i64> %[[UMIN1:.*]], %[[UMIN2:.*]]
-; SHADERTEST: = select <3 x i1> %[[UMINCMP]], <3 x i64> %[[UMIN1]], <3 x i64> %[[UMIN2]]
+; SHADERTEST: = call <3 x i64> @llvm.umin.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
 
-; SHADERTEST: %[[SMINCMP:.*]] = icmp slt <3 x i64> %[[SMIN1:.*]], %[[SMIN2:.*]]
-; SHADERTEST: = select <3 x i1> %[[SMINCMP]], <3 x i64> %[[SMIN1]], <3 x i64> %[[SMIN2]]
+; SHADERTEST: = call <3 x i64> @llvm.smin.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
 
-; SHADERTEST: %[[UMAXCMP:.*]] = icmp ult <3 x i64> %[[UMAX1:.*]], %[[UMAX2:.*]]
-; SHADERTEST: = select <3 x i1> %[[UMAXCMP]], <3 x i64> %[[UMAX2]], <3 x i64> %[[UMAX1]]
+; SHADERTEST: = call <3 x i64> @llvm.umax.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
 
-; SHADERTEST: %[[SMAXCMP:.*]] = icmp slt <3 x i64> %[[SMAX1:.*]], %[[SMAX2:.*]]
-; SHADERTEST: = select <3 x i1> %[[SMAXCMP]], <3 x i64> %[[SMAX2]], <3 x i64> %[[SMAX1]]
+; SHADERTEST: = call <3 x i64> @llvm.smax.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
 
-; SHADERTEST: %[[UCLAMPCMP1:.*]] = icmp ugt <3 x i64> %[[UCLAMP1:.*]], %[[UCLAMP2:.*]]
-; SHADERTEST: %[[UCLAMPMAX:.*]] = select <3 x i1> %[[UCLAMPCMP1]], <3 x i64> %[[UCLAMP1]], <3 x i64> %[[UCLAMP2]]
-; SHADERTEST: %[[UCLAMPCMP2:.*]] = icmp ult <3 x i64> %[[UCLAMP3:.*]], %[[UCLAMPCMP1:.*]]
-; SHADERTEST: = select <3 x i1> %[[UCLAMPCMP2]], <3 x i64> %[[UCLAMP3]], <3 x i64> %[[UCLAMPCMP1]]
+; SHADERTEST:  %[[UCLAMPMAX:.*]] = call <3 x i64> @llvm.umax.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
+; SHADERTEST:  = call <3 x i64> @llvm.umin.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64>  %[[UCLAMPMAX:.*]])
 
-; SHADERTEST: %[[SCLAMPCMP1:.*]] = icmp sgt <3 x i64> %[[SCLAMP1:.*]], %[[SCLAMP2:.*]]
-; SHADERTEST: %[[SCLAMPMAX:.*]] = select <3 x i1> %[[SCLAMPCMP1]], <3 x i64> %[[SCLAMP1]], <3 x i64> %[[SCLAMP2]]
-; SHADERTEST: %[[SCLAMPCMP2:.*]] = icmp slt <3 x i64> %[[SCLAMP3:.*]], %[[SCLAMPCMP1:.*]]
-; SHADERTEST: = select <3 x i1> %[[SCLAMPCMP2]], <3 x i64> %[[SCLAMP3]], <3 x i64> %[[SCLAMPCMP1]]
+; SHADERTEST:  %[[SCLAMPMAX:.*]] = call <3 x i64> @llvm.smax.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
+; SHADERTEST:  = call <3 x i64> @llvm.smin.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64>  %[[SCLAMPMAX:.*]])
 
 ; SHADERTEST: bitcast <3 x double> %{{[0-9]*}} to <3 x i64>
 ; SHADERTEST: bitcast <3 x i64> %{{[0-9]*}} to <3 x double>
