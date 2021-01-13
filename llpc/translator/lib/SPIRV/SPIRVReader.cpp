@@ -7581,6 +7581,13 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     // Split input into fractional and whole number parts.
     Value *wholeNum = getBuilder()->CreateUnaryIntrinsic(Intrinsic::trunc, args[0]);
     Value *fract = getBuilder()->CreateFSub(args[0], wholeNum);
+    // Vectors are represented as arrays in memory, so we need to cast the pointer of array to pointer of vector before
+    // storing.
+    if (wholeNum->getType()->isVectorTy()) {
+      assert(args[1]->getType()->isPointerTy());
+      Type *const castType = wholeNum->getType()->getPointerTo(args[1]->getType()->getPointerAddressSpace());
+      args[1] = getBuilder()->CreateBitCast(args[1], castType);
+    }
     getBuilder()->CreateStore(wholeNum, args[1]);
     return fract;
   }
@@ -7704,6 +7711,13 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     }
     // Frexp: Store the exponent and return the mantissa.
     exp = getBuilder()->CreateSExtOrTrunc(exp, args[1]->getType()->getPointerElementType());
+    // Vectors are represented as arrays in memory, so we need to cast the pointer of array to pointer of vector before
+    // storing.
+    if (exp->getType()->isVectorTy()) {
+      assert(args[1]->getType()->isPointerTy());
+      Type *const castType = exp->getType()->getPointerTo(args[1]->getType()->getPointerAddressSpace());
+      args[1] = getBuilder()->CreateBitCast(args[1], castType);
+    }
     getBuilder()->CreateStore(exp, args[1]);
     return mant;
   }
