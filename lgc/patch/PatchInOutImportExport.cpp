@@ -1938,6 +1938,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
                                                           Value *vertexIdx, Instruction *insertPos) {
   Value *input = UndefValue::get(inputTy);
 
+  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl)->entryArgIdxs.tcs;
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
   auto &inoutUsage = resUsage->inOutUsage;
   auto &builtInInLocMap = inoutUsage.builtInInputLocMap;
@@ -1995,6 +1996,10 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
   }
   case BuiltInInvocationId: {
     input = m_pipelineSysValues.get(m_entryPoint)->getInvocationId();
+    break;
+  }
+  case BuiltInViewIndex: {
+    input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
     break;
   }
   default: {
