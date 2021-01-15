@@ -792,6 +792,9 @@ void SpirvLowerGlobal::lowerOutput() {
 
   if (m_outputProxyMap.empty()) {
     // Skip lowering if there is no output
+    // We need to erase emitCalls, otherwise it will always be there.
+    for (auto emitCall : m_emitCalls)
+      emitCall->eraseFromParent();
     return;
   }
 
