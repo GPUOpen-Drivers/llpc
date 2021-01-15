@@ -1074,6 +1074,9 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize
     case BuiltInInvocationId:
       usage.tcs.invocationId = true;
       break;
+    case BuiltInViewIndex:
+      usage.tcs.viewIndex = true;
+      break;
     default:
       break;
     }

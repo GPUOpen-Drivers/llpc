@@ -1237,6 +1237,9 @@ void PatchResourceCollect::clearInactiveBuiltInInput() {
 
     if (builtInUsage.tcs.invocationId && m_activeInputBuiltIns.find(BuiltInInvocationId) == m_activeInputBuiltIns.end())
       builtInUsage.tcs.invocationId = false;
+
+    if (builtInUsage.tcs.viewIndex && m_activeInputBuiltIns.find(BuiltInViewIndex) == m_activeInputBuiltIns.end())
+      builtInUsage.tcs.viewIndex = false;
   } else if (m_shaderStage == ShaderStageTessEval) {
     if (builtInUsage.tes.pointSizeIn && m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end())
       builtInUsage.tes.pointSizeIn = false;
@@ -1722,6 +1725,9 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (builtInUsage.tcs.cullDistanceIn > 4)
         ++availInMapLoc;
     }
+
+    if (builtInUsage.tcs.viewIndex)
+      inOutUsage.builtInInputLocMap[BuiltInViewIndex] = availInMapLoc++;
 
     // Map built-in outputs to generic ones
     if (nextStage == ShaderStageTessEval) {
