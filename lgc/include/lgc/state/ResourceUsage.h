@@ -187,6 +187,7 @@ struct ResourceUsage {
         unsigned patchVertices : 1;  // Whether gl_PatchVerticesIn is used
         unsigned primitiveId : 1;    // Whether gl_PrimitiveID is used
         unsigned invocationId : 1;   // Whether gl_InvocationID is used
+        unsigned viewIndex : 1;      // Whether gl_ViewIndex is used
         // Output
         unsigned pointSize : 1;      // Whether gl_out[].gl_PointSize is used
         unsigned position : 1;       // Whether gl_out[].gl_Position is used
@@ -472,6 +473,7 @@ struct InterfaceData {
         unsigned relPatchId;     // Relative patch ID (control point ID included)
         unsigned tfBufferBase;   // Base offset of tessellation factor(TF) buffer
         unsigned offChipLdsBase; // Base offset of off-chip LDS buffer
+        unsigned viewIndex;      // View Index
       } tcs;
 
       // Tessellation evaluation shader
