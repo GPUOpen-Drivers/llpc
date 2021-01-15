@@ -1053,8 +1053,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     // that is, VS-TCS, VS-GS (if no tessellation), TES-GS.
 
     // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
-    // merged shader, we place it prior to any other special user data. We do not add it to PAL metadata
-    // for TCS.
+    // merged shader, we place it prior to any other special user data.
     if (m_pipelineState->getInputAssemblyState().enableMultiView) {
       unsigned *argIdx = nullptr;
       auto userDataValue = UserDataMapping::ViewId;
@@ -1063,7 +1062,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
         argIdx = &entryArgIdxs.vs.viewIndex;
         break;
       case ShaderStageTessControl:
-        userDataValue = UserDataMapping::Invalid;
+        argIdx = &entryArgIdxs.tcs.viewIndex;
         break;
       case ShaderStageTessEval:
         argIdx = &entryArgIdxs.tes.viewIndex;

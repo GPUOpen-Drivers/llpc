@@ -1,0 +1,81 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} pipeline before-patching results
+; SHADERTEST:  call i32 @lgc.input.import.builtin.ViewIndex.i32.i32.i32.i32(i32 4440, i32 -1, i32 -1)
+
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 10
+; Bound: 45
+; Schema: 0
+               OpCapability Tessellation
+               OpCapability MultiView
+               OpExtension "SPV_KHR_multiview"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationControl %4 "main" %gl_TessLevelInner %gl_TessLevelOuter %36
+               OpExecutionMode %4 OutputVertices 3
+               OpDecorate %gl_TessLevelInner Patch
+               OpDecorate %gl_TessLevelInner BuiltIn TessLevelInner
+               OpDecorate %gl_TessLevelOuter Patch
+               OpDecorate %gl_TessLevelOuter BuiltIn TessLevelOuter
+               OpDecorate %_arr_uint_uint_8 ArrayStride 4
+               OpMemberDecorate %_struct_31 0 Offset 0
+               OpDecorate %_struct_31 BufferBlock
+               OpDecorate %33 DescriptorSet 0
+               OpDecorate %33 Binding 0
+               OpDecorate %36 BuiltIn ViewIndex
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %uint_2 = OpConstant %uint 2
+%_arr_float_uint_2 = OpTypeArray %float %uint_2
+%_ptr_Output__arr_float_uint_2 = OpTypePointer Output %_arr_float_uint_2
+%gl_TessLevelInner = OpVariable %_ptr_Output__arr_float_uint_2 Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+    %float_1 = OpConstant %float 1
+%_ptr_Output_float = OpTypePointer Output %float
+      %int_1 = OpConstant %int 1
+     %uint_4 = OpConstant %uint 4
+%_arr_float_uint_4 = OpTypeArray %float %uint_4
+%_ptr_Output__arr_float_uint_4 = OpTypePointer Output %_arr_float_uint_4
+%gl_TessLevelOuter = OpVariable %_ptr_Output__arr_float_uint_4 Output
+      %int_2 = OpConstant %int 2
+      %int_3 = OpConstant %int 3
+     %uint_8 = OpConstant %uint 8
+%_arr_uint_uint_8 = OpTypeArray %uint %uint_8
+ %_struct_31 = OpTypeStruct %_arr_uint_uint_8
+%_ptr_Uniform__struct_31 = OpTypePointer Uniform %_struct_31
+         %33 = OpVariable %_ptr_Uniform__struct_31 Uniform
+     %uint_1 = OpConstant %uint 1
+%_ptr_Input_int = OpTypePointer Input %int
+         %36 = OpVariable %_ptr_Input_int Input
+%_ptr_Uniform_uint = OpTypePointer Uniform %uint
+     %uint_0 = OpConstant %uint 0
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+         %16 = OpAccessChain %_ptr_Output_float %gl_TessLevelInner %int_0
+               OpStore %16 %float_1
+         %18 = OpAccessChain %_ptr_Output_float %gl_TessLevelInner %int_1
+               OpStore %18 %float_1
+         %23 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_0
+               OpStore %23 %float_1
+         %24 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_1
+               OpStore %24 %float_1
+         %26 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_2
+               OpStore %26 %float_1
+         %28 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_3
+               OpStore %28 %float_1
+         %37 = OpLoad %int %36
+         %38 = OpBitcast %uint %37
+         %39 = OpIMul %uint %38 %uint_4
+         %40 = OpIAdd %uint %uint_1 %39
+         %42 = OpAccessChain %_ptr_Uniform_uint %33 %int_0 %40
+         %44 = OpAtomicIAdd %uint %42 %uint_1 %uint_0 %uint_1
+               OpReturn
+               OpFunctionEnd
