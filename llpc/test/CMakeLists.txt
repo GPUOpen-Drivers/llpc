@@ -23,7 +23,7 @@
  #
  #######################################################################################################################
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.13)
 
 set(SHADER_TEST_VERSION 0.0.1)
 project(shadertest
@@ -82,15 +82,3 @@ add_lit_testsuite(check-amdllpc "Running the AMDLLPC regression tests"
   DEPENDS
     ${AMDLLPC_TEST_DEPS}
 )
-
-# to enable a custom test target on cmake below 3.11
-# starting with 3.11 "test" is only reserved if ENABLE_TESTING(ON)
-cmake_policy(PUSH)
-if(POLICY CMP0037 AND ${CMAKE_VERSION} VERSION_LESS "3.11.0")
-  cmake_policy(SET CMP0037 OLD)
-endif(POLICY CMP0037 AND ${CMAKE_VERSION} VERSION_LESS "3.11.0")
-add_custom_target(test
-  DEPENDS
-    check-amdllpc
-)
-cmake_policy(POP)
