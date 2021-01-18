@@ -1,0 +1,50 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 10
+; Bound: 19
+; Schema: 0
+               OpCapability Shader
+               OpCapability ShaderNonUniform
+               OpExtension "SPV_EXT_descriptor_indexing"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main"
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 450
+               OpName %main "main"
+               OpName %b "b"
+               OpName %B "B"
+               OpMemberName %B 0 "a"
+               OpName %_ ""
+               OpMemberDecorate %B 0 Offset 0
+               OpDecorate %B BufferBlock
+               OpDecorate %_ DescriptorSet 0
+               OpDecorate %_ Binding 0
+               OpDecorate %18 NonUniform
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+%_ptr_Function_uint = OpTypePointer Function %uint
+          %B = OpTypeStruct %uint
+%_ptr_Uniform_B = OpTypePointer Uniform %B
+          %_ = OpVariable %_ptr_Uniform_B Uniform
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+%_ptr_Uniform_uint = OpTypePointer Uniform %uint
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+          %b = OpVariable %_ptr_Function_uint Function
+         %15 = OpAccessChain %_ptr_Uniform_uint %_ %int_0
+         %16 = OpLoad %uint %15
+               OpStore %b %16
+               OpBranch %17
+         %17 = OpLabel
+         %18 = OpCopyObject %uint %16
+               OpReturn
+               OpFunctionEnd

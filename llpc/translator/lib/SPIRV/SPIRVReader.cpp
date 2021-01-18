@@ -6860,7 +6860,14 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       std::string mangledFuncName(gSPIRVMD::NonUniform);
       appendTypeMangling(nullptr, args, mangledFuncName);
       auto f = getOrCreateFunction(m_m, voidTy, types, mangledFuncName);
-      CallInst::Create(f, args, "", bb);
+      if (bb->getTerminator()) {
+        // NOTE: For OpCopyObject, we use the operand value directly, which may be in another block that already has a
+        // terminator. In this case, insert the call before the terminator.
+        assert(bv->getOpCode() == OpCopyObject);
+        CallInst::Create(f, args, "", bb->getTerminator());
+      } else {
+        CallInst::Create(f, args, "", bb);
+      }
     }
   }
 
