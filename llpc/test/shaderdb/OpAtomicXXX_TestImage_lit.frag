@@ -49,7 +49,7 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 0, i32 0, i32 0, <8 x i32>
-; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 4, i32 1, i32 128, i32 0, <8 x i32>
+; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 4, i32 1, i32 0, i32 0, <8 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 6, i32 1, i32 128, i32 0, <8 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 8, i32 6, i32 0, i32 0, <8 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 9, i32 0, i32 0, i32 0, <8 x i32>
@@ -57,7 +57,7 @@ void main()
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 0, i32 0, i32 0, i32 0, <8 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.compare.swap.i32(i32 0, i32 0, i32 0, <8 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 3, i32 0, i32 0, <8 x i32>
-; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 5, i32 0, i32 128, i32 0, <4 x i32>
+; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 5, i32 0, i32 0, i32 0, <4 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 7, i32 0, i32 128, i32 0, <4 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 8, i32 7, i32 0, i32 0, <8 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 9, i32 3, i32 0, i32 0, <8 x i32>

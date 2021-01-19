@@ -5229,6 +5229,24 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *desc) {
 // Get image and/or sampler descriptors, and get information from the image
 // type.
 void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info) {
+  auto setEnforceReadFirstLaneFlag = [&](SPIRVValue *accessChainInst, bool isImage) {
+    if (!accessChainInst || !isAccessChainOpCode(accessChainInst->getOpCode()))
+      return;
+    SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(accessChainInst);
+    std::vector<SPIRVValue *> spvIndicesVec = spvAccessChain->getIndices();
+    // Check if any index is not a constant, set the flag true
+    bool enforceReadFirstlane = false;
+    for (auto idxIt : spvIndicesVec) {
+      if (idxIt->getOpCode() != OpConstant) {
+        enforceReadFirstlane = true;
+        break;
+      }
+    }
+    if (enforceReadFirstlane)
+      info->flags |= isImage ? lgc::Builder::ImageFlagEnforceReadFirstLaneImage
+                             : lgc::Builder::ImageFlagEnforceReadFirstLaneSampler;
+  };
+
   if (bImageInst->hasDecorate(DecorationNonUniformEXT)) {
     info->flags |= lgc::Builder::ImageFlagNonUniformImage;
     if (bImageInst->getType()->getOpCode() == OpTypeSampledImage)
@@ -5269,11 +5287,9 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
       info->flags |= lgc::Builder::ImageFlagVolatile;
 
     // Set enforce readfirstlane flag for accessing image array
-    if ((info->flags & lgc::Builder::ImageFlagNonUniformImage) == 0 && imageAccessChain) {
-      SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(imageAccessChain);
-      if (!spvAccessChain->getIndices().empty())
-        info->flags |= lgc::Builder::ImageFlagEnforceReadFirstLaneImage;
-    }
+    if ((info->flags & lgc::Builder::ImageFlagNonUniformImage) == 0)
+      setEnforceReadFirstLaneFlag(imageAccessChain, true);
+
     return;
   }
 
@@ -5313,18 +5329,10 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
       imageLoadSrc = static_cast<SPIRVLoad *>(scanBackInst)->getSrc();
   }
   // Set enforce readfirstlane flag for accessing image or sampled image array
-  if ((info->flags & lgc::Builder::ImageFlagNonUniformImage) == 0 && imageLoadSrc &&
-      imageLoadSrc->getOpCode() == OpAccessChain) {
-    SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(imageLoadSrc);
-    if (!spvAccessChain->getIndices().empty())
-      info->flags |= lgc::Builder::ImageFlagEnforceReadFirstLaneImage;
-  }
-  if ((info->flags & lgc::Builder::ImageFlagNonUniformSampler) == 0 && samplerLoadSrc &&
-      samplerLoadSrc->getOpCode() == OpAccessChain) {
-    SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(samplerLoadSrc);
-    if (!spvAccessChain->getIndices().empty())
-      info->flags |= lgc::Builder::ImageFlagEnforceReadFirstLaneSampler;
-  }
+  if ((info->flags & lgc::Builder::ImageFlagNonUniformImage) == 0)
+    setEnforceReadFirstLaneFlag(imageLoadSrc, true);
+  if ((info->flags & lgc::Builder::ImageFlagNonUniformSampler) == 0)
+    setEnforceReadFirstLaneFlag(samplerLoadSrc, false);
 
   // Get the IR value for the image/sampledimage.
   Value *desc = transValue(bImageInst, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());

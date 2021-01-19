@@ -30,9 +30,11 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 384
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 384
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 24
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-COUNT-12: call i32 @llvm.amdgcn.readfirstlane
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: {{%[0-9]*}} = call float @llvm.amdgcn.interp.mov
 ; SHADERTEST: {{%[0-9]*}} = bitcast float {{%[0-9]*}} to i32
