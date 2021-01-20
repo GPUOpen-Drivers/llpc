@@ -35,7 +35,7 @@ project(shadertest
 
 if(DEFINED XGL_LLVM_SRC_PATH)
   # This is a build where LLPC lit testing is integrated into AMDVLK cmake files.
-  set(AMDLLPC_TEST_DEPS amdllpc spvgen FileCheck llvm-objdump count not)
+  set(AMDLLPC_TEST_DEPS amdllpc spvgen FileCheck llvm-objdump llvm-readelf count not)
   set(LLVM_DIR ${XGL_LLVM_SRC_PATH})
 endif()
 

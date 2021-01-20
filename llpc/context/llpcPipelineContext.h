@@ -120,8 +120,16 @@ public:
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
   // Gets pipeline hash code
-  uint64_t getPiplineHashCode() const { return MetroHash::compact64(&m_pipelineHash); }
+  uint64_t getPipelineHashCode() const { return MetroHash::compact64(&m_pipelineHash); }
   uint64_t getCacheHashCode() const { return MetroHash::compact64(&m_cacheHash); }
+
+  // Gets pipeline hash code without compacting it to 64bits-hash. Note that
+  // this method returns the pipeline hash code without compacting it while
+  // `getPipelineHashCode()` returns the hash code compacted to 64bits.
+  MetroHash::Hash getPipelineHashCodeWithoutCompact() const { return m_pipelineHash; }
+
+  // Sets pipeline hash code
+  void setPipelineHashCode(const MetroHash::Hash &hash) { m_pipelineHash = hash; }
 
   virtual ShaderHash getShaderHashCode(ShaderStage stage) const;
 

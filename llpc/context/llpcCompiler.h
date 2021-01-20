@@ -135,6 +135,7 @@ public:
 
   Result buildPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
                                ElfPackage *pipelineElf);
+  MetroHash::Hash convertToHashUsedForCacheLookup(const MetroHash::Hash &hash);
 
   // Gets the count of compiler instance.
   static unsigned getInstanceCount() { return m_instanceCount; }

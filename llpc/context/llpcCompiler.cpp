@@ -47,6 +47,7 @@
 #include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
 #include "lgc/ElfLinker.h"
+#include "lgc/ElfNoteEntryInsertionUtil.h"
 #include "lgc/PassManager.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
@@ -157,6 +158,9 @@ opt<int> ContextReuseLimit("context-reuse-limit",
 
 // -fatal-llvm-errors: Make all LLVM errors fatal
 opt<bool> FatalLlvmErrors("fatal-llvm-errors", cl::desc("Make all LLVM errors fatal"), init(false));
+
+// -add-hash-to-elf
+opt<bool> AddHashToELF("add-hash-to-elf", cl::desc("Add notes to ELF for hash and llpc version"), cl::init(false));
 
 extern opt<bool> EnableOuts;
 
@@ -795,6 +799,12 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 
   ElfPackage elf[ShaderStageNativeStageCount];
   assert(stageCacheAccesses.size() >= shaderInfo.size());
+
+  const MetroHash::Hash originalPipelineHash = context->getPipelineContext()->getPipelineHashCodeWithoutCompact();
+  LLPC_OUTS("LLPC version: " << format("0x%08" PRIx32, LLPC_INTERFACE_MAJOR_VERSION)
+                             << format("%08" PRIx32, LLPC_INTERFACE_MINOR_VERSION) << "\n");
+  LLPC_OUTS("Hash for pipeline cache lookup: " << format_bytes(originalPipelineHash.bytes) << "\n");
+
   for (unsigned stage = 0; stage < shaderInfo.size() && result == Result::Success; ++stage) {
     if (!shaderInfo[stage] || !shaderInfo[stage]->pModuleData)
       continue;
@@ -820,6 +830,12 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 #endif
       userCache = pipelineInfo->cache;
     }
+    // Note that this code updates m_pipelineHash of the pipeline context. It
+    // must be restored before we link the pipeline ELF at the end of this for-loop.
+    auto hashForCacheLookup = convertToHashUsedForCacheLookup(cacheHash);
+    context->getPipelineContext()->setPipelineHashCode(hashForCacheLookup);
+    LLPC_OUTS(format("Hash for %s stage cache lookup: ", getShaderStageName(static_cast<ShaderStage>(stage)))
+              << format_bytes(hashForCacheLookup.bytes) << "\n");
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
     BinaryData elfBin = {};
@@ -869,6 +885,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     LLPC_OUTS("Updating the cache for shader stage " << stage << "\n");
     ReleaseCacheEntry((result == Result::Success), &elfBin, &cacheEntry);
   }
+  context->getPipelineContext()->setPipelineHashCode(originalPipelineHash);
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
   context->getPipelineContext()->setUnlinked(false);
 
@@ -1050,7 +1067,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   Result result = Result::Success;
   unsigned passIndex = 0;
   const PipelineShaderInfo *fragmentShaderInfo = nullptr;
-  TimerProfiler timerProfiler(context->getPiplineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
+  TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
   bool buildingRelocatableElf = context->getPipelineContext()->isUnlinked();
 
   context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
@@ -1259,7 +1276,53 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   context->setDiagnosticHandlerCallBack(nullptr);
 
+  if (result == Result::Success && cl::AddHashToELF) {
+    // Add two note entries:
+    //  1. Note name with "llpc_cache_hash" and note description with the cache hash used for the cache lookup.
+    //  2. Note name with "llpc_version" and note description with the LLPC version - both major and minor.
+    //     The LLPC version information will help us to understand the hash generation algorithm. We have to
+    //     use a correct hash algorithm for the cache lookup.
+    //
+    // For example, if the hash is "4EDBED25 ADF15238 B8C92579 423DA423" and the LLPC version is 45.4
+    // (the major version is 45=0x2D and the minor version is 4=0x04), two new note entries will be
+    //
+    //  Unknown(0)                (name = llpc_cache_hash  size = 16)
+    //        0:4EDBED25 ADF15238 B8C92579 423DA423
+    //  Unknown(0)                (name = llpc_version  size = 8)
+    //        0:0000002D 00000004
+    //
+    const uint32_t llpcVersion[2] = {LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION};
+    auto hash = context->getPipelineContext()->getPipelineHashCodeWithoutCompact();
+
+    // TODO: Use correct note types and names to specify cache hash and llpc version after submiting
+    //       https://github.com/GPUOpen-Drivers/llvm-project/pull/2. Note names must be "AMD".
+    constexpr unsigned noteType = 0;
+
+    NoteEntry notes[] = {
+        {"AMD_llpc_cache_hash", ArrayRef<uint8_t>(hash.bytes), noteType},
+        {"AMD_llpc_version", ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(llpcVersion), sizeof(llpcVersion)),
+         noteType},
+    };
+    addNotesToElf(*pipelineElf, notes, ".note");
+  }
+
   return result;
+}
+
+// =====================================================================================================================
+// Convert the given hash to the actual hash used for the cache lookup. Note
+// that This code is copied from XGL. When XGL changes the hash algorithm for
+// the cache lookup in ICache::GetEntry(), this code must be updated as well.
+//
+// @param hash : Hash generated by PipelineDumper::generateHashForGraphicsPipeline()
+// @returns    : The actual hash used for the cache lookup
+MetroHash::Hash Compiler::convertToHashUsedForCacheLookup(const MetroHash::Hash &hash) {
+  MetroHash::Hash hashForCacheLookup = {};
+  memcpy(&hashForCacheLookup.bytes, &hash.bytes, sizeof(hash));
+  MetroHash128 hash128 = {};
+  hash128.Update(hashForCacheLookup);
+  hash128.Finalize(hashForCacheLookup.bytes);
+  return hashForCacheLookup;
 }
 
 // =====================================================================================================================
@@ -1552,7 +1615,8 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   if (cacheEntryState == ShaderEntryState::Compiling || (m_cache && cacheResult != Result::Success)) {
 
-    GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+    auto pipelineHashForCacheLookup = convertToHashUsedForCacheLookup(pipelineHash);
+    GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHashForCacheLookup, &cacheHash);
     result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildingRelocatableElf, &candidateElf,
                                            pipelineOut->stageCacheAccesses);
 
@@ -1693,7 +1757,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 
   if ((cacheEntryState == ShaderEntryState::Compiling) || (m_cache && (cacheResult != Result::Success))) {
 
-    ComputeContext computeContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+    auto pipelineHashForCacheLookup = convertToHashUsedForCacheLookup(pipelineHash);
+    ComputeContext computeContext(m_gfxIp, pipelineInfo, &pipelineHashForCacheLookup, &cacheHash);
 
     result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildingRelocatableElf, &candidateElf,
                                           &pipelineOut->stageCacheAccess);
