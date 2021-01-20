@@ -786,7 +786,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo,
                                                  ElfPackage *pipelineElf,
                                                  MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
-  LLPC_OUTS("Building pipeline with relocatable shader elf.\n")
+  LLPC_OUTS("Building pipeline with relocatable shader elf.\n");
   Result result = Result::Success;
 
   unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
