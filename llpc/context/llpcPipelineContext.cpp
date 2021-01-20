@@ -256,7 +256,7 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const 
 // @param [in/out] pipeline : Middle-end pipeline object
 void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
   Options options = {};
-  options.hash[0] = getPiplineHashCode();
+  options.hash[0] = getPipelineHashCode();
   options.hash[1] = getCacheHashCode();
 
   options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || getPipelineOptions()->includeDisassembly);

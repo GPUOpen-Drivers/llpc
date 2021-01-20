@@ -307,8 +307,8 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
 
   // Update pipeline hash
   auto pipelineHash = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-  pipelineHash[0] = destDocument.getNode(pContext->getPiplineHashCode());
-  pipelineHash[1] = destDocument.getNode(pContext->getPiplineHashCode());
+  pipelineHash[0] = destDocument.getNode(pContext->getPipelineHashCode());
+  pipelineHash[1] = destDocument.getNode(pContext->getPipelineHashCode());
 
   // List of fragment shader related registers.
   static const unsigned PsRegNumbers[] = {

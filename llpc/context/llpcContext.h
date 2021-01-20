@@ -121,7 +121,7 @@ public:
 
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
-  uint64_t getPiplineHashCode() const { return m_pipelineContext->getPiplineHashCode(); }
+  uint64_t getPipelineHashCode() const { return m_pipelineContext->getPipelineHashCode(); }
 
   uint64_t getCacheHashCode() const { return m_pipelineContext->getCacheHashCode(); }
 
