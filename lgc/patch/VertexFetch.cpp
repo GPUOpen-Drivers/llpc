@@ -134,8 +134,8 @@ private:
   Value *m_vertexIndex = nullptr;       // Vertex index
   Value *m_instanceIndex = nullptr;     // Instance index
 
-  static const VertexCompFormatInfo MVertexCompFormatInfo[]; // Info table of vertex component format
-  static const BufFormat MVertexFormatMap[];                 // Info table of vertex format mapping
+  static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
+  static const unsigned char m_vertexFormatMapGfx10[][8];     // Info table of vertex format mapping for GFX10
 
   // Default values for vertex fetch (<4 x i32> or <8 x i32>)
   struct {
@@ -158,7 +158,7 @@ private:
   { _format, BUF_NUM_FORMAT_FLOAT, BUF_DATA_FORMAT_INVALID, 0, }
 
 // Initializes info table of vertex component format map
-const VertexCompFormatInfo VertexFetchImpl::MVertexCompFormatInfo[] = {
+const VertexCompFormatInfo VertexFetchImpl::m_vertexCompFormatInfo[] = {
     {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BUF_DATA_FORMAT_INVALID
     {1, 1, 1, BUF_DATA_FORMAT_8},          // BUF_DATA_FORMAT_8
     {2, 2, 1, BUF_DATA_FORMAT_16},         // BUF_DATA_FORMAT_16
@@ -176,7 +176,8 @@ const VertexCompFormatInfo VertexFetchImpl::MVertexCompFormatInfo[] = {
     {16, 4, 4, BUF_DATA_FORMAT_32},        // BUF_DATA_FORMAT_32_32_32_32
 };
 
-const BufFormat VertexFetchImpl::MVertexFormatMap[] = {
+// clang-format off
+const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
     // BUF_DATA_FORMAT
     //   BUF_NUM_FORMAT_UNORM
     //   BUF_NUM_FORMAT_SNORM
@@ -188,165 +189,166 @@ const BufFormat VertexFetchImpl::MVertexFormatMap[] = {
     //   BUF_NUM_FORMAT_FLOAT
 
     // BUF_DATA_FORMAT_INVALID
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_8
-    BUF_FORMAT_8_UNORM,
-    BUF_FORMAT_8_SNORM,
-    BUF_FORMAT_8_USCALED,
-    BUF_FORMAT_8_SSCALED,
-    BUF_FORMAT_8_UINT,
-    BUF_FORMAT_8_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
+    {BUF_FORMAT_8_UNORM,
+     BUF_FORMAT_8_SNORM,
+     BUF_FORMAT_8_USCALED,
+     BUF_FORMAT_8_SSCALED,
+     BUF_FORMAT_8_UINT,
+     BUF_FORMAT_8_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_16
-    BUF_FORMAT_16_UNORM,
-    BUF_FORMAT_16_SNORM,
-    BUF_FORMAT_16_USCALED,
-    BUF_FORMAT_16_SSCALED,
-    BUF_FORMAT_16_UINT,
-    BUF_FORMAT_16_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_16_FLOAT,
+    {BUF_FORMAT_16_UNORM,
+     BUF_FORMAT_16_SNORM,
+     BUF_FORMAT_16_USCALED,
+     BUF_FORMAT_16_SSCALED,
+     BUF_FORMAT_16_UINT,
+     BUF_FORMAT_16_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_16_FLOAT},
 
     // BUF_DATA_FORMAT_8_8
-    BUF_FORMAT_8_8_UNORM,
-    BUF_FORMAT_8_8_SNORM,
-    BUF_FORMAT_8_8_USCALED,
-    BUF_FORMAT_8_8_SSCALED,
-    BUF_FORMAT_8_8_UINT,
-    BUF_FORMAT_8_8_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
+    {BUF_FORMAT_8_8_UNORM,
+     BUF_FORMAT_8_8_SNORM,
+     BUF_FORMAT_8_8_USCALED,
+     BUF_FORMAT_8_8_SSCALED,
+     BUF_FORMAT_8_8_UINT,
+     BUF_FORMAT_8_8_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_32
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_32_UINT,
-    BUF_FORMAT_32_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_32_FLOAT,
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_UINT,
+     BUF_FORMAT_32_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_FLOAT},
 
     // BUF_DATA_FORMAT_16_16
-    BUF_FORMAT_16_16_UNORM,
-    BUF_FORMAT_16_16_SNORM,
-    BUF_FORMAT_16_16_USCALED,
-    BUF_FORMAT_16_16_SSCALED,
-    BUF_FORMAT_16_16_UINT,
-    BUF_FORMAT_16_16_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_16_16_FLOAT,
+    {BUF_FORMAT_16_16_UNORM,
+     BUF_FORMAT_16_16_SNORM,
+     BUF_FORMAT_16_16_USCALED,
+     BUF_FORMAT_16_16_SSCALED,
+     BUF_FORMAT_16_16_UINT,
+     BUF_FORMAT_16_16_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_16_16_FLOAT},
 
     // BUF_DATA_FORMAT_10_11_11
-    BUF_FORMAT_10_11_11_UNORM,
-    BUF_FORMAT_10_11_11_SNORM,
-    BUF_FORMAT_10_11_11_USCALED,
-    BUF_FORMAT_10_11_11_SSCALED,
-    BUF_FORMAT_10_11_11_UINT,
-    BUF_FORMAT_10_11_11_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_10_11_11_FLOAT,
+    {BUF_FORMAT_10_11_11_UNORM_GFX10,
+     BUF_FORMAT_10_11_11_SNORM_GFX10,
+     BUF_FORMAT_10_11_11_USCALED_GFX10,
+     BUF_FORMAT_10_11_11_SSCALED_GFX10,
+     BUF_FORMAT_10_11_11_UINT_GFX10,
+     BUF_FORMAT_10_11_11_SINT_GFX10,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_10_11_11_FLOAT_GFX10},
 
     // BUF_DATA_FORMAT_11_11_10
-    BUF_FORMAT_11_11_10_UNORM,
-    BUF_FORMAT_11_11_10_SNORM,
-    BUF_FORMAT_11_11_10_USCALED,
-    BUF_FORMAT_11_11_10_SSCALED,
-    BUF_FORMAT_11_11_10_UINT,
-    BUF_FORMAT_11_11_10_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_11_11_10_FLOAT,
+    {BUF_FORMAT_11_11_10_UNORM_GFX10,
+     BUF_FORMAT_11_11_10_SNORM_GFX10,
+     BUF_FORMAT_11_11_10_USCALED_GFX10,
+     BUF_FORMAT_11_11_10_SSCALED_GFX10,
+     BUF_FORMAT_11_11_10_UINT_GFX10,
+     BUF_FORMAT_11_11_10_SINT_GFX10,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_11_11_10_FLOAT_GFX10},
 
     // BUF_DATA_FORMAT_10_10_10_2
-    BUF_FORMAT_10_10_10_2_UNORM,
-    BUF_FORMAT_10_10_10_2_SNORM,
-    BUF_FORMAT_10_10_10_2_USCALED,
-    BUF_FORMAT_10_10_10_2_SSCALED,
-    BUF_FORMAT_10_10_10_2_UINT,
-    BUF_FORMAT_10_10_10_2_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
+    {BUF_FORMAT_10_10_10_2_UNORM_GFX10,
+     BUF_FORMAT_10_10_10_2_SNORM_GFX10,
+     BUF_FORMAT_10_10_10_2_USCALED_GFX10,
+     BUF_FORMAT_10_10_10_2_SSCALED_GFX10,
+     BUF_FORMAT_10_10_10_2_UINT_GFX10,
+     BUF_FORMAT_10_10_10_2_SINT_GFX10,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_2_10_10_10
-    BUF_FORMAT_2_10_10_10_UNORM,
-    BUF_FORMAT_2_10_10_10_SNORM,
-    BUF_FORMAT_2_10_10_10_USCALED,
-    BUF_FORMAT_2_10_10_10_SSCALED,
-    BUF_FORMAT_2_10_10_10_UINT,
-    BUF_FORMAT_2_10_10_10_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
+    {BUF_FORMAT_2_10_10_10_UNORM_GFX10,
+     BUF_FORMAT_2_10_10_10_SNORM_GFX10,
+     BUF_FORMAT_2_10_10_10_USCALED_GFX10,
+     BUF_FORMAT_2_10_10_10_SSCALED_GFX10,
+     BUF_FORMAT_2_10_10_10_UINT_GFX10,
+     BUF_FORMAT_2_10_10_10_SINT_GFX10,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_8_8_8_8
-    BUF_FORMAT_8_8_8_8_UNORM,
-    BUF_FORMAT_8_8_8_8_SNORM,
-    BUF_FORMAT_8_8_8_8_USCALED,
-    BUF_FORMAT_8_8_8_8_SSCALED,
-    BUF_FORMAT_8_8_8_8_UINT,
-    BUF_FORMAT_8_8_8_8_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
+    {BUF_FORMAT_8_8_8_8_UNORM_GFX10,
+     BUF_FORMAT_8_8_8_8_SNORM_GFX10,
+     BUF_FORMAT_8_8_8_8_USCALED_GFX10,
+     BUF_FORMAT_8_8_8_8_SSCALED_GFX10,
+     BUF_FORMAT_8_8_8_8_UINT_GFX10,
+     BUF_FORMAT_8_8_8_8_SINT_GFX10,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_32_32
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_32_32_UINT,
-    BUF_FORMAT_32_32_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_32_32_FLOAT,
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_UINT_GFX10,
+     BUF_FORMAT_32_32_SINT_GFX10,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_FLOAT_GFX10},
 
     // BUF_DATA_FORMAT_16_16_16_16
-    BUF_FORMAT_16_16_16_16_UNORM,
-    BUF_FORMAT_16_16_16_16_SNORM,
-    BUF_FORMAT_16_16_16_16_USCALED,
-    BUF_FORMAT_16_16_16_16_SSCALED,
-    BUF_FORMAT_16_16_16_16_UINT,
-    BUF_FORMAT_16_16_16_16_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_16_16_16_16_FLOAT,
+    {BUF_FORMAT_16_16_16_16_UNORM_GFX10,
+     BUF_FORMAT_16_16_16_16_SNORM_GFX10,
+     BUF_FORMAT_16_16_16_16_USCALED_GFX10,
+     BUF_FORMAT_16_16_16_16_SSCALED_GFX10,
+     BUF_FORMAT_16_16_16_16_UINT_GFX10,
+     BUF_FORMAT_16_16_16_16_SINT_GFX10,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_16_16_16_16_FLOAT_GFX10},
 
     // BUF_DATA_FORMAT_32_32_32
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_32_32_32_UINT,
-    BUF_FORMAT_32_32_32_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_32_32_32_FLOAT,
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_32_UINT_GFX10,
+     BUF_FORMAT_32_32_32_SINT_GFX10,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_32_FLOAT_GFX10},
 
     // BUF_DATA_FORMAT_32_32_32_32
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_32_32_32_32_UINT,
-    BUF_FORMAT_32_32_32_32_SINT,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_32_32_32_32_FLOAT,
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_32_32_UINT_GFX10,
+     BUF_FORMAT_32_32_32_32_SINT_GFX10,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_32_32_FLOAT_GFX10},
 
     // BUF_DATA_FORMAT_RESERVED_15
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
-    BUF_FORMAT_INVALID,
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
 };
+// clang-format on
 
 char LowerVertexFetch::ID = 0;
 
@@ -869,8 +871,8 @@ VertexFormatInfo VertexFetchImpl::getVertexFormatInfo(const VertexInputDescripti
 //
 // @param dfmt : Date format of vertex buffer
 const VertexCompFormatInfo *VertexFetchImpl::getVertexComponentFormatInfo(unsigned dfmt) {
-  assert(dfmt < sizeof(MVertexCompFormatInfo) / sizeof(MVertexCompFormatInfo[0]));
-  return &MVertexCompFormatInfo[dfmt];
+  assert(dfmt < sizeof(m_vertexCompFormatInfo) / sizeof(m_vertexCompFormatInfo[0]));
+  return &m_vertexCompFormatInfo[dfmt];
 }
 
 // =====================================================================================================================
@@ -884,15 +886,19 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
   unsigned format = 0;
 
   GfxIpVersion gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion();
-  if (gfxIp.major >= 10) {
-    unsigned index = (dfmt * 8) + nfmt;
-    assert(index < sizeof(MVertexFormatMap) / sizeof(MVertexFormatMap[0]));
-    format = MVertexFormatMap[index];
-  } else {
+  switch (gfxIp.major) {
+  default: {
     CombineFormat formatOprd = {};
     formatOprd.bits.dfmt = dfmt;
     formatOprd.bits.nfmt = nfmt;
     format = formatOprd.u32All;
+    break;
+  }
+  case 10:
+    assert(dfmt < sizeof(m_vertexFormatMapGfx10) / sizeof(m_vertexFormatMapGfx10[0]));
+    assert(nfmt < sizeof(m_vertexFormatMapGfx10[0]) / sizeof(m_vertexFormatMapGfx10[0][0]));
+    format = m_vertexFormatMapGfx10[dfmt][nfmt];
+    break;
   }
   return format;
 }
