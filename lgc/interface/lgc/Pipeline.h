@@ -126,71 +126,84 @@ struct Options {
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.
-// The front-end should zero-initialize it with "= {}" in case future changes add new fields.
 struct ShaderOptions {
-  uint64_t hash[2] = {};    // Shader hash to set in ELF PAL metadata
-  unsigned trapPresent = 0; // Indicates a trap handler will be present when this pipeline is executed,
-                            //  and any trap conditions encountered in this shader should call the trap
-                            //  handler. This could include an arithmetic exception, an explicit trap
-                            //  request from the host, or a trap after every instruction when in debug
-                            //  mode.
-  unsigned debugMode = 0;   // When set, this shader should cause the trap handler to be executed after
-                            //  every instruction.  Only valid if trapPresent is set.
-  unsigned allowReZ = 0;    // Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
-                            //  to potentially kill PS waves before launch, and also issues a late-Z test
-                            //  in case the PS kills pixels.  Only valid for pixel shaders.
+  uint64_t hash[2];     // Shader hash to set in ELF PAL metadata
+  unsigned trapPresent; // Indicates a trap handler will be present when this pipeline is executed,
+                        //  and any trap conditions encountered in this shader should call the trap
+                        //  handler. This could include an arithmetic exception, an explicit trap
+                        //  request from the host, or a trap after every instruction when in debug
+                        //  mode.
+  unsigned debugMode;   // When set, this shader should cause the trap handler to be executed after
+                        //  every instruction.  Only valid if trapPresent is set.
+  unsigned allowReZ;    // Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
+                        //  to potentially kill PS waves before launch, and also issues a late-Z test
+                        //  in case the PS kills pixels.  Only valid for pixel shaders.
 
   // Maximum VGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
   // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
-  unsigned vgprLimit = 0;
+  unsigned vgprLimit;
 
   // Maximum SGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
   // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
-  unsigned sgprLimit = 0;
+  unsigned sgprLimit;
 
   /// Overrides the number of CS thread-groups which the GPU will launch per compute-unit. This throttles the
   /// shader, which can sometimes enable more graphics shader work to complete in parallel. A value of zero
   /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
-  unsigned maxThreadGroupsPerComputeUnit = 0;
+  unsigned maxThreadGroupsPerComputeUnit;
 
-  unsigned waveSize = 0;     // Control the number of threads per wavefront (GFX10+)
-  unsigned subgroupSize = 0; // Override for the wave size when the shader uses gl_SubgroupSize, 0 for no override
-  unsigned wgpMode = 0;      // Whether to choose WGP mode or CU mode (GFX10+)
-  WaveBreak waveBreakSize = WaveBreak::None; // Size of region to force the end of a wavefront (GFX10+).
-                                             // Only valid for fragment shaders.
+  unsigned waveSize;       // Control the number of threads per wavefront (GFX10+)
+  unsigned subgroupSize;   // Override for the wave size when the shader uses gl_SubgroupSize, 0 for no override
+  unsigned wgpMode;        // Whether to choose WGP mode or CU mode (GFX10+)
+  WaveBreak waveBreakSize; // Size of region to force the end of a wavefront (GFX10+).
+                           // Only valid for fragment shaders.
 
   // Vector size threshold for load scalarizer. 0 means do not scalarize loads at all.
-  unsigned loadScalarizerThreshold = 0;
+  unsigned loadScalarizerThreshold;
 
   // Use the LLVM backend's SI scheduler instead of the default scheduler.
-  bool useSiScheduler = false;
+  bool useSiScheduler;
 
   // Whether update descriptor root offset in ELF
-  bool updateDescInElf = false;
+  bool updateDescInElf;
 
   // Default unroll threshold for LLVM.
-  unsigned unrollThreshold = 0;
+  unsigned unrollThreshold;
 
   /// Override FP32 denormal handling.
-  DenormalMode fp32DenormalMode = DenormalMode::Auto;
+  DenormalMode fp32DenormalMode;
 
   /// Whether enable adjustment of the fragment shader depth import for the variable shading rate
-  bool adjustDepthImportVrs = false;
+  bool adjustDepthImportVrs;
 
   // Unroll loops by specified amount. 0 is default, 1 is no unroll.
-  unsigned forceLoopUnrollCount = 0;
+  unsigned forceLoopUnrollCount;
 
   // Disable loop unrolling.
-  bool disableLoopUnroll = false;
+  bool disableLoopUnroll;
 
   // Threshold for minimum number of blocks in a loop to disable the LICM pass.
-  unsigned disableLicmThreshold = 0;
+  unsigned disableLicmThreshold;
 
   // Threshold to use for loops with Unroll hint. 0 to use llvm.loop.unroll.full metadata.
-  unsigned unrollHintThreshold = 0;
+  unsigned unrollHintThreshold;
 
   // Threshold to use for loops with DontUnroll hint. 0 to use llvm.loop.unroll.disable metadata.
-  unsigned dontUnrollHintThreshold = 0;
+  unsigned dontUnrollHintThreshold;
+
+  ShaderOptions() {
+    // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from
+    // being written, we force everything to 0, including alignment gaps.
+    memset(this, 0, sizeof(ShaderOptions));
+  }
+
+  ShaderOptions(const ShaderOptions &opts) { *this = opts; }
+
+  ShaderOptions &operator=(const ShaderOptions &opts) {
+    // Copy everything, including data in alignment because this is used to implement the copy constructor
+    memcpy(this, &opts, sizeof(ShaderOptions));
+    return *this;
+  }
 };
 
 // =====================================================================================================================
