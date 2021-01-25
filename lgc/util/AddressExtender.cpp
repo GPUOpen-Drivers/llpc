@@ -84,4 +84,4 @@ Instruction *AddressExtender::getPc() {
     m_pc = cast<Instruction>(pc);
   }
   return m_pc;
-}
+}  
