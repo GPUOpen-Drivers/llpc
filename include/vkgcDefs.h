@@ -296,7 +296,10 @@ struct GfxIpVersion {
   unsigned minor;    ///< Minor version
   unsigned stepping; ///< Stepping info
 
-  // GFX+ checker
+  // GFX IP checkers
+  bool operator==(const GfxIpVersion &rhs) const {
+    return std::tie(major, minor, stepping) == std::tie(rhs.major, rhs.minor, rhs.stepping);
+  }
   bool operator>=(const GfxIpVersion &rhs) const {
     return std::tie(major, minor, stepping) >= std::tie(rhs.major, rhs.minor, rhs.stepping);
   }

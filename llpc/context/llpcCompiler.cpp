@@ -1869,8 +1869,7 @@ Context *Compiler::acquireContext() const {
   for (auto &context : *m_contextPool) {
     GfxIpVersion gfxIpVersion = context->getGfxIpVersion();
 
-    if (!context->isInUse() && gfxIpVersion.major == m_gfxIp.major && gfxIpVersion.minor == m_gfxIp.minor &&
-        gfxIpVersion.stepping == m_gfxIp.stepping) {
+    if (!context->isInUse() && gfxIpVersion == m_gfxIp) {
       // Free up context if it is being used too many times to avoid consuming too much memory.
       int contextReuseLimit = cl::ContextReuseLimit.getValue();
       if (contextReuseLimit > 0 && context->getUseCount() > contextReuseLimit) {

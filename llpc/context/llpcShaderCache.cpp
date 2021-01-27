@@ -861,8 +861,7 @@ bool ShaderCache::isCompatible(const ShaderCacheCreateInfo *createInfo, const Sh
   // Check hash first
   bool isCompatible = (memcmp(&(auxCreateInfo->hash), &m_hash, sizeof(m_hash)) == 0);
 
-  return isCompatible && m_gfxIp.major == auxCreateInfo->gfxIp.major && m_gfxIp.minor == auxCreateInfo->gfxIp.minor &&
-         m_gfxIp.stepping == auxCreateInfo->gfxIp.stepping;
+  return isCompatible && m_gfxIp == auxCreateInfo->gfxIp;
 }
 
 } // namespace Llpc
