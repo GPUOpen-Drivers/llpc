@@ -88,6 +88,9 @@ private:
                                           llvm::Value *coordI, llvm::Value *coordJ, llvm::Value *primMask,
                                           llvm::Value *highHalf);
 
+  llvm::Value *performFsParameterLoad(BuilderBase &builder, llvm::Value *attr, llvm::Value *channel,
+                                      InterpParam interpParam, llvm::Value *primMask, unsigned bitWidth, bool highHalf);
+
   llvm::Value *patchFsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
                                          llvm::Value *compIdx, llvm::Value *auxInterpValue, unsigned interpMode,
                                          unsigned interpLoc, bool highHalf, llvm::Instruction *insertPos);

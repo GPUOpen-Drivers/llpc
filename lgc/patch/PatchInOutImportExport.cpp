@@ -1578,6 +1578,48 @@ Value *PatchInOutImportExport::performFsHalfInterpolation(BuilderBase &builder, 
 }
 
 // =====================================================================================================================
+// Load a specified FS parameter (used under flat/custom interpolation).
+//
+// @param builder : The IR builder to create and insert IR instruction
+// @param attr : The attribute location to access
+// @param channel : The specific attribute channel to access
+// @param interpParam : The parameter to load
+// @param primMask : Value to fill into m0 register
+// @param bitWidth : The bitwidth of required data type
+// @param highHalf : Whether it is a high half in a 16-bit attribute
+Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Value *attr, Value *channel,
+                                                      InterpParam interpParam, Value *primMask, unsigned bitWidth,
+                                                      bool highHalf) {
+  Value *compValue = nullptr;
+
+  {
+    Value *args[] = {
+        builder.getInt32(interpParam), // param
+        channel,                       // attr_chan
+        attr,                          // attr
+        primMask                       // m0
+    };
+    compValue = builder.CreateNamedCall("llvm.amdgcn.interp.mov", builder.getFloatTy(), args, {Attribute::ReadNone});
+  }
+  // Two int8s are also packed like 16-bit in a 32-bit channel in previous export stage
+  if (bitWidth == 8 || bitWidth == 16) {
+    compValue = builder.CreateBitCast(compValue, builder.getInt32Ty());
+
+    if (highHalf)
+      compValue = builder.CreateLShr(compValue, 16);
+
+    if (bitWidth == 8) {
+      compValue = builder.CreateTrunc(compValue, builder.getInt8Ty());
+    } else {
+      compValue = builder.CreateTrunc(compValue, builder.getInt16Ty());
+      compValue = builder.CreateBitCast(compValue, builder.getHalfTy());
+    }
+  }
+
+  return compValue;
+}
+
+// =====================================================================================================================
 // Patches import calls for generic inputs of fragment shader.
 //
 // @param inputTy : Type of input value
@@ -1663,8 +1705,6 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
     coordJ = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
   }
 
-  Attribute::AttrKind attribs[] = {Attribute::ReadNone};
-
   Type *basicTy = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getElementType() : inputTy;
 
   const unsigned compCout = inputTy->isVectorTy() ? cast<FixedVectorType>(inputTy)->getNumElements() : 1;
@@ -1730,30 +1770,13 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
           llvm_unreachable("Should never be called!");
           break;
         }
-      } else
+      } else {
         assert(interpMode == InOutInfo::InterpModeFlat);
-
-      Value *args[] = {
-          ConstantInt::get(Type::getInt32Ty(*m_context), interpParam),                        // param
-          ConstantInt::get(Type::getInt32Ty(*m_context), i % 4),                              // attr_chan
-          locOffset ? loc : ConstantInt::get(Type::getInt32Ty(*m_context), location + i / 4), // attr
-          primMask                                                                            // m0
-      };
-      compValue = emitCall("llvm.amdgcn.interp.mov", Type::getFloatTy(*m_context), args, attribs, insertPos);
-
-      // Two int8s are also packed like 16-bit in a 32-bit channel in previous export stage
-      if (bitWidth == 8 || bitWidth == 16) {
-        compValue = builder.CreateBitCast(compValue, builder.getInt32Ty());
-        if (highHalf)
-          compValue = builder.CreateLShr(compValue, 16);
-
-        if (bitWidth == 8) {
-          compValue = builder.CreateTrunc(compValue, builder.getInt8Ty());
-        } else {
-          compValue = builder.CreateTrunc(compValue, builder.getInt16Ty());
-          compValue = builder.CreateBitCast(compValue, builder.getHalfTy());
-        }
       }
+
+      Value *attr = locOffset ? loc : builder.getInt32(location + i / 4);
+      compValue =
+          performFsParameterLoad(builder, attr, builder.getInt32(i % 4), interpParam, primMask, bitWidth, highHalf);
     }
 
     if (numChannels == 1)
