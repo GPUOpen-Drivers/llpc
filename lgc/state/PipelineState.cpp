@@ -1090,7 +1090,7 @@ unsigned PipelineState::getShaderWaveSize(ShaderStage stage) {
 
     // Experimental data from performance tuning show that wave64 is more efficient than wave32 in most cases for CS
     // on GFX10.3. Hence, set the wave size to wave64 by default.
-    if (getTargetInfo().getGfxIpVersion().minor >= 3 && stage == ShaderStageCompute)
+    if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}) && stage == ShaderStageCompute)
       waveSize = 64;
 
     unsigned waveSizeOption = getShaderOptions(stage).waveSize;

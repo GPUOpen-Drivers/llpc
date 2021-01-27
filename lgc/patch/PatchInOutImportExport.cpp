@@ -2410,7 +2410,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   }
   case BuiltInShadingRate: {
     // gl_ShadingRate is not supported on pre-GFX10.3
-    assert(m_gfxIp.major > 10 || (m_gfxIp.major == 10 && m_gfxIp.minor >= 3));
+    assert(m_gfxIp >= GfxIpVersion({10, 3}));
 
     input = getShadingRate(insertPos);
     break;
@@ -2826,7 +2826,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     // NOTE: Only last non-fragment shader stage has to export the value of gl_PrimitiveShadingRate.
     if (!m_hasTs && !m_hasGs) {
       // gl_PrimitiveShadingRate is not supported on pre-GFX10.3
-      assert(m_gfxIp.major > 10 || (m_gfxIp.major == 10 && m_gfxIp.minor >= 3));
+      assert(m_gfxIp >= GfxIpVersion({10, 3}));
       addExportInstForBuiltInOutput(output, builtInId, insertPos);
     }
 
@@ -3255,7 +3255,7 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(Value *output, u
   }
   case BuiltInPrimitiveShadingRate: {
     // gl_PrimitiveShadingRate is not supported on pre-GFX10.3
-    assert(m_gfxIp.major > 10 || (m_gfxIp.major == 10 && m_gfxIp.minor >= 3));
+    assert(m_gfxIp >= GfxIpVersion({10, 3}));
     addExportInstForBuiltInOutput(output, builtInId, insertPos);
 
     break;
@@ -5135,7 +5135,7 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
   }
   case BuiltInPrimitiveShadingRate: {
     // gl_PrimitiveShadingRate is not supported on pre-GFX10.3
-    assert(m_gfxIp.major > 10 || (m_gfxIp.major == 10 && m_gfxIp.minor >= 3));
+    assert(m_gfxIp >= GfxIpVersion({10, 3}));
 
     exportShadingRate(output, insertPos);
     break;
