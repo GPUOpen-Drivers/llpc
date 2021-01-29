@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2020-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -48,7 +48,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
 )
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_RENOIR  "LLPC support for Renoir?"    ON)
+
 option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 ### Compiler Options ###################################################################################################
@@ -69,10 +69,7 @@ target_compile_definitions(LLVMlgc PRIVATE
         CHIP_HDR_NAVI21
         )
 
-if (LLPC_BUILD_RENOIR)
-    target_compile_definitions(LLVMlgc PRIVATE LLPC_BUILD_RENOIR)
-    target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
-endif()
+target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
 
 if(WIN32)
     target_compile_definitions(LLVMlgc PRIVATE

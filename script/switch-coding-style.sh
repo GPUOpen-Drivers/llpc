@@ -2,7 +2,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2020-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -249,6 +249,7 @@ CheckOptions:
 : # Remove redundant comparisons with false or nullptr
 removeRedundantComparisons() {
   echo "
+ # Do not modify SPIRV library.
 HeaderFilterRegex: '.*/vfx/vfx.*\\.h|.*/vkgc.*\\.h|.*/lgc/include/.*\.h|.*/include/llpc\.h|.*/context/llpc[^/]*\.h|.*/util/llpc[^/]*\.h|.*/lower/llpc[^/]*\.h|.*/builder/llpc[^/]*\.h|.*/patch.*/llpc[^/]*\.h|.*/tool/*\.h'
 CheckOptions:
 " > .clang-tidy
@@ -259,6 +260,7 @@ CheckOptions:
 : # Remove redundant parentheses
 removeRedundantParentheses() {
   echo "
+ # Do not modify SPIRV library.
 HeaderFilterRegex: '.*/vfx/vfx.*\\.h|.*/vkgc.*\\.h|.*/lgc/include/.*\.h|.*/include/llpc\.h|.*/context/llpc[^/]*\.h|.*/util/llpc[^/]*\.h|.*/lower/llpc[^/]*\.h|.*/builder/llpc[^/]*\.h|.*/patch.*/llpc[^/]*\.h|.*/tool/*\.h'
 CheckOptions:
 " > .clang-tidy
@@ -269,6 +271,7 @@ CheckOptions:
 : # Move inline comments on parameters
 moveInlineComments() {
   echo "
+ # Do not modify SPIRV library.
 HeaderFilterRegex: '.*/vfx/vfx.*\\.h|.*/vkgc.*\\.h|.*/lgc/include/.*\.h|.*/include/vkgcDefs\.h|.*/include/llpc\.h|.*/context/llpc[^/]*\.h|.*/util/llpc[^/]*\.h|.*/lower/llpc[^/]*\.h|.*/builder/llpc[^/]*\.h|.*/patch.*/llpc[^/]*\.h|.*/tool/*\.h'
 CheckOptions:
 " > .clang-tidy

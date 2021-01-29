@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -267,7 +267,7 @@ struct ResourceUsage {
         unsigned viewportIndex : 1;    // Whether gl_ViewportIndex is used
         unsigned helperInvocation : 1; // Whether gl_HelperInvocation is used
         unsigned viewIndex : 1;        // Whether gl_ViewIndex is used
-        unsigned shadingRate : 1; // Whether gl_ShadingRate is used
+        unsigned shadingRate : 1;      // Whether gl_ShadingRate is used
         unsigned baryCoordNoPersp : 1;         // Whether gl_BaryCoordNoPersp is used (AMD extension)
         unsigned baryCoordNoPerspCentroid : 1; // Whether gl_BaryCoordNoPerspCentroid is used (AMD extension)
         unsigned baryCoordNoPerspSample : 1;   // Whether gl_BaryCoordNoPerspSample is used (AMD extension)

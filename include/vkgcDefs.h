@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -65,58 +65,57 @@
 #define LLPC_ENABLE_SHADER_CACHE 0
 #endif
 
-//**
-//**********************************************************************************************************************
-//* @page VersionHistory
-//* %Version History
-//* | %Version | Change Description                                                                                    |
-//* | -------- | ----------------------------------------------------------------------------------------------------- |
-//* |     45.4 | Added disableLicmThreshold, unrollHintThreshold, and dontUnrollHintThreshold to PipelineShaderOptions |
-//* |     45.3 | Add pipelinedump function to enable BeginPipelineDump and GetPipelineName                             |                                                               |
-//* |     45.2 | Add GFX IP plus checker to GfxIpVersion                                                               |
-//* |     45.1 | Add pipelineCacheAccess, stageCacheAccess(es) to GraphicsPipelineBuildOut/ComputePipelineBuildOut     |
-//* |     45.0 | Remove the member 'enableFastLaunch' of NGG state                                                     |
-//* |     44.0 | Rename the member 'forceNonPassthrough' of NGG state to 'forceCullingMode'                            |
-//* |     43.1 | Add disableImageResourceCheck in PipelineOptions                                                      |
-//* |     43.0 | Removed the enumerant WaveBreakSize::DrawTime                                                         |
-//* |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
-//* |     41.0 | Moved resource mapping from ShaderPipeline-level to Pipeline-level                                    |
-//* |     40.4 | Added fp32DenormalMode in PipelineShaderOptions to allow overriding SPIR-V denormal settings          |
-//* |     40.3 | Added ICache interface                                                                                |
-//* |     40.2 | Added extendedRobustness in PipelineOptions to support VK_EXT_robustness2                             |
-//* |     40.1 | Added disableLoopUnroll to PipelineShaderOptions                                                      |
-//* |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
-//* |     39.0 | Non-LLPC-specific XGL code should #include vkcgDefs.h instead of llpc.h                               |
-//* |     38.3 | Added shadowDescriptorTableUsage and shadowDescriptorTablePtrHigh to PipelineOptions                  |
-//* |     38.2 | Added scalarThreshold to PipelineShaderOptions                                                        |
-//* |     38.1 | Added unrollThreshold to PipelineShaderOptions                                                        |
-//* |     38.0 | Removed CreateShaderCache in ICompiler and pShaderCache in pipeline build info                        |
-//* |     37.0 | Removed the -enable-dynamic-loop-unroll option                                                        |
-//* |     36.0 | Add 128 bit hash as clientHash in PipelineShaderOptions                                               |
-//* |     35.0 | Added disableLicm to PipelineShaderOptions                                                            |
-//* |     33.0 | Add enableLoadScalarizer option into PipelineShaderOptions.                                           |
-//* |     32.0 | Add ShaderModuleOptions in ShaderModuleBuildInfo                                                      |
-//* |     31.0 | Add PipelineShaderOptions::allowVaryWaveSize                                                          |
-//* |     30.0 | Removed PipelineOptions::autoLayoutDesc                                                               |
-//* |     28.0 | Added reconfigWorkgroupLayout to PipelineOptions and useSiScheduler to PipelineShaderOptions          |
-//* |     27.0 | Remove the includeIrBinary option from PipelineOptions as only IR disassembly is now dumped           |
-//* |     25.0 | Add includeIrBinary option into PipelineOptions for including IR binaries into ELF files.             |
-//* |     24.0 | Add forceLoopUnrollCount option into PipelineShaderOptions.                                           |
-//* |     23.0 | Add flag robustBufferAccess in PipelineOptions to check out of bounds of private array.               |
-//* |     22.0 | Internal revision.                                                                                    |
-//* |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.   |
-//*
-//* IMPORTANT NOTE: All structures defined in this file that are passed as input into LLPC must be zero-initialized
-//* with code such as the following before filling in the structure's fields:
-//*
-//*   SomeLlpcStructure someLlpcStructure = {};
-//*
-//* It is sufficient to perform this initialization on a containing structure.
-//*
-//* LLPC is free to add new fields to such structures without increasing the client interface major version, as long
-//* as setting the newly added fields to a 0 (or false) value is safe, i.e. it preserves the old behavior.
-//*
-//**/
+//
+// -------------------------------------------------------------------------------------------------------------------
+//  @page VersionHistory
+//  %Version History
+//  | %Version | Change Description                                                                                    |
+//  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     45.4 | Added disableLicmThreshold, unrollHintThreshold, and dontUnrollHintThreshold to PipelineShaderOptions |
+//  |     45.3 | Add pipelinedump function to enable BeginPipelineDump and GetPipelineName                             |                                                               |
+//  |     45.2 | Add GFX IP plus checker to GfxIpVersion                                                               |
+//  |     45.1 | Add pipelineCacheAccess, stageCacheAccess(es) to GraphicsPipelineBuildOut/ComputePipelineBuildOut     |
+//  |     45.0 | Remove the member 'enableFastLaunch' of NGG state                                                     |
+//  |     44.0 | Rename the member 'forceNonPassthrough' of NGG state to 'forceCullingMode'                            |
+//  |     43.1 | Add disableImageResourceCheck in PipelineOptions                                                      |
+//  |     43.0 | Removed the enumerant WaveBreakSize::DrawTime                                                         |
+//  |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
+//  |     41.0 | Moved resource mapping from ShaderPipeline-level to Pipeline-level                                    |
+//  |     40.4 | Added fp32DenormalMode in PipelineShaderOptions to allow overriding SPIR-V denormal settings          |
+//  |     40.3 | Added ICache interface                                                                                |
+//  |     40.2 | Added extendedRobustness in PipelineOptions to support VK_EXT_robustness2                             |
+//  |     40.1 | Added disableLoopUnroll to PipelineShaderOptions                                                      |
+//  |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
+//  |     39.0 | Non-LLPC-specific XGL code should #include vkcgDefs.h instead of llpc.h                               |
+//  |     38.3 | Added shadowDescriptorTableUsage and shadowDescriptorTablePtrHigh to PipelineOptions                  |
+//  |     38.2 | Added scalarThreshold to PipelineShaderOptions                                                        |
+//  |     38.1 | Added unrollThreshold to PipelineShaderOptions                                                        |
+//  |     38.0 | Removed CreateShaderCache in ICompiler and pShaderCache in pipeline build info                        |
+//  |     37.0 | Removed the -enable-dynamic-loop-unroll option                                                        |
+//  |     36.0 | Add 128 bit hash as clientHash in PipelineShaderOptions                                               |
+//  |     35.0 | Added disableLicm to PipelineShaderOptions                                                            |
+//  |     33.0 | Add enableLoadScalarizer option into PipelineShaderOptions.                                           |
+//  |     32.0 | Add ShaderModuleOptions in ShaderModuleBuildInfo                                                      |
+//  |     31.0 | Add PipelineShaderOptions::allowVaryWaveSize                                                          |
+//  |     30.0 | Removed PipelineOptions::autoLayoutDesc                                                               |
+//  |     28.0 | Added reconfigWorkgroupLayout to PipelineOptions and useSiScheduler to PipelineShaderOptions          |
+//  |     27.0 | Remove the includeIrBinary option from PipelineOptions as only IR disassembly is now dumped           |
+//  |     25.0 | Add includeIrBinary option into PipelineOptions for including IR binaries into ELF files.             |
+//  |     24.0 | Add forceLoopUnrollCount option into PipelineShaderOptions.                                           |
+//  |     23.0 | Add flag robustBufferAccess in PipelineOptions to check out of bounds of private array.               |
+//  |     22.0 | Internal revision.                                                                                    |
+//  |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.   |
+//
+//  IMPORTANT NOTE: All structures defined in this file that are passed as input into LLPC must be zero-initialized
+//  with code such as the following before filling in the structure's fields:
+//
+//    SomeLlpcStructure someLlpcStructure = {};
+//
+//  It is sufficient to perform this initialization on a containing structure.
+//
+//  LLPC is free to add new fields to such structures without increasing the client interface major version, as long
+//  as setting the newly added fields to a 0 (or false) value is safe, i.e. it preserves the old behavior.
+//
 
 namespace Vkgc {
 

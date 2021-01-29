@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -2201,6 +2201,7 @@ namespace Gfx101
     constexpr unsigned int mmVGT_TF_RING_SIZE_UMD                             = 0xC24E;
 } // namespace Gfx101
 
+#if CHIP_HDR_NAVI21
 namespace Gfx102Plus
 {
     constexpr unsigned int mmCB_CGTT_SCLK_CTRL1                               = 0xF0A9;
@@ -2216,7 +2217,9 @@ namespace Gfx102Plus
     constexpr unsigned int mmSPI_WF_LIFETIME_STATUS_21                        = 0x24CB;
     constexpr unsigned int mmSX_PS_DOWNCONVERT_CONTROL                        = 0xA1D4;
 } // namespace Gfx102Plus
+#endif
 
+#if CHIP_HDR_NAVI21
 namespace Gfx103
 {
     constexpr unsigned int mmATC_PERFCOUNTER0_CFG                             = 0x0C10;
@@ -2266,7 +2269,9 @@ namespace Gfx103
     constexpr unsigned int mmVGT_CACHE_INVALIDATION                           = 0x2220;
     constexpr unsigned int mmVGT_DISPATCH_DRAW_INDEX                          = 0xA2DD;
 } // namespace Gfx103
+#endif
 
+#if CHIP_HDR_NAVI21
 namespace Gfx103Plus
 {
     constexpr unsigned int mmDB_RESERVED_REG_1                                = 0xA016;
@@ -2331,6 +2336,7 @@ namespace Gfx103Plus
     constexpr unsigned int mmSQ_SHADER_TMA_HI                                 = 0x2315;
     constexpr unsigned int mmSQ_SHADER_TMA_LO                                 = 0x2314;
 } // namespace Gfx103Plus
+#endif
 
 namespace Gfx10Core
 {
@@ -2892,11 +2898,13 @@ namespace Gfx10Plus
     constexpr unsigned int mmUTCL1_PERFCOUNTER1_SELECT                        = 0xDD64;
 } // namespace Gfx10Plus
 
+#if CHIP_HDR_NAVI21
 namespace Gfx10Vrs
 {
     constexpr unsigned int mmDB_VRS_OVERRIDE_CNTL                             = 0xA019;
     constexpr unsigned int mmSPI_CONFIG_PS_CU_EN                              = 0x2452;
 } // namespace Gfx10Vrs
+#endif
 
 namespace NotGfx10
 {
@@ -2977,6 +2985,7 @@ namespace Nv10
     constexpr unsigned int mmSPI_SHADER_PREF_PRI_CNTR_CTRL_VS                 = 0x2C71;
 } // namespace Nv10
 
+#if CHIP_HDR_NAVI21
 namespace Nv21
 {
     constexpr unsigned int mmCHCG_PERFCOUNTER0_HI                             = 0xD3C9;
@@ -3270,6 +3279,7 @@ namespace Nv21
     constexpr unsigned int mmVGT_TF_RING_SIZE                                 = 0x2223;
     constexpr unsigned int mmVGT_TF_RING_SIZE_UMD                             = 0xC24E;
 } // namespace Nv21
+#endif
 
 namespace Oss50
 {

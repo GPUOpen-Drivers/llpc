@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -55,7 +55,7 @@ enum class CompSetting : unsigned {
 // Represents the manager of fragment color export operations.
 class FragColorExport {
 public:
-  FragColorExport(llvm::LLVMContext *context);
+  FragColorExport(llvm::LLVMContext *context, PipelineState *pipelineState);
 
   llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorTarget, BuilderBase &builder,
                                              ExportFormat expFmt, const bool signedness);
@@ -74,7 +74,8 @@ private:
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToInt(llvm::Value *value, bool signedness, BuilderBase &builder) const;
 
-  llvm::LLVMContext *m_context; // LLVM context
+  llvm::LLVMContext *m_context;   // LLVM context
+  PipelineState *m_pipelineState; // The pipeline state
 };
 
 } // namespace lgc
