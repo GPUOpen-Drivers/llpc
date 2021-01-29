@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -149,7 +149,8 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
 #warning[!amd-gfx] Scratch bounds checks not supported
 #else
     // The backend currently only supports bounds checks for entry points
-    if (gfxIp.major >= 9 && isShaderEntryPoint(&*func))
+    if (gfxIp.major >= 9 &&
+        isShaderEntryPoint(&*func))
       targetFeatures += ",+enable-scratch-bounds-checks";
 #endif
 

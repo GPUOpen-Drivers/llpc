@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2020-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -43,10 +43,6 @@ if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
 endif()
 if(ICD_BUILD_LLPC)
     target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
-endif()
-
-if(VKI_BUILD_GFX103)
-  target_compile_definitions(dumper PRIVATE VKI_BUILD_GFX103)
 endif()
 
 target_link_libraries(dumper PUBLIC metrohash)

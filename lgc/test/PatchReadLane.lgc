@@ -119,7 +119,6 @@ attributes #0 = { nounwind }
 attributes #1 = { nounwind readnone }
 attributes #2 = { convergent nounwind readnone willreturn }
 
-
 !llpc.compute.mode = !{!0}
 !lgc.unlinked = !{!1}
 !lgc.options = !{!2}

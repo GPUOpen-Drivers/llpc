@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -182,9 +182,6 @@ endif()
 # CMAKE-TODO: Figure out a better way to do this.
 target_include_directories(llpc PRIVATE ${XGL_ICD_PATH}/api/include/khronos)
 
-if(VKI_BUILD_GFX103)
-  target_compile_definitions(llpc PRIVATE LLPC_BUILD_GFX103)
-endif()
 if(VKI_KHR_FRAGMENT_SHADING_RATE)
   target_compile_definitions(llpc PRIVATE VKI_KHR_FRAGMENT_SHADING_RATE)
 endif()

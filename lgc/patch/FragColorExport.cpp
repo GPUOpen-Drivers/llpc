@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -94,9 +94,10 @@ namespace lgc {
 
 // =====================================================================================================================
 //
+// @param context : LLVM context
 // @param pipelineState : Pipeline state
-// @param module : LLVM module
-FragColorExport::FragColorExport(LLVMContext *context) : m_context(context) {
+FragColorExport::FragColorExport(LLVMContext *context, PipelineState *pipelineState)
+    : m_context(context), m_pipelineState(pipelineState) {
 }
 
 // =====================================================================================================================
@@ -482,7 +483,7 @@ bool LowerFragColorExport::runOnModule(Module &module) {
     return true;
   }
 
-  FragColorExport fragColorExport(m_context);
+  FragColorExport fragColorExport(m_context, m_pipelineState);
   SmallVector<ExportFormat, 8> exportFormat(MaxColorTargets + 1, EXP_FORMAT_ZERO);
   for (auto &exp : m_info) {
     exportFormat[exp.hwColorTarget] =
@@ -593,7 +594,7 @@ Value *LowerFragColorExport::getOutputValue(ArrayRef<Value *> expFragColor, unsi
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
 void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder) {
-  std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(m_context));
+  std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(m_context, m_pipelineState));
   SmallVector<CallInst *, 8> colorExports;
 
   // Collect all of the exports in the fragment shader
@@ -852,6 +853,8 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
       lastExport = builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args);
     }
   }
+
+  (void(m_pipelineState)); // Unused
 
   if (!lastExport && dummyExport) {
     lastExport = FragColorExport::addDummyExport(builder);

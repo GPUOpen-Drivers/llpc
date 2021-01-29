@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2020 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -93,9 +93,9 @@ private:
   // Low part of global internal table pointer
   static const unsigned EntryArgIdxInternalTablePtrLow = 0;
 
-  PipelineState *m_pipelineState;     // Pipeline state
-  GlobalVariable *m_lds = nullptr;    // Global variable representing LDS
-  Value *m_gsVsRingBufDesc = nullptr; // Descriptor for GS-VS ring
+  PipelineState *m_pipelineState;                                       // Pipeline state
+  GlobalVariable *m_lds = nullptr;                                      // Global variable representing LDS
+  Value *m_gsVsRingBufDesc = nullptr;                                   // Descriptor for GS-VS ring
   DenseMap<unsigned, unsigned> m_newLocByteSizesMapArray[MaxGsStreams]; // The byte sizes of the output value at the
                                                                         // mapped location for each stream
 };
