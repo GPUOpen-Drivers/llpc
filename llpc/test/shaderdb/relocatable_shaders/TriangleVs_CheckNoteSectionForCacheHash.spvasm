@@ -2,17 +2,24 @@
 ; adds a note section to ELF, which contains the cache hash and the version of LLPC.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -gfxip=9 -unlinked -enable-relocatable-shader-elf -v -o %t.elf -add-hash-to-elf %s > %t.log && llvm-readelf -a %t.elf >> %t.log && cat %t.log | FileCheck --check-prefixes=CHECK %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -gfxip=9 -unlinked -enable-relocatable-shader-elf -v -o %t.elf -add-hash-to-elf %s > %t.log \
+; RUN:   && llvm-readelf -a %t.elf >> %t.log \
+; RUN:   && cat %t.log | FileCheck --check-prefix=CHECK %s
 
-; CHECK: LLPC version: 0x0000[[major_ver0:[a-z0-9][a-z0-9]]][[major_ver1:[a-z0-9][a-z0-9]]]0000[[minor_ver0:[a-z0-9][a-z0-9]]][[minor_ver1:[a-z0-9][a-z0-9]]]
-; CHECK: Hash for vertex stage cache lookup: [[hash0:[a-z0-9][a-z0-9]]][[hash1:[a-z0-9][a-z0-9]]][[hash2:[a-z0-9][a-z0-9]]][[hash3:[a-z0-9][a-z0-9]]]
+; CHECK-LABEL: {{^// LLPC}} calculated hash results (graphics pipeline)
+; CHECK-LABEL: Building pipeline with relocatable shader elf.
+; CHECK-NEXT:  LLPC version: [[llpc_version:([0-9a-f]{2} ?){8}]]{{$}}
+; CHECK:       Hash for vertex stage cache lookup: [[llpc_vert_hash:([a-f0-9]{2} ?){16}]]{{$}}
+; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 
-; CHECK: Displaying notes found in: .note
-; CHECK:   Owner                Data size 	Description
-; CHECK:   llpc_cache_hash      0x00000010	Unknown note type: (0x00000000)
-; CHECK:    description data: [[hash0]] [[hash1]] [[hash2]] [[hash3]]
-; CHECK:   llpc_version         0x00000008	Unknown note type: (0x00000000)
-; CHECK:    description data: [[major_ver1]] [[major_ver0]] 00 00 [[minor_ver1]] [[minor_ver0]] 00 00
+; CHECK-LABEL: {{^=====}}  AMDLLPC SUCCESS  =====
+
+; CHECK-LABEL: {{^Displaying}} notes found in: .note
+; CHECK-NEXT:  Owner Data size Description
+; CHECK-LABEL: {{^ +AMD_llpc_cache_hash *}} 0x00000010 Unknown note type: (0x00000000)
+; CHECK-NEXT:  description data: [[llpc_vert_hash]]{{$}}
+; CHECK-LABEL: {{^ +AMD_llpc_version *}} 0x00000008	Unknown note type: (0x00000000)
+; CHECK-NEXT:  description data: [[llpc_version]]{{$}}
 ; END_SHADERTEST
 
 ; SPIR-V
