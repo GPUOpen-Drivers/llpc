@@ -778,6 +778,17 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 }
 
 // =====================================================================================================================
+// Helper function for formatting raw data into a space-separated string of lowercase hex bytes.
+// This assumes Little Endian byte order, e.g., {45u} --> `2d 00 00 00`.
+//
+// @param data : Raw data to be formatted.
+// @returns : Formatted bytes, e.g., `ab c4 ef 00`.
+template <typename T> static FormattedBytes formatBytesLittleEndian(ArrayRef<T> data) {
+  ArrayRef<uint8_t> bytes(reinterpret_cast<const uint8_t *>(data.data()), data.size() * sizeof(T));
+  return format_bytes(bytes, /* FirstByteOffset = */ None, /* NumPerLine = */ 16, /* ByteGroupSize = */ 1);
+}
+
+// =====================================================================================================================
 // Builds a pipeline by building relocatable elf files and linking them together.  The relocatable elf files will be
 // cached for future use.
 //
@@ -801,9 +812,11 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   assert(stageCacheAccesses.size() >= shaderInfo.size());
 
   const MetroHash::Hash originalPipelineHash = context->getPipelineContext()->getPipelineHashCodeWithoutCompact();
-  LLPC_OUTS("LLPC version: " << format("0x%08" PRIx32, LLPC_INTERFACE_MAJOR_VERSION)
-                             << format("%08" PRIx32, LLPC_INTERFACE_MINOR_VERSION) << "\n");
-  LLPC_OUTS("Hash for pipeline cache lookup: " << format_bytes(originalPipelineHash.bytes) << "\n");
+  // Print log in the format matching llvm-readefl to simplify testing.
+  LLPC_OUTS("LLPC version: " << formatBytesLittleEndian<uint32_t>(
+                                    {LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION})
+                             << "\n");
+  LLPC_OUTS("Hash for pipeline cache lookup: " << formatBytesLittleEndian<uint8_t>(originalPipelineHash.bytes) << "\n");
 
   for (unsigned stage = 0; stage < shaderInfo.size() && result == Result::Success; ++stage) {
     if (!shaderInfo[stage] || !shaderInfo[stage]->pModuleData)
@@ -834,8 +847,8 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     // must be restored before we link the pipeline ELF at the end of this for-loop.
     auto hashForCacheLookup = convertToHashUsedForCacheLookup(cacheHash);
     context->getPipelineContext()->setPipelineHashCode(hashForCacheLookup);
-    LLPC_OUTS(format("Hash for %s stage cache lookup: ", getShaderStageName(static_cast<ShaderStage>(stage)))
-              << format_bytes(hashForCacheLookup.bytes) << "\n");
+    LLPC_OUTS("Hash for " << getShaderStageName(static_cast<ShaderStage>(stage)) << " stage cache lookup: "
+                          << formatBytesLittleEndian<uint8_t>(hashForCacheLookup.bytes) << "\n");
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
     BinaryData elfBin = {};
@@ -1278,17 +1291,17 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   if (result == Result::Success && cl::AddHashToELF) {
     // Add two note entries:
-    //  1. Note name with "llpc_cache_hash" and note description with the cache hash used for the cache lookup.
-    //  2. Note name with "llpc_version" and note description with the LLPC version - both major and minor.
+    //  1. Note with name "AMD_llpc_cache_hash" and description containing the cache hash used for the cache lookup.
+    //  2. Note with name "AMD_llpc_version" and description containing the LLPC major and minor version.
     //     The LLPC version information will help us to understand the hash generation algorithm. We have to
     //     use a correct hash algorithm for the cache lookup.
     //
     // For example, if the hash is "4EDBED25 ADF15238 B8C92579 423DA423" and the LLPC version is 45.4
     // (the major version is 45=0x2D and the minor version is 4=0x04), two new note entries will be
     //
-    //  Unknown(0)                (name = llpc_cache_hash  size = 16)
+    //  Unknown(0)                (name = AMD_llpc_cache_hash  size = 16)
     //        0:4EDBED25 ADF15238 B8C92579 423DA423
-    //  Unknown(0)                (name = llpc_version  size = 8)
+    //  Unknown(0)                (name = AMD_llpc_version  size = 8)
     //        0:0000002D 00000004
     //
     const uint32_t llpcVersion[2] = {LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION};
@@ -1557,7 +1570,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   if (result == Result::Success && EnableOuts()) {
     LLPC_OUTS("===============================================================================\n");
-    LLPC_OUTS("// LLPC calculated hash results (graphics pipline)\n\n");
+    LLPC_OUTS("// LLPC calculated hash results (graphics pipeline)\n\n");
     LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::compact64(&pipelineHash)) << "\n");
     for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
       const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo[stage]->pModuleData);
@@ -1706,7 +1719,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(pipelineInfo->cs.pModuleData);
     auto moduleHash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
     LLPC_OUTS("\n===============================================================================\n");
-    LLPC_OUTS("// LLPC calculated hash results (compute pipline)\n\n");
+    LLPC_OUTS("// LLPC calculated hash results (compute pipeline)\n\n");
     LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::compact64(&pipelineHash)) << "\n");
     LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(ShaderStageCompute, true))
               << format("0x%016" PRIX64, MetroHash::compact64(moduleHash)) << "\n");
