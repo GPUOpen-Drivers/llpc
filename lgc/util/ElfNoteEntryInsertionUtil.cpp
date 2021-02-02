@@ -76,23 +76,17 @@ void addNoteEntry(const NoteEntry &noteEntry, BinaryStreamWriter &noteEntryWrite
   noteHeader.n_namesz = noteEntry.name.size() + 1;
   noteHeader.n_descsz = noteEntry.desc.size();
   noteHeader.n_type = static_cast<ELF::Elf64_Word>(noteEntry.type);
-  auto error = noteEntryWriter.writeObject(noteHeader);
-  (void)error;
-  assert(!error);
+  cantFail(noteEntryWriter.writeObject(noteHeader));
 
   // Write the note name terminated by zero and zeros for the alignment.
-  error = noteEntryWriter.writeCString(noteEntry.name);
-  assert(!error);
-  error = noteEntryWriter.writeFixedString(StringRef(
-      ZerosForNoteAlign, offsetToAlignment(noteEntryWriter.getLength(), Align::Constant<NoteHeader::Align>())));
-  assert(!error);
+  cantFail(noteEntryWriter.writeCString(noteEntry.name));
+  cantFail(noteEntryWriter.writeFixedString(StringRef(
+      ZerosForNoteAlign, offsetToAlignment(noteEntryWriter.getLength(), Align::Constant<NoteHeader::Align>()))));
 
   // Write the note description and zeros for the alignment.
-  error = noteEntryWriter.writeBytes(noteEntry.desc);
-  assert(!error);
-  error = noteEntryWriter.writeFixedString(StringRef(
-      ZerosForNoteAlign, offsetToAlignment(noteEntryWriter.getLength(), Align::Constant<NoteHeader::Align>())));
-  assert(!error);
+  cantFail(noteEntryWriter.writeBytes(noteEntry.desc));
+  cantFail(noteEntryWriter.writeFixedString(StringRef(
+      ZerosForNoteAlign, offsetToAlignment(noteEntryWriter.getLength(), Align::Constant<NoteHeader::Align>()))));
 }
 
 // =====================================================================================================================
@@ -104,10 +98,8 @@ void addNoteEntry(const NoteEntry &noteEntry, BinaryStreamWriter &noteEntryWrite
 void writeNoteEntriesToByteStream(ArrayRef<NoteEntry> notes, const ELF::Elf64_Off newNoteEntryOffset,
                                   AppendingBinaryByteStream &noteEntryStream) {
   BinaryStreamWriter noteEntryWriter(noteEntryStream);
-  auto error = noteEntryWriter.writeFixedString(
-      StringRef(ZerosForNoteAlign, offsetToAlignment(newNoteEntryOffset, Align::Constant<NoteHeader::Align>())));
-  (void)error;
-  assert(!error);
+  cantFail(noteEntryWriter.writeFixedString(
+      StringRef(ZerosForNoteAlign, offsetToAlignment(newNoteEntryOffset, Align::Constant<NoteHeader::Align>()))));
 
   // Write the note entries.
   for (const auto &note : notes)
@@ -162,9 +154,7 @@ void insertContentsToELF(SmallVectorImpl<char> &elf, const ELF::Elf64_Off insert
   // Write the new contents.
   raw_svector_ostream elfStream(elf);
   ArrayRef<uint8_t> contents;
-  auto error = elfContentStream.readBytes(0, elfContentStream.getLength(), contents);
-  (void)error;
-  assert(!error);
+  cantFail(elfContentStream.readBytes(0, elfContentStream.getLength(), contents));
   elfStream << toStringRef(contents);
 
   // Write the sections after the insertion offset.
