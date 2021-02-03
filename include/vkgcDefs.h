@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 45
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 4
+#define LLPC_INTERFACE_MINOR_VERSION 5
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,6 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     45.5 | Added new enum type ThreadGroupSwizzleMode for thread group swizzling for compute shaders             |
 //  |     45.4 | Added disableLicmThreshold, unrollHintThreshold, and dontUnrollHintThreshold to PipelineShaderOptions |
 //  |     45.3 | Add pipelinedump function to enable BeginPipelineDump and GetPipelineName                             |                                                               |
 //  |     45.2 | Add GFX IP plus checker to GfxIpVersion                                                               |
@@ -330,10 +331,10 @@ struct ExtendedRobustness {
 
 /// Represents the tiling modes for compute shader thread group swizzling
 enum class ThreadGroupSwizzleMode : unsigned {
-  Default = 0,      ///< Use the default layout. There is no swizzling conducted.
-  _4x4    = 1,      ///< The tile size is 4x4 in x and y dimension.
-  _8x8    = 2,      ///< The tile size is 8x8 in x and y dimension.
-  _16x16  = 3,      ///< The tile size is 16x16 in x and y dimension.
+  Default = 0, ///< Use the default layout. There is no swizzling conducted.
+  _4x4 = 1,    ///< The tile size is 4x4 in x and y dimension.
+  _8x8 = 2,    ///< The tile size is 8x8 in x and y dimension.
+  _16x16 = 3,  ///< The tile size is 16x16 in x and y dimension.
   Count
 };
 
