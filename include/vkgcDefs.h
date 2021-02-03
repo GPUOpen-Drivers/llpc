@@ -328,6 +328,15 @@ struct ExtendedRobustness {
                            ///  valid to access and acts as if the descriptor is bounded to nothing.
 };
 
+/// Represents the tiling modes for compute shader thread group swizzling
+enum class ThreadGroupSwizzleMode : unsigned {
+  Default = 0,      ///< Use the default layout. There is no swizzling conducted.
+  _4x4    = 1,      ///< The tile size is 4x4 in x and y dimension.
+  _8x8    = 2,      ///< The tile size is 8x8 in x and y dimension.
+  _16x16  = 3,      ///< The tile size is 16x16 in x and y dimension.
+  Count
+};
+
 /// Represents per pipeline options.
 struct PipelineOptions {
   bool includeDisassembly;         ///< If set, the disassembly for all compiled shaders will be included in
