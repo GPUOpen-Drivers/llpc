@@ -467,7 +467,6 @@ struct DrawState {
   VkPolygonMode polygonMode;                            // Triangle rendering mode
   VkCullModeFlags cullMode;                             // Fragment culling mode
   VkFrontFace frontFace;                                // Front-facing triangle orientation
-  unsigned depthBiasEnable;                             // Whether to bias fragment depth values
   unsigned patchControlPoints;                          // Patch control points
   IUFValue dispatch;                                    // Dispatch dimension
   unsigned width;                                       // Window width
@@ -502,7 +501,6 @@ struct GraphicsPipelineState {
   VkPolygonMode polygonMode;        // Triangle rendering mode
   VkCullModeFlags cullMode;         // Fragment culling mode
   VkFrontFace frontFace;            // Front-facing triangle orientation
-  unsigned depthBiasEnable;         // Whether to bias fragment depth values
   unsigned patchControlPoints;      // Patch control points
   unsigned deviceIndex;             // Device index for device group
   unsigned disableVertexReuse;      // Disable reusing vertex shader output for indexed draws

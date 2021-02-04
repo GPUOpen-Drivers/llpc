@@ -367,7 +367,6 @@ public:
     state.polygonMode = VK_POLYGON_MODE_FILL;
     state.cullMode = VK_CULL_MODE_NONE;
     state.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    state.depthBiasEnable = false;
     state.width = 0;
     state.height = 0;
     state.lineWidth = 1.0f;
@@ -386,7 +385,6 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, polygonMode, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, cullMode, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, frontFace, MemberTypeEnum, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, depthBiasEnable, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, patchControlPoints, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, dispatch, MemberTypeIVec4, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, width, MemberTypeInt, false);

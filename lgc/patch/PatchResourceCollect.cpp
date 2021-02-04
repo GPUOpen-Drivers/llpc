@@ -417,8 +417,6 @@ void PatchResourceCollect::buildNggCullingControlRegister(NggControl &nggControl
   PaSuScModeCntl paSuScModeCntl;
   paSuScModeCntl.u32All = 0;
 
-  paSuScModeCntl.bits.polyOffsetFrontEnable = rsState.depthBiasEnable;
-  paSuScModeCntl.bits.polyOffsetBackEnable = rsState.depthBiasEnable;
   paSuScModeCntl.bits.multiPrimIbEna = true;
 
   paSuScModeCntl.bits.polyMode = rsState.polygonMode != PolygonModeFill;

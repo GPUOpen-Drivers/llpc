@@ -770,7 +770,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "polygonMode = " << pipelineInfo->rsState.polygonMode << "\n";
   dumpFile << "cullMode = " << static_cast<VkCullModeFlagBits>(pipelineInfo->rsState.cullMode) << "\n";
   dumpFile << "frontFace = " << pipelineInfo->rsState.frontFace << "\n";
-  dumpFile << "depthBiasEnable = " << pipelineInfo->rsState.depthBiasEnable << "\n";
   dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
   dumpFile << "dualSourceBlendEnable = " << pipelineInfo->cbState.dualSourceBlendEnable << "\n";
 
@@ -1045,7 +1044,6 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     hasher->Update(rsState->polygonMode);
     hasher->Update(rsState->cullMode);
     hasher->Update(rsState->frontFace);
-    hasher->Update(rsState->depthBiasEnable);
   }
 
   if (isCacheHash) {

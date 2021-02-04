@@ -414,7 +414,6 @@ struct RasterizerState {
   PolygonMode polygonMode;          // Polygon mode
   CullModeFlags cullMode;           // Fragment culling mode
   unsigned frontFaceClockwise;      // Front-facing triangle orientation: false=counter, true=clockwise
-  unsigned depthBiasEnable;         // Whether to bias fragment depth values
 };
 
 // =====================================================================================================================
