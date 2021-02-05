@@ -841,6 +841,8 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
       dumpFile << "divisor[" << i << "].divisor = " << divisor->divisor << "\n";
     }
   }
+
+  dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
 }
 
 // =====================================================================================================================
@@ -1032,6 +1034,8 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     auto rsState = &pipeline->rsState;
     hasher->Update(rsState->rasterizerDiscardEnable);
   }
+
+  hasher->Update(pipeline->dynamicVertexStride);
 
   bool passthroughMode = !nggState->enableVertexReuse && !nggState->enableBackfaceCulling &&
                          !nggState->enableFrustumCulling && !nggState->enableBoxFilterCulling &&
