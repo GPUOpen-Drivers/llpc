@@ -655,7 +655,9 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
   rasterizerState.polygonMode = static_cast<PolygonMode>(inputRsState.polygonMode);
   rasterizerState.cullMode = static_cast<CullModeFlags>(inputRsState.cullMode);
   rasterizerState.frontFaceClockwise = inputRsState.frontFace != VK_FRONT_FACE_COUNTER_CLOCKWISE;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
   rasterizerState.depthBiasEnable = inputRsState.depthBiasEnable;
+#endif
 
   pipeline->setGraphicsState(inputAssemblyState, viewportState, rasterizerState);
 }

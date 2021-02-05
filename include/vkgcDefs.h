@@ -44,7 +44,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 45
+#define LLPC_INTERFACE_MAJOR_VERSION 46
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 4
@@ -735,7 +735,9 @@ struct GraphicsPipelineBuildInfo {
     VkPolygonMode polygonMode;    ///< Triangle rendering mode
     VkCullModeFlags cullMode;     ///< Fragment culling mode
     VkFrontFace frontFace;        ///< Front-facing triangle orientation
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
     bool depthBiasEnable;         ///< Whether to bias fragment depth values
+#endif
   } rsState;                      ///< Rasterizer State
 
   struct {
