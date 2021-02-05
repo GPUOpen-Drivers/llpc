@@ -525,6 +525,8 @@ struct GraphicsPipelineState {
   Vkgc::NggState nggState; // NGG state
 
   ColorBuffer colorBuffer[Vkgc::MaxColorTargets]; // Color target state.
+
+  bool dynamicVertexStride; // Dynamic Vertex input Stride is enabled
 };
 
 // =====================================================================================================================

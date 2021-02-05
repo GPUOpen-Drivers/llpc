@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 46
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,6 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     46.1 | Added dynamicVertexStride to GraphicsPipelineBuildInfo                                                |
 //  |     46.0 | Removed the member 'depthBiasEnable' of rsState                                                       |
 //  |     45.4 | Added disableLicmThreshold, unrollHintThreshold, and dontUnrollHintThreshold to PipelineShaderOptions |
 //  |     45.3 | Add pipelinedump function to enable BeginPipelineDump and GetPipelineName                             |
@@ -736,9 +737,7 @@ struct GraphicsPipelineBuildInfo {
     VkPolygonMode polygonMode;    ///< Triangle rendering mode
     VkCullModeFlags cullMode;     ///< Fragment culling mode
     VkFrontFace frontFace;        ///< Front-facing triangle orientation
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
     bool depthBiasEnable;         ///< Whether to bias fragment depth values
-#endif
   } rsState;                      ///< Rasterizer State
 
   struct {
@@ -748,9 +747,10 @@ struct GraphicsPipelineBuildInfo {
     ColorTarget target[MaxColorTargets]; ///< Per-MRT color target info
   } cbState;                             ///< Color target state
 
-  NggState nggState;       ///< NGG state used for tuning and debugging
-  PipelineOptions options; ///< Per pipeline tuning/debugging options
-  bool unlinked;           ///< True to build an "unlinked" half-pipeline ELF
+  NggState nggState;        ///< NGG state used for tuning and debugging
+  PipelineOptions options;  ///< Per pipeline tuning/debugging options
+  bool unlinked;            ///< True to build an "unlinked" half-pipeline ELF
+  bool dynamicVertexStride; ///< Dynamic Vertex input Stride is enabled.
 };
 
 /// Represents info to build a compute pipeline.
