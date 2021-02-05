@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 45
+#define LLPC_INTERFACE_MAJOR_VERSION 46
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 4
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,8 +71,9 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     46.0 | Removed the member 'depthBiasEnable' of rsState                                                       |
 //  |     45.4 | Added disableLicmThreshold, unrollHintThreshold, and dontUnrollHintThreshold to PipelineShaderOptions |
-//  |     45.3 | Add pipelinedump function to enable BeginPipelineDump and GetPipelineName                             |                                                               |
+//  |     45.3 | Add pipelinedump function to enable BeginPipelineDump and GetPipelineName                             |
 //  |     45.2 | Add GFX IP plus checker to GfxIpVersion                                                               |
 //  |     45.1 | Add pipelineCacheAccess, stageCacheAccess(es) to GraphicsPipelineBuildOut/ComputePipelineBuildOut     |
 //  |     45.0 | Remove the member 'enableFastLaunch' of NGG state                                                     |
@@ -735,7 +736,9 @@ struct GraphicsPipelineBuildInfo {
     VkPolygonMode polygonMode;    ///< Triangle rendering mode
     VkCullModeFlags cullMode;     ///< Fragment culling mode
     VkFrontFace frontFace;        ///< Front-facing triangle orientation
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
     bool depthBiasEnable;         ///< Whether to bias fragment depth values
+#endif
   } rsState;                      ///< Rasterizer State
 
   struct {
