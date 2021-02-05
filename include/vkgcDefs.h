@@ -766,6 +766,7 @@ struct ComputePipelineBuildInfo {
 #endif
   PipelineOptions options; ///< Per pipeline tuning options
   bool unlinked;           ///< True to build an "unlinked" half-pipeline ELF
+  bool dynamicVertexStride; ///< Dynamic Vertex input Stride is enabled.
 };
 
 // =====================================================================================================================
