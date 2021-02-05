@@ -414,7 +414,9 @@ struct RasterizerState {
   PolygonMode polygonMode;          // Polygon mode
   CullModeFlags cullMode;           // Fragment culling mode
   unsigned frontFaceClockwise;      // Front-facing triangle orientation: false=counter, true=clockwise
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
   unsigned depthBiasEnable;         // Whether to bias fragment depth values
+#endif
 };
 
 // =====================================================================================================================

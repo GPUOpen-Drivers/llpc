@@ -123,7 +123,9 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->rsState.polygonMode = graphicState.polygonMode;
     gfxPipelineInfo->rsState.cullMode = graphicState.cullMode;
     gfxPipelineInfo->rsState.frontFace = graphicState.frontFace;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
     gfxPipelineInfo->rsState.depthBiasEnable = graphicState.depthBiasEnable != 0;
+#endif
 
     gfxPipelineInfo->cbState.alphaToCoverageEnable = graphicState.alphaToCoverageEnable != 0;
     gfxPipelineInfo->cbState.dualSourceBlendEnable = graphicState.dualSourceBlendEnable != 0;
