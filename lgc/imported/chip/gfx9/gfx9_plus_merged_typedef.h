@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -57,7 +57,7 @@ typedef union CB_BLEND_GREEN                                     regCB_BLEND_GRE
 typedef union CB_BLEND_RED                                       regCB_BLEND_RED;
 typedef union CB_CACHE_EVICT_POINTS                              regCB_CACHE_EVICT_POINTS;
 typedef union CB_CGTT_SCLK_CTRL                                  regCB_CGTT_SCLK_CTRL;
-#if  CHIP_HDR_NAVI21
+#if CHIP_HDR_NAVI21
 typedef union CB_CGTT_SCLK_CTRL1                                 regCB_CGTT_SCLK_CTRL1;
 #endif
 typedef union CB_COLOR0_ATTRIB                                   regCB_COLOR0_ATTRIB;
@@ -1336,7 +1336,7 @@ typedef union RLC_SPM_DBR1_PERFMON_SAMPLE_DELAY                  regRLC_SPM_DBR1
 typedef union RLC_SPM_DB_PERFMON_SAMPLE_DELAY                    regRLC_SPM_DB_PERFMON_SAMPLE_DELAY;
 typedef union RLC_SPM_DESER_START_SKEW                           regRLC_SPM_DESER_START_SKEW;
 typedef union RLC_SPM_GDS_PERFMON_SAMPLE_DELAY                   regRLC_SPM_GDS_PERFMON_SAMPLE_DELAY;
-#if  CHIP_HDR_NAVI21
+#if CHIP_HDR_NAVI21
 typedef union RLC_SPM_GFXCLOCK_HIGHCOUNT                         regRLC_SPM_GFXCLOCK_HIGHCOUNT;
 typedef union RLC_SPM_GFXCLOCK_LOWCOUNT                          regRLC_SPM_GFXCLOCK_LOWCOUNT;
 #endif
@@ -1469,40 +1469,26 @@ typedef union SDMA2_PERFCNT_PERFCOUNTER1_CFG                     regSDMA2_PERFCN
 typedef union SDMA2_PERFCNT_PERFCOUNTER_HI                       regSDMA2_PERFCNT_PERFCOUNTER_HI;
 typedef union SDMA2_PERFCNT_PERFCOUNTER_LO                       regSDMA2_PERFCNT_PERFCOUNTER_LO;
 typedef union SDMA2_PERFCNT_PERFCOUNTER_RSLT_CNTL                regSDMA2_PERFCNT_PERFCOUNTER_RSLT_CNTL;
-#endif
-#if CHIP_HDR_NAVI21
 typedef union SDMA2_PERFCOUNTER0_HI                              regSDMA2_PERFCOUNTER0_HI;
 typedef union SDMA2_PERFCOUNTER0_LO                              regSDMA2_PERFCOUNTER0_LO;
-#endif
-#if CHIP_HDR_NAVI21
 typedef union SDMA2_PERFCOUNTER0_SELECT                          regSDMA2_PERFCOUNTER0_SELECT;
 typedef union SDMA2_PERFCOUNTER0_SELECT1                         regSDMA2_PERFCOUNTER0_SELECT1;
 typedef union SDMA2_PERFCOUNTER1_HI                              regSDMA2_PERFCOUNTER1_HI;
 typedef union SDMA2_PERFCOUNTER1_LO                              regSDMA2_PERFCOUNTER1_LO;
-#endif
-#if CHIP_HDR_NAVI21
 typedef union SDMA2_PERFCOUNTER1_SELECT                          regSDMA2_PERFCOUNTER1_SELECT;
 typedef union SDMA2_PERFCOUNTER1_SELECT1                         regSDMA2_PERFCOUNTER1_SELECT1;
-#endif
-#if CHIP_HDR_NAVI21
 typedef union SDMA3_PERFCNT_MISC_CNTL                            regSDMA3_PERFCNT_MISC_CNTL;
 typedef union SDMA3_PERFCNT_PERFCOUNTER0_CFG                     regSDMA3_PERFCNT_PERFCOUNTER0_CFG;
 typedef union SDMA3_PERFCNT_PERFCOUNTER1_CFG                     regSDMA3_PERFCNT_PERFCOUNTER1_CFG;
 typedef union SDMA3_PERFCNT_PERFCOUNTER_HI                       regSDMA3_PERFCNT_PERFCOUNTER_HI;
 typedef union SDMA3_PERFCNT_PERFCOUNTER_LO                       regSDMA3_PERFCNT_PERFCOUNTER_LO;
 typedef union SDMA3_PERFCNT_PERFCOUNTER_RSLT_CNTL                regSDMA3_PERFCNT_PERFCOUNTER_RSLT_CNTL;
-#endif
-#if CHIP_HDR_NAVI21
 typedef union SDMA3_PERFCOUNTER0_HI                              regSDMA3_PERFCOUNTER0_HI;
 typedef union SDMA3_PERFCOUNTER0_LO                              regSDMA3_PERFCOUNTER0_LO;
-#endif
-#if CHIP_HDR_NAVI21
 typedef union SDMA3_PERFCOUNTER0_SELECT                          regSDMA3_PERFCOUNTER0_SELECT;
 typedef union SDMA3_PERFCOUNTER0_SELECT1                         regSDMA3_PERFCOUNTER0_SELECT1;
 typedef union SDMA3_PERFCOUNTER1_HI                              regSDMA3_PERFCOUNTER1_HI;
 typedef union SDMA3_PERFCOUNTER1_LO                              regSDMA3_PERFCOUNTER1_LO;
-#endif
-#if CHIP_HDR_NAVI21
 typedef union SDMA3_PERFCOUNTER1_SELECT                          regSDMA3_PERFCOUNTER1_SELECT;
 typedef union SDMA3_PERFCOUNTER1_SELECT1                         regSDMA3_PERFCOUNTER1_SELECT1;
 #endif
@@ -1523,7 +1509,7 @@ typedef union SPI_CONFIG_CNTL_2                                  regSPI_CONFIG_C
 typedef union SPI_CONFIG_CNTL_2_REMAP                            regSPI_CONFIG_CNTL_2_REMAP;
 typedef union SPI_CONFIG_CNTL_REMAP                              regSPI_CONFIG_CNTL_REMAP;
 typedef union SPI_CONFIG_PS_CU_EN                                regSPI_CONFIG_PS_CU_EN;
-#if   CHIP_HDR_NAVI21
+#if CHIP_HDR_NAVI21
 typedef union SPI_CSG_PIPE_CONTROL                               regSPI_CSG_PIPE_CONTROL;
 #endif
 typedef union SPI_CSQ_WF_ACTIVE_COUNT_0                          regSPI_CSQ_WF_ACTIVE_COUNT_0;
@@ -2048,7 +2034,7 @@ typedef union SPI_WF_LIFETIME_STATUS_17                          regSPI_WF_LIFET
 typedef union SPI_WF_LIFETIME_STATUS_18                          regSPI_WF_LIFETIME_STATUS_18;
 typedef union SPI_WF_LIFETIME_STATUS_19                          regSPI_WF_LIFETIME_STATUS_19;
 typedef union SPI_WF_LIFETIME_STATUS_20                          regSPI_WF_LIFETIME_STATUS_20;
-#if  CHIP_HDR_NAVI21
+#if CHIP_HDR_NAVI21
 typedef union SPI_WF_LIFETIME_STATUS_21                          regSPI_WF_LIFETIME_STATUS_21;
 #endif
 typedef union SQ_ALU_CLK_CTRL                                    regSQ_ALU_CLK_CTRL;
@@ -2278,7 +2264,7 @@ typedef union SQ_WATCH2_CNTL                                     regSQ_WATCH2_CN
 typedef union SQ_WATCH3_ADDR_H                                   regSQ_WATCH3_ADDR_H;
 typedef union SQ_WATCH3_ADDR_L                                   regSQ_WATCH3_ADDR_L;
 typedef union SQ_WATCH3_CNTL                                     regSQ_WATCH3_CNTL;
-#if   CHIP_HDR_NAVI21
+#if CHIP_HDR_NAVI21
 typedef union SQ_WAVE_ACTIVE                                     regSQ_WAVE_ACTIVE;
 #endif
 typedef union SQ_WAVE_EXEC_HI                                    regSQ_WAVE_EXEC_HI;
@@ -2324,7 +2310,7 @@ typedef union SQ_WAVE_TTMP12                                     regSQ_WAVE_TTMP
 typedef union SQ_WAVE_TTMP13                                     regSQ_WAVE_TTMP13;
 typedef union SQ_WAVE_TTMP14                                     regSQ_WAVE_TTMP14;
 typedef union SQ_WAVE_TTMP15                                     regSQ_WAVE_TTMP15;
-#if   CHIP_HDR_NAVI21
+#if CHIP_HDR_NAVI21
 typedef union SQ_WAVE_VALID_AND_IDLE                             regSQ_WAVE_VALID_AND_IDLE;
 #endif
 typedef union SQ_WAVE_VGPR_OFFSET                                regSQ_WAVE_VGPR_OFFSET;

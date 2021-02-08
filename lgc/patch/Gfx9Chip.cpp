@@ -54,12 +54,13 @@ VsRegConfig::VsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(PA_SU_VTX_CNTL);
   INIT_REG(VGT_PRIMITIVEID_EN);
   INIT_REG(VGT_REUSE_OFF);
-  INIT_REG(VGT_STRMOUT_CONFIG);
-  INIT_REG(VGT_STRMOUT_BUFFER_CONFIG);
-  INIT_REG(VGT_STRMOUT_VTX_STRIDE_0);
-  INIT_REG(VGT_STRMOUT_VTX_STRIDE_1);
-  INIT_REG(VGT_STRMOUT_VTX_STRIDE_2);
-  INIT_REG(VGT_STRMOUT_VTX_STRIDE_3);
+
+  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_CONFIG);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_BUFFER_CONFIG);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_0);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_1);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_2);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_3);
 
   INIT_REG_GFX10(gfxIp.major, SPI_SHADER_PGM_CHKSUM_VS);
   INIT_REG_GFX10(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_0);
@@ -98,8 +99,14 @@ EsGsRegConfig::EsGsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(VGT_GS_MAX_VERT_OUT);
   INIT_REG(VGT_GS_ONCHIP_CNTL);
   INIT_REG(VGT_GS_INSTANCE_CNT);
-  INIT_REG(VGT_GS_OUT_PRIM_TYPE);
   INIT_REG(VGT_ESGS_RING_ITEMSIZE);
+
+  // VGT_GS_OUT_PRIM_TYPE is a special register, having different register IDs
+  if (gfxIp.major == 9 || gfxIp.major == 10) {
+    INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
 
   INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
   INIT_REG_GFX9_10(gfxIp.major, VGT_GS_PER_VS);
@@ -136,8 +143,14 @@ PrimShaderRegConfig::PrimShaderRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(VGT_GS_MAX_VERT_OUT);
   INIT_REG(VGT_GS_ONCHIP_CNTL);
   INIT_REG(VGT_GS_INSTANCE_CNT);
-  INIT_REG(VGT_GS_OUT_PRIM_TYPE);
   INIT_REG(VGT_ESGS_RING_ITEMSIZE);
+
+  // VGT_GS_OUT_PRIM_TYPE is a special register, having different register IDs
+  if (gfxIp.major == 9 || gfxIp.major == 10) {
+    INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
 
   INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
   INIT_REG_GFX9_10(gfxIp.major, VGT_GS_PER_VS);

@@ -8068,6 +8068,7 @@ Instruction *SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRV
   case ScopeCrossDevice:
   case ScopeDevice:
   case ScopeQueueFamilyKHR:
+  case ScopeShaderCallKHR:
     scope = SyncScope::System;
     break;
   case ScopeInvocation:
