@@ -656,6 +656,14 @@ public:
   //    ways). This API is formulated to allow the front-end to implement that. Step (c) can be
   //    performed without needing to see the resource node used in (a).
 
+  // Bit settings for flags argument in CreateLoadBufferDesc.
+  enum {
+    BufferFlagNonUniform = 1, // Descriptor index is non-uniform
+    BufferFlagWritten = 2,    // Buffer is (or might be) written to
+    BufferFlagReserved4 = 4,  // Reserved for future functionality
+    BufferFlagReserved8 = 8,  // Reserved for future functionality
+  };
+
   // Get the type of pointer returned by CreateLoadBufferDesc.
   llvm::PointerType *getBufferDescTy(llvm::Type *pointeeTy);
 
@@ -664,13 +672,11 @@ public:
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
   // @param descIndex : Descriptor index
-  // @param isNonUniform : Whether the descriptor index is non-uniform
-  // @param isWritten : Whether the buffer is (or might be) written to
+  // @param flags : BufferFlag* bit settings
   // @param pointeeTy : Type that the returned pointer should point to.
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex,
-                                            bool isNonUniform, bool isWritten, llvm::Type *pointeeTy,
-                                            const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+                                            llvm::Type *pointeeTy, const llvm::Twine &instName = "") = 0;
 
   // Get the type of a descriptor
   //

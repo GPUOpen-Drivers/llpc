@@ -16,20 +16,20 @@ declare spir_func i32 @compute_library_func() #0
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !spirv.ExecutionModel !7 !lgc.shaderstage !7 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 2, i32 0, i1 false, i1 true)
-  %1 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i1 false, i1 true)
-  %2 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 0, i1 false, i1 true)
+  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 2, i32 0, i32 2)
+  %1 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
+  %2 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 0, i32 2)
   %3 = bitcast i8 addrspace(7)* %2 to <4 x i32> addrspace(7)*
   %4 = load <4 x i32>, <4 x i32> addrspace(7)* %3, align 16
-  %5 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 1, i1 false, i1 true)
+  %5 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 1, i32 2)
   %6 = bitcast i8 addrspace(7)* %5 to <4 x i32> addrspace(7)*
   %7 = load <4 x i32>, <4 x i32> addrspace(7)* %6, align 16
   %8 = add <4 x i32> %4, %7
-  %9 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 2, i1 false, i1 true)
+  %9 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 2, i32 2)
   %10 = bitcast i8 addrspace(7)* %9 to <4 x i32> addrspace(7)*
   %11 = load <4 x i32>, <4 x i32> addrspace(7)* %10, align 16
   %12 = add <4 x i32> %8, %11
-  %13 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 3, i1 false, i1 true)
+  %13 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 3, i32 2)
   %14 = bitcast i8 addrspace(7)* %13 to <4 x i32> addrspace(7)*
   %15 = load <4 x i32>, <4 x i32> addrspace(7)* %14, align 16
   %16 = add <4 x i32> %12, %15

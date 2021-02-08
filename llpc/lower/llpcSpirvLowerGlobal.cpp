@@ -1710,9 +1710,9 @@ void SpirvLowerGlobal::lowerBufferBlock() {
         for (BitCastInst *const bitCast : bitCastsToModify) {
           m_builder->SetInsertPoint(bitCast);
 
-          Value *const bufferDesc =
-              m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0),
-                                              /*isNonUniform=*/false, !global.isConstant(), m_builder->getInt8Ty());
+          Value *const bufferDesc = m_builder->CreateLoadBufferDesc(
+              descSet, binding, m_builder->getInt32(0), global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten,
+              m_builder->getInt8Ty());
 
           // If the global variable is a constant, the data it points to is invariant.
           if (global.isConstant())
@@ -1769,8 +1769,13 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             }
           }
 
-          Value *const bufferDesc = m_builder->CreateLoadBufferDesc(descSet, binding, blockIndex, isNonUniform,
-                                                                    !global.isConstant(), m_builder->getInt8Ty());
+          unsigned bufferFlags = 0;
+          if (isNonUniform)
+            bufferFlags |= lgc::Builder::BufferFlagNonUniform;
+          if (!global.isConstant())
+            bufferFlags |= lgc::Builder::BufferFlagWritten;
+          Value *const bufferDesc =
+              m_builder->CreateLoadBufferDesc(descSet, binding, blockIndex, bufferFlags, m_builder->getInt8Ty());
 
           // If the global variable is a constant, the data it points to is invariant.
           if (global.isConstant())
@@ -1797,9 +1802,9 @@ void SpirvLowerGlobal::lowerBufferBlock() {
       } else {
         m_builder->SetInsertPoint(&func->getEntryBlock(), func->getEntryBlock().getFirstInsertionPt());
 
-        Value *const bufferDesc =
-            m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0),
-                                            /*isNonUniform=*/false, !global.isConstant(), m_builder->getInt8Ty());
+        Value *const bufferDesc = m_builder->CreateLoadBufferDesc(
+            descSet, binding, m_builder->getInt32(0), global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten,
+            m_builder->getInt8Ty());
 
         // If the global variable is a constant, the data it points to is invariant.
         if (global.isConstant())

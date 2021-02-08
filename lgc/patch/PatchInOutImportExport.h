@@ -238,7 +238,7 @@ private:
   PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
 
   std::set<unsigned> m_expLocs; // The locations that already have an export instruction for the vertex shader.
-  const std::array<unsigned, 4> *m_buffFormats; // The format of MTBUF instructions for specified GFX
+  const std::array<unsigned char, 4> *m_buffFormats; // The format of MTBUF instructions for specified GFX
 };
 
 } // namespace lgc

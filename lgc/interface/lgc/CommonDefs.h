@@ -68,7 +68,9 @@ enum class ResourceNodeType : unsigned {
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
   InlineBuffer, ///< Inline buffer, with descriptor set and binding
-  Count,        ///< Count of resource mapping node types.
+  DescriptorReserved14,
+  DescriptorReserved15,
+  Count, ///< Count of resource mapping node types.
 };
 
 } // namespace lgc

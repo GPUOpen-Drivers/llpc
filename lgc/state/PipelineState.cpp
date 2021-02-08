@@ -708,7 +708,7 @@ const ResourceNode *PipelineState::findPushConstantResourceNode() const {
 //
 // @param nodeType : Resource node type
 // @param candidateType : Resource node candidate type
-static bool IsNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType candidateType) {
+static bool isNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType candidateType) {
   if (nodeType == ResourceNodeType::Unknown || candidateType == nodeType)
     return true;
 
@@ -750,6 +750,22 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
 }
 
 // =====================================================================================================================
+// Check whether a (non-table) resource node matches the given {set,binding} compatible with nodeType
+//
+// @param node : Node to try and match
+// @param nodeType : Resource node type being searched for
+// @param descSet : Descriptor set being searched for
+// @param binding : Descriptor binding being searched for
+bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, unsigned descSet,
+                                      unsigned binding) const {
+  if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.type))
+    return false;
+  if (node.binding == binding)
+    return true;
+  return false;
+}
+
+// =====================================================================================================================
 // Find the resource node for the given {set,binding} compatible with nodeType.
 //
 // For nodeType == DescriptorTableVaPtr, the node whose first child matches descSet is returned.
@@ -778,12 +794,12 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
       }
 
       // Check inner nodes.
-      for (const ResourceNode &innerNode : node.innerTable)
-        if (innerNode.set == descSet && innerNode.binding == binding && IsNodeTypeCompatible(nodeType, innerNode.type))
+      for (const ResourceNode &innerNode : node.innerTable) {
+        if (matchResourceNode(innerNode, nodeType, descSet, binding))
           return {&node, &innerNode};
-    } else if (node.set == descSet && node.binding == binding && IsNodeTypeCompatible(nodeType, node.type)) {
+      }
+    } else if (matchResourceNode(node, nodeType, descSet, binding))
       return {&node, &node};
-    }
   }
 
   if (nodeType == ResourceNodeType::DescriptorFmask &&
@@ -1252,6 +1268,8 @@ const char *PipelineState::getResourceNodeTypeName(ResourceNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, StreamOutTableVaPtr)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved12)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, InlineBuffer)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved14)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved15)
     break;
   default:
     llvm_unreachable("Should never be called!");

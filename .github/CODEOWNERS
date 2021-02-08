@@ -1,0 +1,8 @@
+# Global owners
+*        @amdrexu
+# Order is important; the last matching pattern takes the most
+# precedence. When someone opens a pull request that only
+# modifies files under icd, only @JaxLinAMD and not the global
+# owner(s) will be requested for a review.
+/lgc/    @trenouf
+/llpc/   @amdrexu

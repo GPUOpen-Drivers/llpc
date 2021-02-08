@@ -114,17 +114,27 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
     m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
 
   // Set buffer formats based on specific GFX
-  static const std::array<std::array<unsigned, 4>, 2> BufferFormats = {
+  static const std::array<unsigned char, 4> BufferFormatsGfx9 = {
       BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32,
       BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32,
       BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32_32,
       BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32_32_32,
+  };
+  static const std::array<unsigned char, 4> BufferFormatsGfx10 = {
       BUF_FORMAT_32_FLOAT,
-      BUF_FORMAT_32_32_FLOAT,
-      BUF_FORMAT_32_32_32_FLOAT,
-      BUF_FORMAT_32_32_32_32_FLOAT};
+      BUF_FORMAT_32_32_FLOAT_GFX10,
+      BUF_FORMAT_32_32_32_FLOAT_GFX10,
+      BUF_FORMAT_32_32_32_32_FLOAT_GFX10,
+  };
 
-  m_buffFormats = m_gfxIp.major <= 9 ? &BufferFormats[0] : &BufferFormats[1];
+  switch (m_gfxIp.major) {
+  default:
+    m_buffFormats = &BufferFormatsGfx9;
+    break;
+  case 10:
+    m_buffFormats = &BufferFormatsGfx10;
+    break;
+  }
 
   // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
   // set by TCS).
@@ -3431,49 +3441,47 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(Value *storeValu
   auto storeTy = storeValue->getType();
 
   unsigned compCount = storeTy->isVectorTy() ? cast<FixedVectorType>(storeTy)->getNumElements() : 1;
-  assert(compCount <= 4);
+  assert(compCount == 1 || compCount == 2 || compCount == 4);
 
   const uint64_t bitWidth = storeTy->getScalarSizeInBits();
   assert(bitWidth == 16 || bitWidth == 32);
 
+  static const char *const callNames[5][2] = {
+      {},
+      {"llvm.amdgcn.struct.tbuffer.store.f16", "llvm.amdgcn.struct.tbuffer.store.f32"},
+      {"llvm.amdgcn.struct.tbuffer.store.v2f16", "llvm.amdgcn.struct.tbuffer.store.v2f32"},
+      {},
+      {"llvm.amdgcn.struct.tbuffer.store.v4f16", "llvm.amdgcn.struct.tbuffer.store.v4f32"},
+  };
+  StringRef callName(callNames[compCount][bitWidth == 32]);
+
   unsigned format = 0;
-  std::string callName = "llvm.amdgcn.struct.tbuffer.store.";
-
-  CombineFormat formatOprd = {};
-  formatOprd.bits.nfmt = BUF_NUM_FORMAT_FLOAT;
-  switch (compCount) {
-  case 1: {
-    formatOprd.bits.dfmt = bitWidth == 32 ? BUF_DATA_FORMAT_32 : BUF_DATA_FORMAT_16;
-    callName += bitWidth == 32 ? "f32" : "f16";
-    break;
-  }
-  case 2: {
-    formatOprd.bits.dfmt = bitWidth == 32 ? BUF_DATA_FORMAT_32_32 : BUF_DATA_FORMAT_16_16;
-    callName += bitWidth == 32 ? "v2f32" : "v2f16";
-    break;
-  }
-  case 4: {
-    formatOprd.bits.dfmt = bitWidth == 32 ? BUF_DATA_FORMAT_32_32_32_32 : BUF_DATA_FORMAT_16_16_16_16;
-    callName += bitWidth == 32 ? "v4f32" : "v4f16";
-    break;
-  }
+  switch (m_gfxIp.major) {
   default: {
-    llvm_unreachable("Should never be called!");
+    CombineFormat formatOprd = {};
+    formatOprd.bits.nfmt = BUF_NUM_FORMAT_FLOAT;
+    static const unsigned char dfmtTable[5][2] = {
+        {},
+        {BUF_DATA_FORMAT_16, BUF_DATA_FORMAT_32},
+        {BUF_DATA_FORMAT_16_16, BUF_DATA_FORMAT_32_32},
+        {},
+        {BUF_DATA_FORMAT_16_16_16_16, BUF_DATA_FORMAT_32_32_32_32},
+    };
+    formatOprd.bits.dfmt = dfmtTable[compCount][bitWidth == 32];
+    format = formatOprd.u32All;
     break;
   }
+  case 10: {
+    static unsigned char formatTable[5][2] = {
+        {},
+        {BUF_FORMAT_16_FLOAT, BUF_FORMAT_32_FLOAT},
+        {BUF_FORMAT_16_16_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX10},
+        {},
+        {BUF_FORMAT_16_16_16_16_FLOAT_GFX10, BUF_FORMAT_32_32_32_32_FLOAT_GFX10},
+    };
+    format = formatTable[compCount][bitWidth == 32];
+    break;
   }
-
-  format = formatOprd.u32All;
-
-  if (m_gfxIp.major >= 10) {
-    if (compCount == 4)
-      format = bitWidth == 32 ? BUF_FORMAT_32_32_32_32_FLOAT : BUF_FORMAT_16_16_16_16_FLOAT;
-    else if (compCount == 2)
-      format = bitWidth == 32 ? BUF_FORMAT_32_32_FLOAT : BUF_FORMAT_16_16_FLOAT;
-    else if (compCount == 1)
-      format = bitWidth == 32 ? BUF_FORMAT_32_FLOAT : BUF_FORMAT_16_FLOAT;
-    else
-      llvm_unreachable("Should never be called!");
   }
 
   // byteOffset = streamOffsets[xfbBuffer] * 4 +
