@@ -173,10 +173,10 @@ private:
 
   llvm::Value *calcTessFactorOffset(bool isOuter, llvm::Value *elemIdx, llvm::Instruction *insertPos);
 
-  void storeTessFactorToBuffer(const llvm::SmallVectorImpl<llvm::Value *> &tessFactors, llvm::Value *tessFactorOffset,
+  void storeTessFactorToBuffer(llvm::ArrayRef<llvm::Value *> tessFactors, llvm::Value *tessFactorOffset,
                                llvm::Instruction *insertPos);
 
-  void createTessBufferStoreFunction(llvm::StringRef funcName, unsigned compCount);
+  void createTessBufferStoreFunction(llvm::StringRef funcName, unsigned compCount, llvm::Type *tfValueTy);
 
   unsigned calcPatchCountPerThreadGroup(unsigned inVertexCount, unsigned inVertexStride, unsigned outVertexCount,
                                         unsigned outVertexStride, unsigned patchConstCount,
@@ -211,6 +211,10 @@ private:
   void recordVertexAttribExport(unsigned location, llvm::ArrayRef<llvm::Value *> attribValues);
   void exportVertexAttribs(llvm::Instruction *insertPos);
 
+  void storeTessFactors();
+  void doTessFactorBufferStore(llvm::ArrayRef<llvm::Value *> outerTessFactors,
+                               llvm::ArrayRef<llvm::Value *> innerTessFactors, llvm::Instruction *insertPos);
+
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
@@ -242,6 +246,9 @@ private:
 
   std::set<unsigned> m_expLocs; // The locations that already have an export instruction for the vertex shader.
   const std::array<unsigned char, 4> *m_buffFormats; // The format of MTBUF instructions for specified GFX
+
+  llvm::SmallVector<llvm::Instruction *, 4> m_tessLevelOuterInsts; // Collect the instructions of TessLevelOuter
+  llvm::SmallVector<llvm::Instruction *, 2> m_tessLevelInnerInsts; // Collect the instructions of TessLevelInner
 };
 
 } // namespace lgc
