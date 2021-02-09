@@ -4,8 +4,8 @@
 ; RUN: lgc -mcpu=gfx900 -extract=2 - <%s | FileCheck --check-prefixes=VS-ISA,VS-NOTNGG-ISA %s
 ; RUN: lgc -mcpu=gfx1010 -extract=2 - <%s | FileCheck --check-prefixes=VS-ISA,VS-NGG-ISA %s
 ; VS-ISA: .p2align 8
-; VS-ISA-NOTNGG-LABEL: _amdgpu_vs_main_fetchless:
-; VS-ISA-NGG-LABEL: _amdgpu_gs_main_fetchless:
+; VS-NOTNGG-ISA-LABEL: _amdgpu_vs_main_fetchless:
+; VS-NGG-ISA-LABEL: _amdgpu_gs_main_fetchless:
 ; VS-ISA: exp pos0
 ; VS-ISA: s_endpgm
 ; VS-ISA: .vertexInputs:

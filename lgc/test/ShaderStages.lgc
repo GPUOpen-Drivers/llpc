@@ -3,7 +3,8 @@
 
 ; RUN: lgc -extract=1 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK1,CHECK-NO-NGG1 %s
 ; RUN: lgc -extract=1 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK1,CHECK-NGG1 %s
-; CHECK1: define dllexport amdgpu_cs void @_amdgpu_cs_main{{.*}} !lgc.shaderstage !3 {
+; CHECK-NO-NGG1: define dllexport amdgpu_cs void @_amdgpu_cs_main{{.*}} !lgc.shaderstage !3 {
+; CHECK-NGG1: define dllexport amdgpu_cs void @_amdgpu_cs_main{{.*}} !lgc.shaderstage !3 {
 ; CHECK1: !3 = !{i32 5}
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
