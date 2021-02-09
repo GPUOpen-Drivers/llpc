@@ -345,9 +345,7 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
       break;
     }
     break;
-  case SqRsrcRegs::WidthLo:
-  case SqRsrcRegs::WidthHi:
-  case SqRsrcRegs::Count:
+  default:
     llvm_unreachable("Bad SqImgRsrcRegHandler::SetReg!");
     break;
   }
