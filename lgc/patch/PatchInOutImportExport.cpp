@@ -143,6 +143,8 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
     auto entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
     if (entryPoint) {
       processFunction(*entryPoint, static_cast<ShaderStage>(shaderStage), inputCallees, otherCallees);
+      if (shaderStage == ShaderStageTessControl)
+        storeTessFactors();
     }
   }
 
@@ -2877,7 +2879,6 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
   auto &builtInUsage = resUsage->builtInUsage.tcs;
   auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
-  auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition: {
@@ -2932,66 +2933,11 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
     break;
   }
   case BuiltInTessLevelOuter:
-  case BuiltInTessLevelInner: {
-    // Extract tessellation factors
-    SmallVector<Value *> tessFactors;
-    const bool isOuter = BuiltInTessLevelOuter == builtInId;
-    if (!elemIdx) {
-      assert(outputTy->isArrayTy());
-      unsigned tessFactorCount = 0;
-      const unsigned adjust = isOuter ? 2 : 0;
-      auto primitiveMode = m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
-      switch (primitiveMode) {
-      case PrimitiveMode::Isolines:
-        tessFactorCount = 0 + adjust;
-        break;
-      case PrimitiveMode::Triangles:
-        tessFactorCount = 1 + adjust;
-        break;
-      case PrimitiveMode::Quads:
-        tessFactorCount = 2 + adjust;
-        break;
-      default:
-        llvm_unreachable("Should never be called!");
-        break;
-      }
-      for (unsigned i = 0; i < tessFactorCount; ++i) {
-        Value *elem = ExtractValueInst::Create(output, {i}, "", insertPos);
-        tessFactors.push_back(elem);
-      }
-      if (isOuter && primitiveMode == PrimitiveMode::Isolines) {
-        assert(tessFactorCount == 2);
-        std::swap(tessFactors[0], tessFactors[1]);
-      }
-    } else {
-      assert(outputTy->isFloatTy());
-      tessFactors.push_back(output);
-    }
-    Value *tessFactorOffset = calcTessFactorOffset(isOuter, elemIdx, insertPos);
-    storeTessFactorToBuffer(tessFactors, tessFactorOffset, insertPos);
-
-    if (perPatchBuiltInOutLocMap.count(builtInId) == 0)
-      return; // Avoid writing unused tessellation factor to LDS
-
-    unsigned loc = perPatchBuiltInOutLocMap[builtInId];
-
-    if (!elemIdx) {
-      // gl_TessLevelOuter[4] is treated as vec4
-      // gl_TessLevelInner[2] is treated as vec2
-      assert(outputTy->isArrayTy());
-
-      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
-        auto elemIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
-        auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, insertPos);
-        writeValueToLds(elem, ldsOffset, insertPos);
-      }
-    } else {
-      auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, nullptr, insertPos);
-      writeValueToLds(output, ldsOffset, insertPos);
-    }
+    m_tessLevelOuterInsts.push_back(insertPos);
     break;
-  }
+  case BuiltInTessLevelInner:
+    m_tessLevelInnerInsts.push_back(insertPos);
+    break;
   default: {
     llvm_unreachable("Should never be called!");
     break;
@@ -4415,8 +4361,8 @@ Value *PatchInOutImportExport::calcTessFactorOffset(bool isOuter, Value *elemIdx
 // @param tessFactors : Tessellation factors to be stored
 // @param tessFactorOffsetVal : Start offset to store the specified tessellation factors
 // @param insertPos : Where to insert store instructions
-void PatchInOutImportExport::storeTessFactorToBuffer(const SmallVectorImpl<Value *> &tessFactors,
-                                                     Value *tessFactorOffsetVal, Instruction *insertPos) {
+void PatchInOutImportExport::storeTessFactorToBuffer(ArrayRef<Value *> tessFactors, Value *tessFactorOffsetVal,
+                                                     Instruction *insertPos) {
   assert(m_shaderStage == ShaderStageTessControl);
 
   if (tessFactors.size() == 0) {
@@ -4440,17 +4386,15 @@ void PatchInOutImportExport::storeTessFactorToBuffer(const SmallVectorImpl<Value
   const unsigned compCount = tessFactors.size();
   Value *tfValue = nullptr;
   if (compCount == 1) {
-    tfValue = builder.CreateBitCast(tessFactors[0], builder.getInt32Ty());
+    tfValue = tessFactors[0];
   } else {
-    tfValue = UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), compCount));
-    for (unsigned compIdx = 0; compIdx < compCount; ++compIdx) {
-      Value *comp = builder.CreateBitCast(tessFactors[compIdx], builder.getInt32Ty());
-      tfValue = builder.CreateInsertElement(tfValue, comp, compIdx);
-    }
+    tfValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), compCount));
+    for (unsigned compIdx = 0; compIdx < compCount; ++compIdx)
+      tfValue = builder.CreateInsertElement(tfValue, tessFactors[compIdx], compIdx);
   }
   callName += getTypeName(tfValue->getType());
   if (!m_module->getFunction(callName))
-    createTessBufferStoreFunction(callName, compCount);
+    createTessBufferStoreFunction(callName, compCount, tfValue->getType());
 
   if (m_pipelineState->isTessOffChip()) {
     if (m_gfxIp.major <= 8) {
@@ -4476,8 +4420,9 @@ void PatchInOutImportExport::storeTessFactorToBuffer(const SmallVectorImpl<Value
 //
 // param@ funcName : The internal function name
 // param@ compCount : The component count of the store value
-void PatchInOutImportExport::createTessBufferStoreFunction(StringRef funcName, unsigned compCount) {
-  // %tfValueType could be one of {i32, v2i32, v3i32, v4i32}
+// param@ tfValueTy : The type of the store value
+void PatchInOutImportExport::createTessBufferStoreFunction(StringRef funcName, unsigned compCount, Type *tfValueTy) {
+  // %tfValueType could be one of {f32, v2f32, v3f32, v4f32}
   // define void @llpc.tfbuffer.store.%tfValueType(
   //     <4 x i32> %tfBufferDesc, i32 %tfBufferBase, i32 %relPatchId, i32 %tfStride, i32 %tfOffset, %tfValueType
   //     %tfValue)
@@ -4497,12 +4442,8 @@ void PatchInOutImportExport::createTessBufferStoreFunction(StringRef funcName, u
   // .end:
   //     ret void
   // }
-
+  assert(tfValueTy->getScalarType()->isFloatTy());
   BuilderBase builder(*m_context);
-  Type *tfValueTy = builder.getInt32Ty();
-  if (compCount > 1)
-    tfValueTy = FixedVectorType::get(builder.getInt32Ty(), compCount);
-
   Type *argTys[] = {
       FixedVectorType::get(Type::getInt32Ty(*m_context), 4), // TF buffer descriptor
       builder.getInt32Ty(),                                  // TF buffer base
@@ -5594,6 +5535,127 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
     } else {
       llvm_unreachable("Not implemented!");
     }
+  }
+}
+
+// =====================================================================================================================
+// The process of handling the store of tessellation factors.
+//
+// NOTE: Postone the TF store (write to LDS if it is required and TF buffer) here is for future functionality.
+void PatchInOutImportExport::storeTessFactors() {
+  if (m_tessLevelOuterInsts.empty() && m_tessLevelInnerInsts.empty())
+    return;
+
+  BuilderBase builder(*m_context);
+  // Row 0 - Unknown, 1 - Triangle, 2 - Quad, 3 - Isoline.
+  static const unsigned expTessFactorCount[][2] = {{0, 0}, {3, 1}, {4, 2}, {2, 0}};
+  const auto primitiveMode =
+      static_cast<unsigned>(m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode);
+
+  // Collect outer and inner tessellation factors, respectively.
+  SmallVector<Value *> outerTessFactors, innerTessFactors;
+  SmallVector<Value *> *tessFactors = &outerTessFactors;
+  ArrayRef<Instruction *> tessLevelInsts = m_tessLevelOuterInsts;
+  for (unsigned i = 0; i < 2; ++i) {
+    // Fill the container for tessellation factors
+    for (auto tessLevelInst : tessLevelInsts) {
+      Value *output = tessLevelInst->getOperand(3);
+      Type *outputTy = output->getType();
+      if (outputTy->isArrayTy()) {
+        const unsigned tessFactorCount = expTessFactorCount[primitiveMode][i];
+        for (unsigned elemIdx = 0; elemIdx < tessFactorCount; ++elemIdx) {
+          auto elem = builder.CreateExtractValue(output, elemIdx);
+          tessFactors->push_back(elem);
+        }
+        if (static_cast<PrimitiveMode>(primitiveMode) == PrimitiveMode::Isolines && i == 0)
+          std::swap(tessFactors[0], tessFactors[1]);
+      } else {
+        assert(outputTy->isFloatTy());
+        tessFactors->push_back(output);
+      }
+    }
+    tessFactors = &innerTessFactors;
+    tessLevelInsts = m_tessLevelInnerInsts;
+  }
+
+  // Write tessellation factors to LDS if they are used as input for TES or TCS.
+  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
+  auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
+  unsigned builtInId = BuiltInTessLevelOuter;
+  tessFactors = &outerTessFactors;
+  tessLevelInsts = m_tessLevelOuterInsts;
+  for (unsigned i = 0; i < 2; ++i) {
+    // If tessellation factors are used as input of TES or TCS, they are required to write to LDS.
+    const bool needWriteToLds = perPatchBuiltInOutLocMap.count(builtInId) == 1;
+    if (needWriteToLds) {
+      const unsigned loc = perPatchBuiltInOutLocMap[builtInId];
+      const bool isArrayTessFactor = tessLevelInsts[0]->getOperand(3)->getType()->isArrayTy();
+      if (isArrayTessFactor) {
+        // gl_TessLevelOuter[4] is treated as vec4
+        // gl_TessLevelInner[2] is treated as vec2
+        auto output = tessLevelInsts[0]->getOperand(3);
+        auto outputTy = output->getType();
+        auto vertexIdx = tessLevelInsts[0]->getOperand(2);
+        auto insertPos = tessLevelInsts[0];
+        for (unsigned idx = 0; idx < outputTy->getArrayNumElements(); ++idx) {
+          auto elem = builder.CreateExtractValue(output, idx);
+          auto elemIdx = builder.getInt32(idx);
+          auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, insertPos);
+          writeValueToLds(elem, ldsOffset, insertPos);
+        }
+      } else {
+        for (unsigned idx = 0; idx < tessFactors->size(); ++idx) {
+          Value *elemIdx = tessLevelInsts[idx]->getOperand(1);
+          Value *tessFactor = (*tessFactors)[idx];
+          auto ldsOffset =
+              calcLdsOffsetForTcsOutput(tessFactor->getType(), loc, nullptr, elemIdx, nullptr, tessLevelInsts[idx]);
+          writeValueToLds(tessFactor, ldsOffset, tessLevelInsts[idx]);
+        }
+      }
+    }
+    builtInId = BuiltInTessLevelInner;
+    tessFactors = &innerTessFactors;
+    tessLevelInsts = m_tessLevelInnerInsts;
+  }
+
+  doTessFactorBufferStore(outerTessFactors, innerTessFactors, nullptr);
+}
+
+// =====================================================================================================================
+// Write the collected tessellation factors of Outer and Inner to TF buffer in turn.
+//
+// @param outerTessFactors : The collected tessellation factors of Outer
+// @param innerTessFactors : The collected tessellation factors of Inner
+// @param inserPos : Where to insert instructions
+void PatchInOutImportExport::doTessFactorBufferStore(ArrayRef<Value *> outerTessFactors,
+                                                     ArrayRef<Value *> innerTessFactors, Instruction *insertPos) {
+  ArrayRef<Instruction *> tessLevelInsts = m_tessLevelOuterInsts;
+  ArrayRef<Value *> tessFactors = outerTessFactors;
+
+  for (unsigned i = 0; i < 2; ++i) {
+    const bool isOuter = i == 0;
+    if (!tessFactors.empty()) {
+      // NOTE: If the given insert point is null, the original tessLevel instruction is used as the insert point.
+      const bool isArrayTessFactor = tessLevelInsts[0]->getOperand(3)->getType()->isArrayTy();
+      if (isArrayTessFactor) {
+        auto insertPoint = insertPos ? insertPos : tessLevelInsts[0];
+        // The second argument for element index should be nullptr for array type.
+        Value *tessFactorOffset = calcTessFactorOffset(isOuter, nullptr, insertPoint);
+        storeTessFactorToBuffer(tessFactors, tessFactorOffset, insertPoint);
+      } else {
+        // We have to store each element in tessFactors seperately because they may not be in memory order.
+        for (unsigned idx = 0; idx < tessFactors.size(); ++idx) {
+          auto insertPoint = insertPos ? insertPos : tessLevelInsts[idx];
+          Value *elemIdx = tessLevelInsts[idx]->getOperand(1);
+          Value *tessFactorOffset = calcTessFactorOffset(isOuter, elemIdx, insertPoint);
+          SmallVector<Value *> singleTfVector;
+          singleTfVector.push_back(tessFactors[idx]);
+          storeTessFactorToBuffer(singleTfVector, tessFactorOffset, insertPoint);
+        }
+      }
+    }
+    tessLevelInsts = m_tessLevelInnerInsts;
+    tessFactors = innerTessFactors;
   }
 }
 
