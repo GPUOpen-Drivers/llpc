@@ -1152,15 +1152,14 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
   if (userDataUsage->usesStreamOutTable || userDataUsage->isSpecialUserDataUsed(UserDataMapping::StreamOutTable)) {
     if (enableNgg || !m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage.enableXfb) {
       // If no NGG, stream out table will be set to copy shader's user data entry, we should not set it duplicately.
-      auto userDataValue = UserDataMapping::StreamOutTable;
       switch (m_shaderStage) {
       case ShaderStageVertex:
-        userDataArgs.push_back(
-            UserDataArg(builder.getInt32Ty(), userDataValue, &intfData->entryArgIdxs.vs.streamOutData.tablePtr));
+        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::StreamOutTable,
+                                           &intfData->entryArgIdxs.vs.streamOutData.tablePtr));
         break;
       case ShaderStageTessEval:
-        userDataArgs.push_back(
-            UserDataArg(builder.getInt32Ty(), userDataValue, &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
+        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::StreamOutTable,
+                                           &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
         break;
       // Allocate dummy stream-out register for Geometry shader
       case ShaderStageGeometry:
