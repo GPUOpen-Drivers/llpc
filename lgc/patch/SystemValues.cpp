@@ -318,6 +318,7 @@ Value *ShaderSystemValues::getInternalPerShaderTablePtr() {
 //
 // @param xfbBuffer : Transform feedback buffer ID
 Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
+  assert(xfbBuffer < MaxTransformFeedbackBuffers);
   if (m_streamOutBufDescs.size() <= xfbBuffer)
     m_streamOutBufDescs.resize(xfbBuffer + 1);
 

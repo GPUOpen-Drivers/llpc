@@ -34,6 +34,7 @@
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ResourceUsage.h"
+#include "lgc/state/TargetInfo.h"
 
 using namespace lgc;
 using namespace llvm;
@@ -493,13 +494,14 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
   auto intfData = pipelineState->getShaderInterfaceData(shaderStage);
   auto resUsage = pipelineState->getShaderResourceUsage(shaderStage);
   const auto &xfbStrides = resUsage->inOutUsage.xfbStrides;
-  const bool enableXfb = resUsage->inOutUsage.enableXfb;
+  const bool enableHwXfb =
+      resUsage->inOutUsage.enableXfb && pipelineState->getTargetInfo().getGfxIpVersion().major <= 10;
 
   // Enable optional shader inputs as required.
   switch (shaderStage) {
   case ShaderStageVertex:
-    if (enableXfb && (!hasGs && !hasTs)) {
-      // Stream-out in VS as hardware VS
+    if (enableHwXfb && (!hasGs && !hasTs)) {
+      // HW stream-out in VS as hardware VS
       getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
       getShaderInputUsage(shaderStage, ShaderInput::StreamOutWriteIndex)->enable();
       for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
@@ -528,11 +530,11 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
       getShaderInputUsage(shaderStage, ShaderInput::IsOffChip)->enable();
     }
     if (!hasGs) {
-      // TES as hardware VS: handle stream-out. StreamOutInfo is required for off-chip even if there is no
+      // TES as hardware VS: handle HW stream-out. StreamOutInfo is required for off-chip even if there is no
       // stream-out.
-      if (pipelineState->isTessOffChip() || enableXfb)
+      if (pipelineState->isTessOffChip() || enableHwXfb)
         getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
-      if (enableXfb) {
+      if (enableHwXfb) {
         getShaderInputUsage(shaderStage, ShaderInput::StreamOutWriteIndex)->enable();
         for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
           if (xfbStrides[i] > 0)
