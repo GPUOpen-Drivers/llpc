@@ -62,7 +62,6 @@ public:
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
 
   void visitBitCast(llvm::BitCastInst &bitCast);
-  void visitICmp(llvm::ICmpInst &iCmp);
   void visitExtractElement(llvm::ExtractElementInst &extractElement);
   void visitPHINode(llvm::PHINode &phiNode);
   void visitIntToPtr(llvm::IntToPtrInst &intToPtr);
