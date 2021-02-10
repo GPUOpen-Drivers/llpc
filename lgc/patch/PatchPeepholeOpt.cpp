@@ -260,65 +260,6 @@ void PatchPeepholeOpt::visitBitCast(BitCastInst &bitCast) {
 }
 
 // =====================================================================================================================
-// Visit an integer comparison instruction.
-//
-// @param iCmp : The "icmp" instruction to visit.
-void PatchPeepholeOpt::visitICmp(ICmpInst &iCmp) {
-  switch (iCmp.getPredicate()) {
-  case CmpInst::ICMP_UGT:
-    break;
-  default:
-    return;
-  }
-
-  ConstantInt *const constantVal = dyn_cast<ConstantInt>(iCmp.getOperand(1));
-
-  // If we don't have a constant we are comparing against, or the constant is the maximum representable, bail.
-  if (!constantVal || constantVal->isMaxValue(false))
-    return;
-
-  const uint64_t constant = constantVal->getZExtValue();
-
-  ConstantInt *const newConstant = ConstantInt::get(constantVal->getType(), constant + 1, false);
-
-  // Swap the predicate to less than. This helps the loop analysis passes detect more loops that can be trivially
-  // unrolled.
-  iCmp.setPredicate(CmpInst::ICMP_ULT);
-
-  // Set our new constant to the second operand.
-  iCmp.setOperand(1, newConstant);
-
-  // Run through the users of the icmp and if they are branches, switch the branch conditions, otherwise make a not
-  // of the icmp and replace the use with the not.
-
-  SmallVector<Instruction *, 4> instsWithOpsToReplace;
-
-  for (User *const user : iCmp.users()) {
-    if (BranchInst *const branch = dyn_cast<BranchInst>(user)) {
-      // Only conditional branches could use an integer comparison instruction, so we just swap the operands.
-      branch->swapSuccessors();
-    } else if (Instruction *const inst = dyn_cast<Instruction>(user))
-      instsWithOpsToReplace.push_back(inst);
-  }
-
-  // If we have no other instructions we need to deal with, bail.
-  if (instsWithOpsToReplace.empty())
-    return;
-
-  Instruction *const iCmpNot = BinaryOperator::CreateNot(&iCmp);
-  insertAfter(*iCmpNot, iCmp);
-
-  for (Instruction *const inst : instsWithOpsToReplace) {
-    const unsigned numOperands = inst->getNumOperands();
-
-    for (unsigned operandIndex = 0; operandIndex < numOperands; operandIndex++) {
-      if (&iCmp == inst->getOperand(operandIndex))
-        inst->setOperand(operandIndex, iCmpNot);
-    }
-  }
-}
-
-// =====================================================================================================================
 // Visit an extract element instruction.
 //
 // @param extractElement : The "extractelement" instruction to visit.
