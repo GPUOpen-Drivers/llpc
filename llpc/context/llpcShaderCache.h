@@ -122,14 +122,14 @@ typedef void *CacheEntryHandle;
 class ShaderCache : public IShaderCache {
 public:
   ShaderCache();
-  virtual ~ShaderCache();
+  ~ShaderCache() override;
 
   Result init(const ShaderCacheCreateInfo *createInfo, const ShaderCacheAuxCreateInfo *auxCreateInfo);
-  virtual void Destroy();
+  void Destroy() override;
 
-  virtual Result Serialize(void *blob, size_t *size);
+  Result Serialize(void *blob, size_t *size) override;
 
-  virtual Result Merge(unsigned srcCacheCount, const IShaderCache **ppSrcCaches);
+  Result Merge(unsigned srcCacheCount, const IShaderCache **ppSrcCaches) override;
 
   ShaderEntryState findShader(MetroHash::Hash hash, bool allocateOnMiss, CacheEntryHandle *phEntry);
 
