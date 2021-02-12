@@ -123,7 +123,7 @@ public:
 
   uint64_t getPipelineHashCode() const { return m_pipelineContext->getPipelineHashCode(); }
 
-  uint64_t getCacheHashCode() const { return m_pipelineContext->getCacheHashCode(); }
+  uint64_t get64BitCacheHashCode() const { return m_pipelineContext->get64BitCacheHashCode(); }
 
   ShaderHash getShaderHashCode(ShaderStage shaderStage) const {
     return m_pipelineContext->getShaderHashCode(shaderStage);
