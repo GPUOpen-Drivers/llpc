@@ -257,7 +257,7 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const 
 void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
   Options options = {};
   options.hash[0] = getPipelineHashCode();
-  options.hash[1] = getCacheHashCode();
+  options.hash[1] = get64BitCacheHashCode();
 
   options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || getPipelineOptions()->includeDisassembly);
   options.reconfigWorkgroupLayout = getPipelineOptions()->reconfigWorkgroupLayout;

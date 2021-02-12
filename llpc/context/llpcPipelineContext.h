@@ -119,17 +119,29 @@ public:
   // Gets graphics IP version info
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
-  // Gets pipeline hash code
+  // Gets pipeline hash code compacted to 64-bits.
   uint64_t getPipelineHashCode() const { return MetroHash::compact64(&m_pipelineHash); }
-  uint64_t getCacheHashCode() const { return MetroHash::compact64(&m_cacheHash); }
 
-  // Gets pipeline hash code without compacting it to 64bits-hash. Note that
-  // this method returns the pipeline hash code without compacting it while
-  // `getPipelineHashCode()` returns the hash code compacted to 64bits.
-  MetroHash::Hash getPipelineHashCodeWithoutCompact() const { return m_pipelineHash; }
+  // Gets cache hash code compacted to 64-bits.
+  uint64_t get64BitCacheHashCode() const { return MetroHash::compact64(&m_cacheHash); }
+
+  // Gets the finalized 128-bit cache hash code.
+  std::array<uint8_t, 16> get128BitCacheHashCode() const {
+    std::array<uint8_t, 16> finalizedCacheData = {};
+    Util::MetroHash128 hash128 = {};
+    hash128.Update(m_cacheHash);
+    hash128.Finalize(finalizedCacheData.data());
+    return finalizedCacheData;
+  }
+
+  // Get the current cache hash code without compacting it.
+  MetroHash::Hash getCacheHashCodeWithoutCompact() const { return m_cacheHash; }
 
   // Sets pipeline hash code
   void setPipelineHashCode(const MetroHash::Hash &hash) { m_pipelineHash = hash; }
+
+  // Sets the cache hash for the pipeline.  This is the hash that is used to do cache lookups.
+  void setHashForCacheLookUp(MetroHash::Hash hash) { m_cacheHash = hash; }
 
   virtual ShaderHash getShaderHashCode(ShaderStage stage) const;
 
