@@ -41,11 +41,26 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/VersionTuple.h"
 
 #define DEBUG_TYPE "lgc-pal-metadata"
 
 using namespace lgc;
 using namespace llvm;
+
+namespace {
+// =====================================================================================================================
+// Returns an ArrayDocNode associated with the given document that contains the given data.
+//
+// @param document : The msgpack document the returned array will be associated with.
+// @param hash : The hash to place in the array node that will be built.
+msgpack::ArrayDocNode buildArrayDocNode(msgpack::Document *document, Hash128 hash) {
+  msgpack::ArrayDocNode childNode = document->getArrayNode();
+  for (uint32_t i = 0; i < hash.size(); ++i)
+    childNode[i] = hash[i];
+  return childNode;
+}
+} // namespace
 
 // =====================================================================================================================
 // Construct empty object
@@ -127,7 +142,14 @@ void PalMetadata::record(Module *module) {
   MDString *abiMetaString = MDString::get(module->getContext(), blob);
   MDNode *abiMetaNode = MDNode::get(module->getContext(), abiMetaString);
   NamedMDNode *namedMeta = module->getOrInsertNamedMetadata(PalMetadataName);
-  namedMeta->addOperand(abiMetaNode);
+
+  if (namedMeta->getNumOperands() == 0) {
+    namedMeta->addOperand(abiMetaNode);
+  } else {
+    // If the PAL metadata was already written, then we need to replace the previous value.
+    assert(namedMeta->getNumOperands() == 1);
+    namedMeta->setOperand(0, abiMetaNode);
+  }
 }
 
 // =====================================================================================================================
@@ -810,4 +832,16 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool 
     }
   }
   setRegister(mmSPI_SHADER_COL_FORMAT, spiShaderColFormat);
+}
+
+// =====================================================================================================================
+// Fills the xglCacheInfo section of the PAL metadata with the given data.
+//
+// @param finalizedCacheHash : The finalized hash that will be used to look for this pipeline in caches.
+// @param version : The version of llpc that generated the hash.
+void PalMetadata::setFinalized128BitCacheHash(const Hash128 &finalizedCacheHash, const VersionTuple &version) {
+  msgpack::MapDocNode &xglCacheInfo = m_pipelineNode[Util::Abi::PipelineMetadataKey::XglCacheInfo].getMap(true);
+  xglCacheInfo[Util::Abi::PipelineMetadataKey::CacheHash128Bits] = buildArrayDocNode(m_document, finalizedCacheHash);
+  xglCacheInfo[Util::Abi::PipelineMetadataKey::LlpcVersion] = m_document->getNode(version.getAsString(),
+                                                                                  /* copy = */ true);
 }

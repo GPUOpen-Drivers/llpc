@@ -38,6 +38,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/VersionTuple.h"
 
 #define DEBUG_TYPE "llpc-pipeline-context"
 
@@ -224,6 +225,8 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const 
       lgcStageMask |= 1 << getLgcShaderStage(static_cast<ShaderStage>(stage));
   }
   pipeline->setShaderStageMask(lgcStageMask);
+  pipeline->set128BitCacheHash(get128BitCacheHashCode(),
+                               VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION));
 
   // Give the pipeline options to the middle-end.
   setOptionsInPipeline(pipeline);

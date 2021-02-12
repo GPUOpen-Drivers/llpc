@@ -1,25 +1,16 @@
-; This test case checks that amdllpc with the `-add-hash-to-elf` option correctly
-; adds a note section to ELF, which contains the cache hash and the version of LLPC.
-
+; This test case checks that the 128-bit cache hash is correctly added to the PAL metadata.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -gfxip=9 -unlinked -enable-relocatable-shader-elf -v -o %t.elf -add-hash-to-elf %s > %t.log \
-; RUN:   && llvm-readelf -a %t.elf >> %t.log \
-; RUN:   && cat %t.log | FileCheck --check-prefix=CHECK %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -gfxip=9 -unlinked -enable-relocatable-shader-elf -v -o %t.elf %s | FileCheck --check-prefix=CHECK %s
 
 ; CHECK-LABEL: {{^// LLPC}} calculated hash results (graphics pipeline)
 ; CHECK-LABEL: Building pipeline with relocatable shader elf.
-; CHECK-NEXT:  LLPC version: [[llpc_version:([0-9a-f]{2} ?){8}]]{{$}}
-; CHECK:       Hash for vertex stage cache lookup: [[llpc_vert_hash:([a-f0-9]{2} ?){16}]]{{$}}
+; CHECK-NEXT:  LLPC version: [[llpc_version:([0-9]*\.[0-9]*)]]{{$}}
+; CHECK: {{^Finalized}} hash for vertex stage cache lookup: 0x[[#%.16x,llpc_vert_hash_qword1:]] 0x[[#%.16x,llpc_vert_hash_qword2:]]
 ; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 
+; CHECK:       128_bit_cache_hash: [ 0x[[#%.16X,llpc_vert_hash_qword1]] 0x[[#%.16X,llpc_vert_hash_qword2]]
+; CHECK-NEXT:  .llpc_version: [[llpc_version]]
 ; CHECK-LABEL: {{^=====}}  AMDLLPC SUCCESS  =====
-
-; CHECK-LABEL: {{^Displaying}} notes found in: .note
-; CHECK-NEXT:  Owner Data size Description
-; CHECK-LABEL: {{^ +AMD_llpc_cache_hash *}} 0x00000010 Unknown note type: (0x00000000)
-; CHECK-NEXT:  description data: [[llpc_vert_hash]]{{$}}
-; CHECK-LABEL: {{^ +AMD_llpc_version *}} 0x00000008	Unknown note type: (0x00000000)
-; CHECK-NEXT:  description data: [[llpc_version]]{{$}}
 ; END_SHADERTEST
 
 ; SPIR-V

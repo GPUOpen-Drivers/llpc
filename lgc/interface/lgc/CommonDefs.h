@@ -30,7 +30,13 @@
  */
 #pragma once
 
+#include <array>
+#include <cstdint>
+
 namespace lgc {
+
+// Type used to hold a 128-bit hash value in LGC and LLPC.
+using Hash128 = std::array<uint64_t, 2>;
 
 /// Enumerates LGC shader stages.
 enum ShaderStage : unsigned {

@@ -94,6 +94,9 @@ namespace PipelineMetadataKey {
 static constexpr char Name[] = ".name";
 static constexpr char Type[] = ".type";
 static constexpr char InternalPipelineHash[] = ".internal_pipeline_hash";
+static constexpr char XglCacheInfo[] = ".xgl_cache_info";
+static constexpr char CacheHash128Bits[] = ".128_bit_cache_hash";
+static constexpr char LlpcVersion[] = ".llpc_version";
 static constexpr char Shaders[] = ".shaders";
 static constexpr char HardwareStages[] = ".hardware_stages";
 static constexpr char Registers[] = ".registers";

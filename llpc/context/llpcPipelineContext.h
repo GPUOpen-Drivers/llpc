@@ -126,11 +126,11 @@ public:
   uint64_t get64BitCacheHashCode() const { return MetroHash::compact64(&m_cacheHash); }
 
   // Gets the finalized 128-bit cache hash code.
-  std::array<uint8_t, 16> get128BitCacheHashCode() const {
-    std::array<uint8_t, 16> finalizedCacheData = {};
+  lgc::Hash128 get128BitCacheHashCode() const {
+    lgc::Hash128 finalizedCacheData = {};
     Util::MetroHash128 hash128 = {};
     hash128.Update(m_cacheHash);
-    hash128.Finalize(finalizedCacheData.data());
+    hash128.Finalize(reinterpret_cast<uint8_t *>(finalizedCacheData.data()));
     return finalizedCacheData;
   }
 

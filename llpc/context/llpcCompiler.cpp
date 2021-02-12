@@ -846,9 +846,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 
   const MetroHash::Hash originalCacheHash = context->getPipelineContext()->getCacheHashCodeWithoutCompact();
   // Print log in the format matching llvm-readefl to simplify testing.
-  LLPC_OUTS("LLPC version: " << formatBytesLittleEndian<uint32_t>(
-                                    {LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION})
-                             << "\n");
+  LLPC_OUTS("LLPC version: " << VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION) << "\n");
   LLPC_OUTS("Hash for pipeline cache lookup: " << formatBytesLittleEndian<uint8_t>(originalCacheHash.bytes) << "\n");
 
   for (unsigned stage = 0; stage < shaderInfo.size() && result == Result::Success; ++stage) {
@@ -879,10 +877,10 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     // Note that this code updates m_pipelineHash of the pipeline context. It
     // must be restored before we link the pipeline ELF at the end of this for-loop.
     context->getPipelineContext()->setHashForCacheLookUp(cacheHash);
-    LLPC_OUTS("Finalized Hash for " << getShaderStageName(static_cast<ShaderStage>(stage)) << " stage cache lookup: "
-                                    << formatBytesLittleEndian<uint8_t>(
-                                           context->getPipelineContext()->get128BitCacheHashCode())
-                                    << "\n");
+    LLPC_OUTS("Finalized hash for " << getShaderStageName(static_cast<ShaderStage>(stage)) << " stage cache lookup: "
+                                    << format_hex(context->getPipelineContext()->get128BitCacheHashCode()[0], 18) << ' '
+                                    << format_hex(context->getPipelineContext()->get128BitCacheHashCode()[1], 18)
+                                    << '\n');
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
     BinaryData elfBin = {};
@@ -1363,7 +1361,9 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
     constexpr unsigned noteType = 0;
 
     NoteEntry notes[] = {
-        {"AMD_llpc_cache_hash", hash, noteType},
+        {"AMD_llpc_cache_hash",
+         ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(hash.data()), hash.size() * sizeof(hash.front())),
+         noteType},
         {"AMD_llpc_version", ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(llpcVersion), sizeof(llpcVersion)),
          noteType},
     };
