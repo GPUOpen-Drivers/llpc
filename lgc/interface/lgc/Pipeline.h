@@ -592,6 +592,9 @@ public:
   virtual void setGraphicsState(const InputAssemblyState &iaState, const ViewportState &vpState,
                                 const RasterizerState &rsState) = 0;
 
+  // Set the finalized 128-bit cache hash that is used to find this pipeline in the cache for the given version of LLPC.
+  virtual void set128BitCacheHash(const Hash128 &finalizedCacheHash, const llvm::VersionTuple &version) = 0;
+
   // Set entire pipeline state from metadata in an IR module. This is used by the lgc command-line utility
   // for its link option.
   virtual void setStateFromModule(llvm::Module *module) = 0;
