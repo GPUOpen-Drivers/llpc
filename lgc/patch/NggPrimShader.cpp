@@ -2885,7 +2885,11 @@ void NggPrimShader::splitEs(Module *module) {
     valueMap[&arg] = newArg++;
 
   SmallVector<ReturnInst *, 8> retInsts;
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 379998
   CloneFunctionInto(esCullDataFetchFunc, esEntryPoint, valueMap, false, retInsts);
+#else
+  CloneFunctionInto(esCullDataFetchFunc, esEntryPoint, valueMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
+#endif
   esCullDataFetchFunc->setName(lgcName::NggEsCullDataFetch);
 
   // Find the return block, remove all exports, and mutate return type
