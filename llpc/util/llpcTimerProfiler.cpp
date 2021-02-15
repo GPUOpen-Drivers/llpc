@@ -162,7 +162,12 @@ const StringMap<TimeRecord> &TimerProfiler::getDummyTimeRecords() {
       double t2;
       double t3;
       ssize_t m1;
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 379663
     } hackedTimeRecord = {1e-100, 1e-100, 1e-100, 0};
+#else
+      uint64_t i1;
+    } hackedTimeRecord = {1e-100, 1e-100, 1e-100, 0, 0};
+#endif
     static_assert(sizeof(timeRecord) == sizeof(hackedTimeRecord), "Unexpected Size!");
     memcpy(&timeRecord, &hackedTimeRecord, sizeof(TimeRecord));
     DummyTimeRecords["DUMMY"] = timeRecord;
