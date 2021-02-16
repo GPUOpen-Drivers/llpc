@@ -212,9 +212,32 @@ static void fatalErrorHandler(void *userData, const std::string &reason, bool ge
 }
 
 // =====================================================================================================================
+// Returns true if any user data nodes inside the given shader infos contain an entry with a descriptor type that is
+// unsupported by relocatable shader compilation.
+//
+// @param sourceMgrDiag : Diagnostic that should be handled
+// @param context : A boolean pointer to hasError
+// @param locCookie : Line number for the  report if non-zero
+static void InlineAsmDiagHandler(const SMDiagnostic &sourceMgrDiag, void *context, unsigned locCookie) {
+  bool *hasError = static_cast<bool *>(context);
+  if (sourceMgrDiag.getKind() == SourceMgr::DK_Error)
+    *hasError = true;
+
+  sourceMgrDiag.print(nullptr, errs());
+
+  // For testing purposes, we print the locCookie here.
+  if (locCookie)
+    WithColor::note() << "!srcloc = " << locCookie << "\n";
+}
+
+// =====================================================================================================================
 // Handler for diagnosis in pass run, derived from the standard one.
 class LlpcDiagnosticHandler : public DiagnosticHandler {
+public:
+  LlpcDiagnosticHandler(bool *hasError) : m_hasError(hasError) {}
   bool handleDiagnostics(const DiagnosticInfo &diagInfo) override {
+    if (diagInfo.getSeverity() == DS_Error)
+      *m_hasError = true;
     if (cl::FatalLlvmErrors && diagInfo.getSeverity() == DS_Error) {
       DiagnosticPrinterRawOStream printStream(errs());
       printStream << "LLVM FATAL ERROR: ";
@@ -246,6 +269,9 @@ class LlpcDiagnosticHandler : public DiagnosticHandler {
 
     return true;
   }
+
+private:
+  bool *m_hasError;
 };
 
 // =====================================================================================================================
@@ -561,9 +587,11 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
           result = m_shaderCache->retrieveShader(hEntry, &cacheData, &allocSize);
       }
       if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
+        bool hasError = false;
         Context *context = acquireContext();
 
-        context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
+        context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+        context->setInlineAsmDiagnosticHandler(InlineAsmDiagHandler, &hasError);
         context->setBuilder(context->getLgcContext()->createBuilder(nullptr, true));
 
         for (unsigned i = 0; i < entryNames.size(); ++i) {
@@ -658,12 +686,17 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
         }
 
         if (result == Result::Success) {
-          moduleDataEx.common.binType = BinaryType::MultiLlvmBc;
-          moduleDataEx.common.binCode.pCode = moduleBinary.data();
-          moduleDataEx.common.binCode.codeSize = moduleBinary.size();
+          if (!hasError) {
+            moduleDataEx.common.binType = BinaryType::MultiLlvmBc;
+            moduleDataEx.common.binCode.pCode = moduleBinary.data();
+            moduleDataEx.common.binCode.codeSize = moduleBinary.size();
+          } else {
+            result = Result::ErrorInvalidShader;
+          }
         }
 
-        context->setDiagnosticHandlerCallBack(nullptr);
+        context->setDiagnosticHandler(nullptr);
+        context->setInlineAsmDiagnosticHandler(nullptr);
       }
       moduleDataEx.extra.entryCount = entryNames.size();
     }
@@ -902,16 +935,27 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
   context->getPipelineContext()->setUnlinked(false);
 
-  if (!isUnlinkedPipeline) {
-    // Link the relocatable shaders into a single pipeline elf file.
-    linkRelocatableShaderElf(elf, pipelineElf, context);
-  } else {
-    // Return the first relocatable shader, since we can only return one anyway.
-    for (unsigned stage = 0; stage < ShaderStageNativeStageCount; ++stage) {
-      if (elf[stage].empty())
-        continue;
-      *pipelineElf = elf[stage];
-      break;
+  if (result == Result::Success) {
+    if (!isUnlinkedPipeline) {
+      // Link the relocatable shaders into a single pipeline elf file.
+      bool hasError = false;
+      context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+      context->setInlineAsmDiagnosticHandler(InlineAsmDiagHandler, &hasError);
+
+      linkRelocatableShaderElf(elf, pipelineElf, context);
+      context->setDiagnosticHandler(nullptr);
+      context->setInlineAsmDiagnosticHandler(nullptr);
+
+      if (hasError)
+        result = Result::ErrorInvalidShader;
+    } else {
+      // Return the first relocatable shader, since we can only return one anyway.
+      for (unsigned stage = 0; stage < ShaderStageNativeStageCount; ++stage) {
+        if (elf[stage].empty())
+          continue;
+        *pipelineElf = elf[stage];
+        break;
+      }
     }
   }
   return result;
@@ -1083,7 +1127,9 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
   bool buildingRelocatableElf = context->getPipelineContext()->isUnlinked();
 
-  context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
+  bool hasError = false;
+  context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+  context->setInlineAsmDiagnosticHandler(InlineAsmDiagHandler, &hasError);
 
   // Set a couple of pipeline options for front-end use.
   // TODO: The front-end should not be using pipeline options.
@@ -1287,7 +1333,11 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       (context->getShaderStageMask() & shaderStageToMask(ShaderStageFragment)))
     graphicsShaderCacheChecker.updateRootUserDateOffset(pipelineElf);
 
-  context->setDiagnosticHandlerCallBack(nullptr);
+  context->setDiagnosticHandler(nullptr);
+  context->setInlineAsmDiagnosticHandler(nullptr);
+
+  if (result == Result::Success && hasError)
+    result = Result::ErrorInvalidShader;
 
   if (result == Result::Success && cl::AddHashToELF) {
     // Add two note entries:
