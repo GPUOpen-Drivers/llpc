@@ -1633,8 +1633,8 @@ int main(int argc, char *argv[]) {
 
   // Simplify error handling and enable early returns. These assume that result statuses
   // are always written to the |result| local variable.
-  auto isFailure = [result] { return result != Result::Success; };
-  auto onFailure = [compiler, result] {
+  auto isFailure = [&result] { return result != Result::Success; };
+  auto onFailure = [compiler, &result] {
     assert(result != Result::Success);
     (void)result;
     compiler->Destroy();
