@@ -365,11 +365,6 @@ struct InputAssemblyState {
   unsigned enableMultiView;    // Whether to enable multi-view support
 };
 
-// Struct to pass to SetViewportState.
-struct ViewportState {
-  unsigned depthClipEnable; // Enable clipping based on Z coordinate
-};
-
 // Polygon mode. These happen to have the same values as the corresponding Vulkan enum.
 enum PolygonMode : unsigned {
   PolygonModeFill = 0,
@@ -582,10 +577,9 @@ public:
   // @param exportState : Color export flags
   virtual void setColorExportState(llvm::ArrayRef<ColorExportFormat> formats, const ColorExportState &exportState) = 0;
 
-  // Set graphics state (input-assembly, viewport, rasterizer).
+  // Set graphics state (input-assembly, rasterizer).
   // The front-end should zero-initialize each struct with "= {}" in case future changes add new fields.
-  virtual void setGraphicsState(const InputAssemblyState &iaState, const ViewportState &vpState,
-                                const RasterizerState &rsState) = 0;
+  virtual void setGraphicsState(const InputAssemblyState &iaState, const RasterizerState &rsState) = 0;
 
   // Set the finalized 128-bit cache hash that is used to find this pipeline in the cache for the given version of LLPC.
   virtual void set128BitCacheHash(const Hash128 &finalizedCacheHash, const llvm::VersionTuple &version) = 0;

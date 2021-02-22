@@ -1568,7 +1568,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   // Build VS specific configuration
   //
   uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-  bool depthClipDisable = (!static_cast<bool>(m_pipelineState->getViewportState().depthClipEnable));
   bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
   bool disableVertexReuse = m_pipelineState->getInputAssemblyState().disableVertexReuse;
 
@@ -1579,9 +1578,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_CLIP_CNTL, UCP_ENA_4, (usrClipPlaneMask >> 4) & 0x1);
   SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_CLIP_CNTL, UCP_ENA_5, (usrClipPlaneMask >> 5) & 0x1);
   SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_CLIP_CNTL, DX_LINEAR_ATTR_CLIP_ENA, true);
-  SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_CLIP_CNTL, DX_CLIP_SPACE_DEF, true); // DepthRange::ZeroToOne
-  SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_CLIP_CNTL, ZCLIP_NEAR_DISABLE, depthClipDisable);
-  SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_CLIP_CNTL, ZCLIP_FAR_DISABLE, depthClipDisable);
   SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_CLIP_CNTL, DX_RASTERIZATION_KILL, rasterizerDiscardEnable);
 
   SET_REG_FIELD(&pConfig->primShaderRegs, PA_CL_VTE_CNTL, VPORT_X_SCALE_ENA, true);

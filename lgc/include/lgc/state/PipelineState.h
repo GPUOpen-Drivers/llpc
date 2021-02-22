@@ -150,8 +150,7 @@ public:
                            const ColorExportState &exportState) override final;
 
   // Set graphics state (input-assembly, viewport, rasterizer).
-  void setGraphicsState(const InputAssemblyState &iaState, const ViewportState &vpState,
-                        const RasterizerState &rsState) override final;
+  void setGraphicsState(const InputAssemblyState &iaState, const RasterizerState &rsState) override final;
 
   // Set the finalized 128-bit cache hash that is used to find this pipeline in the cache for the given version of LLPC.
   void set128BitCacheHash(const Hash128 &finalizedCacheHash, const llvm::VersionTuple &version) override final;
@@ -244,7 +243,6 @@ public:
   // Accessors for pipeline state
   unsigned getDeviceIndex() const { return m_deviceIndex; }
   const InputAssemblyState &getInputAssemblyState() const { return m_inputAssemblyState; }
-  const ViewportState &getViewportState() const { return m_viewportState; }
   const RasterizerState &getRasterizerState() const { return m_rasterizerState; }
 
   // Determine whether to use off-chip tessellation mode
@@ -427,7 +425,6 @@ private:
   llvm::SmallVector<ColorExportFormat, 8> m_colorExportFormats;                // Color export formats
   ColorExportState m_colorExportState = {};                                    // Color export state
   InputAssemblyState m_inputAssemblyState = {};                                // Input-assembly state
-  ViewportState m_viewportState = {};                                          // Viewport state
   RasterizerState m_rasterizerState = {};                                      // Rasterizer state
   std::unique_ptr<ResourceUsage> m_resourceUsage[ShaderStageCompute + 1] = {}; // Per-shader ResourceUsage
   std::unique_ptr<InterfaceData> m_interfaceData[ShaderStageCompute + 1] = {}; // Per-shader InterfaceData

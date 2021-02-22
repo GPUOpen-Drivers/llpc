@@ -664,10 +664,6 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
   inputAssemblyState.switchWinding = inputIaState.switchWinding;
   inputAssemblyState.enableMultiView = inputIaState.enableMultiView;
 
-  const auto &inputVpState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->vpState;
-  ViewportState viewportState = {};
-  viewportState.depthClipEnable = inputVpState.depthClipEnable;
-
   const auto &inputRsState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->rsState;
   RasterizerState rasterizerState = {};
   rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
@@ -684,7 +680,7 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
   rasterizerState.depthBiasEnable = inputRsState.depthBiasEnable;
 #endif
 
-  pipeline->setGraphicsState(inputAssemblyState, viewportState, rasterizerState);
+  pipeline->setGraphicsState(inputAssemblyState, rasterizerState);
 }
 
 // =====================================================================================================================
