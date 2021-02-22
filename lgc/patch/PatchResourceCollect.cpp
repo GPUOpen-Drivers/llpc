@@ -167,7 +167,6 @@ void PatchResourceCollect::setNggControl(Module *module) {
   nggControl.alwaysUsePrimShaderTable = (options.nggFlags & NggFlagDontAlwaysUsePrimShaderTable) == 0;
   nggControl.compactMode = (options.nggFlags & NggFlagCompactDisable) ? NggCompactDisable : NggCompactVertices;
 
-  nggControl.enableFastLaunch = false; // Currently, always false
   nggControl.enableVertexReuse = (options.nggFlags & NggFlagEnableVertexReuse);
   nggControl.enableBackfaceCulling = (options.nggFlags & NggFlagEnableBackfaceCulling);
   nggControl.enableFrustumCulling = (options.nggFlags & NggFlagEnableFrustumCulling);
@@ -217,7 +216,6 @@ void PatchResourceCollect::setNggControl(Module *module) {
     default:
       break;
     }
-    LLPC_OUTS("EnableFastLaunch             = " << nggControl.enableFastLaunch << "\n");
     LLPC_OUTS("EnableVertexReuse            = " << nggControl.enableVertexReuse << "\n");
     LLPC_OUTS("EnableBackfaceCulling        = " << nggControl.enableBackfaceCulling << "\n");
     LLPC_OUTS("EnableFrustumCulling         = " << nggControl.enableFrustumCulling << "\n");
@@ -327,18 +325,16 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
       return false;
     }
   } else {
-    const auto topology = m_pipelineState->getInputAssemblyState().topology;
+    const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
     if (hasTs) {
       // For tessellation, check primitive mode
-      assert(topology == PrimitiveTopology::PatchList);
+      assert(primType == PrimitiveType::Patch);
       const auto &tessMode = m_pipelineState->getShaderModes()->getTessellationMode();
       if (tessMode.pointMode || tessMode.primitiveMode == PrimitiveMode::Isolines)
         return false;
     } else {
-      // Check topology specified in pipeline state
-      if (topology == PrimitiveTopology::PointList || topology == PrimitiveTopology::LineList ||
-          topology == PrimitiveTopology::LineStrip || topology == PrimitiveTopology::LineListWithAdjacency ||
-          topology == PrimitiveTopology::LineStripWithAdjacency)
+      // Check primitive type specified in pipeline state
+      if (primType == PrimitiveType::Point || primType == PrimitiveType::Line)
         return false;
     }
   }
@@ -649,88 +645,54 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       // invalid primitives. This is to simplify the algorithmic design of NGG GS and improve its efficiency.
       unsigned primAmpFactor = std::max(1u, geometryMode.outputVertices);
 
-      const unsigned vertsPerPrimitive = getVerticesPerPrimitive();
-
       const bool needsLds = (hasGs || !nggControl->passthroughMode || esExtraLdsSize > 0 || gsExtraLdsSize > 0);
 
       unsigned esVertsPerSubgroup = 0;
       unsigned gsPrimsPerSubgroup = 0;
 
-      // It is expected that regular launch NGG will be the most prevalent, so handle its logic first.
-      if (!nggControl->enableFastLaunch) {
-        // The numbers below come from hardware guidance and most likely require further tuning.
-        switch (nggControl->subgroupSizing) {
-        case NggSubgroupSizing::HalfSize:
+      // The numbers below come from hardware guidance and most likely require further tuning.
+      switch (nggControl->subgroupSizing) {
+      case NggSubgroupSizing::HalfSize:
+        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+        gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+        break;
+      case NggSubgroupSizing::OptimizeForVerts:
+        esVertsPerSubgroup = hasTs ? Gfx9::NggMaxThreadsPerSubgroup / 2 : (Gfx9::NggMaxThreadsPerSubgroup / 2 - 2);
+        gsPrimsPerSubgroup = hasTs || needsLds ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
+        break;
+      case NggSubgroupSizing::OptimizeForPrims:
+        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+        gsPrimsPerSubgroup = 128;
+        break;
+      case NggSubgroupSizing::Explicit:
+        esVertsPerSubgroup = nggControl->vertsPerSubgroup;
+        gsPrimsPerSubgroup = nggControl->primsPerSubgroup;
+        break;
+      case NggSubgroupSizing::Auto:
+        if (m_pipelineState->getTargetInfo().getGfxIpVersion() == GfxIpVersion{10, 1}) {
+          //# These magic numbers come from performance runs. We'll need to continue to tune this in the future.
+          esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2 - 2;
+          gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+        } else {
+          // Newer hardware performs the decrement on esVertsPerSubgroup for us already.
           esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
           gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-          break;
-        case NggSubgroupSizing::OptimizeForVerts:
-          esVertsPerSubgroup = hasTs ? Gfx9::NggMaxThreadsPerSubgroup / 2 : (Gfx9::NggMaxThreadsPerSubgroup / 2 - 2);
-          gsPrimsPerSubgroup = hasTs || needsLds ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
-          break;
-        case NggSubgroupSizing::OptimizeForPrims:
-          esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
-          gsPrimsPerSubgroup = 128;
-          break;
-        case NggSubgroupSizing::Explicit:
-          esVertsPerSubgroup = nggControl->vertsPerSubgroup;
-          gsPrimsPerSubgroup = nggControl->primsPerSubgroup;
-          break;
-        case NggSubgroupSizing::Auto:
-          if (m_pipelineState->getTargetInfo().getGfxIpVersion() == GfxIpVersion{10, 1}) {
-            esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2 - 2;
-            gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-          } else {
-            // Newer hardware performs the decrement on esVertsPerSubgroup for us already.
-            esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-            gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-          }
-          break;
-        case NggSubgroupSizing::MaximumSize:
-        default:
-          esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
-          gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
-          break;
         }
-      } else {
-        // Fast launch NGG launches like a compute shader and bypasses most of the fixed function hardware.
-        // As such, the values of esVerts and gsPrims have to be accurate for the primitive type
-        // (and vertsPerPrimitive) to avoid hanging.
-        switch (nggControl->subgroupSizing) {
-        case NggSubgroupSizing::HalfSize:
-          esVertsPerSubgroup = alignDown((Gfx9::NggMaxThreadsPerSubgroup / 2u), vertsPerPrimitive);
-          gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;
-          break;
-        case NggSubgroupSizing::OptimizeForVerts:
-          // Currently the programming of OptimizeForVerts is an inverse of MaximumSize. OptimizeForVerts is
-          // not expected to be a performant choice for fast launch, and as such MaximumSize, HalfSize, or
-          // Explicit should be chosen, with Explicit being optimal for non-point topologies.
-          gsPrimsPerSubgroup = alignDown(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
-          esVertsPerSubgroup = gsPrimsPerSubgroup / vertsPerPrimitive;
-          break;
-        case NggSubgroupSizing::Explicit:
-          esVertsPerSubgroup = nggControl->vertsPerSubgroup;
-          gsPrimsPerSubgroup = nggControl->primsPerSubgroup;
-          break;
-        case NggSubgroupSizing::OptimizeForPrims:
-          // Currently the programming of OptimizeForPrims is the same as MaximumSize, it is possible that
-          // this might change in the future. OptimizeForPrims is not expected to be a performant choice for
-          // fast launch, and as such MaximumSize, HalfSize, or Explicit should be chosen, with Explicit
-          // being optimal for non-point topologies.
-          // Fallthrough intentional.
-        case NggSubgroupSizing::Auto:
-        case NggSubgroupSizing::MaximumSize:
-        default:
-          esVertsPerSubgroup = alignDown(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
-          gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;
-          break;
-        }
+        break;
+      case NggSubgroupSizing::MaximumSize:
+      default:
+        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+        gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+        break;
       }
 
       unsigned gsInstanceCount = std::max(1u, geometryMode.invocations);
       bool enableMaxVertOut = false;
 
       if (hasGs) {
+        // User-GS NGG only supports triangles.
+        constexpr unsigned vertsPerPrimitive = 3;
+
         // NOTE: If primitive amplification is active and the currently calculated gsPrimsPerSubgroup multipled
         // by the amplification factor is larger than the supported number of primitives within a subgroup, we
         // need to shrimp the number of gsPrimsPerSubgroup down to a reasonable level to prevent
@@ -1032,53 +994,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   LLPC_OUTS("\n");
 
   return gsOnChip;
-}
-
-// =====================================================================================================================
-// Gets the count of vertices per primitive
-unsigned PatchResourceCollect::getVerticesPerPrimitive() const {
-  unsigned vertsPerPrim = 1;
-
-  switch (m_pipelineState->getInputAssemblyState().topology) {
-  case PrimitiveTopology::PointList:
-    vertsPerPrim = 1;
-    break;
-  case PrimitiveTopology::LineList:
-    vertsPerPrim = 2;
-    break;
-  case PrimitiveTopology::LineStrip:
-    vertsPerPrim = 2;
-    break;
-  case PrimitiveTopology::TriangleList:
-    vertsPerPrim = 3;
-    break;
-  case PrimitiveTopology::TriangleStrip:
-    vertsPerPrim = 3;
-    break;
-  case PrimitiveTopology::TriangleFan:
-    vertsPerPrim = 3;
-    break;
-  case PrimitiveTopology::LineListWithAdjacency:
-    vertsPerPrim = 4;
-    break;
-  case PrimitiveTopology::LineStripWithAdjacency:
-    vertsPerPrim = 4;
-    break;
-  case PrimitiveTopology::TriangleListWithAdjacency:
-    vertsPerPrim = 6;
-    break;
-  case PrimitiveTopology::TriangleStripWithAdjacency:
-    vertsPerPrim = 6;
-    break;
-  case PrimitiveTopology::PatchList:
-    vertsPerPrim = m_pipelineState->getInputAssemblyState().patchControlPoints;
-    break;
-  default:
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-
-  return vertsPerPrim;
 }
 
 // =====================================================================================================================
