@@ -402,7 +402,6 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
 //
 // @param [in/out] nggControl : NggControl struct
 void PatchResourceCollect::buildNggCullingControlRegister(NggControl &nggControl) {
-  const auto &vpState = m_pipelineState->getViewportState();
   const auto &rsState = m_pipelineState->getRasterizerState();
 
   auto &pipelineState = nggControl.primShaderTable.pipelineStateCb;
@@ -449,11 +448,6 @@ void PatchResourceCollect::buildNggCullingControlRegister(NggControl &nggControl
 
   paClClipCntl.bits.dxClipSpaceDef = true;
   paClClipCntl.bits.dxLinearAttrClipEna = true;
-
-  if (!static_cast<bool>(vpState.depthClipEnable)) {
-    paClClipCntl.bits.zclipNearDisable = true;
-    paClClipCntl.bits.zclipFarDisable = true;
-  }
 
   if (rsState.rasterizerDiscardEnable)
     paClClipCntl.bits.dxRasterizationKill = true;

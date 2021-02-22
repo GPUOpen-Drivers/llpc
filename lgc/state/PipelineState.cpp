@@ -56,7 +56,6 @@ static const char UserDataMetadataName[] = "lgc.user.data.nodes";
 static const char DeviceIndexMetadataName[] = "lgc.device.index";
 static const char VertexInputsMetadataName[] = "lgc.vertex.inputs";
 static const char IaStateMetadataName[] = "lgc.input.assembly.state";
-static const char VpStateMetadataName[] = "lgc.viewport.state";
 static const char RsStateMetadataName[] = "lgc.rasterizer.state";
 static const char ColorExportFormatsMetadataName[] = "lgc.color.export.formats";
 static const char ColorExportStateMetadataName[] = "lgc.color.export.state";
@@ -277,7 +276,6 @@ void PipelineState::clear(Module *module) {
   m_colorExportFormats.clear();
   m_colorExportState = {};
   m_inputAssemblyState = {};
-  m_viewportState = {};
   m_rasterizerState = {};
   record(module);
 }
@@ -995,12 +993,9 @@ void PipelineState::readColorExportState(Module *module) {
 // Set graphics state (input-assembly, viewport, rasterizer).
 //
 // @param iaState : Input assembly state
-// @param vpState : Viewport state
 // @param rsState : Rasterizer state
-void PipelineState::setGraphicsState(const InputAssemblyState &iaState, const ViewportState &vpState,
-                                     const RasterizerState &rsState) {
+void PipelineState::setGraphicsState(const InputAssemblyState &iaState, const RasterizerState &rsState) {
   m_inputAssemblyState = iaState;
-  m_viewportState = vpState;
   m_rasterizerState = rsState;
 }
 
@@ -1036,7 +1031,6 @@ void PipelineState::readDeviceIndex(Module *module) {
 // @param [in/out] module : IR module to record into
 void PipelineState::recordGraphicsState(Module *module) {
   setNamedMetadataToArrayOfInt32(module, m_inputAssemblyState, IaStateMetadataName);
-  setNamedMetadataToArrayOfInt32(module, m_viewportState, VpStateMetadataName);
   setNamedMetadataToArrayOfInt32(module, m_rasterizerState, RsStateMetadataName);
 }
 
@@ -1046,7 +1040,6 @@ void PipelineState::recordGraphicsState(Module *module) {
 // @param [in/out] module : IR module to read from
 void PipelineState::readGraphicsState(Module *module) {
   readNamedMetadataArrayOfInt32(module, IaStateMetadataName, m_inputAssemblyState);
-  readNamedMetadataArrayOfInt32(module, VpStateMetadataName, m_viewportState);
   readNamedMetadataArrayOfInt32(module, RsStateMetadataName, m_rasterizerState);
 }
 
