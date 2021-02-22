@@ -70,7 +70,6 @@ private:
   bool canUseNgg(llvm::Module *module);
   bool canUseNggCulling(llvm::Module *module);
   void buildNggCullingControlRegister(NggControl &nggControl);
-  unsigned getVerticesPerPrimitive() const;
 
   void processShader();
 

@@ -635,8 +635,30 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
   pipeline->setDeviceIndex(inputIaState.deviceIndex);
 
   InputAssemblyState inputAssemblyState = {};
-  // PrimitiveTopology happens to have the same values as the corresponding Vulkan enum.
-  inputAssemblyState.topology = static_cast<PrimitiveTopology>(inputIaState.topology);
+  switch (inputIaState.topology) {
+  case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+    inputAssemblyState.primitiveType = PrimitiveType::Point;
+    break;
+  case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+  case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+  case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+  case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
+    inputAssemblyState.primitiveType = PrimitiveType::Line;
+    break;
+  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
+  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
+  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
+  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
+    inputAssemblyState.primitiveType = PrimitiveType::Triangle;
+    break;
+  case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
+    inputAssemblyState.primitiveType = PrimitiveType::Patch;
+    break;
+  default:
+    llvm_unreachable("");
+  }
+
   inputAssemblyState.patchControlPoints = inputIaState.patchControlPoints;
   inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
   inputAssemblyState.switchWinding = inputIaState.switchWinding;

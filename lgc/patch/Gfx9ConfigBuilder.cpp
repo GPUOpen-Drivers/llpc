@@ -1523,16 +1523,12 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
       llvm_unreachable("Should never be called!");
   } else {
     // Without tessellation
-    const auto topology = m_pipelineState->getInputAssemblyState().topology;
-    if (topology == PrimitiveTopology::PointList)
+    const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
+    if (primType == PrimitiveType::Point)
       gsOutputPrimitiveType = POINTLIST;
-    else if (topology == PrimitiveTopology::LineList || topology == PrimitiveTopology::LineStrip ||
-             topology == PrimitiveTopology::LineListWithAdjacency ||
-             topology == PrimitiveTopology::LineStripWithAdjacency)
+    else if (primType == PrimitiveType::Line)
       gsOutputPrimitiveType = LINESTRIP;
-    else if (topology == PrimitiveTopology::TriangleList || topology == PrimitiveTopology::TriangleStrip ||
-             topology == PrimitiveTopology::TriangleFan || topology == PrimitiveTopology::TriangleListWithAdjacency ||
-             topology == PrimitiveTopology::TriangleStripWithAdjacency)
+    else if (primType == PrimitiveType::Triangle)
       gsOutputPrimitiveType = TRISTRIP;
     else
       llvm_unreachable("Should never be called!");

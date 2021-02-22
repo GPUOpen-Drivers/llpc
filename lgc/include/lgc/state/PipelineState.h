@@ -89,7 +89,6 @@ struct NggControl {
   bool alwaysUsePrimShaderTable; // Always use primitive shader table to fetch culling-control registers
   NggCompactMode compactMode;    // Compaction mode after culling operations
 
-  bool enableFastLaunch;          // Enable the hardware to launch subgroups of work at a faster rate
   bool enableVertexReuse;         // Enable optimization to cull duplicate vertices
   bool enableBackfaceCulling;     // Enable culling of primitives that don't meet facing criteria
   bool enableFrustumCulling;      // Enable discarding of primitives outside of view frustum
