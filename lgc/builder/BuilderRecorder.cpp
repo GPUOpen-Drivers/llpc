@@ -1914,6 +1914,8 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ReadGenericOutput:
       // Functions that only read memory.
       func->addFnAttr(Attribute::ReadOnly);
+      // Must be marked as returning for DCE.
+      func->addFnAttr(Attribute::WillReturn);
       break;
     case Opcode::ImageStore:
       // Functions that only write memory.

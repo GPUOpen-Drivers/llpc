@@ -182,7 +182,7 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
 
   std::string callName(baseCallName);
   addTypeMangling(resultTy, args, callName);
-  Value *result = emitCall(callName, resultTy, args, Attribute::ReadOnly, &*GetInsertPoint());
+  Value *result = emitCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn}, &*GetInsertPoint());
 
   result->setName(instName);
   return result;
@@ -741,7 +741,7 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
   std::string callName = isOutput ? lgcName::OutputImportBuiltIn : lgcName::InputImportBuiltIn;
   callName += PipelineState::getBuiltInName(builtIn);
   addTypeMangling(resultTy, args, callName);
-  Value *result = emitCall(callName, resultTy, args, Attribute::ReadOnly, &*GetInsertPoint());
+  Value *result = emitCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn}, &*GetInsertPoint());
 
   if (instName.isTriviallyEmpty())
     result->setName(PipelineState::getBuiltInName(builtIn));
