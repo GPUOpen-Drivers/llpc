@@ -543,6 +543,9 @@ public:
   // Set the shader stage mask
   virtual void setShaderStageMask(unsigned mask) = 0;
 
+  // Set client name
+  virtual void setClient(llvm::StringRef client) = 0;
+
   // Set and get per-pipeline options
   virtual void setOptions(const Options &options) = 0;
   virtual const Options &getOptions() const = 0;

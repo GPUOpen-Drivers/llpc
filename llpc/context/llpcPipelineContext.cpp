@@ -228,7 +228,8 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const 
   pipeline->set128BitCacheHash(get128BitCacheHashCode(),
                                VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION));
 
-  // Give the pipeline options to the middle-end.
+  // Give the client name and pipeline options to the middle-end.
+  pipeline->setClient("Vulkan");
   setOptionsInPipeline(pipeline);
 
   if (!unlinked) {

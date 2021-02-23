@@ -64,7 +64,7 @@ ConfigBuilderBase::ConfigBuilderBase(Module *module, PipelineState *pipelineStat
   m_pipelineNode =
       m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
 
-  setApiName("Vulkan"); // TODO: Client API name should be from ICD.
+  setApiName(pipelineState->getClient());
 }
 
 // =====================================================================================================================

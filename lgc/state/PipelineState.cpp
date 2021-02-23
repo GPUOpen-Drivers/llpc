@@ -51,6 +51,7 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable t
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";
+static const char ClientMetadataName[] = "lgc.client";
 static const char OptionsMetadataName[] = "lgc.options";
 static const char UserDataMetadataName[] = "lgc.user.data.nodes";
 static const char DeviceIndexMetadataName[] = "lgc.device.index";
@@ -432,12 +433,16 @@ const ShaderOptions &PipelineState::getShaderOptions(ShaderStage stage) {
 
 // =====================================================================================================================
 // Record pipeline and shader options into IR metadata.
-// This also records m_unlinked.
+// This also records m_client and m_unlinked.
 // TODO: The options could be recorded in a more human-readable form, with a string for the option name for each
 // option.
 //
 // @param [in/out] module : Module to record metadata into
 void PipelineState::recordOptions(Module *module) {
+  auto clientNamedMeta = module->getOrInsertNamedMetadata(ClientMetadataName);
+  clientNamedMeta->clearOperands();
+  clientNamedMeta->addOperand(llvm::MDNode::get(module->getContext(), MDString::get(module->getContext(), m_client)));
+
   if (m_unlinked) {
     unsigned unlinkedAsInt = m_unlinked;
     setNamedMetadataToArrayOfInt32(module, unlinkedAsInt, UnlinkedMetadataName);
@@ -452,10 +457,21 @@ void PipelineState::recordOptions(Module *module) {
 
 // =====================================================================================================================
 // Read pipeline and shader options from IR metadata.
-// This also reads m_unlinked.
+// This also reads m_client and m_unlinked.
 //
 // @param module : Module to read metadata from
 void PipelineState::readOptions(Module *module) {
+  m_client.clear();
+  if (auto clientNamedMeta = module->getNamedMetadata(ClientMetadataName)) {
+    if (clientNamedMeta->getNumOperands() >= 1) {
+      auto clientMeta = clientNamedMeta->getOperand(0);
+      if (clientMeta->getNumOperands() >= 1) {
+        if (MDString *mdString = dyn_cast<MDString>(clientMeta->getOperand(0)))
+          m_client = mdString->getString().str();
+      }
+    }
+  }
+
   unsigned unlinkedAsInt = 0;
   readNamedMetadataArrayOfInt32(module, UnlinkedMetadataName, unlinkedAsInt);
   m_unlinked = unlinkedAsInt != 0;

@@ -132,6 +132,9 @@ public:
   // Set shader stage mask
   void setShaderStageMask(unsigned mask) override final { m_stageMask = mask; }
 
+  // Set client name
+  void setClient(llvm::StringRef client) override final { m_client = client.str(); }
+
   // Set and get per-pipeline options
   void setOptions(const Options &options) override final { m_options = options; }
   const Options &getOptions() const override final { return m_options; }
@@ -207,6 +210,9 @@ public:
   ShaderStage getLastVertexProcessingStage() const;
   ShaderStage getPrevShaderStage(ShaderStage shaderStage) const;
   ShaderStage getNextShaderStage(ShaderStage shaderStage) const;
+
+  // Get client name
+  const char *getClient() const { return m_client.c_str(); }
 
   // Get per-shader options
   const ShaderOptions &getShaderOptions(ShaderStage stage);
@@ -410,6 +416,7 @@ private:
   bool m_unlinked = false;                              // Whether generating an unlinked half-pipeline ELF
   unsigned m_stageMask = 0;                             // Mask of active shader stages
   bool m_computeLibrary = false;                        // Whether pipeline is in fact a compute library
+  std::string m_client;                                 // Client name for PAL metadata
   Options m_options = {};                               // Per-pipeline options
   std::vector<ShaderOptions> m_shaderOptions;           // Per-shader options
   std::unique_ptr<ResourceNode[]> m_allocUserDataNodes; // Allocated buffer for user data
