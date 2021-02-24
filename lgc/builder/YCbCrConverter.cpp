@@ -838,12 +838,6 @@ Value *YCbCrConverter::convertColor(Type *resultTy, SamplerYCbCrModelConversion 
     break;
   }
 
-  if (colorModel != SamplerYCbCrModelConversion::YCbCrIdentity) {
-    result =
-        m_builder->CreateFClamp(result, m_builder->CreateVectorSplat(4, ConstantFP::get(m_builder->getFloatTy(), 0.0)),
-                                m_builder->CreateVectorSplat(4, ConstantFP::get(m_builder->getFloatTy(), 1.0)));
-  }
-
   return result;
 }
 
