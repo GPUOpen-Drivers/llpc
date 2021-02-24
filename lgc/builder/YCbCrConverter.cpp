@@ -748,15 +748,17 @@ Value *YCbCrConverter::convertColor(Type *resultTy, SamplerYCbCrModelConversion 
                                     unsigned *channelBits, Value *imageOp) {
   Value *subImage = m_builder->CreateShuffleVector(imageOp, imageOp, ArrayRef<int>{0, 1, 2});
 
-  Value *minVec = UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
-  minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(m_builder->getFloatTy(), -0.5), uint64_t(0));
-  minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(m_builder->getFloatTy(), 0.0), uint64_t(1));
-  minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(m_builder->getFloatTy(), -0.5), uint64_t(2));
+  Type *floatTy = m_builder->getFloatTy();
 
-  Value *maxVec = UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
-  maxVec = m_builder->CreateInsertElement(maxVec, ConstantFP::get(m_builder->getFloatTy(), 0.5), uint64_t(0));
-  maxVec = m_builder->CreateInsertElement(maxVec, ConstantFP::get(m_builder->getFloatTy(), 1.0), uint64_t(1));
-  maxVec = m_builder->CreateInsertElement(maxVec, ConstantFP::get(m_builder->getFloatTy(), 0.5), uint64_t(2));
+  Value *minVec = UndefValue::get(FixedVectorType::get(floatTy, 3));
+  minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(floatTy, -0.5), uint64_t(0));
+  minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(floatTy, 0.0), uint64_t(1));
+  minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(floatTy, -0.5), uint64_t(2));
+
+  Value *maxVec = UndefValue::get(FixedVectorType::get(floatTy, 3));
+  maxVec = m_builder->CreateInsertElement(maxVec, ConstantFP::get(floatTy, 0.5), uint64_t(0));
+  maxVec = m_builder->CreateInsertElement(maxVec, ConstantFP::get(floatTy, 1.0), uint64_t(1));
+  maxVec = m_builder->CreateInsertElement(maxVec, ConstantFP::get(floatTy, 0.5), uint64_t(2));
 
   Value *result = UndefValue::get(resultTy);
 
@@ -769,96 +771,60 @@ Value *YCbCrConverter::convertColor(Type *resultTy, SamplerYCbCrModelConversion 
     result = imageOp;
     break;
   }
-  case SamplerYCbCrModelConversion::YCbCrIdentity: {
-    // result = RangeExpaned(C'_rgba)
-    subImage = m_builder->CreateFClamp(rangeExpand(range, channelBits, subImage), minVec, maxVec);
-    Value *outputR = m_builder->CreateExtractElement(subImage, m_builder->getInt64(0));
-    Value *outputG = m_builder->CreateExtractElement(subImage, m_builder->getInt64(1));
-    Value *outputB = m_builder->CreateExtractElement(subImage, m_builder->getInt64(2));
-    Value *outputA = m_builder->CreateExtractElement(imageOp, m_builder->getInt64(3));
-
-    result = m_builder->CreateInsertElement(result, outputR, m_builder->getInt64(0));
-    result = m_builder->CreateInsertElement(result, outputG, m_builder->getInt64(1));
-    result = m_builder->CreateInsertElement(result, outputB, m_builder->getInt64(2));
-    result = m_builder->CreateInsertElement(result, outputA, m_builder->getInt64(3));
-    break;
-  }
+  case SamplerYCbCrModelConversion::YCbCrIdentity:
   case SamplerYCbCrModelConversion::YCbCr601:
   case SamplerYCbCrModelConversion::YCbCr709:
   case SamplerYCbCrModelConversion::YCbCr2020: {
     // inputVec = RangeExpaned(C'_rgba)
     Value *inputVec = m_builder->CreateFClamp(rangeExpand(range, channelBits, subImage), minVec, maxVec);
 
-    Value *row0 = UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
-    Value *row1 = UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
-    Value *row2 = UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
+    Value *inputCr = m_builder->CreateExtractElement(inputVec, m_builder->getInt64(0));
+    Value *inputY = m_builder->CreateExtractElement(inputVec, m_builder->getInt64(1));
+    Value *inputCb = m_builder->CreateExtractElement(inputVec, m_builder->getInt64(2));
+
+    // SamplerYCbCrModelConversion::YCbCrIdentity
+    Value *outputR = inputCr;
+    Value *outputG = inputY;
+    Value *outputB = inputCb;
+    Value *outputA = m_builder->CreateExtractElement(imageOp, m_builder->getInt64(3));
 
     if (colorModel == SamplerYCbCrModelConversion::YCbCr601) {
 
       //           [            1.402f,   1.0f,               0.0f]
       // convMat = [-0.419198 / 0.587f,   1.0f, -0.202008 / 0.587f]
       //           [              0.0f,   1.0f,             1.772f]
-      row0 = m_builder->CreateInsertElement(row0, ConstantFP::get(m_builder->getFloatTy(), 1.402f), uint64_t(0));
-      row0 = m_builder->CreateInsertElement(row0, ConstantFP::get(m_builder->getFloatTy(), 1.0f), uint64_t(1));
-      row0 = m_builder->CreateInsertElement(row0, ConstantFP::get(m_builder->getFloatTy(), 0.0f), uint64_t(2));
-
       float row1Col0 = static_cast<float>(-0.419198 / 0.587);
       float row1Col2 = static_cast<float>(-0.202008 / 0.587);
 
-      row1 = m_builder->CreateInsertElement(row1, ConstantFP::get(m_builder->getFloatTy(), row1Col0), uint64_t(0));
-      row1 = m_builder->CreateInsertElement(row1, ConstantFP::get(m_builder->getFloatTy(), 1.0f), uint64_t(1));
-      row1 = m_builder->CreateInsertElement(row1, ConstantFP::get(m_builder->getFloatTy(), row1Col2), uint64_t(2));
-
-      row2 = m_builder->CreateInsertElement(row2, ConstantFP::get(m_builder->getFloatTy(), 0.0f), uint64_t(0));
-      row2 = m_builder->CreateInsertElement(row2, ConstantFP::get(m_builder->getFloatTy(), 1.0f), uint64_t(1));
-      row2 = m_builder->CreateInsertElement(row2, ConstantFP::get(m_builder->getFloatTy(), 1.772f), uint64_t(2));
+      outputR = m_builder->CreateFma(inputCr, ConstantFP::get(floatTy, 1.402f), inputY);
+      outputG = m_builder->CreateFma(inputCr, ConstantFP::get(floatTy, row1Col0), inputY);
+      outputG = m_builder->CreateFma(inputCb, ConstantFP::get(floatTy, row1Col2), outputG);
+      outputB = m_builder->CreateFma(inputCb, ConstantFP::get(floatTy, 1.772f), inputY);
     } else if (colorModel == SamplerYCbCrModelConversion::YCbCr709) {
 
       //           [              1.5748f,   1.0f,                  0.0f]
       // convMat = [-0.33480248 / 0.7152f,   1.0f, -0.13397432 / 0.7152f]
       //           [                 0.0f,   1.0f,               1.8556f]
-      row0 = m_builder->CreateInsertElement(row0, ConstantFP::get(m_builder->getFloatTy(), 1.5748f), uint64_t(0));
-      row0 = m_builder->CreateInsertElement(row0, ConstantFP::get(m_builder->getFloatTy(), 1.0f), uint64_t(1));
-      row0 = m_builder->CreateInsertElement(row0, ConstantFP::get(m_builder->getFloatTy(), 0.0f), uint64_t(2));
-
       float row1Col0 = static_cast<float>(-0.33480248 / 0.7152);
       float row1Col2 = static_cast<float>(-0.13397432 / 0.7152);
 
-      row1 = m_builder->CreateInsertElement(row1, ConstantFP::get(m_builder->getFloatTy(), row1Col0), uint64_t(0));
-      row1 = m_builder->CreateInsertElement(row1, ConstantFP::get(m_builder->getFloatTy(), 1.0f), uint64_t(1));
-      row1 = m_builder->CreateInsertElement(row1, ConstantFP::get(m_builder->getFloatTy(), row1Col2), uint64_t(2));
-
-      row2 = m_builder->CreateInsertElement(row2, ConstantFP::get(m_builder->getFloatTy(), 0.0f), uint64_t(0));
-      row2 = m_builder->CreateInsertElement(row2, ConstantFP::get(m_builder->getFloatTy(), 1.0f), uint64_t(1));
-      row2 = m_builder->CreateInsertElement(row2, ConstantFP::get(m_builder->getFloatTy(), 1.8556f), uint64_t(2));
-    } else {
+      outputR = m_builder->CreateFma(inputCr, ConstantFP::get(floatTy, 1.5748f), inputY);
+      outputG = m_builder->CreateFma(inputCr, ConstantFP::get(floatTy, row1Col0), inputY);
+      outputG = m_builder->CreateFma(inputCb, ConstantFP::get(floatTy, row1Col2), outputG);
+      outputB = m_builder->CreateFma(inputCb, ConstantFP::get(floatTy, 1.8556f), inputY);
+    } else if (colorModel == SamplerYCbCrModelConversion::YCbCr2020) {
 
       //           [              1.4746f,   1.0f,                  0.0f]
       // convMat = [-0.38737742 / 0.6780f,   1.0f, -0.11156702 / 0.6780f]
       //           [                 0.0f,   1.0f,               1.8814f]
-      row0 = m_builder->CreateInsertElement(row0, ConstantFP::get(m_builder->getFloatTy(), 1.4746f), uint64_t(0));
-      row0 = m_builder->CreateInsertElement(row0, ConstantFP::get(m_builder->getFloatTy(), 1.0f), uint64_t(1));
-      row0 = m_builder->CreateInsertElement(row0, ConstantFP::get(m_builder->getFloatTy(), 0.0f), uint64_t(2));
-
       float row1Col0 = static_cast<float>(-0.38737742 / 0.6780);
       float row1Col2 = static_cast<float>(-0.11156702 / 0.6780);
 
-      row1 = m_builder->CreateInsertElement(row1, ConstantFP::get(m_builder->getFloatTy(), row1Col0), uint64_t(0));
-      row1 = m_builder->CreateInsertElement(row1, ConstantFP::get(m_builder->getFloatTy(), 1.0f), uint64_t(1));
-      row1 = m_builder->CreateInsertElement(row1, ConstantFP::get(m_builder->getFloatTy(), row1Col2), uint64_t(2));
-
-      row2 = m_builder->CreateInsertElement(row2, ConstantFP::get(m_builder->getFloatTy(), 0.0f), uint64_t(0));
-      row2 = m_builder->CreateInsertElement(row2, ConstantFP::get(m_builder->getFloatTy(), 1.0f), uint64_t(1));
-      row2 = m_builder->CreateInsertElement(row2, ConstantFP::get(m_builder->getFloatTy(), 1.8814f), uint64_t(2));
+      outputR = m_builder->CreateFma(inputCr, ConstantFP::get(floatTy, 1.4746f), inputY);
+      outputG = m_builder->CreateFma(inputCr, ConstantFP::get(floatTy, row1Col0), inputY);
+      outputG = m_builder->CreateFma(inputCb, ConstantFP::get(floatTy, row1Col2), outputG);
+      outputB = m_builder->CreateFma(inputCb, ConstantFP::get(floatTy, 1.8814f), inputY);
     }
-
-    // output[R]             [Cr]
-    // output[G] = convMat * [ Y]
-    // output[B]             [Cb]
-    Value *outputR = m_builder->CreateDotProduct(row0, inputVec);
-    Value *outputG = m_builder->CreateDotProduct(row1, inputVec);
-    Value *outputB = m_builder->CreateDotProduct(row2, inputVec);
-    Value *outputA = m_builder->CreateExtractElement(imageOp, m_builder->getInt64(3));
 
     result = m_builder->CreateInsertElement(result, outputR, m_builder->getInt64(0));
     result = m_builder->CreateInsertElement(result, outputG, m_builder->getInt64(1));
