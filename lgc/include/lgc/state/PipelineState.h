@@ -257,15 +257,6 @@ public:
   // ring is on-chip.
   bool isGsOnChip() const { return m_gsOnChip; }
 
-  // Initialize the state of input/output packing
-  void initializePackInOut();
-
-  // Set the state of input/output packing
-  void setPackInOut(bool isPack) { m_packInOut = isPack; }
-
-  // Check whether input/output packing can be used
-  bool canPackInOut() const { return m_packInOut; }
-
   // Gets wave size for the specified shader stage
   unsigned getShaderWaveSize(ShaderStage stage);
 
@@ -427,7 +418,6 @@ private:
   // Cached MDString for each resource node type
 
   bool m_gsOnChip = false;                                                     // Whether to use GS on-chip mode
-  bool m_packInOut = false;                                                    // Whether to use packing on input/output
   NggControl m_nggControl = {};                                                // NGG control settings
   ShaderModes m_shaderModes;                                                   // Shader modes for this pipeline
   unsigned m_deviceIndex = 0;                                                  // Device index

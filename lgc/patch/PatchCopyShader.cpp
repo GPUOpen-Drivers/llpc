@@ -287,7 +287,7 @@ bool PatchCopyShader::runOnModule(Module &module) {
 void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
   const auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
-  const bool isPack = m_pipelineState->canPackInOut();
+  const bool isPack = !m_pipelineState->isUnlinked();
   std::set<InOutLocationInfo> visitedLocInfos;
 
   // Collect the byte sizes of the output value at each mapped location
@@ -366,7 +366,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
 
   if (resUsage->inOutUsage.enableXfb) {
     // Export XFB output
-    if (m_pipelineState->canPackInOut()) {
+    if (!m_pipelineState->isUnlinked()) {
       // With packing locations, we should collect the XFB output value at an origianl location
       DenseMap<unsigned, SmallVector<Value *, 4>> origLocElemsMap;
       for (const auto &locInfoXfbInfoPair : locInfoXfbOutInfoMap) {

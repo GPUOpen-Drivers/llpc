@@ -577,7 +577,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
             loc = resUsage->inOutUsage.perPatchInputLocMap[value];
           }
         } else {
-          if (m_pipelineState->canPackInOut() &&
+          if (!m_pipelineState->isUnlinked() &&
               (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageTessControl ||
                m_shaderStage == ShaderStageGeometry)) {
             // The inputLocInfoMap of {TCS, GS, FS} maps original InOutLocationInfo to tightly compact InOutLocationInfo
@@ -881,7 +881,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         exist = true;
         loc = value;
       } else {
-        if (m_pipelineState->canPackInOut()) {
+        if (!m_pipelineState->isUnlinked()) {
           const bool isVs = (m_shaderStage == ShaderStageVertex);
           const bool isGs = (m_shaderStage == ShaderStageGeometry);
           assert(isVs || isGs || m_shaderStage == ShaderStageTessEval);
