@@ -1754,6 +1754,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     // the address of that table.
     SET_REG(&pConfig->primShaderRegs, SPI_SHADER_PGM_LO_GS, static_cast<unsigned>(UserDataMapping::NggCullingData));
   }
+
 }
 
 // =====================================================================================================================

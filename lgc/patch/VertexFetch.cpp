@@ -539,7 +539,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     if (!m_vertexIndex) {
       auto savedInsertPoint = builder.saveIP();
       builder.SetInsertPoint(&*insertPos->getFunction()->front().getFirstInsertionPt());
-      m_vertexIndex = ShaderInputs::getVertexIndex(builder);
+      m_vertexIndex = ShaderInputs::getVertexIndex(builder, *m_lgcContext);
       builder.restoreIP(savedInsertPoint);
     }
     vbIndex = m_vertexIndex;
@@ -551,13 +551,13 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
       if (!m_instanceIndex) {
         auto savedInsertPoint = builder.saveIP();
         builder.SetInsertPoint(&*insertPos->getFunction()->front().getFirstInsertionPt());
-        m_instanceIndex = ShaderInputs::getInstanceIndex(builder);
+        m_instanceIndex = ShaderInputs::getInstanceIndex(builder, *m_lgcContext);
         builder.restoreIP(savedInsertPoint);
       }
       vbIndex = m_instanceIndex;
     } else {
       // There is a divisor.
-      vbIndex = builder.CreateUDiv(ShaderInputs::getInput(ShaderInput::InstanceId, builder),
+      vbIndex = builder.CreateUDiv(ShaderInputs::getInput(ShaderInput::InstanceId, builder, *m_lgcContext),
                                    builder.getInt32(description->inputRate));
       vbIndex = builder.CreateAdd(vbIndex, ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder));
     }

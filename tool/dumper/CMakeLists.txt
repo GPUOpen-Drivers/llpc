@@ -47,6 +47,10 @@ endif()
 
 target_link_libraries(dumper PUBLIC metrohash)
 target_link_libraries(dumper PRIVATE cwpack)
+target_link_libraries(dumper PRIVATE
+    khronos_vulkan_interface
+    khronos_spirv_interface
+)
 
 if(LLPC_ENABLE_SHADER_CACHE)
     target_compile_definitions(dumper PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
@@ -57,23 +61,11 @@ target_include_directories(dumper
         ${XGL_VKGC_PATH}/include
     PRIVATE
         ${XGL_VKGC_PATH}/include
-        ${XGL_VKGC_PATH}/include/khronos
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
-        ${XGL_ICD_PATH}/api/include/khronos
         ${XGL_VKGC_PATH}/util
 )
-
-if(EXISTS ${SPIRV_HEADERS_PATH})
-    target_include_directories(dumper PRIVATE ${SPIRV_HEADERS_PATH}/include/spirv)
-    target_compile_definitions(dumper PRIVATE EXTERNAL_SPIRV_HEADERS=1)
-endif()
-
-if(EXISTS ${VULKAN_HEADERS_PATH})
-    target_include_directories(dumper PRIVATE ${VULKAN_HEADERS_PATH}/include)
-    target_compile_definitions(dumper PRIVATE EXTERNAL_VULKAN_HEADERS=1)
-endif()
 
 target_sources(dumper PRIVATE
     ../../util/vkgcUtil.cpp

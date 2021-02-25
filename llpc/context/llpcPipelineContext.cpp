@@ -722,9 +722,8 @@ void PipelineContext::setVertexInputDescriptions(Pipeline *pipeline) const {
           attrib->location,
           attrib->binding,
           attrib->offset,
-          (static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride
-               ? 0
-               : binding->stride),
+          (static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride ?
+          0 : binding->stride),
           dfmt,
           nfmt,
           binding->inputRate,

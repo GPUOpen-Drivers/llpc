@@ -73,6 +73,7 @@
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
 //  |     46.1 | Added dynamicVertexStride to GraphicsPipelineBuildInfo                                                |
 //  |     46.0 | Removed the member 'depthBiasEnable' of rsState                                                       |
+//  |     45.5 | Added new enum type ThreadGroupSwizzleMode for thread group swizzling for compute shaders             |
 //  |     45.4 | Added disableLicmThreshold, unrollHintThreshold, and dontUnrollHintThreshold to PipelineShaderOptions |
 //  |     45.3 | Add pipelinedump function to enable BeginPipelineDump and GetPipelineName                             |
 //  |     45.2 | Add GFX IP plus checker to GfxIpVersion                                                               |
@@ -328,6 +329,15 @@ struct ExtendedRobustness {
                            ///  view. Give defined behavior for out-of-bounds image access.
   bool nullDescriptor;     ///< Whether the descriptor can be written with VK_NULL_HANDLE. If set, it is considered
                            ///  valid to access and acts as if the descriptor is bounded to nothing.
+};
+
+/// Represents the tiling modes for compute shader thread group swizzling
+enum class ThreadGroupSwizzleMode : unsigned {
+  Default = 0, ///< Use the default layout. There is no swizzling conducted.
+  _4x4 = 1,    ///< The tile size is 4x4 in x and y dimension.
+  _8x8 = 2,    ///< The tile size is 8x8 in x and y dimension.
+  _16x16 = 3,  ///< The tile size is 16x16 in x and y dimension.
+  Count
 };
 
 /// Represents per pipeline options.

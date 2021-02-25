@@ -39,7 +39,9 @@
 #pragma once
 
 #include "lgc/CommonDefs.h"
+#include "lgc/LgcContext.h"
 #include "lgc/state/AbiMetadata.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
@@ -153,9 +155,6 @@ enum class ShaderInput : unsigned {
 //
 class ShaderInputs {
 public:
-  ShaderInputs() = delete;
-  ShaderInputs(llvm::LLVMContext *context) : m_context(context) {}
-
   // -------------------------------------------------------------------------------------------------------------------
   // Static methods called any time
 
@@ -166,7 +165,7 @@ public:
   }
 
   // Get IR type of a particular shader input
-  static llvm::Type *getInputType(ShaderInput inputKind, llvm::LLVMContext &context);
+  static llvm::Type *getInputType(ShaderInput inputKind, const LgcContext &lgcContext);
 
   // Get name of shader input
   static const char *getInputName(ShaderInput inputKind);
@@ -181,13 +180,13 @@ public:
   static llvm::Value *getSpecialUserDataAsPointer(UserDataMapping kind, llvm::Type *pointeeTy, BuilderBase &builder);
 
   // Get VertexIndex
-  static llvm::Value *getVertexIndex(BuilderBase &builder);
+  static llvm::Value *getVertexIndex(BuilderBase &builder, const LgcContext &lgcContext);
 
   // Get InstanceIndex
-  static llvm::Value *getInstanceIndex(BuilderBase &builder);
+  static llvm::Value *getInstanceIndex(BuilderBase &builder, const LgcContext &lgcContext);
 
   // Get a shader input value by inserting a call to lgc.shader.input
-  static llvm::Value *getInput(ShaderInput kind, BuilderBase &builder);
+  static llvm::Value *getInput(ShaderInput kind, BuilderBase &builder, const LgcContext &lgcContext);
 
   // -------------------------------------------------------------------------------------------------------------------
   // Object methods called during PatchEntryPointMutate
@@ -224,7 +223,6 @@ private:
   }
   ShaderInputUsage *getShaderInputUsage(ShaderStage stage, unsigned inputKind);
 
-  llvm::LLVMContext *m_context;
   llvm::SmallVector<ShaderInputsUsage, ShaderStageCountInternal> m_shaderInputsUsage;
 };
 

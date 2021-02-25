@@ -40,6 +40,27 @@ elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers)
     set(SPIRV_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers CACHE PATH "The path of SPIRV headers.")
 endif()
 
+### Interface Target ###################################################################################################
+### SPIRV Interface ###
+add_library(khronos_spirv_interface INTERFACE)
+
+if(EXISTS ${SPIRV_HEADERS_PATH})
+    target_include_directories(khronos_spirv_interface
+        INTERFACE
+            ${SPIRV_HEADERS_PATH}/include/spirv
+            ${PROJECT_SOURCE_DIR}/include/khronos
+    )
+    target_compile_definitions(khronos_spirv_interface
+        INTERFACE
+            EXTERNAL_SPIRV_HEADERS=1
+    )
+else()
+    target_include_directories(khronos_spirv_interface
+        INTERFACE
+            ${PROJECT_SOURCE_DIR}/include/khronos
+    )
+endif()
+
 ### VKGC build LLPC ################################################################
 if(ICD_BUILD_LLPC)
     target_include_directories(vkgc

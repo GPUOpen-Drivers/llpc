@@ -34,6 +34,7 @@
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ResourceUsage.h"
+#include "lgc/state/TargetInfo.h"
 
 using namespace lgc;
 using namespace llvm;
@@ -102,10 +103,10 @@ Value *ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping kind, Type *poi
 // Get VertexIndex
 //
 // @param builder : Builder to insert code with
-Value *ShaderInputs::getVertexIndex(BuilderBase &builder) {
+Value *ShaderInputs::getVertexIndex(BuilderBase &builder, const LgcContext &lgcContext) {
   // VertexIndex = BaseVertex + VertexID
   Value *baseVertex = getSpecialUserData(UserDataMapping::BaseVertex, builder);
-  Value *vertexId = getInput(ShaderInput::VertexId, builder);
+  Value *vertexId = getInput(ShaderInput::VertexId, builder, lgcContext);
   return builder.CreateAdd(baseVertex, vertexId, "VertexIndex");
 }
 
@@ -113,10 +114,10 @@ Value *ShaderInputs::getVertexIndex(BuilderBase &builder) {
 // Get InstanceIndex
 //
 // @param builder : Builder to insert code with
-Value *ShaderInputs::getInstanceIndex(BuilderBase &builder) {
+Value *ShaderInputs::getInstanceIndex(BuilderBase &builder, const LgcContext &lgcContext) {
   // InstanceIndex = BaseInstance + InstanceID
   Value *baseInstance = getSpecialUserData(UserDataMapping::BaseInstance, builder);
-  Value *instanceId = getInput(ShaderInput::InstanceId, builder);
+  Value *instanceId = getInput(ShaderInput::InstanceId, builder, lgcContext);
   return builder.CreateAdd(baseInstance, instanceId, "InstanceIndex");
 }
 
@@ -125,8 +126,8 @@ Value *ShaderInputs::getInstanceIndex(BuilderBase &builder) {
 //
 // @param kind : The kind of shader input, a ShaderInput enum value
 // @param builder : Builder to insert code with
-Value *ShaderInputs::getInput(ShaderInput kind, BuilderBase &builder) {
-  Type *ty = getInputType(kind, builder.getContext());
+Value *ShaderInputs::getInput(ShaderInput kind, BuilderBase &builder, const LgcContext &lgcContext) {
+  Type *ty = getInputType(kind, lgcContext);
   return builder.CreateNamedCall((Twine(lgcName::ShaderInput) + getInputName(kind)).str(), ty,
                                  builder.getInt32(static_cast<unsigned>(kind)), Attribute::ReadNone);
 }
@@ -136,9 +137,11 @@ Value *ShaderInputs::getInput(ShaderInput kind, BuilderBase &builder) {
 //
 // @param kind : The kind of shader input, a ShaderInput enum value
 // @param context : LLVM context for getting types
-Type *ShaderInputs::getInputType(ShaderInput inputKind, LLVMContext &context) {
+Type *ShaderInputs::getInputType(ShaderInput inputKind, const LgcContext &lgcContext) {
+  LLVMContext &context = lgcContext.getContext();
   switch (inputKind) {
   case ShaderInput::WorkgroupId:
+    return FixedVectorType::get(Type::getInt32Ty(context), 3);
   case ShaderInput::LocalInvocationId:
     return FixedVectorType::get(Type::getInt32Ty(context), 3);
 
@@ -493,13 +496,14 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
   auto intfData = pipelineState->getShaderInterfaceData(shaderStage);
   auto resUsage = pipelineState->getShaderResourceUsage(shaderStage);
   const auto &xfbStrides = resUsage->inOutUsage.xfbStrides;
-  const bool enableXfb = resUsage->inOutUsage.enableXfb;
+  const bool enableHwXfb =
+      resUsage->inOutUsage.enableXfb && pipelineState->getTargetInfo().getGfxIpVersion().major <= 10;
 
   // Enable optional shader inputs as required.
   switch (shaderStage) {
   case ShaderStageVertex:
-    if (enableXfb && (!hasGs && !hasTs)) {
-      // Stream-out in VS as hardware VS
+    if (enableHwXfb && (!hasGs && !hasTs)) {
+      // HW stream-out in VS as hardware VS
       getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
       getShaderInputUsage(shaderStage, ShaderInput::StreamOutWriteIndex)->enable();
       for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
@@ -528,11 +532,11 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
       getShaderInputUsage(shaderStage, ShaderInput::IsOffChip)->enable();
     }
     if (!hasGs) {
-      // TES as hardware VS: handle stream-out. StreamOutInfo is required for off-chip even if there is no
+      // TES as hardware VS: handle HW stream-out. StreamOutInfo is required for off-chip even if there is no
       // stream-out.
-      if (pipelineState->isTessOffChip() || enableXfb)
+      if (pipelineState->isTessOffChip() || enableHwXfb)
         getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
-      if (enableXfb) {
+      if (enableHwXfb) {
         getShaderInputUsage(shaderStage, ShaderInput::StreamOutWriteIndex)->enable();
         for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
           if (xfbStrides[i] > 0)
@@ -607,7 +611,7 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
       if (inputUsage)
         inputUsage->entryArgIdx = argTys.size();
       // Add the argument type.
-      argTys.push_back(getInputType(inputDesc.inputKind, *m_context));
+      argTys.push_back(getInputType(inputDesc.inputKind, *pipelineState->getLgcContext()));
     }
     inputDescs = vgprInputDescs;
   }

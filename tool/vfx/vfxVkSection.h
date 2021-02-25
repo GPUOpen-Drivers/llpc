@@ -467,7 +467,9 @@ public:
     INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_nggState, MemberTypeNggState, true);
     INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_colorBuffer, MemberTypeColorBufferItem,
                                    Vkgc::MaxColorTargets, true);
+
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dynamicVertexStride, MemberTypeBool, false);
+
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 

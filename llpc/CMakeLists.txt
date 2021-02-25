@@ -154,7 +154,6 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/../lgc/interface
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/../include/khronos
         ${PROJECT_SOURCE_DIR}/context
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/lower
@@ -168,23 +167,6 @@ target_include_directories(llpc
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
 )
-
-if(EXISTS ${SPIRV_HEADERS_PATH})
-    target_include_directories(llpc PRIVATE ${SPIRV_HEADERS_PATH}/include/spirv)
-    target_compile_definitions(llpc PRIVATE EXTERNAL_SPIRV_HEADERS=1)
-endif()
-
-if(EXISTS ${VULKAN_HEADERS_PATH})
-    target_include_directories(llpc PRIVATE ${VULKAN_HEADERS_PATH}/include)
-    target_compile_definitions(llpc PRIVATE EXTERNAL_VULKAN_HEADERS=1)
-endif()
-
-# CMAKE-TODO: Figure out a better way to do this.
-target_include_directories(llpc PRIVATE ${XGL_ICD_PATH}/api/include/khronos)
-
-if(VKI_KHR_FRAGMENT_SHADING_RATE)
-  target_compile_definitions(llpc PRIVATE VKI_KHR_FRAGMENT_SHADING_RATE)
-endif()
 
 if(WIN32)
     target_compile_definitions(llpc PRIVATE VK_USE_PLATFORM_WIN32_KHR)
@@ -256,9 +238,6 @@ if(NOT TARGET dumper)
     set(DUMPER_ENABLE_WERROR ${LLPC_ENABLE_WERROR} CACHE BOOL "${PROJECT_NAME} override." FORCE)
     add_subdirectory(../tool/dumper ${PROJECT_BINARY_DIR}/../dumper)
 endif()
-target_link_libraries(llpc PRIVATE dumper)
-
-target_link_libraries(llpc PRIVATE cwpack)
 
 ### LLPC Auto-generated Files ##########################################################################################
 if(ICD_BUILD_LLPC)
@@ -280,6 +259,13 @@ endif()
 # CMAKE-TODO: LLVM_LIB_DIR should probably be set in the op level CMake?
 # Maybe add XGL_LLVM_PATH?
 # How are these built? Can they be built through CMake?
+
+target_link_libraries(llpc PRIVATE dumper)
+target_link_libraries(llpc PRIVATE cwpack)
+target_link_libraries(llpc PUBLIC
+    khronos_vulkan_interface
+    khronos_spirv_interface
+)
 
 ### Visual Studio Filters ##############################################################################################
 target_find_headers(llpc)
@@ -322,7 +308,6 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/../imported/spirv
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/../include
-    ${PROJECT_SOURCE_DIR}/../include/khronos
     ${PROJECT_SOURCE_DIR}/lower
     ${PROJECT_SOURCE_DIR}/patch
     ${PROJECT_SOURCE_DIR}/patch/gfx6/chip
@@ -341,19 +326,6 @@ PRIVATE
     ${LLVM_INCLUDE_DIRS}
 )
 
-if(EXISTS ${SPIRV_HEADERS_PATH})
-    target_include_directories(amdllpc PRIVATE ${SPIRV_HEADERS_PATH}/include/spirv)
-    target_compile_definitions(amdllpc PRIVATE EXTERNAL_SPIRV_HEADERS=1)
-endif()
-
-if(EXISTS ${VULKAN_HEADERS_PATH})
-    target_include_directories(amdllpc PRIVATE ${VULKAN_HEADERS_PATH}/include)
-    target_compile_definitions(amdllpc PRIVATE EXTERNAL_VULKAN_HEADERS=1)
-endif()
-
-set(VULKAN_HEADER_PATH ${XGL_ICD_PATH}/api/include/khronos)
-target_include_directories(amdllpc PRIVATE ${VULKAN_HEADER_PATH})
-
 set_compiler_options(amdllpc ${LLPC_ENABLE_WERROR})
 
 if(UNIX)
@@ -368,10 +340,6 @@ endif()
 ### Add Subdirectories #################################################################################################
 if(ICD_BUILD_LLPC)
 # SPVGEN
-if(XGL_ICD_PATH)
-    set(VULKAN_HEADER_PATH "${XGL_ICD_PATH}/api/include/khronos" CACHE PATH "${PROJECT_NAME} override." FORCE)
-endif()
-
 if(EXISTS ${PROJECT_SOURCE_DIR}/../../spvgen)
     set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../../spvgen CACHE PATH "Specify the path to SPVGEN.")
 else()

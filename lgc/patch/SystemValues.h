@@ -134,8 +134,8 @@ private:
   llvm::SmallVector<llvm::Value *, 8> m_shadowDescTablePtrs; // Shadow descriptor table pointers
   llvm::Instruction *m_internalGlobalTablePtr = nullptr;     // Internal global table pointer
   llvm::Value *m_internalPerShaderTablePtr = nullptr;        // Internal per shader table pointer
-  llvm::Instruction *m_streamOutTablePtr;                    // Stream-out buffer table pointer
-  llvm::Instruction *m_pc = nullptr;                         // Program counter as <2 x i32>
+  llvm::Instruction *m_streamOutTablePtr = nullptr;          // Stream-out buffer table pointer
+  llvm::Instruction *m_pc = nullptr; // Program counter as <2 x i32>
 };
 
 // =====================================================================================================================

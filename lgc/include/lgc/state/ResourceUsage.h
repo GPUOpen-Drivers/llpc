@@ -414,7 +414,7 @@ struct ResourceUsage {
 
 // Represents stream-out data
 struct StreamOutData {
-  unsigned tablePtr;                                   // Table pointer for stream-out
+  unsigned tablePtr; // Table pointer for stream-out
   unsigned streamInfo;                                 // Stream-out info (ID, vertex count, enablement)
   unsigned writeIndex;                                 // Write index for stream-out
   unsigned streamOffsets[MaxTransformFeedbackBuffers]; // Stream-out Offset
