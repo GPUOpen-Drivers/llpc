@@ -188,3 +188,14 @@ it with
 ```
 
 lines. Use this for something like a table that you have custom formatted for readability.
+
+clang-format can be used with `git diff dev -U0 | clang-format-diff -p1 -i`
+where `clang-format-diff` can be found in `llvm-project/clang/tools/clang-format/clang-format-diff.py`.
+
+## clang-tidy
+
+`clang-tidy` can pick up some coding style mistakes. It can be run with
+`git diff dev -U0 | llvm-project/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py -p1 -j32 -path /path/to/build`
+where `/path/to/build/compile_commands.json` exists. CMake generates a
+`compile_commands.json` file when `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` is
+enabled.
