@@ -80,7 +80,7 @@ bool PatchResourceCollect::runOnModule(Module &module) {
   m_pipelineShaders = &getAnalysis<PipelineShaders>();
   m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
-  if (m_pipelineState->canPackInOut()) {
+  if (!m_pipelineState->isUnlinked()) {
     m_locationInfoMapManager = std::make_unique<InOutLocationInfoMapManager>();
     // Supported packing input and ouput
     m_inOutPackStates[ShaderStageFragment][0] = true;
