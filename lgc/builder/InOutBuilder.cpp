@@ -33,6 +33,7 @@
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
 
 #define DEBUG_TYPE "lgc-builder-impl-inout"
@@ -848,11 +849,12 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
 
   case BuiltInWorkgroupId:
     // WorkgroupId is a v3i32 shader input (three SGPRs set up by hardware).
-    return ShaderInputs::getInput(ShaderInput::WorkgroupId, *this);
+    return ShaderInputs::getInput(ShaderInput::WorkgroupId, *this, *getLgcContext());
 
   case BuiltInLocalInvocationId: {
     // LocalInvocationId is a v3i32 shader input (three VGPRs set up in hardware).
-    Value *localInvocationId = ShaderInputs::getInput(ShaderInput::LocalInvocationId, *this);
+    Value *localInvocationId = ShaderInputs::getInput(ShaderInput::LocalInvocationId, *this, *getLgcContext());
+
     // Unused dimensions need zero-initializing.
     if (shaderMode.workgroupSizeZ <= 1) {
       if (shaderMode.workgroupSizeY <= 1)
@@ -932,9 +934,9 @@ Value *InOutBuilder::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInDrawIndex:
     return ShaderInputs::getSpecialUserData(UserDataMapping::DrawIndex, *this);
   case BuiltInVertexIndex:
-    return ShaderInputs::getVertexIndex(*this);
+    return ShaderInputs::getVertexIndex(*this, *getLgcContext());
   case BuiltInInstanceIndex:
-    return ShaderInputs::getInstanceIndex(*this);
+    return ShaderInputs::getInstanceIndex(*this, *getLgcContext());
   default:
     // Not handled; caller will handle with lgc.input.import.builtin, which is then lowered in PatchInOutImportExport.
     return nullptr;

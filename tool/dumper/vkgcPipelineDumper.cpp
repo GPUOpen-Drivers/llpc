@@ -842,7 +842,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
     }
   }
 
-  dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
+    dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
 }
 
 // =====================================================================================================================

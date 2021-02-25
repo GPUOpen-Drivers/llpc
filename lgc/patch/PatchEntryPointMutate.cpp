@@ -245,7 +245,7 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
   gatherUserDataUsage(&module);
 
   // Create ShaderInputs object and gather shader input usage.
-  ShaderInputs shaderInputs(&module.getContext());
+  ShaderInputs shaderInputs;
   shaderInputs.gatherUsage(module);
   setupComputeWithCalls(&module);
 

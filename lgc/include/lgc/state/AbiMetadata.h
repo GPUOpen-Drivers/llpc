@@ -139,31 +139,30 @@ static constexpr char HardwareMapping[] = ".hardware_mapping";
 
 // User data mapping for special user data values.
 enum class UserDataMapping : unsigned {
-  GlobalTable = 0x10000000,       // 32-bit pointer to GPU memory containing the global internal table.
-  PerShaderTable = 0x10000001,    // 32-bit pointer to GPU memory containing the per-shader internal table.
-  SpillTable = 0x10000002,        // 32-bit pointer to GPU memory containing the user data spill table.  See User
-                                  //  Data Spilling.
-  BaseVertex = 0x10000003,        // Vertex offset (32-bit unsigned integer). Only supported by the first stage in a
-                                  //  graphics pipeline.
-  BaseInstance = 0x10000004,      // Instance offset (32-bit unsigned integer). Only supported by the first stage in
-                                  //  a graphics pipeline.
-  DrawIndex = 0x10000005,         // Draw index (32-bit unsigned integer). Only supported by the first stage in a
-                                  //  graphics pipeline.
-  Workgroup = 0x10000006,         // Thread group count (32-bit unsigned integer). Only supported by compute
-                                  //  pipelines.
-  EsGsLdsSize = 0x1000000A,       // Indicates that PAL will program this user-SGPR to contain the amount of LDS
-                                  //  space used for the ES/GS pseudo-ring-buffer for passing data between shader
-                                  //  stages.
-  ViewId = 0x1000000B,            // View id (32-bit unsigned integer) identifies a view of graphic
-                                  //  pipeline instancing.
-  StreamOutTable = 0x1000000C,    // 32-bit pointer to GPU memory containing the stream out target SRD table.  This
-                                  //  can only appear for one shader stage per pipeline.
+  GlobalTable = 0x10000000,    // 32-bit pointer to GPU memory containing the global internal table.
+  PerShaderTable = 0x10000001, // 32-bit pointer to GPU memory containing the per-shader internal table.
+  SpillTable = 0x10000002,     // 32-bit pointer to GPU memory containing the user data spill table.  See User
+                               //  Data Spilling.
+  BaseVertex = 0x10000003,     // Vertex offset (32-bit unsigned integer). Only supported by the first stage in a
+                               //  graphics pipeline.
+  BaseInstance = 0x10000004,   // Instance offset (32-bit unsigned integer). Only supported by the first stage in
+                               //  a graphics pipeline.
+  DrawIndex = 0x10000005,      // Draw index (32-bit unsigned integer). Only supported by the first stage in a
+                               //  graphics pipeline.
+  Workgroup = 0x10000006,      // Thread group count (32-bit unsigned integer). Only supported by compute
+                               //  pipelines.
+  EsGsLdsSize = 0x1000000A,    // Indicates that PAL will program this user-SGPR to contain the amount of LDS
+                               //  space used for the ES/GS pseudo-ring-buffer for passing data between shader
+                               //  stages.
+  ViewId = 0x1000000B,         // View id (32-bit unsigned integer) identifies a view of graphic
+                               //  pipeline instancing.
+  StreamOutTable = 0x1000000C, // 32-bit pointer to GPU memory containing the stream out target SRD table.  This
+                               //  can only appear for one shader stage per pipeline.
   VertexBufferTable = 0x1000000F, // 32-bit pointer to GPU memory containing the vertex buffer SRD table.  This can
                                   //  only appear for one shader stage per pipeline.
   NggCullingData = 0x10000011,    // 64-bit pointer to GPU memory containing the hardware register data needed by
                                   //  some NGG pipelines to perform culling.  This value contains the address of the
                                   //  first of two consecutive registers which provide the full GPU address.
-
   // Values used in a user data PAL metadata register to be resolved at link time.
   // This is part of the "unlinked" ABI, so should arguably be in AbiUnlinked.h.
   DescriptorSet0 = 0x80000000,   // 32-bit pointer to the descriptor table for descriptor set 0: add N to this value
