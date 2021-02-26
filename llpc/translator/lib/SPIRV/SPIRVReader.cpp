@@ -1778,7 +1778,13 @@ Value *SPIRVToLLVM::transAtomicRMW(SPIRVValue *const spvValue, const AtomicRMWIn
   Value *const atomicValue = transValue(spvAtomicInst->getOpValue(3), getBuilder()->GetInsertBlock()->getParent(),
                                         getBuilder()->GetInsertBlock());
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 383129
+  // Old version of the code
   return getBuilder()->CreateAtomicRMW(binOp, atomicPointer, atomicValue, ordering, scope);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  return getBuilder()->CreateAtomicRMW(binOp, atomicPointer, atomicValue, MaybeAlign(), ordering, scope);
+#endif
 }
 
 // =====================================================================================================================
@@ -1990,7 +1996,13 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicIIncrement>(SPIRVVa
 
   Value *const one = ConstantInt::get(atomicPointer->getType()->getPointerElementType(), 1);
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 383129
+  // Old version of the code
   return getBuilder()->CreateAtomicRMW(AtomicRMWInst::Add, atomicPointer, one, ordering, scope);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  return getBuilder()->CreateAtomicRMW(AtomicRMWInst::Add, atomicPointer, one, MaybeAlign(), ordering, scope);
+#endif
 }
 
 // =====================================================================================================================
@@ -2014,7 +2026,13 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicIDecrement>(SPIRVVa
 
   Value *const one = ConstantInt::get(atomicPointer->getType()->getPointerElementType(), 1);
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 383129
+  // Old version of the code
   return getBuilder()->CreateAtomicRMW(AtomicRMWInst::Sub, atomicPointer, one, ordering, scope);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  return getBuilder()->CreateAtomicRMW(AtomicRMWInst::Sub, atomicPointer, one, MaybeAlign(), ordering, scope);
+#endif
 }
 
 // =====================================================================================================================
@@ -2042,8 +2060,15 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(SP
   Value *const compareValue = transValue(spvAtomicInst->getOpValue(5), getBuilder()->GetInsertBlock()->getParent(),
                                          getBuilder()->GetInsertBlock());
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 383129
+  // Old version of the code
   AtomicCmpXchgInst *const atomicCmpXchg = getBuilder()->CreateAtomicCmpXchg(atomicPointer, compareValue, exchangeValue,
                                                                              successOrdering, failureOrdering, scope);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  AtomicCmpXchgInst *const atomicCmpXchg = getBuilder()->CreateAtomicCmpXchg(
+      atomicPointer, compareValue, exchangeValue, MaybeAlign(), successOrdering, failureOrdering, scope);
+#endif
 
   // LLVM cmpxchg returns { <ty>, i1 }, for SPIR-V we only care about the <ty>.
   return getBuilder()->CreateExtractValue(atomicCmpXchg, 0);

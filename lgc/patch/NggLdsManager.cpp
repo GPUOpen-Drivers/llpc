@@ -346,8 +346,15 @@ void NggLdsManager::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomic
 
   Value *atomicPtr = m_builder->CreateGEP(m_lds, {m_builder->getInt32(0), ldsOffset});
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 383129
+  // Old version of the code
   auto atomicInst = m_builder->CreateAtomicRMW(atomicOp, atomicPtr, atomicValue, AtomicOrdering::SequentiallyConsistent,
                                                SyncScope::System);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  auto atomicInst = m_builder->CreateAtomicRMW(atomicOp, atomicPtr, atomicValue, MaybeAlign(),
+                                               AtomicOrdering::SequentiallyConsistent, SyncScope::System);
+#endif
   atomicInst->setVolatile(true);
 }
 
