@@ -346,7 +346,7 @@ void NggLdsManager::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomic
 
   Value *atomicPtr = m_builder->CreateGEP(m_lds, {m_builder->getInt32(0), ldsOffset});
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 383129
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381087
   // Old version of the code
   auto atomicInst = m_builder->CreateAtomicRMW(atomicOp, atomicPtr, atomicValue, AtomicOrdering::SequentiallyConsistent,
                                                SyncScope::System);
