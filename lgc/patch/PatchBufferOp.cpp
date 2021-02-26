@@ -175,7 +175,7 @@ void PatchBufferOp::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgInst)
 
     Value *const compareValue = atomicCmpXchgInst.getCompareOperand();
     Value *const newValue = atomicCmpXchgInst.getNewValOperand();
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 383129
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381087
     // Old version of the code
     AtomicCmpXchgInst *const newAtomicCmpXchg =
         m_builder->CreateAtomicCmpXchg(atomicPointer, compareValue, newValue, successOrdering, failureOrdering);
@@ -282,7 +282,7 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
 
     atomicPointer = m_builder->CreateBitCast(atomicPointer, storeType->getPointerTo(ADDR_SPACE_GLOBAL));
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 383129
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381087
     // Old version of the code
     AtomicRMWInst *const newAtomicRmw = m_builder->CreateAtomicRMW(
         atomicRmwInst.getOperation(), atomicPointer, atomicRmwInst.getValOperand(), atomicRmwInst.getOrdering());
