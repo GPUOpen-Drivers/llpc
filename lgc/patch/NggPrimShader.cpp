@@ -2030,7 +2030,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(expVertBlock);
 
-    runCopyShader(module);
+    runCopyShader(module, entryPoint->arg_begin());
     m_builder->CreateBr(endExpVertBlock);
   }
 
@@ -3222,7 +3222,8 @@ Function *NggPrimShader::mutateGs(Module *module) {
 // Runs copy shader.
 //
 // @param module : LLVM module
-void NggPrimShader::runCopyShader(Module *module) {
+// @param sysValueStart : Start of system value
+void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
   assert(m_hasGs); // GS must be present
 
   //
@@ -3277,10 +3278,16 @@ void NggPrimShader::runCopyShader(Module *module) {
 
   static const unsigned CopyShaderSysValueCount = 11; // Fixed layout: 10 SGPRs, 1 VGPR
   for (unsigned i = 0; i < CopyShaderSysValueCount; ++i) {
-    if (i == CopyShaderUserSgprIdxVertexOffset)
+    if (i == 0) {
+      // Set global table (must always be the first one of user data SGPRs
+      auto userData = sysValueStart + EsGsSpecialSysValueCount;
+      auto globalTable = m_builder->CreateExtractElement(userData, static_cast<uint64_t>(0));
+      args.push_back(globalTable);
+    } else if (i == CopyShaderUserSgprIdxVertexOffset) {
+      // Set vertex offset
       args.push_back(vertexOffset);
-    else {
-      // All SGPRs are not used
+    } else {
+      // All other SGPRs are not used
       args.push_back(UndefValue::get(getFunctionArgument(copyShaderEntry, i)->getType()));
     }
   }
