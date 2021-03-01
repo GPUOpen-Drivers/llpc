@@ -1079,51 +1079,62 @@ unsigned PipelineState::getShaderWaveSize(ShaderStage stage) {
   }
 
   assert(stage <= ShaderStageCompute);
+  if (!m_waveSize[stage])
+    setShaderDefaultWaveSize(stage);
+  return m_waveSize[stage];
+}
 
-  unsigned waveSize = getTargetInfo().getGpuProperty().waveSize;
-
-  if (getTargetInfo().getGfxIpVersion().major >= 10) {
-    // NOTE: GPU property wave size is used in shader, unless:
-    //  1) A stage-specific default is preferred.
-    //  2) If specified by tuning option, use the specified wave size.
-    //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size when required.
-
-    if (stage == ShaderStageFragment) {
-      // Per programming guide, it's recommended to use wave64 for fragment shader.
-      waveSize = 64;
-    } else if (hasShaderStage(ShaderStageGeometry)) {
-      // Legacy (non-NGG) hardware path for GS does not support wave32.
-      waveSize = 64;
-    }
-
-    // Experimental data from performance tuning show that wave64 is more efficient than wave32 in most cases for CS
-    // on GFX10.3. Hence, set the wave size to wave64 by default.
-    if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}) && stage == ShaderStageCompute)
-      waveSize = 64;
-
-    unsigned waveSizeOption = getShaderOptions(stage).waveSize;
-    if (waveSizeOption != 0)
-      waveSize = waveSizeOption;
-
-    if (stage == ShaderStageGeometry && !hasShaderStage(ShaderStageGeometry)) {
-      // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
-      // In such cases, we check the property of VS or TES.
-      if (hasShaderStage(ShaderStageTessEval))
-        return getShaderWaveSize(ShaderStageTessEval);
-      return getShaderWaveSize(ShaderStageVertex);
-    }
-
-    // If subgroup size is used in any shader in the pipeline, use the specified subgroup size as wave size.
-    if (getShaderModes()->getAnyUseSubgroupSize()) {
-      unsigned subgroupSize = getShaderOptions(stage).subgroupSize;
-      if (subgroupSize != 0)
-        waveSize = subgroupSize;
-    }
-
-    assert(waveSize == 32 || waveSize == 64);
+// =====================================================================================================================
+// Set the default wave size for the specified shader stage
+//
+// @param stage : Shader stage
+void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
+  ShaderStage checkingStage = stage;
+  const bool isGfx10Plus = getTargetInfo().getGfxIpVersion().major >= 10;
+  if (isGfx10Plus && stage == ShaderStageGeometry && !hasShaderStage(ShaderStageGeometry)) {
+    // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
+    // In such cases, we check the property of VS or TES.
+    checkingStage = hasShaderStage(ShaderStageTessEval) ? ShaderStageTessEval : ShaderStageVertex;
   }
 
-  return waveSize;
+  if (!m_waveSize[checkingStage]) {
+    unsigned waveSize = getTargetInfo().getGpuProperty().waveSize;
+    if (isGfx10Plus) {
+      // NOTE: GPU property wave size is used in shader, unless:
+      //  1) A stage-specific default is preferred.
+      //  2) If specified by tuning option, use the specified wave size.
+      //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size when required.
+
+      if (checkingStage == ShaderStageFragment) {
+        // Per programming guide, it's recommended to use wave64 for fragment shader.
+        waveSize = 64;
+      } else if (hasShaderStage(ShaderStageGeometry)) {
+        // Legacy (non-NGG) hardware path for GS does not support wave32.
+        waveSize = 64;
+      }
+
+      // Experimental data from performance tuning show that wave64 is more efficient than wave32 in most cases for CS
+      // on post-GFX10.3. Hence, set the wave size to wave64 by default.
+      if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}) && stage == ShaderStageCompute)
+        waveSize = 64;
+
+      unsigned waveSizeOption = getShaderOptions(checkingStage).waveSize;
+      if (waveSizeOption != 0)
+        waveSize = waveSizeOption;
+
+      // If subgroup size is used in any shader in the pipeline, use the specified subgroup size as wave size.
+      if (getShaderModes()->getAnyUseSubgroupSize()) {
+        unsigned subgroupSize = getShaderOptions(checkingStage).subgroupSize;
+        if (subgroupSize != 0)
+          waveSize = subgroupSize;
+      }
+
+      assert(waveSize == 32 || waveSize == 64);
+    }
+    m_waveSize[checkingStage] = waveSize;
+  }
+  if (stage != checkingStage)
+    m_waveSize[stage] = m_waveSize[checkingStage];
 }
 
 // =====================================================================================================================
