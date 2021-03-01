@@ -20,6 +20,12 @@ jobs:
         assertions:          ["OFF", "ON"]
         feature-set:         ["+gcc", "+clang", "+clang+shadercache", "+clang+sanitizers"]
     steps:
+      - name: Free up disk space
+        if: contains(matrix.feature-set, '+sanitizers')
+        run: |
+          echo 'Before:' && df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache/boost /opt/ghc
+          echo 'After:' && df -h
       - name: Checkout LLPC
         run: |
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
