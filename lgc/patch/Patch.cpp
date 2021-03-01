@@ -111,6 +111,9 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
   passMgr.add(createPatchResourceCollect());
 
+  // Patch wave size adjusting heuristic
+  passMgr.add(createPatchWaveSizeAdjust());
+
   // Patch workarounds
   passMgr.add(createPatchWorkarounds());
 

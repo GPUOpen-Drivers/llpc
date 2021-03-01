@@ -142,6 +142,7 @@ target_sources(LLVMlgc PRIVATE
     patch/ShaderMerger.cpp
     patch/SystemValues.cpp
     patch/VertexFetch.cpp
+    patch/PatchWaveSizeAdjust.cpp
 )
 
 # lgc/state

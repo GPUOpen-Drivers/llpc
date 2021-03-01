@@ -263,6 +263,9 @@ public:
   // Gets wave size for the specified shader stage
   unsigned getShaderWaveSize(ShaderStage stage);
 
+  // Set the default wave size for the specified shader stage
+  void setShaderDefaultWaveSize(ShaderStage stage);
+
   // Get NGG control settings
   NggControl *getNggControl() { return &m_nggControl; }
 
@@ -433,6 +436,7 @@ private:
   std::unique_ptr<ResourceUsage> m_resourceUsage[ShaderStageCompute + 1] = {}; // Per-shader ResourceUsage
   std::unique_ptr<InterfaceData> m_interfaceData[ShaderStageCompute + 1] = {}; // Per-shader InterfaceData
   PalMetadata *m_palMetadata = nullptr;                                        // PAL metadata object
+  unsigned m_waveSize[ShaderStageCountInternal] = {};                          // Per-shader wave size
 };
 
 // =====================================================================================================================
