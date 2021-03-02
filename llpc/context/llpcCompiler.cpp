@@ -211,6 +211,9 @@ static void fatalErrorHandler(void *userData, const std::string &reason, bool ge
 #endif
 }
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381316
+// Old version of the code
+
 // =====================================================================================================================
 // Returns true if any user data nodes inside the given shader infos contain an entry with a descriptor type that is
 // unsupported by relocatable shader compilation.
@@ -229,6 +232,7 @@ static void InlineAsmDiagHandler(const SMDiagnostic &sourceMgrDiag, void *contex
   if (locCookie)
     WithColor::note() << "!srcloc = " << locCookie << "\n";
 }
+#endif
 
 // =====================================================================================================================
 // Handler for diagnosis in pass run, derived from the standard one.
@@ -591,7 +595,10 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
         Context *context = acquireContext();
 
         context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381316
+        // Old version of the code
         context->setInlineAsmDiagnosticHandler(InlineAsmDiagHandler, &hasError);
+#endif
         context->setBuilder(context->getLgcContext()->createBuilder(nullptr, true));
 
         for (unsigned i = 0; i < entryNames.size(); ++i) {
@@ -696,7 +703,10 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
         }
 
         context->setDiagnosticHandler(nullptr);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381316
+        // Old version of the code
         context->setInlineAsmDiagnosticHandler(nullptr);
+#endif
       }
       moduleDataEx.extra.entryCount = entryNames.size();
     }
@@ -941,11 +951,17 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       // Link the relocatable shaders into a single pipeline elf file.
       bool hasError = false;
       context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381316
+      // Old version of the code
       context->setInlineAsmDiagnosticHandler(InlineAsmDiagHandler, &hasError);
+#endif
 
       linkRelocatableShaderElf(elf, pipelineElf, context);
       context->setDiagnosticHandler(nullptr);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381316
+      // Old version of the code
       context->setInlineAsmDiagnosticHandler(nullptr);
+#endif
 
       if (hasError)
         result = Result::ErrorInvalidShader;
@@ -1130,7 +1146,10 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   bool hasError = false;
   context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381316
+  // Old version of the code
   context->setInlineAsmDiagnosticHandler(InlineAsmDiagHandler, &hasError);
+#endif
 
   // Set a couple of pipeline options for front-end use.
   // TODO: The front-end should not be using pipeline options.
@@ -1335,7 +1354,10 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
     graphicsShaderCacheChecker.updateRootUserDateOffset(pipelineElf);
 
   context->setDiagnosticHandler(nullptr);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381316
+  // Old version of the code
   context->setInlineAsmDiagnosticHandler(nullptr);
+#endif
 
   if (result == Result::Success && hasError)
     result = Result::ErrorInvalidShader;
