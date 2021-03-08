@@ -38,6 +38,7 @@
           %4 = OpFunction %2 None %3
           %5 = OpLabel
          %55 = OpVariable %447 Function
+               OpSelectionMerge %43 None
                OpSwitch %28 %443
         %443 = OpLabel
                OpBranch %43
