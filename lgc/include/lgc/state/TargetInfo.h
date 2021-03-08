@@ -110,8 +110,6 @@ struct WorkaroundFlags {
 
   union {
     struct {
-      unsigned disableI32ModToI16Mod : 1;
-
       unsigned waTessFactorBufferSizeLimitGeUtcl1Underflow : 1;
       unsigned waTessIncorrectRelativeIndex : 1;
       unsigned waShaderInstPrefetch123 : 1;
