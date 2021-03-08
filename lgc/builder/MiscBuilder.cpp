@@ -99,16 +99,11 @@ Instruction *MiscBuilder::CreateKill(const Twine &instName) {
 //
 // @param instName : Name to give instruction(s)
 Instruction *MiscBuilder::CreateDemoteToHelperInvocation(const Twine &instName) {
-#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
-#warning[!amd-gfx] DemoteToHelperInvocation replaced by Kill
-  return CreateKill(instName);
-#else
   // Treat a demote as a kill for the purposes of disabling middle-end optimizations.
   auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
   resUsage->builtInUsage.fs.discard = true;
 
   return CreateIntrinsic(Intrinsic::amdgcn_wqm_demote, {}, getFalse(), nullptr, instName);
-#endif
 }
 
 // =====================================================================================================================
@@ -116,14 +111,8 @@ Instruction *MiscBuilder::CreateDemoteToHelperInvocation(const Twine &instName) 
 //
 // @param instName : Name to give instruction(s)
 Value *MiscBuilder::CreateIsHelperInvocation(const Twine &instName) {
-#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
-#warning[!amd-gfx] IsHelperInvocation replaced by !amdgcn.ps.live
-  Value *psLive = CreateIntrinsic(Intrinsic::amdgcn_ps_live, {}, {}, nullptr, instName);
-  return CreateNot(psLive);
-#else
-  auto isNotHelper = CreateIntrinsic(Intrinsic::amdgcn_wqm_helper, {}, {}, nullptr, instName);
-  return CreateNot(isNotHelper);
-#endif
+  auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, instName);
+  return CreateNot(isLive);
 }
 
 // =====================================================================================================================
