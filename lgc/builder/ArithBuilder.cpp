@@ -217,27 +217,6 @@ Value *ArithBuilder::CreateQuantizeToFp16(Value *value, const Twine &instName) {
 // @param divisor : Divisor value
 // @param instName : Name to give instruction(s)
 Value *ArithBuilder::CreateSMod(Value *dividend, Value *divisor, const Twine &instName) {
-  if (divisor->getType()->getScalarType()->isIntegerTy(32) &&
-      getPipelineState()->getTargetInfo().getGpuWorkarounds().gfx10.disableI32ModToI16Mod) {
-
-    // NOTE: On some hardware, when the divisor is a literal value and less than 0xFFFF, i32 mod will be
-    // optimized to i16 mod. There is an existing issue in the backend which makes i16 mod not work.
-    // This is the workaround to this issue.
-    // TODO: Check if this is still needed and what the backend problem is.
-    if (auto divisorConst = dyn_cast<ConstantInt>(divisor)) {
-      if (divisorConst->getZExtValue() <= 0xFFFF) {
-        // Get a non-constant 0 value. (We know the top 17 bits of the 64-bit PC is always zero.)
-        Value *pc = CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
-        Value *pcHi = CreateExtractElement(CreateBitCast(pc, FixedVectorType::get(getInt32Ty(), 2)), 1);
-        Value *nonConstantZero = CreateLShr(pcHi, getInt32(15));
-        if (auto vecTy = dyn_cast<FixedVectorType>(divisor->getType()))
-          nonConstantZero = CreateVectorSplat(vecTy->getNumElements(), nonConstantZero);
-        // Add the non-constant 0 to the denominator to disable the optimization.
-        divisor = CreateAdd(divisor, nonConstantZero);
-      }
-    }
-  }
-
   Value *srem = CreateSRem(dividend, divisor);
   Value *divisorPlusSrem = CreateAdd(divisor, srem);
   Value *isDifferentSign = CreateICmpSLT(CreateXor(dividend, divisor), Constant::getNullValue(dividend->getType()));

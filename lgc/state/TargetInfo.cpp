@@ -293,7 +293,6 @@ static void setGfx10Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().supportSpiPrefPriority = true;
 
   // Hardware workarounds for GFX10 based GPU's:
-  targetInfo->getGpuWorkarounds().gfx10.disableI32ModToI16Mod = 1;
   targetInfo->getGpuWorkarounds().gfx10.waLimitedMaxOutputVertexCount = 1;
   targetInfo->getGpuWorkarounds().gfx10.waGeNggMaxVertOutWithGsInstancing = 1;
 }
