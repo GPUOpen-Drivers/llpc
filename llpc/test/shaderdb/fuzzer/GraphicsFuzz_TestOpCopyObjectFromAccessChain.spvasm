@@ -34,6 +34,7 @@
                OpBranch %205
         %205 = OpLabel
         %279 = OpPhi %73 %76 %5 %76 %233
+               OpSelectionMerge %233 None
                OpSwitch %22 %242
         %242 = OpLabel
         %217 = OpAccessChain %23 %199 %279 %22

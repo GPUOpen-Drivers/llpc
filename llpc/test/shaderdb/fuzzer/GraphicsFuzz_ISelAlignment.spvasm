@@ -43,6 +43,7 @@
         %459 = OpLabel
         %733 = OpVariable %732 Function %1038
         %461 = OpVariable %456 Function %460
+               OpSelectionMerge %475 None
                OpSwitch %1038 %463
         %463 = OpLabel
                OpBranch %475
