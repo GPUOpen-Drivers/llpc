@@ -3303,9 +3303,11 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
   auto copyShaderEntryPoint = module->getFunction(lgcName::NggCopyShaderEntryPoint);
   assert(copyShaderEntryPoint != nullptr);
 
+  unsigned extraArgCount = 0;
+
   auto savedInsertPos = m_builder->saveIP();
 
-  auto vertexOffset = getFunctionArgument(copyShaderEntryPoint, CopyShaderUserSgprIdxVertexOffset);
+  auto vertexOffset = getFunctionArgument(copyShaderEntryPoint, CopyShaderUserSgprIdxVertexOffset + extraArgCount);
 
   std::vector<Instruction *> removeCalls;
 
