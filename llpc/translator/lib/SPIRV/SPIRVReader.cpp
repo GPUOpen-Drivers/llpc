@@ -6260,15 +6260,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   else if (m_fpControlFlags.DenormFlushToZero & SPIRVTW_64Bit)
     shaderMode.fp64DenormMode = FpDenormMode::FlushInOut;
 
-  auto &extensions = m_bm->getExtension();
-  if (extensions.find("SPV_AMD_shader_ballot") != extensions.end() || m_bm->hasCapability(CapabilityGroupNonUniform) ||
-      m_bm->hasCapability(CapabilityGroupNonUniformVote) || m_bm->hasCapability(CapabilityGroupNonUniformArithmetic) ||
-      m_bm->hasCapability(CapabilityGroupNonUniformBallot) || m_bm->hasCapability(CapabilityGroupNonUniformShuffle) ||
-      m_bm->hasCapability(CapabilityGroupNonUniformShuffleRelative) ||
-      m_bm->hasCapability(CapabilityGroupNonUniformClustered) || m_bm->hasCapability(CapabilityGroupNonUniformQuad) ||
-      m_bm->hasCapability(CapabilitySubgroupBallotKHR) || m_bm->hasCapability(CapabilitySubgroupVoteKHR) ||
-      m_bm->hasCapability(CapabilityGroups))
-    shaderMode.useSubgroupSize = true;
+  shaderMode.useSubgroupSize = m_moduleUsage->useSubgroupSize;
 
   getBuilder()->setCommonShaderMode(shaderMode);
 
