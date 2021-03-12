@@ -94,4 +94,11 @@ const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(ShaderStage shad
   return &m_pipelineInfo->cs;
 }
 
+// =====================================================================================================================
+// Check whether the pipeline uses features relevant to subgroup size
+bool ComputeContext::usesSubgroupSize() const {
+  const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(m_pipelineInfo->cs.pModuleData);
+  return moduleData->usage.useSubgroupSize;
+}
+
 } // namespace Llpc

@@ -263,4 +263,21 @@ ArrayRef<ResourceMappingNode> GraphicsContext::mergeUserDataNodeTable(SmallVecto
 }
 #endif
 
+// =====================================================================================================================
+// Check whether the pipeline uses features relevant to subgroup size
+bool GraphicsContext::usesSubgroupSize() const {
+  std::array<const PipelineShaderInfo *, 5> shaderInfos = {
+      &m_pipelineInfo->vs, &m_pipelineInfo->tcs, &m_pipelineInfo->tes, &m_pipelineInfo->gs, &m_pipelineInfo->fs,
+  };
+  for (auto shaderInfo : shaderInfos) {
+    if (!shaderInfo->pModuleData)
+      continue;
+    auto *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+    if (!moduleData->usage.useSubgroupSize)
+      continue;
+    return true;
+  }
+  return false;
+}
+
 } // namespace Llpc
