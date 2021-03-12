@@ -269,6 +269,12 @@ public:
   // Set the default wave size for the specified shader stage
   void setShaderDefaultWaveSize(ShaderStage stage);
 
+  // Set the wave size for the specified shader stage
+  void setShaderWaveSize(ShaderStage stage, unsigned waveSize) {
+    assert(waveSize == 32 || waveSize == 64);
+    m_waveSize[stage] = waveSize;
+  }
+
   // Get NGG control settings
   NggControl *getNggControl() { return &m_nggControl; }
 
