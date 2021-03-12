@@ -151,7 +151,6 @@ void LgcContext::initialize() {
   setOptionDefault("filetype", "obj");
   setOptionDefault("amdgpu-unroll-max-block-to-analyze", "20");
   setOptionDefault("unroll-max-percent-threshold-boost", "1000");
-  setOptionDefault("pragma-unroll-threshold", "1000");
   setOptionDefault("unroll-allow-partial", "1");
   setOptionDefault("simplifycfg-sink-common", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8

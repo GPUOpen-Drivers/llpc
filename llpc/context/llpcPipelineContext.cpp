@@ -116,7 +116,7 @@ static cl::opt<int>
 // -unroll-hint-threshold: loop unroll threshold to use for loops with Unroll hint
 static cl::opt<int> UnrollHintThreshold("unroll-hint-threshold",
                                         cl::desc("loop unroll threshold to use for loops with Unroll hint"),
-                                        cl::init(0));
+                                        cl::init(1800));
 
 // -dontunroll-hint-threshold: loop unroll threshold to use for loops with DontUnroll hint
 static cl::opt<int> DontUnrollHintThreshold("dontunroll-hint-threshold",
