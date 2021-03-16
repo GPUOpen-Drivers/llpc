@@ -3170,7 +3170,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
         assert(streamId < MaxGsStreams);
         Value *output = call->getOperand(3);
 
-        auto emitVerts = m_builder->CreateLoad(emitVertsPtrs[streamId]);
+        auto emitVerts = m_builder->CreateLoad(m_builder->getInt32Ty(), emitVertsPtrs[streamId]);
         exportGsOutput(output, location, compIdx, streamId, threadIdInSubgroup, emitVerts);
 
         removeCalls.push_back(call);
@@ -3589,8 +3589,8 @@ Function *NggPrimShader::createGsEmitHandler(Module *module, unsigned streamId) 
   {
     m_builder->SetInsertPoint(entryBlock);
 
-    emitVerts = m_builder->CreateLoad(emitVertsPtr);
-    outVerts = m_builder->CreateLoad(outVertsPtr);
+    emitVerts = m_builder->CreateLoad(m_builder->getInt32Ty(), emitVertsPtr);
+    outVerts = m_builder->CreateLoad(m_builder->getInt32Ty(), outVertsPtr);
 
     // emitVerts++
     emitVerts = m_builder->CreateAdd(emitVerts, m_builder->getInt32(1));
@@ -5472,7 +5472,7 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
     auto loadPtr = m_builder->CreateGEP(primShaderTablePtr, {m_builder->getInt32(0), regOffset});
     cast<Instruction>(loadPtr)->setMetadata(MetaNameUniform, MDNode::get(m_builder->getContext(), {}));
 
-    auto regValue = m_builder->CreateAlignedLoad(loadPtr, Align(4));
+    auto regValue = m_builder->CreateAlignedLoad(m_builder->getInt32Ty(), loadPtr, Align(4));
     regValue->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder->getContext(), {}));
 
     m_builder->CreateRet(regValue);

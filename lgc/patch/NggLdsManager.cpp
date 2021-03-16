@@ -301,7 +301,7 @@ Value *NggLdsManager::readValueFromLds(Type *readTy, Value *ldsOffset, bool useD
   Value *readPtr = m_builder->CreateGEP(lds, ldsOffset);
   readPtr = m_builder->CreateBitCast(readPtr, PointerType::get(readTy, ADDR_SPACE_LOCAL));
 
-  return m_builder->CreateAlignedLoad(readPtr, Align(alignment));
+  return m_builder->CreateAlignedLoad(readTy, readPtr, Align(alignment));
 }
 
 // =====================================================================================================================

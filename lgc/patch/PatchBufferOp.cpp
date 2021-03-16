@@ -582,7 +582,8 @@ void PatchBufferOp::visitLoadInst(LoadInst &loadInst) {
 
     Value *const loadPointer = m_builder->CreateBitCast(pointer, castType);
 
-    LoadInst *const newLoad = m_builder->CreateAlignedLoad(loadPointer, loadInst.getAlign(), loadInst.isVolatile());
+    LoadInst *const newLoad =
+        m_builder->CreateAlignedLoad(m_builder->getInt32Ty(), loadPointer, loadInst.getAlign(), loadInst.isVolatile());
     newLoad->setOrdering(loadInst.getOrdering());
     newLoad->setSyncScopeID(loadInst.getSyncScopeID());
     copyMetadata(newLoad, &loadInst);
@@ -661,7 +662,7 @@ void PatchBufferOp::visitMemMoveInst(MemMoveInst &memMoveInst) {
   Value *const castSrc = m_builder->CreateBitCast(src, castSrcType);
   copyMetadata(castSrc, &memMoveInst);
 
-  LoadInst *const srcLoad = m_builder->CreateAlignedLoad(castSrc, srcAlignment);
+  LoadInst *const srcLoad = m_builder->CreateAlignedLoad(memoryType, castSrc, srcAlignment);
   copyMetadata(srcLoad, &memMoveInst);
 
   StoreInst *const destStore = m_builder->CreateAlignedStore(srcLoad, castDest, destAlignment);
@@ -966,17 +967,17 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
       stride /= 2;
     }
 
-    Type *castDestType = nullptr;
-    Type *castSrcType = nullptr;
+    Type *memoryType = nullptr;
 
     if (stride == 16) {
-      castDestType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(destAddrSpace);
-      castSrcType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(srcAddrSpace);
+      memoryType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
     } else {
       assert(stride < 8);
-      castDestType = m_builder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
-      castSrcType = m_builder->getIntNTy(stride * 8)->getPointerTo(srcAddrSpace);
+      memoryType = m_builder->getIntNTy(stride * 8);
     }
+
+    Type *castDestType = memoryType->getPointerTo(destAddrSpace);
+    Type *castSrcType = memoryType->getPointerTo(srcAddrSpace);
 
     Value *length = memCpyInst.getArgOperand(2);
 
@@ -993,7 +994,7 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     copyMetadata(castSrc, &memCpyInst);
 
     // Perform a load for the value.
-    LoadInst *const srcLoad = m_builder->CreateLoad(castSrc);
+    LoadInst *const srcLoad = m_builder->CreateLoad(memoryType, castSrc);
     copyMetadata(srcLoad, &memCpyInst);
 
     // Get the current index into our destination pointer.
@@ -1035,7 +1036,7 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     Value *const castSrc = m_builder->CreateBitCast(src, castSrcType);
     copyMetadata(castSrc, &memCpyInst);
 
-    LoadInst *const srcLoad = m_builder->CreateAlignedLoad(castSrc, srcAlignment);
+    LoadInst *const srcLoad = m_builder->CreateAlignedLoad(memoryType, castSrc, srcAlignment);
     copyMetadata(srcLoad, &memCpyInst);
 
     StoreInst *const destStore = m_builder->CreateAlignedStore(srcLoad, castDest, destAlignment);
@@ -1121,7 +1122,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
       Value *const memSet = m_builder->CreateMemSet(castMemoryPointer, value, stride, Align());
       copyMetadata(memSet, &memSetInst);
 
-      newValue = m_builder->CreateLoad(memoryPointer);
+      newValue = m_builder->CreateLoad(castDestType->getPointerElementType(), memoryPointer);
       copyMetadata(newValue, &memSetInst);
     }
 
@@ -1170,7 +1171,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
                                                     cast<FixedVectorType>(memoryType)->getNumElements(), Align());
       copyMetadata(memSet, &memSetInst);
 
-      newValue = m_builder->CreateLoad(memoryPointer);
+      newValue = m_builder->CreateLoad(memoryType, memoryPointer);
       copyMetadata(newValue, &memSetInst);
     }
 
@@ -1376,7 +1377,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
     pointer = m_builder->CreateBitCast(pointer, type->getPointerTo(ADDR_SPACE_GLOBAL));
 
     if (isLoad) {
-      LoadInst *const newLoad = m_builder->CreateAlignedLoad(pointer, alignment, loadInst->isVolatile());
+      LoadInst *const newLoad = m_builder->CreateAlignedLoad(type, pointer, alignment, loadInst->isVolatile());
       newLoad->setOrdering(ordering);
       newLoad->setSyncScopeID(syncScopeID);
       copyMetadata(newLoad, loadInst);
