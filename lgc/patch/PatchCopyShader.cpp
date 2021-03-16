@@ -548,7 +548,7 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
     Value *loadPtr = builder.CreateGEP(m_lds, {builder.getInt32(0), ringOffset});
     loadPtr = builder.CreateBitCast(loadPtr, PointerType::get(loadTy, m_lds->getType()->getPointerAddressSpace()));
 
-    return builder.CreateAlignedLoad(loadPtr, m_lds->getAlign());
+    return builder.CreateAlignedLoad(loadTy, loadPtr, m_lds->getAlign());
   } else {
     assert(m_gsVsRingBufDesc);
 
@@ -601,12 +601,13 @@ Value *PatchCopyShader::loadGsVsRingBufferDescriptor(BuilderBase &builder) {
 
   auto gsVsRingBufDescPtr = builder.CreateAdd(internalTablePtr, builder.getInt64(SiDrvTableVsRingInOffs << 4));
 
-  auto int32x4PtrTy = PointerType::get(FixedVectorType::get(builder.getInt32Ty(), 4), ADDR_SPACE_CONST);
+  auto int32x4Ty = FixedVectorType::get(builder.getInt32Ty(), 4);
+  auto int32x4PtrTy = PointerType::get(int32x4Ty, ADDR_SPACE_CONST);
   gsVsRingBufDescPtr = builder.CreateIntToPtr(gsVsRingBufDescPtr, int32x4PtrTy);
   cast<Instruction>(gsVsRingBufDescPtr)
       ->setMetadata(MetaNameUniform, MDNode::get(gsVsRingBufDescPtr->getContext(), {}));
 
-  auto gsVsRingBufDesc = builder.CreateLoad(gsVsRingBufDescPtr);
+  auto gsVsRingBufDesc = builder.CreateLoad(int32x4Ty, gsVsRingBufDescPtr);
   gsVsRingBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(gsVsRingBufDesc->getContext(), {}));
 
   return gsVsRingBufDesc;
