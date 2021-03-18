@@ -47,7 +47,6 @@
 #include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
 #include "lgc/ElfLinker.h"
-#include "lgc/ElfNoteEntryInsertionUtil.h"
 #include "lgc/PassManager.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
@@ -158,9 +157,6 @@ opt<int> ContextReuseLimit("context-reuse-limit",
 
 // -fatal-llvm-errors: Make all LLVM errors fatal
 opt<bool> FatalLlvmErrors("fatal-llvm-errors", cl::desc("Make all LLVM errors fatal"), init(false));
-
-// -add-hash-to-elf
-opt<bool> AddHashToELF("add-hash-to-elf", cl::desc("Add notes to ELF for hash and llpc version"), cl::init(false));
 
 extern opt<bool> EnableOuts;
 
@@ -855,7 +851,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   assert(stageCacheAccesses.size() >= shaderInfo.size());
 
   const MetroHash::Hash originalCacheHash = context->getPipelineContext()->getCacheHashCodeWithoutCompact();
-  // Print log in the format matching llvm-readefl to simplify testing.
+  // Print log in the format matching llvm-readelf to simplify testing.
   LLPC_OUTS("LLPC version: " << VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION) << "\n");
   LLPC_OUTS("Hash for pipeline cache lookup: " << formatBytesLittleEndian<uint8_t>(originalCacheHash.bytes) << "\n");
 
@@ -1359,38 +1355,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   if (result == Result::Success && hasError)
     result = Result::ErrorInvalidShader;
-
-  if (result == Result::Success && cl::AddHashToELF) {
-    // Add two note entries:
-    //  1. Note with name "AMD_llpc_cache_hash" and description containing the cache hash used for the cache lookup.
-    //  2. Note with name "AMD_llpc_version" and description containing the LLPC major and minor version.
-    //     The LLPC version information will help us to understand the hash generation algorithm. We have to
-    //     use a correct hash algorithm for the cache lookup.
-    //
-    // For example, if the hash is "4EDBED25 ADF15238 B8C92579 423DA423" and the LLPC version is 45.4
-    // (the major version is 45=0x2D and the minor version is 4=0x04), two new note entries will be
-    //
-    //  Unknown(0)                (name = AMD_llpc_cache_hash  size = 16)
-    //        0:4EDBED25 ADF15238 B8C92579 423DA423
-    //  Unknown(0)                (name = AMD_llpc_version  size = 8)
-    //        0:0000002D 00000004
-    //
-    const uint32_t llpcVersion[2] = {LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION};
-    auto hash = context->getPipelineContext()->get128BitCacheHashCode();
-
-    // TODO: Use correct note types and names to specify cache hash and llpc version after submiting
-    //       https://github.com/GPUOpen-Drivers/llvm-project/pull/2. Note names must be "AMD".
-    constexpr unsigned noteType = 0;
-
-    NoteEntry notes[] = {
-        {"AMD_llpc_cache_hash",
-         ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(hash.data()), hash.size() * sizeof(hash.front())),
-         noteType},
-        {"AMD_llpc_version", ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(llpcVersion), sizeof(llpcVersion)),
-         noteType},
-    };
-    addNotesToElf(*pipelineElf, notes, ".note");
-  }
 
   return result;
 }
