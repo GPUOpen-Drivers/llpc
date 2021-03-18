@@ -1484,6 +1484,19 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     }
 
     return load;
+  } else if (spvType->isTypeVector() && isCoherent) {
+    // Coherent load operand must be integer, pointer, or floating point type, so need to spilte vector.
+    SPIRVType *spvElementType = spvType->getVectorComponentType();
+    Type *elementType = transType(spvElementType);
+    Value *load = UndefValue::get(VectorType::get(elementType, spvType->getVectorComponentCount(), false));
+    for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
+      Value *const elementLoadPointer = getBuilder()->CreateGEP(loadPointer, {zero, getBuilder()->getInt32(i)});
+      Value *const elementLoad =
+          addLoadInstRecursively(spvElementType, elementLoadPointer, isVolatile, isCoherent, isNonTemporal);
+      load = getBuilder()->CreateInsertElement(load, elementLoad, i);
+    }
+
+    return load;
   } else {
     Type *alignmentType = loadType;
 
@@ -1591,6 +1604,15 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
       Value *const elementStorePointer = getBuilder()->CreateGEP(storePointer, indices);
       Value *const elementStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
+      addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreValue, isVolatile, isCoherent,
+                              isNonTemporal);
+    }
+  } else if (spvType->isTypeVector() && isCoherent) {
+    // Coherent store operand must be integer, pointer, or floating point type, so need to spilte vector.
+    SPIRVType *spvElementType = spvType->getVectorComponentType();
+    for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
+      Value *const elementStorePointer = getBuilder()->CreateGEP(storePointer, {zero, getBuilder()->getInt32(i)});
+      Value *const elementStoreValue = getBuilder()->CreateExtractElement(storeValue, i);
       addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreValue, isVolatile, isCoherent,
                               isNonTemporal);
     }
