@@ -1354,11 +1354,13 @@ void PatchResourceCollect::matchGenericInOut() {
     assert(inOutUsage.inputMapLocCount == 0);
     for (const auto &locInfoPair : inLocInfoMap) {
       const unsigned origLoc = locInfoPair.first.getLocation();
+      const unsigned origComp = locInfoPair.first.getComponent();
       const unsigned newLoc = locInfoPair.second.getLocation();
+      const unsigned newComp = locInfoPair.second.getComponent();
       assert(newLoc != InvalidValue);
       inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, newLoc + 1);
       LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  loc = " << origLoc
-                    << "  =>  Mapped = " << newLoc << "\n");
+                    << ", comp = " << origComp << " =>  Mapped = " << newLoc << ", " << newComp << "\n");
     }
     LLPC_OUTS("\n");
   }
@@ -1374,7 +1376,9 @@ void PatchResourceCollect::matchGenericInOut() {
     // Note: The value of outLocMap should be filled in packing code path
     for (const auto &locInfoPair : outLocInfoMap) {
       const unsigned origLoc = locInfoPair.first.getLocation();
+      const unsigned origComp = locInfoPair.first.getComponent();
       const unsigned newLoc = locInfoPair.second.getLocation();
+      const unsigned newComp = locInfoPair.second.getComponent();
 
       if (m_shaderStage == ShaderStageGeometry) {
         const unsigned streamId = locInfoPair.first.getStreamId();
@@ -1383,11 +1387,12 @@ void PatchResourceCollect::matchGenericInOut() {
 
         inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, assignedLocCount);
         LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: stream = " << streamId << ", "
-                      << " loc = " << origLoc << "  =>  Mapped = " << newLoc << "\n");
+                      << " loc = " << origLoc << ", comp = " << origComp << "  =>  Mapped = " << newLoc << ", "
+                      << newComp << "\n");
       } else {
         inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, newLoc + 1);
         LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: loc = " << origLoc
-                      << "  =>  Mapped = " << newLoc << "\n");
+                      << ", comp = " << origComp << "  =>  Mapped = " << newLoc << ", " << newComp << "\n");
 
         if (m_shaderStage == ShaderStageFragment)
           outOrigLocs[newLoc] = origLoc;
@@ -2548,21 +2553,27 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(m_outputCalls.back());
 
+  // The output vector can have at most 4 elements, but 2 16-bit values can be packed a single element
+  static constexpr size_t MaxVectorComponents = 4;
+  static constexpr size_t MaxNumElems = MaxVectorComponents * 2;
   // ElementsInfo represents the info of composing a vector in a location
   struct ElementsInfo {
     // Elements to be packed in one location, where 32-bit element is placed at the even index
-    Value *elements[8];
+    std::array<Value *, MaxNumElems> elements = {};
     // The corresponding call of each element
-    CallInst *outCalls[8];
+    std::array<CallInst *, MaxNumElems> outCalls = {};
+    static_assert(std::tuple_size<decltype(elements)>::value == std::tuple_size<decltype(outCalls)>::value,
+                  "The code assumes that 'elements' and 'outCalls' have the same number of elements");
     // Element number of 32-bit
-    unsigned elemCountOf32bit;
+    unsigned elemCountOf32bit = 0;
     // Element number of 16-bit
-    unsigned elemCountOf16bit;
+    unsigned elemCountOf16bit = 0;
+    // First component index in the mapped vector.
+    unsigned baseMappedComponentIdx = InvalidValue;
   };
 
   // Collect ElementsInfo in each packed location
-  ElementsInfo elemsInfo = {{nullptr}, {nullptr}, 0, 0};
-  std::vector<ElementsInfo> elementsInfoArray(m_outputCalls.size(), elemsInfo);
+  std::vector<ElementsInfo> elementsInfoArray(m_outputCalls.size());
 
   const auto &tcsInputLocInfoMap =
       m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.inputLocInfoMap;
@@ -2583,13 +2594,18 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
       }
       continue;
     } else {
-      // To be re-assembaled call
+      // To be re-assembled call
       m_deadCalls.push_back(call);
     }
 
     const unsigned newLoc = mapIter->second.getLocation();
     auto &elementsInfo = elementsInfoArray[newLoc];
-    unsigned elemIdx = mapIter->second.getComponent() * 2 + mapIter->second.isHighHalf();
+
+    const unsigned origComponentIdx = mapIter->second.getComponent();
+    // Update the first components used
+    elementsInfo.baseMappedComponentIdx = std::min(elementsInfo.baseMappedComponentIdx, origComponentIdx);
+
+    const unsigned elemIdx = origComponentIdx * 2 + (mapIter->second.isHighHalf() ? 1 : 0);
     elementsInfo.outCalls[elemIdx] = call;
 
     // Bit cast i8/i16/f16 to i32 for packing in a 32-bit component
@@ -2615,7 +2631,6 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   m_outputCalls.clear();
 
   // Re-assamble XX' output export calls for each packed location
-  Value *args[3] = {};
   for (auto &elementsInfo : elementsInfoArray) {
     if (elementsInfo.elemCountOf16bit + elementsInfo.elemCountOf32bit == 0) {
       // It's the end of the packed location
@@ -2624,38 +2639,46 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
 
     // Construct the output value - a scalar or a vector
     const unsigned compCount = (elementsInfo.elemCountOf16bit + 1) / 2 + elementsInfo.elemCountOf32bit;
-    assert(compCount <= 4);
+    assert(compCount <= MaxVectorComponents);
+    assert(elementsInfo.baseMappedComponentIdx != InvalidValue);
+    const unsigned baseComponentIdx = elementsInfo.baseMappedComponentIdx;
+    const unsigned baseElementIdx = baseComponentIdx * 2;
+
     Value *outValue = nullptr;
     if (compCount == 1) {
       // Output a scalar
-      outValue = elementsInfo.elements[0];
+      outValue = elementsInfo.elements[baseElementIdx];
+      assert(outValue);
       if (elementsInfo.elemCountOf16bit == 2) {
         // Two 16-bit elements packed as a 32-bit scalar
-        Value *highElem = builder.CreateShl(elementsInfo.elements[1], 16);
+        Value *highElem = elementsInfo.elements[baseElementIdx + 1];
+        assert(highElem);
+        highElem = builder.CreateShl(highElem, 16);
         outValue = builder.CreateOr(outValue, highElem);
       }
       outValue = builder.CreateBitCast(outValue, builder.getFloatTy());
     } else {
       // Output a vector
       outValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), compCount));
-      for (unsigned compIdx = 0; compIdx < compCount; ++compIdx) {
-        const unsigned elemIdx = compIdx * 2;
-        Value *elems[2] = {elementsInfo.elements[elemIdx], elementsInfo.elements[elemIdx + 1]};
-        Value *component = elems[0];
-        if (elems[1]) {
+      for (unsigned vectorComp = 0, elemIdx = baseElementIdx; vectorComp < compCount; vectorComp += 1, elemIdx += 2) {
+        assert(elemIdx < MaxNumElems);
+        Value *component = elementsInfo.elements[elemIdx];
+        assert(component);
+        if (Value *highElem = elementsInfo.elements[elemIdx + 1]) {
           // Two 16 - bit elements packed as a 32 - bit scalar
-          elems[1] = builder.CreateShl(elems[1], 16);
-          component = builder.CreateOr(component, elems[1]);
+          highElem = builder.CreateShl(highElem, 16);
+          component = builder.CreateOr(component, highElem);
         }
         component = builder.CreateBitCast(component, builder.getFloatTy());
-        outValue = builder.CreateInsertElement(outValue, component, compIdx);
+        outValue = builder.CreateInsertElement(outValue, component, vectorComp);
       }
     }
+    assert(outValue);
 
-    // Create an output export call with the original call aurgement
-    args[0] = elementsInfo.outCalls[0]->getOperand(0);
-    args[1] = elementsInfo.outCalls[0]->getOperand(1);
-    args[2] = outValue;
+    // Create an output export call with the original call argument
+    CallInst *baseOutCall = elementsInfo.outCalls[baseElementIdx];
+    assert(baseOutCall);
+    Value *args[3] = {baseOutCall->getOperand(0), baseOutCall->getOperand(1), outValue};
 
     std::string callName(lgcName::OutputExportGeneric);
     addTypeMangling(nullptr, args, callName);

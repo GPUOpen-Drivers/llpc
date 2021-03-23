@@ -2,15 +2,26 @@
 ; match the mapping for the inputs of the fragment shader.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST: (VS) Output: loc = 0  =>  Mapped = [[loc0:[0-9]+]]
-; SHADERTEST: (VS) Output: loc = 1  =>  Mapped = [[loc1:[0-9]+]]
-; SHADERTEST: (VS) Output: loc = 3  =>  Mapped = [[loc3:[0-9]+]]
-; SHADERTEST: (VS) Output: loc = 4  =>  Mapped = [[loc4:[0-9]+]]
-; SHADERTEST: (FS) Input: loc = 0  =>  Mapped = [[loc0]]
-; SHADERTEST: (FS) Input: loc = 1  =>  Mapped = [[loc1]]
-; SHADERTEST: (FS) Input: loc = 3  =>  Mapped = [[loc3]]
-; SHADERTEST: (FS) Input: loc = 4  =>  Mapped = [[loc4]]
+; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s \
+; RUN:   | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^//}} LLPC location input/output mapping results (VS shader){{$}}
+;
+; SHADERTEST:       (VS) Output: loc = 0, comp = 0  =>  Mapped = [[loc0:[0-9]+]], 0
+; SHADERTEST-NEXT:  (VS) Output: loc = 1, comp = 0  =>  Mapped = [[loc1:[0-9]+]], 0
+; SHADERTEST-NEXT:  (VS) Output: loc = 2, comp = 0  =>  Mapped = [[loc2:[0-9]+]], 0
+; SHADERTEST-NEXT:  (VS) Output: loc = 3, comp = 0  =>  Mapped = [[loc3:[0-9]+]], 0
+; SHADERTEST-NEXT:  (VS) Output: loc = 4, comp = 0  =>  Mapped = [[loc4:[0-9]+]], 0
+;
+; SHADERTEST-LABEL: {{^//}} LLPC location input/output mapping results (FS shader){{$}}
+;
+; SHADERTEST:       (FS) Input: loc = 0, comp = 0  =>  Mapped = [[loc0]], 0
+; SHADERTEST-NEXT:  (FS) Input: loc = 1, comp = 0  =>  Mapped = [[loc1]], 0
+; SHADERTEST-NEXT:  (FS) Input: loc = 2, comp = 0  =>  Mapped = [[loc2]], 0
+; SHADERTEST-NEXT:  (FS) Input: loc = 3, comp = 0  =>  Mapped = [[loc3]], 0
+; SHADERTEST-NEXT:  (FS) Input: loc = 4, comp = 0  =>  Mapped = [[loc4]], 0
+;
+; SHADERTEST:       (FS) Output: loc = 0, comp = 0  =>  Mapped = 0, 0
+;
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

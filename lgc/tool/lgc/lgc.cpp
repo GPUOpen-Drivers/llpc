@@ -72,6 +72,9 @@ cl::opt<std::string> OutFileName("o", cl::cat(LgcCategory), cl::desc("Output fil
 cl::opt<unsigned> PalAbiVersion("pal-abi-version", cl::init(0xFFFFFFFF), cl::cat(LgcCategory),
                                 cl::desc("PAL pipeline version to compile for (default latest known)"),
                                 cl::value_desc("version"));
+
+// -v: enable verbose output
+cl::opt<bool> VerboseOutput("v", cl::cat(LgcCategory), cl::desc("Enable verbose output"), cl::init(false));
 } // anonymous namespace
 
 // =====================================================================================================================
@@ -157,6 +160,9 @@ int main(int argc, char **argv) {
     errs() << progName << ": GPU type '" << gpuName << "' not recognized\n";
     return 1;
   }
+
+  if (VerboseOutput)
+    lgcContext->setLlpcOuts(&outs());
 
   // Read the input files.
   SmallVector<std::unique_ptr<MemoryBuffer>, 4> inBuffers;

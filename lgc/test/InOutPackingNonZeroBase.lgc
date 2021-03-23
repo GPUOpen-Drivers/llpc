@@ -1,0 +1,130 @@
+; Check that input-output packing works with non-zero-based vector components.
+; RUN: lgc -mcpu=gfx900 --stop-after=lgc-patch-resource-collect %s -v --emit-llvm --verify-ir -o=- 2>&1 \
+; RUN:   | FileCheck %s
+
+; ModuleID = 'lgcPipeline'
+source_filename = "lgcPipeline"
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-G1-ni:7"
+target triple = "amdgcn--amdpal"
+
+; CHECK-LABEL: {{^//}} LLPC location input/output mapping results (FS shader)
+;
+; CHECK:       (FS) Input:  loc = 0, comp = 3 =>  Mapped = 0, 0
+; CHECK-NEXT:  (FS) Input:  loc = 3, comp = 0 =>  Mapped = 0, 1
+; CHECK-NEXT:  (FS) Input:  loc = 3, comp = 1 =>  Mapped = 0, 2
+; CHECK-NEXT:  (FS) Input:  loc = 3, comp = 2 =>  Mapped = 0, 3
+;
+; CHECK:       (FS) Output: loc = 3, comp = 0  =>  Mapped = 0, 0
+
+; CHECK-LABEL: {{^//}} LLPC location input/output mapping results (VS shader)
+;
+; CHECK:       (VS) Input:  loc = 0, comp = 0 =>  Mapped = 0, 0
+; CHECK-NEXT:  (VS) Input:  loc = 1, comp = 0 =>  Mapped = 1, 0
+;
+; CHECK:       (VS) Output: loc = 0, comp = 3  =>  Mapped = 0, 0
+; CHECK-NEXT:  (VS) Output: loc = 3, comp = 0  =>  Mapped = 0, 1
+; CHECK-NEXT:  (VS) Output: loc = 3, comp = 1  =>  Mapped = 0, 2
+; CHECK-NEXT:  (VS) Output: loc = 3, comp = 2  =>  Mapped = 0, 3
+
+; CHECK-LABEL: {{^//}} LLPC pipeline patching results
+
+; Function Attrs: nounwind
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !34 !lgc.shaderstage !34 {
+.entry:
+; CHECK:      define dllexport amdgpu_vs void @_amdgpu_vs_main
+; CHECK-NEXT: .entry:
+
+  %a4 = call <3 x float> (...) @lgc.create.read.generic.input.v3f32(i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  %a5 = call <3 x float> (...) @lgc.create.read.generic.input.v3f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+
+; CHECK: %[[input_load:.+]] = call <3 x i32> @llvm.amdgcn.struct.tbuffer.load.v3i32
+; CHECK: %[[bitcast:.+]] = bitcast <3 x i32> %[[input_load]] to <3 x float>
+
+  %a6 = shufflevector <3 x float> %a5, <3 x float> undef, <4 x i32> <i32 0, i32 1, i32 2, i32 undef>
+  %a7 = insertelement <4 x float> %a6, float 1.000000e+00, i32 3
+
+; CHECK: %[[e0:.+]] = extractelement <3 x float> %[[bitcast]], i32 0
+; CHECK: %[[e1:.+]] = extractelement <3 x float> %[[bitcast]], i32 1
+; CHECK: %[[e2:.+]] = extractelement <3 x float> %[[bitcast]], i32 2
+
+  call void (...) @lgc.create.write.generic.output(<4 x float> %a7, i32 3, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  call void (...) @lgc.create.write.builtin.output(<4 x float> %a7, i32 0, i32 0, i32 undef, i32 undef)
+
+; CHECK: call void @llvm.amdgcn.exp.f32(i32 immarg {{.+}}, i32 immarg {{.+}}, float %[[e0]], float %[[e1]], float %[[e2]], float 1.000000e+00, i1 immarg true, i1 immarg false)
+; CHECK: call void @llvm.amdgcn.exp.f32(i32 {{.+}}, i32 {{.+}}, float undef, float %[[e0]], float %[[e1]], float %[[e2]], i1 false, i1 false)
+
+  call void (...) @lgc.create.write.builtin.output(float undef, i32 1, i32 0, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.builtin.output([1 x float] undef, i32 3, i32 4096, i32 undef, i32 undef)
+  ret void
+}
+
+; Function Attrs: nounwind
+define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spirv.ExecutionModel !38 !lgc.shaderstage !38 {
+.entry:
+; CHECK:       define dllexport amdgpu_ps void @_amdgpu_ps_main
+; CHECK-NEXT:  .entry
+
+  %a2 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 16, i32 undef)
+  %e = extractelement <4 x float> %a2, i32 3
+
+; CHECK-DAG: %[[i0:.+]] = extractelement <2 x float> %[[ps_input:.+]], i32 0
+; CHECK-DAG: %[[i1:.+]] = extractelement <2 x float> %[[ps_input]],    i32 1
+
+  %a6 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 3, i32 0, i32 0, i32 0, i32 16, i32 undef)
+  %a7 = shufflevector <4 x float> %a6, <4 x float> undef, <3 x i32> <i32 0, i32 1, i32 2>
+
+  %a10 = extractelement <3 x float> %a7, i32 0
+  %a11 = extractelement <3 x float> %a7, i32 1
+  %a12 = extractelement <3 x float> %a7, i32 2
+
+  %a13 = insertelement <4 x float> undef, float %a10, i32 0
+  %a14 = insertelement <4 x float> %a13, float %a11, i32 1
+  %a15 = insertelement <4 x float> %a14, float %a12, i32 2
+  %x = insertelement <4 x float> %a15, float 3.000000e+00, i32 3
+  call void (...) @lgc.create.write.generic.output(<4 x float> %x, i32 3, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  ret void
+}
+
+; CHECK-LABEL: {{^//}} LLPC final pipeline module info
+
+; Function Attrs: nounwind readonly willreturn
+declare <3 x float> @lgc.create.read.generic.input.v3f32(...) local_unnamed_addr #1
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.builtin.output(...) local_unnamed_addr #0
+
+; Function Attrs: nounwind readonly willreturn
+declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr #1
+
+attributes #0 = { nounwind }
+attributes #1 = { nounwind readonly willreturn }
+attributes #2 = { argmemonly nofree nosync nounwind willreturn }
+attributes #3 = { nounwind readnone }
+
+!lgc.client = !{!0}
+!lgc.options = !{!1}
+!lgc.options.VS = !{!2}
+!lgc.options.FS = !{!3}
+!lgc.user.data.nodes = !{}
+!lgc.vertex.inputs = !{!29, !30, !31, !32}
+!lgc.color.export.formats = !{!33, !34, !34, !35, !35}
+!lgc.input.assembly.state = !{!36}
+!lgc.rasterizer.state = !{!37}
+
+!0 = !{!"Vulkan"}
+!1 = !{i32 -366789351, i32 241782812, i32 -1754565692, i32 185800550, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
+!2 = !{i32 -1839331196, i32 1350625605, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 20}
+!3 = !{i32 -1814828304, i32 47170791, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 20}
+!29 = !{i32 0, i32 0, i32 0, i32 24, i32 13, i32 7, i32 -1}
+!30 = !{i32 1, i32 0, i32 12, i32 24, i32 10, i32 1, i32 -1}
+!31 = !{i32 8, i32 0, i32 20, i32 24, i32 5, i32 1, i32 -1}
+!32 = !{i32 12, i32 0, i32 16, i32 24, i32 10, i32 0, i32 -1}
+!33 = !{i32 6, i32 7, i32 0, i32 1}
+!34 = !{i32 0}
+!35 = !{i32 9, i32 0, i32 0, i32 1}
+!36 = !{i32 2, i32 3}
+!37 = !{i32 0, i32 0, i32 0, i32 1, i32 0, i32 0, i32 0, i32 2}
+!38 = !{i32 4}
