@@ -40,6 +40,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/CommandFlags.h"
+#include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CodeGen.h"
