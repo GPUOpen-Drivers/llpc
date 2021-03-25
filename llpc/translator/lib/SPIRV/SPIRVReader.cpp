@@ -6717,20 +6717,18 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
         inOutDec.StreamId = streamId;
 
       SPIRVWord xfbBuffer = SPIRVID_INVALID;
-      if (bv->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
-        inOutDec.IsXfb = true;
+      if (bv->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer))
         inOutDec.XfbBuffer = xfbBuffer;
-      }
+
       SPIRVWord xfbStride = SPIRVID_INVALID;
-      if (bv->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
-        inOutDec.IsXfb = true;
+      if (bv->hasDecorate(DecorationXfbStride, 0, &xfbStride))
         inOutDec.XfbStride = xfbStride;
-      }
 
       SPIRVWord xfbOffset = SPIRVID_INVALID;
       if (bv->hasDecorate(DecorationOffset, 0, &xfbOffset)) {
         // NOTE: Transform feedback is triggered only if "xfb_offset"
         // is specified.
+        inOutDec.IsXfb = true;
         inOutDec.XfbOffset = xfbOffset;
       }
 
@@ -7211,19 +7209,17 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     // Enable transform feedback buffer if transform feedback offset is declared, and then
     // find the minimum member transform feedback offset as starting block transform feedback offset
     for (auto memberIdx = 0; memberIdx < numMembers; ++memberIdx) {
-      if (bt->hasMemberDecorate(memberIdx, DecorationXfbBuffer, 0, &xfbBuffer)) {
-        inOutDec.IsXfb = true;
+      if (bt->hasMemberDecorate(memberIdx, DecorationXfbBuffer, 0, &xfbBuffer))
         inOutDec.XfbBuffer = xfbBuffer;
-      }
 
-      if (bt->hasMemberDecorate(memberIdx, DecorationXfbStride, 0, &xfbStride)) {
-        inOutDec.IsXfb = true;
+      if (bt->hasMemberDecorate(memberIdx, DecorationXfbStride, 0, &xfbStride))
         inOutDec.XfbStride = xfbStride;
-      }
 
-      if (bt->hasMemberDecorate(memberIdx, DecorationOffset, 0, &xfbOffset))
+      if (bt->hasMemberDecorate(memberIdx, DecorationOffset, 0, &xfbOffset)) {
+        inOutDec.IsXfb = true;
         if (xfbOffset < blockXfbOffset)
           blockXfbOffset = xfbOffset;
+      }
     }
 
     for (auto memberIdx = 0; memberIdx < numMembers; ++memberIdx) {
