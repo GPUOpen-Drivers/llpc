@@ -245,6 +245,7 @@ constexpr unsigned mmCB_SHADER_MASK = 0xA08F;
 // PS register numbers in PAL metadata
 constexpr unsigned mmSPI_PS_INPUT_ENA = 0xA1B3;
 constexpr unsigned mmSPI_PS_INPUT_ADDR = 0xA1B4;
+constexpr unsigned mmSPI_PS_IN_CONTROL = 0xA1B6;
 constexpr unsigned mmPA_SC_SHADER_CONTROL = 0xA310;
 constexpr unsigned mmPA_SC_AA_CONFIG = 0xA2F8;
 

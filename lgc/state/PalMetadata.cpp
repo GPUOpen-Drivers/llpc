@@ -225,7 +225,8 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
             return 0;
           }
           case mmSPI_PS_INPUT_ENA:
-          case mmSPI_PS_INPUT_ADDR: {
+          case mmSPI_PS_INPUT_ADDR:
+          case mmSPI_PS_IN_CONTROL: {
             if (!isGlueCode) {
               *destNode = srcNode.getUInt();
             }
