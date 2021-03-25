@@ -3305,22 +3305,9 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
 
     xfbOffset += 4 * (bitWidth / 8);
     storeValueToStreamOutBuffer(compX2, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
-  } else if (compCount == 3) {
-    // 16vec3 -> 16vec2 + 16scalar
-    // vec3 -> vec2 + scalar
-    Constant *shuffleMask01[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0),
-                                 ConstantInt::get(Type::getInt32Ty(*m_context), 1)};
-    Value *compX2 = new ShuffleVectorInst(output, output, ConstantVector::get(shuffleMask01), "", insertPos);
-
-    storeValueToStreamOutBuffer(compX2, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
-
-    Value *comp = ExtractElementInst::Create(output, ConstantInt::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
-
-    xfbOffset += 2 * (bitWidth / 8);
-    storeValueToStreamOutBuffer(comp, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
   } else {
-    // 16vec4, 16vec2, 16scalar
-    // vec4, vec2, scalar
+    // 16vec4, 16vec3, 16vec2, 16scalar
+    // vec4, vec3, vec2, scalar
     if (outputTy->isVectorTy() && compCount == 1) {
       // NOTE: We translate vec1 to scalar. SPIR-V translated from DX has such usage.
       output = ExtractElementInst::Create(output, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
@@ -3410,45 +3397,42 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(Value *storeValu
   auto storeTy = storeValue->getType();
 
   unsigned compCount = storeTy->isVectorTy() ? cast<FixedVectorType>(storeTy)->getNumElements() : 1;
-  assert(compCount == 1 || compCount == 2 || compCount == 4);
+  assert(compCount <= 4);
 
   const uint64_t bitWidth = storeTy->getScalarSizeInBits();
   assert(bitWidth == 16 || bitWidth == 32);
 
-  static const char *const callNames[5][2] = {
-      {},
+  static const char *const callNames[4][2] = {
       {"llvm.amdgcn.struct.tbuffer.store.f16", "llvm.amdgcn.struct.tbuffer.store.f32"},
       {"llvm.amdgcn.struct.tbuffer.store.v2f16", "llvm.amdgcn.struct.tbuffer.store.v2f32"},
-      {},
+      {nullptr, "llvm.amdgcn.struct.tbuffer.store.v3f32"},
       {"llvm.amdgcn.struct.tbuffer.store.v4f16", "llvm.amdgcn.struct.tbuffer.store.v4f32"},
   };
-  StringRef callName(callNames[compCount][bitWidth == 32]);
+  StringRef callName(callNames[compCount - 1][bitWidth == 32]);
 
   unsigned format = 0;
   switch (m_gfxIp.major) {
   default: {
     CombineFormat formatOprd = {};
     formatOprd.bits.nfmt = BUF_NUM_FORMAT_FLOAT;
-    static const unsigned char dfmtTable[5][2] = {
-        {},
+    static const unsigned char dfmtTable[4][2] = {
         {BUF_DATA_FORMAT_16, BUF_DATA_FORMAT_32},
         {BUF_DATA_FORMAT_16_16, BUF_DATA_FORMAT_32_32},
-        {},
+        {BUF_DATA_FORMAT_INVALID, BUF_DATA_FORMAT_32_32_32},
         {BUF_DATA_FORMAT_16_16_16_16, BUF_DATA_FORMAT_32_32_32_32},
     };
-    formatOprd.bits.dfmt = dfmtTable[compCount][bitWidth == 32];
+    formatOprd.bits.dfmt = dfmtTable[compCount - 1][bitWidth == 32];
     format = formatOprd.u32All;
     break;
   }
   case 10: {
-    static unsigned char formatTable[5][2] = {
-        {},
+    static unsigned char formatTable[4][2] = {
         {BUF_FORMAT_16_FLOAT, BUF_FORMAT_32_FLOAT},
         {BUF_FORMAT_16_16_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX10},
-        {},
+        {BUF_FORMAT_INVALID, BUF_FORMAT_32_32_32_FLOAT_GFX10},
         {BUF_FORMAT_16_16_16_16_FLOAT_GFX10, BUF_FORMAT_32_32_32_32_FLOAT_GFX10},
     };
-    format = formatTable[compCount][bitWidth == 32];
+    format = formatTable[compCount - 1][bitWidth == 32];
     break;
   }
   }
@@ -3620,6 +3604,25 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
     if (compCount > 1)
       bitCastTy = FixedVectorType::get(bitCastTy, compCount);
     storeValue = new BitCastInst(storeValue, bitCastTy, "", insertPos);
+  }
+
+  // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2 and
+  // 16scalar.
+  if (bitWidth == 16 && compCount == 3) {
+    // 16vec3 -> 16vec2 + 16scalar
+    Constant *shuffleMask01[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0),
+                                 ConstantInt::get(Type::getInt32Ty(*m_context), 1)};
+    Value *compX2 = new ShuffleVectorInst(storeValue, storeValue, ConstantVector::get(shuffleMask01), "", insertPos);
+
+    storeValueToStreamOutBuffer(compX2, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
+
+    Value *comp =
+        ExtractElementInst::Create(storeValue, ConstantInt::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
+
+    xfbOffset += 2 * (bitWidth / 8);
+    storeValueToStreamOutBuffer(comp, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
+
+    return;
   }
 
   const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs;
