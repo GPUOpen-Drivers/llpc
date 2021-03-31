@@ -1166,7 +1166,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
   ShaderInOutMetadata outputMeta = {};
 
   // NOTE: This special flag is just to check if we need output header of transform feedback info.
-  static unsigned EnableXfb = false;
+  static bool EnableXfb = false;
 
   if (outputTy->isArrayTy()) {
     // Array type
@@ -1202,28 +1202,33 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
         auto elemTy = outputTy->getArrayElementType();
         assert(elemTy->isFloatingPointTy() || elemTy->isIntegerTy()); // Must be scalar
 
-        const uint64_t elemCount = outputTy->getArrayNumElements();
-        const uint64_t byteSize = elemTy->getScalarSizeInBits() / 8;
+        const unsigned elemCount = outputTy->getArrayNumElements();
+        const unsigned byteSize = elemTy->getScalarSizeInBits() / 8;
 
-        for (unsigned idx = 0; idx < elemCount; ++idx) {
-          // Handle array elements recursively
-          auto elem = ExtractValueInst::Create(outputValue, {idx}, "", insertPos);
+        for (unsigned i = 0, elemVecSize = 0; i < elemCount; i += elemVecSize) {
+          // Convert the array to a set of 4-element vectors
+          elemVecSize = std::min(4U, elemCount - i);
+          Value *elemVec = UndefValue::get(FixedVectorType::get(elemTy, elemVecSize));
+          for (unsigned j = 0; j < elemVecSize; ++j) {
+            auto elem = ExtractValueInst::Create(outputValue, {i + j}, "", insertPos);
+            elemVec = InsertElementInst::Create(elemVec, elem, m_builder->getInt32(j), "", insertPos);
+          }
 
-          auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + byteSize * idx);
-          m_builder->CreateWriteXfbOutput(elem,
+          auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + byteSize * i);
+          m_builder->CreateWriteXfbOutput(elemVec,
                                           /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
                                           xfbOffset, outputInfo);
 
-          if (!static_cast<bool>(EnableXfb)) {
+          if (!EnableXfb) {
             LLPC_OUTS("\n===============================================================================\n");
             LLPC_OUTS("// LLPC transform feedback export info (" << getShaderStageName(m_shaderStage)
                                                                  << " shader)\n\n");
-
             EnableXfb = true;
           }
 
           auto builtInName = getNameMap(static_cast<BuiltIn>(builtInId)).map(static_cast<BuiltIn>(builtInId));
-          LLPC_OUTS(*outputValue->getType() << " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), "
+          LLPC_OUTS(*outputValue->getType() << "[" << i << ".." << i + elemVecSize - 1
+                                            << "] (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), "
                                             << "xfbBuffer = " << outputMeta.XfbBuffer << ", "
                                             << "xfbStride = " << outputMeta.XfbStride << ", "
                                             << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
@@ -1236,30 +1241,61 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
 
       auto elemMeta = cast<Constant>(outputMetaVal->getOperand(1));
 
-      const uint64_t elemCount = outputTy->getArrayNumElements();
-      for (unsigned idx = 0; idx < elemCount; ++idx) {
-        // Handle array elements recursively
-        Value *elem = ExtractValueInst::Create(outputValue, {idx}, "", insertPos);
+      auto elemTy = outputTy->getArrayElementType();
+      const unsigned elemCount = outputTy->getArrayNumElements();
+      // NOTE: If the array element is single value typed (must be float or integer), we don't have to visit all
+      // elements one by one. Rather, we can convert the array to a set of 4-element vectors. This will optimize
+      // transform feedback exports.
+      if (elemTy->isSingleValueType() && !elemTy->isVectorTy()) {
+        for (unsigned i = 0, elemVecSize = 0; i < elemCount; i += elemVecSize) {
+          // Convert the array to a set of 4-element vectors
+          elemVecSize = std::min(4U, elemCount - i);
+          Value *elemVec = UndefValue::get(FixedVectorType::get(elemTy, elemVecSize));
+          for (unsigned j = 0; j < elemVecSize; ++j) {
+            auto elem = ExtractValueInst::Create(outputValue, {i + j}, "", insertPos);
+            elemVec = InsertElementInst::Create(elemVec, elem, m_builder->getInt32(j), "", insertPos);
+          }
 
-        Value *elemLocOffset = nullptr;
-        ConstantInt *locOffsetConst = dyn_cast<ConstantInt>(locOffset);
+          Value *elemVecLocOffset = nullptr;
+          ConstantInt *locOffsetConst = dyn_cast<ConstantInt>(locOffset);
 
-        // elemLocOffset = locOffset + stride * idx
-        if (locOffsetConst) {
-          unsigned locOffset = locOffsetConst->getZExtValue();
-          elemLocOffset = ConstantInt::get(Type::getInt32Ty(*m_context), locOffset + stride * idx);
-        } else {
-          elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * idx), "", insertPos);
+          // elemVecLocOffset = locOffset + stride * index
+          if (locOffsetConst) {
+            unsigned locOffset = locOffsetConst->getZExtValue();
+            elemVecLocOffset = ConstantInt::get(Type::getInt32Ty(*m_context), locOffset + stride * i);
+          } else {
+            elemVecLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * i), "", insertPos);
+          }
+
+          addCallInstForOutputExport(elemVec, elemMeta, elemVecLocOffset, maxLocOffset,
+                                     xfbOffsetAdjust + outputMeta.XfbArrayStride * i, xfbBufferAdjust, nullptr,
+                                     vertexIdx, emitStreamId, insertPos);
         }
+      } else {
+        for (unsigned i = 0; i < elemCount; ++i) {
+          // Handle array elements recursively
+          Value *elem = ExtractValueInst::Create(outputValue, {i}, "", insertPos);
 
-        // NOTE: GLSL spec says: an array of size N of blocks is captured by N consecutive buffers,
-        // with all members of block array-element E captured by buffer B, where B equals the declared or
-        // inherited xfb_buffer plus E.
-        bool blockArray = outputMeta.IsBlockArray;
-        addCallInstForOutputExport(elem, elemMeta, elemLocOffset, maxLocOffset,
-                                   xfbOffsetAdjust + (blockArray ? 0 : outputMeta.XfbArrayStride * idx),
-                                   xfbBufferAdjust + (blockArray ? outputMeta.XfbArrayStride * idx : 0), nullptr,
-                                   vertexIdx, emitStreamId, insertPos);
+          Value *elemLocOffset = nullptr;
+          ConstantInt *locOffsetConst = dyn_cast<ConstantInt>(locOffset);
+
+          // elemLocOffset = locOffset + stride * index
+          if (locOffsetConst) {
+            unsigned locOffset = locOffsetConst->getZExtValue();
+            elemLocOffset = ConstantInt::get(Type::getInt32Ty(*m_context), locOffset + stride * i);
+          } else {
+            elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * i), "", insertPos);
+          }
+
+          // NOTE: GLSL spec says: an array of size N of blocks is captured by N consecutive buffers,
+          // with all members of block array-element E captured by buffer B, where B equals the declared or
+          // inherited xfb_buffer plus E.
+          bool blockArray = outputMeta.IsBlockArray;
+          addCallInstForOutputExport(elem, elemMeta, elemLocOffset, maxLocOffset,
+                                     xfbOffsetAdjust + (blockArray ? 0 : outputMeta.XfbArrayStride * i),
+                                     xfbBufferAdjust + (blockArray ? outputMeta.XfbArrayStride * i : 0), nullptr,
+                                     vertexIdx, emitStreamId, insertPos);
+        }
       }
     }
   } else if (outputTy->isStructTy()) {
@@ -1304,10 +1340,9 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
                                         /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
                                         xfbOffset, outputInfo);
 
-        if (!static_cast<bool>(EnableXfb)) {
+        if (!EnableXfb) {
           LLPC_OUTS("\n===============================================================================\n");
           LLPC_OUTS("// LLPC transform feedback export info (" << getShaderStageName(m_shaderStage) << " shader)\n\n");
-
           EnableXfb = true;
         }
 
@@ -1344,10 +1379,9 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
                                       outputMeta.XfbBuffer + xfbBufferAdjust, outputMeta.XfbStride, xfbOffset,
                                       outputInfo);
 
-      if (!static_cast<bool>(EnableXfb)) {
+      if (!EnableXfb) {
         LLPC_OUTS("\n===============================================================================\n");
         LLPC_OUTS("// LLPC transform feedback export info (" << getShaderStageName(m_shaderStage) << " shader)\n\n");
-
         EnableXfb = true;
       }
 
