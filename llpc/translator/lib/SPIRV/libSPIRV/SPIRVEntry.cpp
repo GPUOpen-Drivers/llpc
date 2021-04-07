@@ -475,8 +475,10 @@ void SPIRVSource::decode(std::istream &I) {
   SPIRVWord Ver = SPIRVWORD_MAX;
   getDecoder(I) >> Lang >> Ver;
   Module->setSourceLanguage(Lang, Ver);
-  if (WordCount > 3)
+  if (WordCount > 3) {
     getDecoder(I) >> File;
+    Module->setSourceFile(File);
+  }
   if (WordCount > 4)
     getDecoder(I) >> Source;
 }
