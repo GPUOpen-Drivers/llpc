@@ -246,9 +246,9 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
   if (gfxIp.major == 10) {
     SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
 
-    SET_REG_FIELD(&config, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, EsVertsOffchipGsOrTess);
-    SET_REG_FIELD(&config, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, GsPrimsOffchipGsOrTess);
-    SET_REG_FIELD(&config, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, GsPrimsOffchipGsOrTess);
+    SET_REG_MOST_FIELD(&config, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, EsVertsOffchipGsOrTess);
+    SET_REG_MOST_FIELD(&config, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, GsPrimsOffchipGsOrTess);
+    SET_REG_MOST_FIELD(&config, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, GsPrimsOffchipGsOrTess);
   } else {
     SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
   }
@@ -849,15 +849,12 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
     setNumAvailSgprs(Util::Abi::HardwareStage::Vs, m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable);
     setNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable);
 
-    SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
-                       resUsage->inOutUsage.gs.outLocCount[0] > 0 && enableXfb);
-    SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN,
-                       resUsage->inOutUsage.gs.outLocCount[1] > 0);
-    SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN,
-                       resUsage->inOutUsage.gs.outLocCount[2] > 0);
-    SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN,
-                       resUsage->inOutUsage.gs.outLocCount[3] > 0);
-    SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, RAST_STREAM, resUsage->inOutUsage.gs.rasterStream);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
+                  resUsage->inOutUsage.gs.outLocCount[0] > 0 && enableXfb);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, resUsage->inOutUsage.gs.outLocCount[1] > 0);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, resUsage->inOutUsage.gs.outLocCount[2] > 0);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, resUsage->inOutUsage.gs.outLocCount[3] > 0);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, RAST_STREAM, resUsage->inOutUsage.gs.rasterStream);
   } else {
     const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
     SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, shaderOptions.debugMode);
@@ -872,10 +869,10 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
       SET_REG_GFX9_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR_MSB, userSgprMsb);
     }
 
-    SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN, enableXfb);
-    SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, false);
-    SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, false);
-    SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, false);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN, enableXfb);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, false);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, false);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, false);
 
     setNumAvailSgprs(Util::Abi::HardwareStage::Vs, resUsage->numSgprsAvailable);
     setNumAvailVgprs(Util::Abi::HardwareStage::Vs, resUsage->numVgprsAvailable);
@@ -887,10 +884,10 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *pConfig) {
   SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE2_EN, (xfbStrides[2] > 0));
   SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE3_EN, (xfbStrides[3] > 0));
 
-  SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_0, STRIDE, xfbStrides[0] / sizeof(unsigned));
-  SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_1, STRIDE, xfbStrides[1] / sizeof(unsigned));
-  SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_2, STRIDE, xfbStrides[2] / sizeof(unsigned));
-  SET_REG_MOST_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_3, STRIDE, xfbStrides[3] / sizeof(unsigned));
+  SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_0, STRIDE, xfbStrides[0] / sizeof(unsigned));
+  SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_1, STRIDE, xfbStrides[1] / sizeof(unsigned));
+  SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_2, STRIDE, xfbStrides[2] / sizeof(unsigned));
+  SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_3, STRIDE, xfbStrides[3] / sizeof(unsigned));
 
   unsigned streamBufferConfig = 0;
   for (auto i = 0; i < MaxGsStreams; ++i)
@@ -1280,14 +1277,14 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
     SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_1024);
   }
 
-  SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
-  SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
+  SET_REG_MOST_FIELD(&pConfig->esGsRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
+  SET_REG_MOST_FIELD(&pConfig->esGsRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
 
   // NOTE: The value of field "GS_INST_PRIMS_IN_SUBGRP" should be strictly equal to the product of
   // VGT_GS_ONCHIP_CNTL.GS_PRIMS_PER_SUBGRP * VGT_GS_INSTANCE_CNT.CNT.
   const unsigned gsInstPrimsInSubgrp =
       geometryMode.invocations > 1 ? (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations) : 0;
-  SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
+  SET_REG_MOST_FIELD(&pConfig->esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
 
   unsigned gsVertItemSize0 = sizeof(unsigned) * gsInOutUsage.gs.outLocCount[0];
   SET_REG_FIELD(&pConfig->esGsRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize0);
@@ -1329,14 +1326,14 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   // Set multi-stream output primitive type
   if (gsVertItemSize1 > 0 || gsVertItemSize2 > 0 || gsVertItemSize3 > 0) {
     const static auto GsOutPrimInvalid = 3u;
-    SET_REG_MOST_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_1,
-                       gsVertItemSize1 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
+    SET_REG_GFX9_10_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_1,
+                          gsVertItemSize1 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
 
-    SET_REG_MOST_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_2,
-                       gsVertItemSize2 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
+    SET_REG_GFX9_10_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_2,
+                          gsVertItemSize2 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
 
-    SET_REG_MOST_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_3,
-                       gsVertItemSize3 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
+    SET_REG_GFX9_10_FIELD(&pConfig->esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_3,
+                          gsVertItemSize3 > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid);
   }
 
   SET_REG_FIELD(&pConfig->esGsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, calcFactor.gsVsRingItemSize);
@@ -1475,14 +1472,14 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, true);
 
-  SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
-  SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
+  SET_REG_MOST_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
+  SET_REG_MOST_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
   setNggSubgroupSize(std::max(calcFactor.esVertsPerSubgroup, calcFactor.gsPrimsPerSubgroup));
 
   const unsigned gsInstPrimsInSubgrp = geometryMode.invocations > 1
                                            ? (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations)
                                            : calcFactor.gsPrimsPerSubgroup;
-  SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
+  SET_REG_MOST_FIELD(&pConfig->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
 
   unsigned gsVertItemSize = 4 * gsInOutUsage.outputMapLocCount;
   SET_REG_FIELD(&pConfig->primShaderRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize);

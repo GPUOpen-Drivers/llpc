@@ -97,16 +97,8 @@ EsGsRegConfig::EsGsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(SPI_SHADER_PGM_RSRC2_GS);
   INIT_REG(SPI_SHADER_PGM_RSRC4_GS);
   INIT_REG(VGT_GS_MAX_VERT_OUT);
-  INIT_REG(VGT_GS_ONCHIP_CNTL);
   INIT_REG(VGT_GS_INSTANCE_CNT);
   INIT_REG(VGT_ESGS_RING_ITEMSIZE);
-
-  // VGT_GS_OUT_PRIM_TYPE is a special register, having different register IDs
-  if (gfxIp.major == 9 || gfxIp.major == 10) {
-    INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
-  } else {
-    llvm_unreachable("Not implemented!");
-  }
 
   INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
   INIT_REG_GFX9_10(gfxIp.major, VGT_GS_PER_VS);
@@ -118,6 +110,8 @@ EsGsRegConfig::EsGsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_2);
   INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_3);
   INIT_REG_GFX9_10(gfxIp.major, VGT_GS_MODE);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_ONCHIP_CNTL);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
 
   INIT_REG_GFX9(gfxIp.major, VGT_GS_MAX_PRIMS_PER_SUBGROUP);
   INIT_REG_GFX10_PLUS(gfxIp.major, GE_MAX_OUTPUT_PER_SUBGROUP);
@@ -141,13 +135,13 @@ PrimShaderRegConfig::PrimShaderRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(SPI_SHADER_PGM_RSRC2_GS);
   INIT_REG(SPI_SHADER_PGM_RSRC4_GS);
   INIT_REG(VGT_GS_MAX_VERT_OUT);
-  INIT_REG(VGT_GS_ONCHIP_CNTL);
   INIT_REG(VGT_GS_INSTANCE_CNT);
   INIT_REG(VGT_ESGS_RING_ITEMSIZE);
 
-  // VGT_GS_OUT_PRIM_TYPE is a special register, having different register IDs
+  // Special registers, having different register IDs
   if (gfxIp.major == 9 || gfxIp.major == 10) {
     INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
+    INIT_REG_GFX9_10(gfxIp.major, VGT_GS_ONCHIP_CNTL);
   } else {
     llvm_unreachable("Not implemented!");
   }
@@ -223,9 +217,9 @@ PsRegConfig::PsRegConfig(GfxIpVersion gfxIp) {
 // @param gfxIp : Graphics IP version info
 PipelineVsFsRegConfig::PipelineVsFsRegConfig(GfxIpVersion gfxIp) : vsRegs(gfxIp), psRegs(gfxIp) {
   INIT_REG(VGT_SHADER_STAGES_EN);
-  INIT_REG(VGT_GS_ONCHIP_CNTL);
   INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
   INIT_REG_GFX10(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_ONCHIP_CNTL);
 }
 
 // =====================================================================================================================
@@ -236,7 +230,7 @@ PipelineVsTsFsRegConfig::PipelineVsTsFsRegConfig(GfxIpVersion gfxIp) : lsHsRegs(
   INIT_REG(VGT_SHADER_STAGES_EN);
   INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
   INIT_REG_GFX10(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
-  INIT_REG(VGT_GS_ONCHIP_CNTL);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_ONCHIP_CNTL);
 }
 
 // =====================================================================================================================

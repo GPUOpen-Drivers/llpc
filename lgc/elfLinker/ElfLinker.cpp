@@ -953,9 +953,10 @@ void OutputSection::write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr) {
   }
 
   if (endPadding) {
-    // On GFX10 in .text, also add padding at the end of the section: align to 64 bytes, then
-    // add another 192 bytes.
-    uint64_t alignmentGap = (-size & 0x3F) + 0xC0;
+    // On GFX10 in .text, also add padding at the end of the section: align to an instruction cache line
+    // boundary, then add another 3 cache lines worth of padding.
+    uint64_t cacheLineSize = 64;
+    uint64_t alignmentGap = (-size & (cacheLineSize - 1)) + 3 * cacheLineSize;
     while (alignmentGap != 0) {
       size_t thisSize = std::min(alignmentGap, paddingUnit - (size & (paddingUnit - 1)));
       outStream << StringRef(&endPadding[size & (paddingUnit - 1)], thisSize);

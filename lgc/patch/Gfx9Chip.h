@@ -174,6 +174,7 @@ using namespace Pal::Gfx9::Chip;
 // Sets GFX-dependent register field value
 #define SET_REG_GFX9_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx09._field = (_val);
 #define SET_REG_GFX10_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx10._field = (_val);
+#define SET_REG_GFX9_10_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx09_10._field = (_val);
 #define SET_REG_GFX10_PLUS_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx10Plus._field = (_val);
 #define SET_REG_GFX10_1_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx101._field = (_val);
 #define SET_REG_GFX10_3_PLUS_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx103Plus._field = (_val);

@@ -26,7 +26,11 @@ ifdef VULKAN_HEADERS_DEPTH
     LCXXDEFS += -DEXTERNAL_VULKAN_HEADERS=1
 endif
 
-LCXXDEFS += -DCHIP_HDR_VEGA20=1 -DCHIP_HDR_RAVEN2=1 -DCHIP_HDR_NAVI14=1 -DCHIP_HDR_NAVI21=1
+LCXXDEFS += -DCHIP_HDR_NAVI14=1 -DCHIP_HDR_NAVI21=1
+
+ifeq ($(VKI_BUILD_NAVI12), 1)
+    LCXXDEFS += -DLLPC_BUILD_NAVI12=1
+endif
 
 ifeq ($(VKI_BUILD_NAVI22), 1)
     LCXXDEFS += -DLLPC_BUILD_NAVI22=1
@@ -139,6 +143,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
                     /wd4503 \
                     /wd4624 \
                     /wd4706 \
+                    /wd4996 \
                     /wd6001 \
                     /wd6102 \
                     /wd6239 \

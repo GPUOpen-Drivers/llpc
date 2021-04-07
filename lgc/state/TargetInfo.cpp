@@ -314,6 +314,24 @@ static void setGfx1010Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
 }
 
+// gfx1011
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1011Info(TargetInfo *targetInfo) {
+  setGfx10Info(targetInfo);
+
+  targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetch0 = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waDidtThrottleVmem = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waLdsVmemNotWaitingVmVsrc = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waNsaCannotFollowWritelane = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waNsaAndClauseCanHang = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waSmemFollowedByVopc = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetchFwd64 = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waWarFpAtomicDenormHazard = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
+}
+
 // gfx1012
 //
 // @param [in/out] targetInfo : Target info
@@ -398,6 +416,7 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
       {"gfx909", &setGfx9Info},     // gfx909, raven2
       {"gfx90c", &setGfx9Info},     // gfx90c
       {"gfx1010", &setGfx1010Info}, // gfx1010
+      {"gfx1011", &setGfx1011Info}, // gfx1011, navi12
       {"gfx1012", &setGfx1012Info}, // gfx1012, navi14
       {"gfx1030", &setGfx1030Info}, // gfx1030, navi21
       {"gfx1031", &setGfx1031Info}, // gfx1031, navi22
