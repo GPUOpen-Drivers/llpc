@@ -133,11 +133,11 @@ private:
   void patchCopyShaderGenericOutputExport(llvm::Value *output, unsigned location, llvm::Instruction *insertPos);
   void patchCopyShaderBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
 
-  void patchXfbOutputExport(llvm::Value *output, unsigned xfbBuffer, unsigned xfbOffset, unsigned locOffset,
+  void patchXfbOutputExport(llvm::Value *output, unsigned xfbBuffer, unsigned xfbOffset, unsigned streamId,
                             llvm::Instruction *insertPos);
 
   void storeValueToStreamOutBuffer(llvm::Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset, unsigned xfbStride,
-                                   llvm::Value *streamOutBufDesc, llvm::Instruction *insertPos);
+                                   unsigned streamId, llvm::Value *streamOutBufDesc, llvm::Instruction *insertPos);
 
   void createStreamOutBufferStoreFunction(llvm::Value *storeValue, unsigned xfbStrde, std::string &funcName);
 

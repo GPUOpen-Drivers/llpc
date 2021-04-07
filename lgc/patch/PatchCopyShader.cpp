@@ -654,7 +654,7 @@ void PatchCopyShader::exportXfbOutput(Value *outputValue, const XfbOutInfo &xfbO
   }
 
   Value *args[] = {builder.getInt32(xfbOutInfo.xfbBuffer), builder.getInt32(xfbOutInfo.xfbOffset),
-                   builder.getInt32(xfbOutInfo.xfbExtraOffset), outputValue};
+                   builder.getInt32(xfbOutInfo.streamId), outputValue};
 
   std::string instName(lgcName::OutputExportXfb);
   addTypeMangling(nullptr, args, instName);

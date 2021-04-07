@@ -778,20 +778,20 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       assert(xfbBuffer < MaxTransformFeedbackBuffers);
 
       unsigned xfbOffset = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-      unsigned xfbExtraOffset = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
+      unsigned streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
 
       // NOTE: Transform feedback output will be done in last vertex-processing shader stage.
       switch (m_shaderStage) {
       case ShaderStageVertex: {
         // No TS/GS pipeline, VS is the last stage
         if (!m_hasGs && !m_hasTs)
-          patchXfbOutputExport(output, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
+          patchXfbOutputExport(output, xfbBuffer, xfbOffset, streamId, &callInst);
         break;
       }
       case ShaderStageTessEval: {
         // TS-only pipeline, TES is the last stage
         if (!m_hasGs)
-          patchXfbOutputExport(output, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
+          patchXfbOutputExport(output, xfbBuffer, xfbOffset, streamId, &callInst);
         break;
       }
       case ShaderStageGeometry: {
@@ -800,7 +800,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       case ShaderStageCopyShader: {
         // TS-GS or GS-only pipeline, copy shader is the last stage
-        patchXfbOutputExport(output, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
+        patchXfbOutputExport(output, xfbBuffer, xfbOffset, streamId, &callInst);
         break;
       }
       default: {
@@ -3242,10 +3242,10 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(Value *output, u
 // @param output : Output value
 // @param xfbBuffer : Transform feedback buffer ID
 // @param xfbOffset : Transform feedback offset
-// @param xfbExtraOffset : Transform feedback extra offset, passed from aggregate type
+// @param streamId : Output stream ID
 // @param insertPos : Where to insert the store instruction
 void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuffer, unsigned xfbOffset,
-                                                  unsigned xfbExtraOffset, Instruction *insertPos) {
+                                                  unsigned streamId, Instruction *insertPos) {
   assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
          m_shaderStage == ShaderStageCopyShader);
 
@@ -3257,8 +3257,6 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
   auto outputTy = output->getType();
   unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
   unsigned bitWidth = outputTy->getScalarSizeInBits();
-
-  xfbOffset = xfbOffset + xfbExtraOffset;
 
   if (bitWidth == 64) {
     // Cast 64-bit output to 32-bit
@@ -3278,7 +3276,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
         ConstantInt::get(Type::getInt32Ty(*m_context), 2), ConstantInt::get(Type::getInt32Ty(*m_context), 3)};
     Value *compX4 = new ShuffleVectorInst(output, output, ConstantVector::get(shuffleMask0123), "", insertPos);
 
-    storeValueToStreamOutBuffer(compX4, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
+    storeValueToStreamOutBuffer(compX4, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
 
     Constant *shuffleMask4567[] = {
         ConstantInt::get(Type::getInt32Ty(*m_context), 4), ConstantInt::get(Type::getInt32Ty(*m_context), 5),
@@ -3286,7 +3284,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
     compX4 = new ShuffleVectorInst(output, output, ConstantVector::get(shuffleMask4567), "", insertPos);
 
     xfbOffset += 4 * (bitWidth / 8);
-    storeValueToStreamOutBuffer(compX4, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
+    storeValueToStreamOutBuffer(compX4, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
   } else if (compCount == 6) {
     // vec6 -> vec4 + vec2
     assert(bitWidth == 32);
@@ -3297,14 +3295,14 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
         ConstantInt::get(Type::getInt32Ty(*m_context), 2), ConstantInt::get(Type::getInt32Ty(*m_context), 3)};
     Value *compX4 = new ShuffleVectorInst(output, output, ConstantVector::get(shuffleMask0123), "", insertPos);
 
-    storeValueToStreamOutBuffer(compX4, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
+    storeValueToStreamOutBuffer(compX4, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
 
     Constant *shuffleMask45[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 4),
                                  ConstantInt::get(Type::getInt32Ty(*m_context), 5)};
     Value *compX2 = new ShuffleVectorInst(output, output, ConstantVector::get(shuffleMask45), "", insertPos);
 
     xfbOffset += 4 * (bitWidth / 8);
-    storeValueToStreamOutBuffer(compX2, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
+    storeValueToStreamOutBuffer(compX2, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
   } else {
     // 16vec4, 16vec3, 16vec2, 16scalar
     // vec4, vec3, vec2, scalar
@@ -3313,7 +3311,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
       output = ExtractElementInst::Create(output, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
     }
 
-    storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
+    storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
   }
 }
 
@@ -3586,10 +3584,11 @@ unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadVal
 // @param xfbBuffer : Transform feedback buffer
 // @param xfbOffset : Offset of the store value within transform feedback buffer
 // @param xfbStride : Transform feedback stride
+// @param streamId : Output stream ID
 // @param streamOutBufDesc : Transform feedback buffer descriptor
 // @param insertPos : Where to insert the store instruction
 void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset,
-                                                         unsigned xfbStride, Value *streamOutBufDesc,
+                                                         unsigned xfbStride, unsigned streamId, Value *streamOutBufDesc,
                                                          Instruction *insertPos) {
   auto storeTy = storeValue->getType();
 
@@ -3614,13 +3613,13 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
                                  ConstantInt::get(Type::getInt32Ty(*m_context), 1)};
     Value *compX2 = new ShuffleVectorInst(storeValue, storeValue, ConstantVector::get(shuffleMask01), "", insertPos);
 
-    storeValueToStreamOutBuffer(compX2, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
+    storeValueToStreamOutBuffer(compX2, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
 
     Value *comp =
         ExtractElementInst::Create(storeValue, ConstantInt::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
 
     xfbOffset += 2 * (bitWidth / 8);
-    storeValueToStreamOutBuffer(comp, xfbBuffer, xfbOffset, xfbStride, streamOutBufDesc, insertPos);
+    storeValueToStreamOutBuffer(comp, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
 
     return;
   }
