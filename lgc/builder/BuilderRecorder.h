@@ -79,6 +79,7 @@ public:
 
     // Base class
     DotProduct,
+    IntegerDotProduct,
 
     // Arithmetic
     CubeFaceCoord,
@@ -236,6 +237,9 @@ public:
 
   llvm::Value *CreateDotProduct(llvm::Value *const vector1, llvm::Value *const vector2,
                                 const llvm::Twine &instName = "") override final;
+
+  llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
+                                       unsigned flags, const llvm::Twine &instName = "") override final;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Arithmetic operations

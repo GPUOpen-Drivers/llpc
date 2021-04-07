@@ -199,6 +199,22 @@ public:
   virtual llvm::Value *CreateDotProduct(llvm::Value *const vector1, llvm::Value *const vector2,
                                         const llvm::Twine &instName = "") = 0;
 
+  // Bit settings in flags argument for integer dot product
+  enum { FirstVectorSigned = 1, SecondVectorSigned = 2 };
+  // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
+  // where available.
+  // The two input vectors must both be <4 x i8>.
+  // The accumulator input must be i32; use a value of 0 for no accumulation.
+  // The result type is i32.
+  //
+  // @param vector1 : The integer vector 1
+  // @param vector2 : The integer vector 2
+  // @param accumulator : The accumulator to the scalar of dot product
+  // @param flags : Bit 0 is "first vector is signed" and bit 1 is "second vector is signed"
+  // @param instName : Name to give instruction(s)
+  virtual llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
+                                               unsigned flags, const llvm::Twine &instName = "") = 0;
+
   // Create a call to the specified intrinsic with one operand, mangled on its type.
   // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
   // flags from the Builder if none are specified by pFmfSource.
