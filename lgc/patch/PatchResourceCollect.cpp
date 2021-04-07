@@ -664,7 +664,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         break;
       case NggSubgroupSizing::Auto:
         if (m_pipelineState->getTargetInfo().getGfxIpVersion() == GfxIpVersion{10, 1}) {
-          //# These magic numbers come from performance runs. We'll need to continue to tune this in the future.
           esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2 - 2;
           gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
         } else {

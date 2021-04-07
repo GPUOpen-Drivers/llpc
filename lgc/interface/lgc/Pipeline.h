@@ -125,6 +125,7 @@ struct Options {
   unsigned disableImageResourceCheck;  // Don't do image resource type check
   unsigned reserved0f;                 // Reserved for future functionality
   unsigned reserved10;                 // Reserved for future functionality
+  unsigned reserved1f; // Reserved for funture functionality
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

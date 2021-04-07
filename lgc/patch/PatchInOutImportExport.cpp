@@ -35,6 +35,7 @@
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/util/Debug.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -286,7 +287,6 @@ void PatchInOutImportExport::processShader() {
       //           \  +----------------------------------------+
       //            \ | TCS Patch Constant                     |
       //              +----------------------------------------+
-      //
       // inPatchTotalSize = inVertexCount * inVertexStride * patchCountPerThreadGroup
       // outPatchTotalSize = outVertexCount * outVertexStride * patchCountPerThreadGroup
       // patchConstTotalSize = patchConstCount * 4 * patchCountPerThreadGroup
@@ -5540,8 +5540,8 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
 
 // =====================================================================================================================
 // The process of handling the store of tessellation factors.
-//
-// NOTE: Postone the TF store (write to LDS if it is required and TF buffer) here is for future functionality.
+// 1. Collect outer and inner tessellation factors from the corresponding callInst.
+// 2. Store TFs to LDS if they are read as input and write to TF buffer.
 void PatchInOutImportExport::storeTessFactors() {
   if (m_tessLevelOuterInsts.empty() && m_tessLevelInnerInsts.empty())
     return;
@@ -5556,12 +5556,14 @@ void PatchInOutImportExport::storeTessFactors() {
   SmallVector<Value *> outerTessFactors, innerTessFactors;
   SmallVector<Value *> *tessFactors = &outerTessFactors;
   ArrayRef<Instruction *> tessLevelInsts = m_tessLevelOuterInsts;
+  bool isOutputArray[2] = {};
   for (unsigned i = 0; i < 2; ++i) {
     // Fill the container for tessellation factors
     for (auto tessLevelInst : tessLevelInsts) {
       Value *output = tessLevelInst->getOperand(3);
       Type *outputTy = output->getType();
-      if (outputTy->isArrayTy()) {
+      isOutputArray[i] = outputTy->isArrayTy();
+      if (isOutputArray[i]) {
         const unsigned tessFactorCount = expTessFactorCount[primitiveMode][i];
         for (unsigned elemIdx = 0; elemIdx < tessFactorCount; ++elemIdx) {
           auto elem = builder.CreateExtractValue(output, elemIdx);
@@ -5578,47 +5580,50 @@ void PatchInOutImportExport::storeTessFactors() {
     tessLevelInsts = m_tessLevelInnerInsts;
   }
 
-  // Write tessellation factors to LDS if they are used as input for TES or TCS.
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
-  auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
-  unsigned builtInId = BuiltInTessLevelOuter;
-  tessFactors = &outerTessFactors;
-  tessLevelInsts = m_tessLevelOuterInsts;
-  for (unsigned i = 0; i < 2; ++i) {
-    // If tessellation factors are used as input of TES or TCS, they are required to write to LDS.
-    const bool needWriteToLds = perPatchBuiltInOutLocMap.count(builtInId) == 1;
-    if (needWriteToLds) {
-      const unsigned loc = perPatchBuiltInOutLocMap[builtInId];
-      const bool isArrayTessFactor = tessLevelInsts[0]->getOperand(3)->getType()->isArrayTy();
-      if (isArrayTessFactor) {
-        // gl_TessLevelOuter[4] is treated as vec4
-        // gl_TessLevelInner[2] is treated as vec2
-        auto output = tessLevelInsts[0]->getOperand(3);
-        auto outputTy = output->getType();
-        auto vertexIdx = tessLevelInsts[0]->getOperand(2);
-        auto insertPos = tessLevelInsts[0];
-        for (unsigned idx = 0; idx < outputTy->getArrayNumElements(); ++idx) {
-          auto elem = builder.CreateExtractValue(output, idx);
-          auto elemIdx = builder.getInt32(idx);
-          auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, insertPos);
-          writeValueToLds(elem, ldsOffset, insertPos);
-        }
-      } else {
-        for (unsigned idx = 0; idx < tessFactors->size(); ++idx) {
-          Value *elemIdx = tessLevelInsts[idx]->getOperand(1);
-          Value *tessFactor = (*tessFactors)[idx];
-          auto ldsOffset =
-              calcLdsOffsetForTcsOutput(tessFactor->getType(), loc, nullptr, elemIdx, nullptr, tessLevelInsts[idx]);
-          writeValueToLds(tessFactor, ldsOffset, tessLevelInsts[idx]);
+  bool optimizeTessFactors = false;
+
+  if (!optimizeTessFactors) {
+    // Write tessellation factors to LDS if they are used as input for TES or TCS.
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
+    auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
+    unsigned builtInId = BuiltInTessLevelOuter;
+    tessFactors = &outerTessFactors;
+    tessLevelInsts = m_tessLevelOuterInsts;
+    for (unsigned i = 0; i < 2; ++i) {
+      // If tessellation factors are used as input of TES or TCS, they are required to write to LDS.
+      const bool needWriteToLds = perPatchBuiltInOutLocMap.count(builtInId) == 1;
+      if (needWriteToLds) {
+        const unsigned loc = perPatchBuiltInOutLocMap[builtInId];
+        if (isOutputArray[i]) {
+          // gl_TessLevelOuter[4] is treated as vec4
+          // gl_TessLevelInner[2] is treated as vec2
+          auto output = tessLevelInsts[0]->getOperand(3);
+          auto outputTy = output->getType();
+          auto vertexIdx = tessLevelInsts[0]->getOperand(2);
+          auto insertPos = tessLevelInsts[0];
+          for (unsigned idx = 0; idx < outputTy->getArrayNumElements(); ++idx) {
+            auto elem = builder.CreateExtractValue(output, idx);
+            auto elemIdx = builder.getInt32(idx);
+            auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, insertPos);
+            writeValueToLds(elem, ldsOffset, insertPos);
+          }
+        } else {
+          for (unsigned idx = 0; idx < tessFactors->size(); ++idx) {
+            Value *elemIdx = tessLevelInsts[idx]->getOperand(1);
+            Value *tessFactor = (*tessFactors)[idx];
+            auto ldsOffset =
+                calcLdsOffsetForTcsOutput(tessFactor->getType(), loc, nullptr, elemIdx, nullptr, tessLevelInsts[idx]);
+            writeValueToLds(tessFactor, ldsOffset, tessLevelInsts[idx]);
+          }
         }
       }
+      builtInId = BuiltInTessLevelInner;
+      tessFactors = &innerTessFactors;
+      tessLevelInsts = m_tessLevelInnerInsts;
     }
-    builtInId = BuiltInTessLevelInner;
-    tessFactors = &innerTessFactors;
-    tessLevelInsts = m_tessLevelInnerInsts;
-  }
 
-  doTessFactorBufferStore(outerTessFactors, innerTessFactors, nullptr);
+    doTessFactorBufferStore(outerTessFactors, innerTessFactors, nullptr);
+  }
 }
 
 // =====================================================================================================================

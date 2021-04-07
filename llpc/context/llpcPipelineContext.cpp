@@ -447,7 +447,7 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
   auto allocNodes = std::make_unique<ResourceMappingNode[]>(resourceMapping->userDataNodeCount);
 
   for (unsigned idx = 0; idx < resourceMapping->userDataNodeCount; ++idx)
-      allocNodes[idx] = resourceMapping->pUserDataNodes[idx].node;
+    allocNodes[idx] = resourceMapping->pUserDataNodes[idx].node;
 
   // Translate the resource nodes into the LGC format expected by Pipeline::SetUserDataNodes.
   ArrayRef<ResourceMappingNode> nodes(allocNodes.get(), resourceMapping->userDataNodeCount);
@@ -744,8 +744,9 @@ void PipelineContext::setVertexInputDescriptions(Pipeline *pipeline) const {
           attrib->location,
           attrib->binding,
           attrib->offset,
-          (static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride ?
-          0 : binding->stride),
+          (static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride
+               ? 0
+               : binding->stride),
           dfmt,
           nfmt,
           binding->inputRate,

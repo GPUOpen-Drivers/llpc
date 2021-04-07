@@ -74,7 +74,7 @@ void ComputeContext::mergeResourceMappingData() {
     m_staticDescriptorValueStorage = std::make_unique<SmallVector<StaticDescriptorValue, 8>>();
     m_staticDescriptorValueStorage->reserve(shaderInfo.descriptorRangeValueCount);
     for (unsigned i = 0; i < shaderInfo.descriptorRangeValueCount; ++i) {
-      const auto& descRangeValue = shaderInfo.pDescriptorRangeValues[i];
+      const auto &descRangeValue = shaderInfo.pDescriptorRangeValues[i];
       m_staticDescriptorValueStorage->push_back({descRangeValue.type, descRangeValue.set, descRangeValue.binding,
                                                  descRangeValue.arraySize, descRangeValue.pValue,
                                                  ShaderStageBit::ShaderStageComputeBit});

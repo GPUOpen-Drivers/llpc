@@ -97,7 +97,6 @@ public:
 
   // Checks whether the pipeline is graphics or compute
   virtual bool isGraphics() const = 0;
-
   // Check whether the pipeline uses features relevant to subgroup size
   virtual bool usesSubgroupSize() const = 0;
 

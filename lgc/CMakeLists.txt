@@ -63,8 +63,6 @@ if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
 endif()
 target_compile_definitions(LLVMlgc PRIVATE
         LITTLEENDIAN_CPU
-        CHIP_HDR_VEGA20
-        CHIP_HDR_RAVEN2
         CHIP_HDR_NAVI14
         CHIP_HDR_NAVI21
         )
