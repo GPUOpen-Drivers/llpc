@@ -572,10 +572,10 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
   if (m_shaderStage == ShaderStageGeometry) {
     // Mark the XFB output for copy shader generation.
     XfbOutInfo xfbOutInfo = {};
+    xfbOutInfo.streamId = streamId;
     xfbOutInfo.xfbBuffer = xfbBuffer;
     xfbOutInfo.xfbOffset = cast<ConstantInt>(xfbOffset)->getZExtValue();
     xfbOutInfo.is16bit = valueToWrite->getType()->getScalarSizeInBits() == 16;
-    xfbOutInfo.xfbExtraOffset = 0;
 
     // For packed generic GS output, the XFB output should be scalarized to align with the scalarized GS output
     if (!getPipelineState()->isUnlinked() && !isBuiltIn) {
@@ -616,12 +616,12 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
     }
   }
 
-  // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 xfbExtraOffset, %Type% outputValue)
+  // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 streamId, %Type% outputValue)
   SmallVector<Value *, 4> args;
   std::string instName = lgcName::OutputExportXfb;
   args.push_back(getInt32(xfbBuffer));
   args.push_back(xfbOffset);
-  args.push_back(getInt32(0));
+  args.push_back(getInt32(streamId));
   args.push_back(valueToWrite);
   addTypeMangling(nullptr, args, instName);
   return emitCall(instName, getVoidTy(), args, {}, &*GetInsertPoint());

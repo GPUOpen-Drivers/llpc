@@ -68,10 +68,10 @@ union DescriptorPair {
 // Represents transform feedback output info
 union XfbOutInfo {
   struct {
-    unsigned xfbBuffer : 2;       // Transform feedback buffer
-    unsigned xfbOffset : 16;      // Transform feedback offset
-    unsigned xfbExtraOffset : 13; // Transform feedback extra offset
-    unsigned is16bit : 1;         // Whether it is 16-bit data for transform feedback
+    unsigned streamId : 2;   // Output stream ID
+    unsigned xfbBuffer : 2;  // Transform feedback buffer
+    unsigned xfbOffset : 27; // Transform feedback offset
+    unsigned is16bit : 1;    // Whether it is 16-bit data for transform feedback
   };
   unsigned u32All;
 };
