@@ -76,6 +76,59 @@ Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vect
 }
 
 // =====================================================================================================================
+// Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
+// where available.
+// The two input vectors must both be <4 x i8>.
+// The accumulator input must be i32; use a value of 0 for no accumulation.
+// The result type is i32.
+//
+// @param vector1 : The integer vector 1
+// @param vector2 : The integer vector 2
+// @param accumulator : The accumulator to the scalar of dot product
+// @param flags : Bit 0 is "first vector is signed" and bit 1 is "second vector is signed"
+// @param instName : Name to give instruction(s)
+Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, Value *accumulator, unsigned flags,
+                                                const Twine &instName) {
+  Type *inputTy = vector1->getType();
+  assert(inputTy->isVectorTy() && inputTy->getScalarType()->isIntegerTy(8) &&
+         cast<FixedVectorType>(inputTy)->getNumElements() == 4);
+  Value *scalar = nullptr;
+
+  bool isHwSupported = getPipelineState()->getTargetInfo().getGpuProperty().hasIntegerDot;
+  const bool isSigned = (flags & lgc::Builder::FirstVectorSigned);
+  const bool isMixed = (flags == lgc::Builder::FirstVectorSigned);
+  // The mixed mode "First vector is signed and secont vector is unsigned" is not supported
+  if (isHwSupported && isMixed)
+    isHwSupported = false;
+
+  const bool hasNoAccumulator = isa<ConstantInt>(accumulator) && cast<ConstantInt>(accumulator)->isNullValue();
+  if (!isHwSupported) {
+    // Emulate dot product with no HW support cases
+    const unsigned compCount = cast<FixedVectorType>(vector1->getType())->getNumElements();
+    scalar = getInt32(0);
+    for (unsigned elemIdx = 0; elemIdx < compCount; ++elemIdx) {
+      Value *elem1 = CreateExtractElement(vector1, elemIdx);
+      elem1 = isSigned ? CreateSExt(elem1, getInt32Ty()) : CreateZExt(elem1, getInt32Ty());
+      Value *elem2 = CreateExtractElement(vector2, elemIdx);
+      elem2 = (isSigned && !isMixed) ? CreateSExt(elem2, getInt32Ty()) : CreateZExt(elem2, getInt32Ty());
+      Value *product = CreateMul(elem1, elem2);
+      scalar = CreateAdd(product, scalar);
+    }
+    if (!hasNoAccumulator)
+      scalar = CreateAdd(scalar, accumulator);
+  } else {
+    Value *input1 = CreateBitCast(vector1, getInt32Ty());
+    Value *input2 = CreateBitCast(vector2, getInt32Ty());
+    Value *clamp = hasNoAccumulator ? getInt1(false) : getInt1(true);
+    Intrinsic::ID intrinsicId = isSigned ? Intrinsic::amdgcn_sdot4 : Intrinsic::amdgcn_udot4;
+    scalar = CreateIntrinsic(intrinsicId, {}, {input1, input2, accumulator, clamp}, nullptr, instName);
+  }
+
+  scalar->setName(instName);
+  return scalar;
+}
+
+// =====================================================================================================================
 // Get whether the context we are building in supports DPP operations.
 bool BuilderImplBase::supportDpp() const {
   return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 8;

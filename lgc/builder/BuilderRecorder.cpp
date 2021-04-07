@@ -50,6 +50,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "nop";
   case Opcode::DotProduct:
     return "dot.product";
+  case Opcode::IntegerDotProduct:
+    return "integer.dot.product";
   case Opcode::CubeFaceCoord:
     return "cube.face.coord";
   case Opcode::CubeFaceIndex:
@@ -341,6 +343,23 @@ ShaderModes *BuilderRecorder::getShaderModes() {
 Value *BuilderRecorder::CreateDotProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
   Type *const scalarType = cast<VectorType>(vector1->getType())->getElementType();
   return record(Opcode::DotProduct, scalarType, {vector1, vector2}, instName);
+}
+
+// =====================================================================================================================
+// Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
+// where available.
+// The two input vectors must both be <4 x i8>.
+// The accumulator input must be i32; use a value of 0 for no accumulation.
+// The result type is i32.
+//
+// @param vector1 : The integer vector 1
+// @param vector2 : The integer vector 2
+// @param accumulator : The accumulotor to the scalar of dot product
+// @param flags : Bit 0 is "first vector is signed" and bit 1 is "second vector is signed"
+// @param instName : Name to give instruction(s)
+Value *BuilderRecorder::CreateIntegerDotProduct(Value *vector1, Value *vector2, Value *accumulator, unsigned flags,
+                                                const Twine &instName) {
+  return record(Opcode::IntegerDotProduct, getInt32Ty(), {vector1, vector2, accumulator, getInt32(flags)}, instName);
 }
 
 // =====================================================================================================================
@@ -1855,6 +1874,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::CubeFaceIndex:
     case Opcode::Derivative:
     case Opcode::DotProduct:
+    case Opcode::IntegerDotProduct:
     case Opcode::ExtractBitField:
     case Opcode::ExtractExponent:
     case Opcode::ExtractSignificand:

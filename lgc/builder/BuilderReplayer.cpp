@@ -694,6 +694,13 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderRecorder::Opcode::DotProduct: {
     return m_builder->CreateDotProduct(args[0], args[1]);
   }
+  case BuilderRecorder::Opcode::IntegerDotProduct: {
+    Value *vector1 = args[0];
+    Value *vector2 = args[1];
+    Value *accumulator = args[2];
+    unsigned flags = cast<ConstantInt>(args[3])->getZExtValue();
+    return m_builder->CreateIntegerDotProduct(vector1, vector2, accumulator, flags);
+  }
   case BuilderRecorder::Opcode::Determinant: {
     return m_builder->CreateDeterminant(args[0]);
   }

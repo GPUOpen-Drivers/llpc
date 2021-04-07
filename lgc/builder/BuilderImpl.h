@@ -45,6 +45,10 @@ public:
   llvm::Value *CreateDotProduct(llvm::Value *const vector1, llvm::Value *const vector2,
                                 const llvm::Twine &instName = "") override final;
 
+  // Create scalar from integer dot product of vector
+  llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
+                                       unsigned flags, const llvm::Twine &instName = "") override final;
+
 protected:
   // Get the ShaderModes object.
   ShaderModes *getShaderModes() override final;

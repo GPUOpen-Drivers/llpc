@@ -274,6 +274,14 @@ static void setGfx900Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx9.fixLsVgprInput = 1;
 }
 
+// gfx906
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx906Info(TargetInfo *targetInfo) {
+  setGfx9Info(targetInfo);
+  targetInfo->getGpuProperty().hasIntegerDot = true;
+}
+
 // gfx10
 //
 // @param [in/out] targetInfo : Target info
@@ -312,6 +320,7 @@ static void setGfx1010Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waSmemFollowedByVopc = 1;
   targetInfo->getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
+  targetInfo->getGpuProperty().hasIntegerDot = true;
 }
 
 // gfx1011
@@ -330,6 +339,7 @@ static void setGfx1011Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waWarFpAtomicDenormHazard = 1;
   targetInfo->getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
+  targetInfo->getGpuProperty().hasIntegerDot = true;
 }
 
 // gfx1012
@@ -350,6 +360,7 @@ static void setGfx1012Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waWarFpAtomicDenormHazard = 1;
   targetInfo->getGpuWorkarounds().gfx10.waNggDisabled = 1;
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
+  targetInfo->getGpuProperty().hasIntegerDot = true;
 }
 
 // gfx103
@@ -368,6 +379,7 @@ static void setGfx1030Info(TargetInfo *targetInfo) {
   setGfx103Info(targetInfo);
 
   targetInfo->getGpuProperty().numShaderEngines = 4;
+  targetInfo->getGpuProperty().hasIntegerDot = true;
 }
 
 // gfx1031
@@ -412,7 +424,7 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
       {"gfx902", &setGfx900Info},   // gfx902
       {"gfx903", &setGfx9Info},     // gfx903
       {"gfx904", &setGfx9Info},     // gfx904, vega12
-      {"gfx906", &setGfx9Info},     // gfx906, vega20
+      {"gfx906", &setGfx906Info},   // gfx906, vega20
       {"gfx909", &setGfx9Info},     // gfx909, raven2
       {"gfx90c", &setGfx9Info},     // gfx90c
       {"gfx1010", &setGfx1010Info}, // gfx1010
