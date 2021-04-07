@@ -48,6 +48,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
 )
 
 ### Cached Project Options #############################################################################################
+option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" OFF)
 option(LLPC_BUILD_NAVI22 "LLPC support for NAVI22?" OFF)
 
 option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
@@ -69,6 +70,12 @@ target_compile_definitions(LLVMlgc PRIVATE
 
 target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
 
+  if(LLPC_BUILD_NAVI12)
+    target_compile_definitions(LLVMlgc PRIVATE
+        LLPC_BUILD_NAVI12
+        CHIP_HDR_NAVI12
+    )
+  endif()
   if(LLPC_BUILD_NAVI22)
     target_compile_definitions(LLVMlgc PRIVATE
         LLPC_BUILD_NAVI22
