@@ -63,6 +63,8 @@ void SPIRVToLLVMDbgTran::createCompilationUnit() {
   SPIRVFunction *EntryPoint = BM->getEntryPoint(BM->getExecutionModel(), 0U);
   if (EntryPoint && EntryPoint->hasLine()) {
     FileName = EntryPoint->getLine()->getFileNameStr();
+  } else if (auto srcFile = BM->getSourceFile(0)) {
+    FileName = srcFile->getStr();
   } else {
     FileName = "spirv.dbg.cu"; // File name must be non-empty
   }
@@ -901,9 +903,10 @@ DebugLoc SPIRVToLLVMDbgTran::transDebugScope(const SPIRVInstruction *SpirvInst, 
   unsigned Col = 0;
   MDNode *Scope = nullptr;
   MDNode *InlinedAt = nullptr;
-  if (auto L = SpirvInst->getLine()) {
-    Line = L->getLine();
-    Col = L->getColumn();
+  std::shared_ptr<const SPIRVLine> LineInfo = nullptr;
+  if (LineInfo = SpirvInst->getLine()) {
+    Line = LineInfo->getLine();
+    Col = LineInfo->getColumn();
   }
   if (SPIRVEntry *S = SpirvInst->getDebugScope()) {
     using namespace SPIRVDebug::Operand::Scope;
@@ -926,6 +929,10 @@ DebugLoc SPIRVToLLVMDbgTran::transDebugScope(const SPIRVInstruction *SpirvInst, 
     if (SF->hasLine()) {
       Filename = SF->getLine()->getFileNameStr();
       LN = SF->getLine()->getLine();
+    } else if (LineInfo) {
+      // If no function line, use function first instruction line and filename
+      Filename = LineInfo->getFileNameStr();
+      LN = Line;
     }
     auto DF = getDIFile(Filename);
     auto *F = Inst->getParent()->getParent();

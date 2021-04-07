@@ -140,6 +140,8 @@ public:
       *Ver = SrcLangVer;
     return SrcLang;
   }
+
+  SPIRVString *getSourceFile(uint32_t FileId) const override { return get<SPIRVString>(SrcFiles[FileId]); }
   std::set<std::string> &getSourceExtension() override { return SrcExtension; }
   virtual SPIRVEntryPoint* getEntryPoint(SPIRVId) const override;
   virtual SPIRVEntryPoint*
@@ -164,6 +166,7 @@ public:
     SrcLang = Lang;
     SrcLangVer = Ver;
   }
+  void setSourceFile(SPIRVId File) override { SrcFiles.push_back(File); }
   void setGeneratorId(unsigned short Id) override { GeneratorId = Id; }
   void setGeneratorVer(unsigned short Ver) override { GeneratorVer = Ver; }
   void resolveUnknownStructFields() override;
@@ -351,6 +354,7 @@ private:
   SPIRVInstructionSchemaKind InstSchema;
   SourceLanguage SrcLang;
   SPIRVWord SrcLangVer;
+  std::vector<SPIRVId> SrcFiles;
   std::set<std::string> SrcExtension;
   std::set<std::string> SPIRVExt;
   SPIRVAddressingModelKind AddrModel;
