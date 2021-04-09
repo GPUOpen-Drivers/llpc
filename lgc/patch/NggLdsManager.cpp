@@ -70,10 +70,12 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     //
     // ES-GS ring size is dynamically calculated (don't use it)
     InvalidValue,                                             // LdsRegionEsGsRing
-    // 1 dword (uint32) per thread
-    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionOutPrimData
-    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
-    SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionOutVertCountInWaves
+    // 1 dword (uint32) per thread, 4 GS streams
+    (SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup) * MaxGsStreams,
+                                                              // LdsRegionOutPrimData
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group, 4 GS streams
+    (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * MaxGsStreams,
+                                                              // LdsRegionOutVertCountInWaves
     // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionOutVertThreadIdMap
     // GS-VS ring size is dynamically calculated (don't use it)
