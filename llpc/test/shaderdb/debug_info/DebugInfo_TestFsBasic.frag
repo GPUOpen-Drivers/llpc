@@ -33,11 +33,10 @@ void main()
 ; SHADERTEST: [[D7:![0-9]*]] = !{i32 2, !"Dwarf Version", i32 4}
 ; SHADERTEST: [[D8:![0-9]*]] = !{i32 2, !"Debug Info Version", i32 3}
 ; SHADERTEST: [[D9:![0-9]*]] = distinct !DICompileUnit(language: DW_LANG_C99, file: [[D10:![0-9]*]], producer: "spirv", isOptimized: false, runtimeVersion: 0, emissionKind: LineTablesOnly, enums: [[D11:![0-9]*]])
-; SHADERTEST: [[D10]] = !DIFile(filename: "spirv.dbg.cu", directory: ".")
+; SHADERTEST: [[D10]] = !DIFile(filename: "DebugInfo_TestFsBasic.frag", directory: "{{.*}}")
 ; SHADERTEST: [[D11]] = !{}
-; SHADERTEST: [[D12]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: [[D13:![0-9]*]], file: [[D13]], type: [[D14:![0-9]*]], spFlags: DISPFlagDefinition, unit: [[D9]], retainedNodes: [[D11]])
-; SHADERTEST: [[D13]] = !DIFile(filename: "", directory: ".")
-; SHADERTEST: [[D14]] = !DISubroutineType(types: [[D11]])
+; SHADERTEST: [[D12]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: [[D10:![0-9]*]], file: [[D10]], line: 11, type: [[D13:![0-9]*]], scopeLine: 11, spFlags: DISPFlagDefinition, unit: [[D9]], retainedNodes: [[D11]])
+; SHADERTEST: [[D13]] = !DISubroutineType(types: [[D11]])
 ; SHADERTEST: [[D3]] = !{i32 4}
 ; SHADERTEST: [[D4]] = !DILocation(line: 11, scope: [[D12]])
 ; SHADERTEST: [[D15:![0-9]*]] = !DILocation(line: 12, scope: [[D12]])
