@@ -1094,7 +1094,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     m_builder->SetInsertPoint(writeVertCullDataBlock);
 
     // Write vertex position data
-    writePerThreadDataToLds(position, m_nggFactor.threadIdInSubgroup, LdsRegionVertPosData, true);
+    writePerThreadDataToLds(position, m_nggFactor.threadIdInSubgroup, LdsRegionVertPosData, 0, true);
 
     // Write cull distance sign mask
     if (m_nggControl->enableCullDistanceCulling) {
@@ -1525,6 +1525,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
   const bool cullingMode = !m_nggControl->passthroughMode;
 
+  const auto rasterStream = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
+
   auto entryPoint = module->getFunction(lgcName::NggPrimShaderEntryPoint);
 
   auto arg = entryPoint->arg_begin();
@@ -1697,7 +1699,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(initOutPrimDataBlock);
 
-    writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData);
+    writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
+                            SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
 
     m_builder->CreateBr(endInitOutPrimDataBlock);
   }
@@ -1715,7 +1718,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(initOutVertCountBlock);
 
-    writePerThreadDataToLds(m_builder->getInt32(0), m_nggFactor.threadIdInSubgroup, LdsRegionOutVertCountInWaves);
+    writePerThreadDataToLds(m_builder->getInt32(0), m_nggFactor.threadIdInSubgroup, LdsRegionOutVertCountInWaves,
+                            (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * rasterStream);
 
     m_builder->CreateBr(endInitOutVertCountBlock);
   }
@@ -1748,8 +1752,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
     if (cullingMode) {
       // Do culling
-      primData =
-          readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData);
+      primData = readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
+                                          SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
       auto doCull = m_builder->CreateICmpNE(primData, m_builder->getInt32(NullPrim));
       auto outPrimValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
       doCull = m_builder->CreateAnd(doCull, outPrimValid);
@@ -1789,7 +1793,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     {
       m_builder->SetInsertPoint(nullifyOutPrimDataBlock);
 
-      writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData);
+      writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
+                              SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
 
       m_builder->CreateBr(endCullingBlock);
     }
@@ -1814,7 +1819,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
     // drawFlag = primData[N] != NullPrim
     auto primData0 =
-        readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData);
+        readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
+                                 SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
     auto drawFlag0 = m_builder->CreateICmpNE(primData0, m_builder->getInt32(NullPrim));
     drawFlag = drawFlag0;
 
@@ -1822,7 +1828,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
       // drawFlag |= N >= 1 ? (primData[N-1] != NullPrim) : false
       auto primData1 = readPerThreadDataFromLds(
           m_builder->getInt32Ty(), m_builder->CreateSub(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(1)),
-          LdsRegionOutPrimData);
+          LdsRegionOutPrimData, SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
       auto drawFlag1 = m_builder->CreateSelect(
           m_builder->CreateICmpUGE(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(1)),
           m_builder->CreateICmpNE(primData1, m_builder->getInt32(NullPrim)), m_builder->getFalse());
@@ -1833,7 +1839,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
       // drawFlag |= N >= 2 ? (primData[N-2] != NullPrim) : false
       auto primData2 = readPerThreadDataFromLds(
           m_builder->getInt32Ty(), m_builder->CreateSub(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(2)),
-          LdsRegionOutPrimData);
+          LdsRegionOutPrimData, SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
       auto drawFlag2 = m_builder->CreateSelect(
           m_builder->CreateICmpUGE(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(2)),
           m_builder->CreateICmpNE(primData2, m_builder->getInt32(NullPrim)), m_builder->getFalse());
@@ -1876,7 +1882,9 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
     unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionOutVertCountInWaves);
 
-    ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
+    ldsOffset = m_builder->CreateAdd(
+        ldsOffset,
+        m_builder->getInt32(regionStart + (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * rasterStream));
     m_ldsManager->atomicOpWithLds(AtomicRMWInst::Add, outVertCountInWave, ldsOffset);
 
     m_builder->CreateBr(endAccumOutVertCountBlock);
@@ -1894,7 +1902,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
       m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
     } else {
       auto outVertCountInWaves =
-          readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInWave, LdsRegionOutVertCountInWaves);
+          readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInWave, LdsRegionOutVertCountInWaves,
+                                   (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * rasterStream);
 
       // The last dword following dwords for all waves (each wave has one dword) stores GS output vertex count of the
       // entire sub-group
@@ -2295,8 +2304,10 @@ void NggPrimShader::doPrimitiveExportWithGs(Value *vertexId) {
   //   [18:10] = vertexId1 (in bytes)
   //   [8:0]   = vertexId0 (in bytes)
   //
+  const auto rasterStream = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
   Value *primData =
-      readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData);
+      readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
+                               SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
 
   auto primValid = m_builder->CreateICmpNE(primData, m_builder->getInt32(NullPrim));
 
@@ -3621,7 +3632,8 @@ Function *NggPrimShader::createGsEmitHandler(Module *module, unsigned streamId) 
       }
 
       // Write primitive data (just winding)
-      writePerThreadDataToLds(winding, vertexId, LdsRegionOutPrimData);
+      writePerThreadDataToLds(winding, vertexId, LdsRegionOutPrimData,
+                              SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * streamId);
     }
 
     m_builder->CreateBr(endEmitPrimBlock);
@@ -3689,9 +3701,10 @@ Function *NggPrimShader::createGsCutHandler(Module *module, unsigned streamId) {
 // @param readDataTy : Data read from LDS
 // @param threadId : Thread ID in sub-group to calculate LDS offset
 // @param region : NGG LDS region
+// @param offsetInRegion : Offset within this NGG LDS region (in bytes), the default is 0 (from the region beginning)
 // @param useDs128 : Whether to use 128-bit LDS read, 16-byte alignment is guaranteed by caller
 Value *NggPrimShader::readPerThreadDataFromLds(Type *readDataTy, Value *threadId, NggLdsRegionType region,
-                                               bool useDs128) {
+                                               unsigned offsetInRegion, bool useDs128) {
   assert(region != LdsRegionVertCullInfo); // Vertex cull info region is an aggregate-typed one, not applicable
   auto sizeInBytes = readDataTy->getPrimitiveSizeInBits() / 8;
 
@@ -3702,7 +3715,7 @@ Value *NggPrimShader::readPerThreadDataFromLds(Type *readDataTy, Value *threadId
     ldsOffset = m_builder->CreateMul(threadId, m_builder->getInt32(sizeInBytes));
   else
     ldsOffset = threadId;
-  ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
+  ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart + offsetInRegion));
 
   return m_ldsManager->readValueFromLds(readDataTy, ldsOffset, useDs128);
 }
@@ -3713,8 +3726,10 @@ Value *NggPrimShader::readPerThreadDataFromLds(Type *readDataTy, Value *threadId
 // @param writeData : Data written to LDS
 // @param threadId : Thread ID in sub-group to calculate LDS offset
 // @param region : NGG LDS region
+// @param offsetInRegion : Offset within this NGG LDS region (in bytes), the default is 0 (from the region beginning)
 // @param useDs128 : Whether to use 128-bit LDS write, 16-byte alignment is guaranteed by caller
-void NggPrimShader::writePerThreadDataToLds(Value *writeData, Value *threadId, NggLdsRegionType region, bool useDs128) {
+void NggPrimShader::writePerThreadDataToLds(Value *writeData, Value *threadId, NggLdsRegionType region,
+                                            unsigned offsetInRegion, bool useDs128) {
   assert(region != LdsRegionVertCullInfo); // Vertex cull info region is an aggregate-typed one, not applicable
   auto writeDataTy = writeData->getType();
   auto sizeInBytes = writeDataTy->getPrimitiveSizeInBits() / 8;
@@ -3726,7 +3741,7 @@ void NggPrimShader::writePerThreadDataToLds(Value *writeData, Value *threadId, N
     ldsOffset = m_builder->CreateMul(threadId, m_builder->getInt32(sizeInBytes));
   else
     ldsOffset = threadId;
-  ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart));
+  ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(regionStart + offsetInRegion));
 
   m_ldsManager->writeValueToLds(writeData, ldsOffset, useDs128);
 }
@@ -5545,7 +5560,7 @@ unsigned NggPrimShader::getOutputVerticesPerPrimitive() const {
 Value *NggPrimShader::fetchVertexPositionData(Value *vertexId) {
   if (!m_hasGs) {
     // ES-only
-    return readPerThreadDataFromLds(FixedVectorType::get(m_builder->getFloatTy(), 4), vertexId, LdsRegionVertPosData,
+    return readPerThreadDataFromLds(FixedVectorType::get(m_builder->getFloatTy(), 4), vertexId, LdsRegionVertPosData, 0,
                                     true);
   }
 

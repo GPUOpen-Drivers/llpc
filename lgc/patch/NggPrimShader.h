@@ -205,9 +205,9 @@ private:
   llvm::Function *createGsCutHandler(llvm::Module *module, unsigned streamId);
 
   llvm::Value *readPerThreadDataFromLds(llvm::Type *readDataTy, llvm::Value *threadId, NggLdsRegionType region,
-                                        bool useDs128 = false);
+                                        unsigned offsetInRegion = 0, bool useDs128 = false);
   void writePerThreadDataToLds(llvm::Value *writeData, llvm::Value *threadId, NggLdsRegionType region,
-                               bool useDs128 = false);
+                               unsigned offsetInRegion = 0, bool useDs128 = false);
 
   llvm::Value *readVertexCullInfoFromLds(llvm::Type *readDataTy, llvm::Value *vertexItemOffset, unsigned dataOffset);
   void writeVertexCullInfoToLds(llvm::Value *writeData, llvm::Value *vertexItemOffset, unsigned dataOffset);
