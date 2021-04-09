@@ -201,9 +201,9 @@ public:
 
   // Bit settings in flags argument for integer dot product
   enum { FirstVectorSigned = 1, SecondVectorSigned = 2 };
+
   // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
   // where available.
-  // The two input vectors must both be <4 x i8>.
   // The accumulator input must be i32; use a value of 0 for no accumulation.
   // The result type is i32.
   //

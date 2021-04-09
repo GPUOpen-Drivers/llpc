@@ -78,7 +78,6 @@ Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vect
 // =====================================================================================================================
 // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
 // where available.
-// The two input vectors must both be <4 x i8>.
 // The accumulator input must be i32; use a value of 0 for no accumulation.
 // The result type is i32.
 //
@@ -90,9 +89,11 @@ Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vect
 Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, Value *accumulator, unsigned flags,
                                                 const Twine &instName) {
   Type *inputTy = vector1->getType();
-  assert(inputTy->isVectorTy() && inputTy->getScalarType()->isIntegerTy(8) &&
-         cast<FixedVectorType>(inputTy)->getNumElements() == 4);
+  assert(inputTy->isVectorTy() && inputTy->getScalarType()->isIntegerTy());
   Value *scalar = nullptr;
+
+  const unsigned compBitWidth = inputTy->getScalarSizeInBits();
+  assert(compBitWidth == 8 || compBitWidth == 16);
 
   bool isHwSupported = getPipelineState()->getTargetInfo().getGpuProperty().hasIntegerDot;
   const bool isSigned = (flags & lgc::Builder::FirstVectorSigned);
@@ -102,26 +103,83 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
     isHwSupported = false;
 
   const bool hasNoAccumulator = isa<ConstantInt>(accumulator) && cast<ConstantInt>(accumulator)->isNullValue();
+  const unsigned compCount = cast<FixedVectorType>(inputTy)->getNumElements();
   if (!isHwSupported) {
     // Emulate dot product with no HW support cases
-    const unsigned compCount = cast<FixedVectorType>(vector1->getType())->getNumElements();
     scalar = getInt32(0);
+    Type *targetTy = getInt32Ty();
+
     for (unsigned elemIdx = 0; elemIdx < compCount; ++elemIdx) {
       Value *elem1 = CreateExtractElement(vector1, elemIdx);
-      elem1 = isSigned ? CreateSExt(elem1, getInt32Ty()) : CreateZExt(elem1, getInt32Ty());
+      elem1 = isSigned ? CreateSExt(elem1, targetTy) : CreateZExt(elem1, targetTy);
       Value *elem2 = CreateExtractElement(vector2, elemIdx);
-      elem2 = (isSigned && !isMixed) ? CreateSExt(elem2, getInt32Ty()) : CreateZExt(elem2, getInt32Ty());
+      elem2 = (isSigned && !isMixed) ? CreateSExt(elem2, targetTy) : CreateZExt(elem2, targetTy);
       Value *product = CreateMul(elem1, elem2);
       scalar = CreateAdd(product, scalar);
     }
     if (!hasNoAccumulator)
       scalar = CreateAdd(scalar, accumulator);
   } else {
-    Value *input1 = CreateBitCast(vector1, getInt32Ty());
-    Value *input2 = CreateBitCast(vector2, getInt32Ty());
+    // <4xi8>, <3xi8>, <2xi8> are native supported by using v_dot4_i32_i8 or v_dot4_u32_u8
+    // <2xi16> is native supported by using v_dot2_i32_i16 and v_dot2_u32_u16
+    // <3xi16>, <4xi16> will be splitted up with two sequences of v_dot2 and a final saturation add
+    Value *input1 = vector1;
+    Value *input2 = vector2;
+
+    bool isDot4 = (compBitWidth == 8);
     Value *clamp = hasNoAccumulator ? getInt1(false) : getInt1(true);
-    Intrinsic::ID intrinsicId = isSigned ? Intrinsic::amdgcn_sdot4 : Intrinsic::amdgcn_udot4;
-    scalar = CreateIntrinsic(intrinsicId, {}, {input1, input2, accumulator, clamp}, nullptr, instName);
+
+    if (isDot4) {
+      if (compCount < 4) {
+        // Extend <3xi8> or <2xi8> to <4xi8>
+        ArrayRef<int> indices = compCount == 3 ? ArrayRef<int>({0, 1, 2, 4}) : ArrayRef<int>({0, 1, 4, 4});
+        input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
+        input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
+      }
+      // Cast <4xi8> to i32
+      input1 = CreateBitCast(input1, getInt32Ty());
+      input2 = CreateBitCast(input2, getInt32Ty());
+      auto intrinsicDot4 = isSigned ? Intrinsic::amdgcn_sdot4 : Intrinsic::amdgcn_udot4;
+      scalar = CreateIntrinsic(intrinsicDot4, {}, {input1, input2, accumulator, clamp}, nullptr, instName);
+    } else {
+      auto intrinsicDot2 = isSigned ? Intrinsic::amdgcn_sdot2 : Intrinsic::amdgcn_udot2;
+      if (compCount == 2) {
+        scalar = CreateIntrinsic(intrinsicDot2, {}, {input1, input2, accumulator, clamp}, nullptr, instName);
+      } else {
+        Value *intermediateRes = getInt32(0);
+        auto indices = ArrayRef<int>({0, 1});
+        Value *product = getInt32(0);
+        if (compCount == 3) {
+          // Split <3xi16> up with an integer multiplication, a 16-bit integer dot product
+          Value *w1 = CreateExtractElement(input1, 2);
+          Value *w2 = CreateExtractElement(input2, 2);
+          w1 = isSigned ? CreateSExt(w1, getInt32Ty()) : CreateZExt(w1, getInt32Ty());
+          w2 = isSigned ? CreateSExt(w2, getInt32Ty()) : CreateZExt(w2, getInt32Ty());
+          intermediateRes = CreateMul(w1, w2);
+
+          input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
+          input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
+          product =
+              CreateIntrinsic(intrinsicDot2, {}, {input1, input2, intermediateRes, getInt1(false)}, nullptr, instName);
+        } else {
+          assert(compCount == 4);
+          // Split <4xi16> up with two 16-bit integer dot product
+          Value *vec1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
+          Value *vec2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
+          intermediateRes =
+              CreateIntrinsic(intrinsicDot2, {}, {vec1, vec2, getInt32(0), getInt1(false)}, nullptr, instName);
+
+          indices = ArrayRef<int>({2, 3});
+          input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
+          input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
+          product =
+              CreateIntrinsic(intrinsicDot2, {}, {input1, input2, intermediateRes, getInt1(false)}, nullptr, instName);
+        }
+        // Add a satruation add if required.
+        if (!hasNoAccumulator)
+          scalar = CreateNamedCall("llvm.sadd.sat.i32", getInt32Ty(), {product, accumulator}, {}, instName);
+      }
+    }
   }
 
   scalar->setName(instName);

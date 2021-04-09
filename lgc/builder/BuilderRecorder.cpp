@@ -348,7 +348,6 @@ Value *BuilderRecorder::CreateDotProduct(Value *const vector1, Value *const vect
 // =====================================================================================================================
 // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
 // where available.
-// The two input vectors must both be <4 x i8>.
 // The accumulator input must be i32; use a value of 0 for no accumulation.
 // The result type is i32.
 //
