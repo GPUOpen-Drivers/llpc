@@ -6726,9 +6726,10 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
 
       SPIRVWord xfbOffset = SPIRVID_INVALID;
       if (bv->hasDecorate(DecorationOffset, 0, &xfbOffset)) {
-        // NOTE: Transform feedback is triggered only if "xfb_offset"
-        // is specified.
-        inOutDec.IsXfb = true;
+        // NOTE: Transform feedback is triggered only if "xfb_offset" is specified. And in such case, "xfb_stride"
+        // must be specified as well.
+        if (inOutDec.XfbStride > 0)
+          inOutDec.IsXfb = true;
         inOutDec.XfbOffset = xfbOffset;
       }
 
@@ -7216,7 +7217,10 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
         inOutDec.XfbStride = xfbStride;
 
       if (bt->hasMemberDecorate(memberIdx, DecorationOffset, 0, &xfbOffset)) {
-        inOutDec.IsXfb = true;
+        // NOTE: Transform feedback is triggered only if "xfb_offset" is specified. And in such case, "xfb_stride"
+        // must be specified as well.
+        if (inOutDec.XfbStride > 0)
+          inOutDec.IsXfb = true;
         if (xfbOffset < blockXfbOffset)
           blockXfbOffset = xfbOffset;
       }
