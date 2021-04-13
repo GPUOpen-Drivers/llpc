@@ -1,0 +1,80 @@
+// This test case checks that relocatable shaders are disabled if immutable shaders
+// are present (descriptorRangeValue entry exists).
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} calculated hash results (graphics pipeline)
+; SHADERTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: {{^=====}} AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[VsGlsl]
+#version 450
+
+layout(location = 0) in vec2 inPosition;
+layout(location = 0) out vec2 outUV;
+
+void main() {
+    outUV = inPosition;
+}
+
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450 core
+
+layout(set = 0, binding = 0) uniform sampler s;
+layout(set = 0, binding = 1) uniform texture2D tex;
+layout(location = 0) in vec2 inUV;
+layout(location = 0) out vec4 oColor;
+
+void main()
+{
+    ivec2 iUV = ivec2(inUV);
+    oColor = texture(sampler2D(tex, s), iUV);
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+descriptorRangeValue[0].visibility = 17
+descriptorRangeValue[0].type = DescriptorSampler
+descriptorRangeValue[0].set = 0
+descriptorRangeValue[0].binding = 0
+descriptorRangeValue[0].arraySize = 1
+descriptorRangeValue[0].uintData = 2156034194, 184545280, 3371171840, 2147483648
+
+userDataNode[0].visibility = 17
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 11
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorSampler
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 4
+userDataNode[0].next[0].set = 0
+userDataNode[0].next[0].binding = 0
+userDataNode[0].next[1].type = DescriptorResource
+userDataNode[0].next[1].offsetInDwords = 0
+userDataNode[0].next[1].sizeInDwords = 8
+userDataNode[0].next[1].set = 0
+userDataNode[0].next[1].binding = 1
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+colorBuffer[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 1
+colorBuffer[0].blendSrcAlphaToColor = 1
+
+[VertexInputState]
+binding[0].binding = 1
+binding[0].stride = 16
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
