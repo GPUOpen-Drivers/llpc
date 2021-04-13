@@ -22,9 +22,16 @@
  #  SOFTWARE.
  #
  #######################################################################################################################
+cmake_minimum_required(VERSION 3.13.4)
 
 project(VKGC LANGUAGES C CXX)
 
+### Standalone LLPC build handling
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    include(cmake/CompilerStandalone.cmake)
+endif()
+
+### Top-level VKGC Interface ###
 add_library(vkgc INTERFACE)
 
 ### Expose header files ################################################################################################
@@ -71,10 +78,13 @@ if(ICD_BUILD_LLPC)
 
     add_subdirectory(llpc ${PROJECT_BINARY_DIR}/llpc)
 
-    # Export the LLVM and spvgen build paths so that they are available in XGL.
-    set(XGL_LLVM_BUILD_PATH ${XGL_LLVM_BUILD_PATH} PARENT_SCOPE)
-    if(DEFINED XGL_SPVGEN_BUILD_PATH)
-        set(XGL_SPVGEN_BUILD_PATH ${XGL_SPVGEN_BUILD_PATH} PARENT_SCOPE)
+    # Export the LLVM and spvgen build paths so that they are available in XGL,
+    # if this is not an LLPC standalone build.
+    if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+        set(XGL_LLVM_BUILD_PATH ${XGL_LLVM_BUILD_PATH} PARENT_SCOPE)
+        if(DEFINED XGL_SPVGEN_BUILD_PATH)
+            set(XGL_SPVGEN_BUILD_PATH ${XGL_SPVGEN_BUILD_PATH} PARENT_SCOPE)
+        endif()
     endif()
 
     target_link_libraries(vkgc INTERFACE llpc)

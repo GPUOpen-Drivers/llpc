@@ -262,15 +262,18 @@ endif()
 
 target_link_libraries(llpc PRIVATE dumper)
 target_link_libraries(llpc PRIVATE cwpack)
+target_link_libraries(llpc PRIVATE metrohash)
 target_link_libraries(llpc PUBLIC
     khronos_vulkan_interface
     khronos_spirv_interface
 )
 
 ### Visual Studio Filters ##############################################################################################
-target_find_headers(llpc)
-if(MSVC)
-    target_source_groups(llpc)
+if(COMMAND target_find_headers)
+    target_find_headers(llpc)
+    if(MSVC)
+        target_source_groups(llpc)
+    endif()
 endif()
 
 ### VFX library for Standalone Compiler ###################################################################################

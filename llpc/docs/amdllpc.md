@@ -106,36 +106,45 @@ amdllpc -auto-layout-desc -gfxip=9.0.0 a.frag
 amdllpc -gfxip=8.0.3 -o=c.elf b.pipe
 ```
 
-## Test with SHADERDB
-You can use [shaderdb](https://github.com/GPUOpen-Drivers/llpc/tree/master/test) to test llpc with standalone compiler and [spvgen](https://github.com/GPUOpen-Drivers/spvgen):
+## Driver build and lit testing
 
-By integrating with [lit](http://llvm.org/docs/CommandGuide/lit.html), the test will check the correctness of shader compilation result with the pattern specified in test files.
+LLPC is normally built as part of the [AMD Open Source Driver for Vulkan](../AMDVLK/README.md).
+That build includes building standalone `lgc` and `amdllpc` commands, and the ability to run LGC and LLPC
+lit tests using the `check-lgc` and `check-amdllpc` targets.
 
-First, enable LLVM utils build when you [build](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) Vulkan driver and amdllpc:
-```
-cd <vulkandriver_path>/drivers/xgl
-cmake -H. -Bbuilds/Release64 -DXGL_BUILD_LIT=ON -DLLVM_BUILD_UTILS=ON
-cd builds/Release64
-```
-
-Now, the tests can be run in the same directory using:
-```
-ninja check-amdllpc
-```
-
-That command (re)builds amdllpc and spvgen.so if necessary. If the spvgen.so build fails with
-an error like this:
+Building the `check-amdllpc` target also builds spvgen.so.
+If the spvgen.so build fails with an error like this:
 ```
 drivers/spvgen/source/spvgen.cpp:51:10: fatal error: doc.h: No such file or directory
+```
+or
+```
+drivers/spvgen/source/spvgen.cpp:73:10: fatal error: SPIRV/GlslangToSpv.h: No such file or directory
 ```
 
 then you need to fetch the external sources (glslang and SPIRV-Tools) used by SPVGEN:
 ```
-(cd ../../../spvgen/external && python fetch_external_sources.py)
+(cd ../spvgen/external && python fetch_external_sources.py)
 ```
-and then retry the `ninja check-amdllpc`.
+and then retry the ninja command.
 
 When you need to investigate a test failure, run a single test from that same build directory like this example:
 ```
 llvm/bin/llvm-lit -v llpc/test/shaderdb/OpAtomicIIncrement_TestVariablePointer_lit.spvasm
 ```
+
+## Standalone LLPC build and lit testing
+
+Once you have followed the driver build instructions for installing source,
+you can build LLPC standalone, and run the LLPC and LGC lit tests from there instead.
+A standalone LLPC build does not depend on many of the packages required for a driver build; it
+pretty much has the same requirements as an LLVM build.
+
+Starting at the top level `llpc` directory:
+
+```
+cmake -G Ninja -B build
+ninja -C build check-lgc check-amdllpc
+```
+
+See above if this gives an error due to not finding an include file from glslang or SPIRV-Tools.
