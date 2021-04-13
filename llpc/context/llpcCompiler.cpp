@@ -1030,6 +1030,10 @@ static bool hasUnrelocatableDescriptorNode(const ArrayRef<const PipelineShaderIn
 //
 // @param [in] resourceMapping : resource mapping data, containing user data nodes
 static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMapping) {
+  // The code to handle an immutable sampler cannot be easily patched.
+  if (resourceMapping->staticDescriptorValueCount != 0)
+    return true;
+
   for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
     if (isUnrelocatableResourceMappingRootNode(&resourceMapping->pUserDataNodes[i].node))
       return true;
@@ -1042,7 +1046,7 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMa
     if (node->type != ResourceMappingNodeType::DescriptorTableVaPtr)
       continue;
     const ResourceMappingNode *innerNode = node->tablePtr.pNext;
-    if (!descriptorSetsSeen.insert(innerNode->srdRange.set).second)
+    if (innerNode && !descriptorSetsSeen.insert(innerNode->srdRange.set).second)
       return true;
   }
 
