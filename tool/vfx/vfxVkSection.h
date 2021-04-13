@@ -254,7 +254,7 @@ private:
   std::string m_entryPoint;                                            // Entry point name
 
   // Used for backwards compatibility with Version 1 .pipe files
-  std::vector<SectionDescriptorRangeValueItem> m_descriptorRangeValue; // Contains descriptor range vuale
+  std::vector<SectionDescriptorRangeValueItem> m_descriptorRangeValue; // Contains descriptor range value
   std::vector<SectionResourceMappingNode> m_userDataNode;              // Contains user data node
   std::vector<SectionDescriptorRangeValueItem::SubState> m_descriptorRangeValues;
   std::vector<SectionResourceMappingNode::SubState> m_userDataNodes;
@@ -275,10 +275,9 @@ public:
 
   static void initialAddrTable() {
     StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_staticDescriptorValue,
-                                      MemberTypeDescriptorRangeValue, true);
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_userDataNode,
-                                      MemberTypeResourceMappingNode, true);
+    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_descriptorRangeValue, MemberTypeDescriptorRangeValue,
+                                      true);
+    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_userDataNode, MemberTypeResourceMappingNode, true);
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
@@ -286,12 +285,12 @@ public:
     memset(&state, 0, sizeof(SubState));
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
-    if (m_staticDescriptorValue.size() > 0) {
-      m_staticDescriptorValues.resize(m_staticDescriptorValue.size());
-      for (unsigned i = 0; i < m_staticDescriptorValue.size(); ++i)
-        m_staticDescriptorValue[i].getSubState(m_staticDescriptorValues[i]);
-      state.staticDescriptorValueCount = static_cast<unsigned>(m_staticDescriptorValue.size());
-      state.pStaticDescriptorValues = &m_staticDescriptorValues[0];
+    if (m_descriptorRangeValue.size() > 0) {
+      m_descriptorRangeValues.resize(m_descriptorRangeValue.size());
+      for (unsigned i = 0; i < m_descriptorRangeValue.size(); ++i)
+        m_descriptorRangeValue[i].getSubState(m_descriptorRangeValues[i]);
+      state.staticDescriptorValueCount = static_cast<unsigned>(m_descriptorRangeValue.size());
+      state.pStaticDescriptorValues = &m_descriptorRangeValues[0];
     }
 
     if (m_userDataNode.size() > 0) {
@@ -300,7 +299,7 @@ public:
       for (unsigned i = 0; i < state.userDataNodeCount; ++i)
         m_userDataNode[i].getSubState(m_userDataNodes[i]);
       state.pUserDataNodes = &m_userDataNodes[0];
-      }
+    }
 #endif
   };
   SubState &getSubStateRef() { return m_state; };
@@ -309,10 +308,10 @@ private:
   static const unsigned MemberCount = 2;
   static StrToMemberAddr m_addrTable[MemberCount];
   SubState m_state;
-  std::vector<SectionDescriptorRangeValueItem> m_staticDescriptorValue; // Contains descriptor range vuale
-  std::vector<SectionResourceMappingNode>      m_userDataNode;           // Contains user data node
+  std::vector<SectionDescriptorRangeValueItem> m_descriptorRangeValue; // Contains descriptor range value
+  std::vector<SectionResourceMappingNode> m_userDataNode;              // Contains user data node
 
-  std::vector<Vkgc::StaticDescriptorValue>   m_staticDescriptorValues;
+  std::vector<Vkgc::StaticDescriptorValue> m_descriptorRangeValues;
   std::vector<Vkgc::ResourceMappingRootNode> m_userDataNodes;
 };
 
