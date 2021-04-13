@@ -1578,8 +1578,9 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
       &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
   };
 
-  bool buildingRelocatableElf = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
-  buildingRelocatableElf = buildingRelocatableElf && canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo);
+  const bool relocatableElfRequested = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
+  const bool buildingRelocatableElf =
+      relocatableElfRequested && canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo);
 
   for (unsigned i = 0; i < ShaderStageGfxCount && result == Result::Success; ++i)
     result = validatePipelineShaderInfo(shaderInfo[i]);
@@ -1600,6 +1601,10 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
         LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(static_cast<ShaderStage>(stage), true))
                   << format("0x%016" PRIX64, MetroHash::compact64(hash)) << "\n");
       }
+    }
+    if (relocatableElfRequested && !buildingRelocatableElf) {
+      LLPC_OUTS("\nWarning: Relocatable shader compilation requested but not possible. "
+                << "Falling back to whole-pipeline compilation.\n");
     }
     LLPC_OUTS("\n");
   }
@@ -1725,8 +1730,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
                                       ComputePipelineBuildOut *pipelineOut, void *pipelineDumpFile) {
   BinaryData elfBin = {};
 
-  bool buildingRelocatableElf = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
-  buildingRelocatableElf = buildingRelocatableElf && canUseRelocatableComputeShaderElf(pipelineInfo);
+  const bool relocatableElfRequested = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
+  const bool buildingRelocatableElf = relocatableElfRequested && canUseRelocatableComputeShaderElf(pipelineInfo);
 
   Result result = validatePipelineShaderInfo(&pipelineInfo->cs);
 
@@ -1743,6 +1748,10 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::compact64(&pipelineHash)) << "\n");
     LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(ShaderStageCompute, true))
               << format("0x%016" PRIX64, MetroHash::compact64(moduleHash)) << "\n");
+    if (relocatableElfRequested && !buildingRelocatableElf) {
+      LLPC_OUTS("\nWarning: Relocatable shader compilation requested but not possible. "
+                << "Falling back to whole-pipeline compilation.\n");
+    }
     LLPC_OUTS("\n");
   }
 
