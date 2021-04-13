@@ -62,3 +62,4 @@ PRIVATE
 )
 
 target_link_libraries(vfx PRIVATE khronos_vulkan_interface)
+target_link_libraries(vfx PRIVATE khronos_spirv_interface)
