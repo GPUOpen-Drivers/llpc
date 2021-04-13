@@ -1,0 +1,53 @@
+; Check that a warning is printed when relocatable compilation is requested but not possible.
+; Force this compute shader to use whole-pipeline compilation by using the
+; `--relocatable-shader-elf-limit` dev flag.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -enable-relocatable-shader-elf -relocatable-shader-elf-limit=0 -spvgen-dir=%spvgendir% -v %gfxip %s \
+; RUN:   | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} calculated hash results (compute pipeline)
+; SHADERTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: {{^=====}} AMDLLPC SUCCES
+; END_SHADERTEST
+
+
+[CsGlsl]
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+layout(binding = 0) uniform UniformBufferObject {
+    vec4 i;
+} ubo;
+
+layout(set = 1, binding = 0, std430) buffer OUT
+{
+    vec4 o;
+};
+
+layout(local_size_x = 2, local_size_y = 3) in;
+void main() {
+    o = ubo.i;
+}
+
+
+[CsInfo]
+entryPoint = main
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 6
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].set = 0
+userDataNode[0].next[0].type = DescriptorBuffer
+userDataNode[0].next[0].offsetInDwords = 4
+userDataNode[0].next[0].sizeInDwords = 8
+userDataNode[0].next[0].set = 0
+userDataNode[0].next[0].binding = 0
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 7
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].set = 1
+userDataNode[1].next[0].type = DescriptorBuffer
+userDataNode[1].next[0].offsetInDwords = 4
+userDataNode[1].next[0].sizeInDwords = 8
+userDataNode[1].next[0].set = 1
+userDataNode[1].next[0].binding = 0
