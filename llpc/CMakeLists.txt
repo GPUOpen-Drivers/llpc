@@ -35,7 +35,7 @@ endif()
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_LIT        "LLPC build lit test"         OFF)
 option(LLPC_BUILD_LLVM_TOOLS "Build LLVM tools"            OFF)
-option(LLPC_ENABLE_WERROR    "Build LLPC with more errors" OFF)
+option(LLPC_ENABLE_WERROR    "Build LLPC with more errors" ON)
 
 if(ICD_BUILD_LLPC)
     set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR})
