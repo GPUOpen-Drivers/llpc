@@ -903,8 +903,8 @@ DebugLoc SPIRVToLLVMDbgTran::transDebugScope(const SPIRVInstruction *SpirvInst, 
   unsigned Col = 0;
   MDNode *Scope = nullptr;
   MDNode *InlinedAt = nullptr;
-  std::shared_ptr<const SPIRVLine> LineInfo = nullptr;
-  if (LineInfo = SpirvInst->getLine()) {
+  std::shared_ptr<const SPIRVLine> LineInfo = SpirvInst->getLine();
+  if (LineInfo) {
     Line = LineInfo->getLine();
     Col = LineInfo->getColumn();
   }
