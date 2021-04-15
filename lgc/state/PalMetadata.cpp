@@ -121,7 +121,7 @@ void PalMetadata::initialize() {
     *m_userDataLimit = 0U;
   m_spillThreshold = &m_pipelineNode[Util::Abi::PipelineMetadataKey::SpillThreshold];
   if (m_spillThreshold->isEmpty())
-    *m_spillThreshold = UINT_MAX;
+    *m_spillThreshold = MAX_SPILL_THRESHOLD;
 }
 
 // =====================================================================================================================
@@ -346,10 +346,6 @@ unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
 // @param dwordCount : Number of user data entries to set
 void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue,
                                    unsigned dwordCount) {
-  // If this is the spill table pointer, adjust userDataLimit accordingly.
-  if (userDataValue == static_cast<unsigned>(UserDataMapping::SpillTable))
-    setUserDataLimit();
-
   // Get the start register number of SPI user data registers for this shader stage.
   unsigned userDataReg = getUserDataReg0(stage);
 
@@ -527,9 +523,23 @@ void PalMetadata::finalizePipeline() {
     }
   }
 
-  // If there are root user data nodes but none of them are used, adjust userDataLimit accordingly.
-  if (m_userDataLimit->getUInt() == 0 && !m_pipelineState->getUserDataNodes().empty())
+  if (pipelineRequiresAllUserData())
     setUserDataLimit();
+}
+
+// =====================================================================================================================
+// Returns true of the setting in the PAL meta data require all of the user data nodes.
+//
+bool PalMetadata::pipelineRequiresAllUserData() const {
+  // If there are root user data nodes but none of them are used, then PAL wants a non-zoro user data limit.
+  if (m_userDataLimit->getUInt() == 0 && !m_pipelineState->getUserDataNodes().empty())
+    return true;
+
+  // If the spill is used, the entire user data table is considered used.
+  if (userDataNodesAreSpilled())
+    return true;
+
+  return false;
 }
 
 // =====================================================================================================================
