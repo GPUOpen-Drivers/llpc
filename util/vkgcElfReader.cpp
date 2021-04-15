@@ -400,7 +400,10 @@ template <class Elf> bool ElfReader<Elf>::getNextMsgNode() {
   } else if (curIter.status == MsgPackIteratorArray) {
     curIter.arrayIt = curIter.node->getArray(true).begin();
     curIter.arrayEnd = curIter.node->getArray(true).end();
-    if (curIter.arrayIt->isMap()) {
+    if (curIter.arrayIt == curIter.arrayEnd) {
+      // Empty array.
+      curIter.status = MsgPackIteratorArrayEnd;
+    } else if (curIter.arrayIt->isMap()) {
       curIter.status = MsgPackIteratorMapBegin;
       curIter.node = &(curIter.arrayIt->getMap(true));
     } else if (curIter.arrayIt->isArray()) {
