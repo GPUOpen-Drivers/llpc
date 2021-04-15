@@ -72,6 +72,7 @@ private:
   void buildNggCullingControlRegister(NggControl &nggControl);
 
   void processShader();
+  void processMissingFs();
 
   bool isVertexReuseDisabled();
 
@@ -112,6 +113,8 @@ private:
   ResourceUsage *m_resUsage;  // Pointer to shader resource usage
   std::unique_ptr<InOutLocationInfoMapManager>
       m_locationInfoMapManager; // Pointer to InOutLocationInfoMapManager instance
+
+  bool m_processMissingFs = false; // Whether to process a missing FS (part-pipeline compilation).
 };
 
 // Represents the compatibility info of input/output
@@ -133,6 +136,7 @@ public:
   InOutLocationInfoMapManager() {}
 
   void createMap(const std::vector<llvm::CallInst *> &calls, ShaderStage shaderStage, bool requireDword);
+  void deserializeMap(llvm::ArrayRef<std::pair<unsigned, unsigned>> serializedMap);
   bool findMap(const InOutLocationInfo &origLocInfo, InOutLocationInfoMap::const_iterator &mapIt);
   InOutLocationInfoMap &getMap() { return m_locationInfoMap; }
 

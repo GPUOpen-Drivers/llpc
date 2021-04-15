@@ -264,6 +264,23 @@ void PipelineState::mergePalMetadataFromBlob(llvm::StringRef blob, bool isGlueCo
 }
 
 // =====================================================================================================================
+// Set the "other part-pipeline" from the given other Pipeline object. This is used when doing a part-pipeline
+// compile of the non-FS part of the pipeline, to inherit required information from the FS part-pipeline.
+//
+// @param otherPartPipeline : The other part-pipeline, containing metadata for FS input mappings
+// @param module : If called before Pipeline::irLink(), should be nullptr. If called after Pipeline::irLink(), should
+//                 be the linked IR module, so the PAL metadata that needs to be inherited from otherPartPipeline
+//                 can be recorded in the module. The latter is provided as a hook for the LGC tool, which does not
+//                 do an irLink() at all.
+void PipelineState::setOtherPartPipeline(Pipeline &otherPartPipeline, Module *linkedModule) {
+  auto &otherPartPipelineState = *static_cast<PipelineState *>(&otherPartPipeline);
+  getPalMetadata()->setOtherPartPipeline(*otherPartPipelineState.getPalMetadata());
+  // Record the updated PAL metadata.
+  if (linkedModule && m_palMetadata)
+    m_palMetadata->record(linkedModule);
+}
+
+// =====================================================================================================================
 // Clear the pipeline state IR metadata.
 // This does not clear PalMetadta, because we want that to persist into the back-end.
 //
@@ -379,7 +396,8 @@ ShaderStage PipelineState::getPrevShaderStage(ShaderStage shaderStage) const {
 // Gets the next active shader stage in this pipeline
 //
 // @param shaderStage : Current shader stage
-ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage) const {
+// @param fakeFs : True to return FS even if it is not present
+ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage, bool fakeFs) const {
   if (shaderStage == ShaderStageCompute)
     return ShaderStageInvalid;
 
@@ -391,9 +409,12 @@ ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage) const {
   assert(shaderStage < ShaderStageGfxCount);
 
   ShaderStage nextStage = ShaderStageInvalid;
+  unsigned stageMask = m_stageMask;
+  if (fakeFs)
+    stageMask |= shaderStageToMask(ShaderStageFragment);
 
   for (unsigned stage = shaderStage + 1; stage < ShaderStageGfxCount; ++stage) {
-    if ((m_stageMask & shaderStageToMask(static_cast<ShaderStage>(stage))) != 0) {
+    if ((stageMask & shaderStageToMask(static_cast<ShaderStage>(stage))) != 0) {
       nextStage = static_cast<ShaderStage>(stage);
       break;
     }
@@ -433,7 +454,7 @@ const ShaderOptions &PipelineState::getShaderOptions(ShaderStage stage) {
 
 // =====================================================================================================================
 // Record pipeline and shader options into IR metadata.
-// This also records m_client and m_unlinked.
+// This also records m_client and m_pipelineLink.
 // TODO: The options could be recorded in a more human-readable form, with a string for the option name for each
 // option.
 //
@@ -443,10 +464,8 @@ void PipelineState::recordOptions(Module *module) {
   clientNamedMeta->clearOperands();
   clientNamedMeta->addOperand(llvm::MDNode::get(module->getContext(), MDString::get(module->getContext(), m_client)));
 
-  if (m_unlinked) {
-    unsigned unlinkedAsInt = m_unlinked;
+  if (unsigned unlinkedAsInt = unsigned(m_pipelineLink))
     setNamedMetadataToArrayOfInt32(module, unlinkedAsInt, UnlinkedMetadataName);
-  }
   setNamedMetadataToArrayOfInt32(module, m_options, OptionsMetadataName);
   for (unsigned stage = 0; stage != m_shaderOptions.size(); ++stage) {
     std::string metadataName =
@@ -457,7 +476,7 @@ void PipelineState::recordOptions(Module *module) {
 
 // =====================================================================================================================
 // Read pipeline and shader options from IR metadata.
-// This also reads m_client and m_unlinked.
+// This also reads m_client and m_pipelineLink.
 //
 // @param module : Module to read metadata from
 void PipelineState::readOptions(Module *module) {
@@ -474,7 +493,7 @@ void PipelineState::readOptions(Module *module) {
 
   unsigned unlinkedAsInt = 0;
   readNamedMetadataArrayOfInt32(module, UnlinkedMetadataName, unlinkedAsInt);
-  m_unlinked = unlinkedAsInt != 0;
+  m_pipelineLink = PipelineLink(unlinkedAsInt);
 
   readNamedMetadataArrayOfInt32(module, OptionsMetadataName, m_options);
   for (unsigned stage = 0; stage != ShaderStageCompute + 1; ++stage) {
@@ -1341,8 +1360,8 @@ StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
 //
 void PipelineState::initializeInOutPackState() {
   // If the pipeline is not unlinked, the state of input/output pack in specified shader stages is enabled
-  if (!m_unlinked) {
-    // The generic input import of {TCS, GS, FS} are packed by default
+  if (!isUnlinked()) {
+    // The generic input imports of {TCS, GS, FS} are packed by default
     m_inputPackState[ShaderStageTessControl] = true;
     m_inputPackState[ShaderStageGeometry] = true;
     m_inputPackState[ShaderStageFragment] = true;

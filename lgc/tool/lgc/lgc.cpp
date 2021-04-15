@@ -68,6 +68,11 @@ cl::opt<bool> Link("l", cl::cat(LgcCategory),
 cl::opt<std::string> OutFileName("o", cl::cat(LgcCategory), cl::desc("Output filename ('-' for stdout)"),
                                  cl::value_desc("filename"));
 
+// -other: filename of other part-pipeline ELF
+cl::opt<std::string> OtherName("other", cl::cat(LgcCategory),
+                               cl::desc("Name of 'other' FS part-pipeline ELF when compiling non-FS part-pipeline"),
+                               cl::value_desc("filename"));
+
 // -pal-abi-version: PAL pipeline ABI version to compile for (default is latest known)
 cl::opt<unsigned> PalAbiVersion("pal-abi-version", cl::init(0xFFFFFFFF), cl::cat(LgcCategory),
                                 cl::desc("PAL pipeline version to compile for (default latest known)"),
@@ -163,6 +168,19 @@ int main(int argc, char **argv) {
 
   if (VerboseOutput)
     lgcContext->setLlpcOuts(&outs());
+
+  // Read the "other" part-pipeline ELF input.
+  std::unique_ptr<MemoryBuffer> otherBuffer;
+  if (!OtherName.empty()) {
+    ErrorOr<std::unique_ptr<MemoryBuffer>> fileOrErr = MemoryBuffer::getFileOrSTDIN(OtherName);
+    if (std::error_code errorCode = fileOrErr.getError()) {
+      auto error = SMDiagnostic(OtherName, SourceMgr::DK_Error, "Could not open input file: " + errorCode.message());
+      error.print(progName, errs());
+      errs() << "\n";
+      return 1;
+    }
+    otherBuffer = std::move(*fileOrErr);
+  }
 
   // Read the input files.
   SmallVector<std::unique_ptr<MemoryBuffer>, 4> inBuffers;
@@ -273,6 +291,14 @@ int main(int argc, char **argv) {
       std::unique_ptr<Pipeline> pipeline(lgcContext->createPipeline());
       StringRef err;
 
+      // If there is an "other" part-pipeline ELF, give its metadata to our compile's pipeline by setting
+      // up a pipeline and linker for it that we are not otherwise going to use.
+      if (otherBuffer) {
+        std::unique_ptr<Pipeline> otherPipeline(lgcContext->createPipeline());
+        std::unique_ptr<ElfLinker> linker(otherPipeline->createElfLinker(otherBuffer->getMemBufferRef()));
+        pipeline->setOtherPartPipeline(*otherPipeline, &*module);
+      }
+
       if (Link) {
         // The -l option (link) is handled differently: We have just read the first input file as IR, and
         // we get the pipeline state from that. Subsequent input files are ELF, and we link them.
@@ -298,7 +324,7 @@ int main(int argc, char **argv) {
         }
       } else {
         // Run the middle-end compiler.
-        if (!pipeline->generate(std::move(module), outStream, nullptr, {}, {}))
+        if (!pipeline->generate(std::move(module), outStream, nullptr, {}))
           err = pipeline->getLastError();
       }
 

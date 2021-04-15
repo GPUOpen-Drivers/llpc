@@ -135,7 +135,7 @@ The front-end gives the IR modules for all the shaders in the pipeline, and the 
 to the `Lgc::Pipeline` object, and then asks it to link and generate them into a single pipeline ELF,
 ready for consumption by the PAL ELF loader.
 
-There are a number of variations on that:
+There are a number of variations on that, mostly specified by the `pipelineLink` arg to `Pipeline::irLink()`:
 
 #### Unlinked shader compilation
 
@@ -162,7 +162,7 @@ allowed to have a compact (2-dword) descriptor, or a static sampler.
 Also, it seems like some built-in inputs in the FS
 would not work, if they are implemented as generic inputs that need to be exported by the VS.
 
-#### Partial pipeline compilation scheme
+#### Old partial pipeline compilation scheme
 
 LGC has a hook part way through compilation, just after determining inter-shader output/input packing,
 in which it calls a callback function (provided by the front-end as the `checkShaderCacheFunc` arg to
@@ -179,6 +179,50 @@ compilation is added to its cache for future compiles to find.
 To do this, the LLPC front-end has to extract the partial pipeline it wants from a pipeline ELF, then
 link two partial pipelines together. It does this with its own ELF extracting and linking code, not
 using the LGC ELF linker.
+
+#### New part-pipeline compilation scheme
+
+LGC supports another scheme, similar in concept but not needing compilation of the whole pipeline
+to proceed to a cache-checking point, and allowing use of the LGC ELF linker.
+
+This scheme is based on the observation that you can compile the FS without reference to other shaders
+(but with the pipeline state), and it can still pack its inputs (i.e. not reserve an attribute in the
+attribute space if it never uses it), as long as the compile of the other part of the pipeline gets
+the information about that packing. This works because packing is done backwards through the shader
+stages, packing a shader's inputs and then fixing the previous shader's outputs to match.
+
+The FS input information also includes where the FS uses a built-in that needs to be exported from the VS.
+
+The scheme is intended to be used by the front-end as follows:
+
+* First, the front-end creates a `Pipeline` object for the whole pipeline, and an `ElfLinker` using it,
+  and sets the parts of the pipeline state needed for linking at the end.
+
+* The front-end calculates a hash of the FS and the pipeline state that is relevant to the FS, and
+  checks its shader cache for the same shader-and-state being compiled before. If not found, it
+  compiles it and stores it in the cache.
+
+* Compiling the FS works as normal, using the LGC interface to create a `Pipeline` object (not the same
+  as the one created above for the whole pipeline), give it
+  relevant pipeline state, front-end compile the shader with `Builder` calls, call `Pipeline::irLink`
+  with just the FS and with `pipelineLink` set to `PipelineLink::PartPipeline`. The `Pipeline::generate`
+  method then middle-end and back-end compiles it and generates an ELF.
+
+* The front-end calculates a hash of the rest of the shaders and pipeline state relevant to them,
+  and includes in that hash the FS input mapping. It does the latter by adding the FS ELF (whether
+  just-compiled or retrieved from cache) to the `ElfLinker` and calling `ElfLinker::getFsInputMappings()`,
+  which returns an opaque representation of the FS input mappings to include in the hash.
+  Then it can check the cache.
+
+* If the non-FS part of the pipeline was not found in the cache, then the front-end compiles it as
+  normal (without the FS), in its own `Pipeline` object, but additionally calling
+  `Pipeline::setOtherPartPipeline()` passing the whole-pipeline `Pipeline` object, so the compile
+  has access to the FS input mappings metadata. This compile generates an ELF for the non-FS part-pipeline.
+
+* Now the front-end adds the ELF for the non-FS part-pipeline (whether compiled or retrieved from its
+  cache) to the ELF linker, and tells it to link them, resulting in a pipeline ELF.
+
+This scheme is experimental, and is not yet in use by the LLPC front-end.
 
 ## LGC internal classes
 

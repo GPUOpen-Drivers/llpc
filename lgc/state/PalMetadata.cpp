@@ -200,7 +200,9 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
             // Ignore new value of VGT_SHADER_STAGES_EN from glue shader, as it might accidentally make the VS
             // wave32. (This relies on the glue shader's PAL metadata being merged into the vertex-processing
             // part-pipeline, rather than the other way round.)
-            return 0;
+            if (isGlueCode)
+              return 0;
+            break; // Use "default behavior for uint nodes" code below.
           case mmSPI_SHADER_PGM_RSRC1_LS:
           case mmSPI_SHADER_PGM_RSRC1_HS:
           case mmSPI_SHADER_PGM_RSRC1_ES:
@@ -226,12 +228,10 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
           }
           case mmSPI_PS_INPUT_ENA:
           case mmSPI_PS_INPUT_ADDR:
-          case mmSPI_PS_IN_CONTROL: {
-            if (!isGlueCode) {
-              *destNode = srcNode.getUInt();
-            }
-            return 0;
-          }
+          case mmSPI_PS_IN_CONTROL:
+            if (isGlueCode)
+              return 0;
+            break; // Use "default behavior for uint nodes" code below.
           }
         } else if (mapKey.isString()) {
           // For .userdatalimit, register counts, and register limits, take the max value.
@@ -469,6 +469,7 @@ void PalMetadata::fixUpRegisters() {
 // =====================================================================================================================
 // Test whether this is a graphics pipeline (even works in a link-only pipeline).
 bool PalMetadata::isGraphics() {
+  assert(m_pipelineState->isWholePipeline());
   if (m_pipelineState->getShaderStageMask() != 0) {
     // This is a whole pipeline compile, and the shader stage mask is set. Therefore, we can use the PipelineState's
     // isGraphics method.
@@ -483,11 +484,29 @@ bool PalMetadata::isGraphics() {
 }
 
 // =====================================================================================================================
+// Finalize PAL metadata user data limit for any compilation (shader, part-pipeline, whole pipeline)
+void PalMetadata::finalizeUserDataLimit() {
+  // Ensure user_data_limit is set correctly if no user data used or spill is in use.
+  // If the spill is used, the entire user data table is considered used.
+  if (userDataNodesAreSpilled())
+    setUserDataLimit();
+  // If there are root user data nodes but none of them are used, then PAL wants a non-zero user data limit.
+  else if (m_userDataLimit->getUInt() == 0 && !m_pipelineState->getUserDataNodes().empty())
+    *m_userDataLimit = 1U;
+}
+
+// =====================================================================================================================
 // Finalize PAL metadata for pipeline.
-// This is called at the end of a full pipeline compilation, or from the ELF link when doing shader/part-pipeline
-// compilation.
-void PalMetadata::finalizePipeline() {
-  assert(!m_pipelineState->isUnlinked());
+//
+// @param isWholePipeline : True if called for a whole pipeline compilation or an ELF link, false if called
+//                          for part-pipeline or shader compilation.
+void PalMetadata::finalizePipeline(bool isWholePipeline) {
+  // Ensure user_data_limit is set correctly.
+  finalizeUserDataLimit();
+
+  // The rest of this function is used only for whole pipeline PAL metadata.
+  if (!isWholePipeline)
+    return;
 
   // Set pipeline hash.
   auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
@@ -539,23 +558,8 @@ void PalMetadata::finalizePipeline() {
     }
   }
 
-  if (pipelineRequiresAllUserData())
-    setUserDataLimit();
-}
-
-// =====================================================================================================================
-// Returns true of the setting in the PAL meta data require all of the user data nodes.
-//
-bool PalMetadata::pipelineRequiresAllUserData() const {
-  // If there are root user data nodes but none of them are used, then PAL wants a non-zoro user data limit.
-  if (m_userDataLimit->getUInt() == 0 && !m_pipelineState->getUserDataNodes().empty())
-    return true;
-
-  // If the spill is used, the entire user data table is considered used.
-  if (userDataNodesAreSpilled())
-    return true;
-
-  return false;
+  // Erase the PAL metadata for FS input mappings.
+  eraseFragmentInputInfo();
 }
 
 // =====================================================================================================================
@@ -869,4 +873,99 @@ void PalMetadata::setFinalized128BitCacheHash(const Hash128 &finalizedCacheHash,
   xglCacheInfo[Util::Abi::PipelineMetadataKey::CacheHash128Bits] = buildArrayDocNode(m_document, finalizedCacheHash);
   xglCacheInfo[Util::Abi::PipelineMetadataKey::LlpcVersion] = m_document->getNode(version.getAsString(),
                                                                                   /* copy = */ true);
+}
+
+// =====================================================================================================================
+// Store the fragment shader input mapping information for a fragment shader being compiled by itself (part-
+// pipeline compilation).
+//
+// @param fsInputMappings : FS input mapping information
+void PalMetadata::addFragmentInputInfo(const FsInputMappings &fsInputMappings) {
+  auto fragInputMappingArray1 = m_pipelineNode[PipelineMetadataKey::FragInputMapping1].getArray(true);
+  for (std::pair<unsigned, unsigned> item : fsInputMappings.locationInfo) {
+    fragInputMappingArray1.push_back(m_document->getNode(item.first));
+    fragInputMappingArray1.push_back(m_document->getNode(item.second));
+  }
+  auto fragInputMappingArray2 = m_pipelineNode[PipelineMetadataKey::FragInputMapping2].getArray(true);
+  for (std::pair<unsigned, unsigned> item : fsInputMappings.builtInLocationInfo) {
+    fragInputMappingArray2.push_back(m_document->getNode(item.first));
+    fragInputMappingArray2.push_back(m_document->getNode(item.second));
+  }
+}
+
+// =====================================================================================================================
+// In part-pipeline compilation, copy any metadata needed from the "other" pipeline's PAL metadata into ours.
+// Currently this just copies the fragment shader input mapping information.
+// Storing it in our PAL metadata, even though it will be erased before the PAL metadata is written into the ELF,
+// means that it persists in the IR if compilation is interrupted by e.g. -emit-lgc.
+//
+// @param other : PAL metadata object for "other" pipeline
+void PalMetadata::setOtherPartPipeline(PalMetadata &other) {
+  m_pipelineNode[PipelineMetadataKey::FragInputMapping1] = other.m_pipelineNode[PipelineMetadataKey::FragInputMapping1];
+  m_pipelineNode[PipelineMetadataKey::FragInputMapping2] = other.m_pipelineNode[PipelineMetadataKey::FragInputMapping2];
+}
+
+// =====================================================================================================================
+// Check whether we have FS input mappings, and thus whether we're doing part-pipeline compilation of the
+// pre-FS part of the pipeline.
+bool PalMetadata::haveFsInputMappings() {
+  return m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping1)) != m_pipelineNode.end();
+}
+
+// =====================================================================================================================
+// In part-pipeline compilation, get a blob of data representing the FS input mappings that can be used by the
+// client in a hash. The resulting data is owned by the PalMetadata object, and lives until the PalMetadata
+// object is destroyed or another call is made to getFsInputMappings.
+StringRef PalMetadata::getFsInputMappings() {
+  assert(haveFsInputMappings());
+  m_fsInputMappingsBlob.clear();
+  auto fragInputMappingArray1 = m_pipelineNode[PipelineMetadataKey::FragInputMapping1].getArray(true);
+  auto fragInputMappingArray2 = m_pipelineNode[PipelineMetadataKey::FragInputMapping2].getArray(true);
+  for (auto &element : fragInputMappingArray1) {
+    unsigned elementVal = element.getUInt();
+    m_fsInputMappingsBlob.append(StringRef(reinterpret_cast<const char *>(&elementVal), sizeof(elementVal)));
+  }
+  for (auto &element : fragInputMappingArray2) {
+    unsigned elementVal = element.getUInt();
+    m_fsInputMappingsBlob.append(StringRef(reinterpret_cast<const char *>(&elementVal), sizeof(elementVal)));
+  }
+  return m_fsInputMappingsBlob;
+}
+
+// =====================================================================================================================
+// In part-pipeline compilation, retrieve the FS input mappings into the provided vectors.
+//
+// This is used when compiling the non-FS part pipeline.
+// The function copes with that metadata not being present, as it can be called when doing a compile of a single
+// shader in the command-line tool.
+//
+// @param [out] fsInputMappings : Struct to populate with FS input mapping information
+void PalMetadata::retrieveFragmentInputInfo(FsInputMappings &fsInputMappings) {
+  auto array1It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping1));
+  if (array1It != m_pipelineNode.end()) {
+    auto fragInputMappingArray1 = array1It->second.getArray(true);
+    for (unsigned idx = 0; idx < fragInputMappingArray1.size() / 2; ++idx)
+      fsInputMappings.locationInfo.push_back(
+          {fragInputMappingArray1[idx * 2].getUInt(), fragInputMappingArray1[idx * 2 + 1].getUInt()});
+  }
+
+  auto array2It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping2));
+  if (array2It != m_pipelineNode.end()) {
+    auto fragInputMappingArray2 = array2It->second.getArray(true);
+    for (unsigned idx = 0; idx < fragInputMappingArray2.size() / 2; ++idx)
+      fsInputMappings.builtInLocationInfo.push_back(
+          {fragInputMappingArray2[idx * 2].getUInt(), fragInputMappingArray2[idx * 2 + 1].getUInt()});
+  }
+}
+
+// =====================================================================================================================
+// Erase the PAL metadata for FS input mappings. Used when finalizing the PAL metadata in the link.
+void PalMetadata::eraseFragmentInputInfo() {
+  auto array1It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping1));
+  if (array1It != m_pipelineNode.end())
+    m_pipelineNode.erase(array1It);
+
+  auto array2It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping2));
+  if (array2It != m_pipelineNode.end())
+    m_pipelineNode.erase(array2It);
 }

@@ -54,7 +54,7 @@ void ConfigBuilder::buildPalMetadata() {
   else {
     const bool hasTs = (m_hasTcs || m_hasTes);
 
-    if (m_pipelineState->isUnlinked() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
+    if (!m_pipelineState->isWholePipeline() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
       // FS-only shader compilation
       buildPipelineVsFsRegConfig();
     } else if (!hasTs && !m_hasGs) {
@@ -950,7 +950,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
 
   for (unsigned i = 0; i < interpInfo->size(); ++i) {
     const auto &interpInfoElem = (*interpInfo)[i];
-    if (m_pipelineState->isUnlinked() && interpInfoElem.loc == InvalidFsInterpInfo.loc) {
+    if (!m_pipelineState->isWholePipeline() && interpInfoElem.loc == InvalidFsInterpInfo.loc) {
       appendConfig(mmSPI_PS_INPUT_CNTL_0 + i, i);
       continue;
     }

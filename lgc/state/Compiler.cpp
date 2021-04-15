@@ -72,10 +72,9 @@ void Pipeline::markShaderEntryPoint(Function *func, ShaderStage stage) {
 // Link shader IR modules into a pipeline module.
 //
 // @param modules : Array of modules. Modules are freed
-// @param unlinked : True if generating an "unlinked" half-pipeline ELF that then needs further linking to
-//                   generate a pipeline ELF
-Module *PipelineState::irLink(ArrayRef<Module *> modules, bool unlinked) {
-  m_unlinked = unlinked;
+// @param pipelineLink : Enum saying whether this is a pipeline, unlinked or part-pipeline compile.
+Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineLink) {
+  m_pipelineLink = pipelineLink;
 #ifndef NDEBUG
   unsigned shaderStageMask = 0;
 #endif
@@ -173,18 +172,13 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, bool unlinked) {
 //                 timers[0]: patch passes
 //                 timers[1]: LLVM optimizations
 //                 timers[2]: codegen
-// @param otherElf : Optional ELF for the other half-pipeline when compiling an unlinked half-pipeline ELF.
-//                   Supplying this could allow more optimal code for writing/reading attribute values between
-//                   the two pipeline halves
 // @returns : True for success.
-//           False if irLink asked for an "unlinked" shader or half-pipeline, and there is some reason why the
+//           False if irLink asked for an "unlinked" shader or part-pipeline, and there is some reason why the
 //           module cannot be compiled that way.  The client typically then does a whole-pipeline compilation
 //           instead. The client can call getLastError() to get a textual representation of the error, for
 //           use in logging or in error reporting in a command-line utility.
 bool PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_stream &outStream,
-                             Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, ArrayRef<Timer *> timers,
-                             MemoryBufferRef otherElf) {
-  assert(otherElf.getBuffer().empty() && "otherElf not supported yet");
+                             Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, ArrayRef<Timer *> timers) {
 
   m_lastError.clear();
   unsigned passIndex = 1000;

@@ -516,6 +516,14 @@ struct ComputeShaderMode {
   unsigned workgroupSizeZ; // Z dimension of workgroup size. 0 is taken to be 1
 };
 
+// Enum passed to Pipeline::irLink to give information on whether this is a whole or part pipeline.
+enum class PipelineLink : unsigned {
+  WholePipeline, // Compiling a whole pipeline
+  Unlinked,      // Compiling a shader or part-pipeline that will be ELF linked later
+  PartPipeline,  // Compiling in the part-pipeline scheme, compiling the FS first and then using metadata to
+                 //  pass its packed input mapping to the compile of the rest of the pipeline.
+};
+
 // =====================================================================================================================
 // The public API of the middle-end pipeline state exposed to the front-end for setting state and linking and
 // generating the pipeline
@@ -585,6 +593,16 @@ public:
   // for its link option.
   virtual void setStateFromModule(llvm::Module *module) = 0;
 
+  // Set the "other part-pipeline" from the given other Pipeline object. This is used when doing a part-pipeline
+  // compile of the non-FS part of the pipeline, to inherit required information from the FS part-pipeline.
+  //
+  // @param otherPartPipeline : The other part-pipeline, containing metadata for FS input mappings
+  // @param module : If called before Pipeline::irLink(), should be nullptr. If called after Pipeline::irLink(), should
+  //                 be the linked IR module, so the PAL metadata that needs to be inherited from otherPartPipeline
+  //                 can be recorded in the module. The latter is provided as a hook for the LGC tool, which does not
+  //                 do an irLink() at all.
+  virtual void setOtherPartPipeline(Pipeline &otherPartPipeline, llvm::Module *linkedModule = nullptr) = 0;
+
   // -----------------------------------------------------------------------------------------------------------------
   // IR link and generate pipeline/library methods
 
@@ -614,13 +632,8 @@ public:
   // Returns the pipeline/library module, or nullptr on link failure.
   //
   // @param modules : Array of modules
-  // @param unlinked : True if generating an "unlinked" half-pipeline ELF that then needs further linking to
-  //                   generate a pipeline ELF. In that case, using the methods above to set pipeline state items
-  //                   (setUserDataNodes, setDeviceIndex, setVertexInputDescriptions, setColorExportState,
-  //                   setGraphicsState) becomes optional, as LGC will generate relocs or user data entries
-  //                   that are fixed up in the ELF link step.
-  //                   TODO: That isn't implemented yet.
-  virtual llvm::Module *irLink(llvm::ArrayRef<llvm::Module *> modules, bool unlinked) = 0;
+  // @param pipelineLink : Enum saying whether this is a pipeline, unlinked or part-pipeline compile.
+  virtual llvm::Module *irLink(llvm::ArrayRef<llvm::Module *> modules, PipelineLink pipelineLink) = 0;
 
   // Typedef of function passed in to Generate to check the shader cache.
   // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages
@@ -642,8 +655,8 @@ public:
   //           returns a textual description
   virtual bool checkElfLinkable() = 0;
 
-  // Generate pipeline/library module or unlinked half-pipeline module by running patch, middle-end optimization
-  // and backend codegen passes.
+  // Generate pipeline/library module or unlinked shader or part-pipeline module by running patch, middle-end
+  // optimization and backend codegen passes.
   // The output is normally ELF, but IR assembly if an option is used to stop compilation early,
   // or ISA assembly if -filetype=asm is specified.
   // Output is written to outStream.
@@ -657,20 +670,17 @@ public:
   //                 timers[0]: patch passes
   //                 timers[1]: LLVM optimizations
   //                 timers[2]: codegen
-  // @param otherElf : Optional ELF for the other half-pipeline when compiling an unlinked half-pipeline ELF.
-  //                   Supplying this could allow more optimal code for writing/reading attribute values between
-  //                   the two pipeline halves
+  // @param otherElf : Optional ELF for the other part-pipeline when compiling an unlinked part-pipeline ELF.
   // @returns : True for success.
-  //           False if irLink asked for an "unlinked" shader or half-pipeline, and there is some reason why the
+  //           False if irLink asked for an "unlinked" shader or part-pipeline, and there is some reason why the
   //           module cannot be compiled that way.  The client typically then does a whole-pipeline compilation
   //           instead. The client can call getLastError() to get a textual representation of the error, for
   //           use in logging or in error reporting in a command-line utility.
   virtual bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
-                        CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers,
-                        llvm::MemoryBufferRef otherElf) = 0;
+                        CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) = 0;
 
-  // Create an ELF linker object for linking unlinked half-pipeline ELFs into a pipeline ELF using the pipeline state.
-  // This needs to be deleted after use.
+  // Create an ELF linker object for linking unlinked shader or part-pipeline ELFs into a pipeline ELF using
+  // the pipeline state. This needs to be deleted after use.
   virtual ElfLinker *createElfLinker(llvm::ArrayRef<llvm::MemoryBufferRef> elfs) = 0;
 
   // Get a textual error message for the last recoverable error caused by generate() or one of the ElfLinker

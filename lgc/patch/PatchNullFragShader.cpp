@@ -31,6 +31,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/Internal.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -84,8 +85,8 @@ bool PatchNullFragShader::runOnModule(Module &module) {
 
   PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
-  // Do not add a null fragment shader if generating an unlinked half-pipeline ELF.
-  if (pipelineState->isUnlinked())
+  // Do not add a null fragment shader if not generating a whole pipeline.
+  if (!pipelineState->isWholePipeline())
     return false;
 
   const bool hasCs = pipelineState->hasShaderStage(ShaderStageCompute);
