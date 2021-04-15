@@ -320,7 +320,6 @@ static void setGfx1010Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waSmemFollowedByVopc = 1;
   targetInfo->getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
-  targetInfo->getGpuProperty().hasIntegerDot = true;
 }
 
 // gfx1011
@@ -369,6 +368,7 @@ static void setGfx1012Info(TargetInfo *targetInfo) {
 static void setGfx103Info(TargetInfo *targetInfo) {
   // Hardware workarounds for GFX10.3 based GPU's:
   targetInfo->getGpuWorkarounds().gfx10.waAdjustDepthImportVrs = 1;
+  targetInfo->getGpuProperty().hasIntegerDot = true;
 }
 
 // gfx1030
@@ -379,7 +379,6 @@ static void setGfx1030Info(TargetInfo *targetInfo) {
   setGfx103Info(targetInfo);
 
   targetInfo->getGpuProperty().numShaderEngines = 4;
-  targetInfo->getGpuProperty().hasIntegerDot = true;
 }
 
 // gfx1031
