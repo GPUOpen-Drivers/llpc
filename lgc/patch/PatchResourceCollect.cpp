@@ -35,6 +35,7 @@
 #include "NggPrimShader.h"
 #include "lgc/Builder.h"
 #include "lgc/state/IntrinsDefs.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -80,6 +81,10 @@ bool PatchResourceCollect::runOnModule(Module &module) {
   m_pipelineShaders = &getAnalysis<PipelineShaders>();
   m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
+  // This pass processes a missing fragment shader using FS input packing information passed into LGC
+  // from the separate compile of the FS.
+  m_processMissingFs = m_pipelineState->isPartPipeline();
+
   bool needPack = false;
   for (int shaderStage = 0; shaderStage < ShaderStageGfxCount; ++shaderStage) {
     ShaderStage stage = static_cast<ShaderStage>(shaderStage);
@@ -95,13 +100,14 @@ bool PatchResourceCollect::runOnModule(Module &module) {
     scalarizeForInOutPacking(&module);
   }
 
-  // Process each shader stage, in reverse order.
+  // Process each shader stage, in reverse order. We process FS even if it does not exist (part-pipeline compile).
   for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage) {
     m_entryPoint = m_pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
-    if (m_entryPoint) {
-      m_shaderStage = static_cast<ShaderStage>(shaderStage);
+    m_shaderStage = static_cast<ShaderStage>(shaderStage);
+    if (m_entryPoint)
       processShader();
-    }
+    else if (m_shaderStage == ShaderStageFragment)
+      processMissingFs();
   }
 
   // Process non-entry-point shaders
@@ -1021,7 +1027,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 }
 
 // =====================================================================================================================
-// Process a single shader
+// Process a single shader.
 void PatchResourceCollect::processShader() {
   m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
@@ -1042,6 +1048,18 @@ void PatchResourceCollect::processShader() {
       if (m_pipelineState->getRasterizerState().perSampleShading)
         m_resUsage->builtInUsage.fs.runAtSampleRate = true;
     }
+
+    // If we're compiling a fragment shader only, then serialize inputLocInfoMap and builtInInputLocMap
+    // into PAL metadata, for the other half of the pipeline to be compiled against later.
+    if (m_pipelineState->getShaderStageMask() == 1U << ShaderStageFragment) {
+      FsInputMappings fsInputMappings;
+      for (auto it : m_resUsage->inOutUsage.inputLocInfoMap)
+        fsInputMappings.locationInfo.push_back({it.first.getData(), it.second.getData()});
+      for (auto it : m_resUsage->inOutUsage.builtInInputLocMap)
+        fsInputMappings.builtInLocationInfo.push_back({it.first, it.second});
+      m_pipelineState->getPalMetadata()->addFragmentInputInfo(fsInputMappings);
+    }
+
   } else if (m_shaderStage == ShaderStageVertex) {
     // Collect resource usages from vertex input create info
     // TODO: In the future, we might check if the corresponding vertex attribute is active in vertex shader
@@ -1065,6 +1083,27 @@ void PatchResourceCollect::processShader() {
     call->eraseFromParent();
   }
   m_deadCalls.clear();
+}
+
+// =====================================================================================================================
+// Process missing fragment shader. This happens in a part-pipeline compile; we deserialize the FS's input mappings
+// from PAL metadata that came from the separate FS compilation.
+void PatchResourceCollect::processMissingFs() {
+  assert(m_shaderStage == ShaderStageFragment);
+  if (!m_processMissingFs)
+    return;
+  m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
+
+  FsInputMappings fsInputMappings;
+  m_pipelineState->getPalMetadata()->retrieveFragmentInputInfo(fsInputMappings);
+  // Deserialize generic inputs. We deserialize into both m_locationInfoMapManager and inputLocInfoMap as
+  // later code seems to use both places to look up a mapping.
+  m_locationInfoMapManager->deserializeMap(fsInputMappings.locationInfo);
+  for (std::pair<unsigned, unsigned> oneLocInfo : fsInputMappings.locationInfo)
+    m_resUsage->inOutUsage.inputLocInfoMap[oneLocInfo.first] = oneLocInfo.second;
+  // Deserialize built-ins as generic inputs.
+  for (std::pair<unsigned, unsigned> oneLocInfo : fsInputMappings.builtInLocationInfo)
+    m_resUsage->inOutUsage.builtInInputLocMap[oneLocInfo.first] = oneLocInfo.second;
 }
 
 // =====================================================================================================================
@@ -1487,7 +1526,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
   auto &builtInUsage = resUsage->builtInUsage;
   auto &inOutUsage = resUsage->inOutUsage;
 
-  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage, m_processMissingFs);
   auto nextResUsage = nextStage != ShaderStageInvalid ? m_pipelineState->getShaderResourceUsage(nextStage) : nullptr;
 
   assert(inOutUsage.builtInInputLocMap.empty()); // Should be empty
@@ -2280,7 +2319,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
 // =====================================================================================================================
 // Clear unused output from outputLocInfoMap and perPatchOutputLocMap
 void PatchResourceCollect::clearUnusedOutput() {
-  ShaderStage nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+  ShaderStage nextStage = m_pipelineState->getNextShaderStage(m_shaderStage, m_processMissingFs);
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
   if (!m_pipelineState->isUnlinked() && nextStage != ShaderStageInvalid) {
@@ -2522,7 +2561,7 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
 
   if (m_shaderStage != ShaderStageGeometry) {
     assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval);
-    auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+    auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage, m_processMissingFs);
     assert(nextStage != ShaderStageInvalid);
     // In reassembleOutputExportCalls, the unused calls in next stage have been added into dead call set.
     bool isMarkedDeadCall = (m_shaderStage == m_pipelineState->getLastVertexProcessingStage());
@@ -2956,6 +2995,15 @@ void InOutLocationInfoMapManager::createMap(const std::vector<CallInst *> &calls
     addSpan(call, shaderStage, requireDword);
   // Build locationInfoMap according to the collected LocationSpans
   buildMap(shaderStage);
+}
+
+// =====================================================================================================================
+// Create a locationInfo map by deserializing the serialized map. Used when compiling the vertex-processing
+// part-pipeline given the packed input map from the separate FS compilation.
+void InOutLocationInfoMapManager::deserializeMap(ArrayRef<std::pair<unsigned, unsigned>> serializedMap) {
+  m_locationInfoMap.clear();
+  for (std::pair<unsigned, unsigned> entry : serializedMap)
+    m_locationInfoMap[entry.first] = entry.second;
 }
 
 // =====================================================================================================================

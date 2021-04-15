@@ -122,6 +122,8 @@ namespace PipelineMetadataKey {
 
 static const char VertexInputs[] = ".vertexInputs";
 static const char ColorExports[] = ".colorExports";
+static const char FragInputMapping1[] = ".fragInputs";
+static const char FragInputMapping2[] = ".fragBuiltInInputs";
 
 } // namespace PipelineMetadataKey
 

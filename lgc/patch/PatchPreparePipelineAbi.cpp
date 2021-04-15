@@ -137,8 +137,7 @@ bool PatchPreparePipelineAbi::runOnModule(Module &module) {
 
     setConstantGlobalSection(module);
 
-    if (!m_pipelineState->isUnlinked())
-      m_pipelineState->getPalMetadata()->finalizePipeline();
+    m_pipelineState->getPalMetadata()->finalizePipeline(m_pipelineState->isWholePipeline());
   }
 
   return true; // Modified the module.
@@ -395,7 +394,7 @@ void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
 // shader/part-pipeline compilation, we leave it as default, which (after an LLVM change) puts the constant data
 // into the .rodata section.
 void PatchPreparePipelineAbi::setConstantGlobalSection(Module &module) {
-  if (m_pipelineState->isUnlinked())
+  if (!m_pipelineState->isWholePipeline())
     return;
   for (GlobalVariable &global : module.globals()) {
     if (global.getAddressSpace() == ADDR_SPACE_CONST)

@@ -159,12 +159,11 @@ public:
   void set128BitCacheHash(const Hash128 &finalizedCacheHash, const llvm::VersionTuple &version) override final;
 
   // Link the individual shader IR modules into a single pipeline module
-  llvm::Module *irLink(llvm::ArrayRef<llvm::Module *> modules, bool unlinked) override final;
+  llvm::Module *irLink(llvm::ArrayRef<llvm::Module *> modules, PipelineLink pipelineLink) override final;
 
   // Generate pipeline module
   bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
-                CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers,
-                llvm::MemoryBufferRef otherElf) override final;
+                CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) override final;
 
   // Create an ELF linker object for linking unlinked shader/part-pipeline ELFs into a pipeline ELF using the
   // pipeline state
@@ -184,6 +183,10 @@ public:
   // for its link option.
   void setStateFromModule(llvm::Module *module) override final { readState(module); }
 
+  // Set the "other part-pipeline" from the given other Pipeline object. This is used when doing a part-pipeline
+  // compile of the non-FS part of the pipeline, to inherit required information from the FS part-pipeline.
+  void setOtherPartPipeline(Pipeline &otherPartPipeline, llvm::Module *linkedModule = nullptr) override final;
+
   // -----------------------------------------------------------------------------------------------------------------
   // Other methods
 
@@ -194,8 +197,14 @@ public:
   const TargetInfo &getTargetInfo() const;
   unsigned getPalAbiVersion() const;
 
-  // Return the "unlinked" flag, true if generating an unlinked half-pipeline ELF.
-  bool isUnlinked() const { return m_unlinked; }
+  // Return whether we're generating a whole pipeline.
+  bool isWholePipeline() const { return m_pipelineLink == PipelineLink::WholePipeline; }
+
+  // Return whether we're generating a part-pipeline.
+  bool isPartPipeline() const { return m_pipelineLink == PipelineLink::PartPipeline; }
+
+  // Return whether we're generating an indepedent unlinked shader (not in the part-pipeline scheme).
+  bool isUnlinked() const { return m_pipelineLink == PipelineLink::Unlinked; }
 
   // Clear the pipeline state IR metadata.
   void clear(llvm::Module *module);
@@ -210,7 +219,7 @@ public:
   bool isComputeLibrary() const { return m_computeLibrary; }
   ShaderStage getLastVertexProcessingStage() const;
   ShaderStage getPrevShaderStage(ShaderStage shaderStage) const;
-  ShaderStage getNextShaderStage(ShaderStage shaderStage) const;
+  ShaderStage getNextShaderStage(ShaderStage shaderStage, bool fakeFs = false) const;
 
   // Get client name
   const char *getClient() const { return m_client.c_str(); }
@@ -441,7 +450,8 @@ private:
   std::string m_lastError;                              // Error to be reported by getLastError()
   bool m_noReplayer = false;                            // True if no BuilderReplayer needed
   bool m_emitLgc = false;                               // Whether -emit-lgc is on
-  bool m_unlinked = false;                              // Whether generating an unlinked half-pipeline ELF
+  // Whether generating pipeline or unlinked part-pipeline
+  PipelineLink m_pipelineLink = PipelineLink::WholePipeline;
   unsigned m_stageMask = 0;                             // Mask of active shader stages
   bool m_computeLibrary = false;                        // Whether pipeline is in fact a compute library
   std::string m_client;                                 // Client name for PAL metadata
@@ -449,10 +459,10 @@ private:
   std::vector<ShaderOptions> m_shaderOptions;           // Per-shader options
   std::unique_ptr<ResourceNode[]> m_allocUserDataNodes; // Allocated buffer for user data
   llvm::ArrayRef<ResourceNode> m_userDataNodes;         // Top-level user data node table
-  // Allocated buffers for immutable sampler data
-  llvm::SmallVector<std::unique_ptr<uint32_t[]>, 4> m_immutableValueAllocs;
   // Cached MDString for each resource node type
   llvm::MDString *m_resourceNodeTypeNames[unsigned(ResourceNodeType::Count)] = {};
+  // Allocated buffers for immutable sampler data
+  llvm::SmallVector<std::unique_ptr<uint32_t[]>, 4> m_immutableValueAllocs;
 
   bool m_gsOnChip = false;                                                     // Whether to use GS on-chip mode
   NggControl m_nggControl = {};                                                // NGG control settings

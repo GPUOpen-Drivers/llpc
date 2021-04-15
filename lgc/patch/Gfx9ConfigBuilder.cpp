@@ -55,8 +55,8 @@ void ConfigBuilder::buildPalMetadata() {
     const bool hasTs = (m_hasTcs || m_hasTes);
     const bool enableNgg = m_pipelineState->getNggControl()->enableNgg;
 
-    if (m_pipelineState->isUnlinked() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
-      // FS-only shader compilation
+    if (!m_pipelineState->isWholePipeline() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
+      // FS-only shader or part-pipeline compilation
       buildPipelineVsFsRegConfig();
     } else if (!hasTs && !m_hasGs) {
       // VS-FS pipeline
@@ -1884,7 +1884,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   for (unsigned i = 0; i < interpInfo->size(); ++i) {
     auto interpInfoElem = (*interpInfo)[i];
 
-    if (m_pipelineState->isUnlinked() && interpInfoElem.loc == InvalidFsInterpInfo.loc) {
+    if (!m_pipelineState->isWholePipeline() && interpInfoElem.loc == InvalidFsInterpInfo.loc) {
       appendConfig(mmSPI_PS_INPUT_CNTL_0 + i, i);
       continue;
     }

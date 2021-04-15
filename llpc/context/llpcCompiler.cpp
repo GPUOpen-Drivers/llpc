@@ -1292,7 +1292,9 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
     }
 
     // Link the shader modules into a single pipeline module.
-    pipelineModule.reset(pipeline->irLink(modulesToLink, context->getPipelineContext()->isUnlinked()));
+    pipelineModule.reset(pipeline->irLink(modulesToLink, context->getPipelineContext()->isUnlinked()
+                                                             ? PipelineLink::Unlinked
+                                                             : PipelineLink::WholePipeline));
     if (!pipelineModule) {
       LLPC_ERRS("Failed to link shader modules into pipeline module\n");
       result = Result::ErrorInvalidShader;
@@ -1333,7 +1335,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
           timerProfiler.getTimer(TimerCodeGen),
       };
 
-      pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers, {});
+      pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers);
       result = Result::Success;
     }
 #if LLPC_ENABLE_EXCEPTION

@@ -33,6 +33,7 @@
 #include "lgc/CommonDefs.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/MemoryBuffer.h"
 
 namespace llvm {
 class raw_pwrite_stream;
@@ -48,6 +49,14 @@ namespace lgc {
 class ElfLinker {
 public:
   virtual ~ElfLinker() {}
+
+  // Add another input ELF to the link, in addition to the ones that were added when the ElfLinker was constructed.
+  virtual void addInputElf(llvm::MemoryBufferRef inputElf) = 0;
+
+  // Get a representation of the fragment shader input mappings from the PAL metadata of ELF input(s) added so far.
+  // This is used by the caller in a part-pipeline compilation scheme to include the FS input mappings in the
+  // hash for the non-FS part of the pipeline.
+  virtual llvm::StringRef getFsInputMappings() = 0;
 
   // Get information on the glue code that will be needed for the link. It is an implementation detail how many
   // chunks of glue there might be and what they are for, but, for information, they will be some subset of:

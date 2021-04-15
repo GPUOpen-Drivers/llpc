@@ -141,6 +141,18 @@ public:
   // -----------------------------------------------------------------------------------------------------------------
   // Implementations of ElfLinker methods exposed to the front-end
 
+  // Add another input ELF to the link, in addition to the ones that were added when the ElfLinker was constructed.
+  // The default behavior of adding extra ones at the start of the list instead of the end is just so you
+  // get the same order of code (VS then FS) when doing a part-pipeline compile as when doing a whole pipeline
+  // compile, to make it easier to test by diff.
+  void addInputElf(MemoryBufferRef inputElf) override final { addInputElf(inputElf, /*addAtStart=*/true); }
+  void addInputElf(MemoryBufferRef inputElf, bool addAtStart);
+
+  // Get a representation of the fragment shader input mappings from the PAL metadata of ELF input(s) added so far.
+  // This is used by the caller in a part-pipeline compilation scheme to include the FS input mappings in the
+  // hash for the non-FS part of the pipeline.
+  StringRef getFsInputMappings() override final;
+
   // Get information on the glue code that will be needed for the link
   llvm::ArrayRef<StringRef> getGlueInfo() override final;
 
@@ -175,6 +187,9 @@ public:
   unsigned findSymbol(StringRef name);
 
 private:
+  // Processing when all inputs are done.
+  void doneInputs();
+
   // Get the value of the symbol referenced in a reloc
   bool getRelocValue(object::RelocationRef reloc, uint64_t &value);
 
@@ -206,6 +221,7 @@ private:
   std::string m_strings;                                     // Strings for string table
   StringMap<unsigned> m_stringMap;                           // Map from string to string table index
   std::string m_notes;                                       // Notes to go in .note section
+  bool m_doneInputs = false;                                 // Set when caller has done adding inputs
 };
 
 } // anonymous namespace
@@ -235,25 +251,46 @@ inline uint64_t cantFail(uint64_t value, const char *Msg = nullptr) {
 // @param elfs : Array of unlinked ELF modules to link
 ElfLinkerImpl::ElfLinkerImpl(PipelineState *pipelineState, ArrayRef<MemoryBufferRef> elfs)
     : m_pipelineState(pipelineState), m_relocHandler(pipelineState) {
-  // For each input ELF, create an ELF object for it.
-  for (auto elfBuffer : elfs)
-    m_elfInputs.push_back({cantFail(object::ObjectFile::createELFObjectFile(elfBuffer))});
-
-  // Gather and merge PAL metadata.
   m_pipelineState->clearPalMetadata();
-  for (auto &elfInput : m_elfInputs)
-    mergePalMetadataFromElf(*elfInput.objectFile, false);
 
-  // Create any needed glue shaders.
-  createGlueShaders();
-
-  // Populate output ELF header
-  memcpy(&m_ehdr, elfs[0].getBuffer().data(), sizeof(ELF::Elf64_Ehdr));
+  // Add ELF inputs supplied here.
+  for (MemoryBufferRef elf : elfs)
+    addInputElf(elf, /*addAtStart=*/false);
 }
 
 // =====================================================================================================================
 // Destructor
 ElfLinkerImpl::~ElfLinkerImpl() {
+}
+
+// =====================================================================================================================
+// Add another input ELF to the link.
+void ElfLinkerImpl::addInputElf(MemoryBufferRef inputElf, bool addAtStart) {
+  assert(!m_doneInputs && "Cannot use ElfLinker::addInputElf after other ElfLinker calls");
+  ElfInput elfInput = {cantFail(object::ObjectFile::createELFObjectFile(inputElf))};
+  // Populate output ELF header if this is the first one to be added.
+  if (m_elfInputs.empty())
+    memcpy(&m_ehdr, inputElf.getBuffer().data(), sizeof(ELF::Elf64_Ehdr));
+  // Add the ELF.
+  mergePalMetadataFromElf(*elfInput.objectFile, false);
+  m_elfInputs.insert(addAtStart ? m_elfInputs.begin() : m_elfInputs.end(), std::move(elfInput));
+}
+
+// =====================================================================================================================
+// Get a representation of the fragment shader input mappings from the PAL metadata of ELF input(s) added so far.
+StringRef ElfLinkerImpl::getFsInputMappings() {
+  return m_pipelineState->getPalMetadata()->getFsInputMappings();
+}
+
+// =====================================================================================================================
+// Processing when all inputs are done.
+void ElfLinkerImpl::doneInputs() {
+  if (m_doneInputs)
+    return;
+  m_doneInputs = true;
+
+  // Create any needed glue shaders.
+  createGlueShaders();
 }
 
 // =====================================================================================================================
@@ -291,6 +328,7 @@ void ElfLinkerImpl::createGlueShaders() {
 // found blob to ElfLinker::addGlue. If it does not get a cache hit, the client can call ElfLinker::compileGlue to
 // retrieve the compiled glue code to store in the cache.
 ArrayRef<StringRef> ElfLinkerImpl::getGlueInfo() {
+  doneInputs();
   if (m_glueShaders.empty())
     return {};
   if (m_glueStrings.empty()) {
@@ -307,6 +345,7 @@ ArrayRef<StringRef> ElfLinkerImpl::getGlueInfo() {
 // @param glueIndex : Index into the array that was returned by getGlueInfo()
 // @param blob : Blob for the glue code
 void ElfLinkerImpl::addGlue(unsigned glueIndex, StringRef blob) {
+  doneInputs();
   m_glueShaders[glueIndex]->setElfBlob(blob);
 }
 
@@ -320,6 +359,7 @@ void ElfLinkerImpl::addGlue(unsigned glueIndex, StringRef blob) {
 // @returns : The blob. A zero-length blob indicates that a recoverable error occurred, and link() will also return
 //           and empty ELF blob.
 StringRef ElfLinkerImpl::compileGlue(unsigned glueIndex) {
+  doneInputs();
   return m_glueShaders[glueIndex]->getElfBlob();
 }
 
@@ -338,6 +378,8 @@ StringRef ElfLinkerImpl::compileGlue(unsigned glueIndex) {
 // @param [out] outStream : Stream to write linked ELF to
 // @returns : True for success, false if something about the pipeline state stops linking
 bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
+  doneInputs();
+
   // Insert glue shaders (if any).
   if (!insertGlueShaders())
     return false;
@@ -653,7 +695,7 @@ void ElfLinkerImpl::writePalMetadata() {
     glueShader->updatePalMetadata(*palMetadata);
 
   // Finalize the PAL metadata, writing pipeline state items into it.
-  palMetadata->finalizePipeline();
+  palMetadata->finalizePipeline(/*isWholePipeline=*/true);
   // Write the MsgPack document into a blob.
   std::string blob;
   palMetadata->getDocument()->writeToBlob(blob);

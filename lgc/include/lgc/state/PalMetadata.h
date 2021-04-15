@@ -81,6 +81,19 @@ struct ColorExportInfo {
 };
 
 // =====================================================================================================================
+// Struct containing the FS input mappings, generated and stored in PAL metadata when compiling an FS by itself,
+// and consumed when generating the rest-of-pipeline that will link to it.
+struct FsInputMappings {
+  // For each input, the original InOutLocationInfo and the mapped InOutLocationInfo.
+  // An InOutLocationInfo contains bitfields for the location number, component number, and a few other
+  // things.
+  llvm::SmallVector<std::pair<unsigned, unsigned>> locationInfo;
+  // For each built-in input that is implemented as a generic input passed from the previous shader stage,
+  // such as CullDistance and ClipDistance, the built-in id and the mapped location number.
+  llvm::SmallVector<std::pair<unsigned, unsigned>> builtInLocationInfo;
+};
+
+// =====================================================================================================================
 // Class for manipulating PAL metadata through LGC
 class PalMetadata {
 public:
@@ -147,16 +160,37 @@ public:
   // Erase the color export info
   void eraseColorExportInfo();
 
-  // Finalize PAL metadata for pipeline.
-  // TODO Shader compilation: The idea is that this will be called at the end of a pipeline compilation, or in
-  // an ELF link, but not at the end of a shader/part-pipeline compile.
-  void finalizePipeline();
+  // Finalize PAL metadata for pipeline, part-pipeline or shader compilation.
+  void finalizePipeline(bool isWholePipeline);
 
   // Updates the PS register information that depends on the exports.
   void updateSpiShaderColFormat(llvm::ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero, bool killEnabled);
 
   // Sets the finalized 128-bit cache hash.  The version identifies the version of LLPC used to generate the hash.
   void setFinalized128BitCacheHash(const lgc::Hash128 &finalizedCacheHash, const llvm::VersionTuple &version);
+
+  // Store the fragment shader input mapping information for a fragment shader being compiled by itself (partial
+  // pipeline compilation).
+  void addFragmentInputInfo(const FsInputMappings &fsInputMappings);
+
+  // Check whether we have FS input mappings, and thus whether we're doing part-pipeline compilation of the
+  // pre-FS part of the pipeline.
+  bool haveFsInputMappings();
+
+  // In part-pipeline compilation, get a blob of data representing the FS input mappings that can be used by the
+  // client in a hash. The resulting data is owned by the PalMetadata object, and lives until the PalMetadata
+  // object is destroyed or another call is made to getFsInputMappings.
+  llvm::StringRef getFsInputMappings();
+
+  // In part-pipeline compilation, retrieve the FS input mappings into the provided vectors, and delete them
+  // from the PAL metadata so they do not appear in the final ELF.
+  void retrieveFragmentInputInfo(FsInputMappings &fsInputMappings);
+
+  // In part-pipeline compilation, copy any metadata needed from the "other" pipeline's PAL metadata into ours.
+  void setOtherPartPipeline(PalMetadata &other);
+
+  // Erase the PAL metadata for FS input mappings. Used when finalizing the PAL metadata in the link.
+  void eraseFragmentInputInfo();
 
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
@@ -174,11 +208,11 @@ private:
   // Returns true of the some of the user data nodes are spilled.
   bool userDataNodesAreSpilled() const { return m_spillThreshold->getUInt() != MAX_SPILL_THRESHOLD; }
 
-  // Returns true of the setting in the PAL meta data require all of the user data nodes.
-  bool pipelineRequiresAllUserData() const;
-
   // Test whether this is a graphics pipeline (even works in a link-only pipeline).
   bool isGraphics();
+
+  // Finalize PAL metadata user data limit for any compilation (shader, part-pipeline, whole pipeline)
+  void finalizeUserDataLimit();
 
   // The maximum possible value for the spill threshold entry in the PAL meatadata.
   static constexpr uint64_t MAX_SPILL_THRESHOLD = UINT_MAX;
@@ -193,6 +227,7 @@ private:
   unsigned m_userDataRegMapping[ShaderStageCountInternal] = {};
   llvm::msgpack::DocNode *m_userDataLimit;  // Maximum so far number of user data dwords used
   llvm::msgpack::DocNode *m_spillThreshold; // Minimum so far dword offset used in user data spill table
+  llvm::SmallString<0> m_fsInputMappingsBlob; // Buffer for returning FS input mappings blob to LGC client
 };
 
 } // namespace lgc
