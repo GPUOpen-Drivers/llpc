@@ -171,6 +171,15 @@ private:
   // Set userDataLimit to maximum
   void setUserDataLimit();
 
+  // Returns true of the some of the user data nodes are spilled.
+  bool userDataNodesAreSpilled() const { return m_spillThreshold->getUInt() != MAX_SPILL_THRESHOLD; }
+
+  // Returns true of the setting in the PAL meta data require all of the user data nodes.
+  bool pipelineRequiresAllUserData() const;
+
+  // The maximum possible value for the spill threshold entry in the PAL meatadata.
+  static constexpr uint64_t MAX_SPILL_THRESHOLD = UINT_MAX;
+
   PipelineState *m_pipelineState;             // PipelineState
   llvm::msgpack::Document *m_document;        // The MsgPack document
   llvm::msgpack::MapDocNode m_pipelineNode;   // MsgPack map node for amdpal.pipelines[0]
