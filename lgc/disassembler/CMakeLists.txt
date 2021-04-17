@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2021 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -23,30 +23,29 @@
  #
  #######################################################################################################################
 
-set(LGC_TEST_DEPENDS lgc lgcdis FileCheck count not)
-add_custom_target(lgc-test-depends DEPENDS ${LGC_TEST_DEPENDS})
-set_target_properties(lgc-test-depends PROPERTIES FOLDER "Tests")
-
-# required by lit.site.cfg.py.in
-set(LGC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-
-# required by configure_lit_site_cfg
-set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
-configure_lit_site_cfg(
-  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
-  ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
-  MAIN_CONFIG
-    ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
+add_llvm_library(LLVMlgcdis
+    Disassembler.cpp
+    PalMetadataRegs.cpp
+LINK_COMPONENTS
+    AllTargetsDescs
+    AllTargetsDisassemblers
+    AllTargetsInfos
+    BinaryFormat
+    MC
+    Object
+    Support
+    Target
 )
 
-add_lit_testsuite(check-lgc "Running the LGC regression tests"
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${exclude_from_check_all}
-  DEPENDS ${LGC_TEST_DEPENDS}
-)
-set_target_properties(check-lgc PROPERTIES FOLDER "Tests")
+### Compiler Options ###################################################################################################
+include(../../cmake/CompilerFlags.cmake)
+set_compiler_options(LLVMlgcdis ${LLPC_ENABLE_WERROR})
 
-add_lit_testsuites(LLVM ${CMAKE_CURRENT_SOURCE_DIR}
-  ${exclude_from_check_all}
-  DEPENDS ${LLVM_TEST_DEPENDS}
+### Defines/Includes/Sources ###########################################################################################
+target_include_directories(LLVMlgcdis
+PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../interface>
+    $<INSTALL_INTERFACE:../interface>
 )
+
+add_subdirectory(../tool/lgcdis lgcdis)

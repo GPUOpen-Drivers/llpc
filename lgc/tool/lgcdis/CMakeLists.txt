@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2021 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -22,31 +22,20 @@
  #  SOFTWARE.
  #
  #######################################################################################################################
-
-set(LGC_TEST_DEPENDS lgc lgcdis FileCheck count not)
-add_custom_target(lgc-test-depends DEPENDS ${LGC_TEST_DEPENDS})
-set_target_properties(lgc-test-depends PROPERTIES FOLDER "Tests")
-
-# required by lit.site.cfg.py.in
-set(LGC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-
-# required by configure_lit_site_cfg
-set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
-configure_lit_site_cfg(
-  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
-  ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
-  MAIN_CONFIG
-    ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
+set(LLVM_LINK_COMPONENTS
+    lgcdis
+    AMDGPUDisassembler
 )
 
-add_lit_testsuite(check-lgc "Running the LGC regression tests"
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${exclude_from_check_all}
-  DEPENDS ${LGC_TEST_DEPENDS}
+add_llvm_tool(lgcdis
+    lgcdis.cpp
 )
-set_target_properties(check-lgc PROPERTIES FOLDER "Tests")
 
-add_lit_testsuites(LLVM ${CMAKE_CURRENT_SOURCE_DIR}
-  ${exclude_from_check_all}
-  DEPENDS ${LLVM_TEST_DEPENDS}
+add_dependencies(lgcdis LLVMlgcdis)
+
+target_include_directories(lgcdis
+PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../interface
 )
+
+set_compiler_options(lgcdis ${LLPC_ENABLE_WERROR})

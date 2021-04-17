@@ -1,0 +1,5 @@
+; RUN: ( lgcdis %s || true ) 2>&1 | FileCheck %s
+
+; Negative test of lgcdis, the ELF disassembler.
+
+; CHECK: Cannot decode ELF
