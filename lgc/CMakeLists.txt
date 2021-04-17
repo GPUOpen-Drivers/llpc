@@ -184,5 +184,6 @@ target_sources(LLVMlgc PRIVATE
     util/StartStopTimer.cpp
 )
 
+add_subdirectory(disassembler)
 add_subdirectory(tool/lgc)
 add_subdirectory(test)
