@@ -175,15 +175,8 @@ void PatchBufferOp::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgInst)
 
     Value *const compareValue = atomicCmpXchgInst.getCompareOperand();
     Value *const newValue = atomicCmpXchgInst.getNewValOperand();
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381087
-    // Old version of the code
-    AtomicCmpXchgInst *const newAtomicCmpXchg =
-        m_builder->CreateAtomicCmpXchg(atomicPointer, compareValue, newValue, successOrdering, failureOrdering);
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
     AtomicCmpXchgInst *const newAtomicCmpXchg = m_builder->CreateAtomicCmpXchg(
         atomicPointer, compareValue, newValue, MaybeAlign(), successOrdering, failureOrdering);
-#endif
     newAtomicCmpXchg->setVolatile(atomicCmpXchgInst.isVolatile());
     newAtomicCmpXchg->setSyncScopeID(atomicCmpXchgInst.getSyncScopeID());
     newAtomicCmpXchg->setWeak(atomicCmpXchgInst.isWeak());
@@ -282,16 +275,9 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
 
     atomicPointer = m_builder->CreateBitCast(atomicPointer, storeType->getPointerTo(ADDR_SPACE_GLOBAL));
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 381087
-    // Old version of the code
-    AtomicRMWInst *const newAtomicRmw = m_builder->CreateAtomicRMW(
-        atomicRmwInst.getOperation(), atomicPointer, atomicRmwInst.getValOperand(), atomicRmwInst.getOrdering());
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
     AtomicRMWInst *const newAtomicRmw =
         m_builder->CreateAtomicRMW(atomicRmwInst.getOperation(), atomicPointer, atomicRmwInst.getValOperand(),
                                    atomicRmwInst.getAlign(), atomicRmwInst.getOrdering());
-#endif
     newAtomicRmw->setVolatile(atomicRmwInst.isVolatile());
     newAtomicRmw->setSyncScopeID(atomicRmwInst.getSyncScopeID());
     copyMetadata(newAtomicRmw, &atomicRmwInst);
