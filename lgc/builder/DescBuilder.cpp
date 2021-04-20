@@ -332,11 +332,25 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     // descriptor set, so we need to generate a select between the two, where the condition is a reloc.
     // If the descriptor ends up in the root table (top-level), a value from the spill table will be used.
     // The linking code has to take care of marking PAL metadata for user spill usage.
+
+    // Since the descriptor pointers will be later formed by bitcasting v2i32 to i8* we bitcast them to v2i32
+    // here. This enables the middle-end to eliminate i8* before doing the instruction selection and reason about high
+    // and low parts of the pointers producing better code overall.
     Value *spillDescPtr = GetSpillTablePtr();
+    // Bitcast the pointer to v2i32.
+    spillDescPtr = CreatePtrToInt(spillDescPtr, getInt64Ty());
+    spillDescPtr = CreateBitCast(spillDescPtr, FixedVectorType::get(getInt32Ty(), 2));
+
     Value *descriptorTableDescPtr = GetDescriptorSetPtr();
+    // Bitcast the pointer to v2i32.
+    descriptorTableDescPtr = CreatePtrToInt(descriptorTableDescPtr, getInt64Ty());
+    descriptorTableDescPtr = CreateBitCast(descriptorTableDescPtr, FixedVectorType::get(getInt32Ty(), 2));
+
     Value *reloc = CreateRelocationConstant(reloc::DescriptorUseSpillTable + Twine(descSet) + "_" + Twine(binding));
     Value *useSpillTable = CreateZExtOrTrunc(reloc, getInt1Ty());
     descPtr = CreateSelect(useSpillTable, spillDescPtr, descriptorTableDescPtr);
+    descPtr = CreateBitCast(descPtr, getInt64Ty());
+    descPtr = CreateIntToPtr(descPtr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
   } else {
     descPtr = GetDescriptorSetPtr();
   }

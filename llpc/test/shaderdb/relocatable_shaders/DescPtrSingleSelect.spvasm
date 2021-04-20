@@ -1,0 +1,81 @@
+; Check that selecting between spill descriptor pointer and descriptor table descriptor pointer results in just a single scalar select instruction.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf -gfxip=9 -amdgpu-transform-discard-to-demote %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL:_amdgpu_ps_main
+; SHADERTEST: s_cbranch_scc0
+; SHADERTEST-COUNT-1: s_cselect_b32
+; SHADERTEST-NOT: v_cndmask_b32
+; SHADERTEST-NOT: v_readfirstlane_b32
+; SHADERTEST: s_load_dwordx4
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.3
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 36
+; Schema: 0
+               OpCapability Shader
+               OpCapability SampledCubeArray
+               OpCapability GroupNonUniform
+               OpCapability GroupNonUniformVote
+               OpCapability GroupNonUniformArithmetic
+               OpCapability GroupNonUniformBallot
+               OpCapability SubgroupBallotKHR
+               OpExtension "SPV_KHR_shader_ballot"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %2 "main" %gl_FrontFacing
+               OpExecutionMode %2 OriginUpperLeft
+               OpExecutionMode %2 EarlyFragmentTests
+               OpMemberDecorate %_struct_4 0 Offset 544
+               OpDecorate %_struct_4 Block
+               OpDecorate %5 DescriptorSet 0
+               OpDecorate %5 Binding 0
+               OpMemberDecorate %_struct_6 0 Offset 48
+               OpDecorate %_struct_6 Block
+               OpDecorate %7 DescriptorSet 2
+               OpDecorate %7 Binding 0
+               OpDecorate %gl_FrontFacing BuiltIn FrontFacing
+       %void = OpTypeVoid
+          %9 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+       %bool = OpTypeBool
+      %int_0 = OpConstant %int 0
+     %uint_2 = OpConstant %uint 2
+     %uint_3 = OpConstant %uint 3
+  %_struct_4 = OpTypeStruct %v4float
+%_ptr_Uniform__struct_4 = OpTypePointer Uniform %_struct_4
+          %5 = OpVariable %_ptr_Uniform__struct_4 Uniform
+%_ptr_Uniform_float = OpTypePointer Uniform %float
+  %_struct_6 = OpTypeStruct %v4float
+%_ptr_Uniform__struct_6 = OpTypePointer Uniform %_struct_6
+          %7 = OpVariable %_ptr_Uniform__struct_6 Uniform
+    %float_7 = OpConstant %float 7
+%_ptr_Input_bool = OpTypePointer Input %bool
+%gl_FrontFacing = OpVariable %_ptr_Input_bool Input
+          %2 = OpFunction %void None %9
+         %23 = OpLabel
+         %24 = OpAccessChain %_ptr_Uniform_float %7 %int_0 %int_0
+         %25 = OpLoad %float %24
+         %26 = OpFOrdEqual %bool %25 %float_7
+	       OpSelectionMerge %28 None
+               OpBranchConditional %26 %27 %28
+         %27 = OpLabel
+         %29 = OpLoad %bool %gl_FrontFacing
+               OpSelectionMerge %30 None
+               OpBranchConditional %29 %31 %30
+         %31 = OpLabel
+               OpKill
+         %30 = OpLabel
+         %32 = OpAccessChain %_ptr_Uniform_float %5 %int_0 %uint_2
+         %33 = OpLoad %float %32
+         %34 = OpConvertFToU %uint %33
+         %35 = OpGroupNonUniformAllEqual %bool %uint_3 %34
+               OpBranch %28
+         %28 = OpLabel
+               OpReturn
+               OpFunctionEnd
