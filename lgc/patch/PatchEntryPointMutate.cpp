@@ -1161,9 +1161,11 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
         userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::StreamOutTable,
                                            &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
         break;
-      // Allocate dummy stream-out register for Geometry shader
       case ShaderStageGeometry:
-        userDataArgs.push_back(UserDataArg(builder.getInt32Ty()));
+        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
+          // Allocate dummy stream-out register for geometry shader
+          userDataArgs.push_back(UserDataArg(builder.getInt32Ty()));
+        }
         break;
       default:
         llvm_unreachable("Should never be called!");

@@ -3279,29 +3279,13 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
     }
   }
 
-  const auto rasterStream = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
-  auto vertexOffset = calcVertexItemOffset(rasterStream, vertexId);
-
   auto copyShaderEntry = mutateCopyShader(module);
 
   // Run copy shader
   std::vector<Value *> args;
 
-  static const unsigned CopyShaderSysValueCount = 11; // Fixed layout: 10 SGPRs, 1 VGPR
-  for (unsigned i = 0; i < CopyShaderSysValueCount; ++i) {
-    if (i == 0) {
-      // Set global table (must always be the first one of user data SGPRs
-      auto userData = sysValueStart + EsGsSpecialSysValueCount;
-      auto globalTable = m_builder->CreateExtractElement(userData, static_cast<uint64_t>(0));
-      args.push_back(globalTable);
-    } else if (i == CopyShaderUserSgprIdxVertexOffset) {
-      // Set vertex offset
-      args.push_back(vertexOffset);
-    } else {
-      // All other SGPRs are not used
-      args.push_back(UndefValue::get(getFunctionArgument(copyShaderEntry, i)->getType()));
-    }
-  }
+  // Vertex ID in sub-group
+  args.push_back(vertexId);
 
   m_builder->CreateCall(copyShaderEntry, args);
 }
@@ -3314,11 +3298,10 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
   auto copyShaderEntryPoint = module->getFunction(lgcName::NggCopyShaderEntryPoint);
   assert(copyShaderEntryPoint != nullptr);
 
-  unsigned extraArgCount = 0;
-
   auto savedInsertPos = m_builder->saveIP();
 
-  auto vertexOffset = getFunctionArgument(copyShaderEntryPoint, CopyShaderUserSgprIdxVertexOffset + extraArgCount);
+  // Vertex ID is always the last argument
+  auto vertexId = getFunctionArgument(copyShaderEntryPoint, copyShaderEntryPoint->arg_size() - 1);
 
   std::vector<Instruction *> removeCalls;
 
@@ -3336,6 +3319,7 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
         const unsigned streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
         assert(streamId < MaxGsStreams);
 
+        auto vertexOffset = calcVertexItemOffset(streamId, vertexId);
         auto output = importGsOutput(call->getType(), location, compIdx, streamId, vertexOffset);
 
         call->replaceAllUsesWith(output);
