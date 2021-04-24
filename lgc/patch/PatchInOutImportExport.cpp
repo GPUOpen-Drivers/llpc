@@ -1039,48 +1039,65 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
   const bool enableXfb = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
   if (m_shaderStage == ShaderStageCopyShader && enableXfb) {
-    // NOTE: For copy shader, if transform feedback is enabled for multiple streams, the following processing doesn't
-    // happen in return block. Rather, they happen in the switch-case branch for the raster stream. See the following:
-    //
-    // copyShader() {
-    //   ...
-    //   switch(streamId) {
-    //   case 0:
-    //     export outputs of stream 0
-    //     break
-    //   ...
-    //   case rasterStream:
-    //     export outputs of raster stream
-    //     break
-    //   ...
-    //   case 3:
-    //     export outputs of stream 3
-    //     break
-    //   }
-    //
-    //   return
-    // }
-    //
-    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
+    if (!m_pipelineState->getNggControl()->enableNgg) {
+      // NOTE: For copy shader, if transform feedback is enabled for multiple streams, the following processing doesn't
+      // happen in return block. Rather, they happen in the switch-case branch for the raster stream. See the following:
+      //
+      //   copyShader() {
+      //     ...
+      //     switch(streamId) {
+      //     case 0:
+      //       export outputs of stream 0
+      //       break
+      //       ...
+      //     case rasterStream:
+      //       export outputs of raster stream
+      //       break
+      //       ...
+      //     case 3:
+      //       export outputs of stream 3
+      //       break
+      //     }
+      //
+      //     return
+      //   }
+      //
+      // If NGG, the copy shader with stream-out is not a real HW VS and will be incorporated into NGG
+      // primitive shader later. There is no mutiple HW executions. And it has the following structure similar to
+      // single stream processing:
+      //
+      //   copyShader() {
+      //     ...
+      //     export outputs of stream 0
+      //     ...
+      //     export outputs of raster stream
+      //     ...
+      //     export outputs of stream 3
+      //
+      //     return
+      //   }
+      //
+      auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
-    bool updated = false;
-    for (auto &block : *m_entryPoint) {
-      // Seach blocks to find the switch-case instruction
-      auto switchInst = dyn_cast<SwitchInst>(block.getTerminator());
-      if (switchInst) {
-        for (auto &caseBranch : switchInst->cases()) {
-          if (caseBranch.getCaseValue()->getZExtValue() == resUsage->inOutUsage.gs.rasterStream) {
-            // The insert position is updated to this case branch, before the terminator
-            insertPos = caseBranch.getCaseSuccessor()->getTerminator();
-            updated = true;
-            // We must go to return block from this case branch
-            assert(caseBranch.getCaseSuccessor()->getSingleSuccessor() == retInst.getParent());
-            break;
+      bool updated = false;
+      for (auto &block : *m_entryPoint) {
+        // Seach blocks to find the switch-case instruction
+        auto switchInst = dyn_cast<SwitchInst>(block.getTerminator());
+        if (switchInst) {
+          for (auto &caseBranch : switchInst->cases()) {
+            if (caseBranch.getCaseValue()->getZExtValue() == resUsage->inOutUsage.gs.rasterStream) {
+              // The insert position is updated to this case branch, before the terminator
+              insertPos = caseBranch.getCaseSuccessor()->getTerminator();
+              updated = true;
+              // We must go to return block from this case branch
+              assert(caseBranch.getCaseSuccessor()->getSingleSuccessor() == retInst.getParent());
+              break;
+            }
           }
-        }
 
-        if (updated)
-          break; // Early exit if we have updated the insert position
+          if (updated)
+            break; // Early exit if we have updated the insert position
+        }
       }
     }
   }

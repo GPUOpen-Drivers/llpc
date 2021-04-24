@@ -129,24 +129,59 @@ bool PatchCopyShader::runOnModule(Module &module) {
   // Gather GS generic export details.
   collectGsGenericOutputInfo(gsEntryPoint);
 
-  // Create type of new function:
-  // define void @copy_shader(
-  //    i32 inreg,  ; Internal table
-  //    i32 inreg,  ; Shader table
-  //    i32 inreg,  ; Stream-out table (GFX6-GFX8) / ES-GS size (GFX9+)
-  //    i32 inreg,  ; ES-GS size (GFX6-GFX8) / Stream-out table (GFX9+)
-  //    i32 inreg,  ; Stream info
-  //    i32 inreg,  ; Stream-out write index
-  //    i32 inreg,  ; Stream offset0
-  //    i32 inreg,  ; Stream offset1
-  //    i32 inreg,  ; Stream offset2
-  //    i32 inreg,  ; Stream offset3
-  //    i32
   BuilderBase builder(*m_context);
 
   auto int32Ty = Type::getInt32Ty(*m_context);
-  Type *argTys[] = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
-  bool argInReg[] = {true, true, true, true, true, true, true, true, true, true, false};
+  SmallVector<Type *, 16> argTys;
+  SmallVector<bool, 16> argInReg;
+  SmallVector<const char *, 16> argNames;
+
+  const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  if (!m_pipelineState->getNggControl()->enableNgg) {
+    // Create type of new function with fixed HW layout:
+    //
+    //   void copyShader(
+    //     i32 inreg globalTable,
+    //     i32 inreg perShaderTable,
+    //     i32 inreg streamOutTable (GFX6-GFX8) / esGsLdsSize (GFX9+),
+    //     i32 inreg esGsLdsSize (GFX6-GFX8) / streamOutTable (GFX9+),
+    //     i32 inreg streamOutInfo,
+    //     i32 inreg streamOutWriteIndex,
+    //     i32 inreg streamOutOffset0,
+    //     i32 inreg streamOutOffset1,
+    //     i32 inreg streamOutOffset2,
+    //     i32 inreg streamOutOffset3,
+    //     i32 vertexOffset)
+    //
+    argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
+    argInReg = {true, true, true, true, true, true, true, true, true, true, false};
+    argNames = {"globalTable",
+                "perShaderTable",
+                gfxIp.major <= 8 ? "streamOutTable" : "esGsLdsSize",
+                gfxIp.major <= 8 ? "esGsLdsSize" : "streamOutTable",
+                "streamOutInfo",
+                "streamOutWriteIndex",
+                "streamOutOffset0",
+                "streamOutOffset1",
+                "streamOutOffset2",
+                "streamOutOffset3",
+                "vertexOffset"};
+  } else {
+    // If NGG, the copy shader is not a real HW VS and will be incorporated into NGG primitive shader finally. Thus,
+    // the argument definitions are decided by compiler not by HW. We could have such variable layout (not fixed with
+    // GPU generation evolvement):
+    //
+    // GFX10:
+    //   void copyShader(
+    //     i32 vertexIndex)
+    //
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
+      argTys = {int32Ty};
+      argInReg = {false};
+      argNames = {"vertexId"};
+    }
+  }
+
   auto entryPointTy = FunctionType::get(builder.getVoidTy(), argTys, false);
 
   // Create function for the copy shader entrypoint, and insert it before the FS (if there is one).
@@ -159,10 +194,11 @@ bool PatchCopyShader::runOnModule(Module &module) {
     insertPos = fsEntryPoint->getIterator();
   module.getFunctionList().insert(insertPos, entryPoint);
 
-  // Make the args "inreg" (passed in SGPR) as appropriate.
-  for (unsigned i = 0; i < sizeof(argInReg) / sizeof(argInReg[0]); ++i) {
+  // Make the args "inreg" (passed in SGPR) as appropriate and make their names.
+  for (unsigned i = 0; i < entryPoint->arg_size(); ++i) {
     if (argInReg[i])
-      entryPoint->arg_begin()[i].addAttr(Attribute::InReg);
+      entryPoint->getArg(i)->addAttr(Attribute::InReg);
+    entryPoint->getArg(i)->setName(argNames[i]);
   }
 
   // Create ending basic block, and terminate it with return.
@@ -176,21 +212,26 @@ bool PatchCopyShader::runOnModule(Module &module) {
 
   auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageCopyShader);
 
-  // For GFX6 ~ GFX8, streamOutTable SGPR index value should be less than esGsLdsSize
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 8) {
-    intfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
+    // For GFX6 ~ GFX8, streamOutTable SGPR index value should be less than esGsLdsSize
     intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 3;
-  }
-  // For GFX9+, streamOutTable SGPR index value should be greater than esGsLdsSize
-  else {
-    intfData->userDataUsage.gs.copyShaderStreamOutTable = 3;
-    intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
+    intfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
+  } else {
+    if (!m_pipelineState->getNggControl()->enableNgg) {
+      // For GFX9+, streamOutTable SGPR index value should be greater than esGsLdsSize
+      intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
+      intfData->userDataUsage.gs.copyShaderStreamOutTable = 3;
+    } else {
+      // If NGG, esGsLdsSize is not used
+      intfData->userDataUsage.gs.copyShaderEsGsLdsSize = InvalidValue;
+      intfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
+    }
   }
 
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
   if (!m_pipelineState->getNggControl()->enableNgg) {
-    // If no NGG, the copy shader will become a real hardware VS. Set the user data entries in the
+    // If no NGG, the copy shader will become a real HW VS. Set the user data entries in the
     // PAL metadata here.
     m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader, 0, UserDataMapping::GlobalTable);
     if (resUsage->inOutUsage.enableXfb) {
@@ -219,51 +260,73 @@ bool PatchCopyShader::runOnModule(Module &module) {
   }
 
   if (outputStreamCount > 1 && resUsage->inOutUsage.enableXfb) {
-    // StreamId = streamInfo[25:24]
-    auto streamInfo = getFunctionArgument(entryPoint, CopyShaderUserSgprIdxStreamInfo);
+    if (!m_pipelineState->getNggControl()->enableNgg) {
+      // StreamId = streamInfo[25:24]
+      auto streamInfo = getFunctionArgument(entryPoint, CopyShaderUserSgprIdxStreamInfo);
 
-    Value *streamId = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
-                                              {
-                                                  streamInfo,
-                                                  builder.getInt32(24),
-                                                  builder.getInt32(2),
-                                              });
+      Value *streamId = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
+                                                {
+                                                    streamInfo,
+                                                    builder.getInt32(24),
+                                                    builder.getInt32(2),
+                                                });
+      //
+      // copyShader() {
+      //   ...
+      //   switch(streamId) {
+      //   case 0:
+      //     export outputs of stream 0
+      //     break
+      //   ...
+      //   case rasterStream:
+      //     export outputs of raster stream
+      //     break
+      //   ...
+      //   case 3:
+      //     export outputs of stream 3
+      //     break
+      //   }
+      //
+      //   return
+      // }
+      //
 
-    //
-    // copyShader() {
-    //   ...
-    //   switch(streamId) {
-    //   case 0:
-    //     export outputs of stream 0
-    //     break
-    //   ...
-    //   case rasterStream:
-    //     export outputs of raster stream
-    //     break
-    //   ...
-    //   case 3:
-    //     export outputs of stream 3
-    //     break
-    //   }
-    //
-    //   return
-    // }
-    //
+      // Add switchInst to entry block
+      auto switchInst = builder.CreateSwitch(streamId, endBlock, outputStreamCount);
 
-    // Add switchInst to entry block
-    auto switchInst = builder.CreateSwitch(streamId, endBlock, outputStreamCount);
+      for (unsigned streamId = 0; streamId < MaxGsStreams; ++streamId) {
+        if (resUsage->inOutUsage.gs.outLocCount[streamId] > 0) {
+          std::string blockName = ".stream" + std::to_string(streamId);
+          BasicBlock *streamBlock = BasicBlock::Create(*m_context, blockName, entryPoint, endBlock);
+          builder.SetInsertPoint(streamBlock);
 
-    for (unsigned streamId = 0; streamId < MaxGsStreams; ++streamId) {
-      if (resUsage->inOutUsage.gs.outLocCount[streamId] > 0) {
-        std::string blockName = ".stream" + std::to_string(streamId);
-        BasicBlock *streamBlock = BasicBlock::Create(*m_context, blockName, entryPoint, endBlock);
-        builder.SetInsertPoint(streamBlock);
+          switchInst->addCase(builder.getInt32(streamId), streamBlock);
 
-        switchInst->addCase(builder.getInt32(streamId), streamBlock);
-
-        exportOutput(streamId, builder);
-        builder.CreateBr(endBlock);
+          exportOutput(streamId, builder);
+          builder.CreateBr(endBlock);
+        }
       }
+    } else {
+      // NOTE: If NGG, the copy shader with stream-out is not a real HW VS and will be incorporated into NGG
+      // primitive shader later. Therefore, there is no mutiple HW executions.
+
+      //
+      // copyShader() {
+      //   ...
+      //   export outputs of stream 0
+      //   ...
+      //   export outputs of raster stream
+      //   ...
+      //   export outputs of stream 3
+      //
+      //   return
+      // }
+      //
+      for (unsigned streamId = 0; streamId < MaxGsStreams; ++streamId) {
+        if (resUsage->inOutUsage.gs.outLocCount[streamId] > 0)
+          exportOutput(streamId, builder);
+      }
+      builder.CreateBr(endBlock);
     }
   } else {
     outputStreamId = outputStreamCount == 0 ? 0 : outputStreamId;
@@ -419,11 +482,13 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
       }
     }
   }
-  if (resUsage->inOutUsage.gs.rasterStream == streamId) {
-    // Export generic output in raster stream which will generate `exp param` instruction
-    for (const auto &locValuePair : newLocValueMap)
-      exportGenericOutput(locValuePair.second, locValuePair.first, builder);
-  }
+
+  // Following non-XFB output exports are only for rasterization stream
+  if (resUsage->inOutUsage.gs.rasterStream != streamId)
+    return;
+
+  for (const auto &locValuePair : newLocValueMap)
+    exportGenericOutput(locValuePair.second, locValuePair.first, builder);
 
   // Export built-in outputs
   std::vector<std::pair<BuiltInKind, Type *>> builtInPairs;
@@ -468,15 +533,6 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
     unsigned loc = resUsage->inOutUsage.builtInOutputLocMap[builtInId];
     Value *outputValue = loadValueFromGsVsRing(builtInTy, loc, streamId, builder);
     exportBuiltInOutput(outputValue, builtInId, streamId, builder);
-  }
-
-  // Generate dummy gl_position vec4(0, 0, 0, 1) for the rasterization stream if transform feeback is enabled
-  if (resUsage->inOutUsage.enableXfb && !static_cast<bool>(builtInUsage.position)) {
-    auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
-    auto one = ConstantFP::get(builder.getFloatTy(), 1.0);
-
-    std::vector<Constant *> outputValues = {zero, zero, zero, one};
-    exportBuiltInOutput(ConstantVector::get(outputValues), BuiltInPosition, streamId, builder);
   }
 }
 
