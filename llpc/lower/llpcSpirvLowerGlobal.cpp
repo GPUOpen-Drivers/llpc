@@ -1644,10 +1644,24 @@ void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, cons
 void SpirvLowerGlobal::lowerBufferBlock() {
   SmallVector<GlobalVariable *, 8> globalsToRemove;
 
+  // Represent the users of the global varibales, expect a bitCast, a GEP or a select used by GEPs
+  struct ReplaceInstsInfo {
+    BitCastInst *bitCastInst;                         // The user is a bitCast
+    SelectInst *selectInst;                           // The user is a select
+    SmallVector<GetElementPtrInst *> getElemPtrInsts; // The user is a GEP. If the user is a select, we store its users.
+  };
+
+  // Skip the globals that are handled with previous global.
+  SmallSet<GlobalVariable *, 4> skipGlobals;
+
   for (GlobalVariable &global : m_module->globals()) {
     // Skip anything that is not a block.
     if (global.getAddressSpace() != SPIRAS_Uniform)
       continue;
+    if (skipGlobals.count(&global) > 0) {
+      globalsToRemove.push_back(&global);
+      continue;
+    }
 
     MDNode *const resMetaNode = global.getMetadata(gSPIRVMD::Resource);
     assert(resMetaNode);
@@ -1673,14 +1687,13 @@ void SpirvLowerGlobal::lowerBufferBlock() {
         funcsUsedIn.insert(inst->getFunction());
     }
 
+    // Collect the instructions to be replaced per-global
+    SmallVector<ReplaceInstsInfo> instructionsToReplace;
     for (Function *const func : funcsUsedIn) {
       // Check if our block is an array of blocks.
       if (global.getType()->getPointerElementType()->isArrayTy()) {
         Type *const elementType = global.getType()->getPointerElementType()->getArrayElementType();
         Type *const blockType = elementType->getPointerTo(global.getAddressSpace());
-
-        SmallVector<BitCastInst *, 8> bitCastsToModify;
-        SmallVector<GetElementPtrInst *, 8> getElemPtrsToReplace;
 
         // We need to run over the users of the global, find the GEPs, and add a load for each.
         for (User *const user : global.users()) {
@@ -1690,114 +1703,172 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             if (inst->getFunction() != func)
               continue;
 
-            // We have a user of the global, expect either a GEP or a bitcast.
+            ReplaceInstsInfo replaceInstsInfo = {};
+            // We have a user of the global, expect a GEP, a bitcast or a select.
             if (auto *getElemPtr = dyn_cast<GetElementPtrInst>(inst)) {
-              getElemPtrsToReplace.push_back(getElemPtr);
-            } else {
+              replaceInstsInfo.getElemPtrInsts.push_back(getElemPtr);
+            } else if (auto *bitCast = dyn_cast<BitCastInst>(inst)) {
               // We need to modify the bitcast if we did not find a GEP.
-              BitCastInst *const bitCast = dyn_cast<BitCastInst>(inst);
-              assert(bitCast);
               assert(bitCast->getOperand(0) == &global);
-
-              bitCastsToModify.push_back(bitCast);
-            }
-          }
-        }
-
-        // All bitcasts recorded here are for GEPs that indexed by 0, 0 into the arrayed resource, and LLVM
-        // has been clever enough to realise that doing a GEP of 0, 0 is actually a no-op (because the pointer
-        // does not change!), and has removed it.
-        for (BitCastInst *const bitCast : bitCastsToModify) {
-          m_builder->SetInsertPoint(bitCast);
-
-          Value *const bufferDesc = m_builder->CreateLoadBufferDesc(
-              descSet, binding, m_builder->getInt32(0), global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten,
-              m_builder->getInt8Ty());
-
-          // If the global variable is a constant, the data it points to is invariant.
-          if (global.isConstant())
-            m_builder->CreateInvariantStart(bufferDesc);
-
-          bitCast->replaceUsesOfWith(&global, m_builder->CreateBitCast(bufferDesc, blockType));
-        }
-
-        for (GetElementPtrInst *const getElemPtr : getElemPtrsToReplace) {
-          // The second index is the block offset, so we need at least two indices!
-          assert(getElemPtr->getNumIndices() >= 2);
-
-          m_builder->SetInsertPoint(getElemPtr);
-
-          SmallVector<Value *, 8> indices;
-
-          for (Value *const index : getElemPtr->indices())
-            indices.push_back(index);
-
-          // The first index should always be zero.
-          assert(isa<ConstantInt>(indices[0]) && cast<ConstantInt>(indices[0])->getZExtValue() == 0);
-
-          // The second index is the block index.
-          Value *const blockIndex = indices[1];
-
-          bool isNonUniform = false;
-
-          // Run the users of the GEP to check for any nonuniform calls.
-          for (User *const user : getElemPtr->users()) {
-            CallInst *const call = dyn_cast<CallInst>(user);
-            // If the user is not a call, bail.
-            if (!call)
-              continue;
-            // If the call is our non uniform decoration, record we are non uniform.
-            if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform)) {
-              isNonUniform = true;
-              break;
-            }
-          }
-          if (!isNonUniform) {
-            // Run the users of the block index to check for any nonuniform calls.
-            for (User *const user : blockIndex->users()) {
-              CallInst *const call = dyn_cast<CallInst>(user);
-
-              // If the user is not a call, bail.
-              if (!call)
-                continue;
-
-              // If the call is our non uniform decoration, record we are non uniform.
-              if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform)) {
-                isNonUniform = true;
-                break;
+              replaceInstsInfo.bitCastInst = bitCast;
+            } else {
+              // The users of the select must be a GEP.
+              SelectInst *selectInst = dyn_cast<SelectInst>(inst);
+              assert(selectInst);
+              assert(selectInst->getTrueValue() == &global || selectInst->getFalseValue() == &global);
+              replaceInstsInfo.selectInst = selectInst;
+              for (User *selectUser : selectInst->users()) {
+                if (auto *userInst = dyn_cast<Instruction>(selectUser)) {
+                  assert(userInst->getFunction() == func);
+                  if (auto *getElemPtr = dyn_cast<GetElementPtrInst>(userInst))
+                    replaceInstsInfo.getElemPtrInsts.push_back(getElemPtr);
+                }
               }
             }
+            instructionsToReplace.push_back(replaceInstsInfo);
           }
+        }
 
-          unsigned bufferFlags = 0;
-          if (isNonUniform)
-            bufferFlags |= lgc::Builder::BufferFlagNonUniform;
-          if (!global.isConstant())
-            bufferFlags |= lgc::Builder::BufferFlagWritten;
-          Value *const bufferDesc =
-              m_builder->CreateLoadBufferDesc(descSet, binding, blockIndex, bufferFlags, m_builder->getInt8Ty());
+        for (const auto &replaceInstsInfo : instructionsToReplace) {
+          if (replaceInstsInfo.bitCastInst) {
+            // All bitcasts recorded here are for GEPs that indexed by 0, 0 into the arrayed resource, and LLVM
+            // has been clever enough to realise that doing a GEP of 0, 0 is actually a no-op (because the pointer
+            // does not change!), and has removed it.
+            m_builder->SetInsertPoint(replaceInstsInfo.bitCastInst);
 
-          // If the global variable is a constant, the data it points to is invariant.
-          if (global.isConstant())
-            m_builder->CreateInvariantStart(bufferDesc);
+            Value *const bufferDesc = m_builder->CreateLoadBufferDesc(
+                descSet, binding, m_builder->getInt32(0), global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten,
+                m_builder->getInt8Ty());
 
-          Value *const bitCast = m_builder->CreateBitCast(bufferDesc, blockType);
+            // If the global variable is a constant, the data it points to is invariant.
+            if (global.isConstant())
+              m_builder->CreateInvariantStart(bufferDesc);
 
-          // We need to remove the block index from the original GEP indices so that we can use them.
-          indices[1] = indices[0];
+            replaceInstsInfo.bitCastInst->replaceUsesOfWith(&global, m_builder->CreateBitCast(bufferDesc, blockType));
+          } else {
+            assert(!replaceInstsInfo.getElemPtrInsts.empty());
 
-          ArrayRef<Value *> newIndices(indices);
-          newIndices = newIndices.drop_front(1);
+            for (GetElementPtrInst *getElemPtr : replaceInstsInfo.getElemPtrInsts) {
+              // The second index is the block offset, so we need at least two indices!
+              assert(getElemPtr->getNumIndices() >= 2);
+              SmallVector<Value *, 8> indices;
 
-          Value *newGetElemPtr = nullptr;
+              for (Value *const index : getElemPtr->indices())
+                indices.push_back(index);
 
-          if (getElemPtr->isInBounds())
-            newGetElemPtr = m_builder->CreateInBoundsGEP(bitCast, newIndices);
-          else
-            newGetElemPtr = m_builder->CreateGEP(bitCast, newIndices);
+              // The first index should always be zero.
+              assert(isa<ConstantInt>(indices[0]) && cast<ConstantInt>(indices[0])->getZExtValue() == 0);
 
-          getElemPtr->replaceAllUsesWith(newGetElemPtr);
-          getElemPtr->eraseFromParent();
+              // The second index is the block index.
+              Value *const blockIndex = indices[1];
+
+              bool isNonUniform = false;
+
+              // Run the users of the GEP to check for any nonuniform calls.
+              for (User *const user : getElemPtr->users()) {
+                CallInst *const call = dyn_cast<CallInst>(user);
+                // If the user is not a call, bail.
+                if (!call)
+                  continue;
+                // If the call is our non uniform decoration, record we are non uniform.
+                if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform)) {
+                  isNonUniform = true;
+                  break;
+                }
+              }
+              if (!isNonUniform) {
+                // Run the users of the block index to check for any nonuniform calls.
+                for (User *const user : blockIndex->users()) {
+                  CallInst *const call = dyn_cast<CallInst>(user);
+
+                  // If the user is not a call, bail.
+                  if (!call)
+                    continue;
+
+                  // If the call is our non uniform decoration, record we are non uniform.
+                  if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform)) {
+                    isNonUniform = true;
+                    break;
+                  }
+                }
+              }
+
+              // If the user of the global is a GEP, we need specify blockIndex to invoke CreateLoadBufferDesc and
+              // remove the second index (blockIndex) from GEP indices. If the user of the global is a select, the
+              // bufferFlags and blockIndex are obtained from the GEP (select's user) to respectively invoke
+              // CreateLoadBufferDesc for the true and false value of the select.
+              auto &select = replaceInstsInfo.selectInst;
+              if (select)
+                m_builder->SetInsertPoint(select);
+              else
+                m_builder->SetInsertPoint(getElemPtr);
+
+              unsigned bufferFlags = 0;
+              if (isNonUniform)
+                bufferFlags |= lgc::Builder::BufferFlagNonUniform;
+              if (!global.isConstant())
+                bufferFlags |= lgc::Builder::BufferFlagWritten;
+
+              Value *bufferDescs[2] = {nullptr};
+              Value *bitCasts[2] = {nullptr};
+              unsigned descSets[2] = {descSet, 0};
+              unsigned bindings[2] = {binding, 0};
+              GlobalVariable *globals[2] = {&global, nullptr};
+              const unsigned descCount = replaceInstsInfo.selectInst ? 2 : 1;
+              if (descCount == 2) {
+                // The true value and false value must be global variable
+                assert(isa<GlobalVariable>(select->getTrueValue()));
+                assert(isa<GlobalVariable>(select->getFalseValue()));
+                globals[0] = cast<GlobalVariable>(select->getTrueValue());
+                globals[1] = cast<GlobalVariable>(select->getFalseValue());
+                unsigned nextGlobalIdx = (&global == select->getTrueValue()) ? 1 : 0;
+
+                MDNode *const resMetaNode1 = globals[nextGlobalIdx]->getMetadata(gSPIRVMD::Resource);
+                assert(resMetaNode);
+                descSets[1] = mdconst::dyn_extract<ConstantInt>(resMetaNode1->getOperand(0))->getZExtValue();
+                bindings[1] = mdconst::dyn_extract<ConstantInt>(resMetaNode1->getOperand(1))->getZExtValue();
+
+                if (!nextGlobalIdx) {
+                  std::swap(descSets[0], descSets[1]);
+                  std::swap(bindings[0], bindings[1]);
+                }
+                skipGlobals.insert(globals[nextGlobalIdx]);
+              }
+              for (unsigned idx = 0; idx < descCount; ++idx) {
+                bufferDescs[idx] = m_builder->CreateLoadBufferDesc(descSets[idx], bindings[idx], blockIndex,
+                                                                   bufferFlags, m_builder->getInt8Ty());
+                // If the global variable is a constant, the data it points to is invariant.
+                if (global.isConstant())
+                  m_builder->CreateInvariantStart(bufferDescs[idx]);
+
+                bitCasts[idx] = m_builder->CreateBitCast(bufferDescs[idx], blockType);
+              }
+
+              Value *newSelect = nullptr;
+              if (select)
+                newSelect = m_builder->CreateSelect(select->getCondition(), bitCasts[0], bitCasts[1]);
+
+              Value *base = newSelect ? newSelect : bitCasts[0];
+              // We need to remove the block index from the original GEP indices so that we can use them.
+              indices[1] = indices[0];
+
+              ArrayRef<Value *> newIndices(indices);
+              newIndices = newIndices.drop_front(1);
+
+              Value *newGetElemPtr = nullptr;
+
+              if (getElemPtr->isInBounds())
+                newGetElemPtr = m_builder->CreateInBoundsGEP(base, newIndices);
+              else
+                newGetElemPtr = m_builder->CreateGEP(base, newIndices);
+
+              getElemPtr->replaceAllUsesWith(newGetElemPtr);
+              getElemPtr->eraseFromParent();
+
+              if (select)
+                select->eraseFromParent();
+            }
+          }
         }
       } else {
         m_builder->SetInsertPoint(&func->getEntryBlock(), func->getEntryBlock().getFirstInsertionPt());
