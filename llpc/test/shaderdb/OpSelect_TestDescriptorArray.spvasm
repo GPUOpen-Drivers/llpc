@@ -1,0 +1,73 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: getelementptr <{ [10 x %llpc.array.element] }>, <{ [10 x %llpc.array.element] }> addrspace(7)* %{{.*}}, i64 0, i32 0, i64 %{{.*}}, i32 0
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 37
+; Schema: 0
+               OpCapability Shader
+               OpCapability VariablePointers
+               OpExtension "SPV_KHR_variable_pointers"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %2 "main"
+               OpExecutionMode %2 LocalSize 1 1 1
+               OpSource GLSL 430
+               OpMemberDecorate %_struct_3 0 Offset 0
+               OpMemberDecorate %_struct_3 1 Offset 4
+               OpMemberDecorate %_struct_3 2 Offset 8
+               OpDecorate %_struct_3 Block
+               OpMemberDecorate %_struct_4 0 Offset 0
+               OpDecorate %_struct_4 Block
+               OpDecorate %5 DescriptorSet 0
+               OpDecorate %5 Binding 2
+               OpDecorate %_arr_int_int_10 ArrayStride 16
+               OpMemberDecorate %_struct_7 0 Offset 0
+               OpDecorate %_struct_7 Block
+               OpDecorate %8 DescriptorSet 0
+               OpDecorate %8 Binding 0
+               OpDecorate %9 DescriptorSet 0
+               OpDecorate %9 Binding 1
+       %void = OpTypeVoid
+       %bool = OpTypeBool
+        %int = OpTypeInt 32 1
+         %13 = OpTypeFunction %void
+  %_struct_3 = OpTypeStruct %int %int %int
+%_ptr_PushConstant__struct_3 = OpTypePointer PushConstant %_struct_3
+         %15 = OpVariable %_ptr_PushConstant__struct_3 PushConstant
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+     %int_10 = OpConstant %int 10
+%_ptr_PushConstant_int = OpTypePointer PushConstant %int
+  %_struct_4 = OpTypeStruct %int
+%_ptr_StorageBuffer__struct_4 = OpTypePointer StorageBuffer %_struct_4
+          %5 = OpVariable %_ptr_StorageBuffer__struct_4 StorageBuffer
+%_arr_int_int_10 = OpTypeArray %int %int_10
+  %_struct_7 = OpTypeStruct %_arr_int_int_10
+%_arr__struct_7_int_2 = OpTypeArray %_struct_7 %int_2
+%_ptr_StorageBuffer__arr__struct_7_int_2 = OpTypePointer StorageBuffer %_arr__struct_7_int_2
+%_ptr_StorageBuffer_int = OpTypePointer StorageBuffer %int
+          %8 = OpVariable %_ptr_StorageBuffer__arr__struct_7_int_2 StorageBuffer
+          %9 = OpVariable %_ptr_StorageBuffer__arr__struct_7_int_2 StorageBuffer
+          %2 = OpFunction %void None %13
+         %25 = OpLabel
+         %26 = OpAccessChain %_ptr_PushConstant_int %15 %int_0
+         %27 = OpLoad %int %26
+         %28 = OpAccessChain %_ptr_PushConstant_int %15 %int_1
+         %29 = OpLoad %int %28
+         %30 = OpAccessChain %_ptr_PushConstant_int %15 %int_2
+         %31 = OpLoad %int %30
+         %32 = OpIEqual %bool %27 %int_0
+         %33 = OpSelect %_ptr_StorageBuffer__arr__struct_7_int_2 %32 %8 %9
+         %34 = OpAccessChain %_ptr_StorageBuffer_int %33 %29 %int_0 %31
+         %35 = OpLoad %int %34
+         %36 = OpAccessChain %_ptr_StorageBuffer_int %5 %int_0
+               OpStore %36 %35
+               OpReturn
+               OpFunctionEnd
