@@ -129,14 +129,10 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Patch entry-point mutation (should be done before external library link)
   passMgr.add(createPatchEntryPointMutate());
 
-  // Function inlining and remove dead functions after it
-  passMgr.add(createAlwaysInlinerLegacyPass());
-  passMgr.add(createGlobalDCEPass());
-
   // Patch input import and output export operations
   passMgr.add(createPatchInOutImportExport());
 
-  // Prior to general optimization, do function inlining and dead function removal once again
+  // Prior to general optimization, do function inlining and dead function removal
   passMgr.add(createAlwaysInlinerLegacyPass());
   passMgr.add(createGlobalDCEPass());
 
@@ -158,10 +154,6 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   passMgr.add(createPatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
 
   // Add some optimization passes
-
-  // Need to run a first promote mem 2 reg to remove alloca's whose only args are lifetimes
-  passMgr.add(createPromoteMemoryToRegisterPass());
-
   if (!cl::DisablePatchOpt)
     addOptimizationPasses(passMgr);
 
@@ -235,9 +227,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   if (!cl::UseLlvmOpt) {
     passMgr.add(createForceFunctionAttrsLegacyPass());
     passMgr.add(createIPSCCPPass());
-    passMgr.add(createCalledValuePropagationPass());
-    passMgr.add(createGlobalOptimizerPass());
-    passMgr.add(createPromoteMemoryToRegisterPass());
     passMgr.add(createInstructionCombiningPass(5));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createInstSimplifyLegacyPass());
@@ -265,17 +254,13 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createScalarizerPass());
     passMgr.add(createPatchLoadScalarizer());
     passMgr.add(createInstSimplifyLegacyPass());
-    passMgr.add(createMergedLoadStoreMotionPass());
     passMgr.add(createNewGVNPass());
-    passMgr.add(createSCCPPass());
     passMgr.add(createBitTrackingDCEPass());
     passMgr.add(createInstructionCombiningPass(2));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createCorrelatedValuePropagationPass());
     passMgr.add(createAggressiveDCEPass());
     passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createInstSimplifyLegacyPass());
-    passMgr.add(createFloat2IntPass());
     passMgr.add(createLoopRotatePass());
     passMgr.add(createCFGSimplificationPass(SimplifyCFGOptions()
                                                 .bonusInstThreshold(1)
@@ -284,17 +269,12 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
                                                 .needCanonicalLoops(true)
                                                 .sinkCommonInsts(true)));
     passMgr.add(createPatchPeepholeOpt());
-    passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createLoopUnrollPass(cl::OptLevel));
     // uses DivergenceAnalysis
     passMgr.add(createPatchReadFirstLane());
     passMgr.add(createInstructionCombiningPass(2));
     passMgr.add(createLICMPass());
-    passMgr.add(createStripDeadPrototypesPass());
-    passMgr.add(createGlobalDCEPass());
     passMgr.add(createConstantMergePass());
-    passMgr.add(createLoopSinkPass());
-    passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createDivRemPairsPass());
     passMgr.add(createCFGSimplificationPass());
   } else {
