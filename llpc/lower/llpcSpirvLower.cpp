@@ -184,12 +184,10 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   // It is required by SpirvLowerImageOp.
   passMgr.add(createSROAPass());
   passMgr.add(createGlobalOptimizerPass());
-  passMgr.add(createGlobalDCEPass());
   passMgr.add(createPromoteMemoryToRegisterPass());
   passMgr.add(createAggressiveDCEPass());
   passMgr.add(createInstructionCombiningPass(3));
   passMgr.add(createCFGSimplificationPass());
-  passMgr.add(createSROAPass());
   passMgr.add(createEarlyCSEPass());
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createIPSCCPPass());
