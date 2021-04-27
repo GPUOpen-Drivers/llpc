@@ -239,6 +239,8 @@ uint64_t getConstantValue(SPIRVValue *BV, uint32_t I = 0) {
   else if (BV->getOpCode() == OpConstantNull ||
            BV->getOpCode() == OpUndef)
     ConstVal = 0;
+  else if (BV->getOpCode() == OpSpecConstantOp)
+    ConstVal = getConstantValue(static_cast<SPIRVSpecConstantOp *>(BV)->getMappedConstant());
   else
     llvm_unreachable("Invalid op code");
   return ConstVal;
