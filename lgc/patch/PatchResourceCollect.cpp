@@ -2926,7 +2926,7 @@ void InOutLocationInfoMapManager::createMap(const std::vector<CallInst *> &calls
 }
 
 // =====================================================================================================================
-// Fill the locationSpan container by constructing a LocationSpan from each input import call
+// Fill the locationSpan container by constructing a LocationSpan from each input import call or GS output export call
 //
 // @param call : Call to process
 // @param shaderStage : Shader stage
@@ -2948,7 +2948,9 @@ void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStag
   span.firstLocationInfo.setComponent(cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue());
 
   unsigned bitWidth = call->getType()->getScalarSizeInBits();
-  if (shaderStage == ShaderStageGeometry) {
+  if (shaderStage == ShaderStageGeometry &&
+      call->getCalledFunction()->getName().startswith(lgcName::OutputExportGeneric)) {
+    // Set streamId and output bitWidth of a GS output export for copy shader use
     span.firstLocationInfo.setStreamId(cast<ConstantInt>(call->getOperand(2))->getZExtValue());
     bitWidth = call->getOperand(3)->getType()->getScalarSizeInBits();
   }
