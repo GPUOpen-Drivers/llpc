@@ -41,6 +41,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     MC
     Object
     ScalarOpts
+    SelectionDAG
     Support
     Target
     TransformUtils

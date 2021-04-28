@@ -268,6 +268,10 @@ target_link_libraries(llpc PUBLIC
     khronos_spirv_interface
 )
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(llpc PRIVATE Threads::Threads)
+
 ### Visual Studio Filters ##############################################################################################
 if(COMMAND target_find_headers)
     target_find_headers(llpc)
@@ -336,7 +340,7 @@ if(UNIX)
 elseif(WIN32)
     target_link_libraries(amdllpc PRIVATE llpc vfx)
 endif()
-llvm_map_components_to_libnames(llvm_libs lgc amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
+llvm_map_components_to_libnames(llvm_libs lgc amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler asmparser LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
 target_link_libraries(amdllpc PRIVATE ${llvm_libs})
 target_link_libraries(amdllpc PRIVATE cwpack)
 endif()
