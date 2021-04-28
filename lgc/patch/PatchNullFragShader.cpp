@@ -142,7 +142,7 @@ bool PatchNullFragShader::runOnModule(Module &module) {
   pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | shaderStageToMask(ShaderStageFragment));
 
   // Add usage info for dummy input
-  FsInterpInfo interpInfo = {0, false, false, false, false, false};
+  FsInterpInfo interpInfo = {};
   resUsage->builtInUsage.fs.smooth = true;
   InOutLocationInfo origLocInfo;
   origLocInfo.setLocation(0);

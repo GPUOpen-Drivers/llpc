@@ -1664,14 +1664,44 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   const unsigned locCount = inputTy->getPrimitiveSizeInBits() / 8 > SizeOfVec4 ? 2 : 1;
   while (interpInfo.size() <= location + locCount - 1)
     interpInfo.push_back(InvalidFsInterpInfo);
+
+  // Check last vertex processing stage to see if there is an output matching this input.
+  bool noVsMatch = true;
+  auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
+  lastVertexStage = lastVertexStage == ShaderStageCopyShader ? ShaderStageGeometry : lastVertexStage;
+  if (lastVertexStage != ShaderStageInvalid) {
+    const auto &lastVertexInOutUsage = m_pipelineState->getShaderResourceUsage(lastVertexStage)->inOutUsage;
+    const auto streamId = lastVertexStage == ShaderStageGeometry ? lastVertexInOutUsage.gs.rasterStream : 0;
+
+    // We first check generic outputs of last vertex processing stage
+    for (auto &locMap : lastVertexInOutUsage.outputLocInfoMap) {
+      if (locMap.second.getLocation() == location && locMap.second.getStreamId() == streamId) {
+        noVsMatch = false;
+        break;
+      }
+    }
+
+    // If we don't find a matching output, we then check built-in outputs of last vertex processing stage. Such
+    // built-ins are exported as generic outputs from the last vertex processing stage like gl_PrimitiveID,
+    // gl_Layer, gl_ViewportIndex, and gl_ViewIndex.
+    if (noVsMatch) {
+      for (auto &locMap : lastVertexInOutUsage.builtInOutputLocMap) {
+        if (locMap.second == location) {
+          noVsMatch = false;
+          break;
+        }
+      }
+    }
+  }
+
   // Set the fields of FsInterpInfo except attr1Valid at location when it is not a high half
   if (!highHalf) {
-    auto &interpInfoAtLoc = interpInfo[location];
-    interpInfoAtLoc.loc = location;
-    interpInfoAtLoc.flat = interpMode == InOutInfo::InterpModeFlat;
-    interpInfoAtLoc.custom = interpMode == InOutInfo::InterpModeCustom;
-    interpInfoAtLoc.is16bit = inputTy->getScalarSizeInBits() == 16;
-    interpInfoAtLoc.attr0Valid = true;
+    interpInfo[location].loc = location;
+    interpInfo[location].flat = interpMode == InOutInfo::InterpModeFlat;
+    interpInfo[location].noVsMatch = noVsMatch;
+    interpInfo[location].custom = interpMode == InOutInfo::InterpModeCustom;
+    interpInfo[location].is16bit = inputTy->getScalarSizeInBits() == 16;
+    interpInfo[location].attr0Valid = true;
   } else {
     // attr1Valid is false by default and set it true when it is realy a high half
     interpInfo[location].attr1Valid = true;
@@ -1680,12 +1710,8 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   if (locCount > 1) {
     // The input occupies two consecutive locations
     assert(locCount == 2);
-    interpInfo[location + 1] = {
-        location + 1,
-        (interpMode == InOutInfo::InterpModeFlat),
-        (interpMode == InOutInfo::InterpModeCustom),
-        false,
-    };
+    interpInfo[location + 1] = interpInfo[location];
+    interpInfo[location + 1].loc = location + 1;
   }
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
@@ -2342,7 +2368,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     auto &interpInfo = inOutUsage.fs.interpInfo;
     while (interpInfo.size() <= loc)
       interpInfo.push_back(InvalidFsInterpInfo);
-    interpInfo[loc] = {loc, false, false, false};
+    interpInfo[loc] = {loc};
 
     // Emulation for "in vec2 gl_PointCoord"
     const bool perSampleShading = m_pipelineState->getRasterizerState().perSampleShading;
@@ -2382,7 +2408,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     auto &interpInfo = inOutUsage.fs.interpInfo;
     while (interpInfo.size() <= loc)
       interpInfo.push_back(InvalidFsInterpInfo);
-    interpInfo[loc] = {loc, true, false}; // Flat interpolation
+    interpInfo[loc] = {loc, true}; // Flat interpolation
 
     // Emulation for "in int gl_PrimitiveID" or "in int gl_Layer" or "in int gl_ViewportIndex"
     // or "in int gl_ViewIndex"
@@ -2416,9 +2442,9 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     while (interpInfo.size() <= loc + locCount - 1)
       interpInfo.push_back(InvalidFsInterpInfo);
 
-    interpInfo[loc] = {loc, false, false};
+    interpInfo[loc] = {loc};
     if (locCount > 1)
-      interpInfo[loc + 1] = {loc + 1, false, false};
+      interpInfo[loc + 1] = {loc + 1};
 
     // Emulation for "in float gl_ClipDistance[]" or "in float gl_CullDistance[]"
     auto primMask = getFunctionArgument(m_entryPoint, entryArgIdxs.primMask);

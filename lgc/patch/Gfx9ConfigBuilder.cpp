@@ -1876,7 +1876,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
 
   // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none
   // were identified in the shader.
-  const std::vector<FsInterpInfo> dummyInterpInfo{{0, false, false, false, false, false}};
+  const std::vector<FsInterpInfo> dummyInterpInfo{{}};
   const auto &fsInterpInfo = resUsage->inOutUsage.fs.interpInfo;
   const auto *interpInfo = fsInterpInfo.size() == 0 ? &dummyInterpInfo : &fsInterpInfo;
 
@@ -1916,6 +1916,8 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
       // NOTE: Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
       spiPsInputCntl.bits.OFFSET = UseDefaultVal;
       spiPsInputCntl.bits.FLAT_SHADE = false;
+    } else if (interpInfoElem.noVsMatch) {
+      spiPsInputCntl.bits.OFFSET = spiPsInputCntl.bits.OFFSET | UseDefaultVal;
     }
 
     appendConfig(mmSPI_PS_INPUT_CNTL_0 + i, spiPsInputCntl.u32All);
