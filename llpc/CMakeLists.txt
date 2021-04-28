@@ -332,7 +332,7 @@ PRIVATE
 set_compiler_options(amdllpc ${LLPC_ENABLE_WERROR})
 
 if(UNIX)
-    target_link_libraries(amdllpc PRIVATE llpc vfx dl stdc++)
+    target_link_libraries(amdllpc PRIVATE llpc vfx dl)
 elseif(WIN32)
     target_link_libraries(amdllpc PRIVATE llpc vfx)
 endif()
