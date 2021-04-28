@@ -549,7 +549,9 @@ Value *InOutBuilder::adjustIj(Value *value, Value *offset) {
 Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuiltIn, unsigned location,
                                                 unsigned xfbBuffer, unsigned xfbStride, Value *xfbOffset,
                                                 InOutInfo outputInfo) {
-  // Can currently only cope with constant pXfbOffset.
+  // xfbStride must be a non-zero value
+  assert(xfbStride > 0);
+  // Can currently only cope with constant xfbOffset.
   assert(isa<ConstantInt>(xfbOffset));
 
   // Ignore if not in last-vertex-stage shader (excluding copy shader).

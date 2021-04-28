@@ -124,8 +124,12 @@ unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
     return (4 * std::max(1u, resUsage->inOutUsage.inputMapLocCount)) | 1;
   }
 
-  if (pipelineState->getNggControl()->passthroughMode)
-    return 1; // Always 1 for NGG pass-through mode
+  if (pipelineState->getNggControl()->passthroughMode) {
+    unsigned esGsRingItemSize = 1;
+
+    // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
+    return esGsRingItemSize | 1;
+  }
 
   VertexCullInfoOffsets vertCullInfoOffsets = {}; // Dummy offsets (don't care)
   // For non-GS NGG, in the culling mode, the ES-GS ring item is vertex cull info.
@@ -609,9 +613,11 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       endReadPrimIdBlock = createBlock(entryPoint, ".endReadPrimId");
     }
 
+    bool passthroughNoMsg = false;
+
     BasicBlock *allocReqBlock = nullptr;
     BasicBlock *endAllocReqBlock = nullptr;
-    if (m_gfxIp.major <= 10) {
+    if (!passthroughNoMsg) {
       allocReqBlock = createBlock(entryPoint, ".allocReq");
       endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
     }
@@ -637,11 +643,13 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       } else {
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-        if (m_gfxIp.major <= 10) {
+        if (!passthroughNoMsg) {
+
           auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
           m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
         } else {
-          llvm_unreachable("Not implemented!");
+          auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
+          m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
         }
       }
     }
@@ -699,16 +707,18 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-        if (m_gfxIp.major <= 10) {
+        if (!passthroughNoMsg) {
+
           auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
           m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
         } else {
-          llvm_unreachable("Not implemented!");
+          auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
+          m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
         }
       }
     }
 
-    if (m_gfxIp.major <= 10) {
+    if (!passthroughNoMsg) {
       // Construct ".allocReq" block
       {
         m_builder->SetInsertPoint(allocReqBlock);
@@ -943,6 +953,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.primCountInWave);
       m_builder->CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
     } else {
+
       auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
       m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
     }
@@ -2461,7 +2472,7 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
   if (m_hasGs) {
     auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
     unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    unsigned esGsBytesPerWave = waveSize * 4 * calcFactor.esGsRingItemSize;
+    unsigned esGsBytesPerWave = waveSize * SizeOfDword * calcFactor.esGsRingItemSize;
     esGsOffset = m_builder->CreateMul(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(esGsBytesPerWave));
   }
 
@@ -5511,6 +5522,37 @@ Value *NggPrimShader::doSubgroupBallot(Value *value) {
     ballot = m_builder->CreateZExt(ballot, m_builder->getInt64Ty());
 
   return ballot;
+}
+
+// =====================================================================================================================
+// Gets the count of VS/TES vertices per primitive
+unsigned NggPrimShader::getVerticesPerPrimitive() const {
+  assert(!m_hasGs);
+
+  unsigned vertsPerPrim = 0;
+  auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
+  const bool hasTs = m_hasTcs || m_hasTes;
+  if (hasTs) {
+    // For tessellation, check primitive mode
+    assert(primType == PrimitiveType::Patch);
+    const auto &tessMode = m_pipelineState->getShaderModes()->getTessellationMode();
+    if (tessMode.pointMode)
+      vertsPerPrim = 1;
+    else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
+      vertsPerPrim = 2;
+    else if (tessMode.primitiveMode == PrimitiveMode::Triangles)
+      vertsPerPrim = 3;
+  } else {
+    if (primType == PrimitiveType::Point)
+      vertsPerPrim = 1;
+    else if (primType == PrimitiveType::Line)
+      vertsPerPrim = 2;
+    else if (primType == PrimitiveType::Triangle)
+      vertsPerPrim = 3;
+  }
+
+  assert(vertsPerPrim > 0);
+  return vertsPerPrim;
 }
 
 // =====================================================================================================================

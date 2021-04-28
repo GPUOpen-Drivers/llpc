@@ -31,6 +31,9 @@
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 
@@ -60,6 +63,7 @@ public:
 private:
   PatchWaveSizeAdjust(const PatchWaveSizeAdjust &) = delete;
   PatchWaveSizeAdjust &operator=(const PatchWaveSizeAdjust &) = delete;
+
 };
 
 } // namespace
@@ -97,6 +101,7 @@ bool PatchWaveSizeAdjust::runOnModule(Module &module) {
         pipelineState->setShaderDefaultWaveSize(ShaderStageCopyShader);
     }
   }
+
   return false;
 }
 

@@ -54,8 +54,8 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     //
     // LDS region size for ES-only
     //
-    // 1 dword (uint32) per thread
-    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionDistribPrimId
+    // Distributed primitive ID size is dynamically calculated (don't use it)
+    InvalidValue,                                             // LdsRegionDistribPrimId
     // 4 dwords (vec4) per thread
     SizeOfVec4 * Gfx9::NggMaxThreadsPerSubgroup,              // LdsRegionVertPosData
     // Vertex cull info size is dynamically calculated (don't use it)
@@ -179,7 +179,7 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
     m_ldsRegionStart[LdsRegionDistribPrimId] = 0;
 
     LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32, m_ldsRegionNames[LdsRegionDistribPrimId],
-                     m_ldsRegionStart[LdsRegionDistribPrimId], LdsRegionSizes[LdsRegionDistribPrimId])
+                     m_ldsRegionStart[LdsRegionDistribPrimId], calcFactor.esVertsPerSubgroup * SizeOfDword)
               << "\n");
 
     if (!nggControl->passthroughMode) {
@@ -228,6 +228,37 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
 }
 
 // =====================================================================================================================
+// Checks if this NGG pipeline needs LDS space.
+//
+// @param pipelineState : Pipeline state
+bool NggLdsManager::needsLds(PipelineState *pipelineState) {
+  const auto nggControl = pipelineState->getNggControl();
+  if (!nggControl->enableNgg)
+    return false;
+
+  // NGG GS always needs LDS
+  const bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
+  if (hasGs)
+    return true;
+
+  // NGG culling mode always needs LDS
+  if (!nggControl->passthroughMode)
+    return true;
+
+  // To distribute primitive ID, we need LDS
+  const bool hasTs =
+      pipelineState->hasShaderStage(ShaderStageTessControl) || pipelineState->hasShaderStage(ShaderStageTessEval);
+  if (!hasTs) {
+    const bool distribPrimitiveId =
+        pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.primitiveId;
+    if (distribPrimitiveId)
+      return true;
+  }
+
+  return false;
+}
+
+// =====================================================================================================================
 // Calculates ES extra LDS size.
 //
 // @param pipelineState : Pipeline state
@@ -243,16 +274,8 @@ unsigned NggLdsManager::calcEsExtraLdsSize(PipelineState *pipelineState) {
   }
 
   if (nggControl->passthroughMode) {
-    // NOTE: For NGG pass-through mode, only distributed primitive ID region is valid.
-    bool distributePrimitiveId = false;
-    const bool hasTs =
-        pipelineState->hasShaderStage(ShaderStageTessControl) || pipelineState->hasShaderStage(ShaderStageTessEval);
-    if (!hasTs) {
-      const auto &builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
-      distributePrimitiveId = builtInUsage.primitiveId;
-    }
 
-    return distributePrimitiveId ? LdsRegionSizes[LdsRegionDistribPrimId] : 0;
+    return 0;
   }
 
   return LdsRegionSizes[LdsRegionVertPosData] + LdsRegionSizes[LdsRegionVertCountInWaves] +

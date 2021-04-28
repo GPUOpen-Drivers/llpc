@@ -360,12 +360,12 @@ void YCbCrConverter::genImgDescChroma() {
     }
     case 10: {
       isGbGrFmt = m_builder->CreateICmpEQ(imgDataFmt,
-                                          m_builder->getInt32(ImageBuilder::ImgFmt::IMG_FMT_BG_RG_UNORM__GFX10CORE));
+                                          m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_BG_RG_UNORM__GFX10CORE));
       isBgRgFmt = m_builder->CreateICmpEQ(imgDataFmt,
-                                          m_builder->getInt32(ImageBuilder::ImgFmt::IMG_FMT_GB_GR_UNORM__GFX10CORE));
+                                          m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_GB_GR_UNORM__GFX10CORE));
 
       proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format,
-                                  m_builder->getInt32(ImageBuilder::ImgFmt::IMG_FMT_8_8_8_8_UNORM__GFX10CORE));
+                                  m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_8_8_8_8_UNORM__GFX10CORE));
       break;
     }
     default:

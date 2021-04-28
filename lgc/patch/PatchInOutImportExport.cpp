@@ -3591,6 +3591,7 @@ unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadVal
 void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset,
                                                          unsigned xfbStride, Value *streamOutBufDesc,
                                                          Instruction *insertPos) {
+
   auto storeTy = storeValue->getType();
 
   unsigned compCount = storeTy->isVectorTy() ? cast<FixedVectorType>(storeTy)->getNumElements() : 1;
