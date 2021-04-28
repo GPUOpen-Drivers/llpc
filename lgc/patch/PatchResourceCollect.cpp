@@ -639,7 +639,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       // invalid primitives. This is to simplify the algorithmic design of NGG GS and improve its efficiency.
       unsigned primAmpFactor = std::max(1u, geometryMode.outputVertices);
 
-      const bool needsLds = (hasGs || !nggControl->passthroughMode || esExtraLdsSize > 0 || gsExtraLdsSize > 0);
+      const bool needsLds = NggLdsManager::needsLds(m_pipelineState);
 
       unsigned esVertsPerSubgroup = 0;
       unsigned gsPrimsPerSubgroup = 0;
@@ -2189,7 +2189,7 @@ void PatchResourceCollect::mapGsBuiltInOutput(unsigned builtInId, unsigned elemC
 }
 
 // =====================================================================================================================
-// Update the inputLocInfoMap and perPatchInputLocMap
+// Update the inputLocInfoutputoMap and perPatchInputLocMap
 void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;

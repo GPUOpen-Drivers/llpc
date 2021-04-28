@@ -47,6 +47,7 @@ public:
 
 protected:
   void createLoadDwordAtAddr(llvm::Function *func, llvm::Type *loadPtrTy);
+  void createConvertF32toF16(llvm::Function *func, unsigned roundingMode);
 
 private:
   SpirvLowerRayTracingIntrinsics(const SpirvLowerRayTracingIntrinsics &) = delete;

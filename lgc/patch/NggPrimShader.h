@@ -247,6 +247,7 @@ private:
   llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexId);
   llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertexId);
 
+  unsigned getVerticesPerPrimitive() const;
   unsigned getOutputVerticesPerPrimitive() const;
 
   // Checks if NGG culling operations are enabled

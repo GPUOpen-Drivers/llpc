@@ -37,3 +37,6 @@
 #include "spirv/spirv.hpp"
 #endif
 
+#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
+#include "devext/spv_khr_integer_dot_product.h"
+#endif

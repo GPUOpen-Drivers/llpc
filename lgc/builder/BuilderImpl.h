@@ -435,7 +435,7 @@ private:
     IMG_DATA_FORMAT_BG_RG__CORE = 33,
   };
 
-  enum ImgFmt {
+  enum ImgFmtGfx10 {
     IMG_FMT_8_8_8_8_UNORM__GFX10CORE = 56,
     IMG_FMT_GB_GR_UNORM__GFX10CORE = 147,
     IMG_FMT_BG_RG_UNORM__GFX10CORE = 151,

@@ -65,6 +65,7 @@ static const unsigned GsEmitCutStreamIdMask = 0x300; // Mask of STREAM_ID of the
 // Enumerates address spaces valid for AMD GPU (similar to LLVM header AMDGPU.h)
 enum AddrSpace {
   ADDR_SPACE_GLOBAL = 1,             // Global memory
+  ADDR_SPACE_REGION = 2,             // GDS memory
   ADDR_SPACE_LOCAL = 3,              // Local memory
   ADDR_SPACE_CONST = 4,              // Constant memory
   ADDR_SPACE_PRIVATE = 5,            // Private memory

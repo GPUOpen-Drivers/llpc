@@ -80,6 +80,7 @@ class NggLdsManager {
 public:
   NggLdsManager(llvm::Module *module, PipelineState *pipelineState, llvm::IRBuilder<> *builder);
 
+  static bool needsLds(PipelineState *pipelineState);
   static unsigned calcEsExtraLdsSize(PipelineState *pipelineState);
   static unsigned calcGsExtraLdsSize(PipelineState *pipelineState);
 
