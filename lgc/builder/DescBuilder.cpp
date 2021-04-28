@@ -316,7 +316,7 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
 
       // Use a relocation to select between the two.
       Value *useShadowReloc = CreateRelocationConstant(reloc::ShadowDescriptorTableEnabled);
-      Value *useShadowTable = CreateZExtOrTrunc(useShadowReloc, getInt1Ty());
+      Value *useShadowTable = CreateICmpNE(useShadowReloc, getInt32(0));
       return CreateSelect(useShadowTable, shadowAddr, nonShadowAddr);
     }
   };
@@ -347,7 +347,7 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     descriptorTableDescPtr = CreateBitCast(descriptorTableDescPtr, FixedVectorType::get(getInt32Ty(), 2));
 
     Value *reloc = CreateRelocationConstant(reloc::DescriptorUseSpillTable + Twine(descSet) + "_" + Twine(binding));
-    Value *useSpillTable = CreateZExtOrTrunc(reloc, getInt1Ty());
+    Value *useSpillTable = CreateICmpNE(reloc, getInt32(0));
     descPtr = CreateSelect(useSpillTable, spillDescPtr, descriptorTableDescPtr);
     descPtr = CreateBitCast(descPtr, getInt64Ty());
     descPtr = CreateIntToPtr(descPtr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
