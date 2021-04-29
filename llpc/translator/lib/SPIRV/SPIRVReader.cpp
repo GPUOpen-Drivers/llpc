@@ -124,7 +124,7 @@ static void dumpLLVM(Module *m, const std::string &fName) {
   std::error_code ec;
   static int DumpIdx = 0;
   std::string uniqueFName = fName + "_" + std::to_string(DumpIdx++) + ".ll";
-  raw_fd_ostream fs(uniqueFName, ec, sys::fs::F_None);
+  raw_fd_ostream fs(uniqueFName, ec, sys::fs::OF_None);
   if (!ec) {
     fs << *m;
     fs.close();
