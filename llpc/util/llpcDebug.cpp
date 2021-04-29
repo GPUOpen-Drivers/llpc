@@ -128,7 +128,7 @@ void redirectLogOutput(bool restoreToDefault, unsigned optionCount, const char *
       if (needDebugOut) {
         std::error_code errCode;
 
-        static raw_fd_ostream NewDbgFile(cl::LogFileDbgs.c_str(), errCode, sys::fs::F_Text);
+        static raw_fd_ostream NewDbgFile(cl::LogFileDbgs.c_str(), errCode, sys::fs::OF_Text);
         assert(!errCode);
         if (!DbgFile) {
           NewDbgFile.SetUnbuffered();
@@ -148,7 +148,7 @@ void redirectLogOutput(bool restoreToDefault, unsigned optionCount, const char *
       } else {
         std::error_code errCode;
 
-        static raw_fd_ostream NewOutFile(cl::LogFileOuts.c_str(), errCode, sys::fs::F_Text);
+        static raw_fd_ostream NewOutFile(cl::LogFileOuts.c_str(), errCode, sys::fs::OF_Text);
         assert(!errCode);
         if (!OutFile) {
           NewOutFile.SetUnbuffered();
