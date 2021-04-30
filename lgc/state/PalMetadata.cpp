@@ -467,6 +467,22 @@ void PalMetadata::fixUpRegisters() {
 }
 
 // =====================================================================================================================
+// Test whether this is a graphics pipeline (even works in a link-only pipeline).
+bool PalMetadata::isGraphics() {
+  if (m_pipelineState->getShaderStageMask() != 0) {
+    // This is a whole pipeline compile, and the shader stage mask is set. Therefore, we can use the PipelineState's
+    // isGraphics method.
+    return m_pipelineState->isGraphics();
+  }
+
+  // Otherwise, this is the pipeline and PAL metadata for a pipeline being linked, and the shader stage mask is not
+  // set. We detect whether it is a graphics pipeline by what hardware shader stages we can find in PAL metadata.
+  msgpack::MapDocNode hwStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
+  return hwStages.find(m_document->getNode(".gs")) != hwStages.end() ||
+         hwStages.find(m_document->getNode(".vs")) != hwStages.end();
+}
+
+// =====================================================================================================================
 // Finalize PAL metadata for pipeline.
 // This is called at the end of a full pipeline compilation, or from the ELF link when doing shader/half-pipeline
 // compilation.
@@ -479,7 +495,7 @@ void PalMetadata::finalizePipeline() {
   pipelineHashNode[0] = options.hash[0];
   pipelineHashNode[1] = options.hash[1];
 
-  if (m_pipelineState->isGraphics()) {
+  if (isGraphics()) {
     // Set PA_CL_CLIP_CNTL from pipeline state settings.
     // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
     // version 629), and are no longer part of the PAL ELF ABI.
