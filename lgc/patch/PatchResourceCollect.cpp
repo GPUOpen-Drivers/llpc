@@ -2400,20 +2400,12 @@ void PatchResourceCollect::packInOutLocation(bool isInput) {
     // Update inputLocInfoMap of {TCS, GS, FS}
     updateInputLocInfoMapWithPack();
   } else {
-    if (m_shaderStage == ShaderStageGeometry) {
-      // Update outputLocInfoMap of GS
-      updateOutputLocInfoMapWithPack();
-    } else {
-      // Re-create output export calls for VS/TES with FS as the next shader stage
-      if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage())
-        reassembleOutputExportCalls();
-      // Copy the InOutLocMap of the next stage to that of the current stage for computing the shader hash and looking
-      // remapped location
-      auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-      assert(nextStage != ShaderStageInvalid);
-      m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.outputLocInfoMap =
-          m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.inputLocInfoMap;
-    }
+    // Re-create output export calls to pack exp instruction for the last vertex processing stage
+    if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() && m_shaderStage != ShaderStageGeometry)
+      reassembleOutputExportCalls();
+
+    // OutputLocInfoMap is used for computing the shader hash and looking remapped location
+    updateOutputLocInfoMapWithPack();
   }
 }
 
@@ -2496,14 +2488,45 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
 }
 
 // =====================================================================================================================
-// Update outputLocInfoMap based on GS output export calls for copy shader
+// Update outputLocInfoMap based on inputLocInfoMap of next stage or GS output export calls for copy shader
 void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
-  if (m_shaderStage != ShaderStageGeometry || m_outputCalls.empty())
+  if (m_outputCalls.empty())
     return;
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
+  outputLocInfoMap.clear();
 
-  // Create locationInfoMap according to the output calls in each stream
+  if (m_shaderStage != ShaderStageGeometry) {
+    assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval);
+    auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+    assert(nextStage != ShaderStageInvalid);
+    // In reassembleOutputExportCalls, the unused calls in next stage have been added into dead call set.
+    bool isMarkedDeadCall = (m_shaderStage == m_pipelineState->getLastVertexProcessingStage());
+    bool checkDynIndex =
+        (m_shaderStage == ShaderStageVertex && m_pipelineState->hasShaderStage(ShaderStageTessControl));
+    auto &nextStageInputLocInfoMap = m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.inputLocInfoMap;
+    for (auto call : m_outputCalls) {
+      InOutLocationInfo origLocInfo;
+      origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
+      origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
+
+      auto locInfoMapIt = nextStageInputLocInfoMap.find(origLocInfo);
+      if (locInfoMapIt == nextStageInputLocInfoMap.end() && checkDynIndex) {
+        // Output is always scalarized. If it is VS and the next stage is TCS, try if the location corresponds a
+        // dynamic indexing in TCS.
+        origLocInfo.setComponent(0);
+        locInfoMapIt = nextStageInputLocInfoMap.find(origLocInfo);
+      }
+      if (locInfoMapIt != nextStageInputLocInfoMap.end())
+        outputLocInfoMap[origLocInfo] = locInfoMapIt->second;
+      else if (!isMarkedDeadCall)
+        m_deadCalls.push_back(call); // unused call in next stage
+    }
+    m_outputCalls.clear();
+    return;
+  }
+
+  // For GS, the outputLocInfoMap is created according to the output calls in each stream
   // LDS load/store copes with dword
   m_locationInfoMapManager->createMap(m_outputCalls, m_shaderStage, true);
   m_outputCalls.clear();
@@ -2574,28 +2597,15 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   // Collect ElementsInfo in each packed location
   std::vector<ElementsInfo> elementsInfoArray(m_outputCalls.size());
 
-  const auto &tcsInputLocInfoMap =
-      m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.inputLocInfoMap;
-  const bool checkDynIndex =
-      (m_shaderStage == ShaderStageVertex && m_pipelineState->hasShaderStage(ShaderStageTessControl));
   for (auto call : m_outputCalls) {
     InOutLocationInfo origLocInfo;
     origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
     origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
 
+    m_deadCalls.push_back(call);
     InOutLocationInfoMap::const_iterator mapIter;
-    if (!m_locationInfoMapManager->findMap(origLocInfo, mapIter)) {
-      // No change on the VS output export call corresponding to dynamic indexing TCS input import call
-      origLocInfo.setComponent(0);
-      if (checkDynIndex && tcsInputLocInfoMap.count(origLocInfo) == 0) {
-        // An unused export call
-        m_deadCalls.push_back(call);
-      }
+    if (!m_locationInfoMapManager->findMap(origLocInfo, mapIter))
       continue;
-    } else {
-      // To be re-assembled call
-      m_deadCalls.push_back(call);
-    }
 
     const unsigned newLoc = mapIter->second.getLocation();
     auto &elementsInfo = elementsInfoArray[newLoc];
@@ -2627,7 +2637,6 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
     else
       ++elementsInfo.elemCountOf32bit;
   }
-  m_outputCalls.clear();
 
   // Re-assamble XX' output export calls for each packed location
   for (auto &elementsInfo : elementsInfoArray) {
