@@ -21,8 +21,7 @@ target triple = "amdgcn--amdpal"
 ; CHECK:       (VS) Input:  loc = 0, comp = 0 =>  Mapped = 0, 0
 ; CHECK-NEXT:  (VS) Input:  loc = 1, comp = 0 =>  Mapped = 1, 0
 ;
-; CHECK:       (VS) Output: loc = 0, comp = 3  =>  Mapped = 0, 0
-; CHECK-NEXT:  (VS) Output: loc = 3, comp = 0  =>  Mapped = 0, 1
+; CHECK:  (VS) Output: loc = 3, comp = 0  =>  Mapped = 0, 1
 ; CHECK-NEXT:  (VS) Output: loc = 3, comp = 1  =>  Mapped = 0, 2
 ; CHECK-NEXT:  (VS) Output: loc = 3, comp = 2  =>  Mapped = 0, 3
 
