@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  ElfLinker.cpp
- * @brief LLPC source file: Implementation class for linking unlinked half-pipeline ELFs into pipeline ELF
+ * @brief LLPC source file: Implementation class for linking unlinked shader/part-pipeline ELFs into pipeline ELF
  ***********************************************************************************************************************
  */
 #include "lgc/ElfLinker.h"
@@ -150,7 +150,7 @@ public:
   // Compile a particular chunk of glue code and retrieve its blob
   StringRef compileGlue(unsigned glueIndex) override final;
 
-  // Link the unlinked half-pipeline ELFs and the compiled glue code into a pipeline ELF
+  // Link the unlinked shader/part-pipeline ELFs and the compiled glue code into a pipeline ELF
   bool link(raw_pwrite_stream &outStream) override final;
 
   // -----------------------------------------------------------------------------------------------------------------
@@ -324,7 +324,7 @@ StringRef ElfLinkerImpl::compileGlue(unsigned glueIndex) {
 }
 
 // =====================================================================================================================
-// Link the unlinked half-pipeline ELFs and the compiled glue code into a pipeline ELF.
+// Link the unlinked shader/part-pipeline ELFs and the compiled glue code into a pipeline ELF.
 // Three ways this can exit:
 // 1. On success, returns true.
 // 2. Returns false on failure due to something in the shaders or pipeline state making separate
@@ -727,7 +727,7 @@ bool ElfLinkerImpl::insertGlueShaders() {
     }
 
     // Merge PAL metadata from glue ELF.
-    // Note that the merger callback in PalMetadata.cpp relies on the PAL metadata for the shader/half-pipeline
+    // Note that the merger callback in PalMetadata.cpp relies on the PAL metadata for the shader/part-pipeline
     // ELFs being read first, and the glue shaders being merged in afterwards.
     mergePalMetadataFromElf(*glueElfInput.objectFile, true);
 

@@ -166,10 +166,11 @@ public:
                 CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers,
                 llvm::MemoryBufferRef otherElf) override final;
 
-  // Create an ELF linker object for linking unlinked half-pipeline ELFs into a pipeline ELF using the pipeline state
+  // Create an ELF linker object for linking unlinked shader/part-pipeline ELFs into a pipeline ELF using the
+  // pipeline state
   ElfLinker *createElfLinker(llvm::ArrayRef<llvm::MemoryBufferRef> elfs) override final;
 
-  // Do an early check for ability to use shader/half-pipeline compilation then ELF linking.
+  // Do an early check for ability to use unlinked shader compilation then ELF linking.
   bool checkElfLinkable() override final;
 
   // Get a textual error message for the last recoverable error

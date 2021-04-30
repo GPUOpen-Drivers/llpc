@@ -149,7 +149,7 @@ public:
 
   // Finalize PAL metadata for pipeline.
   // TODO Shader compilation: The idea is that this will be called at the end of a pipeline compilation, or in
-  // an ELF link, but not at the end of a shader/half-pipeline compile.
+  // an ELF link, but not at the end of a shader/part-pipeline compile.
   void finalizePipeline();
 
   // Updates the PS register information that depends on the exports.

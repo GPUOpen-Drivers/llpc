@@ -61,7 +61,7 @@ cl::opt<unsigned> Glue("glue", cl::desc("Compile a single glue shader instead of
 
 // -l: link
 cl::opt<bool> Link("l", cl::cat(LgcCategory),
-                   cl::desc("Link shader/half-pipeline ELFs. First input filename is "
+                   cl::desc("Link shader/part-pipeline ELFs. First input filename is "
                             "IR providing pipeline state; subsequent ones are ELF files."));
 
 // -o: output filename

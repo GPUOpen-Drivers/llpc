@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  ElfLinker.h
- * @brief LLPC header file: LGC interface for linking unlinked half-pipeline ELFs into pipeline ELF
+ * @brief LLPC header file: LGC interface for linking unlinked shader and part-pipeline ELFs into pipeline ELF
  ***********************************************************************************************************************
  */
 #pragma once
@@ -79,13 +79,13 @@ public:
   //           and empty ELF blob.
   virtual llvm::StringRef compileGlue(unsigned glueIndex) = 0;
 
-  // Link the unlinked half-pipeline ELFs and the compiled glue code into a pipeline ELF.
+  // Link the unlinked shader or part-pipeline ELFs and the compiled glue code into a pipeline ELF.
   //
   // Like other LGC and LLVM library functions, an internal compiler error could cause an assert or report_fatal_error.
   //
   // @param [out] outStream : Stream to write linked ELF to
   // @returns : True for success.
-  //           False if there is some reason why the pipeline cannot be linked from unlinked shader/half-pipeline
+  //           False if there is some reason why the pipeline cannot be linked from unlinked shader/part-pipeline
   //           ELFs. The client typically then does a whole-pipeline compilation instead. The client can call
   //           getLastError() to get a textual representation of the error, for use in logging or in error
   //           reporting in a command-line utility.

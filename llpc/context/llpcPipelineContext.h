@@ -216,7 +216,7 @@ private:
   void setColorExportState(lgc::Pipeline *pipeline) const;
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
-  bool m_unlinked = false; // Whether we are building an "unlinked" half-pipeline ELF
+  bool m_unlinked = false; // Whether we are building an "unlinked" shader ELF
 };
 
 } // namespace Llpc
