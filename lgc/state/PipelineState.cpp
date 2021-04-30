@@ -951,6 +951,11 @@ void PipelineState::readVertexInputDescriptions(Module *module) {
 // @param formats : Array of ColorExportFormat structs
 // @param exportState : Color export flags
 void PipelineState::setColorExportState(ArrayRef<ColorExportFormat> formats, const ColorExportState &exportState) {
+  // Trim null entries off the end.
+  constexpr ColorExportFormat nullFormat = {};
+  while (!formats.empty() && memcmp(&formats.back(), &nullFormat, sizeof(nullFormat)) == 0)
+    formats = formats.drop_back(1);
+  // Copy into our state.
   m_colorExportFormats.clear();
   m_colorExportFormats.insert(m_colorExportFormats.end(), formats.begin(), formats.end());
   m_colorExportState = exportState;
