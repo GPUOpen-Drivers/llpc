@@ -199,7 +199,7 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
           case mmVGT_SHADER_STAGES_EN:
             // Ignore new value of VGT_SHADER_STAGES_EN from glue shader, as it might accidentally make the VS
             // wave32. (This relies on the glue shader's PAL metadata being merged into the vertex-processing
-            // half-pipeline, rather than the other way round.)
+            // part-pipeline, rather than the other way round.)
             return 0;
           case mmSPI_SHADER_PGM_RSRC1_LS:
           case mmSPI_SHADER_PGM_RSRC1_HS:
@@ -484,7 +484,7 @@ bool PalMetadata::isGraphics() {
 
 // =====================================================================================================================
 // Finalize PAL metadata for pipeline.
-// This is called at the end of a full pipeline compilation, or from the ELF link when doing shader/half-pipeline
+// This is called at the end of a full pipeline compilation, or from the ELF link when doing shader/part-pipeline
 // compilation.
 void PalMetadata::finalizePipeline() {
   assert(!m_pipelineState->isUnlinked());

@@ -118,8 +118,8 @@ static cl::opt<std::string> OutFile("o", cl::desc("Output file"), cl::value_desc
 // -l: link pipeline
 static cl::opt<bool> ToLink("l", cl::desc("Link pipeline and generate ISA codes"), cl::init(true));
 
-// -unlinked : build an "unlinked" half-pipeline ELF that needs a further link step
-static cl::opt<bool> Unlinked("unlinked", cl::desc("Build \"unlinked\" half-pipeline ELF"), cl::init(false));
+// -unlinked : build an "unlinked" shader/part-pipeline ELF that needs a further link step
+static cl::opt<bool> Unlinked("unlinked", cl::desc("Build \"unlinked\" shader/part-pipeline ELF"), cl::init(false));
 
 // -val: validate input SPIR-V binary or text
 static cl::opt<bool> Validate("val", cl::desc("Validate input SPIR-V binary or text"), cl::init(true));
@@ -309,7 +309,7 @@ struct CompileInfo {
   void *pipelineBuf;              // Alllocation buffer of building pipeline
   void *pipelineInfoFile;         // VFX-style file containing pipeline info
   const char *fileNames;          // Names of input shader source files
-  bool unlinked;                  // Whether to generate unlinked half-pipeline ELF
+  bool unlinked;                  // Whether to generate unlinked shader/part-pipeline ELF
   bool doAutoLayout;              // Whether to auto layout descriptors
   bool checkAutoLayoutCompatible; // Whether to comapre if auto layout descriptors is
                                   // same as specified pipeline layout
@@ -1417,7 +1417,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
           fileNames += inFile;
           fileNames += " ";
           *nextFile = i + 1;
-          // For a .pipe, build an "unlinked" half-pipeline ELF if -unlinked is on.
+          // For a .pipe, build an "unlinked" shader/part-pipeline ELF if -unlinked is on.
           compileInfo.unlinked = Unlinked;
           compileInfo.doAutoLayout = false;
           break;

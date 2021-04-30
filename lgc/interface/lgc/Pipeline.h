@@ -631,8 +631,8 @@ public:
                                  )>
       CheckShaderCacheFunc;
 
-  // Do an early check for ability to use shader/half-pipeline compilation then ELF linking.
-  // Intended to be used when doing shader/half-pipeline compilation with pipeline state already available.
+  // Do an early check for ability to use unlinked shader compilation then ELF linking.
+  // Intended to be used when doing unlinked shader compilation with pipeline state already available.
   // It gives an early indication that there is something in the pipeline state (such as compact buffer
   // descriptors) that stops ELF linking working. It does not necessarily spot all such conditions, but
   // it can be useful in avoiding an unnecessary shader compile before falling back to full-pipeline

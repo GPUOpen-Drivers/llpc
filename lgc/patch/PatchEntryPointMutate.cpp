@@ -41,8 +41,8 @@
  * Root descriptors are dynamic uniform buffer descriptors in Vulkan, that can be changed without modifying a descriptor
  * set and rebuilding the pipeline. They get put into the spill table but can be unspilled.
  *
- * Special care is required for compute libraries. Similar to half-pipeline compilation, we do not know the final layout
- * for non-entrypoint shaders. For compute libraries, user data args must be passed to other functions, whose
+ * Special care is required for compute libraries. Similar to unlinked shader compilation, we do not know the final
+ * layout for non-entrypoint shaders. For compute libraries, user data args must be passed to other functions, whose
  * implementation is unknown at compile time. Therefore, computation of user data arguments must be independent of any
  * instructions or uses. This is important, even for functions that have no calls, as we still need to compute the taken
  * arguments in a deterministic layout. For library functions, only a prefix of the user data is known at compile time.
@@ -1267,7 +1267,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
         // This is part of the original "partial pipeline compile" scheme, and it uses a magic number for the
         // PAL metadata register value because the code to fix it up in llpcElfWriter.cpp just fixes up any
         // register with the magic value, and hopes it lucks out by not getting a false positive.
-        // TODO: Remove all that code once the new "shader/half-pipeline compile" scheme can replace it.
+        // TODO: Remove all that code once the new "shader/part-pipeline compile" scheme can replace it.
         static const unsigned DescRelocMagic = 0xA5A5A500;
         userDataValue = DescRelocMagic | node.innerTable[0].set;
       }
