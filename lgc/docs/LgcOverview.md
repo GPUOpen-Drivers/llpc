@@ -126,6 +126,60 @@ The front-end flow is:
   The front-end can pass a call-back function into `Pipeline::Generate` to check a shader cache
   after input and output mapping, and elect to remove already-cached shaders from the pipeline.
 
+### Support for shader, part-pipeline and whole pipeline compilation
+
+#### Whole pipeline compilation
+
+The default setup for LGC, and the LLPC front-end that uses it, is whole pipeline compilation.
+The front-end gives the IR modules for all the shaders in the pipeline, and the pipeline state,
+to the `Lgc::Pipeline` object, and then asks it to link and generate them into a single pipeline ELF,
+ready for consumption by the PAL ELF loader.
+
+There are a number of variations on that:
+
+#### Unlinked shader compilation
+
+The front-end can use a scheme where it compiles each shader separately, possibly without the pipeline
+state or with incomplete pipeline state, and later links the resulting ELF files with the pipeline state
+to create the pipeline ELF. This is only supported for compute, vertex and fragment shaders (where
+vertex and fragment shaders are used in a VS-FS pipeline, with no tessellation or geometry shaders).
+
+The advantage of this is that a single shader used in multiple pipelines could be only compiled once, and
+could be retrieved from a cache for other occurrences. Further, that cache could be pre-populated offline.
+The implementation of those features is in the front-end, not in LGC.
+
+In this scheme, LGC uses relocs for certain values that cannot be determined without the pipeline state,
+such as the offset of a descriptor table in user data, and the offset of a descriptor within its
+descriptor table. The LGC ELF linker resolves such relocs with reference to the pipeline state.
+In addition, if vertex layout information is not available when compiling the VS, then the LGC ELF linker glues
+a "fetch shader" on to the front, and, similarly, if color export information is not available when
+compiling the FS, then the LGC ELF linker glues an "export shader" on to the end. Compilation of each
+shader places metadata into the PAL metadata .note record for the linker to generate these glue shaders.
+
+This scheme has some restrictions on what the pipeline is allowed to do. Most notably, if resource mapping
+(the layout of user data and descriptor tables) is not available at shader compile time, then it is not
+allowed to have a compact (2-dword) descriptor, or a static sampler.
+Also, it seems like some built-in inputs in the FS
+would not work, if they are implemented as generic inputs that need to be exported by the VS.
+
+#### Partial pipeline compilation scheme
+
+LGC has a hook part way through compilation, just after determining inter-shader output/input packing,
+in which it calls a callback function (provided by the front-end as the `checkShaderCacheFunc` arg to
+`Pipeline::generate` method), providing a hash of input/output usage and mapping for each shader stage,
+and allowing the callback to clear bits in the shader stage mask to disable the continued compilation of
+part of the pipeline.
+
+The LLPC front-end uses this to implement a partial pipeline compilation scheme. Considering the two
+parts of a graphics pipeline (the non-FS part (VS,TCS,TES,GS) and the FS), it uses the LGC input/output
+usage and mapping hashes, in conjunction with its own hashes of the shader stages, to determine whether
+it has compiled the same partial pipeline with the same input/output usage before. The ELF result of
+compilation is added to its cache for future compiles to find.
+
+To do this, the LLPC front-end has to extract the partial pipeline it wants from a pipeline ELF, then
+link two partial pipelines together. It does this with its own ELF extracting and linking code, not
+using the LGC ELF linker.
+
 ## LGC internal classes
 
 ### TargetInfo
