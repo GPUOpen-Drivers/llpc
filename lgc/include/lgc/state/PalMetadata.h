@@ -177,6 +177,9 @@ private:
   // Returns true of the setting in the PAL meta data require all of the user data nodes.
   bool pipelineRequiresAllUserData() const;
 
+  // Test whether this is a graphics pipeline (even works in a link-only pipeline).
+  bool isGraphics();
+
   // The maximum possible value for the spill threshold entry in the PAL meatadata.
   static constexpr uint64_t MAX_SPILL_THRESHOLD = UINT_MAX;
 
