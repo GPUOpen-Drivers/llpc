@@ -40,6 +40,7 @@
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/SymbolicFile.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "lgc-elf-linker"
@@ -463,8 +464,8 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
             std::tie(relocSectionId, relocIdxInSection) = findInputSection(elfInput, relocSection);
             uint64_t relocSectionOffset = m_outputSections[relocSectionId].getOutputOffset(relocIdxInSection);
             uint64_t targetSectionOffset = m_outputSections[targetSectionIdx].getOutputOffset(targetIdxInSection);
-            m_outputSections[relocSectionId].addRelocation(reloc, elfInput.objectFile->getFileName(),
-                                                           relocSectionOffset, targetSectionOffset);
+            StringRef id = sys::path::filename(elfInput.objectFile->getFileName());
+            m_outputSections[relocSectionId].addRelocation(reloc, id, relocSectionOffset, targetSectionOffset);
           }
         }
       }
