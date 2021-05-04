@@ -64,6 +64,9 @@ public:
     return m_elfBlob;
   }
 
+  // Set the ELF for this glue shader so that it does not have to be compiled.
+  void setElfBlob(llvm::StringRef elfBlob) { m_elfBlob = elfBlob; }
+
   // Get the symbol name of the main shader that this glue shader is prolog or epilog for
   virtual llvm::StringRef getMainShaderName() = 0;
 

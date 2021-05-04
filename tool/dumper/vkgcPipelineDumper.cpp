@@ -1328,6 +1328,14 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   }
 }
 
+const Hash PipelineDumper::generateHashForGlueShader(BinaryData glueShaderString) {
+  MetroHash64 hasher;
+  hasher.Update(reinterpret_cast<const uint8_t *>(glueShaderString.pCode), glueShaderString.codeSize);
+  MetroHash::Hash hash = {};
+  hasher.Finalize(hash.bytes);
+  return hash;
+}
+
 // =====================================================================================================================
 // Outputs text with specified range to output stream.
 template <class OStream>

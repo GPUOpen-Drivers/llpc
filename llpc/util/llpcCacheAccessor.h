@@ -51,6 +51,36 @@ public:
     initializeUsingBuildInfo(buildInfo, cacheHash, compiler);
   }
 
+  CacheAccessor(CacheAccessor &&ca) { *this = std::move(ca); }
+
+  CacheAccessor &operator=(CacheAccessor &&ca) {
+    this->m_userCache = ca.m_userCache;
+    ca.m_userCache = nullptr;
+    this->m_userShaderCache = ca.m_userShaderCache;
+    ca.m_userShaderCache = nullptr;
+
+    this->m_compiler = ca.m_compiler;
+    ca.m_compiler = nullptr;
+
+    this->m_shaderCacheEntryState = ca.m_shaderCacheEntryState;
+    ca.m_shaderCacheEntryState = ShaderEntryState::Unavailable;
+
+    this->m_shaderCacheEntry = ca.m_shaderCacheEntry;
+    ca.m_shaderCacheEntry = nullptr;
+
+    this->m_shaderCache = ca.m_shaderCache;
+    ca.m_shaderCache = nullptr;
+
+    this->m_cacheResult = ca.m_cacheResult;
+    ca.m_cacheResult = Result::ErrorUnknown;
+
+    this->m_cacheEntry = std::move(ca.m_cacheEntry);
+
+    this->m_elf = ca.m_elf;
+    ca.m_elf = {0, nullptr};
+    return *this;
+  }
+
   CacheAccessor(Context *context, MetroHash::Hash &cacheHash, Compiler *compiler);
 
   // Finalizes the cache access by releasing any handles that need to be released.
@@ -77,6 +107,10 @@ public:
   }
 
 private:
+  CacheAccessor() = delete;
+  CacheAccessor(const CacheAccessor &) = delete;
+  CacheAccessor &operator=(const CacheAccessor &) = delete;
+
   Vkgc::ICache *getUserCache() const { return m_userCache; }
   IShaderCache *getUserShaderCache() const { return m_userShaderCache; }
 
