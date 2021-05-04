@@ -183,8 +183,11 @@ FetchShader::FetchShader(PipelineState *pipelineState, ArrayRef<VertexFetchInfo>
 // that the front-end client can use as a cache key to avoid compiling the same glue shader more than once.
 StringRef FetchShader::getString() {
   if (m_shaderString.empty()) {
-    m_shaderString =
-        StringRef(reinterpret_cast<const char *>(m_fetches.data()), m_fetches.size() * sizeof(VertexFetchInfo)).str();
+    for (VertexFetchInfo fetchInfo : m_fetches) {
+      m_shaderString += StringRef(reinterpret_cast<const char *>(&fetchInfo.location), sizeof(fetchInfo.location));
+      m_shaderString += StringRef(reinterpret_cast<const char *>(&fetchInfo.component), sizeof(fetchInfo.component));
+      m_shaderString += getTypeName(fetchInfo.ty);
+    }
     m_shaderString += StringRef(reinterpret_cast<const char *>(&m_vsEntryRegInfo), sizeof(m_vsEntryRegInfo)).str();
     for (const VertexInputDescription *description : m_fetchDescriptions) {
       if (!description)
@@ -365,8 +368,21 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
 // shader more than once.
 StringRef ColorExportShader::getString() {
   if (m_shaderString.empty()) {
-    m_shaderString =
-        StringRef(reinterpret_cast<const char *>(m_exports.data()), m_exports.size() * sizeof(ColorExportInfo)).str();
+    constexpr uint32_t estimatedTypeSize = 10;
+    uint32_t sizeEstimate = (sizeof(ColorExportInfo) + estimatedTypeSize) * m_exports.size();
+    sizeEstimate += sizeof(m_exportFormat);
+    sizeEstimate += sizeof(m_killEnabled);
+    m_shaderString.reserve(sizeEstimate);
+
+    for (ColorExportInfo colorExportInfo : m_exports) {
+      m_shaderString += StringRef(reinterpret_cast<const char *>(&colorExportInfo.hwColorTarget),
+                                  sizeof(colorExportInfo.hwColorTarget));
+      m_shaderString +=
+          StringRef(reinterpret_cast<const char *>(&colorExportInfo.isSigned), sizeof(colorExportInfo.isSigned));
+      m_shaderString +=
+          StringRef(reinterpret_cast<const char *>(&colorExportInfo.location), sizeof(colorExportInfo.location));
+      m_shaderString += getTypeName(colorExportInfo.ty);
+    }
     m_shaderString += StringRef(reinterpret_cast<const char *>(m_exportFormat), sizeof(m_exportFormat)).str();
     m_shaderString += StringRef(reinterpret_cast<const char *>(&m_killEnabled), sizeof(m_killEnabled));
   }
