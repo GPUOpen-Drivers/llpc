@@ -209,6 +209,65 @@ static void fatalErrorHandler(void *userData, const std::string &reason, bool ge
 }
 
 // =====================================================================================================================
+// Returns the cache accessor object resulting from checking the caches for the glue shader for the given identifier.
+//
+// @param glueShaderIdentifier : The linker object for which the glue shaders are needed.
+// @param context : The context that contains the application caches.
+// @param compiler : The compiler object that contains the internal caches.
+static CacheAccessor checkCacheForGlueShader(StringRef glueShaderIdentifier, Context *context, Compiler *compiler) {
+  Hash glueShaderCacheHash =
+      PipelineDumper::generateHashForGlueShader({glueShaderIdentifier.size(), glueShaderIdentifier.data()});
+  return CacheAccessor(context, glueShaderCacheHash, compiler);
+}
+
+// =====================================================================================================================
+// Set the glue shader at glueIndex in the ELF linking with the data in the cache.  The data must be in the cache.
+//
+// @param elfLinker : The linker object for which the glue shaders are needed.
+// @param glueIndex : The index of the glue shader to be set.
+// @param cacheAccessor : The cache accessor that resulted from checking the caches for the glue shader.
+static void setGlueBinaryBlobFromCacheData(ElfLinker *elfLinker, unsigned glueIndex,
+                                           const CacheAccessor &cacheAccessor) {
+  assert(cacheAccessor.isInCache());
+  BinaryData elf = cacheAccessor.getElfFromCache();
+  elfLinker->addGlue(glueIndex, StringRef(reinterpret_cast<const char *>(elf.pCode), elf.codeSize));
+}
+
+// =====================================================================================================================
+// Set the data in the cache to the given data.
+//
+// @param cacheAccessor : The cache accessor for the entry to be updated.
+// @param elfData : The data to use to update the cache.
+static void updateCache(CacheAccessor &cacheAccessor, const StringRef &elfData) {
+  BinaryData elfBin = {elfData.size(), elfData.data()};
+  cacheAccessor.setElfInCache(elfBin);
+}
+
+// =====================================================================================================================
+// Sets all of the glue shaders in elfLinker by getting the binary from the cache or compiling it.
+//
+// @param elfLinker : The linker object for which the glue shaders are needed.
+// @param context : The context that contains the application caches.
+// @param compiler : The compiler object that contains the internal caches.
+static void setGlueBinaryBlobsInLinker(ElfLinker *elfLinker, Context *context, Compiler *compiler) {
+  ArrayRef<StringRef> glueShaderIdentifiers = elfLinker->getGlueInfo();
+  for (unsigned i = 0; i < glueShaderIdentifiers.size(); ++i) {
+    LLPC_OUTS("ID for glue shader" << i << ": " << llvm::toHex(glueShaderIdentifiers[i]) << "\n");
+    CacheAccessor cacheAccessor = checkCacheForGlueShader(glueShaderIdentifiers[i], context, compiler);
+
+    if (cacheAccessor.isInCache()) {
+      LLPC_OUTS("Cache hit for glue shader " << i << "\n");
+      setGlueBinaryBlobFromCacheData(elfLinker, i, cacheAccessor);
+    } else {
+      LLPC_OUTS("Cache miss for glue shader " << i << "\n");
+      StringRef elfData = elfLinker->compileGlue(i);
+      LLPC_OUTS("Updating the cache for glue shader " << i << "\n");
+      updateCache(cacheAccessor, elfData);
+    }
+  }
+}
+
+// =====================================================================================================================
 // Handler for diagnosis in pass run, derived from the standard one.
 class LlpcDiagnosticHandler : public DiagnosticHandler {
 public:
@@ -873,6 +932,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     if (result == Result::Success) {
       BinaryData elfBin = {elf[stage].size(), elf[stage].data()};
       cacheAccessor.setElfInCache(elfBin);
+      LLPC_OUTS("Updating the cache for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
     }
   }
   context->getPipelineContext()->setHashForCacheLookUp(originalCacheHash);
@@ -2095,6 +2155,7 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
   }
   std::unique_ptr<ElfLinker> elfLinker(pipeline->createElfLinker(elfs));
 
+  setGlueBinaryBlobsInLinker(elfLinker.get(), context, this);
   // Do the link.
   raw_svector_ostream outStream(*pipelineElf);
   if (!elfLinker->link(outStream)) {

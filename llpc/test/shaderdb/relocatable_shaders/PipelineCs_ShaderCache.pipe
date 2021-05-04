@@ -1,18 +1,16 @@
-; XFAIL: *
-
 ; This test case checks shader cache creation in the standalone compilation mode.
 ; BEGIN_SHADERTEST
 ; RUN: rm -rf %t_dir && \
 ; RUN: mkdir -p %t_dir && \
 ; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip \
-; RUN:         -build-shader-cache -shader-cache-mode=2 \
+; RUN:         -shader-cache-mode=2 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=CREATE %s
 ; REQUIRES: llpc-shader-cache
 ; CREATE: Building pipeline with relocatable shader elf.
-; CREATE: Cache miss for shader stage 5
-; CREATE: Updating the cache for shader stage 5
+; CREATE: Cache miss for shader stage compute
+; CREATE: Updating the cache for shader stage compute
 ; CREATE: =====  AMDLLPC SUCCESS  =====
 ; END_SHADERTEST
 
@@ -27,14 +25,14 @@
 ; No new cache entries should be added.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip \
-; RUN:         -build-shader-cache -shader-cache-mode=4 \
+; RUN:         -shader-cache-mode=4 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=LOAD %s
 ; REQUIRES: llpc-shader-cache
 ; LOAD: Building pipeline with relocatable shader elf.
-; LOAD: Cache hit for shader stage 5
-; LOAD-NOT: Updating the cache for shader stage 5
+; LOAD: Cache hit for shader stage compute
+; LOAD-NOT: Updating the cache for shader stage compute
 ; LOAD: =====  AMDLLPC SUCCESS  =====
 ; END_SHADERTEST
 
@@ -43,14 +41,14 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip \
 ; RUN:         -vgpr-limit=64 \
-; RUN:         -build-shader-cache -shader-cache-mode=3 \
+; RUN:         -shader-cache-mode=3 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=MODIFY %s
 ; REQUIRES: llpc-shader-cache
 ; MODIFY: Building pipeline with relocatable shader elf.
-; MODIFY: Cache miss for shader stage 5
-; MODIFY: Updating the cache for shader stage 5
+; MODIFY: Cache miss for shader stage compute
+; MODIFY: Updating the cache for shader stage compute
 ; MODIFY: =====  AMDLLPC SUCCESS  =====
 ; END_SHADERTEST
 

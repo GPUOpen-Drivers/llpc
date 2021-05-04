@@ -103,6 +103,9 @@ public:
   // Get name of register, or "" if not known
   static const char *getRegisterNameString(unsigned regNumber);
 
+  // Returns the hash for the glue shader that corresponds to the given glue shader string.
+  static const MetroHash::Hash generateHashForGlueShader(BinaryData glueShaderString);
+
 private:
   static std::string getSpirvBinaryFileName(const MetroHash::Hash *hash);
 
