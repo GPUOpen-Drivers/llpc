@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llpc.h"
+#include "llpcCacheAccessor.h"
 #include "llpcShaderCacheManager.h"
 #include "llpcShaderModuleHelper.h"
 #include "vkgcElfReader.h"
@@ -69,10 +70,6 @@ public:
   // Check shader caches, returning mask of which shader stages we want to keep in this compile.
   unsigned check(const llvm::Module *module, unsigned stageMask, llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes);
 
-  // Get cache results.
-  ShaderEntryState getNonFragmentCacheEntryState() { return m_nonFragmentCacheEntryState; }
-  ShaderEntryState getFragmentCacheEntryState() { return m_fragmentCacheEntryState; }
-
   // Update shader caches with results of compile, and merge ELF outputs if necessary.
   void updateAndMerge(Result result, ElfPackage *pipelineElf);
   void updateRootUserDateOffset(ElfPackage *pipelineElf);
@@ -80,12 +77,8 @@ public:
 private:
   Compiler *m_compiler;
   Context *m_context;
-
-  // Old shader cache
-  ShaderEntryState m_nonFragmentCacheEntryState = ShaderEntryState::New;
-  ShaderCache *m_nonFragmentShaderCache = nullptr;
-  CacheEntryHandle m_hNonFragmentEntry = {};
-  BinaryData m_nonFragmentElf = {};
+  llvm::Optional<CacheAccessor> m_nonFragmentCacheAccessor;
+  llvm::Optional<CacheAccessor> m_fragmentCacheAccessor;
 
   ShaderEntryState m_fragmentCacheEntryState = ShaderEntryState::New;
   ShaderCache *m_fragmentShaderCache = nullptr;
