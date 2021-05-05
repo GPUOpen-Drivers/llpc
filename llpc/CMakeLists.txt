@@ -221,6 +221,7 @@ if(ICD_BUILD_LLPC)
 
 # llpc/util
     target_sources(llpc PRIVATE
+        util/llpcCacheAccessor.cpp
         util/llpcDebug.cpp
         util/llpcElfWriter.cpp
         util/llpcFile.cpp
