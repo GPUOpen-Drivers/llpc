@@ -31,6 +31,7 @@
 #include "llpcCompiler.h"
 #include "LLVMSPIRVLib.h"
 #include "SPIRVInternal.h"
+#include "llpcCacheAccessor.h"
 #include "llpcComputeContext.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
@@ -832,22 +833,12 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 
     // Check the cache for the relocatable shader for this stage.
     MetroHash::Hash cacheHash = {};
-    IShaderCache *userShaderCache = nullptr;
-    ICache *userCache = nullptr;
     if (context->isGraphics()) {
       auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
       cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
-#if LLPC_ENABLE_SHADER_CACHE
-      userShaderCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
-#endif
-      userCache = pipelineInfo->cache;
     } else {
       auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
       cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, true);
-#if LLPC_ENABLE_SHADER_CACHE
-      userShaderCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
-#endif
-      userCache = pipelineInfo->cache;
     }
     // Note that this code updates m_pipelineHash of the pipeline context. It
     // must be restored before we link the pipeline ELF at the end of this for-loop.
@@ -857,32 +848,14 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
                                     << format_hex(context->getPipelineContext()->get128BitCacheHashCode()[1], 18)
                                     << '\n');
 
-    ShaderEntryState cacheEntryState = ShaderEntryState::New;
-    BinaryData elfBin = {};
-
-    EntryHandle cacheEntry;
-    HashId hashId = {};
-    memcpy(&hashId.bytes, &cacheHash.bytes, sizeof(cacheHash));
-    Result cacheResult = lookUpCaches(userCache, &hashId, &elfBin, &cacheEntry);
-    if (cacheResult == Result::Success) {
-      auto data = reinterpret_cast<const char *>(elfBin.pCode);
-      elf[stage].assign(data, data + elfBin.codeSize);
-      // Release Entry
-      ReleaseCacheEntry(false, nullptr, &cacheEntry);
-      LLPC_OUTS("Cache hit for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
-      stageCacheAccesses[stage] = CacheAccessInfo::CacheHit;
-      continue;
-    }
-
-    ShaderCache *shaderCache;
-    CacheEntryHandle hEntry;
-    cacheEntryState = lookUpShaderCaches(userShaderCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
-
-    if (cacheEntryState == ShaderEntryState::Ready) {
+    CacheAccessor cacheAccessor(context, cacheHash, this);
+    if (cacheAccessor.isInCache()) {
+      BinaryData elfBin = cacheAccessor.getElfFromCache();
       auto data = reinterpret_cast<const char *>(elfBin.pCode);
       elf[stage].assign(data, data + elfBin.codeSize);
       LLPC_OUTS("Cache hit for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
-      stageCacheAccesses[stage] = userShaderCache ? CacheAccessInfo::CacheHit : CacheAccessInfo::InternalCacheHit;
+      stageCacheAccesses[stage] =
+          cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
       continue;
     }
     LLPC_OUTS("Cache miss for shader stage " << getShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
@@ -898,12 +871,9 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 
     // Add the result to the cache.
     if (result == Result::Success) {
-      elfBin.codeSize = elf[stage].size();
-      elfBin.pCode = elf[stage].data();
+      BinaryData elfBin = {elf[stage].size(), elf[stage].data()};
+      cacheAccessor.setElfInCache(elfBin);
     }
-    updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
-    LLPC_OUTS("Updating the cache for shader stage " << stage << "\n");
-    ReleaseCacheEntry((result == Result::Success), &elfBin, &cacheEntry);
   }
   context->getPipelineContext()->setHashForCacheLookUp(originalCacheHash);
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
