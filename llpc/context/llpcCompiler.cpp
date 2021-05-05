@@ -31,6 +31,7 @@
 #include "llpcCompiler.h"
 #include "LLVMSPIRVLib.h"
 #include "SPIRVInternal.h"
+#include "llpcCacheAccessor.h"
 #include "llpcComputeContext.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
@@ -1575,42 +1576,13 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), &extraInfo);
   }
 
-  ShaderEntryState cacheEntryState = ShaderEntryState::New;
-  IShaderCache *appCache = nullptr;
-#if LLPC_ENABLE_SHADER_CACHE
-  appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
-#endif
-  ICache *userCache = nullptr;
-  userCache = pipelineInfo->cache;
-
-  ShaderCache *shaderCache = nullptr;
-  CacheEntryHandle hEntry = nullptr;
-  HashId hashId = {};
-  memcpy(&hashId.bytes, &cacheHash.bytes, sizeof(cacheHash));
-  EntryHandle cacheEntry;
-  Result cacheResult = Result::ErrorUnknown;
-
+  llvm::Optional<CacheAccessor> cacheAccessor;
   if (!buildingRelocatableElf) {
-    if (m_cache) {
-      cacheResult = lookUpCaches(userCache, &hashId, &elfBin, &cacheEntry);
-      if (cacheResult == Result::Success)
-        pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheHit;
-    } else {
-      cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
-      if (cacheEntryState == ShaderEntryState::Ready) {
-        pipelineOut->pipelineCacheAccess = appCache ? CacheAccessInfo::CacheHit : CacheAccessInfo::InternalCacheHit;
-      }
-    }
-    if (pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
-      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
-  } else {
-    cacheEntryState = ShaderEntryState::Compiling;
+    cacheAccessor.emplace(pipelineInfo, cacheHash, this);
   }
 
   ElfPackage candidateElf;
-
-  if (cacheEntryState == ShaderEntryState::Compiling || (m_cache && cacheResult != Result::Success)) {
-
+  if (!cacheAccessor || !cacheAccessor->isInCache()) {
     GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
     result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildingRelocatableElf, &candidateElf,
                                            pipelineOut->stageCacheAccesses);
@@ -1619,9 +1591,14 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
       elfBin.codeSize = candidateElf.size();
       elfBin.pCode = candidateElf.data();
     }
-
-    if (!buildingRelocatableElf && !m_cache)
-      updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
+    if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
+  } else {
+    elfBin = cacheAccessor->getElfFromCache();
+    if (cacheAccessor->isInCache()) {
+      pipelineOut->pipelineCacheAccess =
+          cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+    }
   }
 
   if (result == Result::Success) {
@@ -1640,11 +1617,9 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     }
   }
 
-  if (m_cache) {
-    bool withValue = (result == Result::Success) && (cacheResult != Result::Success);
-    ReleaseCacheEntry(withValue, &elfBin, &cacheEntry);
+  if (cacheAccessor && !cacheAccessor->isInCache() && result == Result::Success) {
+    cacheAccessor->setElfInCache(elfBin);
   }
-
   return result;
 }
 
@@ -1721,43 +1696,14 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), &extraInfo);
   }
 
-  ShaderEntryState cacheEntryState = ShaderEntryState::New;
-  IShaderCache *appCache = nullptr;
-#if LLPC_ENABLE_SHADER_CACHE
-  appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
-#endif
-  ICache *userCache = nullptr;
-  userCache = pipelineInfo->cache;
-
-  ShaderCache *shaderCache = nullptr;
-  CacheEntryHandle hEntry = nullptr;
-  HashId hashId = {};
-  memcpy(&hashId.bytes, &cacheHash.bytes, sizeof(cacheHash));
-  EntryHandle cacheEntry;
-  Result cacheResult = Result::ErrorUnknown;
-
+  std::unique_ptr<CacheAccessor> cacheAccessor;
   if (!buildingRelocatableElf) {
-    if (m_cache) {
-      cacheResult = lookUpCaches(userCache, &hashId, &elfBin, &cacheEntry);
-      if (cacheResult == Result::Success)
-        pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheHit;
-    } else {
-      cacheEntryState = lookUpShaderCaches(appCache, &cacheHash, &elfBin, &shaderCache, &hEntry);
-      if (cacheEntryState == ShaderEntryState::Ready) {
-        pipelineOut->pipelineCacheAccess = appCache ? CacheAccessInfo::CacheHit : CacheAccessInfo::InternalCacheHit;
-      }
-    }
-    if (pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
-      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
-  } else
-    cacheEntryState = ShaderEntryState::Compiling;
+    cacheAccessor = std::make_unique<CacheAccessor>(pipelineInfo, cacheHash, this);
+  }
 
   ElfPackage candidateElf;
-
-  if ((cacheEntryState == ShaderEntryState::Compiling) || (m_cache && (cacheResult != Result::Success))) {
-
+  if (!cacheAccessor || !cacheAccessor->isInCache()) {
     ComputeContext computeContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
-
     result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildingRelocatableElf, &candidateElf,
                                           &pipelineOut->stageCacheAccess);
 
@@ -1765,8 +1711,14 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
       elfBin.codeSize = candidateElf.size();
       elfBin.pCode = candidateElf.data();
     }
-    if (!buildingRelocatableElf && !m_cache)
-      updateShaderCache((result == Result::Success), &elfBin, shaderCache, hEntry);
+    if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
+  } else {
+    elfBin = cacheAccessor->getElfFromCache();
+    if (cacheAccessor->isInCache()) {
+      pipelineOut->pipelineCacheAccess =
+          cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+    }
   }
 
   if (result == Result::Success) {
@@ -1787,11 +1739,9 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     }
   }
 
-  if (m_cache) {
-    bool withValue = (result == Result::Success) && (cacheResult != Result::Success);
-    ReleaseCacheEntry(withValue, &elfBin, &cacheEntry);
+  if (cacheAccessor && !cacheAccessor->isInCache() && result == Result::Success) {
+    cacheAccessor->setElfInCache(elfBin);
   }
-
   return result;
 }
 
