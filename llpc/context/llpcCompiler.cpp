@@ -1300,58 +1300,22 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, unsigned stageM
   MetroHash::Hash fragmentHash = {};
   MetroHash::Hash nonFragmentHash = {};
   Compiler::buildShaderCacheHash(m_context, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
-  HashId fragmentHashId = {};
-  HashId nonFragmentHashId = {};
-  memcpy(&fragmentHashId.bytes, &fragmentHash.bytes, sizeof(fragmentHash));
-  memcpy(&nonFragmentHashId.bytes, &nonFragmentHash.bytes, sizeof(nonFragmentHash));
 
-  IShaderCache *appCache = nullptr;
-  auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
-#if LLPC_ENABLE_SHADER_CACHE
-  appCache = reinterpret_cast<IShaderCache *>(pipelineInfo->pShaderCache);
-#endif
-  ICache *userCache = nullptr;
-  userCache = pipelineInfo->cache;
+  if (stageMask & shaderStageToMask(ShaderStageFragment)) {
+    m_fragmentCacheAccessor.emplace(m_context, fragmentHash, m_compiler);
+    if (m_fragmentCacheAccessor->isInCache()) {
+      // Remove fragment shader stages.
+      stageMask &= ~shaderStageToMask(ShaderStageFragment);
+    }
+  }
 
-  using LookupHelperType = std::function<void(void)>;
-  LookupHelperType lookupFragCache = [this, userCache, &fragmentHashId]() {
-    m_fragmentCacheResult = m_compiler->lookUpCaches(userCache, &fragmentHashId, &m_fragmentElf, &m_fragmentEntry);
-  };
-
-  LookupHelperType lookupNonFragCache = [this, userCache, &nonFragmentHashId]() {
-    m_nonFragmentCacheResult =
-        m_compiler->lookUpCaches(userCache, &nonFragmentHashId, &m_nonFragmentElf, &m_nonFragmentEntry);
-  };
-
-  LookupHelperType lookupFragShader = [this, appCache, &fragmentHash]() {
-    m_fragmentCacheEntryState = m_compiler->lookUpShaderCaches(appCache, &fragmentHash, &m_fragmentElf,
-                                                               &m_fragmentShaderCache, &m_hFragmentEntry);
-  };
-
-  LookupHelperType lookupNonFragShader = [this, appCache, &nonFragmentHash]() {
-    m_nonFragmentCacheEntryState = m_compiler->lookUpShaderCaches(appCache, &nonFragmentHash, &m_nonFragmentElf,
-                                                                  &m_nonFragmentShaderCache, &m_hNonFragmentEntry);
-  };
-
-  auto lookupFragFunc = m_compiler->IsCacheValid() ? lookupFragCache : lookupFragShader;
-  auto lookupNonFragFunc = m_compiler->IsCacheValid() ? lookupNonFragCache : lookupNonFragShader;
-
-  if (stageMask & shaderStageToMask(ShaderStageFragment))
-    lookupFragFunc();
-
-  if (stageMask & ~shaderStageToMask(ShaderStageFragment))
-    lookupNonFragFunc();
-
-  if ((m_compiler->IsCacheValid() && m_nonFragmentCacheResult != Result::NotFound) ||
-      (!m_compiler->IsCacheValid() && m_nonFragmentCacheEntryState != ShaderEntryState::Compiling))
-    // Remove non-fragment shader stages.
-    stageMask &= shaderStageToMask(ShaderStageFragment);
-
-  if ((m_compiler->IsCacheValid() && m_fragmentCacheResult != Result::NotFound) ||
-      (!m_compiler->IsCacheValid() && m_fragmentCacheEntryState != ShaderEntryState::Compiling))
-    // Remove fragment shader stages.
-    stageMask &= ~shaderStageToMask(ShaderStageFragment);
-
+  if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
+    m_nonFragmentCacheAccessor.emplace(m_context, nonFragmentHash, m_compiler);
+    if (m_nonFragmentCacheAccessor->isInCache()) {
+      // Remove non-fragment shader stages.
+      stageMask &= shaderStageToMask(ShaderStageFragment);
+    }
+  }
   return stageMask;
 }
 
@@ -1375,54 +1339,43 @@ void GraphicsShaderCacheChecker::updateRootUserDateOffset(ElfPackage *pipelineEl
 // @param outputPipelineElf : ELF output of compile, updated to merge ELF from shader cache
 void GraphicsShaderCacheChecker::updateAndMerge(Result result, ElfPackage *outputPipelineElf) {
   // Update the shader cache if required, with the compiled pipeline or with a failure state.
-  if ((m_fragmentCacheEntryState == ShaderEntryState::Compiling ||
-       m_nonFragmentCacheEntryState == ShaderEntryState::Compiling) ||
-      (m_fragmentCacheResult == Result::NotFound || m_nonFragmentCacheResult == Result::NotFound)) {
-    BinaryData pipelineElf = {};
-    pipelineElf.codeSize = outputPipelineElf->size();
-    pipelineElf.pCode = outputPipelineElf->data();
+  bool needToMergeElf = false;
+  BinaryData pipelineElf = {};
+  pipelineElf.codeSize = outputPipelineElf->size();
+  pipelineElf.pCode = outputPipelineElf->data();
+  if (m_nonFragmentCacheAccessor) {
+    if (!m_nonFragmentCacheAccessor->isInCache())
+      m_nonFragmentCacheAccessor->setElfInCache(pipelineElf);
+    else
+      needToMergeElf = true;
+  }
 
-    if (m_compiler->IsCacheValid()) {
-      bool withValue = (result == Result::Success);
-
-      m_compiler->ReleaseCacheEntry(withValue && (m_fragmentCacheResult == Result::NotFound), &pipelineElf,
-                                    &m_fragmentEntry);
-      m_compiler->ReleaseCacheEntry(withValue && (m_nonFragmentCacheResult == Result::NotFound), &pipelineElf,
-                                    &m_nonFragmentEntry);
-    }
-
-    if (m_fragmentCacheEntryState == ShaderEntryState::Compiling) {
-      m_compiler->updateShaderCache(result == Result::Success, &pipelineElf, m_fragmentShaderCache, m_hFragmentEntry);
-    }
-
-    if (m_nonFragmentCacheEntryState == ShaderEntryState::Compiling) {
-      m_compiler->updateShaderCache(result == Result::Success, &pipelineElf, m_nonFragmentShaderCache,
-                                    m_hNonFragmentEntry);
-    }
+  if (m_fragmentCacheAccessor) {
+    if (!m_fragmentCacheAccessor->isInCache())
+      m_fragmentCacheAccessor->setElfInCache(pipelineElf);
+    else
+      needToMergeElf = true;
   }
 
   // Now merge ELFs if one or both parts are from the cache. Nothing needs to be merged if we just compiled the full
   // pipeline, as everything is already contained in the single incoming ELF in this case.
-  if (result == Result::Success &&
-      ((m_fragmentCacheEntryState == ShaderEntryState::Ready ||
-        m_nonFragmentCacheEntryState == ShaderEntryState::Ready) ||
-       (m_fragmentCacheResult == Result::Success || m_nonFragmentCacheResult == Result::Success))) {
+  if (needToMergeElf) {
     // Move the compiled ELF out of the way.
     ElfPackage compiledPipelineElf = std::move(*outputPipelineElf);
     outputPipelineElf->clear();
 
     // Determine where the fragment / non-fragment parts come from (cache or just-compiled).
     BinaryData fragmentElf = {};
-    if (m_fragmentCacheEntryState == ShaderEntryState::Ready || m_fragmentCacheResult == Result::Success)
-      fragmentElf = m_fragmentElf;
+    if (m_fragmentCacheAccessor && m_fragmentCacheAccessor->isInCache())
+      fragmentElf = m_fragmentCacheAccessor->getElfFromCache();
     else {
       fragmentElf.pCode = compiledPipelineElf.data();
       fragmentElf.codeSize = compiledPipelineElf.size();
     }
 
     BinaryData nonFragmentElf = {};
-    if (m_nonFragmentCacheEntryState == ShaderEntryState::Ready || m_nonFragmentCacheResult == Result::Success)
-      nonFragmentElf = m_nonFragmentElf;
+    if ((m_nonFragmentCacheAccessor && m_nonFragmentCacheAccessor->isInCache()))
+      nonFragmentElf = m_nonFragmentCacheAccessor->getElfFromCache();
     else {
       nonFragmentElf.pCode = compiledPipelineElf.data();
       nonFragmentElf.codeSize = compiledPipelineElf.size();
