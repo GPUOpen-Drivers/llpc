@@ -28,6 +28,8 @@ set(LLVM_LINK_COMPONENTS
     AMDGPUAsmParser
     AMDGPUCodeGen
     AMDGPUDisassembler
+    AsmParser
+    Support
 )
 
 add_llvm_tool(lgc
