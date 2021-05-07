@@ -109,8 +109,8 @@ const char *lgc::getShaderStageAbbreviation(ShaderStage shaderStage) {
 }
 
 // =====================================================================================================================
-// Add args to a function. The new args are put before any existing ones. This creates a new function with the
-// added args, then moves everything from the old function across to it.
+// Add args to a function. This creates a new function with the added args, then moves everything from the old function
+// across to it.
 // If this changes the return type, then all the return instructions will be invalid.
 // This does not erase the old function, as the caller needs to do something with its uses (if any).
 //
@@ -118,13 +118,20 @@ const char *lgc::getShaderStageAbbreviation(ShaderStage shaderStage) {
 // @param retTy : New return type, nullptr to use the same as in the original function
 // @param argTys : Types of new args
 // @param inRegMask : Bitmask of which args should be marked "inreg", to be passed in SGPRs
+// @param append : Append new arguments if true, prepend new arguments if false
 // @returns : The new function
-Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> argTys, uint64_t inRegMask) {
+Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> argTys, uint64_t inRegMask,
+                               bool append) {
   // Gather all arg types: first the new ones, then the ones from the original function.
   FunctionType *oldFuncTy = oldFunc->getFunctionType();
   SmallVector<Type *, 8> allArgTys;
+  // Old arguments first if new arguments are appended.
+  if (append)
+    allArgTys.append(oldFuncTy->params().begin(), oldFuncTy->params().end());
   allArgTys.append(argTys.begin(), argTys.end());
-  allArgTys.append(oldFuncTy->params().begin(), oldFuncTy->params().end());
+  // Old arguments last if new arguments are prepended.
+  if (!append)
+    allArgTys.append(oldFuncTy->params().begin(), oldFuncTy->params().end());
 
   // Create new empty function.
   if (!retTy)
@@ -147,14 +154,22 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   // bit is set in inRegMask.
   AttributeList oldAttrList = oldFunc->getAttributes();
   SmallVector<AttributeSet, 8> argAttrs;
+  if (append) {
+    // Old arguments first.
+    for (unsigned idx = 0; idx != argTys.size(); ++idx)
+      argAttrs.push_back(oldAttrList.getParamAttributes(idx));
+  }
+
   // New arguments.
   AttributeSet emptyAttrSet;
   AttributeSet inRegAttrSet = emptyAttrSet.addAttribute(oldFunc->getContext(), Attribute::InReg);
   for (unsigned idx = 0; idx != argTys.size(); ++idx)
     argAttrs.push_back((inRegMask >> idx) & 1 ? inRegAttrSet : emptyAttrSet);
-  // Old arguments.
-  for (unsigned idx = 0; idx != argTys.size(); ++idx)
-    argAttrs.push_back(oldAttrList.getParamAttributes(idx));
+  if (!append) {
+    // Old arguments.
+    for (unsigned idx = 0; idx != argTys.size(); ++idx)
+      argAttrs.push_back(oldAttrList.getParamAttributes(idx));
+  }
   // Construct new AttributeList and set it on the new function.
   newFunc->setAttributes(AttributeList::get(oldFunc->getContext(), oldAttrList.getFnAttributes(),
                                             oldAttrList.getRetAttributes(), argAttrs));
@@ -167,14 +182,14 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   // to the Function, and the attribute copy above copied the arg attributes at their original arg numbers.
   // Also set name of each new arg that comes from old arg.
   for (unsigned idx = 0; idx != argTys.size(); ++idx) {
-    Argument *arg = newFunc->getArg(idx);
+    Argument *arg = newFunc->getArg(append ? idx + oldFuncTy->params().size() : idx);
     if ((inRegMask >> idx) & 1)
       arg->addAttr(Attribute::InReg);
     else if (!oldFuncTy->params().empty())
       arg->removeAttr(Attribute::AttrKind::InReg);
   }
   for (unsigned idx = 0; idx != oldFuncTy->params().size(); ++idx) {
-    Argument *arg = newFunc->getArg(idx + argTys.size());
+    Argument *arg = newFunc->getArg(append ? idx : idx + argTys.size());
     Argument *oldArg = oldFunc->getArg(idx);
     arg->setName(oldArg->getName());
     oldArg->replaceAllUsesWith(arg);

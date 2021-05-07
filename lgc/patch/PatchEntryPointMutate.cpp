@@ -757,7 +757,7 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
   for (Function *origFunc : origFuncs) {
     // Create the new function and transfer code and attributes to it.
     Function *newFunc =
-        addFunctionArgs(origFunc, origFunc->getFunctionType()->getReturnType(), shaderInputTys, inRegMask);
+        addFunctionArgs(origFunc, origFunc->getFunctionType()->getReturnType(), shaderInputTys, inRegMask, true);
 
     // Set Attributes on new function.
     setFuncAttrs(newFunc);
@@ -793,7 +793,7 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
   // - a compute pipeline with non-inlined functions;
   // - a compute pipeline with calls to library functions;
   // - a compute library.
-  // We need to scan the code and modify each call to prepend the extra args.
+  // We need to scan the code and modify each call to append the extra args.
   IRBuilder<> builder(func.getContext());
   for (BasicBlock &block : func) {
     for (auto it = block.begin(), end = block.end(); it != end;) {
@@ -816,13 +816,13 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       // inputs), plus the original args on the call.
       SmallVector<Type *, 20> argTys;
       SmallVector<Value *, 20> args;
-      for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
-        argTys.push_back(func.getArg(idx)->getType());
-        args.push_back(func.getArg(idx));
-      }
       for (unsigned idx = 0; idx != call->getNumArgOperands(); ++idx) {
         argTys.push_back(call->getArgOperand(idx)->getType());
         args.push_back(call->getArgOperand(idx));
+      }
+      for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
+        argTys.push_back(func.getArg(idx)->getType());
+        args.push_back(func.getArg(idx));
       }
       // Get the new called value as a bitcast of the old called value. If the old called value is already
       // the inverse bitcast, just drop that bitcast.
@@ -846,7 +846,7 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       // Mark sgpr arguments as inreg
       for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
         if ((inRegMask >> idx) & 1)
-          newCall->addParamAttr(idx, Attribute::InReg);
+          newCall->addParamAttr(idx + call->getNumArgOperands(), Attribute::InReg);
       }
 
       // Replace and erase the old one.
