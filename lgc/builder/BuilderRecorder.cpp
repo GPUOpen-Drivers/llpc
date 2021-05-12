@@ -1917,6 +1917,12 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Sinh:
     case Tan:
     case Tanh:
+    case Opcode::SubgroupBallotBitCount:
+    case Opcode::SubgroupBallotBitExtract:
+    case Opcode::SubgroupBallotExclusiveBitCount:
+    case Opcode::SubgroupBallotFindLsb:
+    case Opcode::SubgroupBallotFindMsb:
+    case Opcode::SubgroupBallotInclusiveBitCount:
       // Functions that don't access memory.
       func->addFnAttr(Attribute::ReadNone);
       break;
@@ -1945,27 +1951,10 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::WriteXfbOutput:
       // Functions that read and write memory.
       break;
-    case Opcode::Barrier:
-    case Opcode::DemoteToHelperInvocation:
-    case Opcode::EmitVertex:
-    case Opcode::EndPrimitive:
-    case Opcode::ImageGetLod:
-    case Opcode::ImageQueryLevels:
-    case Opcode::ImageQuerySamples:
-    case Opcode::ImageQuerySize:
-    case Opcode::IsHelperInvocation:
-    case Opcode::Kill:
-    case Opcode::ReadClock:
     case Opcode::SubgroupAll:
     case Opcode::SubgroupAllEqual:
     case Opcode::SubgroupAny:
     case Opcode::SubgroupBallot:
-    case Opcode::SubgroupBallotBitCount:
-    case Opcode::SubgroupBallotBitExtract:
-    case Opcode::SubgroupBallotExclusiveBitCount:
-    case Opcode::SubgroupBallotFindLsb:
-    case Opcode::SubgroupBallotFindMsb:
-    case Opcode::SubgroupBallotInclusiveBitCount:
     case Opcode::SubgroupBroadcast:
     case Opcode::SubgroupBroadcastFirst:
     case Opcode::SubgroupClusteredExclusive:
@@ -1984,7 +1973,22 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::SubgroupShuffleXor:
     case Opcode::SubgroupSwizzleMask:
     case Opcode::SubgroupSwizzleQuad:
+    case Opcode::Barrier:
+      // TODO: we should mark these functions 'ReadNone' in theory, but that need to wait until we fix all convergent
+      // issues in LLVM optimizations.
+      func->addFnAttr(Attribute::Convergent);
+      break;
     case Opcode::SubgroupWriteInvocation:
+    case Opcode::DemoteToHelperInvocation:
+    case Opcode::EmitVertex:
+    case Opcode::EndPrimitive:
+    case Opcode::ImageGetLod:
+    case Opcode::ImageQueryLevels:
+    case Opcode::ImageQuerySamples:
+    case Opcode::ImageQuerySize:
+    case Opcode::IsHelperInvocation:
+    case Opcode::Kill:
+    case Opcode::ReadClock:
     case Opcode::WriteBuiltInOutput:
     case Opcode::WriteGenericOutput:
       // TODO: These functions have not been classified yet.
