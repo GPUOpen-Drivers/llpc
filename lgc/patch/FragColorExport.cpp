@@ -473,7 +473,6 @@ bool LowerFragColorExport::runOnModule(Module &module) {
   BuilderBase builder(module.getContext());
   builder.SetInsertPoint(retInst);
 
-  Value *lastExport = nullptr;
   collectExportInfoForBuiltinOutput(fragEntryPoint, builder);
   collectExportInfoForGenericOutputs(fragEntryPoint, builder);
 
@@ -496,7 +495,7 @@ bool LowerFragColorExport::runOnModule(Module &module) {
   const auto &builtInUsage = m_resUsage->builtInUsage.fs;
   bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
   m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(m_info, hasDepthExpFmtZero, builtInUsage.discard);
-  return lastExport != nullptr;
+  return !m_info.empty() || dummyExport;
 }
 
 // =====================================================================================================================
