@@ -41,10 +41,12 @@ target_include_directories(vkgc
 )
 
 ### external SPIRV headers #########################################################
-if(EXISTS ${PROJECT_SOURCE_DIR}/../SPIRV-Headers)
-    set(SPIRV_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../SPIRV-Headers CACHE PATH "The path of SPIRV headers.")
-elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers)
-    set(SPIRV_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers CACHE PATH "The path of SPIRV headers.")
+if (NOT SPIRV_HEADERS_PATH)
+    if(EXISTS ${PROJECT_SOURCE_DIR}/../SPIRV-Headers)
+        set(SPIRV_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../SPIRV-Headers CACHE PATH "The path of SPIRV headers.")
+    elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers)
+        set(SPIRV_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers CACHE PATH "The path of SPIRV headers.")
+    endif()
 endif()
 
 ### Interface Target ###################################################################################################
@@ -57,10 +59,12 @@ if(EXISTS ${SPIRV_HEADERS_PATH})
             ${SPIRV_HEADERS_PATH}/include/spirv
             ${PROJECT_SOURCE_DIR}/include/khronos
     )
-    target_compile_definitions(khronos_spirv_interface
-        INTERFACE
-            EXTERNAL_SPIRV_HEADERS=1
-    )
+    if (NOT SPIRV_HEADERS_PATH_INTERNAL)
+        target_compile_definitions(khronos_spirv_interface
+            INTERFACE
+                EXTERNAL_SPIRV_HEADERS=1
+        )
+    endif()
 else()
     target_include_directories(khronos_spirv_interface
         INTERFACE
@@ -79,7 +83,7 @@ if(ICD_BUILD_LLPC)
     add_subdirectory(llpc ${PROJECT_BINARY_DIR}/llpc)
 
     # Export the LLVM and spvgen build paths so that they are available in XGL,
-    # if this is not an LLPC standalone build.
+    # when this is not an LLPC standalone build.
     if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         set(XGL_LLVM_BUILD_PATH ${XGL_LLVM_BUILD_PATH} PARENT_SCOPE)
         if(DEFINED XGL_SPVGEN_BUILD_PATH)

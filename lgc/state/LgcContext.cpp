@@ -153,6 +153,9 @@ void LgcContext::initialize() {
   setOptionDefault("amdgpu-unroll-max-block-to-analyze", "20");
   setOptionDefault("unroll-max-percent-threshold-boost", "1000");
   setOptionDefault("unroll-allow-partial", "1");
+  // TODO: phi-of-ops optimization in NewGVN has some problems, we temporarily
+  // disable this to avoid mis-compile, see (https://github.com/GPUOpen-Drivers/llpc/issues/1206).
+  setOptionDefault("enable-phi-of-ops", "0");
   setOptionDefault("simplifycfg-sink-common", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
   setOptionDefault("amdgpu-atomic-optimizations", "1");

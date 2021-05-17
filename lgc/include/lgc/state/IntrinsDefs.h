@@ -62,6 +62,8 @@ static const unsigned GsEmitStreaM3 = 0x322; // [3:0] = 2 (GS), [5:4] = 2 (emit)
 static const unsigned GsEmitCutStreamIdShift = 0x8;  // Shift of STREAM_ID of the message GS_EMIT/GS_CUT
 static const unsigned GsEmitCutStreamIdMask = 0x300; // Mask of STREAM_ID of the message GS_EMIT/GS_CUT
 
+static const unsigned GetRealTime = 0x83; // [7] = 1, [6:0] = 3
+
 // Enumerates address spaces valid for AMD GPU (similar to LLVM header AMDGPU.h)
 enum AddrSpace {
   ADDR_SPACE_GLOBAL = 1,             // Global memory
