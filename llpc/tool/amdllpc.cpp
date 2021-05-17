@@ -232,10 +232,10 @@ static cl::opt<bool> EnableRelocatableShaderElf("enable-relocatable-shader-elf",
                                                 cl::desc("Compile pipelines using relocatable shader elf"),
                                                 cl::init(false));
 
-// -check-auto-layout-compatible: check if auto descriptor layout got from spv file is commpatible with real layout
+// -check-auto-layout-compatible: check if auto descriptor layout got from spv file is compatible with real layout
 static cl::opt<bool> CheckAutoLayoutCompatible(
     "check-auto-layout-compatible",
-    cl::desc("check if auto descriptor layout got from spv file is commpatible with real layout"));
+    cl::desc("Check if auto descriptor layout got from spv file is compatible with real layout"));
 
 namespace llvm {
 
@@ -306,12 +306,12 @@ struct CompileInfo {
   GraphicsPipelineBuildOut gfxPipelineOut;           // Output of building graphics pipeline
   ComputePipelineBuildInfo compPipelineInfo;         // Info to build compute pipeline
   ComputePipelineBuildOut compPipelineOut;           // Output of building compute pipeline
-  void *pipelineBuf;              // Alllocation buffer of building pipeline
+  void *pipelineBuf;                                 // Allocation buffer of building pipeline
   void *pipelineInfoFile;         // VFX-style file containing pipeline info
   const char *fileNames;          // Names of input shader source files
   bool unlinked;                  // Whether to generate unlinked half-pipeline ELF
   bool doAutoLayout;              // Whether to auto layout descriptors
-  bool checkAutoLayoutCompatible; // Whether to comapre if auto layout descriptors is
+  bool checkAutoLayoutCompatible; // Whether to compare if auto layout descriptors is
                                   // same as specified pipeline layout
 };
 

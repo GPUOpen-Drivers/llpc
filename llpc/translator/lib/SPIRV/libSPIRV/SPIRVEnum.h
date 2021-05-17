@@ -203,6 +203,9 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityUniformTexelBufferArrayNonUniformIndexingEXT, { CapabilitySampledBuffer });
   ADD_VEC_INIT(CapabilityStorageTexelBufferArrayNonUniformIndexingEXT, { CapabilityImageBuffer });
   ADD_VEC_INIT(CapabilityInt64ImageEXT, {CapabilityShader});
+#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
+  ADD_VEC_INIT(CapabilityDotProductInput4x8BitKHR, {CapabilityInt16});
+#endif
 }
 
 template <> inline void SPIRVMap<SPIRVExecutionModelKind, SPIRVCapVec>::init() {
