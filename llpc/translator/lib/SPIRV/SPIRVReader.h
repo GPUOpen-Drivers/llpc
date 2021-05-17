@@ -172,6 +172,11 @@ public:
   // Translate OpImageQueryLod to LLVM IR
   Value *transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicBlock *bb);
 
+#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
+  // Translate integer dot product to LLVM IR
+  Value *transSPIRVIntegerDotProductFromInst(SPIRVInstruction *bi, BasicBlock *bb);
+#endif
+
   Value *createLaunderRowMajorMatrix(Value *const);
   Value *addLoadInstRecursively(SPIRVType *const, Value *const, bool, bool, bool);
   void addStoreInstRecursively(SPIRVType *const, Value *const, Value *const, bool, bool, bool);

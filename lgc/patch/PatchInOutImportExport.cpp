@@ -1049,18 +1049,18 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       //     case 0:
       //       export outputs of stream 0
       //       break
-      //       ...
+      //     ...
       //     case rasterStream:
       //       export outputs of raster stream
       //       break
-      //       ...
+      //     ...
       //     case 3:
       //       export outputs of stream 3
       //       break
-      //     }
-      //
-      //     return
       //   }
+      //
+      //   return
+      // }
       //
       // If NGG, the copy shader with stream-out is not a real HW VS and will be incorporated into NGG
       // primitive shader later. There is no mutiple HW executions. And it has the following structure similar to
@@ -1763,7 +1763,7 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
 
       if (bitWidth == 16) {
         compValue = performFsHalfInterpolation(builder, loc, builder.getInt32(i), coordI, coordJ, primMask,
-                                               builder.getInt32(highHalf));
+                                               builder.getInt1(highHalf));
 
       } else {
         compValue = performFsFloatInterpolation(builder, loc, builder.getInt32(i), coordI, coordJ, primMask);

@@ -545,6 +545,17 @@ inline bool isValid(spv::Capability V) {
   case CapabilityStorageTexelBufferArrayNonUniformIndexingEXT:
 #endif
   case CapabilityDemoteToHelperInvocationEXT:
+#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
+  case CapabilityDotProductInputAllKHR:
+  case CapabilityDotProductInput4x8BitKHR:
+  case CapabilityDotProductInput4x8BitPackedKHR:
+  case CapabilityDotProductUnsignedKHR:
+  case CapabilityDotProductMixedSignednessKHR:
+  case CapabilityDotProductSignedKHR:
+  case CapabilityDotProductAccSatUnsignedKHR:
+  case CapabilityDotProductAccSatMixedSignednessKHR:
+  case CapabilityDotProductAccSatSignedKHR:
+#endif
     return true;
   default:
     return false;
@@ -847,6 +858,14 @@ inline bool isValid(spv::Op V) {
   case OpSubgroupAllKHR:
   case OpSubgroupAnyKHR:
   case OpSubgroupAllEqualKHR:
+#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
+  case OpSDotKHR:
+  case OpUDotKHR:
+  case OpSUDotKHR:
+  case OpSDotAccSatKHR:
+  case OpUDotAccSatKHR:
+  case OpSUDotAccSatKHR:
+#endif
   case OpFragmentMaskFetchAMD:
   case OpFragmentFetchAMD:
   case OpGroupIAddNonUniformAMD:
@@ -873,6 +892,17 @@ inline bool isValid(spv::Op V) {
     return false;
   }
 }
+
+#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
+inline bool isValidPackedVectorFormat(spv::PackedVectorFormat V) {
+  switch (V) {
+  case PackedVectorFormat4x8BitKHR:
+    return true;
+  default:
+    return false;
+  }
+}
+#endif
 
 inline bool isValidImageOperandsMask(SPIRVWord Mask) {
   SPIRVWord ValidMask = 0u;

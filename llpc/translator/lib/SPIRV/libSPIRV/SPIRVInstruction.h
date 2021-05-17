@@ -2536,6 +2536,92 @@ _SPIRV_OP(SubgroupImageBlockReadINTEL, true, 5)
 _SPIRV_OP(SubgroupImageBlockWriteINTEL, false, 4)
 #undef _SPIRV_OP
 
+#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
+class SPIRVIntegerDotProductInstBase : public SPIRVInstTemplateBase {
+public:
+  SPIRVCapVec getRequiredCapability() const override {
+    SPIRVCapVec CapVec;
+    switch (static_cast<int>(getOpCode())) {
+    case OpSDotKHR:
+      CapVec.push_back(CapabilityDotProductSignedKHR);
+      break;
+    case OpUDotKHR:
+      CapVec.push_back(CapabilityDotProductUnsignedKHR);
+      break;
+    case OpSUDotKHR:
+      CapVec.push_back(CapabilityDotProductMixedSignednessKHR);
+      break;
+    case OpSDotAccSatKHR:
+      CapVec.push_back(CapabilityDotProductAccSatSignedKHR);
+      break;
+    case OpUDotAccSatKHR:
+      CapVec.push_back(CapabilityDotProductAccSatUnsignedKHR);
+      break;
+    case OpSUDotAccSatKHR:
+      CapVec.push_back(CapabilityDotProductAccSatMixedSignednessKHR);
+      break;
+    default:
+      assert("Invalid Op");
+      break;
+    }
+
+    if (getValueType(Ops[0])->isTypeVector()) {
+      CapVec.push_back(CapabilityDotProductInputAllKHR);
+      CapVec.push_back(CapabilityDotProductInput4x8BitKHR);
+    } else {
+      CapVec.push_back(CapabilityDotProductInput4x8BitPackedKHR);
+    }
+    return CapVec;
+  }
+
+protected:
+  void validate() const override {
+    SPIRVInstruction::validate();
+    SPIRVId Op1 = Ops[0];
+    SPIRVId Op2 = Ops[1];
+    SPIRVType *Op1Ty = getValueType(Op1);
+    SPIRVType *Op2Ty = getValueType(Op2);
+    assert(Op1Ty->isTypeInt() || Op1Ty->isTypeVector());
+
+    if (Op1Ty->isTypeInt()) {
+      // 4x8-bit is packed into a 32-bit integer
+      auto Op1IntTy = static_cast<SPIRVTypeInt *>(Op1Ty);
+      auto Op2IntTy = static_cast<SPIRVTypeInt *>(Op2Ty);
+      assert(Op1IntTy->getBitWidth() == 32 && Op2IntTy->getBitWidth() == 32 && Type->getBitWidth() >= 8);
+      unsigned optionalIdx = WordCount == 6 ? 2 : 3;
+      assert(isValidPackedVectorFormat(static_cast<spv::PackedVectorFormat>(Ops[optionalIdx])) &&
+             "Invalid packed vector format");
+      (void)Op1IntTy;
+      (void)Op2IntTy;
+    } else {
+      // 4x8-bit integer vectors
+      assert(Op1Ty->getVectorComponentCount() == Op2Ty->getVectorComponentCount() &&
+             Op1Ty->getVectorComponentCount() == 4 && Op1Ty->getVectorComponentType()->isTypeInt() &&
+             Op2Ty->getVectorComponentType()->isTypeInt());
+      auto Op1IntTy = static_cast<SPIRVTypeInt *>(Op1Ty->getVectorComponentType());
+      auto Op2IntTy = static_cast<SPIRVTypeInt *>(Op2Ty->getVectorComponentType());
+      assert(Op1IntTy->getBitWidth() == Op2IntTy->getBitWidth() && Op1IntTy->getBitWidth() == 8 &&
+             Type->getBitWidth() >= Op1IntTy->getBitWidth());
+      (void)Op1IntTy;
+      (void)Op2IntTy;
+    }
+    // The accumulator type is the same as the return type.
+    if (WordCount == 7)
+      assert(Type == getValueType(Ops[2]));
+  }
+};
+
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVIntegerDotProductInstBase, Op##x, __VA_ARGS__> SPIRV##x;
+// Integer dot product instrction
+_SPIRV_OP(SDotKHR, true, 5, true, 2)
+_SPIRV_OP(UDotKHR, true, 5, true, 2)
+_SPIRV_OP(SUDotKHR, true, 5, true, 2)
+_SPIRV_OP(SDotAccSatKHR, true, 6, true, 3)
+_SPIRV_OP(UDotAccSatKHR, true, 6, true, 3)
+_SPIRV_OP(SUDotAccSatKHR, true, 6, true, 3)
+#undef _SPIRV_OP
+#endif
+
 SPIRVSpecConstantOp *createSpecConstantOpInst(SPIRVInstruction *Inst);
 SPIRVInstruction *createInstFromSpecConstantOp(SPIRVSpecConstantOp *C);
 SPIRVValue *createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,

@@ -31,6 +31,7 @@
 #include "BuilderImpl.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "lgc/state/TargetInfo.h"
 
 #define DEBUG_TYPE "lgc-builder-impl-misc"
 
@@ -122,9 +123,9 @@ Value *MiscBuilder::CreateIsHelperInvocation(const Twine &instName) {
 // @param instName : Name to give instruction(s)
 Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) {
   CallInst *readClock = nullptr;
-  if (realtime)
-    readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
-  else
+  if (realtime) {
+      readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
+  } else
     readClock = CreateIntrinsic(Intrinsic::readcyclecounter, {}, {}, nullptr, instName);
   readClock->addAttribute(AttributeList::FunctionIndex, Attribute::ReadOnly);
 

@@ -4963,6 +4963,15 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, transValueWithOpcode<OpDemoteToHelperInvocationEXT>(bv));
   case OpIsHelperInvocationEXT:
     return mapValue(bv, transValueWithOpcode<OpIsHelperInvocationEXT>(bv));
+#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
+  case OpSDotKHR:
+  case OpUDotKHR:
+  case OpSUDotKHR:
+  case OpSDotAccSatKHR:
+  case OpUDotAccSatKHR:
+  case OpSUDotAccSatKHR:
+    return mapValue(bv, transSPIRVIntegerDotProductFromInst(static_cast<SPIRVInstruction *>(bv), bb));
+#endif
   default: {
     auto oc = bv->getOpCode();
     if (isSPIRVCmpInstTransToLLVMInst(static_cast<SPIRVInstruction *>(bv)))
@@ -6180,6 +6189,118 @@ Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicB
 
   return result;
 }
+
+#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
+// =============================================================================
+// Translate integer dot product to LLVM IR
+Value *SPIRVToLLVM::transSPIRVIntegerDotProductFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
+  auto bc = static_cast<SPIRVIntegerDotProductInstBase *>(bi);
+  Value *vector1 = transValue(bc->getOperand(0), bb->getParent(), bb);
+  Value *vector2 = transValue(bc->getOperand(1), bb->getParent(), bb);
+
+  Type *inputTy = vector1->getType();
+
+  auto oc = bc->getOpCode();
+  unsigned flags = 0;
+  if (oc == OpSDotKHR || oc == OpSDotAccSatKHR)
+    flags = lgc::Builder::FirstVectorSigned | lgc::Builder::SecondVectorSigned;
+  else if (oc == OpSUDotKHR || oc == OpSUDotAccSatKHR)
+    flags = lgc::Builder::FirstVectorSigned;
+  const bool isSigned = (flags | lgc::Builder::FirstVectorSigned);
+
+  Value *accumulator = nullptr;
+  const unsigned compBitWidth = inputTy->getScalarSizeInBits();
+  const bool isAccSat = (oc == OpSDotAccSatKHR || oc == OpUDotAccSatKHR || oc == OpSUDotAccSatKHR);
+  if (isAccSat) {
+    accumulator = transValue(bc->getOperand(2), bb->getParent(), bb);
+    Type *targetTy = getBuilder()->getInt32Ty();
+    if (inputTy->isVectorTy() && (compBitWidth == 32 || compBitWidth == 64))
+      targetTy = getBuilder()->getInt64Ty();
+    accumulator =
+        isSigned ? getBuilder()->CreateSExt(accumulator, targetTy) : getBuilder()->CreateZExt(accumulator, targetTy);
+  } else {
+    accumulator = getBuilder()->getInt32(0);
+  }
+
+  Value *scalar = nullptr;
+  // The dot product of vectors of 32-bit integers or 64-bit integers is emulated here
+  if (inputTy->isVectorTy() && (compBitWidth == 32 || compBitWidth == 64)) {
+    scalar = getBuilder()->getInt32(0);
+    Type *targetTy = getBuilder()->getInt64Ty();
+
+    const unsigned compCount = cast<FixedVectorType>(inputTy)->getNumElements();
+    for (unsigned elemIdx = 0; elemIdx < compCount; ++elemIdx) {
+      Value *elem1 = getBuilder()->CreateExtractElement(vector1, elemIdx);
+      elem1 = isSigned ? getBuilder()->CreateSExt(elem1, targetTy) : getBuilder()->CreateZExt(elem1, targetTy);
+      Value *elem2 = getBuilder()->CreateExtractElement(vector2, elemIdx);
+      elem2 = (oc == OpSDotKHR || oc == OpSDotAccSatKHR) ? getBuilder()->CreateSExt(elem2, targetTy)
+                                                         : getBuilder()->CreateZExt(elem2, targetTy);
+      Value *product = getBuilder()->CreateMul(elem1, elem2);
+      scalar = getBuilder()->CreateAdd(product, scalar);
+    }
+    if (isAccSat)
+      scalar = getBuilder()->CreateAdd(scalar, accumulator);
+  } else {
+    // The dot product of vectors of 8-bit integers and 16-bit integers is implemented in CreateIntegerDotProduct
+    if (inputTy->isIntegerTy(32)) {
+      // Cast i32 to <4xi8>
+      auto vecTy = FixedVectorType::get(getBuilder()->getInt8Ty(), 4);
+      vector1 = getBuilder()->CreateBitCast(vector1, vecTy);
+      vector2 = getBuilder()->CreateBitCast(vector2, vecTy);
+    }
+    scalar = getBuilder()->CreateIntegerDotProduct(vector1, vector2, accumulator, flags);
+  }
+
+  Type *returnTy = transType(bc->getType());
+  const unsigned bitWidth = cast<IntegerType>(returnTy)->getBitWidth();
+  assert(bitWidth <= 64);
+  if (bitWidth != 32) {
+    if (isAccSat) {
+      // Perform clamp for non-32-bit return type
+      // The scope for 8-bit/16-bit/64-bit signed/unsinged integer type
+      struct ClampRange {
+        long long signedMin;
+        long long signedMax;
+        unsigned long long unsignedMin;
+        unsigned long long unsignedMax;
+      };
+      static const ClampRange clampRange[] = {{SCHAR_MIN, SCHAR_MAX, 0, UCHAR_MAX},
+                                              {SHRT_MIN, SHRT_MAX, 0, USHRT_MAX},
+                                              {LLONG_MIN, LLONG_MAX, 0, ULLONG_MAX}};
+      unsigned bitWidthIdx = 0;
+      if (bitWidth == 16)
+        bitWidthIdx = 1;
+      else if (bitWidth == 64)
+        bitWidthIdx = 2;
+
+      const ClampRange &range = clampRange[bitWidthIdx];
+      Value *minimum, *maximum, *isUnderflow, *isOverflow;
+      if (isSigned) {
+        scalar = getBuilder()->CreateSExt(scalar, getBuilder()->getInt64Ty());
+        minimum = ConstantInt::getSigned(getBuilder()->getInt64Ty(), range.signedMin);
+        maximum = ConstantInt::getSigned(getBuilder()->getInt64Ty(), range.signedMax);
+        isUnderflow = getBuilder()->CreateICmpSLT(scalar, minimum);
+        isOverflow = getBuilder()->CreateICmpSGT(scalar, maximum);
+      } else {
+        scalar = getBuilder()->CreateZExt(scalar, getBuilder()->getInt64Ty());
+        minimum = getBuilder()->getInt64(range.unsignedMin);
+        maximum = getBuilder()->getInt64(range.unsignedMax);
+        isUnderflow = getBuilder()->CreateICmpULT(scalar, minimum);
+        isOverflow = getBuilder()->CreateICmpUGT(scalar, maximum);
+      }
+      scalar = getBuilder()->CreateSelect(isUnderflow, minimum, scalar);
+      scalar = getBuilder()->CreateSelect(isOverflow, maximum, scalar);
+      scalar = getBuilder()->CreateTrunc(scalar, returnTy);
+    } else {
+      // Extend or truncate to return type
+      scalar = isSigned ? getBuilder()->CreateSExtOrTrunc(scalar, returnTy)
+                        : getBuilder()->CreateZExtOrTrunc(scalar, returnTy);
+    }
+  }
+
+  return scalar;
+}
+#endif
 
 // =============================================================================
 

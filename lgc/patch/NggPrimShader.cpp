@@ -2611,7 +2611,6 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
   const bool hasTs = (m_hasTcs || m_hasTes);
 
   // Call ES-partial entry
-
   Argument *arg = sysValueStart;
 
   Value *offChipLdsBase = (arg + EsGsSysValueOffChipLdsBase);

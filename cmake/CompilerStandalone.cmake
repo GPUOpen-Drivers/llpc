@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -22,8 +22,6 @@
  #  SOFTWARE.
  #
  #######################################################################################################################
-
-# Settings required for a standalone LLPC build that would otherwise be inherited from the driver.
 
 if(COMMAND cmake_policy)
     cmake_policy(SET CMP0003 NEW)
