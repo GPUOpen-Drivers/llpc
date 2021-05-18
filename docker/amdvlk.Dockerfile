@@ -45,7 +45,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
        libwayland-dev \
-       git curl wget \
+       git curl wget openssh-client \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir --upgrade cmake \
