@@ -94,6 +94,9 @@ public:
   // Get the name of this glue shader.
   StringRef getName() const override { return "fetch shader"; }
 
+  // No PAL metadata entries need updating for the fetch shader.
+  void updatePalMetadata(PalMetadata &) override { return; }
+
 protected:
   // Generate the glue shader to IR module
   Module *generate() override;
@@ -134,6 +137,10 @@ public:
   // Get the name of this glue shader.
   StringRef getName() const override { return "color export shader"; }
 
+  // Update the entries in the PAL metadata that require both the pipeline state
+  // and export info.
+  void updatePalMetadata(PalMetadata &palMetadata) override;
+
 protected:
   // Generate the glue shader to IR module
   Module *generate() override;
@@ -149,7 +156,7 @@ private:
   // The encoded or hashed (in some way) single string version of the above.
   std::string m_shaderString;
   PipelineState *m_pipelineState; // The pipeline state.  Used to set meta data information.
-  bool m_killEnabled;             // True if this fragement shader has kill enabled.
+  bool m_killEnabled;             // True if this fragment shader has kill enabled.
 };
 } // anonymous namespace
 
@@ -413,16 +420,6 @@ Module *ColorExportShader::generate() {
 
   bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
   fragColorExport->generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
-
-  bool hasDepthExpFmtZero = true;
-  for (auto &info : m_exports) {
-    if (info.hwColorTarget == MaxColorTargets) {
-      hasDepthExpFmtZero = false;
-      break;
-    }
-  }
-
-  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(m_exports, hasDepthExpFmtZero, m_killEnabled);
   return colorExportFunc->getParent();
 }
 
@@ -450,4 +447,19 @@ Function *ColorExportShader::createColorExportFunc() {
   BuilderBase builder(block);
   builder.CreateRetVoid();
   return func;
+}
+
+// =====================================================================================================================
+// Update the color format entry in the PAL metadata.
+//
+// @param [in/out] outStream : The PAL metadata object in which to update the color format.
+void ColorExportShader::updatePalMetadata(PalMetadata &palMetadata) {
+  bool hasDepthExpFmtZero = true;
+  for (auto &info : m_exports) {
+    if (info.hwColorTarget == MaxColorTargets) {
+      hasDepthExpFmtZero = false;
+      break;
+    }
+  }
+  palMetadata.updateSpiShaderColFormat(m_exports, hasDepthExpFmtZero, m_killEnabled);
 }

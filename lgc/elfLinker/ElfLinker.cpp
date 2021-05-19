@@ -649,6 +649,9 @@ void ElfLinkerImpl::writePalMetadata() {
   // Fix up user data registers.
   PalMetadata *palMetadata = m_pipelineState->getPalMetadata();
   palMetadata->fixUpRegisters();
+  for (auto &glueShader : m_glueShaders)
+    glueShader->updatePalMetadata(*palMetadata);
+
   // Finalize the PAL metadata, writing pipeline state items into it.
   palMetadata->finalizePipeline();
   // Write the MsgPack document into a blob.
