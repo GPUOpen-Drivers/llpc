@@ -157,10 +157,18 @@ void ObjDisassembler::run() {
   if (!instrInfo)
     report_fatal_error(m_data.getBufferIdentifier() + ": No instruction info for target");
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 389223
   MCObjectFileInfo objFileInfo;
   MCContext context(triple, asmInfo.get(), regInfo.get(), &objFileInfo, m_subtargetInfo.get());
-  m_context = &context;
   objFileInfo.initMCObjectFileInfo(context, false);
+#else
+  MCContext context(triple, asmInfo.get(), regInfo.get(), m_subtargetInfo.get());
+  std::unique_ptr<MCObjectFileInfo> objFileInfo(m_target->createMCObjectFileInfo(context, /*PIC=*/false));
+  if (!objFileInfo)
+    report_fatal_error("No MC object file info");
+  context.setObjectFileInfo(objFileInfo.get());
+#endif
+  m_context = &context;
 
   m_instDisassembler.reset(m_target->createMCDisassembler(*m_subtargetInfo, *m_context));
   if (!m_instDisassembler)
