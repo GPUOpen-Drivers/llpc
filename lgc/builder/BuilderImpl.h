@@ -493,11 +493,11 @@ private:
                                       InOutInfo inOutInfo, llvm::Value *vertexIndex, const llvm::Twine &instName);
 
   // Mark usage for a generic (user) input or output
-  void markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount, InOutInfo inOutInfo,
+  void markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount, InOutInfo &inOutInfo,
                                    llvm::Value *vertexIndex);
 
   // Mark interpolation info for FS input.
-  void markInterpolationInfo(InOutInfo interpInfo);
+  void markInterpolationInfo(InOutInfo &interpInfo);
 
   // Mark fragment output type
   void markFsOutputType(llvm::Type *outputTy, unsigned location, InOutInfo outputInfo);
@@ -525,7 +525,7 @@ private:
   llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 
   // Mark usage of a built-in input
-  void markBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize);
+  void markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize);
 
   // Mark usage of a built-in output
   void markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize, unsigned streamId);
