@@ -225,6 +225,7 @@ private:
   const Vkgc::PipelineShaderOptions *m_shaderOptions;
   unsigned m_spirvOpMetaKindId;
   unsigned m_execModule;
+
   lgc::Builder *getBuilder() const { return m_builder; }
 
   Type *mapType(SPIRVType *bt, Type *t) {
@@ -315,6 +316,33 @@ private:
                                              std::function<Value *(Value *)> createImageOp);
 
   Function *createLibraryEntryFunc();
+
+  const Vkgc::PipelineOptions *getPipelineOptions() const;
+
+  // This flag must explicitly be updated while translating if we want to continue inserting at the last insert point
+  // instead of omitting it.
+  bool continueAtLastInsertPoint = false;
+
+  struct ScratchBoundsCheckInfo {
+    // true, if the bounds check preparation algorithm determined that we want to add an OOB check.
+    bool shouldInsertBoundsCheck;
+
+    // The entry BB where the memory operation was discovered.
+    BasicBlock *entryBlock;
+
+    // A newly created BB wheere the memory operation will be moved to. Will be conditionally branched to from the entry
+    // block.
+    BasicBlock *intermediateBlock;
+
+    // A newly created BB where all subsequent instructions will be moved to. Will be conditionally branched to from the
+    // entry block and unconditionally branched from the intermediate block.
+    BasicBlock *finalBlock;
+
+    // Describes the result of all ANDed out of bounds access checks, used for executing the conditional branch.
+    Value *finalCmpResult;
+  };
+
+  ScratchBoundsCheckInfo prepareScratchBoundsCheck(SPIRVValue *origin);
 }; // class SPIRVToLLVM
 
 } // namespace SPIRV

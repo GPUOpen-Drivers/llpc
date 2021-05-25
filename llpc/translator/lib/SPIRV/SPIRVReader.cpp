@@ -2175,8 +2175,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   }
 
   bool isVolatile = spvLoad->SPIRVMemoryAccess::isVolatile(true);
-  const Vkgc::ExtendedRobustness &extendedRobustness =
-      static_cast<Llpc::Context *>(m_context)->getPipelineContext()->getPipelineOptions()->extendedRobustness;
+  const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
   if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
     isVolatile |= spvLoad->getSrc()->isVolatile();
 
@@ -2205,6 +2204,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     if (isSystemScope)
       isCoherent = true;
   }
+
   if (spvLoad->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
     isCoherent = true;
 
@@ -2215,6 +2215,46 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
 
   SPIRVType *const spvLoadType = spvLoad->getSrc()->getType();
 
+  SPIRVToLLVM::ScratchBoundsCheckInfo boundsCheckInfo = prepareScratchBoundsCheck(spvLoad->getSrc());
+
+  if (boundsCheckInfo.shouldInsertBoundsCheck) {
+    // An OpLoad will be converted to a chain of comparison results against all bounds in the OpLoad.
+    // The actual work (adding the load to the load block, jumping to the final block and adding a phi node with a zero
+    // initializer is done here).
+
+    // .parentBlock:
+    // foreach (indexToAccess in accessChain)
+    // addUlt(indexToAccess, accessChain.relevantArray);
+    // jmpeq .loadBlock, !oob ; else branch to final block
+
+    // .loadBlock:
+    // loadResult = ...
+    // jmp .finalBlock
+
+    // .finalBlock:
+    // finalLoadResult = phi (0, .parentBlock), (loadResult, .loadBlock)
+    // ; ... all subsequent instructions use finalLoadResult
+
+    getBuilder()->CreateCondBr(boundsCheckInfo.finalCmpResult, boundsCheckInfo.intermediateBlock,
+                               boundsCheckInfo.finalBlock);
+
+    // Add the load instruction to the load block, followed by an unconditional jump.
+    getBuilder()->SetInsertPoint(boundsCheckInfo.intermediateBlock);
+    auto loadInst = addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, isVolatile, isCoherent,
+                                           isNonTemporal);
+
+    getBuilder()->CreateBr(boundsCheckInfo.finalBlock);
+
+    // Let the load and the NOP converge and return the value.
+    getBuilder()->SetInsertPoint(boundsCheckInfo.finalBlock);
+    PHINode *convergePhi = getBuilder()->CreatePHI(loadInst->getType(), 2);
+    convergePhi->addIncoming(Constant::getNullValue(loadInst->getType()), boundsCheckInfo.entryBlock);
+    convergePhi->addIncoming(loadInst, boundsCheckInfo.intermediateBlock);
+
+    return convergePhi;
+  }
+
+  // If no OOB guard needs to be inserted, just return the actual load instruction.
   return addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, isVolatile, isCoherent,
                                 isNonTemporal);
 }
@@ -2412,7 +2452,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
     isVolatile |= spvStore->getDst()->isVolatile();
 
   // We don't require volatile on address spaces that become non-pointers.
-  switch (spvStore->getDst()->getType()->getPointerStorageClass()) {
+  const auto pointerStorageClass = spvStore->getDst()->getType()->getPointerStorageClass();
+  switch (pointerStorageClass) {
   case StorageClassInput:
   case StorageClassOutput:
   case StorageClassPrivate:
@@ -2449,8 +2490,38 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
 
   SPIRVType *const spvStoreType = spvStore->getDst()->getType();
 
-  addStoreInstRecursively(spvStoreType->getPointerElementType(), storePointer, storeValue, isVolatile, isCoherent,
-                          isNonTemporal);
+  SPIRVToLLVM::ScratchBoundsCheckInfo boundsCheckInfo = prepareScratchBoundsCheck(spvStore->getDst());
+
+  SPIRVType *pointerElementType = spvStoreType->getPointerElementType();
+  if (boundsCheckInfo.shouldInsertBoundsCheck) {
+    // An OpStore will be converted to a chain of comparison results against all bounds in the OpStore.
+    // The actual work (adding the store to the store block) and just omitting the store if the OOB check failed is done
+    // here:
+
+    // .parentBlock:
+    // foreach (indexToAccess in accessChain)
+    // addUlt(indexToAccess, accessChain.relevantArray);
+    // jmpeq .storeBlock, !oob ; else branch to final block
+
+    // .storeBlock:
+    // store...
+    // jmp .finalBlock
+
+    // .finalBlock:
+    // ; ... all subsequent instructions
+    getBuilder()->CreateCondBr(boundsCheckInfo.finalCmpResult, boundsCheckInfo.intermediateBlock,
+                               boundsCheckInfo.finalBlock);
+
+    // Add the store instruction to the load block, followed by an unconditional jump.
+    getBuilder()->SetInsertPoint(boundsCheckInfo.intermediateBlock);
+    addStoreInstRecursively(pointerElementType, storePointer, storeValue, isVolatile, isCoherent, isNonTemporal);
+    getBuilder()->CreateBr(boundsCheckInfo.finalBlock);
+
+    // Continue building from here.
+    getBuilder()->SetInsertPoint(boundsCheckInfo.finalBlock);
+  } else {
+    addStoreInstRecursively(pointerElementType, storePointer, storeValue, isVolatile, isCoherent, isNonTemporal);
+  }
 
   // For stores, we don't really have a thing to map to, so we just return nullptr here.
   return nullptr;
@@ -5037,6 +5108,7 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
   FunctionType *ft = dyn_cast<FunctionType>(transType(bf->getFunctionType()));
   Function *f = dyn_cast<Function>(mapValue(bf, Function::Create(ft, linkage, bf->getName(), m_m)));
   assert(f);
+  continueAtLastInsertPoint = false;
   mapFunction(bf, f);
   if (!f->isIntrinsic()) {
     if (isEntry) {
@@ -5076,12 +5148,24 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
     f->getEntryBlock().setName(".entry");
 
   for (size_t i = 0, e = bf->getNumBasicBlock(); i != e; ++i) {
+    continueAtLastInsertPoint = false;
     SPIRVBasicBlock *bbb = bf->getBasicBlock(i);
     BasicBlock *bb = dyn_cast<BasicBlock>(transValue(bbb, f, nullptr));
+    BasicBlock *lastBb = bb;
+
     for (size_t bi = 0, be = bbb->getNumInst(); bi != be; ++bi) {
       SPIRVInstruction *bInst = bbb->getInst(bi);
+      if (continueAtLastInsertPoint) {
+        if (auto possibleNewBB = getBuilder()->GetInsertBlock()) {
+          BasicBlock *newBB = dyn_cast<BasicBlock>(possibleNewBB);
+          if (newBB && newBB != bb) {
+            bb = newBB;
+          }
+        }
+      }
       transValue(bInst, f, bb, false);
     }
+    bb = lastBb;
   }
 
   // Update phi nodes -- add missing incoming arcs.
@@ -8306,6 +8390,144 @@ llvm::Function *SPIRVToLLVM::createLibraryEntryFunc() {
   func->addMetadata(gSPIRVMD::ExecutionModel, *execModelMdNode);
   func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   return func;
+}
+
+const Vkgc::PipelineOptions *SPIRVToLLVM::getPipelineOptions() const {
+  assert(m_context && "Invalid context!");
+
+  return static_cast<Llpc::Context *>(m_context)->getPipelineContext()->getPipelineOptions();
+}
+
+// This method does preparation work for adding the scratch access bounds checks for memory operations
+// like OpLoads and OpStores. We are handling private and function memory classes here.
+// The idea behind this method is that while translating a OpLoad or OpStore which loads from local scratch memory using
+// a unknown (run-time) index into an array, we parse the operands of the corresponding access chain, add a chain of
+// ANDed compares to check if the bounds requirements are met and then do a conditional jump to either the intermediate
+// block which handles the memory operation or the final block (which will skip the memory op, if bounds checks failed).
+// As mentioned, this does preparation work like inserting the bounds checks, its up to the caller caring about
+// inserting the OpLoad or OpStore. This also sets a flag that signals the main translation loop that we want to
+// continue inserting subsequent instructions at the final block instead of just going back to the parent block.
+// Currently, OpLoads will yield zero and OpStores will just omit the store, if bounds checks failed. This is up to the
+// caller. This implementation handles nested structs using arrays and 1...n-dimensional arrays. This returns if we need
+// to insert a bounds checks and pointers to the newly created basic blocks (which can be optimized away by subsequent
+// passes, if not needed).
+//
+// An example: We have the following sequence in LLVM IR:
+//
+// entry:
+// %load = load <4 x float>, <4 x float> ... localArray[runtimeIndex][runtimeIndex * 2]
+//
+// which can cause a out of bounds access.
+//
+// However, we are converting it to a sequence like this:
+//
+// entry:
+//
+// %shouldLoad1 = icmp ult i32 runtimeIndex, localArray.dim1.upperBound
+// %shouldLoad2 = icmp ult i32 runtimeIndex * 2, localArray.dim2.upperBound
+// %shouldLoad = and i1 %shouldLoad1, %shouldLoad2
+// br i1 %shouldLoad, label %loadBlock, label %finalBlock
+//
+// loadBlock:
+// %load = load <4 x float>, <4 x float> ... localArray[runtimeIndex][runtimeIndex * 2]
+// br label %finalBlock
+//
+// finalBlock:
+// %finalResult = phi ... <4 x float> [ zeroinitializer, %entry], [ %load, loadBlock ]
+// ... use %finalResult subsequently
+//
+SPIRVToLLVM::ScratchBoundsCheckInfo SPIRVToLLVM::prepareScratchBoundsCheck(SPIRVValue *toBeWrapped) {
+  constexpr ScratchBoundsCheckInfo nullValue{};
+  if (!getPipelineOptions()->enableScratchAccessBoundsChecks) {
+    return nullValue;
+  }
+
+  if (!toBeWrapped || toBeWrapped->getOpCode() != OpAccessChain) {
+    return nullValue;
+  }
+
+  SPIRVStorageClassKind pointerStorageClass = toBeWrapped->getType()->getPointerStorageClass();
+
+  // We don't want bounds checks if we are outside private or function storage class.
+  if (pointerStorageClass != StorageClassPrivate && pointerStorageClass != StorageClassFunction) {
+    return nullValue;
+  }
+
+  // Fetch the access chain behind the pointer the memory operation uses.
+  const auto accessChainBase = static_cast<SPIRVAccessChainBase *const>(toBeWrapped);
+  const auto accessChainIndices = accessChainBase->getIndices();
+  if (accessChainIndices.empty()) {
+    return nullValue;
+  }
+
+  SPIRVType *baseType = accessChainBase->getBase()->getType()->getPointerElementType();
+
+  if (!baseType) {
+    return nullValue;
+  }
+
+  // This will contain our final compare result.
+  Value *finalCmpResult = nullptr;
+
+  BasicBlock *entryBlock = getBuilder()->GetInsertBlock();
+  Function *parent = entryBlock->getParent();
+
+  // Build a chain of OOB checks by consuming all feasible access chain indices front to back.
+  for (SPIRVValue *currentIndex : accessChainIndices) {
+    // Handle either arrays or (nested) structs.
+    if (baseType->getOpCode() == OpTypeArray) {
+      if (const auto baseArray = static_cast<const SPIRVTypeArray *>(baseType)) {
+        // Add the bounds check.
+        const uint64_t arrayLength = baseArray->getArrayLength();
+        if (isConstantOpCode(currentIndex->getOpCode())) {
+          if (static_cast<SPIRVConstant *>(currentIndex)->getZExtIntValue() < arrayLength) {
+            baseType = baseType->getArrayElementType();
+            continue;
+          }
+        }
+
+        Value *comparisonValue = transValue(currentIndex, entryBlock->getParent(), entryBlock);
+        ConstantInt *arrayUpperBound = getBuilder()->getInt32(arrayLength);
+        auto cmpResult = getBuilder()->CreateICmpULT(comparisonValue, arrayUpperBound);
+
+        if (finalCmpResult) {
+          finalCmpResult = getBuilder()->CreateAnd(finalCmpResult, cmpResult);
+        } else {
+          finalCmpResult = cmpResult;
+        }
+
+        baseType = baseType->getArrayElementType();
+      }
+    } else if (baseType->getOpCode() == OpTypeStruct) {
+      // Fetch the struct member index.
+      assert(isConstantOpCode(currentIndex->getOpCode()));
+
+      const uint64_t structMemberIndex = static_cast<SPIRVConstant *>(currentIndex)->getZExtIntValue();
+      baseType = baseType->getStructMemberType(static_cast<size_t>(structMemberIndex));
+    } else {
+      break;
+    }
+
+    if (!baseType) {
+      break;
+    }
+
+    // Check if the next element is feasible for checking.
+    const auto newOpCode = baseType->getOpCode();
+    if (newOpCode != OpTypeArray && newOpCode != OpTypeStruct) {
+      break;
+    }
+  }
+
+  // Pass back the bounds check information to the caller so he can do work with it.
+  if (finalCmpResult) {
+    continueAtLastInsertPoint = true;
+    BasicBlock *intermediateBlock = BasicBlock::Create(*m_context, "", parent);
+    BasicBlock *finalBlock = BasicBlock::Create(*m_context, "", parent);
+    return {true, entryBlock, intermediateBlock, finalBlock, finalCmpResult};
+  }
+
+  return nullValue;
 }
 
 } // namespace SPIRV
