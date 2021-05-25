@@ -227,7 +227,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   if (!cl::UseLlvmOpt) {
     passMgr.add(createForceFunctionAttrsLegacyPass());
     passMgr.add(createIPSCCPPass());
-    passMgr.add(createInstructionCombiningPass(5));
+    passMgr.add(createInstructionCombiningPass(1));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createCFGSimplificationPass());
@@ -237,7 +237,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createCorrelatedValuePropagationPass());
     passMgr.add(createCFGSimplificationPass());
     passMgr.add(createAggressiveInstCombinerPass());
-    passMgr.add(createInstructionCombiningPass(3));
+    passMgr.add(createInstructionCombiningPass(1));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createCFGSimplificationPass());
@@ -245,7 +245,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createLoopRotatePass());
     passMgr.add(createLICMPass());
     passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createInstructionCombiningPass(2));
+    passMgr.add(createInstructionCombiningPass(1));
     passMgr.add(createIndVarSimplifyPass());
     passMgr.add(createLoopIdiomPass());
     passMgr.add(createLoopDeletionPass());
@@ -256,7 +256,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createInstSimplifyLegacyPass());
     passMgr.add(createNewGVNPass());
     passMgr.add(createBitTrackingDCEPass());
-    passMgr.add(createInstructionCombiningPass(2));
+    passMgr.add(createInstructionCombiningPass(1));
     passMgr.add(createPatchPeepholeOpt());
     passMgr.add(createCorrelatedValuePropagationPass());
     passMgr.add(createAggressiveDCEPass());
@@ -272,7 +272,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
     passMgr.add(createLoopUnrollPass(cl::OptLevel));
     // uses DivergenceAnalysis
     passMgr.add(createPatchReadFirstLane());
-    passMgr.add(createInstructionCombiningPass(2));
+    passMgr.add(createInstructionCombiningPass(1));
     passMgr.add(createLICMPass());
     passMgr.add(createConstantMergePass());
     passMgr.add(createDivRemPairsPass());
