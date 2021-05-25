@@ -232,10 +232,16 @@ static cl::opt<bool> EnableRelocatableShaderElf("enable-relocatable-shader-elf",
                                                 cl::desc("Compile pipelines using relocatable shader elf"),
                                                 cl::init(false));
 
-// -check-auto-layout-compatible: check if auto descriptor layout got from spv file is commpatible with real layout
+// -check-auto-layout-compatible: check if auto descriptor layout got from spv file is compatible with real layout
 static cl::opt<bool> CheckAutoLayoutCompatible(
     "check-auto-layout-compatible",
-    cl::desc("check if auto descriptor layout got from spv file is commpatible with real layout"));
+    cl::desc("Check if auto descriptor layout got from spv file is compatible with real layout"));
+
+// -enable-scratch-bounds-checks: insert scratch access bounds checks on loads and stores
+static cl::opt<bool>
+    EnableScratchAccessBoundsChecks("enable-scratch-bounds-checks",
+                                    cl::desc("Insert scratch access bounds checks on loads and stores"),
+                                    cl::init(false));
 
 namespace llvm {
 
@@ -1044,6 +1050,7 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
 
     pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
     pipelineInfo->options.enableRelocatableShaderElf = EnableRelocatableShaderElf;
+    pipelineInfo->options.enableScratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
 
     void *pipelineDumpHandle = nullptr;
     if (cl::EnablePipelineDump) {
@@ -1119,6 +1126,7 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
     pipelineInfo->unlinked = compileInfo->unlinked;
     pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
     pipelineInfo->options.enableRelocatableShaderElf = EnableRelocatableShaderElf;
+    pipelineInfo->options.enableScratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
 
     void *pipelineDumpHandle = nullptr;
     if (cl::EnablePipelineDump) {

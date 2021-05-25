@@ -363,6 +363,8 @@ struct PipelineOptions {
                                    ///  then linking them, when possible.  When not possible this option is ignored.
   bool disableImageResourceCheck;  ///< If set, the pipeline shader will not contain code to check and fix invalid image
                                    ///  descriptors.
+  bool enableScratchAccessBoundsChecks; ///< If set, out of bounds guards will be inserted in the LLVM IR for OpLoads
+                                        ///< and OpStores in private and function memory storage.
   ShadowDescriptorTableUsage shadowDescriptorTableUsage; ///< Controls shadow descriptor table.
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.
   ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the
