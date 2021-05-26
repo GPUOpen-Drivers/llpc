@@ -10,7 +10,7 @@
 ; REQUIRES: llpc-shader-cache
 ; CREATE: Building pipeline with relocatable shader elf.
 ; CREATE: Cache miss for shader stage compute
-; CREATE: Updating the cache for shader stage compute
+; CREATE: Updating the cache for unlinked shader stage compute
 ; CREATE: =====  AMDLLPC SUCCESS  =====
 ; END_SHADERTEST
 
@@ -48,7 +48,7 @@
 ; REQUIRES: llpc-shader-cache
 ; MODIFY: Building pipeline with relocatable shader elf.
 ; MODIFY: Cache miss for shader stage compute
-; MODIFY: Updating the cache for shader stage compute
+; MODIFY: Updating the cache for unlinked shader stage compute
 ; MODIFY: =====  AMDLLPC SUCCESS  =====
 ; END_SHADERTEST
 

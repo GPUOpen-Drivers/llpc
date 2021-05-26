@@ -886,26 +886,20 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
 // @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
 MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline,
                                                                 bool isCacheHash, bool isRelocatableShader,
-                                                                unsigned stage) {
+                                                                UnlinkedShaderStage unlinkedShaderType) {
   MetroHash64 hasher;
 
-  switch (stage) {
-  case ShaderStageVertex:
+  switch (unlinkedShaderType) {
+  case UnlinkedStageVertexProcess:
     updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
-    break;
-  case ShaderStageTessControl:
     updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
-    break;
-  case ShaderStageTessEval:
     updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
-    break;
-  case ShaderStageGeometry:
     updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isRelocatableShader);
     break;
-  case ShaderStageFragment:
+  case UnlinkedStageFragment:
     updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
     break;
-  case ShaderStageInvalid:
+  case UnlinkedStageCount:
     updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
@@ -926,13 +920,13 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked || isRelocatableShader);
 
-  if (stage != ShaderStageFragment) {
+  if (unlinkedShaderType != UnlinkedStageFragment) {
     if (!isRelocatableShader)
       updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
     updateHashForNonFragmentState(pipeline, isCacheHash, &hasher, isRelocatableShader);
   }
 
-  if (stage == ShaderStageFragment || stage == ShaderStageInvalid)
+  if (unlinkedShaderType != UnlinkedStageVertexProcess)
     updateHashForFragmentState(pipeline, &hasher, isRelocatableShader);
 
   MetroHash::Hash hash = {};

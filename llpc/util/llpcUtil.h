@@ -34,6 +34,7 @@
 #include "llpc.h"
 #include "spirv.hpp"
 #include "vkgcUtil.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace Llpc {
 
@@ -114,4 +115,30 @@ inline unsigned log2(T u) {
   return logValue;
 }
 
+// Returns true if shaderInfo has the information required to compile an unlinked shader of the given type.
+bool hasDataForUnlinkedShaderType(Vkgc::UnlinkedShaderStage type,
+                                  llvm::ArrayRef<const Vkgc::PipelineShaderInfo *> shaderInfo);
+
+// Returns the shader stage mask for all shader stages that can be part of the given unlinked shader type.
+unsigned getShaderStageMaskForType(Vkgc::UnlinkedShaderStage type);
+
+// Returns the name of the given unlinked shader stage.
+const char *getUnlinkedShaderStageName(Vkgc::UnlinkedShaderStage type);
+
+// Pre-increment operator on the unlinked shader stage.
+inline Vkgc::UnlinkedShaderStage operator++(Vkgc::UnlinkedShaderStage &type) {
+  type = static_cast<Vkgc::UnlinkedShaderStage>(type + 1);
+  return type;
+}
+
+// Post-increment operator on the unlinked shader stage.
+inline Vkgc::UnlinkedShaderStage operator++(Vkgc::UnlinkedShaderStage &type, int) {
+  Vkgc::UnlinkedShaderStage oldValue = type;
+  type = static_cast<Vkgc::UnlinkedShaderStage>(type + 1);
+  return oldValue;
+}
+
+inline bool doesShaderStageExist(llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, ShaderStage stage) {
+  return stage < shaderInfo.size() && shaderInfo[stage] && shaderInfo[stage]->pModuleData;
+}
 } // namespace Llpc

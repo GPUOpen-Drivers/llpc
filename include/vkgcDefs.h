@@ -200,6 +200,14 @@ enum ShaderStageBit : unsigned {
   ShaderStageComputeBit = (1 << ShaderStageCompute),         ///< Compute shader bit
 };
 
+/// Enumerates LLPC types of unlinked shader elf.
+enum UnlinkedShaderStage : unsigned {
+  UnlinkedStageVertexProcess,
+  UnlinkedStageFragment,
+  UnlinkedStageCompute,
+  UnlinkedStageCount
+};
+
 static_assert((1 << (ShaderStageCount - 1)) == ShaderStageComputeBit,
               "Vkgc::ShaderStage has been updated. Please update Vkgc::ShaderStageBit as well.");
 
