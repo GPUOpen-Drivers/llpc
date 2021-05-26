@@ -36,6 +36,9 @@
 #include "spirvExt.h"
 #include "vkgcElfReader.h"
 
+using namespace llvm;
+using namespace Vkgc;
+
 #define DEBUG_TYPE "llpc-util"
 
 namespace Llpc {
@@ -120,6 +123,53 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
 unsigned shaderStageToMask(ShaderStage stage) {
   assert(stage < ShaderStageCount || stage == ShaderStageCopyShader);
   return (1 << stage);
+}
+
+// =====================================================================================================================
+// Returns true if shaderInfo has the information required to compile an unlinked shader of the given type.
+//
+// @param type : The unlinked shader type.
+// @param shaderInfo : The shader information to check.
+bool hasDataForUnlinkedShaderType(Vkgc::UnlinkedShaderStage type, ArrayRef<const PipelineShaderInfo *> shaderInfo) {
+  switch (type) {
+  case UnlinkedStageVertexProcess:
+    return doesShaderStageExist(shaderInfo, ShaderStageVertex);
+  case UnlinkedStageFragment:
+    return doesShaderStageExist(shaderInfo, ShaderStageFragment);
+  case UnlinkedStageCompute:
+    return doesShaderStageExist(shaderInfo, ShaderStageCompute);
+  default:
+    return false;
+  }
+}
+
+// =====================================================================================================================
+// Returns the shader stage mask for all shader stages that can be part of the given unlinked shader type.
+//
+// @param type : The unlinked shader type.
+unsigned getShaderStageMaskForType(Vkgc::UnlinkedShaderStage type) {
+  switch (type) {
+  case UnlinkedStageVertexProcess:
+    return shaderStageToMask(static_cast<ShaderStage>(ShaderStageVertex)) |
+           shaderStageToMask(static_cast<ShaderStage>(ShaderStageGeometry)) |
+           shaderStageToMask(static_cast<ShaderStage>(ShaderStageTessControl)) |
+           shaderStageToMask(static_cast<ShaderStage>(ShaderStageTessEval));
+  case UnlinkedStageFragment:
+    return shaderStageToMask(static_cast<ShaderStage>(ShaderStageFragment));
+  case UnlinkedStageCompute:
+    return shaderStageToMask(static_cast<ShaderStage>(ShaderStageCompute));
+  default:
+    return 0;
+  }
+}
+
+// =====================================================================================================================
+// Returns the name of the given unlinked shader type.
+//
+// @param type : The unlinked shader type.
+const char *getUnlinkedShaderStageName(Vkgc::UnlinkedShaderStage type) {
+  static const char *names[] = {"vertex", "fragment", "compute", "unknown"};
+  return names[type];
 }
 
 } // namespace Llpc
