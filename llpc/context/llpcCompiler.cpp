@@ -1050,10 +1050,10 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
                                                   const GraphicsPipelineBuildInfo *pipelineInfo) {
   if (!pipelineInfo->unlinked) {
     for (unsigned stage = 0; stage < shaderInfos.size(); ++stage) {
-      if (stage != ShaderStageVertex && stage != ShaderStageFragment) {
+      if (stage != ShaderStageVertex && stage != ShaderStageFragment && stage != ShaderStageGeometry) {
         if (shaderInfos[stage] && shaderInfos[stage]->pModuleData)
           return false;
-      } else if (!shaderInfos[stage] || !shaderInfos[stage]->pModuleData) {
+      } else if (stage != ShaderStageGeometry && (!shaderInfos[stage] || !shaderInfos[stage]->pModuleData)) {
         // TODO: Generate pass-through shaders when the fragment or vertex shaders are missing.
         return false;
       }
