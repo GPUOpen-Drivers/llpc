@@ -109,7 +109,8 @@ inline bool isValid(spv::MemoryModel V) {
 }
 
 inline bool isValid(spv::ExecutionMode V) {
-  switch (V) {
+  uint32_t execMode = V;
+  switch (execMode) {
   case ExecutionModeInvocations:
   case ExecutionModeSpacingEqual:
   case ExecutionModeSpacingFractionalEven:

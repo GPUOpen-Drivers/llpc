@@ -1246,6 +1246,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   SET_REG_FIELD(&pConfig->esGsRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE,
                 calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
+
   setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, calcFactor.gsOnChipLdsSize * 4);
   setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
