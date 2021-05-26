@@ -1,0 +1,160 @@
+// This test case checks that a pipeline with geometry shader can be compiled using relocatable shaders.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: Building pipeline with relocatable shader elf.
+; SHADERTEST-LABEL: AMDGPU.disasm
+; SHADERTEST: _amdgpu_gs_main:
+; SHADERTEST: _amdgpu_vs_main:
+; SHADERTEST: _amdgpu_ps_main:
+; SHADERTEST-LABEL: PalMetadata
+; SHADERTEST-LABEL: .hardware_stages
+; SHADERTEST-LABEL: .gs:
+; SHADERTEST-LABEL: .entry_point: _amdgpu_gs_main
+; SHADERTEST-LABEL: .ps:
+; SHADERTEST-LABEL: .entry_point: _amdgpu_ps_main
+; SHADERTEST-LABEL: .vs:
+; SHADERTEST-LABEL: .entry_point: _amdgpu_vs_main
+; SHADERTEST-LABEL: .type: Gs
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 46
+
+[VsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main" %out_TEXCOORD0
+               OpSource GLSL 430
+               OpSourceExtension "GL_ARB_separate_shader_objects"
+               OpSourceExtension "GL_ARB_shading_language_420pack"
+               OpName %main "main"
+               OpName %out_TEXCOORD0 "out_TEXCOORD0"
+               OpDecorate %out_TEXCOORD0 Location 0
+       %void = OpTypeVoid
+         %11 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v2float = OpTypeVector %float 2
+%_ptr_Output_v2float = OpTypePointer Output %v2float
+%out_TEXCOORD0 = OpVariable %_ptr_Output_v2float Output
+         %31 = OpConstantNull %v2float
+       %main = OpFunction %void None %11
+         %32 = OpLabel
+               OpStore %out_TEXCOORD0 %31
+               OpReturn
+               OpFunctionEnd
+
+[VsInfo]
+entryPoint = main
+
+[GsSpirv]
+               OpCapability Geometry
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Geometry %main "main" %gl_in %output
+               OpExecutionMode %main Triangles
+               OpExecutionMode %main Invocations 1
+               OpExecutionMode %main OutputTriangleStrip
+               OpExecutionMode %main OutputVertices 3
+               OpName %main "main"
+               OpName %gl_PerVertex "gl_PerVertex"
+               OpMemberName %gl_PerVertex 0 "gl_Position"
+               OpMemberName %gl_PerVertex 1 "gl_PointSize"
+               OpMemberName %gl_PerVertex 2 "gl_ClipDistance"
+               OpName %gl_in "gl_in"
+               OpName %gl_PerVertex_0 "gl_PerVertex"
+               OpMemberName %gl_PerVertex_0 0 "gl_Position"
+               OpMemberName %gl_PerVertex_0 1 "gl_PointSize"
+               OpMemberName %gl_PerVertex_0 2 "gl_ClipDistance"
+               OpName %output "output"
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex 2 BuiltIn ClipDistance
+               OpDecorate %gl_PerVertex Block
+               OpMemberDecorate %gl_PerVertex_0 0 Invariant
+               OpMemberDecorate %gl_PerVertex_0 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex_0 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex_0 2 BuiltIn ClipDistance
+               OpDecorate %gl_PerVertex_0 Block
+       %void = OpTypeVoid
+         %17 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+%gl_PerVertex = OpTypeStruct %v4float %float %_arr_float_uint_1
+     %uint_3 = OpConstant %uint 3
+%_arr_gl_PerVertex_uint_3 = OpTypeArray %gl_PerVertex %uint_3
+%_ptr_Input__arr_gl_PerVertex_uint_3 = OpTypePointer Input %_arr_gl_PerVertex_uint_3
+      %gl_in = OpVariable %_ptr_Input__arr_gl_PerVertex_uint_3 Input
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+%gl_PerVertex_0 = OpTypeStruct %v4float %float %_arr_float_uint_1
+%_ptr_Output_gl_PerVertex_0 = OpTypePointer Output %gl_PerVertex_0
+          %output = OpVariable %_ptr_Output_gl_PerVertex_0 Output
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+       %main = OpFunction %void None %17
+         %44 = OpLabel
+         %45 = OpAccessChain %_ptr_Input_v4float %gl_in %int_0 %int_0
+         %46 = OpLoad %v4float %45
+         %48 = OpCompositeExtract %float %46 1
+         %51 = OpAccessChain %_ptr_Input_v4float %gl_in %int_1 %int_0
+         %52 = OpLoad %v4float %51
+         %54 = OpCompositeExtract %float %52 1
+         %57 = OpAccessChain %_ptr_Input_v4float %gl_in %int_2 %int_0
+         %58 = OpLoad %v4float %57
+         %60 = OpCompositeExtract %float %58 1
+        %110 = OpCompositeInsert %v4float %48 %46 1
+         %71 = OpAccessChain %_ptr_Output_v4float %output %int_0
+               OpStore %71 %110
+               OpEmitVertex
+        %113 = OpCompositeInsert %v4float %54 %52 1
+               OpStore %71 %113
+               OpEmitVertex
+        %116 = OpCompositeInsert %v4float %60 %58 1
+               OpStore %71 %116
+               OpEmitVertex
+               OpReturn
+               OpFunctionEnd
+
+[GsInfo]
+entryPoint = main
+
+[FsSpirv]
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %out_Target0
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 430
+               OpName %main "main"
+               OpName %out_Target0 "out_Target0"
+               OpDecorate %out_Target0 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+%out_Target0 = OpVariable %_ptr_Output_v4float Output
+      %null = OpConstantNull %v4float
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+               OpStore %out_Target0 %null
+               OpReturn
+               OpFunctionEnd
+
+[FsInfo]
+entryPoint = main
+
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+patchControlPoints = 3
+colorBuffer[0].format = VK_FORMAT_R16G16B16A16_SFLOAT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
