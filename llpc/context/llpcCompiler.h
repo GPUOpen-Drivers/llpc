@@ -141,21 +141,11 @@ public:
   virtual Result CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache);
 #endif
 
-  ShaderEntryState lookUpShaderCaches(IShaderCache *appPipelineCache, MetroHash::Hash *cacheHash, BinaryData *elfBin,
-                                      ShaderCache **ppShaderCache, CacheEntryHandle *phEntry);
-
-  void updateShaderCache(bool insert, const BinaryData *elfBin, ShaderCache *shaderCache, CacheEntryHandle phEntry);
-
-  Vkgc::Result lookUpCaches(Vkgc::ICache *appPipelineCache, Vkgc::HashId *cacheHash, BinaryData *elfBin,
-                            Vkgc::EntryHandle *entryHandle);
-
-  void ReleaseCacheEntry(bool withValue, const BinaryData *elfBin, Vkgc::EntryHandle *entryHandle);
-
-  bool IsCacheValid() { return m_cache != nullptr; }
-
   static void buildShaderCacheHash(Context *context, unsigned stageMask,
                                    llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes, MetroHash::Hash *fragmentHash,
                                    MetroHash::Hash *nonFragmentHash);
+
+  CachePair getInternalCaches() { return {m_cache, m_shaderCache.get()}; }
 
 private:
   Compiler() = delete;

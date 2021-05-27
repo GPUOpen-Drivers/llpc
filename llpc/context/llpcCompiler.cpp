@@ -130,10 +130,10 @@ opt<int> RelocatableShaderElfLimit("relocatable-shader-elf-limit",
 // 2 - Cache to disk
 // 3 - Use internal on-disk cache in read/write mode.
 // 4 - Use internal on-disk cache in read-only mode.
-static opt<unsigned> ShaderCacheMode("shader-cache-mode",
-                                     desc("Shader cache mode, 0 - disable, 1 - runtime cache, 2 - cache to disk, 3 - "
-                                          "load on-disk cache for read/write, 4 - load on-disk cache for read only"),
-                                     init(0));
+opt<unsigned> ShaderCacheMode("shader-cache-mode",
+                              desc("Shader cache mode, 0 - disable, 1 - runtime cache, 2 - cache to disk, 3 - "
+                                   "load on-disk cache for read/write, 4 - load on-disk cache for read only"),
+                              init(0));
 
 // -executable-name: executable file name
 static opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
@@ -217,7 +217,7 @@ static void fatalErrorHandler(void *userData, const std::string &reason, bool ge
 static CacheAccessor checkCacheForGlueShader(StringRef glueShaderIdentifier, Context *context, Compiler *compiler) {
   Hash glueShaderCacheHash =
       PipelineDumper::generateHashForGlueShader({glueShaderIdentifier.size(), glueShaderIdentifier.data()});
-  return CacheAccessor(context, glueShaderCacheHash, compiler);
+  return CacheAccessor(context, glueShaderCacheHash, compiler->getInternalCaches());
 }
 
 // =====================================================================================================================
@@ -907,7 +907,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
                                     << format_hex(context->getPipelineContext()->get128BitCacheHashCode()[1], 18)
                                     << '\n');
 
-    CacheAccessor cacheAccessor(context, cacheHash, this);
+    CacheAccessor cacheAccessor(context, cacheHash, getInternalCaches());
     if (cacheAccessor.isInCache()) {
       BinaryData elfBin = cacheAccessor.getElfFromCache();
       auto data = reinterpret_cast<const char *>(elfBin.pCode);
@@ -1031,7 +1031,7 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMa
   }
 
   // If there is no 1-to-1 mapping between descriptor sets and descriptor tables, then relocatable shaders will fail.
-  llvm::SmallSet<unsigned, 8> descriptorSetsSeen;
+  SmallSet<unsigned, 8> descriptorSetsSeen;
   for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
     const ResourceMappingNode *node = &resourceMapping->pUserDataNodes[i].node;
     if (node->type != ResourceMappingNodeType::DescriptorTableVaPtr)
@@ -1362,7 +1362,7 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, unsigned stageM
   Compiler::buildShaderCacheHash(m_context, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
 
   if (stageMask & shaderStageToMask(ShaderStageFragment)) {
-    m_fragmentCacheAccessor.emplace(m_context, fragmentHash, m_compiler);
+    m_fragmentCacheAccessor.emplace(m_context, fragmentHash, m_compiler->getInternalCaches());
     if (m_fragmentCacheAccessor->isInCache()) {
       // Remove fragment shader stages.
       stageMask &= ~shaderStageToMask(ShaderStageFragment);
@@ -1370,7 +1370,7 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, unsigned stageM
   }
 
   if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
-    m_nonFragmentCacheAccessor.emplace(m_context, nonFragmentHash, m_compiler);
+    m_nonFragmentCacheAccessor.emplace(m_context, nonFragmentHash, m_compiler->getInternalCaches());
     if (m_nonFragmentCacheAccessor->isInCache()) {
       // Remove non-fragment shader stages.
       stageMask &= shaderStageToMask(ShaderStageFragment);
@@ -1558,9 +1558,9 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), &extraInfo);
   }
 
-  llvm::Optional<CacheAccessor> cacheAccessor;
+  Optional<CacheAccessor> cacheAccessor;
   if (!buildingRelocatableElf) {
-    cacheAccessor.emplace(pipelineInfo, cacheHash, this);
+    cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
   }
 
   ElfPackage candidateElf;
@@ -1680,7 +1680,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 
   std::unique_ptr<CacheAccessor> cacheAccessor;
   if (!buildingRelocatableElf) {
-    cacheAccessor = std::make_unique<CacheAccessor>(pipelineInfo, cacheHash, this);
+    cacheAccessor = std::make_unique<CacheAccessor>(pipelineInfo, cacheHash, getInternalCaches());
   }
 
   ElfPackage candidateElf;
@@ -1918,145 +1918,6 @@ void Compiler::releaseContext(Context *context) const {
   std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
   context->reset();
   context->setInUse(false);
-}
-
-// =====================================================================================================================
-// Lookup in the shader caches with the given pipeline hash code.
-// It will try App's pipelince cache first if that's available.
-// Then try on the internal shader cache next if it misses.
-//
-// Upon hit, Ready is returned and pElfBin is filled in. Upon miss, Compiling is returned and ppShaderCache and
-// phEntry are filled in.
-//
-// @param appPipelineCache : App's pipeline cache
-// @param cacheHash : Hash code of the shader
-// @param [out] elfBin : Pointer to shader data
-// @param [out] ppShaderCache : Shader cache to use
-// @param [out] phEntry : Handle to use
-ShaderEntryState Compiler::lookUpShaderCaches(IShaderCache *appPipelineCache, MetroHash::Hash *cacheHash,
-                                              BinaryData *elfBin, ShaderCache **ppShaderCache,
-                                              CacheEntryHandle *phEntry) {
-  ShaderCache *shaderCache[2];
-  unsigned shaderCacheCount = 0;
-
-  shaderCache[shaderCacheCount++] = m_shaderCache.get();
-
-  if (appPipelineCache && cl::ShaderCacheMode != ShaderCacheForceInternalCacheOnDisk) {
-    // Put the application's cache last so that we prefer adding entries there (only relevant with old
-    // client version).
-    shaderCache[shaderCacheCount++] = static_cast<ShaderCache *>(appPipelineCache);
-  }
-
-  for (unsigned i = 0; i < shaderCacheCount; i++) {
-    // Lookup the shader. Allocate on miss when we've reached the last cache.
-    bool allocateOnMiss = (i + 1) == shaderCacheCount;
-    CacheEntryHandle currentEntry;
-    ShaderEntryState cacheEntryState = shaderCache[i]->findShader(*cacheHash, allocateOnMiss, &currentEntry);
-    if (cacheEntryState == ShaderEntryState::Ready) {
-      Result result = shaderCache[i]->retrieveShader(currentEntry, &elfBin->pCode, &elfBin->codeSize);
-      if (result == Result::Success)
-        return ShaderEntryState::Ready;
-    } else if (cacheEntryState == ShaderEntryState::Compiling) {
-      *ppShaderCache = shaderCache[i];
-      *phEntry = currentEntry;
-      return ShaderEntryState::Compiling;
-    }
-  }
-
-  // Unable to allocate an entry in a cache, but we can compile anyway.
-  *ppShaderCache = nullptr;
-  *phEntry = nullptr;
-
-  return ShaderEntryState::Compiling;
-}
-
-// =====================================================================================================================
-// Update the shader caches with the given entry handle, based on the "insert" flag.
-//
-// @param insert : To insert data or reset the shader cache
-// @param elfBin : Pointer to shader data
-// @param shaderCache : Shader cache to update (may be nullptr for default)
-// @param hEntry : Handle to update
-void Compiler::updateShaderCache(bool insert, const BinaryData *elfBin, ShaderCache *shaderCache,
-                                 CacheEntryHandle hEntry) {
-  if (!hEntry)
-    return;
-
-  if (!shaderCache)
-    shaderCache = m_shaderCache.get();
-
-  if (insert) {
-    assert(elfBin->codeSize > 0);
-    shaderCache->insertShader(hEntry, elfBin->pCode, elfBin->codeSize);
-  } else
-    shaderCache->resetShader(hEntry);
-}
-
-// =====================================================================================================================
-// Lookup in the shader caches with the given pipeline hash code.
-// It will try App's pipelince cache first if that's available.
-// Then try on the internal shader cache next if it misses.
-//
-// Upon hit, Ready is returned and pElfBin is filled in. Upon miss, NotFound is returned and ppShaderCache and
-// phEntry are filled in. If NotReady is returned, means cache will be updated by another thread.
-// The returned phEntry must be released by calling ReleaseCacheEntry().
-//
-// @param appPipelineCache : App's pipeline cache
-// @param cacheHash : Hash code of the shader
-// @param [out] elfBin : Pointer to shader data
-// @param [out] entryHandle : Handle to use
-Result Compiler::lookUpCaches(ICache *appPipelineCache, HashId *cacheHash, BinaryData *elfBin,
-                              EntryHandle *entryHandle) {
-  Result cacheResult = Result::Unsupported;
-
-  auto LookUpCache = [](ICache *cache, bool allocateOnMiss, HashId *cacheHash, BinaryData *elfBin,
-                        EntryHandle *entryHandle) -> Result {
-    EntryHandle currentEntry;
-    Result cacheResult = Result::Unsupported;
-
-    cacheResult = cache->GetEntry(*cacheHash, allocateOnMiss, &currentEntry);
-
-    if (cacheResult == Result::NotReady)
-      cacheResult = currentEntry.WaitForEntry();
-
-    if (cacheResult == Result::Success) {
-      cacheResult = currentEntry.GetValueZeroCopy(&elfBin->pCode, &elfBin->codeSize);
-      *entryHandle = std::move(currentEntry);
-    } else if (allocateOnMiss && (cacheResult == Result::NotFound)) {
-      *entryHandle = std::move(currentEntry);
-    }
-
-    return cacheResult;
-  };
-
-  if (m_cache)
-    cacheResult = LookUpCache(m_cache, !appPipelineCache, cacheHash, elfBin, entryHandle);
-
-  if (appPipelineCache && cacheResult != Result::Success)
-    cacheResult = LookUpCache(appPipelineCache, true, cacheHash, elfBin, entryHandle);
-
-  return cacheResult;
-}
-
-// =====================================================================================================================
-// Release cache Entry and update the shader caches with the given entry handle, based on the "withValue" flag.
-//
-// @param withValue : Whether insert value to cache
-// @param elfBin : Pointer to shader data
-// @param cache : Shader cache to update (may be nullptr for default)
-// @param entryHandle : Handle to update
-void Compiler::ReleaseCacheEntry(bool withValue, const BinaryData *elfBin, EntryHandle *entryHandle) {
-
-  if (entryHandle->IsEmpty())
-    return;
-
-  if (withValue) {
-    assert(elfBin->codeSize > 0);
-    entryHandle->SetValue(withValue, elfBin->pCode, elfBin->codeSize);
-  }
-
-  // Empty EntryHandle
-  EntryHandle::ReleaseHandle(std::move(*entryHandle));
 }
 
 // =====================================================================================================================
