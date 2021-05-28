@@ -46,7 +46,7 @@ class PassRegistry;
 class Type;
 class Value;
 
-void initializeStartStopTimerPass(PassRegistry &);
+void initializeLegacyStartStopTimerPass(PassRegistry &);
 
 } // namespace llvm
 
@@ -62,7 +62,7 @@ static const unsigned SizeOfVec4 = sizeof(float) * 4;
 //
 // @param passRegistry : Pass registry
 inline static void initializeUtilPasses(llvm::PassRegistry &passRegistry) {
-  initializeStartStopTimerPass(passRegistry);
+  initializeLegacyStartStopTimerPass(passRegistry);
 }
 
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type

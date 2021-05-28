@@ -30,6 +30,7 @@
 */
 #include "lgc/LgcContext.h"
 #include "lgc/util/Internal.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Timer.h"
 
@@ -42,13 +43,17 @@ namespace {
 
 // =====================================================================================================================
 // Pass to start or stop a timer
-class StartStopTimer : public ModulePass {
+class StartStopTimer : public PassInfoMixin<StartStopTimer> {
 public:
-  static char ID;
-  StartStopTimer() : ModulePass(ID) {}
-  StartStopTimer(Timer *timer, bool starting) : ModulePass(ID), m_timer(timer), m_starting(starting) {}
+  StartStopTimer() {}
+  StartStopTimer(Timer *timer, bool starting) : m_timer(timer), m_starting(starting) {}
 
-  bool runOnModule(Module &module) override;
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
+    runImpl(M);
+    return PreservedAnalyses::all();
+  }
+
+  bool runImpl(Module &module);
 
 private:
   StartStopTimer(const StartStopTimer &) = delete;
@@ -58,7 +63,24 @@ private:
   bool m_starting; // True to start the timer, false to stop it
 };
 
-char StartStopTimer::ID = 0;
+// =====================================================================================================================
+// Legacy pass manager wrapper class
+class LegacyStartStopTimer : public ModulePass {
+public:
+  static char ID;
+  LegacyStartStopTimer() : ModulePass(ID) {}
+  LegacyStartStopTimer(Timer *timer, bool starting) : ModulePass(ID), Impl(timer, starting) {}
+
+  bool runOnModule(Module &module) override;
+
+private:
+  LegacyStartStopTimer(const LegacyStartStopTimer &) = delete;
+  LegacyStartStopTimer &operator=(const LegacyStartStopTimer &) = delete;
+
+  StartStopTimer Impl;
+};
+
+char LegacyStartStopTimer::ID = 0;
 
 } // namespace
 
@@ -69,14 +91,14 @@ char StartStopTimer::ID = 0;
 // @param timer : The timer to start or stop when the pass is run
 // @param starting : True to start the timer, false to stop it
 ModulePass *LgcContext::createStartStopTimer(Timer *timer, bool starting) {
-  return new StartStopTimer(timer, starting);
+  return new LegacyStartStopTimer(timer, starting);
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool StartStopTimer::runOnModule(Module &module) {
+bool StartStopTimer::runImpl(Module &module) {
   if (m_starting)
     m_timer->startTimer();
   else
@@ -85,5 +107,13 @@ bool StartStopTimer::runOnModule(Module &module) {
 }
 
 // =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+bool LegacyStartStopTimer::runOnModule(Module &module) {
+  return Impl.runImpl(module);
+}
+
+// =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(StartStopTimer, DEBUG_TYPE, "Start or stop timer", false, false)
+INITIALIZE_PASS(LegacyStartStopTimer, DEBUG_TYPE, "Start or stop timer", false, false)
