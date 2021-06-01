@@ -1324,6 +1324,23 @@ StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
 }
 
 // =====================================================================================================================
+// Set the packable state of generic input/output
+//
+void PipelineState::initializeInOutPackState() {
+  // If the pipeline is not unlinked, the state of input/output pack in specified shader stages is enabled
+  if (!m_unlinked) {
+    // The generic input import of {TCS, GS, FS} are packed by default
+    m_inputPackState[ShaderStageTessControl] = true;
+    m_inputPackState[ShaderStageGeometry] = true;
+    m_inputPackState[ShaderStageFragment] = true;
+    // The generic output exports of {VS, TES, GS} are packed by default
+    m_outputPackState[ShaderStageVertex] = true;
+    m_outputPackState[ShaderStageTessEval] = true;
+    m_outputPackState[ShaderStageGeometry] = true;
+  }
+}
+
+// =====================================================================================================================
 // Get (create if necessary) the PipelineState from this wrapper pass.
 //
 // @param module : IR module
@@ -1332,6 +1349,7 @@ PipelineState *PipelineStateWrapper::getPipelineState(Module *module) {
     m_allocatedPipelineState = std::make_unique<PipelineState>(m_builderContext);
     m_pipelineState = &*m_allocatedPipelineState;
     m_pipelineState->readState(module);
+    m_pipelineState->initializeInOutPackState();
   }
   return m_pipelineState;
 }

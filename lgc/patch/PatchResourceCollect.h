@@ -86,7 +86,6 @@ private:
 
   void updateInputLocInfoMapWithUnpack();
   void updateOutputLocInfoMapWithUnpack();
-  void packInOutLocation(bool isInput);
   void updateInputLocInfoMapWithPack();
   void updateOutputLocInfoMapWithPack();
   void reassembleOutputExportCalls();
@@ -113,8 +112,6 @@ private:
   ResourceUsage *m_resUsage;  // Pointer to shader resource usage
   std::unique_ptr<InOutLocationInfoMapManager>
       m_locationInfoMapManager; // Pointer to InOutLocationInfoMapManager instance
-  bool m_inOutPackStates[ShaderStageGfxCount][2] = {
-      {false, false}}; // The input and output packable state of each shader stage, 0-input, 1-output
 };
 
 // Represents the compatibility info of input/output

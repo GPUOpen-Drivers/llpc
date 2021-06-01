@@ -429,7 +429,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
 
   if (resUsage->inOutUsage.enableXfb) {
     // Export XFB output
-    if (!m_pipelineState->isUnlinked()) {
+    if (m_pipelineState->canPackOutput(ShaderStageGeometry)) {
       // With packing locations, we should collect the XFB output value at an origianl location
       DenseMap<unsigned, SmallVector<Value *, 4>> origLocElemsMap;
       for (const auto &locInfoXfbInfoPair : locInfoXfbOutInfoMap) {
