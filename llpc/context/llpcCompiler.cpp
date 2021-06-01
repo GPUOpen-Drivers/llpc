@@ -238,7 +238,7 @@ static void setGlueBinaryBlobFromCacheData(ElfLinker *elfLinker, unsigned glueIn
 //
 // @param cacheAccessor : The cache accessor for the entry to be updated.
 // @param elfData : The data to use to update the cache.
-static void updateCache(CacheAccessor &cacheAccessor, const StringRef &elfData) {
+static void updateCache(CacheAccessor &cacheAccessor, StringRef elfData) {
   BinaryData elfBin = {elfData.size(), elfData.data()};
   cacheAccessor.setElfInCache(elfBin);
 }
