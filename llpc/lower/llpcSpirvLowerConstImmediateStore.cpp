@@ -54,7 +54,7 @@ ModulePass *createSpirvLowerConstImmediateStore() {
 }
 
 // =====================================================================================================================
-SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore() : SpirvLower(ID) {
+SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore() : LegacySpirvLower(ID) {
 }
 
 // =====================================================================================================================

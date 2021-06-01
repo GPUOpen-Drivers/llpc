@@ -56,7 +56,7 @@ void initializeSpirvLowerGlobalPass(PassRegistry &);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry &);
 void initializeSpirvLowerResourceCollectPass(PassRegistry &);
 void initializeSpirvLowerTerminatorPass(PassRegistry &);
-void initializeSpirvLowerTranslatorPass(PassRegistry &);
+void initializeLegacySpirvLowerTranslatorPass(PassRegistry &);
 } // namespace llvm
 
 namespace lgc {
@@ -80,7 +80,7 @@ inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
   initializeSpirvLowerInstMetaRemovePass(passRegistry);
   initializeSpirvLowerResourceCollectPass(passRegistry);
   initializeSpirvLowerTerminatorPass(passRegistry);
-  initializeSpirvLowerTranslatorPass(passRegistry);
+  initializeLegacySpirvLowerTranslatorPass(passRegistry);
 }
 
 class Context;
@@ -98,15 +98,10 @@ llvm::ModulePass *createSpirvLowerTranslator(ShaderStage stage, const PipelineSh
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations, as the base class.
-class SpirvLower : public llvm::ModulePass {
+class SpirvLower {
 public:
-  explicit SpirvLower(char &pid)
-      : llvm::ModulePass(pid), m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid),
-        m_entryPoint(nullptr) {}
-
-  // Add per-shader lowering passes to pass manager
-  static void addPasses(Context *context, ShaderStage stage, llvm::legacy::PassManager &passMgr, llvm::Timer *lowerTimer
-  );
+  explicit SpirvLower()
+      : m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid), m_entryPoint(nullptr) {}
 
   static void removeConstantExpr(Context *context, llvm::GlobalVariable *global);
   static void replaceConstWithInsts(Context *context, llvm::Constant *const constVal);
@@ -119,11 +114,24 @@ protected:
   ShaderStage m_shaderStage;    // Shader stage
   llvm::Function *m_entryPoint; // Entry point of input module
   lgc::Builder *m_builder;      // LGC builder object
+};
+
+// =====================================================================================================================
+// Legacy pass manager wrapper class. Used as the base class for the legacy
+// lower passes.
+class LegacySpirvLower : public llvm::ModulePass, public SpirvLower {
+public:
+  explicit LegacySpirvLower(char &pid) : llvm::ModulePass(pid) {}
+
+  // Add per-shader lowering passes to pass manager
+  static void addPasses(Context *context, ShaderStage stage, llvm::legacy::PassManager &passMgr,
+                        llvm::Timer *lowerTimer
+  );
 
 private:
-  SpirvLower() = delete;
-  SpirvLower(const SpirvLower &) = delete;
-  SpirvLower &operator=(const SpirvLower &) = delete;
+  LegacySpirvLower() = delete;
+  LegacySpirvLower(const LegacySpirvLower &) = delete;
+  LegacySpirvLower &operator=(const LegacySpirvLower &) = delete;
 };
 
 } // namespace Llpc

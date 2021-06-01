@@ -178,7 +178,7 @@ ModulePass *createSpirvLowerGlobal() {
 
 // =====================================================================================================================
 SpirvLowerGlobal::SpirvLowerGlobal()
-    : SpirvLower(ID), m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false) {
+    : LegacySpirvLower(ID), m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false) {
 }
 
 // =====================================================================================================================

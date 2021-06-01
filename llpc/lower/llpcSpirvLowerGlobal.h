@@ -41,7 +41,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for globals (global variables, inputs, and outputs).
-class SpirvLowerGlobal : public SpirvLower, public llvm::InstVisitor<SpirvLowerGlobal> {
+class SpirvLowerGlobal : public LegacySpirvLower, public llvm::InstVisitor<SpirvLowerGlobal> {
 public:
   SpirvLowerGlobal();
 
