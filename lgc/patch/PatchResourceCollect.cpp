@@ -82,14 +82,6 @@ bool PatchResourceCollect::runOnModule(Module &module) {
 
   if (!m_pipelineState->isUnlinked()) {
     m_locationInfoMapManager = std::make_unique<InOutLocationInfoMapManager>();
-    // Supported packing input and ouput
-    m_inOutPackStates[ShaderStageFragment][0] = true;
-    m_inOutPackStates[ShaderStageTessEval][1] = true;
-    m_inOutPackStates[ShaderStageTessControl][0] = true;
-    m_inOutPackStates[ShaderStageVertex][1] = true;
-    m_inOutPackStates[ShaderStageGeometry][0] = true;
-    m_inOutPackStates[ShaderStageGeometry][1] = true;
-
     // If packing {VS, TES} outputs and {TCS, FS} inputs, scalarize those outputs and inputs now.
     scalarizeForInOutPacking(&module);
   }
@@ -1324,18 +1316,21 @@ void PatchResourceCollect::clearInactiveBuiltInOutput() {
 void PatchResourceCollect::matchGenericInOut() {
   assert(m_pipelineState->isGraphics());
 
-  // Do input/output matching and location remapping
-  for (unsigned idx = 0; idx < 2; ++idx) {
-    // True means perform packing on input/output, otherwise no packing
-    const bool isInput = (idx == 0);
-    if (m_inOutPackStates[m_shaderStage][idx]) {
-      packInOutLocation(isInput);
-    } else {
-      if (isInput)
-        updateInputLocInfoMapWithUnpack();
-      else
-        updateOutputLocInfoMapWithUnpack();
-    }
+  // Do input matching and location remapping
+  if (m_pipelineState->canPackInput(m_shaderStage))
+    updateInputLocInfoMapWithPack();
+  else
+    updateInputLocInfoMapWithUnpack();
+
+  // Do output matching and location remapping
+  if (m_pipelineState->canPackOutput(m_shaderStage)) {
+    // Re-create output export calls to pack exp instruction for the last vertex processing stage
+    if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() && m_shaderStage != ShaderStageGeometry)
+      reassembleOutputExportCalls();
+    // OutputLocInfoMap is used for computing the shader hash and looking remapped location
+    updateOutputLocInfoMapWithPack();
+  } else {
+    updateOutputLocInfoMapWithUnpack();
   }
 
   // Update location count of input/output
@@ -2393,23 +2388,6 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
 }
 
 // =====================================================================================================================
-// The process of packing input/output
-void PatchResourceCollect::packInOutLocation(bool isInput) {
-  if (isInput) {
-    assert(m_inOutPackStates[m_shaderStage][0]);
-    // Update inputLocInfoMap of {TCS, GS, FS}
-    updateInputLocInfoMapWithPack();
-  } else {
-    // Re-create output export calls to pack exp instruction for the last vertex processing stage
-    if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() && m_shaderStage != ShaderStageGeometry)
-      reassembleOutputExportCalls();
-
-    // OutputLocInfoMap is used for computing the shader hash and looking remapped location
-    updateOutputLocInfoMapWithPack();
-  }
-}
-
-// =====================================================================================================================
 // Update inputLocInfoMap based on {TCS, GS, FS} input import calls
 void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   if (m_inputCalls.empty())
@@ -2570,7 +2548,7 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
 void PatchResourceCollect::reassembleOutputExportCalls() {
   if (m_outputCalls.empty())
     return;
-  assert(m_inOutPackStates[m_shaderStage][1]);
+  assert(m_pipelineState->canPackOutput(m_shaderStage));
 
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(m_outputCalls.back());
@@ -2710,7 +2688,7 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
       for (User *user : func.users()) {
         auto call = cast<CallInst>(user);
         ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
-        if (m_inOutPackStates[shaderStage][0]) {
+        if (m_pipelineState->canPackInput(shaderStage)) {
           // NOTE: Dynamic indexing (location offset or component) in FS is processed to be constant in lower pass.
           assert(!isInterpolant ||
                  (isInterpolant && isa<ConstantInt>(call->getOperand(1)) && isa<ConstantInt>(call->getOperand(2))));
@@ -2731,7 +2709,7 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
       for (User *user : func.users()) {
         auto call = cast<CallInst>(user);
         ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
-        if (m_inOutPackStates[shaderStage][1]) {
+        if (m_pipelineState->canPackOutput(shaderStage)) {
           // We have a use in VS/TES/GS. See if it needs scalarizing. The output value is always the final argument.
           Type *valueTy = call->getArgOperand(call->getNumArgOperands() - 1)->getType();
           if (isa<VectorType>(valueTy) || valueTy->getPrimitiveSizeInBits() == 64)

@@ -296,6 +296,15 @@ public:
   // Set error message to be returned to the client by it calling getLastError
   void setError(const llvm::Twine &message);
 
+  // Initialize the packable state of generic input/output
+  void initializeInOutPackState();
+
+  // Get whehter the input locations of the specified shader stage can be packed
+  bool canPackInput(ShaderStage shaderStage) const { return m_inputPackState[shaderStage]; }
+
+  // Get whehter the output locations of the specified shader stage can be packed
+  bool canPackOutput(ShaderStage shaderStage) const { return m_outputPackState[shaderStage]; }
+
   // -----------------------------------------------------------------------------------------------------------------
   // Utility methods
 
@@ -446,6 +455,8 @@ private:
   std::unique_ptr<InterfaceData> m_interfaceData[ShaderStageCompute + 1] = {}; // Per-shader InterfaceData
   PalMetadata *m_palMetadata = nullptr;                                        // PAL metadata object
   unsigned m_waveSize[ShaderStageCountInternal] = {};                          // Per-shader wave size
+  bool m_inputPackState[ShaderStageGfxCount] = {};  // The input packable state per shader stage
+  bool m_outputPackState[ShaderStageGfxCount] = {}; // The output packable state per shader stage
 };
 
 // =====================================================================================================================

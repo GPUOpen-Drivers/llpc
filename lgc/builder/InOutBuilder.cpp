@@ -578,7 +578,7 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
     xfbOutInfo.is16bit = valueToWrite->getType()->getScalarSizeInBits() == 16;
 
     // For packed generic GS output, the XFB output should be scalarized to align with the scalarized GS output
-    if (!getPipelineState()->isUnlinked() && !isBuiltIn) {
+    if (getPipelineState()->canPackOutput(m_shaderStage) && !isBuiltIn) {
       Type *elementTy = valueToWrite->getType();
       unsigned scalarizeBy = 1;
       if (auto vectorTy = dyn_cast<FixedVectorType>(elementTy)) {
