@@ -41,7 +41,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations for constant immediate store
-class SpirvLowerConstImmediateStore : public SpirvLower {
+class SpirvLowerConstImmediateStore : public LegacySpirvLower {
 public:
   SpirvLowerConstImmediateStore();
 

@@ -65,7 +65,7 @@ ModulePass *createSpirvLowerResourceCollect(bool collectDetailUsage) {
 //
 // @param collectDetailUsage : Whether to collect detailed usages of resource node datas and FS output infos
 SpirvLowerResourceCollect::SpirvLowerResourceCollect(bool collectDetailUsage)
-    : SpirvLower(ID), m_collectDetailUsage(collectDetailUsage), m_pushConstSize(0), m_detailUsageValid(false) {
+    : LegacySpirvLower(ID), m_collectDetailUsage(collectDetailUsage), m_pushConstSize(0), m_detailUsageValid(false) {
 }
 
 // =====================================================================================================================

@@ -55,7 +55,7 @@ ModulePass *createSpirvLowerMemoryOp() {
 }
 
 // =====================================================================================================================
-SpirvLowerMemoryOp::SpirvLowerMemoryOp() : SpirvLower(ID) {
+SpirvLowerMemoryOp::SpirvLowerMemoryOp() : LegacySpirvLower(ID) {
 }
 
 // =====================================================================================================================

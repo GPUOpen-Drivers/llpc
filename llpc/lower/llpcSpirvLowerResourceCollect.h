@@ -59,7 +59,7 @@ struct ResNodeDataSortingComparer {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for resource collecting.
-class SpirvLowerResourceCollect : public SpirvLower, public llvm::InstVisitor<SpirvLowerResourceCollect> {
+class SpirvLowerResourceCollect : public LegacySpirvLower, public llvm::InstVisitor<SpirvLowerResourceCollect> {
 public:
   SpirvLowerResourceCollect(bool collectDetailUsage = false);
   auto &getResourceNodeDatas() { return m_resNodeDatas; }

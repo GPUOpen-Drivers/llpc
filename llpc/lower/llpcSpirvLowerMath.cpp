@@ -57,11 +57,11 @@ namespace {
 
 // =====================================================================================================================
 // SPIR-V lowering operations for math transformation.
-class SpirvLowerMath : public SpirvLower {
+class SpirvLowerMath : public LegacySpirvLower {
 public:
   explicit SpirvLowerMath(char &ID)
-      : SpirvLower(ID), m_changed(false), m_fp16DenormFlush(false), m_fp32DenormFlush(false), m_fp64DenormFlush(false),
-        m_fp16RoundToZero(false) {}
+      : LegacySpirvLower(ID), m_changed(false), m_fp16DenormFlush(false), m_fp32DenormFlush(false),
+        m_fp64DenormFlush(false), m_fp16RoundToZero(false) {}
 
   void init(llvm::Module &module);
 

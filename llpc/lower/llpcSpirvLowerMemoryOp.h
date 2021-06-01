@@ -51,7 +51,7 @@ struct StoreExpandInfo {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering memory operations.
-class SpirvLowerMemoryOp : public SpirvLower, public llvm::InstVisitor<SpirvLowerMemoryOp> {
+class SpirvLowerMemoryOp : public LegacySpirvLower, public llvm::InstVisitor<SpirvLowerMemoryOp> {
 public:
   SpirvLowerMemoryOp();
 

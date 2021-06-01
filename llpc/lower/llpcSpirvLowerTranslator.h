@@ -31,33 +31,54 @@
 #pragma once
 
 #include "llpcSpirvLower.h"
+#include "llvm/IR/PassManager.h"
 
 namespace Llpc {
 
 // =====================================================================================================================
 // Pass to translate the SPIR-V modules and generate an IR module for the whole pipeline
-class SpirvLowerTranslator : public SpirvLower {
+class SpirvLowerTranslator : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerTranslator> {
 public:
-  static char ID;
-  SpirvLowerTranslator() : SpirvLower(ID) {}
+  SpirvLowerTranslator() {}
 
   //
   // @param stage : Shader stage
   // @param shaderInfo : Shader info for this shader
-  SpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo)
-      : SpirvLower(ID), m_shaderInfo(shaderInfo) {}
+  SpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo) : m_shaderInfo(shaderInfo) {}
 
-  bool runOnModule(llvm::Module &module) override;
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  bool runImpl(llvm::Module &module);
 
 private:
-  SpirvLowerTranslator(const SpirvLowerTranslator &) = delete;
-  SpirvLowerTranslator &operator=(const SpirvLowerTranslator &) = delete;
-
   void translateSpirvToLlvm(const PipelineShaderInfo *shaderInfo, llvm::Module *module);
 
   // -----------------------------------------------------------------------------------------------------------------
 
   const PipelineShaderInfo *m_shaderInfo; // Input shader info
+};
+
+// =====================================================================================================================
+// Legacy pass manager wrapper class
+class LegacySpirvLowerTranslator : public LegacySpirvLower {
+public:
+  static char ID;
+  LegacySpirvLowerTranslator() : LegacySpirvLower(ID) {}
+
+  //
+  // @param stage : Shader stage
+  // @param shaderInfo : Shader info for this shader
+  LegacySpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo)
+      : LegacySpirvLower(ID), Impl(stage, shaderInfo) {}
+
+  bool runOnModule(llvm::Module &module) override;
+
+private:
+  LegacySpirvLowerTranslator(const LegacySpirvLowerTranslator &) = delete;
+  LegacySpirvLowerTranslator &operator=(const LegacySpirvLowerTranslator &) = delete;
+
+  // -----------------------------------------------------------------------------------------------------------------
+
+  SpirvLowerTranslator Impl;
 };
 
 } // namespace Llpc

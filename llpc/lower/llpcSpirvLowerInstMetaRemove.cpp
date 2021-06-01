@@ -53,7 +53,7 @@ ModulePass *createSpirvLowerInstMetaRemove() {
 }
 
 // =====================================================================================================================
-SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove() : SpirvLower(ID), m_changed(false) {
+SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove() : LegacySpirvLower(ID), m_changed(false) {
 }
 
 // =====================================================================================================================

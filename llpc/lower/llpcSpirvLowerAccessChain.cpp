@@ -54,7 +54,7 @@ ModulePass *createSpirvLowerAccessChain() {
 }
 
 // =====================================================================================================================
-SpirvLowerAccessChain::SpirvLowerAccessChain() : SpirvLower(ID) {
+SpirvLowerAccessChain::SpirvLowerAccessChain() : LegacySpirvLower(ID) {
 }
 
 // =====================================================================================================================

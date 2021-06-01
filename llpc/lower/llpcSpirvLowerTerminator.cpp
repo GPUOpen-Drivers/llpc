@@ -52,7 +52,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering terminators.
-class SpirvLowerTerminator : public SpirvLower, public llvm::InstVisitor<SpirvLowerTerminator> {
+class SpirvLowerTerminator : public LegacySpirvLower, public llvm::InstVisitor<SpirvLowerTerminator> {
 public:
   SpirvLowerTerminator();
 
@@ -81,7 +81,7 @@ ModulePass *createSpirvLowerTerminator() {
 }
 
 // =====================================================================================================================
-SpirvLowerTerminator::SpirvLowerTerminator() : SpirvLower(ID) {
+SpirvLowerTerminator::SpirvLowerTerminator() : LegacySpirvLower(ID) {
 }
 
 // =====================================================================================================================
