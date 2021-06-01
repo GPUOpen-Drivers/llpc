@@ -80,16 +80,9 @@ private:
   llvm::Optional<CacheAccessor> m_nonFragmentCacheAccessor;
   llvm::Optional<CacheAccessor> m_fragmentCacheAccessor;
 
-  ShaderEntryState m_fragmentCacheEntryState = ShaderEntryState::New;
-  ShaderCache *m_fragmentShaderCache = nullptr;
-  CacheEntryHandle m_hFragmentEntry = {};
-  BinaryData m_fragmentElf = {};
-
   // New ICache
-  Vkgc::Result m_nonFragmentCacheResult = Vkgc::Result::ErrorUnknown;
   Vkgc::EntryHandle m_nonFragmentEntry;
 
-  Vkgc::Result m_fragmentCacheResult = Vkgc::Result::ErrorUnknown;
   Vkgc::EntryHandle m_fragmentEntry;
 };
 
