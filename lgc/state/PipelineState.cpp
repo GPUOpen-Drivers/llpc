@@ -524,11 +524,27 @@ void PipelineState::setUserDataNodesTable(ArrayRef<ResourceNode> nodes, Resource
 
     // Copy the node.
     destNode = node;
-    if (node.type == ResourceNodeType::DescriptorTableVaPtr) {
+
+    switch (node.type) {
+    case ResourceNodeType::DescriptorTableVaPtr:
       // Process an inner table.
       destInnerTable -= node.innerTable.size();
       destNode.innerTable = ArrayRef<ResourceNode>(destInnerTable, node.innerTable.size());
       setUserDataNodesTable(node.innerTable, destInnerTable, destInnerTable);
+      break;
+    case ResourceNodeType::IndirectUserDataVaPtr:
+    case ResourceNodeType::StreamOutTableVaPtr:
+      break;
+    default:
+      // If there is immutable sampler data, take our own copy of it.
+      if (node.immutableSize != 0) {
+        unsigned sizeInDwords = node.immutableSize * DescriptorSizeSamplerInDwords;
+        auto buffer = std::make_unique<uint32_t[]>(sizeInDwords);
+        std::copy_n(node.immutableValue, sizeInDwords, buffer.get());
+        destNode.immutableValue = buffer.get();
+        m_immutableValueAllocs.push_back(std::move(buffer));
+      }
+      break;
     }
   }
 }
@@ -591,16 +607,10 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.binding)));
       // Operand 5: stride
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.stride)));
-      if (node.immutableValue) {
-        // Operand 6 onwards: immutable descriptor constant.
-        // Writing the constant array directly does not seem to work, as it does not survive IR linking.
-        // Maybe it is a problem with the IR linker when metadata contains a non-ConstantData constant.
-        // So we write the individual constant vectors instead.
-        // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
-        unsigned elemCount = node.immutableValue->getType()->getArrayNumElements();
-        for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx)
-          operands.push_back(ConstantAsMetadata::get(ConstantExpr::getExtractValue(node.immutableValue, elemIdx)));
-      }
+      // Operand 6 onwards: immutable descriptor constants
+      for (uint32_t element :
+           ArrayRef<uint32_t>(node.immutableValue, node.immutableSize * DescriptorSizeSamplerInDwords))
+        operands.push_back(ConstantAsMetadata::get(builder.getInt32(element)));
       break;
     }
     }
@@ -663,18 +673,16 @@ void PipelineState::readUserDataNodes(Module *module) {
         // Operand 5: stride
         nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
         nextNode->immutableValue = nullptr;
-        if (metadataNode->getNumOperands() >= 7) {
-          // Operand 6 onward: immutable descriptor constant
-          // The descriptor is either a sampler (<4 x i32>) or converting sampler (<8 x i32>).
-          static const unsigned OperandStartIdx = 6;
-          unsigned elemCount = metadataNode->getNumOperands() - OperandStartIdx;
-          SmallVector<Constant *, 8> descriptors;
-          for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx) {
-            descriptors.push_back(
-                dyn_cast<ConstantAsMetadata>(metadataNode->getOperand(OperandStartIdx + elemIdx))->getValue());
-          }
-          nextNode->immutableValue =
-              ConstantArray::get(ArrayType::get(descriptors[0]->getType(), elemCount), descriptors);
+        // Operand 6 onward: immutable descriptor constants
+        constexpr unsigned ImmutableStartOperand = 6;
+        unsigned immutableSizeInDwords = metadataNode->getNumOperands() - ImmutableStartOperand;
+        nextNode->immutableSize = immutableSizeInDwords / DescriptorSizeSamplerInDwords;
+        if (nextNode->immutableSize) {
+          m_immutableValueAllocs.push_back(std::make_unique<uint32_t[]>(immutableSizeInDwords));
+          nextNode->immutableValue = m_immutableValueAllocs.back().get();
+          for (unsigned i = 0; i != immutableSizeInDwords; ++i)
+            m_immutableValueAllocs.back()[i] =
+                mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(ImmutableStartOperand + i))->getZExtValue();
         }
       }
       // Move on to next node to write in table.

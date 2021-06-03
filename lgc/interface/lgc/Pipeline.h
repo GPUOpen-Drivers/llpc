@@ -229,7 +229,8 @@ struct ResourceNode {
       unsigned set;                   // Descriptor set
       unsigned binding;               // Binding
       unsigned stride;                // Size of each descriptor in the indexable range in dwords.
-      llvm::Constant *immutableValue; // Array of vectors of i32 constants for immutable value
+      unsigned immutableSize;         // Size (in units of DescriptorSizeSampler bytes) of immutableValue array
+      const uint32_t *immutableValue; // Array of dwords for immutable sampler.
     };
 
     // Info for DescriptorTableVaPtr
@@ -238,15 +239,6 @@ struct ResourceNode {
     // Info for indirect data nodes (IndirectUserDataVaPtr, StreamOutVaTablePtr)
     unsigned indirectSizeInDwords;
   };
-};
-
-/// Represents the info of immutable descriptor.
-struct ImmutableDescriptor {
-  ResourceNodeType type; ///< Type of this resource node (currently, only sampler is supported)
-  unsigned set;          ///< ID of descriptor set
-  unsigned binding;      ///< ID of descriptor binding
-  unsigned arraySize;    ///< Element count for arrayed binding
-  const unsigned *value; ///< Static SRDs
 };
 
 // =====================================================================================================================

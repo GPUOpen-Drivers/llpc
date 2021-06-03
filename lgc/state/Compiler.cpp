@@ -135,9 +135,7 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, bool unlinked) {
     pipelineModule = modules[0];
     pipelineModule->setModuleIdentifier("lgcPipeline");
   } else {
-    // Create an empty module then link each shader module into it. We record pipeline state into IR
-    // metadata before the link, to avoid problems with a Constant for an immutable descriptor value
-    // disappearing when modules are deleted.
+    // Create an empty module then link each shader module into it.
     bool result = true;
     pipelineModule = new Module("lgcPipeline", getContext());
     TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
