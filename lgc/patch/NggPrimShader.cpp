@@ -1536,7 +1536,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
   const bool cullingMode = !m_nggControl->passthroughMode;
 
-  const auto rasterStream = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
+  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs;
+  const auto rasterStream = inOutUsage.rasterStream;
 
   auto entryPoint = module->getFunction(lgcName::NggPrimShaderEntryPoint);
 
@@ -1567,12 +1568,13 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   //
   //   if (threadIdInSubgroup < primCountInSubgroup)
   //     Initialize primitive connectivity data (0x80000000)
-  //   if (threadIdInSubgroup < waveCount + 1)
-  //     Initialize per-wave and per-subgroup count of output vertices
   //   Barrier
   //
   //   if (threadIdInWave < primCountInWave)
   //     Run GS
+  //
+  //  if (threadIdInSubgroup < waveCount + 1)
+  //     Initialize per-wave and per-subgroup count of output vertices
   //   Barrier
   //
   //   if (culling && valid primitive & threadIdInSubgroup < primCountInSubgroup) {
@@ -1618,11 +1620,11 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   auto initOutPrimDataBlock = createBlock(entryPoint, ".initOutPrimData");
   auto endInitOutPrimDataBlock = createBlock(entryPoint, ".endInitOutPrimData");
 
-  auto initOutVertCountBlock = createBlock(entryPoint, ".initOutVertCount");
-  auto endInitOutVertCountBlock = createBlock(entryPoint, ".endInitOutVertCount");
-
   auto beginGsBlock = createBlock(entryPoint, ".beginGs");
   auto endGsBlock = createBlock(entryPoint, ".endGs");
+
+  auto initOutVertCountBlock = createBlock(entryPoint, ".initOutVertCount");
+  auto endInitOutVertCountBlock = createBlock(entryPoint, ".endInitOutVertCount");
 
   // Create blocks of culling only if culling is requested
   BasicBlock *cullingBlock = nullptr;
@@ -1720,25 +1722,6 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(endInitOutPrimDataBlock);
 
-    auto waveValid =
-        m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(waveCountInSubgroup + 1));
-    m_builder->CreateCondBr(waveValid, initOutVertCountBlock, endInitOutVertCountBlock);
-  }
-
-  // Construct ".initOutVertCount" block
-  {
-    m_builder->SetInsertPoint(initOutVertCountBlock);
-
-    writePerThreadDataToLds(m_builder->getInt32(0), m_nggFactor.threadIdInSubgroup, LdsRegionOutVertCountInWaves,
-                            (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * rasterStream);
-
-    m_builder->CreateBr(endInitOutVertCountBlock);
-  }
-
-  // Construct ".endInitOutVertCount" block
-  {
-    m_builder->SetInsertPoint(endInitOutVertCountBlock);
-
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
     auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.primCountInWave);
@@ -1755,9 +1738,28 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   }
 
   // Construct ".endGs" block
-  Value *primData = nullptr;
   {
     m_builder->SetInsertPoint(endGsBlock);
+
+    auto waveValid =
+        m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(waveCountInSubgroup + 1));
+    m_builder->CreateCondBr(waveValid, initOutVertCountBlock, endInitOutVertCountBlock);
+  }
+
+  // Construct ".initOutVertCount" block
+  {
+    m_builder->SetInsertPoint(initOutVertCountBlock);
+
+    writePerThreadDataToLds(m_builder->getInt32(0), m_nggFactor.threadIdInSubgroup, LdsRegionOutVertCountInWaves,
+                            (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * rasterStream);
+
+    m_builder->CreateBr(endInitOutVertCountBlock);
+  }
+
+  // Construct ".endInitOutVertCount" block
+  Value *primData = nullptr;
+  {
+    m_builder->SetInsertPoint(endInitOutVertCountBlock);
 
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
@@ -1869,7 +1871,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     auto drawFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2);
     drawFlagPhi->addIncoming(drawFlag, checkOutVertDrawFlagBlock);
     // NOTE: The predecessors are different if culling mode is enabled.
-    drawFlagPhi->addIncoming(m_builder->getFalse(), cullingMode ? endCullingBlock : endGsBlock);
+    drawFlagPhi->addIncoming(m_builder->getFalse(), cullingMode ? endCullingBlock : endInitOutVertCountBlock);
     drawFlag = drawFlagPhi; // Update draw flag
 
     drawMask = doSubgroupBallot(drawFlagPhi);
@@ -1952,8 +1954,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
       }
 
       compactVertexId = m_builder->CreateAdd(vertCountInPrevWaves, compactVertexId);
-      writePerThreadDataToLds(m_builder->CreateTrunc(m_nggFactor.threadIdInSubgroup, m_builder->getInt32Ty()),
-                              compactVertexId, LdsRegionOutVertThreadIdMap);
+      writePerThreadDataToLds(m_nggFactor.threadIdInSubgroup, compactVertexId, LdsRegionOutVertThreadIdMap);
 
       m_builder->CreateBr(endCompactOutVertIdBlock);
     }
@@ -3302,33 +3303,39 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
 // @param module : LLVM module
 Function *NggPrimShader::mutateCopyShader(Module *module) {
   auto copyShaderEntryPoint = module->getFunction(lgcName::NggCopyShaderEntryPoint);
-  assert(copyShaderEntryPoint != nullptr);
+  assert(copyShaderEntryPoint);
 
   auto savedInsertPos = m_builder->saveIP();
 
   // Vertex ID is always the last argument
   auto vertexId = getFunctionArgument(copyShaderEntryPoint, copyShaderEntryPoint->arg_size() - 1);
+  const unsigned rasterStream =
+      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
+  (void(rasterStream)); // Unused
 
   std::vector<Instruction *> removeCalls;
 
   for (auto &func : module->functions()) {
     if (func.getName().startswith(lgcName::NggGsOutputImport)) {
       // Import GS outputs from GS-VS ring
-      for (auto pUser : func.users()) {
-        CallInst *const call = dyn_cast<CallInst>(pUser);
-        assert(call != nullptr);
+      for (auto user : func.users()) {
+        CallInst *const call = dyn_cast<CallInst>(user);
+        assert(call);
+
+        if (call->getFunction() != copyShaderEntryPoint)
+          continue; // Not belong to copy shader
+
         m_builder->SetInsertPoint(call);
 
-        assert(call->getNumArgOperands() == 3);
+        assert(call->getNumArgOperands() == 2);
         const unsigned location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-        const unsigned compIdx = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
-        const unsigned streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
-        assert(streamId < MaxGsStreams);
+        const unsigned streamId = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
+        assert(streamId == rasterStream);
 
         auto vertexOffset = calcVertexItemOffset(streamId, vertexId);
-        auto output = importGsOutput(call->getType(), location, compIdx, streamId, vertexOffset);
-
+        auto output = importGsOutput(call->getType(), location, streamId, vertexOffset);
         call->replaceAllUsesWith(output);
+
         removeCalls.push_back(call);
       }
     }
@@ -3451,11 +3458,9 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
 //
 // @param outputTy : Type of the output
 // @param location : Location of the output
-// @param compIdx : Index used for vector element indexing
 // @param streamId : ID of output vertex stream
 // @param vertexOffset : Start offset of vertex item in GS-VS ring (in bytes)
-Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned compIdx, unsigned streamId,
-                                     Value *vertexOffset) {
+Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned streamId, Value *vertexOffset) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: Only import those outputs that belong to the rasterization stream.
@@ -3474,8 +3479,8 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
     outputTy = FixedVectorType::get(outputElemTy, elemCount);
   }
 
-  // ldsOffset = vertexOffset + (location * 4 + compIdx) * 4 (in bytes)
-  const unsigned attribOffset = (location * 4) + compIdx;
+  // ldsOffset = vertexOffset + location * 4 * 4 (in bytes)
+  const unsigned attribOffset = location * 4;
   auto ldsOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(attribOffset * 4));
 
   auto output = m_ldsManager->readValueFromLds(outputTy, ldsOffset);
@@ -3508,11 +3513,18 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *threadIdInSubgroup, Value *emitVertsPtr,
                                   Value *outVertsPtr) {
+  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+  if (resUsage->inOutUsage.gs.rasterStream != streamId) {
+    // Only handle GS_EMIT message that belongs to the rasterization stream.
+    assert(resUsage->inOutUsage.enableXfb == false);
+    return;
+  }
+
   auto gsEmitHandler = module->getFunction(lgcName::NggGsEmit);
   if (!gsEmitHandler)
-    gsEmitHandler = createGsEmitHandler(module, streamId);
+    gsEmitHandler = createGsEmitHandler(module);
 
-  m_builder->CreateCall(gsEmitHandler, {threadIdInSubgroup, emitVertsPtr, outVertsPtr});
+  m_builder->CreateCall(gsEmitHandler, {threadIdInSubgroup, m_builder->getInt32(streamId), emitVertsPtr, outVertsPtr});
 }
 
 // =====================================================================================================================
@@ -3522,9 +3534,16 @@ void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *thre
 // @param streamId : ID of output vertex stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsCut(Module *module, unsigned streamId, Value *outVertsPtr) {
+  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+  if (resUsage->inOutUsage.gs.rasterStream != streamId) {
+    // Only handle GS_CUT message that belongs to the rasterization stream.
+    assert(resUsage->inOutUsage.enableXfb == false);
+    return;
+  }
+
   auto gsCutHandler = module->getFunction(lgcName::NggGsCut);
   if (!gsCutHandler)
-    gsCutHandler = createGsCutHandler(module, streamId);
+    gsCutHandler = createGsCutHandler(module);
 
   m_builder->CreateCall(gsCutHandler, outVertsPtr);
 }
@@ -3533,8 +3552,7 @@ void NggPrimShader::processGsCut(Module *module, unsigned streamId, Value *outVe
 // Creates the function that processes GS_EMIT.
 //
 // @param module : LLVM module
-// @param streamId : ID of output vertex stream
-Function *NggPrimShader::createGsEmitHandler(Module *module, unsigned streamId) {
+Function *NggPrimShader::createGsEmitHandler(Module *module) {
   assert(m_hasGs);
 
   //
@@ -3553,6 +3571,7 @@ Function *NggPrimShader::createGsEmitHandler(Module *module, unsigned streamId) 
   auto funcTy = FunctionType::get(m_builder->getVoidTy(),
                                   {
                                       m_builder->getInt32Ty(),                              // %threadIdInSubgroup
+                                      m_builder->getInt32Ty(),                              // %streamId
                                       PointerType::get(m_builder->getInt32Ty(), addrSpace), // %emitVertsPtr
                                       PointerType::get(m_builder->getInt32Ty(), addrSpace), // %outVertsPtr
                                   },
@@ -3565,6 +3584,9 @@ Function *NggPrimShader::createGsEmitHandler(Module *module, unsigned streamId) 
   auto argIt = func->arg_begin();
   Value *threadIdInSubgroup = argIt++;
   threadIdInSubgroup->setName("threadIdInSubgroup");
+
+  Value *streamId = argIt++;
+  threadIdInSubgroup->setName("streamId");
 
   Value *emitVertsPtr = argIt++;
   emitVertsPtr->setName("emitVertsPtr");
@@ -3579,8 +3601,6 @@ Function *NggPrimShader::createGsEmitHandler(Module *module, unsigned streamId) 
   auto savedInsertPoint = m_builder->saveIP();
 
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
-  const auto &resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-
   const unsigned outVertsPerPrim = getOutputVerticesPerPrimitive();
 
   // Construct ".entry" block
@@ -3608,23 +3628,25 @@ Function *NggPrimShader::createGsEmitHandler(Module *module, unsigned streamId) 
   {
     m_builder->SetInsertPoint(emitPrimBlock);
 
-    // NOTE: Only calculate GS output primitive data and write it to LDS for rasterization stream.
-    if (streamId == resUsage->inOutUsage.gs.rasterStream) {
-      // vertexId = threadIdInSubgroup * outputVertices + emitVerts - outVertsPerPrim
-      auto vertexId = m_builder->CreateMul(threadIdInSubgroup, m_builder->getInt32(geometryMode.outputVertices));
-      vertexId = m_builder->CreateAdd(vertexId, emitVerts);
-      vertexId = m_builder->CreateSub(vertexId, m_builder->getInt32(outVertsPerPrim));
+    // vertexId = threadIdInSubgroup * outputVertices + emitVerts - outVertsPerPrim
+    auto vertexId = m_builder->CreateMul(threadIdInSubgroup, m_builder->getInt32(geometryMode.outputVertices));
+    vertexId = m_builder->CreateAdd(vertexId, emitVerts);
+    vertexId = m_builder->CreateSub(vertexId, m_builder->getInt32(outVertsPerPrim));
 
-      Value *winding = m_builder->getInt32(0);
-      if (geometryMode.outputPrimitive == OutputPrimitives::TriangleStrip) {
-        winding = m_builder->CreateSub(outVerts, m_builder->getInt32(outVertsPerPrim));
-        winding = m_builder->CreateAnd(winding, 0x1);
-      }
-
-      // Write primitive data (just winding)
-      writePerThreadDataToLds(winding, vertexId, LdsRegionOutPrimData,
-                              SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * streamId);
+    Value *winding = m_builder->getInt32(0);
+    if (geometryMode.outputPrimitive == OutputPrimitives::TriangleStrip) {
+      winding = m_builder->CreateSub(outVerts, m_builder->getInt32(outVertsPerPrim));
+      winding = m_builder->CreateAnd(winding, 0x1);
     }
+
+    // Write primitive data (just winding)
+    const unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionOutPrimData);
+    // ldsOffset = regionStart + vertexId * sizeof(DWORD) + sizeof(DWORD) * NggMaxThreadsPerSubgroup * streamId
+    auto ldsOffset = m_builder->CreateAdd(m_builder->getInt32(regionStart),
+                                          m_builder->CreateMul(vertexId, m_builder->getInt32(SizeOfDword)));
+    ldsOffset = m_builder->CreateAdd(
+        ldsOffset, m_builder->CreateMul(m_builder->getInt32(SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup), streamId));
+    m_ldsManager->writeValueToLds(winding, ldsOffset);
 
     m_builder->CreateBr(endEmitPrimBlock);
   }
@@ -3647,8 +3669,7 @@ Function *NggPrimShader::createGsEmitHandler(Module *module, unsigned streamId) 
 // Creates the function that processes GS_CUT.
 //
 // @param module : LLVM module
-// @param streamId : ID of output vertex stream
-Function *NggPrimShader::createGsCutHandler(Module *module, unsigned streamId) {
+Function *NggPrimShader::createGsCutHandler(Module *module) {
   assert(m_hasGs);
 
   //
@@ -5592,7 +5613,7 @@ Value *NggPrimShader::fetchVertexPositionData(Value *vertexId) {
   const unsigned rasterStream = inOutUsage.gs.rasterStream;
   auto vertexOffset = calcVertexItemOffset(rasterStream, vertexId);
 
-  return importGsOutput(FixedVectorType::get(m_builder->getFloatTy(), 4), loc, 0, rasterStream, vertexOffset);
+  return importGsOutput(FixedVectorType::get(m_builder->getFloatTy(), 4), loc, rasterStream, vertexOffset);
 }
 
 // =====================================================================================================================
@@ -5619,7 +5640,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexId) {
   auto vertexOffset = calcVertexItemOffset(rasterStream, vertexId);
 
   auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
-  auto cullDistances = importGsOutput(ArrayType::get(m_builder->getFloatTy(), builtInUsage.cullDistance), loc, 0,
+  auto cullDistances = importGsOutput(ArrayType::get(m_builder->getFloatTy(), builtInUsage.cullDistance), loc,
                                       rasterStream, vertexOffset);
 
   // Calculate the sign mask for all cull distances

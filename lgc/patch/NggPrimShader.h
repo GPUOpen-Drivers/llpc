@@ -193,16 +193,15 @@ private:
   void exportGsOutput(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                       llvm::Value *threadIdInSubgroup, llvm::Value *emitVerts);
 
-  llvm::Value *importGsOutput(llvm::Type *outputTy, unsigned location, unsigned compIdx, unsigned streamId,
-                              llvm::Value *vertexOffset);
+  llvm::Value *importGsOutput(llvm::Type *outputTy, unsigned location, unsigned streamId, llvm::Value *vertexOffset);
 
   void processGsEmit(llvm::Module *module, unsigned streamId, llvm::Value *threadIdInSubgroup,
                      llvm::Value *emitVertsPtr, llvm::Value *outVertsPtr);
 
   void processGsCut(llvm::Module *module, unsigned streamId, llvm::Value *outVertsPtr);
 
-  llvm::Function *createGsEmitHandler(llvm::Module *module, unsigned streamId);
-  llvm::Function *createGsCutHandler(llvm::Module *module, unsigned streamId);
+  llvm::Function *createGsEmitHandler(llvm::Module *module);
+  llvm::Function *createGsCutHandler(llvm::Module *module);
 
   llvm::Value *readPerThreadDataFromLds(llvm::Type *readDataTy, llvm::Value *threadId, NggLdsRegionType region,
                                         unsigned offsetInRegion = 0, bool useDs128 = false);
