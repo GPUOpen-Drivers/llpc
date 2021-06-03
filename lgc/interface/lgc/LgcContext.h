@@ -58,8 +58,10 @@ class TargetInfo;
 
 // Size in bytes of resource (image) descriptor
 static constexpr unsigned DescriptorSizeResource = 8 * sizeof(uint32_t);
+// Size in dwords of sampler descriptor
+static constexpr unsigned DescriptorSizeSamplerInDwords = 4;
 // Size in bytes of sampler descriptor
-static constexpr unsigned DescriptorSizeSampler = 4 * sizeof(uint32_t);
+static constexpr unsigned DescriptorSizeSampler = DescriptorSizeSamplerInDwords * sizeof(uint32_t);
 // Size in bytes of buffer descriptor
 static constexpr unsigned DescriptorSizeBuffer = 4 * sizeof(uint32_t);
 

@@ -175,7 +175,7 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet
   }
 
   Value *descPtr = nullptr;
-  if (node && node->immutableValue && descType == ResourceNodeType::DescriptorSampler) {
+  if (node && node->immutableSize != 0 && descType == ResourceNodeType::DescriptorSampler) {
     // This is an immutable sampler. Put the immutable value into a static variable and return a pointer
     // to that. For a simple non-variably-indexed immutable sampler not passed through a function call
     // or phi node, we rely on subsequent LLVM optimizations promoting the value back to a constant.
@@ -184,9 +184,22 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet
     Module *module = GetInsertPoint()->getModule();
     descPtr = module->getGlobalVariable(globalName, /*AllowInternal=*/true);
     if (!descPtr) {
-      descPtr = new GlobalVariable(*module, node->immutableValue->getType(),
-                                   /*isConstant=*/true, GlobalValue::InternalLinkage, node->immutableValue, globalName,
-                                   nullptr, GlobalValue::NotThreadLocal, ADDR_SPACE_CONST);
+      // We need to create the global variable as it does not already exist.
+      // First construct the immutable value as an array of <4 x i32>, for use as the initialzier of the
+      // global variable.
+      SmallVector<Constant *> immutableArray;
+      for (unsigned idx = 0; idx != node->immutableSize; ++idx) {
+        Constant *dwords[DescriptorSizeSamplerInDwords];
+        for (unsigned subidx = 0; subidx != DescriptorSizeSamplerInDwords; ++subidx)
+          dwords[subidx] = getInt32(node->immutableValue[idx * DescriptorSizeSamplerInDwords + subidx]);
+        immutableArray.push_back(ConstantVector::get(dwords));
+      }
+      Constant *globalInit =
+          ConstantArray::get(ArrayType::get(immutableArray[0]->getType(), immutableArray.size()), immutableArray);
+      // Then create the global variable.
+      descPtr = new GlobalVariable(*module, globalInit->getType(),
+                                   /*isConstant=*/true, GlobalValue::InternalLinkage, globalInit, globalName, nullptr,
+                                   GlobalValue::NotThreadLocal, ADDR_SPACE_CONST);
     }
   } else {
     // Get a pointer to the descriptor.
@@ -223,7 +236,7 @@ Value *DescBuilder::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const Twin
 // @param node : The descriptor node (nullptr for shader compilation)
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::getStride(ResourceNodeType descType, unsigned descSet, unsigned binding, const ResourceNode *node) {
-  if (node && node->immutableValue && descType == ResourceNodeType::DescriptorSampler) {
+  if (node && node->immutableSize != 0 && descType == ResourceNodeType::DescriptorSampler) {
     // This is an immutable sampler. Because we put the immutable value into a static variable, the stride is
     // always the size of the descriptor.
     return getInt32(DescriptorSizeSampler);

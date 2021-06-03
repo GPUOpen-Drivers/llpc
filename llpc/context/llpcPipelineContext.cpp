@@ -558,6 +558,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       destNode.set = node.srdRange.set;
       destNode.binding = node.srdRange.binding;
       destNode.immutableValue = nullptr;
+      destNode.immutableSize = 0;
       switch (node.type) {
       case ResourceMappingNodeType::DescriptorResource:
       case ResourceMappingNodeType::DescriptorFmask:
@@ -610,15 +611,8 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
             destNode.stride /= immutableNode.arraySize;
           }
 
-          constexpr unsigned SamplerDescriptorSize = 4;
-
-          for (unsigned compIdx = 0; compIdx < immutableNode.arraySize; ++compIdx) {
-            Constant *compValues[SamplerDescriptorSize] = {};
-            for (unsigned i = 0; i < SamplerDescriptorSize; ++i)
-              compValues[i] = builder.getInt32(immutableNode.pValue[compIdx * SamplerDescriptorSize + i]);
-            values.push_back(ConstantVector::get(compValues));
-          }
-          destNode.immutableValue = ConstantArray::get(ArrayType::get(values[0]->getType(), values.size()), values);
+          destNode.immutableSize = immutableNode.arraySize;
+          destNode.immutableValue = immutableNode.pValue;
         }
       }
       break;

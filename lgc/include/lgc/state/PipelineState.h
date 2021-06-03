@@ -445,8 +445,10 @@ private:
   std::vector<ShaderOptions> m_shaderOptions;           // Per-shader options
   std::unique_ptr<ResourceNode[]> m_allocUserDataNodes; // Allocated buffer for user data
   llvm::ArrayRef<ResourceNode> m_userDataNodes;         // Top-level user data node table
-  llvm::MDString *m_resourceNodeTypeNames[unsigned(ResourceNodeType::Count)] = {};
+  // Allocated buffers for immutable sampler data
+  llvm::SmallVector<std::unique_ptr<uint32_t[]>, 4> m_immutableValueAllocs;
   // Cached MDString for each resource node type
+  llvm::MDString *m_resourceNodeTypeNames[unsigned(ResourceNodeType::Count)] = {};
 
   bool m_gsOnChip = false;                                                     // Whether to use GS on-chip mode
   NggControl m_nggControl = {};                                                // NGG control settings
