@@ -224,7 +224,7 @@ bool PatchCopyShader::runOnModule(Module &module) {
     } else {
       // If NGG, esGsLdsSize is not used
       intfData->userDataUsage.gs.copyShaderEsGsLdsSize = InvalidValue;
-      intfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
+      intfData->userDataUsage.gs.copyShaderStreamOutTable = 1;
     }
   }
 
