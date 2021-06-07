@@ -28,8 +28,9 @@
  * @brief VKGC source file: contains implementation of VKGC ELF reading utilities.
  ***********************************************************************************************************************
  */
-#include <algorithm>
 #include "vkgcElfReader.h"
+#include "llvm/Support/MathExtras.h"
+#include <algorithm>
 #include <string.h>
 
 #define DEBUG_TYPE "vkgc-elf-reader"
