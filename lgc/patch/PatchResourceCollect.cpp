@@ -80,9 +80,18 @@ bool PatchResourceCollect::runOnModule(Module &module) {
   m_pipelineShaders = &getAnalysis<PipelineShaders>();
   m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
-  if (!m_pipelineState->isUnlinked()) {
+  bool needPack = false;
+  for (int shaderStage = 0; shaderStage < ShaderStageGfxCount; ++shaderStage) {
+    ShaderStage stage = static_cast<ShaderStage>(shaderStage);
+    if (m_pipelineState->hasShaderStage(stage) &&
+        (m_pipelineState->canPackInput(stage) || m_pipelineState->canPackOutput(stage))) {
+      needPack = true;
+      break;
+    }
+  }
+  if (needPack) {
     m_locationInfoMapManager = std::make_unique<InOutLocationInfoMapManager>();
-    // If packing {VS, TES} outputs and {TCS, FS} inputs, scalarize those outputs and inputs now.
+    // If packing {VS, TES, GS} outputs and {TCS, GS, FS} inputs, scalarize those outputs and inputs now.
     scalarizeForInOutPacking(&module);
   }
 
