@@ -5391,12 +5391,11 @@ Value *PatchInOutImportExport::reconfigWorkgroup(Value *localInvocationId, Instr
 //
 // @param shadingRate : LGC shading rate
 // @param insertPos : Where to insert instructions.
-void PatchInOutImportExport::exportShadingRate(llvm::Value *shadingRate, llvm::Instruction *insertPos) {
+void PatchInOutImportExport::exportShadingRate(Value *shadingRate, Instruction *insertPos) {
   IRBuilder<> builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
-  // TODO: Current shading rate interpretation is based on GFX10.3.
-  assert(m_gfxIp.major == 10 && m_gfxIp.minor == 3);
+  assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
   // and 4-pixel mode is not supported. But the spec requires us to accept unsupported rates and clamp them to
@@ -5442,12 +5441,11 @@ void PatchInOutImportExport::exportShadingRate(llvm::Value *shadingRate, llvm::I
 // Gets HW shading rate and converts them to LGC definitions.
 //
 // @param insertPos : Where to insert instructions.
-llvm::Value *PatchInOutImportExport::getShadingRate(llvm::Instruction *insertPos) {
+Value *PatchInOutImportExport::getShadingRate(Instruction *insertPos) {
   IRBuilder<> builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
-  // TODO: Current shading rate interpretation is based on GFX10.3.
-  assert(m_gfxIp.major == 10 && m_gfxIp.minor == 3);
+  assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   assert(m_shaderStage == ShaderStageFragment);
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
