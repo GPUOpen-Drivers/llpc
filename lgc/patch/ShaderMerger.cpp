@@ -142,11 +142,13 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   uint64_t inRegMask = 0;
   auto entryPointTy = generateLsHsEntryPointType(&inRegMask);
 
-  // Create the entrypoint for the merged shader, and insert it just before the old HS.
+  // Create the entrypoint for the merged shader, and insert it at the start.  This has to be done for unlinked shaders
+  // because the vertex fetch shader will be prepended to this module and expect the fall through into the merged
+  // shader.
   Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::LsHsEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   auto module = hsEntryPoint->getParent();
-  module->getFunctionList().insert(hsEntryPoint->getIterator(), entryPoint);
+  module->getFunctionList().push_front(entryPoint);
 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
@@ -554,10 +556,12 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   uint64_t inRegMask = 0;
   auto entryPointTy = generateEsGsEntryPointType(&inRegMask);
 
-  // Create the entrypoint for the merged shader, and insert it just before the old GS.
+  // Create the entrypoint for the merged shader, and insert it at the start.  This has to be done for unlinked shaders
+  // because the vertex fetch shader will be prepended to this module and expect the fall through into the merged
+  // shader.
   Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::EsGsEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-  module->getFunctionList().insert(gsEntryPoint->getIterator(), entryPoint);
+  module->getFunctionList().push_front(entryPoint);
 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
