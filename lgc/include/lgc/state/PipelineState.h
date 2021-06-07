@@ -299,11 +299,17 @@ public:
   // Initialize the packable state of generic input/output
   void initializeInOutPackState();
 
-  // Get whehter the input locations of the specified shader stage can be packed
-  bool canPackInput(ShaderStage shaderStage) const { return m_inputPackState[shaderStage]; }
+  // Get whether the input locations of the specified shader stage can be packed
+  bool canPackInput(ShaderStage shaderStage);
 
-  // Get whehter the output locations of the specified shader stage can be packed
-  bool canPackOutput(ShaderStage shaderStage) const { return m_outputPackState[shaderStage]; }
+  // Get whether the output locations of the specified shader stage can be packed
+  bool canPackOutput(ShaderStage shaderStage);
+
+  // Set the flag to pack the input locations of the specified shader stage
+  void setPackInput(ShaderStage shaderStage, bool pack) { m_inputPackState[shaderStage] = pack; }
+
+  // Set the flag to pack the output locations of the specified shader stage
+  void setPackOutput(ShaderStage shaderStage, bool pack) { m_outputPackState[shaderStage] = pack; }
 
   // -----------------------------------------------------------------------------------------------------------------
   // Utility methods

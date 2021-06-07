@@ -1341,6 +1341,34 @@ void PipelineState::initializeInOutPackState() {
 }
 
 // =====================================================================================================================
+// Get whether the input locations of the specified shader stage can be packed
+//
+// @param shaderStage : The given shader stage
+bool PipelineState::canPackInput(ShaderStage shaderStage) {
+  ShaderStage preStage = getPrevShaderStage(shaderStage);
+  // The input packable state of the current stage should match the output packable state of the previous stage, except
+  // that the current stage has no previous and it is a null FS.
+  if (preStage != ShaderStageInvalid &&
+      !(shaderStage == ShaderStageFragment && getShaderResourceUsage(shaderStage)->inOutUsage.fs.isNullFs))
+    assert(m_inputPackState[shaderStage] == m_outputPackState[preStage]);
+  return m_inputPackState[shaderStage];
+}
+
+// =====================================================================================================================
+// Get whether the output locations of the specified shader stage can be packed
+//
+// @param shaderStage : The given shader stage
+bool PipelineState::canPackOutput(ShaderStage shaderStage) {
+  ShaderStage nextStage = getNextShaderStage(shaderStage);
+  // The output packable state of the current stage should match the input packable state of the next stage, except that
+  // the current stage has no next stage or a null FS.
+  if (nextStage != ShaderStageInvalid &&
+      !(nextStage == ShaderStageFragment && getShaderResourceUsage(nextStage)->inOutUsage.fs.isNullFs))
+    assert(m_outputPackState[shaderStage] == m_inputPackState[nextStage]);
+  return m_outputPackState[shaderStage];
+}
+
+// =====================================================================================================================
 // Get (create if necessary) the PipelineState from this wrapper pass.
 //
 // @param module : IR module

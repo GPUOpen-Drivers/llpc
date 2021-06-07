@@ -350,7 +350,6 @@ bool PatchCopyShader::runOnModule(Module &module) {
 void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
   const auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
-  const bool isPack = !m_pipelineState->isUnlinked();
   std::set<InOutLocationInfo> visitedLocInfos;
 
   // Collect the byte sizes of the output value at each mapped location
@@ -379,7 +378,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
         unsigned byteSize = 4;
         auto &newLocByteSizesMap = m_newLocByteSizesMapArray[origLocInfo.getStreamId()];
         const unsigned newLoc = locInfoMapIt->second.getLocation();
-        if (isPack) {
+        if (m_pipelineState->canPackOutput(ShaderStageGeometry)) {
           newLocByteSizesMap[newLoc] += byteSize;
         } else {
           unsigned compCount = 1;
