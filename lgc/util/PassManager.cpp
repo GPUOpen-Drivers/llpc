@@ -63,7 +63,7 @@ namespace {
 // =====================================================================================================================
 // LLPC's legacy::PassManager override.
 // This is the implementation subclass of the PassManager class declared in PassManager.h
-class PassManagerImpl final : public lgc::PassManager {
+class PassManagerImpl final : public lgc::LegacyPassManager {
 public:
   PassManagerImpl();
   ~PassManagerImpl() override {}
@@ -109,12 +109,12 @@ static AnalysisID getPassIdFromName(StringRef passName) {
 
 // =====================================================================================================================
 // Create a PassManagerImpl
-lgc::PassManager *lgc::PassManager::Create() {
+lgc::LegacyPassManager *lgc::LegacyPassManager::Create() {
   return new PassManagerImpl;
 }
 
 // =====================================================================================================================
-PassManagerImpl::PassManagerImpl() : PassManager() {
+PassManagerImpl::PassManagerImpl() : LegacyPassManager() {
   if (!cl::DumpCfgAfter.empty())
     m_dumpCfgAfter = getPassIdFromName(cl::DumpCfgAfter);
 

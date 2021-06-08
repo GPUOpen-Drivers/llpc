@@ -81,15 +81,15 @@ public:
   PassManagerCache(LgcContext *lgcContext) : m_lgcContext(lgcContext) {}
 
   // Get pass manager for glue shader compilation
-  PassManager &getGlueShaderPassManager(llvm::raw_pwrite_stream &outStream);
+  LegacyPassManager &getGlueShaderPassManager(llvm::raw_pwrite_stream &outStream);
 
   void resetStream();
 
 private:
-  PassManager &getPassManager(const PassManagerInfo &info, llvm::raw_pwrite_stream &outStream);
+  LegacyPassManager &getPassManager(const PassManagerInfo &info, llvm::raw_pwrite_stream &outStream);
 
   LgcContext *m_lgcContext;
-  llvm::StringMap<std::unique_ptr<PassManager>> m_cache;
+  llvm::StringMap<std::unique_ptr<LegacyPassManager>> m_cache;
   raw_proxy_ostream m_proxyStream;
 };
 

@@ -195,7 +195,7 @@ bool PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
   Timer *codeGenTimer = timers.size() >= 3 ? timers[2] : nullptr;
 
   // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
-  std::unique_ptr<PassManager> passMgr(PassManager::Create());
+  std::unique_ptr<LegacyPassManager> passMgr(LegacyPassManager::Create());
   passMgr->setPassIndex(&passIndex);
   passMgr->add(createTargetTransformInfoWrapperPass(getLgcContext()->getTargetMachine()->getTargetIRAnalysis()));
 

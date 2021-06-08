@@ -54,7 +54,7 @@ struct PassManagerInfo {
 // Get pass manager for glue shader compilation
 //
 // @param outStream : Stream to output ELF info
-lgc::PassManager &PassManagerCache::getGlueShaderPassManager(raw_pwrite_stream &outStream) {
+lgc::LegacyPassManager &PassManagerCache::getGlueShaderPassManager(raw_pwrite_stream &outStream) {
   PassManagerInfo info = {};
   info.isGlue = true;
   return getPassManager(info, outStream);
@@ -65,12 +65,12 @@ lgc::PassManager &PassManagerCache::getGlueShaderPassManager(raw_pwrite_stream &
 //
 // @param info : PassManagerInfo to direct how to create the pass manager
 // @param outStream : Stream to output ELF info
-lgc::PassManager &PassManagerCache::getPassManager(const PassManagerInfo &info, raw_pwrite_stream &outStream) {
+lgc::LegacyPassManager &PassManagerCache::getPassManager(const PassManagerInfo &info, raw_pwrite_stream &outStream) {
   // Set our single proxy stream to use the provided stream.
   m_proxyStream.setUnderlyingStream(&outStream);
 
   // Check the cache.
-  std::unique_ptr<lgc::PassManager> &passManager =
+  std::unique_ptr<lgc::LegacyPassManager> &passManager =
       m_cache[StringRef(reinterpret_cast<const char *>(&info), sizeof(info))];
   if (passManager)
     return *passManager;
@@ -79,7 +79,7 @@ lgc::PassManager &PassManagerCache::getPassManager(const PassManagerInfo &info, 
   // TODO: Creation of a normal compilation pass manager, not just one for a glue shader.
   assert(info.isGlue && "Non-glue shader compilation not implemented yet");
 
-  passManager.reset(PassManager::Create());
+  passManager.reset(LegacyPassManager::Create());
   passManager->add(createTargetTransformInfoWrapperPass(m_lgcContext->getTargetMachine()->getTargetIRAnalysis()));
 
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.

@@ -51,7 +51,7 @@ class PassManager;
 namespace lgc {
 
 class Builder;
-class PassManager;
+class LegacyPassManager;
 class PassManagerCache;
 class Pipeline;
 class TargetInfo;
@@ -112,7 +112,7 @@ public:
   void preparePassManager(llvm::legacy::PassManager *passMgr);
 
   // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
-  void addTargetPasses(lgc::PassManager &passMgr, llvm::Timer *codeGenTimer, llvm::raw_pwrite_stream &outStream);
+  void addTargetPasses(lgc::LegacyPassManager &passMgr, llvm::Timer *codeGenTimer, llvm::raw_pwrite_stream &outStream);
 
   // Utility method to create a start/stop timer pass
   static llvm::ModulePass *createStartStopTimer(llvm::Timer *timer, bool starting);

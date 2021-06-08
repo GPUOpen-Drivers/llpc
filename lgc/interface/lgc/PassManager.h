@@ -36,10 +36,10 @@ namespace lgc {
 
 // =====================================================================================================================
 // Public interface of LLPC middle-end's legacy::PassManager override
-class PassManager : public llvm::legacy::PassManager {
+class LegacyPassManager : public llvm::legacy::PassManager {
 public:
-  static PassManager *Create();
-  virtual ~PassManager() {}
+  static LegacyPassManager *Create();
+  virtual ~LegacyPassManager() {}
   virtual void stop() = 0;
   virtual void setPassIndex(unsigned *passIndex) = 0;
 };
