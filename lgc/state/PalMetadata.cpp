@@ -49,6 +49,28 @@ using namespace lgc;
 using namespace llvm;
 
 namespace {
+
+// Structure used to hold the key and the corresponding value in an ArrayMap below.
+struct KeyValuePair {
+  unsigned key;
+  unsigned value;
+};
+
+// A type used to represent a map that is stored as a constant array.
+using ArrayMap = KeyValuePair[];
+
+// =====================================================================================================================
+// Returns the value for the given key in the map.  It assumes that the key will be found.
+//
+// @param map : The map to search.
+// @param key : The key to be searched for.
+unsigned findValueInArrayMap(ArrayRef<KeyValuePair> map, unsigned key) {
+  auto entryHasGivenKey = [key](const KeyValuePair &keyValuePair) { return keyValuePair.key == key; };
+  auto keyValuePair = std::find_if(map.begin(), map.end(), entryHasGivenKey);
+  assert(keyValuePair != map.end() && "Could not find key in the array map.");
+  return keyValuePair->value;
+}
+
 // =====================================================================================================================
 // Returns an ArrayDocNode associated with the given document that contains the given data.
 //
@@ -209,7 +231,7 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
           case mmSPI_SHADER_PGM_RSRC1_GS:
           case mmSPI_SHADER_PGM_RSRC1_VS:
           case mmSPI_SHADER_PGM_RSRC1_PS: {
-            // For the RSRC1 registers, we need to consider the VGPRS and SGPRS fields separately, and max them.
+            // For the RSRC1 registers, we need to consider the VGPRs and SGPRs fields separately, and max them.
             // This happens when linking in a glue shader.
             SPI_SHADER_PGM_RSRC1 destRsrc1;
             SPI_SHADER_PGM_RSRC1 srcRsrc1;
@@ -719,94 +741,44 @@ void PalMetadata::eraseColorExportInfo() {
 // @param [out] regInfo : Where to store VS entry register info
 void PalMetadata::getVsEntryRegInfo(VsEntryRegInfo &regInfo) {
   regInfo = {};
+  regInfo.callingConv = getCallingConventionForFirstHardwareShaderStage();
+  unsigned userDataReg0 = getFirstUserDataReg(regInfo.callingConv);
+  auto userDataRegIt = m_registers.find(m_document->getNode(userDataReg0));
+  assert(userDataRegIt != m_registers.end());
 
-  // Find the first hardware shader stage that has SPI registers set. That must be the API VS, or the merged
-  // shader containing it. User data register 0 is always set if a shader stage is active.
-  static const std::pair<unsigned, unsigned> shaderTable[] = {{mmSPI_SHADER_USER_DATA_LS_0, CallingConv::AMDGPU_LS},
-                                                              {mmSPI_SHADER_USER_DATA_HS_0, CallingConv::AMDGPU_HS},
-                                                              {mmSPI_SHADER_USER_DATA_ES_0, CallingConv::AMDGPU_ES},
-                                                              {mmSPI_SHADER_USER_DATA_GS_0, CallingConv::AMDGPU_GS},
-                                                              {mmSPI_SHADER_USER_DATA_VS_0, CallingConv::AMDGPU_VS}};
-  ArrayRef<std::pair<unsigned, unsigned>> shaderEntries = shaderTable;
-  auto userDataRegIt = m_registers.begin();
-  for (;;) {
-    userDataRegIt = m_registers.find(m_document->getNode(shaderEntries[0].first));
-    if (userDataRegIt != m_registers.end())
-      break;
-    shaderEntries = shaderEntries.drop_front();
-  }
-  unsigned userDataOffset = 0;
-  unsigned userDataReg0 = shaderEntries[0].first;
-  regInfo.callingConv = shaderEntries[0].second;
-  if (userDataReg0 != mmSPI_SHADER_USER_DATA_VS_0 && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9)
-    userDataOffset = 8; // GFX9+ merged shader: extra 8 SGPRs beore user data
+  unsigned sgprsBeforeUserData = getNumberOfSgprsBeforeUserData(regInfo.callingConv);
+  unsigned sgprsAfterUserData = getNumberOfSgprsAfterUserData(regInfo.callingConv);
 
-  // Scan the user data registers for vertex buffer table, vertex id, instance id.
-  unsigned userDataCount = m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
-  for (;;) {
-    switch (static_cast<UserDataMapping>(userDataRegIt->second.getUInt())) {
-    case UserDataMapping::VertexBufferTable:
-      regInfo.vertexBufferTable = userDataRegIt->first.getUInt() - userDataReg0 + userDataOffset;
-      break;
-    case UserDataMapping::BaseVertex:
-      regInfo.baseVertex = userDataRegIt->first.getUInt() - userDataReg0 + userDataOffset;
-      break;
-    case UserDataMapping::BaseInstance:
-      regInfo.baseInstance = userDataRegIt->first.getUInt() - userDataReg0 + userDataOffset;
-      break;
-    default:
-      break;
-    }
-    if (++userDataRegIt == m_registers.end() || userDataRegIt->first.getUInt() >= userDataReg0 + userDataCount)
-      break;
-  }
+  regInfo.vertexBufferTable =
+      sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::VertexBufferTable);
+  regInfo.baseVertex = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::BaseVertex);
+  regInfo.baseInstance = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::BaseInstance);
+  regInfo.sgprCount = sgprsBeforeUserData + getUserDataCount(regInfo.callingConv) + sgprsAfterUserData;
+  regInfo.vertexId = getVertexIdOffset(regInfo.callingConv);
+  regInfo.instanceId = getInstanceIdOffset(regInfo.callingConv);
+  regInfo.vgprCount = getVgprCount(regInfo.callingConv);
+  regInfo.wave32 = isWave32(regInfo.callingConv);
+}
 
-  // Get the number of user data registers in this shader. For GFX9+, we ignore the USER_SGPR_MSB field; we
-  // know that there is at least one user SGPR, so if we find that USER_SGPR is 0, it must mean 32.
+// =====================================================================================================================
+// Returns the number of user data registers are used for the shader with the given calling convention.
+//
+// @param callingConv : The calling convention of the shader we are interested in.
+unsigned PalMetadata::getUserDataCount(unsigned callingConv) {
+  // Should we just define mmSPI_SHADER_PGM_RSRC2_* for all shader types? The comment before the definition of
+  // mmSPI_SHADER_PGM_RSRC2_VS in AbiMetadata.h says that do not want to.
+  static const ArrayMap callingConvToRsrc2Map = {{CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0 - 1},
+                                                 {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_HS_0 - 1},
+                                                 {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0 - 1},
+                                                 {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_GS_0 - 1},
+                                                 {CallingConv::AMDGPU_VS, mmSPI_SHADER_USER_DATA_VS_0 - 1}};
+
   SPI_SHADER_PGM_RSRC2 rsrc2;
-  rsrc2.u32All =
-      m_registers[m_document->getNode(userDataReg0 + mmSPI_SHADER_PGM_RSRC2_VS - mmSPI_SHADER_USER_DATA_VS_0)]
-          .getUInt();
-  userDataCount = rsrc2.bits.USER_SGPR == 0 ? 32 : rsrc2.bits.USER_SGPR;
+  rsrc2.u32All = m_registers[m_document->getNode(findValueInArrayMap(callingConvToRsrc2Map, callingConv))].getUInt();
 
-  // Conservatively set the total number of input SGPRs. A merged shader with 8 SGPRs before user data
-  // does not have any extra ones after; an unmerged shader has up to 10 SGPRs after.
-  regInfo.sgprCount = userDataOffset + userDataCount;
-  if (userDataOffset == 0)
-    regInfo.sgprCount += 10;
-
-  // Set the VGPR numbers for vertex ID and instance ID, and the total number of input VGPRs, depending on the
-  // shader stage. We know that instance ID is enabled, because it always is in a fetchless VS.
-  // On GFX10, also get the wave32 bit.
-  VGT_SHADER_STAGES_EN vgtShaderStagesEn;
-  vgtShaderStagesEn.u32All = m_registers[m_document->getNode(mmVGT_SHADER_STAGES_EN)].getUInt();
-  switch (regInfo.callingConv) {
-  case CallingConv::AMDGPU_LS: // Before-GFX9 unmerged LS
-  case CallingConv::AMDGPU_ES: // Before-GFX9 unmerged ES
-  case CallingConv::AMDGPU_VS:
-    regInfo.vertexId = 0;
-    regInfo.instanceId = 3;
-    regInfo.vgprCount = 4;
-    regInfo.wave32 = vgtShaderStagesEn.gfx10.VS_W32_EN;
-    break;
-  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
-    regInfo.vertexId = 2;
-    regInfo.instanceId = 5;
-    regInfo.vgprCount = 6;
-    regInfo.wave32 = vgtShaderStagesEn.gfx10.HS_W32_EN;
-    break;
-  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
-    regInfo.vertexId = 5;
-    regInfo.instanceId = 8;
-    regInfo.vgprCount = 9;
-    regInfo.wave32 = vgtShaderStagesEn.gfx10.GS_W32_EN;
-    break;
-  default:
-    llvm_unreachable("");
-    break;
-  }
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
-    regInfo.wave32 = false;
+  // For GFX9+, we ignore the USER_SGPR_MSB field.  We know that there is at least one user SGPR, so if we find that
+  // USER_SGPR is 0, it must mean 32.
+  return rsrc2.bits.USER_SGPR == 0 ? 32 : rsrc2.bits.USER_SGPR;
 }
 
 // =====================================================================================================================
@@ -979,4 +951,174 @@ bool PalMetadata::fragmentShaderUsesMappedBuiltInInputs() {
     return !fragInputMappingArray2.empty();
   }
   return false;
+}
+
+// =====================================================================================================================
+// Returns the calling convention of the first hardware shader stage that will be executed in the pipeline.
+unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage() {
+  constexpr unsigned hwShaderStageCount = 6;
+  static const std::pair<unsigned, unsigned> shaderTable[hwShaderStageCount] = {
+      {mmSPI_SHADER_PGM_RSRC1_LS, CallingConv::AMDGPU_LS}, {mmSPI_SHADER_PGM_RSRC1_HS, CallingConv::AMDGPU_HS},
+      {mmSPI_SHADER_PGM_RSRC1_ES, CallingConv::AMDGPU_ES}, {mmSPI_SHADER_PGM_RSRC1_GS, CallingConv::AMDGPU_GS},
+      {mmSPI_SHADER_PGM_RSRC1_VS, CallingConv::AMDGPU_VS}, {mmCOMPUTE_PGM_RSRC1, CallingConv::AMDGPU_CS}};
+
+  for (unsigned i = 0; i < hwShaderStageCount; ++i) {
+    auto entry = m_registers.find(m_document->getNode(shaderTable[i].first));
+    if (entry != m_registers.end())
+      return shaderTable[i].second;
+  }
+  return CallingConv::AMDGPU_CS;
+}
+
+// =====================================================================================================================
+// Returns the offset of the first user data register for the given calling convention.
+//
+// @param callingConv : The calling convention
+unsigned PalMetadata::getFirstUserDataReg(unsigned callingConv) {
+  static const ArrayMap shaderTable = {
+      {CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0}, {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_HS_0},
+      {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0}, {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_GS_0},
+      {CallingConv::AMDGPU_VS, mmSPI_SHADER_USER_DATA_VS_0}, {CallingConv::AMDGPU_CS, mmCOMPUTE_PGM_RSRC1}};
+  static const ArrayMap shaderTableGfx9 = {
+      {CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0}, {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_LS_0},
+      {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0}, {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_ES_0},
+      {CallingConv::AMDGPU_VS, mmSPI_SHADER_USER_DATA_VS_0}, {CallingConv::AMDGPU_CS, mmCOMPUTE_USER_DATA_0}};
+
+  bool isGfx9 = m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9;
+  ArrayRef<KeyValuePair> currentShaderTable(isGfx9 ? shaderTableGfx9 : shaderTable);
+  return findValueInArrayMap(currentShaderTable, callingConv);
+}
+
+// =====================================================================================================================
+// Returns to number of SGPRs before the SGPRs used for other purposes before the first user data SGPRs.
+//
+// @param callingConv : The calling convention of the shader
+unsigned PalMetadata::getNumberOfSgprsBeforeUserData(unsigned callingConv) {
+  switch (callingConv) {
+  case CallingConv::AMDGPU_CS:
+  case CallingConv::AMDGPU_VS:
+  case CallingConv::AMDGPU_PS:
+    return 0;
+  default:
+    // GFX9+ merged shader have an extra 8 SGPRs before user data.
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion{9, 0, 0})
+      return 8;
+    return 0;
+  }
+}
+
+// =====================================================================================================================
+// Returns the offset of the userDataMapping from firstUserDataNode.  Returns UINT_MAX if it cannot be found.
+//
+// @param firstUserDataNode : An iterator identifing the starting point for the search.  It is assumed that it points to
+//                            the first user data node for some shader stage.
+// @param userDataMapping : The user data mapping that is being search for.
+//
+unsigned PalMetadata::getOffsetOfUserDataReg(std::map<msgpack::DocNode, msgpack::DocNode>::iterator firstUserDataNode,
+                                             UserDataMapping userDataMapping) {
+  unsigned firstReg = firstUserDataNode->first.getUInt();
+  unsigned lastReg = firstReg + m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
+  for (auto &userDataNode : make_range(firstUserDataNode, m_registers.end())) {
+    unsigned reg = userDataNode.first.getUInt();
+    if (reg >= lastReg)
+      return UINT_MAX;
+    if (static_cast<UserDataMapping>(userDataNode.second.getUInt()) == userDataMapping)
+      return reg - firstReg;
+  }
+  return UINT_MAX;
+}
+
+// =====================================================================================================================
+// Returns the upper bound on the number of SGPRs that contain parameters for the shader after the user data.
+//
+// @param callingConv : The calling convention of the shader stage
+unsigned PalMetadata::getNumberOfSgprsAfterUserData(unsigned callingConv) {
+  // Conservatively set the total number of input SGPRs. A merged shader with 8 SGPRs before user data
+  // does not have any extra ones after; an unmerged shader has up to 10 SGPRs after.
+  if (getNumberOfSgprsBeforeUserData(callingConv) == 0)
+    return 10;
+  return 0;
+}
+
+// =====================================================================================================================
+// Returns the offset of the vertex id in the parameter vertex registers.
+//
+// @param callingConv : The calling convention of the shader stage
+unsigned PalMetadata::getVertexIdOffset(unsigned callingConv) {
+  switch (callingConv) {
+  case CallingConv::AMDGPU_LS: // Before-GFX9 unmerged LS
+  case CallingConv::AMDGPU_ES: // Before-GFX9 unmerged ES
+  case CallingConv::AMDGPU_VS:
+    return 0;
+  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
+    return 2;
+  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
+    return 5;
+  default:
+    llvm_unreachable("Unexpected calling convention.");
+    return UINT_MAX;
+  }
+}
+
+// =====================================================================================================================
+// Returns the offset of the register containing the instance id in the shader.
+//
+// @param callingConv : The calling convention of the shader stage
+unsigned PalMetadata::getInstanceIdOffset(unsigned callingConv) {
+  switch (callingConv) {
+  case CallingConv::AMDGPU_LS: // Before-GFX9 unmerged LS
+  case CallingConv::AMDGPU_ES: // Before-GFX9 unmerged ES
+  case CallingConv::AMDGPU_VS:
+    return 3;
+  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
+    return 5;
+  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
+    return 8;
+  default:
+    llvm_unreachable("Unexpected calling convention.");
+    return UINT_MAX;
+  }
+}
+
+// =====================================================================================================================
+// Returns the number of VGPRs used for inputs to the shader.
+//
+// @param callingConv : The calling convention of the shader stage
+unsigned PalMetadata::getVgprCount(unsigned callingConv) {
+  switch (callingConv) {
+  case CallingConv::AMDGPU_LS: // Before-GFX9 unmerged LS
+  case CallingConv::AMDGPU_ES: // Before-GFX9 unmerged ES
+  case CallingConv::AMDGPU_VS:
+    return 4;
+  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
+    return 6;
+  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
+    return 9;
+  default:
+    llvm_unreachable("Unexpected calling convention.");
+    return UINT_MAX;
+  }
+}
+
+// =====================================================================================================================
+// Returns true if the shader runs in wave32 mode.
+//
+// @param callingConv : The calling convention of the shader stage
+bool PalMetadata::isWave32(unsigned callingConv) {
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
+    return false;
+
+  VGT_SHADER_STAGES_EN vgtShaderStagesEn;
+  vgtShaderStagesEn.u32All = m_registers[m_document->getNode(mmVGT_SHADER_STAGES_EN)].getUInt();
+  switch (callingConv) {
+  case CallingConv::AMDGPU_VS:
+    return vgtShaderStagesEn.gfx10.VS_W32_EN;
+  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
+    return vgtShaderStagesEn.gfx10.HS_W32_EN;
+  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
+    return vgtShaderStagesEn.gfx10.GS_W32_EN;
+  default:
+    llvm_unreachable("Unexpected calling convention.");
+    return false;
+  }
 }
