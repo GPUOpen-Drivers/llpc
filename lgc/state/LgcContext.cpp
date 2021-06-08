@@ -274,7 +274,7 @@ void LgcContext::preparePassManager(legacy::PassManager *passMgr) {
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param codeGenTimer : Timer to time target passes with, nullptr if not timing
 // @param [out] outStream : Output stream
-void LgcContext::addTargetPasses(lgc::PassManager &passMgr, Timer *codeGenTimer, raw_pwrite_stream &outStream) {
+void LgcContext::addTargetPasses(lgc::LegacyPassManager &passMgr, Timer *codeGenTimer, raw_pwrite_stream &outStream) {
   // Start timer for codegen passes.
   if (codeGenTimer)
     passMgr.add(createStartStopTimer(codeGenTimer, true));
