@@ -229,6 +229,7 @@ constexpr unsigned mmSPI_SHADER_PGM_RSRC1_ES = 0x2CCA;
 constexpr unsigned mmSPI_SHADER_PGM_RSRC1_GS = 0x2C8A;
 constexpr unsigned mmSPI_SHADER_PGM_RSRC1_VS = 0x2C4A;
 constexpr unsigned mmSPI_SHADER_PGM_RSRC1_PS = 0x2C0A;
+constexpr unsigned mmCOMPUTE_PGM_RSRC1 = 0x2E12;
 
 // RSRC2 register. We only specify one, as each graphics shader stage has its RSRC2 register at the same
 // offset (-1) from its USER_DATA_*_0 register.
