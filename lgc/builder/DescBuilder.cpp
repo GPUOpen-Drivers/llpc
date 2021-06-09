@@ -404,6 +404,24 @@ Value *DescBuilder::CreateGetBufferDescLength(Value *const bufferDesc, Value *of
 }
 
 // =====================================================================================================================
+// Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
+// For buffer fat pointers, delays the translation to patch phase.
+//
+// @param lhs : Left hand side of the subtraction.
+// @param rhs : Reft hand side of the subtraction.
+// @param instName : Name to give instruction(s)
+Value *DescBuilder::CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName) {
+  Type *const lhsType = lhs->getType();
+  Type *const rhsType = rhs->getType();
+  if (!lhsType->isPointerTy() || lhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER ||
+      !rhsType->isPointerTy() || rhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    return IRBuilderBase::CreatePtrDiff(lhs, rhs, instName);
+
+  std::string callName = lgcName::LateBufferPtrDiff;
+  return CreateNamedCall(lgcName::LateBufferPtrDiff, getInt64Ty(), {lhs, rhs}, Attribute::ReadNone);
+}
+
+// =====================================================================================================================
 // Calculate a buffer descriptor for an inline buffer
 //
 // @param descPtr : Pointer to inline buffer

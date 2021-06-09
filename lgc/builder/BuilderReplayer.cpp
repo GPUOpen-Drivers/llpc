@@ -437,6 +437,11 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
                                                 args[1]); // offset
   }
 
+  case BuilderRecorder::Opcode::PtrDiff: {
+    return m_builder->CreatePtrDiff(args[0],  // lhs
+                                    args[1]); // rhs
+  }
+
   // Replayer implementations of ImageBuilder methods
   case BuilderRecorder::Opcode::ImageLoad: {
     unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();

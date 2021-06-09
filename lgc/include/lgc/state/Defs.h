@@ -87,6 +87,7 @@ const static char ShaderInput[] = "lgc.shader.input.";
 const static char LaterCallPrefix[] = "lgc.late.";
 const static char LateLaunderFatPointer[] = "lgc.late.launder.fat.pointer";
 const static char LateBufferLength[] = "lgc.late.buffer.desc.length";
+const static char LateBufferPtrDiff[] = "lgc.late.buffer.ptrdiff";
 
 // Names of global variables
 const static char ImmutableSamplerGlobal[] = "lgc.immutable.sampler";
