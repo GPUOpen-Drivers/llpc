@@ -25,6 +25,7 @@
 set(LLVM_LINK_COMPONENTS
     lgcdis
     AMDGPUDisassembler
+    Support
 )
 
 add_llvm_tool(lgcdis
