@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/state/PipelineState.h"
+#include "lgc/CommonDefs.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/patch/FragColorExport.h"
@@ -875,9 +876,8 @@ ResourceNodeType PipelineState::getResourceTypeFromName(MDString *typeName) {
 // data nodes.
 ArrayRef<MDString *> PipelineState::getResourceTypeNames() {
   if (!m_resourceNodeTypeNames[0]) {
-    for (unsigned type = 0; type < static_cast<unsigned>(ResourceNodeType::Count); ++type) {
-      m_resourceNodeTypeNames[type] =
-          MDString::get(getContext(), getResourceNodeTypeName(static_cast<ResourceNodeType>(type)));
+    for (ResourceNodeType type : enumRange<ResourceNodeType>()) {
+      m_resourceNodeTypeNames[toUnderlying(type)] = MDString::get(getContext(), getResourceNodeTypeName(type));
     }
   }
   return ArrayRef<MDString *>(m_resourceNodeTypeNames);
