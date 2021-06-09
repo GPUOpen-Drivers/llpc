@@ -442,6 +442,29 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     m_replacementMap[&callInst] = std::make_pair(nullptr, nullptr);
 
     callInst.replaceAllUsesWith(numRecords);
+  } else if (callName.startswith(lgcName::LateBufferPtrDiff)) {
+    Value *const lhs = getPointerOperandAsInst(callInst.getArgOperand(0));
+    Value *const rhs = getPointerOperandAsInst(callInst.getArgOperand(1));
+    Type *const lhsType = lhs->getType();
+
+    assert(lhsType->isPointerTy() && lhsType->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
+           rhs->getType()->isPointerTy() && rhs->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
+           "Argument to BufferPtrDiff is not a buffer fat pointer");
+
+    Value *const lhsPtrToInt = m_builder->CreatePtrToInt(m_replacementMap[lhs].second, m_builder->getInt64Ty());
+    Value *const rhsPtrToInt = m_builder->CreatePtrToInt(m_replacementMap[rhs].second, m_builder->getInt64Ty());
+
+    copyMetadata(lhsPtrToInt, lhs);
+    copyMetadata(rhsPtrToInt, rhs);
+
+    Value *const difference = m_builder->CreateSub(lhsPtrToInt, rhsPtrToInt);
+    Constant *const size = ConstantExpr::getSizeOf(cast<PointerType>(lhsType)->getElementType());
+    Value *const elementDifference = m_builder->CreateExactSDiv(difference, size);
+
+    // Record the call instruction so we remember to delete it later.
+    m_replacementMap[&callInst] = std::make_pair(nullptr, nullptr);
+
+    callInst.replaceAllUsesWith(elementDifference);
   } else
     llvm_unreachable("Should never be called!");
 }

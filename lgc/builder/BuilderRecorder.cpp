@@ -156,6 +156,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "load.push.constants.ptr";
   case Opcode::GetBufferDescLength:
     return "get.buffer.desc.length";
+  case Opcode::PtrDiff:
+    return "buffer.ptrdiff";
   case Opcode::ReadGenericInput:
     return "read.generic.input";
   case Opcode::ReadGenericOutput:
@@ -1073,6 +1075,16 @@ Value *BuilderRecorder::CreateGetBufferDescLength(Value *const bufferDesc, Value
 }
 
 // =====================================================================================================================
+// Return the i64 difference between two buffer fat pointer values, dividing out the size of the pointed-to objects.
+//
+// @param lhs : Left hand side of the subtraction.
+// @param rhs : Reft hand side of the subtraction.
+// @param instName : Name to give instruction(s)
+Value *BuilderRecorder::CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName) {
+  return record(Opcode::PtrDiff, getInt64Ty(), {lhs, rhs}, instName);
+}
+
+// =====================================================================================================================
 // Create an image load.
 //
 // @param resultTy : Result type
@@ -1904,6 +1916,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::MatrixTimesVector:
     case Opcode::NormalizeVector:
     case Opcode::OuterProduct:
+    case Opcode::PtrDiff:
     case Opcode::QuantizeToFp16:
     case Opcode::Reflect:
     case Opcode::Refract:

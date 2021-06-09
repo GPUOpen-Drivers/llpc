@@ -285,6 +285,9 @@ public:
   llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc, llvm::Value *offset,
                                          const llvm::Twine &instName = "") override final;
 
+  // Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
+  llvm::Value *CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName = "") override final;
+
 private:
   DescBuilder() = delete;
   DescBuilder(const DescBuilder &) = delete;
