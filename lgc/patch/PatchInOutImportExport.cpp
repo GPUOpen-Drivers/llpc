@@ -857,6 +857,8 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
       InOutLocationInfo origLocInfo;
       origLocInfo.setLocation(value);
+      if (m_shaderStage == ShaderStageGeometry)
+        origLocInfo.setStreamId(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
       auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
 
       if (m_shaderStage == ShaderStageTessControl) {
@@ -882,15 +884,13 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         loc = value;
       } else {
         if (m_pipelineState->canPackOutput(m_shaderStage)) {
-          const bool isVs = (m_shaderStage == ShaderStageVertex);
-          const bool isGs = (m_shaderStage == ShaderStageGeometry);
-          assert(isVs || isGs || m_shaderStage == ShaderStageTessEval);
+          assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageGeometry ||
+                 m_shaderStage == ShaderStageTessEval);
           origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
-          if (isGs)
-            origLocInfo.setStreamId(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
           locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
           bool relateDynIndex = false;
-          const bool checkDynIndex = (isVs && m_pipelineState->hasShaderStage(ShaderStageTessControl));
+          const bool checkDynIndex =
+              (m_shaderStage == ShaderStageVertex && m_pipelineState->hasShaderStage(ShaderStageTessControl));
           if (checkDynIndex && locInfoMapIt == resUsage->inOutUsage.outputLocInfoMap.end()) {
             // The location in TCS may be used with dynamic indexing, try location as the key for a search
             origLocInfo.setComponent(0);
