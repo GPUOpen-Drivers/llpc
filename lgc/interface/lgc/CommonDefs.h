@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "EnumIterator.h"
 #include <array>
 #include <cstdint>
 
@@ -78,5 +79,8 @@ enum class ResourceNodeType : unsigned {
   DescriptorReserved15,
   Count, ///< Count of resource mapping node types.
 };
+
+// Enable iteration over resource node type with `lgc::enumRange<ResourceNodeType>()`.
+LGC_DEFINE_DEFAULT_ITERABLE_ENUM(ResourceNodeType);
 
 } // namespace lgc
