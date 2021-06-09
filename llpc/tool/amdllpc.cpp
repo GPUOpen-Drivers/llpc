@@ -378,6 +378,8 @@ static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
     // Before we get to LLVM command-line option parsing, we need to find the -gfxip option value.
     for (int i = 1; i != argc; ++i) {
       StringRef arg = argv[i];
+      if (arg.startswith("--gfxip"))
+        arg = arg.drop_front(1);
       if (!arg.startswith("-gfxip"))
         continue;
       StringRef gfxipStr;
