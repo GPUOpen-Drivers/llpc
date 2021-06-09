@@ -72,7 +72,7 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage);
 // @param inRegMask : Bitmask of which args should be marked "inreg", to be passed in SGPRs
 // @returns : The new function
 llvm::Function *addFunctionArgs(llvm::Function *oldFunc, llvm::Type *retTy, llvm::ArrayRef<llvm::Type *> argTys,
-                                uint64_t inRegMask = 0);
+                                llvm::ArrayRef<std::string> argNames, uint64_t inRegMask = 0);
 
 // Get the ABI-mandated entry-point name for a shader stage
 //

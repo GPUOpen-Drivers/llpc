@@ -2990,7 +2990,7 @@ void NggPrimShader::splitEs(Module *module) {
 
   // NOTE: Here, we just mutate original ES to do deferred vertex export. We add vertex position data as an additional
   // argument. This could avoid re-fetching it since we already get the data before NGG culling.
-  auto esDeferredVertexExportFunc = addFunctionArgs(esEntryPoint, nullptr, positionTy);
+  auto esDeferredVertexExportFunc = addFunctionArgs(esEntryPoint, nullptr, {positionTy}, {"position"});
   esDeferredVertexExportFunc->setName(lgcName::NggEsDeferredVertexExport);
 
   position = esDeferredVertexExportFunc->getArg(0); // The first argument is vertex position data

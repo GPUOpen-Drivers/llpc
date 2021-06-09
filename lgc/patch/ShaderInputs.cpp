@@ -485,9 +485,10 @@ static const ShaderInputDesc CsVgprInputs[] = {
 // @param pipelineState : Pipeline state
 // @param shaderStage : Shader stage
 // @param [in/out] argTys : Argument types vector to add to
+// @param [in/out] argNames : Argument names vector to add to
 // @returns : Bitmap with bits set for SGPR arguments so caller can set "inreg" attribute on the args
 uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage,
-                                       SmallVectorImpl<Type *> &argTys) {
+                                       SmallVectorImpl<Type *> &argTys, SmallVectorImpl<std::string> &argNames) {
 
   bool hasTs = pipelineState->hasShaderStage(ShaderStageTessControl);
   bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
@@ -612,6 +613,7 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
         inputUsage->entryArgIdx = argTys.size();
       // Add the argument type.
       argTys.push_back(getInputType(inputDesc.inputKind, *pipelineState->getLgcContext()));
+      argNames.push_back(ShaderInputs::getInputName(inputDesc.inputKind));
     }
     inputDescs = vgprInputDescs;
   }

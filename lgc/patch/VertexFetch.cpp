@@ -422,6 +422,7 @@ bool LowerVertexFetch::runOnModule(Module &module) {
 
   // Gather the input arg types.
   SmallVector<Type *, 8> argTys;
+  SmallVector<std::string, 8> argNames;
   for (CallInst *call : vertexFetches) {
     Type *ty = call->getType();
     // The return value from the fetch shader needs to use all floats, as the back-end maps an int in the
@@ -429,10 +430,11 @@ bool LowerVertexFetch::runOnModule(Module &module) {
     // args to the fetchless vertex shader.
     ty = getVgprTy(ty);
     argTys.push_back(ty);
+    argNames.push_back("");
   }
 
   // Mutate the vertex shader function to add the new args.
-  Function *newFunc = addFunctionArgs(vertexFetches[0]->getFunction(), nullptr, argTys);
+  Function *newFunc = addFunctionArgs(vertexFetches[0]->getFunction(), nullptr, argTys, argNames);
 
   // Hook up each vertex fetch call to the corresponding arg.
   for (unsigned idx = 0; idx != vertexFetches.size(); ++idx) {

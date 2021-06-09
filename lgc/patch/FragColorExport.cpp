@@ -661,7 +661,7 @@ Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBas
     outputTypes.push_back(getVgprTy(info.ty));
   }
   Type *retTy = StructType::get(*m_context, outputTypes);
-  addFunctionArgs(fragEntryPoint, retTy, {});
+  addFunctionArgs(fragEntryPoint, retTy, {}, {});
 
   // Now build the return value.
   Value *retVal = UndefValue::get(retTy);

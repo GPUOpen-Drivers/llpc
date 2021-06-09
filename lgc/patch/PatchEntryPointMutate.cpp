@@ -108,19 +108,20 @@ public:
 private:
   // A shader entry-point user data argument
   struct UserDataArg {
-    UserDataArg(Type *argTy, unsigned userDataValue = static_cast<unsigned>(UserDataMapping::Invalid),
-                unsigned *argIndex = nullptr)
-        : argTy(argTy), userDataValue(userDataValue), argIndex(argIndex) {
+    UserDataArg(Type *argTy, const Twine &name,
+                unsigned userDataValue = static_cast<unsigned>(UserDataMapping::Invalid), unsigned *argIndex = nullptr)
+        : argTy(argTy), name(name.str()), userDataValue(userDataValue), argIndex(argIndex) {
       if (isa<PointerType>(argTy))
         argDwordSize = argTy->getPointerAddressSpace() == ADDR_SPACE_CONST_32BIT ? 1 : 2;
       else
         argDwordSize = argTy->getPrimitiveSizeInBits() / 32;
     }
 
-    UserDataArg(Type *argTy, UserDataMapping userDataValue, unsigned *argIndex = nullptr)
-        : UserDataArg(argTy, static_cast<unsigned>(userDataValue), argIndex) {}
+    UserDataArg(Type *argTy, const Twine &name, UserDataMapping userDataValue, unsigned *argIndex = nullptr)
+        : UserDataArg(argTy, name, static_cast<unsigned>(userDataValue), argIndex) {}
 
     Type *argTy;            // IR type of the argument
+    std::string name;       // Name of the argument
     unsigned argDwordSize;  // Size of argument in dwords
     unsigned userDataValue; // PAL metadata user data value, ~0U (UserDataMapping::Invalid) for none
     unsigned *argIndex;     // Where to store arg index once it is allocated, nullptr for none
@@ -178,16 +179,18 @@ private:
 
   void processShader(ShaderInputs *shaderInputs);
   void processComputeFuncs(ShaderInputs *shaderInputs, Module &module);
-  void processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys, uint64_t inRegMask);
+  void processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys,
+                    SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask);
   void setFuncAttrs(Function *entryPoint);
 
-  uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys);
+  uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys,
+                                    SmallVectorImpl<std::string> &argNames);
 
   void addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
                               SmallVectorImpl<UserDataArg> &specialUserDataArgs, IRBuilder<> &builder);
   void addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder);
   void addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue, unsigned sizeInDwords,
-                      unsigned *argIndex, IRBuilder<> &builder);
+                      const Twine &name, unsigned *argIndex, IRBuilder<> &builder);
 
   void determineUnspilledUserDataArgs(ArrayRef<UserDataArg> userDataArgs, ArrayRef<UserDataArg> specialUserDataArgs,
                                       IRBuilder<> &builder, SmallVectorImpl<UserDataArg> &unspilledArgs);
@@ -492,7 +495,6 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
     if (userDataUsage->spillTable.entryArgIdx != 0) {
       builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
       Argument *arg = func.getArg(userDataUsage->spillTable.entryArgIdx);
-      arg->setName("spillTable");
       spillTable = addressExtender.extend(arg, builder.getInt32(HighAddrPc),
                                           builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), builder);
     }
@@ -514,7 +516,6 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           // This offset into the push constant is unspilled. Replace the loads with the entry arg, with a
           // bitcast. (We know that all loads are non-aggregates of the same size, so we can bitcast.)
           Argument *arg = func.getArg(pushConstOffset.entryArgIdx);
-          arg->setName("pushConst_" + Twine(dwordOffset));
           for (Instruction *&load : pushConstOffset.users) {
             if (load && load->getFunction() == &func) {
               builder.SetInsertPoint(load);
@@ -586,7 +587,6 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
       if (rootDescriptor.entryArgIdx != 0) {
         // The root descriptor is unspilled, and uses an entry arg.
         Argument *arg = func.getArg(rootDescriptor.entryArgIdx);
-        arg->setName("rootDesc" + Twine(dwordOffset));
         for (Instruction *&call : rootDescriptor.users) {
           if (call && call->getFunction() == &func) {
             call->replaceAllUsesWith(arg);
@@ -657,10 +657,10 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
               load = builder.CreateLoad(builder.getInt32Ty(), addr);
             }
             descTableVal = load;
+            descTableVal->setName(namePrefix + Twine(userDataIdx));
             // Set builder to insert the 32-to-64 extension code just after the load.
             builder.SetInsertPoint(load->getNextNode());
           }
-          descTableVal->setName(namePrefix + Twine(userDataIdx));
 
           // Now we want to extend the loaded 32-bit value to a 64-bit pointer, using either PC or the provided
           // high half.
@@ -685,7 +685,6 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           arg = UndefValue::get(specialUserData.users[0]->getType());
         } else {
           arg = func.getArg(specialUserData.entryArgIdx);
-          arg->setName(ShaderInputs::getSpecialUserDataName(static_cast<unsigned>(UserDataMapping::GlobalTable) + idx));
         }
         for (Instruction *&inst : specialUserData.users) {
           if (inst && inst->getFunction() == &func) {
@@ -716,20 +715,21 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
 void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   // Create new entry-point from the original one
   SmallVector<Type *, 8> argTys;
-  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, argTys);
+  SmallVector<std::string, 8> argNames;
+  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, argTys, argNames);
 
   Function *origEntryPoint = m_entryPoint;
 
   // Create the new function and transfer code and attributes to it.
   Function *entryPoint =
-      addFunctionArgs(origEntryPoint, origEntryPoint->getFunctionType()->getReturnType(), argTys, inRegMask);
+      addFunctionArgs(origEntryPoint, origEntryPoint->getFunctionType()->getReturnType(), argTys, argNames, inRegMask);
 
   // Set Attributes on new function.
   setFuncAttrs(entryPoint);
 
   // Remove original entry-point
   origEntryPoint->eraseFromParent();
-  processCalls(*entryPoint, argTys, inRegMask);
+  processCalls(*entryPoint, argTys, argNames, inRegMask);
 }
 
 // =====================================================================================================================
@@ -746,7 +746,8 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
 
   // Determine what args need to be added on to all functions.
   SmallVector<Type *, 20> shaderInputTys;
-  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, shaderInputTys);
+  SmallVector<std::string, 20> shaderInputNames;
+  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, shaderInputTys, shaderInputNames);
 
   // Process each function definition.
   SmallVector<Function *, 4> origFuncs;
@@ -756,8 +757,8 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
   }
   for (Function *origFunc : origFuncs) {
     // Create the new function and transfer code and attributes to it.
-    Function *newFunc =
-        addFunctionArgs(origFunc, origFunc->getFunctionType()->getReturnType(), shaderInputTys, inRegMask);
+    Function *newFunc = addFunctionArgs(origFunc, origFunc->getFunctionType()->getReturnType(), shaderInputTys,
+                                        shaderInputNames, inRegMask);
 
     // Set Attributes on new function.
     setFuncAttrs(newFunc);
@@ -780,7 +781,7 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
   for (Function &func : module) {
     if (func.isDeclaration())
       continue;
-    processCalls(func, shaderInputTys, inRegMask);
+    processCalls(func, shaderInputTys, shaderInputNames, inRegMask);
   }
 }
 
@@ -788,7 +789,8 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
 // Process all real function calls and passes arguments to them.
 //
 // @param [in/out] module : Module
-void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys, uint64_t inRegMask) {
+void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys,
+                                         SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask) {
   // This is one of:
   // - a compute pipeline with non-inlined functions;
   // - a compute pipeline with calls to library functions;
@@ -953,10 +955,12 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 //
 // @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs
 // @param [out] argTys : The argument types for the new function type
+// @param [out] argNames : The argument names corresponding to the argument types
 // @returns inRegMask : "Inreg" bit mask for the arguments, with a bit set to indicate that the corresponding
 //                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
 //
-uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys) {
+uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys,
+                                                         SmallVectorImpl<std::string> &argNames) {
 
   uint64_t inRegMask = 0;
   IRBuilder<> builder(*m_context);
@@ -980,12 +984,12 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   SmallVector<UserDataArg, 4> specialUserDataArgs;
 
   // Global internal table
-  userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::GlobalTable));
+  userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "globalTable", UserDataMapping::GlobalTable));
 
   // Per-shader table
   // TODO: We need add per shader table per real usage after switch to PAL new interface.
   // if (pResUsage->perShaderTable)
-  userDataArgs.push_back(UserDataArg(builder.getInt32Ty()));
+  userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "perShaderTable"));
 
   addSpecialUserDataArgs(userDataArgs, specialUserDataArgs, builder);
 
@@ -1016,6 +1020,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
       }
     }
     argTys.push_back(userDataArg.argTy);
+    argNames.push_back(userDataArg.name);
     userDataIdx += dwordSize;
   }
 
@@ -1023,7 +1028,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   inRegMask = (1ull << argTys.size()) - 1;
 
   // Push the fixed system (not user data) register args.
-  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys);
+  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames);
 
   return inRegMask;
 }
@@ -1074,7 +1079,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       default:
         llvm_unreachable("Unexpected shader stage");
       }
-      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue, argIdx));
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "viewId", userDataValue, argIdx));
     }
 
     // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
@@ -1102,7 +1107,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       // the PAL metadata for it, for consistency with the old code.
       if (m_shaderStage == ShaderStageVertex && !m_pipelineState->hasShaderStage(ShaderStageVertex))
         userDataValue = UserDataMapping::Invalid;
-      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue));
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "esGsLdsSize", userDataValue));
     }
 
     if (getMergedShaderStage(m_shaderStage) == getMergedShaderStage(ShaderStageVertex)) {
@@ -1116,7 +1121,8 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 
       // Vertex buffer table.
       if (willHaveFetchShader || userDataUsage->isSpecialUserDataUsed(UserDataMapping::VertexBufferTable)) {
-        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::VertexBufferTable,
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "vertexBufferTable",
+                                                  UserDataMapping::VertexBufferTable,
                                                   &vsIntfData->entryArgIdxs.vs.vbTablePtr));
       }
 
@@ -1124,15 +1130,15 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       if (willHaveFetchShader || vsResUsage->builtInUsage.vs.baseVertex || vsResUsage->builtInUsage.vs.baseInstance ||
           userDataUsage->isSpecialUserDataUsed(UserDataMapping::BaseVertex) ||
           userDataUsage->isSpecialUserDataUsed(UserDataMapping::BaseInstance)) {
-        specialUserDataArgs.push_back(
-            UserDataArg(builder.getInt32Ty(), UserDataMapping::BaseVertex, &vsIntfData->entryArgIdxs.vs.baseVertex));
-        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::BaseInstance,
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "baseVertex", UserDataMapping::BaseVertex,
+                                                  &vsIntfData->entryArgIdxs.vs.baseVertex));
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "baseInstance", UserDataMapping::BaseInstance,
                                                   &vsIntfData->entryArgIdxs.vs.baseInstance));
       }
 
       // Draw index.
       if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::DrawIndex))
-        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::DrawIndex));
+        specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "drawIndex", UserDataMapping::DrawIndex));
     }
 
   } else if (m_shaderStage == ShaderStageCompute) {
@@ -1143,7 +1149,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     // even if it thinks that the user data layout is a prefix of what the pipeline thinks it is.
     if (isComputeWithCalls() || userDataUsage->isSpecialUserDataUsed(UserDataMapping::Workgroup)) {
       auto numWorkgroupsPtrTy = PointerType::get(FixedVectorType::get(builder.getInt32Ty(), 3), ADDR_SPACE_CONST);
-      userDataArgs.push_back(UserDataArg(numWorkgroupsPtrTy, UserDataMapping::Workgroup, nullptr));
+      userDataArgs.push_back(UserDataArg(numWorkgroupsPtrTy, "numWorkgroupsPtr", UserDataMapping::Workgroup, nullptr));
     }
   }
 
@@ -1154,17 +1160,17 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       // If no NGG, stream out table will be set to copy shader's user data entry, we should not set it duplicately.
       switch (m_shaderStage) {
       case ShaderStageVertex:
-        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::StreamOutTable,
+        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
                                            &intfData->entryArgIdxs.vs.streamOutData.tablePtr));
         break;
       case ShaderStageTessEval:
-        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), UserDataMapping::StreamOutTable,
+        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
                                            &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
         break;
       case ShaderStageGeometry:
         if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
           // Allocate dummy stream-out register for geometry shader
-          userDataArgs.push_back(UserDataArg(builder.getInt32Ty()));
+          userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "dummyStreamOut"));
         }
         break;
       default:
@@ -1193,7 +1199,8 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
         assert(descSetIdx <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
                                  static_cast<unsigned>(UserDataMapping::DescriptorSet0));
         unsigned userDataValue = static_cast<unsigned>(UserDataMapping::DescriptorSet0) + descSetIdx;
-        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), userDataValue, &descriptorTable.entryArgIdx));
+        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "descTable" + Twine(descSetIdx), userDataValue,
+                                           &descriptorTable.entryArgIdx));
       }
     }
 
@@ -1227,7 +1234,8 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       assert(dwordOffset + pushConstOffset.dwordSize - 1 <=
              static_cast<unsigned>(UserDataMapping::PushConstMax) - static_cast<unsigned>(UserDataMapping::PushConst0));
       addUserDataArg(userDataArgs, static_cast<unsigned>(UserDataMapping::PushConst0) + dwordOffset,
-                     pushConstOffset.dwordSize, &pushConstOffset.entryArgIdx, builder);
+                     pushConstOffset.dwordSize, "pushConst" + Twine(dwordOffset), &pushConstOffset.entryArgIdx,
+                     builder);
     }
 
     return;
@@ -1265,7 +1273,8 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       }
       // Add the arg (descriptor set pointer) that we can potentially unspill.
       unsigned *argIndex = descSetUsage == nullptr ? nullptr : &descSetUsage->entryArgIdx;
-      addUserDataArg(userDataArgs, userDataValue, node.sizeInDwords, argIndex, builder);
+      addUserDataArg(userDataArgs, userDataValue, node.sizeInDwords, "descTable" + Twine(userDataNodeIdx), argIndex,
+                     builder);
       break;
     }
 
@@ -1312,7 +1321,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
 
           // Add the arg (part of the push const) that we can potentially unspill.
           addUserDataArg(userDataArgs, node.offsetInDwords + dwordOffset, pushConstOffset.dwordSize,
-                         &pushConstOffset.entryArgIdx, builder);
+                         "pushConst" + Twine(dwordOffset), &pushConstOffset.entryArgIdx, builder);
         }
       } else {
         // Mark push constant for spill for compute library.
@@ -1342,7 +1351,8 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
           continue;
         unsigned dwordSize = rootDescUsage.users[0]->getType()->getPrimitiveSizeInBits() / 32;
         // Add the arg (root descriptor) that we can potentially unspill.
-        addUserDataArg(userDataArgs, dwordOffset, dwordSize, &rootDescUsage.entryArgIdx, builder);
+        addUserDataArg(userDataArgs, dwordOffset, dwordSize, "rootDesc" + Twine(dwordOffset),
+                       &rootDescUsage.entryArgIdx, builder);
       }
       break;
     }
@@ -1358,11 +1368,12 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
 // @param argIndex : Where to store arg index once it is allocated, nullptr for none
 // @param builder : IRBuilder (just for getting types)
 void PatchEntryPointMutate::addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue,
-                                           unsigned sizeInDwords, unsigned *argIndex, IRBuilder<> &builder) {
+                                           unsigned sizeInDwords, const Twine &name, unsigned *argIndex,
+                                           IRBuilder<> &builder) {
   Type *argTy = builder.getInt32Ty();
   if (sizeInDwords != 1)
     argTy = FixedVectorType::get(argTy, sizeInDwords);
-  userDataArgs.push_back(UserDataArg(argTy, userDataValue, argIndex));
+  userDataArgs.push_back(UserDataArg(argTy, name, userDataValue, argIndex));
 }
 
 // =====================================================================================================================
@@ -1375,6 +1386,7 @@ void PatchEntryPointMutate::addUserDataArg(SmallVectorImpl<UserDataArg> &userDat
 // @param [out] unspilledArgs : Output vector of UserDataArg structs that will be "unspilled". Mostly these are
 //                              copied from the input arrays, plus an extra one for the spill table pointer if
 //                              needed.
+// @param [out] unspilledArgNames : Argument names of unspilled arguments.
 void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg> userDataArgs,
                                                            ArrayRef<UserDataArg> specialUserDataArgs,
                                                            IRBuilder<> &builder,
@@ -1387,8 +1399,8 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
       userDataUsage->spillUsage != UINT_MAX) {
     // Spill table is already in use by code added in DescBuilder, or by uses of the push const pointer not
     // all being of the form that can be unspilled.
-    spillTableArg =
-        UserDataArg(builder.getInt32Ty(), UserDataMapping::SpillTable, &userDataUsage->spillTable.entryArgIdx);
+    spillTableArg = UserDataArg(builder.getInt32Ty(), "spillTable", UserDataMapping::SpillTable,
+                                &userDataUsage->spillTable.entryArgIdx);
 
     // Determine the lowest offset at which the spill table is used, so we can set PAL metadata accordingly.
     // (This only covers uses of the spill table generated by DescBuilder. It excludes the push const and args
@@ -1424,8 +1436,8 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
   // needed in the pipeline. Thus we cannot use s15 for anything else. Using the single-arg UserDataArg
   // constructor like this means that the arg is not used, so it will not be set up in PAL metadata.
   if (m_computeWithCalls && !spillTableArg.hasValue())
-    spillTableArg =
-        UserDataArg(builder.getInt32Ty(), UserDataMapping::SpillTable, &userDataUsage->spillTable.entryArgIdx);
+    spillTableArg = UserDataArg(builder.getInt32Ty(), "spillTable", UserDataMapping::SpillTable,
+                                &userDataUsage->spillTable.entryArgIdx);
 
   // Figure out how many sgprs we have available for userDataArgs.
   // We have s0-s31 (s0-s15 for <=GFX8, or for a compute shader on any chip) for everything, so take off the number
@@ -1452,8 +1464,8 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
     if (afterUserDataIdx > userDataEnd) {
       // Spill this node. Allocate the spill table arg.
       if (!spillTableArg.hasValue()) {
-        spillTableArg =
-            UserDataArg(builder.getInt32Ty(), UserDataMapping::SpillTable, &userDataUsage->spillTable.entryArgIdx);
+        spillTableArg = UserDataArg(builder.getInt32Ty(), "spillTable", UserDataMapping::SpillTable,
+                                    &userDataUsage->spillTable.entryArgIdx);
         --userDataEnd;
 
         if (userDataIdx > userDataEnd) {
@@ -1470,8 +1482,8 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
         // This is the compute-with-calls case that we reserved s15 for the spill table pointer above,
         // without setting its PAL metadata or spillTable.entryArgIdx, but now we find we do need to set
         // them.
-        spillTableArg =
-            UserDataArg(builder.getInt32Ty(), UserDataMapping::SpillTable, &userDataUsage->spillTable.entryArgIdx);
+        spillTableArg = UserDataArg(builder.getInt32Ty(), "spillTable", UserDataMapping::SpillTable,
+                                    &userDataUsage->spillTable.entryArgIdx);
       }
 
       // Ensure that spillUsage includes this offset. (We might be on a compute shader padding node, in which
@@ -1489,7 +1501,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
   // the spill table pointer below, even if we didn't appear to need one.
   if (isComputeWithCalls()) {
     while (userDataIdx < userDataEnd) {
-      unspilledArgs.push_back(UserDataArg(builder.getInt32Ty()));
+      unspilledArgs.push_back(UserDataArg(builder.getInt32Ty(), Twine()));
       ++userDataIdx;
     }
   }
