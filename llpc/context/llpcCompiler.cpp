@@ -454,7 +454,7 @@ Compiler::~Compiler() {
     // Free context pool
     std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
 
-    // Keep the max allowed count of contexts that reside in the pool so that we can speed up the creatoin of
+    // Keep the max allowed count of contexts that reside in the pool so that we can speed up the creation of the
     // compiler next time.
     for (auto it = m_contextPool->begin(); it != m_contextPool->end();) {
       auto context = *it;
