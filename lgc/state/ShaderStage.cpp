@@ -119,7 +119,8 @@ const char *lgc::getShaderStageAbbreviation(ShaderStage shaderStage) {
 // @param argTys : Types of new args
 // @param inRegMask : Bitmask of which args should be marked "inreg", to be passed in SGPRs
 // @returns : The new function
-Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> argTys, uint64_t inRegMask) {
+Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> argTys, ArrayRef<std::string> argNames,
+                               uint64_t inRegMask) {
   // Gather all arg types: first the new ones, then the ones from the original function.
   FunctionType *oldFuncTy = oldFunc->getFunctionType();
   SmallVector<Type *, 8> allArgTys;
@@ -168,6 +169,7 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   // Also set name of each new arg that comes from old arg.
   for (unsigned idx = 0; idx != argTys.size(); ++idx) {
     Argument *arg = newFunc->getArg(idx);
+    arg->setName(argNames[idx]);
     if ((inRegMask >> idx) & 1)
       arg->addAttr(Attribute::InReg);
     else if (!oldFuncTy->params().empty())

@@ -199,7 +199,7 @@ public:
 
   // Get argument types for shader inputs
   uint64_t getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage,
-                           llvm::SmallVectorImpl<llvm::Type *> &argTys);
+                           llvm::SmallVectorImpl<llvm::Type *> &argTys, llvm::SmallVectorImpl<std::string> &argNames);
 
 private:
   // Usage for one system shader input in one shader stage
