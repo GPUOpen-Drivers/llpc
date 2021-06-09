@@ -32,6 +32,7 @@ LINK_COMPONENTS
     AllTargetsInfos
     BinaryFormat
     MC
+    MCDisassembler
     Object
     Support
     Target
