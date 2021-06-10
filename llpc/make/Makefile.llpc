@@ -102,6 +102,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
 
     # llpc/util
     CPPFILES +=                             \
+        llpcCacheAccessor.cpp               \
         llpcDebug.cpp                       \
         llpcElfWriter.cpp                   \
         llpcFile.cpp                        \
