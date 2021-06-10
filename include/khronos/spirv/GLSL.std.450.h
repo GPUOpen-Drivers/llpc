@@ -128,4 +128,4 @@ enum GLSLstd450 {
     GLSLstd450Count
 };
 
-#endif
+#endif // #ifndef GLSLstd450_H
