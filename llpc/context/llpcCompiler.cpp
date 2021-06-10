@@ -1504,7 +1504,9 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   }
 
   ElfPackage candidateElf;
+
   if (!cacheAccessor || !cacheAccessor->isInCache()) {
+
     GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
     result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildingRelocatableElf, &candidateElf,
                                            pipelineOut->stageCacheAccesses);
@@ -1513,6 +1515,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
       elfBin.codeSize = candidateElf.size();
       elfBin.pCode = candidateElf.data();
     }
+
     if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
       pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
   } else {
@@ -1619,6 +1622,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   }
 
   std::unique_ptr<CacheAccessor> cacheAccessor;
+
   if (!buildingRelocatableElf) {
     cacheAccessor = std::make_unique<CacheAccessor>(pipelineInfo, cacheHash, this);
   }
