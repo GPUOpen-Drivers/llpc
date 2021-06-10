@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  PassManager.h
- * @brief LLPC header file: contains declaration of class lgc::PassManager.
+ * @brief LLPC header file: contains declaration of class lgc::LegacyPassManager.
  ***********************************************************************************************************************
  */
 #pragma once
