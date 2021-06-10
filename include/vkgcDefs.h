@@ -71,6 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     46.3 | Added enableInterpModePatch to PipelineOptions                                                       |
 //  |     46.1 | Added dynamicVertexStride to GraphicsPipelineBuildInfo                                                |
 //  |     46.0 | Removed the member 'depthBiasEnable' of rsState                                                       |
 //  |     45.5 | Added new enum type ThreadGroupSwizzleMode for thread group swizzling for compute shaders             |
@@ -358,6 +359,7 @@ struct PipelineOptions {
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.
   ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the
                                                          ///  features of VK_EXT_robustness2.
+  bool enableInterpModePatch; ///< If set, per-sample interpolation for nonperspective and smooth input is enabled
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

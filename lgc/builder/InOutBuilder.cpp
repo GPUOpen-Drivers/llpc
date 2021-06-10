@@ -42,11 +42,6 @@
 using namespace lgc;
 using namespace llvm;
 
-// -disable-interp-mode-patch: disable interpolation at sample location when perSampleShading is enabled
-// TODO: It is a temporary option, it will be removed once crunch test is updated.
-static cl::opt<bool> DisableInterpModePatch("disable-interp-mode-patch", cl::desc("Disable interpolation mode patch"),
-                                            cl::init(true));
-
 // =====================================================================================================================
 // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
 // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
@@ -383,7 +378,7 @@ void InOutBuilder::markInterpolationInfo(InOutInfo &interpInfo) {
   // per-sample interpolation.
   // NOTE: if the input is used by interpolation functions (has auxiliary value), we should not modify its interpLoc
   // because it is used for modifyAuxInterpValue.
-  if (!DisableInterpModePatch && getPipelineState()->getRasterizerState().perSampleShading &&
+  if (getPipelineState()->getOptions().enableInterpModePatch &&
       interpInfo.getInterpLoc() == InOutInfo::InterpLocCenter && !interpInfo.hasInterpAux() &&
       (resUsage->builtInUsage.fs.smooth || resUsage->builtInUsage.fs.noperspective))
     interpInfo.setInterpLoc(InOutInfo::InterpLocSample);
@@ -1226,7 +1221,7 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySiz
       break;
     case BuiltInBaryCoordNoPersp:
       usage.fs.baryCoordNoPersp = true;
-      if (!DisableInterpModePatch && getPipelineState()->getRasterizerState().perSampleShading) {
+      if (getPipelineState()->getOptions().enableInterpModePatch) {
         usage.fs.baryCoordNoPerspSample = true;
         builtIn = BuiltInBaryCoordNoPerspSample;
       }
@@ -1239,7 +1234,7 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySiz
       break;
     case BuiltInBaryCoordSmooth:
       usage.fs.baryCoordSmooth = true;
-      if (!DisableInterpModePatch && getPipelineState()->getRasterizerState().perSampleShading) {
+      if (getPipelineState()->getOptions().enableInterpModePatch) {
         usage.fs.baryCoordSmoothSample = true;
         builtIn = BuiltInBaryCoordSmoothSample;
       }

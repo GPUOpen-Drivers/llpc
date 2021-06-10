@@ -337,6 +337,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
+  options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
 
   pipeline->setOptions(options);
 
