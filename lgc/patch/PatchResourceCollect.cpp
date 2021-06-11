@@ -2987,6 +2987,8 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
   unsigned compIdx = 0;
   bool isHighHalf = false;
   const bool isGs = shaderStage == ShaderStageGeometry;
+  // For GS, the locatioSpans in the same stream is compatible.
+  // No need to check compatibility means all locationSpans are comatible.
   const bool checkCompatibility = shaderStage == ShaderStageFragment || isGs;
   for (auto spanIt = m_locationSpans.begin(); spanIt != m_locationSpans.end(); ++spanIt) {
     if (spanIt != m_locationSpans.begin()) {
@@ -2995,22 +2997,26 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
       const auto &prevSpan = *(--spanIt);
       ++spanIt;
 
-      // Start a new location in two case:
-      // 1. the component index is up to 4
-      // 2. checkCompatibility is enabled (FS input or GS output) and the two adjacent spans are not compatible
-      // NOTE: For GS, the indexing of remapped location is zero-based in each stream
-      bool isNewLoc = compIdx > 3;
       bool compatible = true;
-      if (!isNewLoc && checkCompatibility) {
+      if (checkCompatibility)
         compatible = isCompatible(prevSpan, *spanIt, isGs);
-        isNewLoc = !compatible;
-      }
-      if (isNewLoc) {
-        consectiveLocation = isGs && !compatible ? 0 : consectiveLocation + 1;
+
+      // If the current loactionSpan is compatible with previous one, increase component index with location unchanged
+      // until the component index is up to 4 and increase location index and reset component index to 0. Otherwise,
+      // reset the location index for GS or increase location index, and reset component index to 0.
+      if (compatible) {
+        if (compIdx > 3) {
+          ++consectiveLocation;
+          compIdx = 0;
+          isHighHalf = false;
+        } else {
+          isHighHalf = spanIt->compatibilityInfo.is16Bit ? !isHighHalf : false;
+        }
+      } else {
+        // NOTE: For GS, the indexing of remapped location is zero-based in each stream
+        consectiveLocation = isGs ? 0 : consectiveLocation + 1;
         compIdx = 0;
         isHighHalf = false;
-      } else {
-        isHighHalf = spanIt->compatibilityInfo.is16Bit ? !isHighHalf : false;
       }
     }
 
