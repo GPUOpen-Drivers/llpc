@@ -211,6 +211,9 @@ private:
   // Insert glue shaders (if any).
   bool insertGlueShaders();
 
+  // Returns true of the given elf contains just 1 shader.
+  bool containsASingleShader(ElfInput &elf);
+
   PipelineState *m_pipelineState;                            // PipelineState object
   RelocHandler m_relocHandler;                               // RelocHandler object
   SmallVector<ElfInput, 5> m_elfInputs;                      // ELF objects to link
@@ -760,7 +763,11 @@ bool ElfLinkerImpl::insertGlueShaders() {
               getPipelineState()->setError("Shader " + mainName + " is not at the start of its text section");
               return false;
             }
-            elfInput.reduceAlign = cantFail(section->getName());
+
+            // You cannot reduce the aligment if the elfInput has more than one
+            // shader.  Otherwise the other shaders could be misalligned.
+            if (containsASingleShader(elfInput))
+              elfInput.reduceAlign = cantFail(section->getName());
             insertPos = idx;
           } else {
             // For an epilog glue shader, we can only cope if the main shader is the last one in its text section.
@@ -785,6 +792,20 @@ bool ElfLinkerImpl::insertGlueShaders() {
     // Insert the glue shader in the appropriate place in the list of ELFs.
     assert(insertPos != UINT_MAX && "Main shader not found for glue shader");
     m_elfInputs.insert(m_elfInputs.begin() + insertPos, std::move(glueElfInput));
+  }
+  return true;
+}
+
+// =====================================================================================================================
+// Returns true of the given elf contains just 1 shader.
+bool ElfLinkerImpl::containsASingleShader(ElfInput &elf) {
+  bool foundAFunction = false;
+  for (auto sym : elf.objectFile->symbols()) {
+    if (cantFail(sym.getType()) != llvm::object::SymbolRef::Type::ST_Function)
+      continue;
+    if (foundAFunction)
+      return false;
+    foundAFunction = true;
   }
   return true;
 }
