@@ -399,7 +399,6 @@ Value *DescBuilder::scalarizeIfUniform(Value *value, bool isNonUniform) {
 Value *DescBuilder::CreateGetBufferDescLength(Value *const bufferDesc, Value *offset, const Twine &instName) {
   // In future this should become a full LLVM intrinsic, but for now we patch in a late intrinsic that is cleaned up
   // in patch buffer op.
-  std::string callName = lgcName::LateBufferLength;
   return CreateNamedCall(lgcName::LateBufferLength, getInt32Ty(), {bufferDesc, offset}, Attribute::ReadNone);
 }
 
@@ -418,7 +417,8 @@ Value *DescBuilder::CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm
     return IRBuilderBase::CreatePtrDiff(lhs, rhs, instName);
 
   std::string callName = lgcName::LateBufferPtrDiff;
-  return CreateNamedCall(lgcName::LateBufferPtrDiff, getInt64Ty(), {lhs, rhs}, Attribute::ReadNone);
+  addTypeMangling(getInt64Ty(), {lhs, rhs}, callName);
+  return CreateNamedCall(callName, getInt64Ty(), {lhs, rhs}, Attribute::ReadNone);
 }
 
 // =====================================================================================================================
