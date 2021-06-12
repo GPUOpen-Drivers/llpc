@@ -421,8 +421,9 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
     const unsigned byteSize = locByteSizePair.second;
     assert(byteSize % 4 == 0 && byteSize <= 32);
     const unsigned dwordSize = byteSize / 4;
-    Value *outputValue =
-        loadValueFromGsVsRing(FixedVectorType::get(builder.getFloatTy(), dwordSize), newLoc, streamId, builder);
+    Value *outputValue = loadValueFromGsVsRing(dwordSize > 1 ? FixedVectorType::get(builder.getFloatTy(), dwordSize)
+                                                             : builder.getFloatTy(),
+                                               newLoc, streamId, builder);
     newLocValueMap[newLoc] = outputValue;
   }
 
@@ -440,7 +441,9 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
         auto &newLocInfo = outputLocInfoMap[origLocInfo];
         assert(newLocValueMap.count(newLocInfo.getLocation()) > 0);
         Value *const packedOutValue = newLocValueMap[newLocInfo.getLocation()];
-        Value *elem = builder.CreateExtractElement(packedOutValue, newLocInfo.getComponent());
+        Value *elem = packedOutValue->getType()->isVectorTy()
+                          ? builder.CreateExtractElement(packedOutValue, newLocInfo.getComponent())
+                          : packedOutValue;
 
         auto &elements = origLocElemsMap[origLocInfo.getLocation()];
         elements.push_back(elem);
@@ -449,9 +452,14 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
       for (const auto &locElemsPair : origLocElemsMap) {
         auto &elements = locElemsPair.second;
         const unsigned elemCount = elements.size();
-        Value *xfbOutValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), elemCount));
-        for (unsigned idx = 0; idx < elemCount; ++idx)
-          xfbOutValue = builder.CreateInsertElement(xfbOutValue, elements[idx], idx);
+        Value *xfbOutValue = nullptr;
+        if (elemCount > 1) {
+          xfbOutValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), elemCount));
+          for (unsigned idx = 0; idx < elemCount; ++idx)
+            xfbOutValue = builder.CreateInsertElement(xfbOutValue, elements[idx], idx);
+        } else {
+          xfbOutValue = elements[0];
+        }
 
         // Get the XFB out info at the origial location info
         InOutLocationInfo origLocInfo;
@@ -592,8 +600,8 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
     // real instructions when when NGG primitive shader is generated.
     std::string callName(lgcName::NggGsOutputImport);
     callName += getTypeName(loadTy);
-    return builder.CreateNamedCall(callName, loadTy,
-                                   {builder.getInt32(location), builder.getInt32(0), builder.getInt32(streamId)}, {});
+    return builder.CreateNamedCall(callName, loadTy, {builder.getInt32(location), builder.getInt32(streamId)},
+                                   {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn});
   }
 
   if (m_pipelineState->isGsOnChip()) {
