@@ -3311,7 +3311,6 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
   auto vertexId = getFunctionArgument(copyShaderEntryPoint, copyShaderEntryPoint->arg_size() - 1);
   const unsigned rasterStream =
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
-  (void(rasterStream)); // Unused
 
   std::vector<Instruction *> removeCalls;
 
@@ -3330,11 +3329,14 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
         assert(call->getNumArgOperands() == 2);
         const unsigned location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
         const unsigned streamId = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
-        assert(streamId == rasterStream);
+        assert(streamId < MaxGsStreams);
 
-        auto vertexOffset = calcVertexItemOffset(streamId, vertexId);
-        auto output = importGsOutput(call->getType(), location, streamId, vertexOffset);
-        call->replaceAllUsesWith(output);
+        // Only lower the GS output import calls if they belong to the rasterization stream.
+        if (streamId == rasterStream) {
+          auto vertexOffset = calcVertexItemOffset(streamId, vertexId);
+          auto output = importGsOutput(call->getType(), location, streamId, vertexOffset);
+          call->replaceAllUsesWith(output);
+        }
 
         removeCalls.push_back(call);
       }
