@@ -29,6 +29,7 @@
 ***********************************************************************************************************************
 */
 #include "lgc/LgcContext.h"
+#include "lgc/PassManager.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
@@ -55,10 +56,9 @@ public:
 
   bool runImpl(Module &module);
 
-private:
-  StartStopTimer(const StartStopTimer &) = delete;
-  StartStopTimer &operator=(const StartStopTimer &) = delete;
+  static StringRef name() { return "Start or stop timer"; }
 
+private:
   Timer *m_timer;  // The timer to start or stop when the pass is run
   bool m_starting; // True to start the timer, false to stop it
 };
@@ -92,6 +92,18 @@ char LegacyStartStopTimer::ID = 0;
 // @param starting : True to start the timer, false to stop it
 ModulePass *LgcContext::createStartStopTimer(Timer *timer, bool starting) {
   return new LegacyStartStopTimer(timer, starting);
+}
+
+// =====================================================================================================================
+// Create a start/stop timer pass and add it to the pass manager.  This is a
+// static method in LgcContext, so it can be accessed by the front-end to add
+// to its pass manager.
+//
+// @param passMgr : Pass manager to add the pass to
+// @param timer : The timer to start or stop when the pass is run
+// @param starting : True to start the timer, false to stop it
+void LgcContext::createAndAddStartStopTimer(lgc::PassManager &passMgr, Timer *timer, bool starting) {
+  passMgr.addPass(StartStopTimer(timer, starting));
 }
 
 // =====================================================================================================================

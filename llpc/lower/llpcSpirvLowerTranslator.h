@@ -49,6 +49,8 @@ public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
   bool runImpl(llvm::Module &module);
 
+  static llvm::StringRef name() { return "LLPC translate SPIR-V binary to LLVM IR"; }
+
 private:
   void translateSpirvToLlvm(const PipelineShaderInfo *shaderInfo, llvm::Module *module);
 

@@ -52,6 +52,7 @@ namespace lgc {
 
 class Builder;
 class LegacyPassManager;
+class PassManager;
 class PassManagerCache;
 class Pipeline;
 class TargetInfo;
@@ -118,6 +119,10 @@ public:
 
   // Utility method to create a start/stop timer pass
   static llvm::ModulePass *createStartStopTimer(llvm::Timer *timer, bool starting);
+
+  // Utility method to create a start/stop timer pass and add it to the given
+  // pass manager
+  static void createAndAddStartStopTimer(lgc::PassManager &passMgr, llvm::Timer *timer, bool starting);
 
   // Set and get a pointer to the stream used for LLPC_OUTS. This is initially nullptr,
   // signifying no output from LLPC_OUTS. Setting this to a stream means that LLPC_OUTS
