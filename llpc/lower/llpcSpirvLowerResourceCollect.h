@@ -68,14 +68,15 @@ public:
   bool detailUsageValid() { return m_detailUsageValid; }
 
   virtual bool runOnModule(llvm::Module &module);
-  void visitCalls(llvm::Module &module);
-  llvm::Value *findCallAndGetIndexValue(llvm::Module &module, llvm::CallInst *const targetCall);
 
   static char ID; // ID of this pass
 
 private:
   SpirvLowerResourceCollect(const SpirvLowerResourceCollect &) = delete;
   SpirvLowerResourceCollect &operator=(const SpirvLowerResourceCollect &) = delete;
+
+  void visitCalls(llvm::Module &module);
+  llvm::Value *findCallAndGetIndexValue(llvm::Module &module, llvm::CallInst *const targetCall);
 
   unsigned getFlattenArrayElementCount(const llvm::Type *ty) const;
   const llvm::Type *getFlattenArrayElementType(const llvm::Type *ty) const;

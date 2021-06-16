@@ -154,9 +154,6 @@ void LegacySpirvLower::addPasses(Context *context, ShaderStage stage, legacy::Pa
   if (lowerTimer)
     passMgr.add(LgcContext::createStartStopTimer(lowerTimer, true));
 
-  // Lower SPIR-V resource collecting
-  passMgr.add(createSpirvLowerResourceCollect(false));
-
   // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
   // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
   passMgr.add(createAlwaysInlinerLegacyPass());
