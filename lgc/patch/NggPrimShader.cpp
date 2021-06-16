@@ -1828,7 +1828,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(checkOutVertDrawFlagBlock);
 
-    const unsigned outVertsPerPrim = getOutputVerticesPerPrimitive();
+    const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
 
     // drawFlag = primData[N] != NullPrim
     auto primData0 =
@@ -3603,7 +3603,7 @@ Function *NggPrimShader::createGsEmitHandler(Module *module) {
   auto savedInsertPoint = m_builder->saveIP();
 
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
-  const unsigned outVertsPerPrim = getOutputVerticesPerPrimitive();
+  const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
 
   // Construct ".entry" block
   Value *emitVerts = nullptr;
@@ -5539,62 +5539,6 @@ Value *NggPrimShader::doSubgroupBallot(Value *value) {
     ballot = m_builder->CreateZExt(ballot, m_builder->getInt64Ty());
 
   return ballot;
-}
-
-// =====================================================================================================================
-// Gets the count of VS/TES vertices per primitive
-unsigned NggPrimShader::getVerticesPerPrimitive() const {
-  assert(!m_hasGs);
-
-  unsigned vertsPerPrim = 0;
-  auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
-  const bool hasTs = m_hasTcs || m_hasTes;
-  if (hasTs) {
-    // For tessellation, check primitive mode
-    assert(primType == PrimitiveType::Patch);
-    const auto &tessMode = m_pipelineState->getShaderModes()->getTessellationMode();
-    if (tessMode.pointMode)
-      vertsPerPrim = 1;
-    else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-      vertsPerPrim = 2;
-    else if (tessMode.primitiveMode == PrimitiveMode::Triangles)
-      vertsPerPrim = 3;
-  } else {
-    if (primType == PrimitiveType::Point)
-      vertsPerPrim = 1;
-    else if (primType == PrimitiveType::Line)
-      vertsPerPrim = 2;
-    else if (primType == PrimitiveType::Triangle)
-      vertsPerPrim = 3;
-  }
-
-  assert(vertsPerPrim > 0);
-  return vertsPerPrim;
-}
-
-// =====================================================================================================================
-// Gets the count of GS output vertices per primitive
-unsigned NggPrimShader::getOutputVerticesPerPrimitive() const {
-  assert(m_hasGs);
-  const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
-
-  unsigned outVertsPerPrim = 0;
-  switch (geometryMode.outputPrimitive) {
-  case OutputPrimitives::Points:
-    outVertsPerPrim = 1;
-    break;
-  case OutputPrimitives::LineStrip:
-    outVertsPerPrim = 2;
-    break;
-  case OutputPrimitives::TriangleStrip:
-    outVertsPerPrim = 3;
-    break;
-  default:
-    llvm_unreachable("Unexpected output primitive type!");
-    break;
-  }
-
-  return outVertsPerPrim;
 }
 
 // =====================================================================================================================

@@ -311,6 +311,9 @@ public:
   // Set the flag to pack the output locations of the specified shader stage
   void setPackOutput(ShaderStage shaderStage, bool pack) { m_outputPackState[shaderStage] = pack; }
 
+  // Get the count of vertices per primitive
+  unsigned getVerticesPerPrimitive();
+
   // -----------------------------------------------------------------------------------------------------------------
   // Utility methods
 
