@@ -680,6 +680,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         break;
       }
 
+      static const unsigned OptimalVerticesPerPrimitiveForTess = 2;
       unsigned gsInstanceCount = std::max(1u, geometryMode.invocations);
       bool enableMaxVertOut = false;
 
@@ -721,32 +722,61 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         }
 
         esVertsPerSubgroup = gsPrimsPerSubgroup * vertsPerPrimitive;
+        if (hasTs)
+          esVertsPerSubgroup = std::min(esVertsPerSubgroup, OptimalVerticesPerPrimitiveForTess * gsPrimsPerSubgroup);
       } else {
         // If GS is not present, instance count must be 1
         assert(gsInstanceCount == 1);
       }
+
+      unsigned expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
+      unsigned expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
+
+      const unsigned ldsSizeDwordGranularity =
+          1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+      unsigned ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
+
+      static const unsigned MaxHwGsLdsSizeDwords = 16384;
+
+      // In exceedingly rare circumstances, an NGG subgroup might calculate its LDS space requirements and overallocate.
+      // In those cases we need to scale down our esVertsPerSubgroup/gsPrimsPerSubgroup so that they'll fit in LDS.
+      // In the following NGG calculation, we'll attempt to set esVertsPerSubgroup/gsPrimsPerSubgroup first and
+      // then scale down if we overallocate LDS.
+      if (ldsSizeDwords > MaxHwGsLdsSizeDwords) {
+        // For esVertsPerSubgroup, we can instead substitute (esVertToGsPrimRatio * gsPrimsPerSubgroup) for
+        // esVertsPerSubgroup. Then we can rearrange the equation and solve for gsPrimsPerSubgroup.
+        float esVertToGsPrimRatio = esVertsPerSubgroup / (gsPrimsPerSubgroup * 1.0f);
+
+        if (hasTs)
+          esVertToGsPrimRatio = std::min(esVertToGsPrimRatio, OptimalVerticesPerPrimitiveForTess * 1.0f);
+
+        gsPrimsPerSubgroup =
+            std::min(gsPrimsPerSubgroup, (MaxHwGsLdsSizeDwords - esExtraLdsSize - gsExtraLdsSize) /
+                                             (static_cast<unsigned>(esGsRingItemSize * esVertToGsPrimRatio) +
+                                              (gsVsRingItemSize * gsInstanceCount)));
+
+        // Make sure that we have at least one primitive.
+        gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
+
+        // esVertsPerPrimitive is the minimum number of vertices we must have per subgroup.
+        esVertsPerSubgroup = std::max(
+            m_pipelineState->getVerticesPerPrimitive(),
+            std::min(static_cast<unsigned>(gsPrimsPerSubgroup * esVertToGsPrimRatio), Gfx9::NggMaxThreadsPerSubgroup));
+
+        // And then recalculate our LDS usage.
+        expectedEsLdsSize = (esVertsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
+        expectedGsLdsSize = (gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize) + gsExtraLdsSize;
+        ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
+      }
+
+      // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
+      assert(ldsSizeDwords <= MaxHwGsLdsSizeDwords);
 
       // Make sure that we have at least one primitive
       assert(gsPrimsPerSubgroup >= 1);
 
       // HW has restriction on NGG + Tessellation where gsPrimsPerSubgroup must be >= 3.
       assert(!hasTs || gsPrimsPerSubgroup >= 3);
-
-      unsigned expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
-      const unsigned expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
-
-      if (expectedGsLdsSize == 0) {
-        assert(hasGs == false);
-
-        expectedEsLdsSize = (Gfx9::NggMaxThreadsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
-      }
-
-      const unsigned ldsSizeDwords = alignTo(
-          expectedEsLdsSize + expectedGsLdsSize,
-          static_cast<unsigned>(1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift));
-
-      // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
-      assert(ldsSizeDwords <= 16384);
 
       gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
       gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
@@ -1112,6 +1142,13 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
         unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         m_activeOutputBuiltIns.insert(builtInId);
       }
+    }
+  } else if (mangledName.startswith(lgcName::OutputExportXfb)) {
+    auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
+    if (isa<UndefValue>(outputValue)) {
+      // NOTE: If output value is undefined one, we can safely drop it and remove the transform feedback output export
+      // call.
+      m_deadCalls.push_back(&callInst);
     }
   }
 }

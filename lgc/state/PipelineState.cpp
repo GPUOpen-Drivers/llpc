@@ -1369,6 +1369,45 @@ bool PipelineState::canPackOutput(ShaderStage shaderStage) {
 }
 
 // =====================================================================================================================
+// Get the count of vertices per primitive. For GS, the count is for output primitive.
+unsigned PipelineState::getVerticesPerPrimitive() {
+  if (hasShaderStage(ShaderStageGeometry)) {
+    const auto &geometryMode = getShaderModes()->getGeometryShaderMode();
+    switch (geometryMode.outputPrimitive) {
+    case OutputPrimitives::Points:
+      return 1;
+    case OutputPrimitives::LineStrip:
+      return 2;
+    case OutputPrimitives::TriangleStrip:
+      return 3;
+    default:
+      llvm_unreachable("Unexpected output primitive type!");
+      return 0;
+    }
+  } else if (hasShaderStage(ShaderStageTessControl) || hasShaderStage(ShaderStageTessEval)) {
+    assert(getInputAssemblyState().primitiveType == PrimitiveType::Patch);
+    const auto &tessMode = getShaderModes()->getTessellationMode();
+    if (tessMode.pointMode)
+      return 1;
+    else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
+      return 2;
+    else if (tessMode.primitiveMode == PrimitiveMode::Triangles)
+      return 3;
+  } else {
+    auto primType = getInputAssemblyState().primitiveType;
+    if (primType == PrimitiveType::Point)
+      return 1;
+    else if (primType == PrimitiveType::Line)
+      return 2;
+    else if (primType == PrimitiveType::Triangle)
+      return 3;
+  }
+
+  llvm_unreachable("Unable to get vertices per primitive!");
+  return 0;
+}
+
+// =====================================================================================================================
 // Get (create if necessary) the PipelineState from this wrapper pass.
 //
 // @param module : IR module
