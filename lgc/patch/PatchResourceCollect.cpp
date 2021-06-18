@@ -736,13 +736,13 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
       unsigned ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
 
-      static const unsigned MaxHwGsLdsSizeDwords = 16384;
+      const unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
 
       // In exceedingly rare circumstances, an NGG subgroup might calculate its LDS space requirements and overallocate.
       // In those cases we need to scale down our esVertsPerSubgroup/gsPrimsPerSubgroup so that they'll fit in LDS.
       // In the following NGG calculation, we'll attempt to set esVertsPerSubgroup/gsPrimsPerSubgroup first and
       // then scale down if we overallocate LDS.
-      if (ldsSizeDwords > MaxHwGsLdsSizeDwords) {
+      if (ldsSizeDwords > maxHwGsLdsSizeDwords) {
         // For esVertsPerSubgroup, we can instead substitute (esVertToGsPrimRatio * gsPrimsPerSubgroup) for
         // esVertsPerSubgroup. Then we can rearrange the equation and solve for gsPrimsPerSubgroup.
         float esVertToGsPrimRatio = esVertsPerSubgroup / (gsPrimsPerSubgroup * 1.0f);
@@ -751,7 +751,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           esVertToGsPrimRatio = std::min(esVertToGsPrimRatio, OptimalVerticesPerPrimitiveForTess * 1.0f);
 
         gsPrimsPerSubgroup =
-            std::min(gsPrimsPerSubgroup, (MaxHwGsLdsSizeDwords - esExtraLdsSize - gsExtraLdsSize) /
+            std::min(gsPrimsPerSubgroup, (maxHwGsLdsSizeDwords - esExtraLdsSize - gsExtraLdsSize) /
                                              (static_cast<unsigned>(esGsRingItemSize * esVertToGsPrimRatio) +
                                               (gsVsRingItemSize * gsInstanceCount)));
 
@@ -770,7 +770,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       }
 
       // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
-      assert(ldsSizeDwords <= MaxHwGsLdsSizeDwords);
+      assert(ldsSizeDwords <= maxHwGsLdsSizeDwords);
 
       // Make sure that we have at least one primitive
       assert(gsPrimsPerSubgroup >= 1);
