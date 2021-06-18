@@ -1130,12 +1130,19 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
     m_importedOutputBuiltIns.insert(builtInId);
   } else if (mangledName.startswith(lgcName::OutputExportGeneric)) {
-    m_outputCalls.push_back(&callInst);
+    auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
+    if (m_shaderStage != ShaderStageFragment && isa<UndefValue>(outputValue)) {
+      // NOTE: If an output value of vertex processing stages is undefined, we can safely drop it and remove the output
+      // export call.
+      m_deadCalls.push_back(&callInst);
+    } else {
+      m_outputCalls.push_back(&callInst);
+    }
   } else if (mangledName.startswith(lgcName::OutputExportBuiltIn)) {
-    // NOTE: If output value is undefined one, we can safely drop it and remove the output export call.
+    // NOTE: If an output value is undefined, we can safely drop it and remove the output export call.
     // Currently, do this for geometry shader.
     if (m_shaderStage == ShaderStageGeometry) {
-      auto *outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
+      auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
       if (isa<UndefValue>(outputValue))
         m_deadCalls.push_back(&callInst);
       else {
@@ -1146,7 +1153,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
   } else if (mangledName.startswith(lgcName::OutputExportXfb)) {
     auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
     if (isa<UndefValue>(outputValue)) {
-      // NOTE: If output value is undefined one, we can safely drop it and remove the transform feedback output export
+      // NOTE: If an output value is undefined, we can safely drop it and remove the transform feedback output export
       // call.
       m_deadCalls.push_back(&callInst);
     }
