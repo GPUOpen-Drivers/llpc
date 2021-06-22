@@ -973,6 +973,8 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
   }
   // Enable contraction when "NoContraction" decoration is not specified
   bool allowContract = !bv->hasDecorate(DecorationNoContraction);
+  // If invariant variable is used, we cannot enable contraction
+  allowContract &= !m_moduleUsage->useInvariant;
   // Do not set AllowContract or AllowReassoc if DenormFlushToZero is on, to
   // avoid an FP operation being simplified to a move that does not flush
   // denorms.
