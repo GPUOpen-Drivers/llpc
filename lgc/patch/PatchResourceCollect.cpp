@@ -1169,12 +1169,35 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
     m_importedOutputBuiltIns.insert(builtInId);
   } else if (mangledName.startswith(lgcName::OutputExportGeneric)) {
-    m_outputCalls.push_back(&callInst);
+    auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
+    if (m_shaderStage != ShaderStageFragment && isa<UndefValue>(outputValue)) {
+      // NOTE: If an output value of vertex processing stages is undefined, we can safely drop it and remove the output
+      // export call.
+      m_deadCalls.push_back(&callInst);
+
+      InOutLocationInfo outLocInfo;
+      outLocInfo.setLocation(cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue());
+      outLocInfo.setComponent(cast<ConstantInt>(callInst.getArgOperand(1))->getZExtValue());
+      if (m_shaderStage == ShaderStageGeometry)
+        outLocInfo.setStreamId(cast<ConstantInt>(callInst.getArgOperand(2))->getZExtValue());
+      // Also, we remove the output location info from the map if it exists
+      auto &outLocInfoMap = m_resUsage->inOutUsage.outputLocInfoMap;
+      if (outLocInfoMap.count(outLocInfo) > 0)
+        outLocInfoMap.erase(outLocInfo);
+      // For GS, we remove transform feedback location info as well if it exists
+      if (m_shaderStage == ShaderStageGeometry) {
+        auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.gs.locInfoXfbOutInfoMap;
+        if (locInfoXfbOutInfoMap.count(outLocInfo) > 0)
+          locInfoXfbOutInfoMap.erase(outLocInfo);
+      }
+    } else {
+      m_outputCalls.push_back(&callInst);
+    }
   } else if (mangledName.startswith(lgcName::OutputExportBuiltIn)) {
-    // NOTE: If output value is undefined one, we can safely drop it and remove the output export call.
+    // NOTE: If an output value is undefined, we can safely drop it and remove the output export call.
     // Currently, do this for geometry shader.
     if (m_shaderStage == ShaderStageGeometry) {
-      auto *outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
+      auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
       if (isa<UndefValue>(outputValue))
         m_deadCalls.push_back(&callInst);
       else {
@@ -1185,7 +1208,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
   } else if (mangledName.startswith(lgcName::OutputExportXfb)) {
     auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
     if (isa<UndefValue>(outputValue)) {
-      // NOTE: If output value is undefined one, we can safely drop it and remove the transform feedback output export
+      // NOTE: If an output value is undefined, we can safely drop it and remove the transform feedback output export
       // call.
       m_deadCalls.push_back(&callInst);
     }
