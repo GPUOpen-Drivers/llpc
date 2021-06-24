@@ -1318,9 +1318,10 @@ const char *PipelineState::getResourceNodeTypeName(ResourceNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorBufferCompact)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, StreamOutTableVaPtr)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved12)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved13)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, InlineBuffer)
-    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved14)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved15)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved16)
     break;
   default:
     llvm_unreachable("Should never be called!");

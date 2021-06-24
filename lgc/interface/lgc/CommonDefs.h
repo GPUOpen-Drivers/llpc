@@ -74,9 +74,10 @@ enum class ResourceNodeType : unsigned {
   DescriptorBufferCompact,   ///< Compact buffer descriptor, only contains the buffer address
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
+  DescriptorReserved13,
   InlineBuffer, ///< Inline buffer, with descriptor set and binding
-  DescriptorReserved14,
   DescriptorReserved15,
+  DescriptorReserved16,
   Count, ///< Count of resource mapping node types.
 };
 
