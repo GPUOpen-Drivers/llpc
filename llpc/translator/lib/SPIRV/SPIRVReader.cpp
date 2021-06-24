@@ -963,6 +963,8 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
   SPIRVType *ty = bv->getType();
   if (ty->isTypeVector())
     ty = ty->getVectorComponentType();
+  else if (ty->isTypeMatrix())
+    ty = ty->getMatrixColumnType()->getVectorComponentType();
   if (!ty->isTypeFloat())
     return fmf;
 
