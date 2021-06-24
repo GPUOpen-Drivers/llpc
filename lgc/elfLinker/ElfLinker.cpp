@@ -301,13 +301,12 @@ ArrayRef<StringRef> ElfLinkerImpl::getGlueInfo() {
 }
 
 // =====================================================================================================================
-// Add a blob for a particular chunk of glue code, typically retrieved from a cache. The blob is not copied,
-// and remains in use until the first of the link completing or the ElfLinker's parent Pipeline being destroyed.
+// Add a blob for a particular chunk of glue code, typically retrieved from a cache.
 //
 // @param glueIndex : Index into the array that was returned by getGlueInfo()
 // @param blob : Blob for the glue code
 void ElfLinkerImpl::addGlue(unsigned glueIndex, StringRef blob) {
-  llvm_unreachable("Not implemented");
+  m_glueShaders[glueIndex]->setElfBlob(blob);
 }
 
 // =====================================================================================================================
@@ -649,6 +648,9 @@ void ElfLinkerImpl::writePalMetadata() {
   // Fix up user data registers.
   PalMetadata *palMetadata = m_pipelineState->getPalMetadata();
   palMetadata->fixUpRegisters();
+  for (auto &glueShader : m_glueShaders)
+    glueShader->updatePalMetadata(*palMetadata);
+
   // Finalize the PAL metadata, writing pipeline state items into it.
   palMetadata->finalizePipeline();
   // Write the MsgPack document into a blob.

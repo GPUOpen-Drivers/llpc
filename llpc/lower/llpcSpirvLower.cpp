@@ -186,10 +186,9 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassMana
   passMgr.add(createGlobalOptimizerPass());
   passMgr.add(createPromoteMemoryToRegisterPass());
   passMgr.add(createAggressiveDCEPass());
-  passMgr.add(createInstructionCombiningPass(3));
+  passMgr.add(createInstructionCombiningPass(2));
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createEarlyCSEPass());
-  passMgr.add(createCFGSimplificationPass());
   passMgr.add(createIPSCCPPass());
 
   // Lower SPIR-V floating point optimisation

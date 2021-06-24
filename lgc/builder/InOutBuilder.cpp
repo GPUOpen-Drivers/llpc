@@ -35,11 +35,17 @@
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
+#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "lgc-builder-impl-inout"
 
 using namespace lgc;
 using namespace llvm;
+
+// -disable-interp-mode-patch: disable interpolation at sample location when perSampleShading is enabled
+// TODO: It is a temporary option, it will be removed once crunch test is updated.
+static cl::opt<bool> DisableInterpModePatch("disable-interp-mode-patch", cl::desc("Disable interpolation mode patch"),
+                                            cl::init(true));
 
 // =====================================================================================================================
 // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
@@ -285,7 +291,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
 // @param vertexIndex : For TCS/TES/GS per-vertex input/output: vertex index; for FS custom-interpolated input:
 // auxiliary value; else nullptr. (This is just used to tell whether an input/output is per-vertex.)
 void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount,
-                                               InOutInfo inOutInfo, Value *vertexIndex) {
+                                               InOutInfo &inOutInfo, Value *vertexIndex) {
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
 
   // Mark the input or output locations as in use.
@@ -352,7 +358,7 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
 // Mark interpolation info for FS input.
 //
 // @param interpInfo : Interpolation info (location and mode)
-void InOutBuilder::markInterpolationInfo(InOutInfo interpInfo) {
+void InOutBuilder::markInterpolationInfo(InOutInfo &interpInfo) {
   assert(m_shaderStage == ShaderStageFragment);
 
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
@@ -372,6 +378,15 @@ void InOutBuilder::markInterpolationInfo(InOutInfo interpInfo) {
     llvm_unreachable("Should never be called!");
     break;
   }
+
+  // When per-smaple shading is enabled, force nonperspective and smooth input with center-based interpolation to do
+  // per-sample interpolation.
+  // NOTE: if the input is used by interpolation functions (has auxiliary value), we should not modify its interpLoc
+  // because it is used for modifyAuxInterpValue.
+  if (!DisableInterpModePatch && getPipelineState()->getRasterizerState().perSampleShading &&
+      interpInfo.getInterpLoc() == InOutInfo::InterpLocCenter && !interpInfo.hasInterpAux() &&
+      (resUsage->builtInUsage.fs.smooth || resUsage->builtInUsage.fs.noperspective))
+    interpInfo.setInterpLoc(InOutInfo::InterpLocSample);
 
   switch (interpInfo.getInterpLoc()) {
   case InOutInfo::InterpLocCenter:
@@ -578,7 +593,7 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
     xfbOutInfo.is16bit = valueToWrite->getType()->getScalarSizeInBits() == 16;
 
     // For packed generic GS output, the XFB output should be scalarized to align with the scalarized GS output
-    if (!getPipelineState()->isUnlinked() && !isBuiltIn) {
+    if (getPipelineState()->canPackOutput(m_shaderStage) && !isBuiltIn) {
       Type *elementTy = valueToWrite->getType();
       unsigned scalarizeBy = 1;
       if (auto vectorTy = dyn_cast<FixedVectorType>(elementTy)) {
@@ -1037,7 +1052,7 @@ Type *InOutBuilder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
 // @param builtIn : Built-in ID
 // @param arraySize : Number of array elements for ClipDistance and CullDistance. (Multiple calls to this function for
 // this built-in might have different array sizes; we take the max)
-void InOutBuilder::markBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize) {
+void InOutBuilder::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize) {
   auto &usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
   assert((builtIn != BuiltInClipDistance && builtIn != BuiltInCullDistance) || arraySize != 0);
   switch (m_shaderStage) {
@@ -1211,6 +1226,10 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize
       break;
     case BuiltInBaryCoordNoPersp:
       usage.fs.baryCoordNoPersp = true;
+      if (!DisableInterpModePatch && getPipelineState()->getRasterizerState().perSampleShading) {
+        usage.fs.baryCoordNoPerspSample = true;
+        builtIn = BuiltInBaryCoordNoPerspSample;
+      }
       break;
     case BuiltInBaryCoordNoPerspCentroid:
       usage.fs.baryCoordNoPerspCentroid = true;
@@ -1220,6 +1239,10 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind builtIn, unsigned arraySize
       break;
     case BuiltInBaryCoordSmooth:
       usage.fs.baryCoordSmooth = true;
+      if (!DisableInterpModePatch && getPipelineState()->getRasterizerState().perSampleShading) {
+        usage.fs.baryCoordSmoothSample = true;
+        builtIn = BuiltInBaryCoordSmoothSample;
+      }
       break;
     case BuiltInBaryCoordSmoothCentroid:
       usage.fs.baryCoordSmoothCentroid = true;

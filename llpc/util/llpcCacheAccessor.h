@@ -34,24 +34,46 @@
 #include "llpc.h"
 #include "llpcShaderCache.h"
 #include "vkgcMetroHash.h"
+#include "llvm/Support/CommandLine.h"
 
 namespace Llpc {
 
-class Compiler;
 class Context;
+
+struct CachePair {
+  Vkgc::ICache *cache = nullptr;
+  IShaderCache *shaderCache = nullptr;
+};
 
 class CacheAccessor {
 public:
-  // Checks the caches in the build info and compiler objects for an entry with the given hash.
+  // Checks the caches in the build info and the internal caches for an entry with the given hash.
   //
   // @param buildInfo : The build information that will give the caches from the application.
   // @param hash : The hash for the entry to access.
-  // @param compiler : The compiler object with the internal caches.
-  template <class BuildInfo> CacheAccessor(BuildInfo *buildInfo, MetroHash::Hash &cacheHash, Compiler *compiler) {
-    initializeUsingBuildInfo(buildInfo, cacheHash, compiler);
+  // @param internalCaches : The internal caches to check.
+  template <class BuildInfo> CacheAccessor(BuildInfo *buildInfo, MetroHash::Hash &cacheHash, CachePair internalCaches) {
+    initializeUsingBuildInfo(buildInfo, cacheHash, internalCaches);
   }
 
-  CacheAccessor(Context *context, MetroHash::Hash &cacheHash, Compiler *compiler);
+  CacheAccessor(CacheAccessor &&ca) { *this = std::move(ca); }
+
+  CacheAccessor &operator=(CacheAccessor &&ca) {
+    m_applicationCaches = ca.m_applicationCaches;
+    m_internalCaches = ca.m_internalCaches;
+    m_shaderCacheEntryState = ca.m_shaderCacheEntryState;
+    m_shaderCacheEntry = ca.m_shaderCacheEntry;
+    m_shaderCache = ca.m_shaderCache;
+    m_cacheResult = ca.m_cacheResult;
+    m_cacheEntry = std::move(ca.m_cacheEntry);
+    m_elf = ca.m_elf;
+
+    // Reinitialize ca with not caches.  It needs to be in an appropriate state for the destructor.
+    ca.initialize(nullptr, nullptr, {nullptr, nullptr});
+    return *this;
+  }
+
+  CacheAccessor(Context *context, MetroHash::Hash &cacheHash, CachePair internalCaches);
 
   // Finalizes the cache access by releasing any handles that need to be released.
   ~CacheAccessor() { setElfInCache({0, nullptr}); }
@@ -73,20 +95,30 @@ public:
     if (m_cacheResult == Result::Success) {
       return true;
     }
-    return getUserShaderCache() == m_shaderCache;
+    return getApplicationShaderCache() == m_shaderCache;
   }
 
 private:
-  Vkgc::ICache *getUserCache() const { return m_userCache; }
-  IShaderCache *getUserShaderCache() const { return m_userShaderCache; }
+  CacheAccessor() = delete;
+  CacheAccessor(const CacheAccessor &) = delete;
+  CacheAccessor &operator=(const CacheAccessor &) = delete;
+
+  const Vkgc::ICache *getApplicationCache() const { return m_applicationCaches.cache; }
+  const IShaderCache *getApplicationShaderCache() const { return m_applicationCaches.shaderCache; }
+  const Vkgc::ICache *getInternalCache() const { return m_internalCaches.cache; }
+  const IShaderCache *getInternalShaderCache() const { return m_internalCaches.shaderCache; }
+  Vkgc::ICache *getApplicationCache() { return m_applicationCaches.cache; }
+  IShaderCache *getApplicationShaderCache() { return m_applicationCaches.shaderCache; }
+  Vkgc::ICache *getInternalCache() { return m_internalCaches.cache; }
+  IShaderCache *getInternalShaderCache() { return m_internalCaches.shaderCache; }
 
   // Access the given caches using the hash.
   //
   // @param buildInfo : The build info object that the caches from the application.
   // @param hash : The hash for the entry to access.
-  // @param compiler : The compiler object with the internal caches.
+  // @param internalCaches : The internal caches to check.
   template <class BuildInfo>
-  void initializeUsingBuildInfo(const BuildInfo *buildInfo, MetroHash::Hash &hash, Compiler *compiler) {
+  void initializeUsingBuildInfo(const BuildInfo *buildInfo, MetroHash::Hash &hash, CachePair internalCaches) {
     assert(buildInfo);
     Vkgc::ICache *userCache = buildInfo->cache;
 
@@ -95,22 +127,27 @@ private:
     userShaderCache = reinterpret_cast<IShaderCache *>(buildInfo->pShaderCache);
 #endif
 
-    initialize(hash, userCache, userShaderCache, compiler);
+    initialize(userCache, userShaderCache, internalCaches);
+    lookUpInCaches(hash);
+    if (m_cacheResult != Result::Success)
+      lookUpInShaderCaches(hash);
   }
 
-  void initialize(MetroHash::Hash &hash, Vkgc::ICache *userCache, IShaderCache *userShaderCache, Compiler *compiler);
+  void initialize(Vkgc::ICache *userCache, IShaderCache *userShaderCache, CachePair internalCaches);
 
-  // The application caches
-  Vkgc::ICache *m_userCache = nullptr;
-  IShaderCache *m_userShaderCache = nullptr;
+  void lookUpInCaches(const MetroHash::Hash &hash);
+  Result lookUpInCache(Vkgc::ICache *cache, bool allocateOnMiss, const Vkgc::HashId &hashId);
 
-  // The compiler object holds the internal caches.  Used for the functions to access those caches as well.
-  // TODO: We should write a new class that holds the internal and external cache.  Move the function to check the
-  //  caches from the compiler class, so we will not need the compiler object here.
-  Compiler *m_compiler = nullptr;
+  void lookUpInShaderCaches(MetroHash::Hash &hash);
+  bool lookUpInShaderCache(const MetroHash::Hash &hash, bool allocateOnMiss, ShaderCache *cache);
+  void updateShaderCache(BinaryData &elf);
+  void resetShaderCacheTrackingData();
+
+  CachePair m_applicationCaches;
+  CachePair m_internalCaches;
 
   // The state of the shader cache look up.
-  ShaderEntryState m_shaderCacheEntryState = ShaderEntryState::Unavailable;
+  ShaderEntryState m_shaderCacheEntryState = ShaderEntryState::New;
 
   // The handle to the entry in the shader cache.
   CacheEntryHandle m_shaderCacheEntry = nullptr;

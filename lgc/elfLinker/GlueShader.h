@@ -64,6 +64,9 @@ public:
     return m_elfBlob;
   }
 
+  // Set the ELF for this glue shader so that it does not have to be compiled.
+  void setElfBlob(llvm::StringRef elfBlob) { m_elfBlob = elfBlob; }
+
   // Get the symbol name of the main shader that this glue shader is prolog or epilog for
   virtual llvm::StringRef getMainShaderName() = 0;
 
@@ -75,6 +78,10 @@ public:
 
   // Get the name of this glue shader.
   virtual llvm::StringRef getName() const = 0;
+
+  // Update the PAL metadata entries that require the glue code data and the
+  // pipeline state.
+  virtual void updatePalMetadata(PalMetadata &palMetadata) = 0;
 
 protected:
   GlueShader(LgcContext *lgcContext) : m_lgcContext(lgcContext) {}
