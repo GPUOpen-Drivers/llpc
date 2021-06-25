@@ -74,10 +74,13 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       return UndefValue::get(getBufferDescTy(pointeeTy));
     }
 
-    if (node == topNode && isa<Constant>(descIndex)) {
+    if (node == topNode && isa<Constant>(descIndex) && node->type != ResourceNodeType::InlineBuffer) {
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
-      // indexed. This lgc.root.descriptor call is by default lowered in PatchEntryPointMutate into a load from the
-      // spill table, but it might be able to "unspill" it to directly use shader entry SGPRs.
+      // indexed and is not an InlineBuffer. This lgc.root.descriptor call is by default lowered in
+      // PatchEntryPointMutate into a load from the spill table, but it might be able to "unspill" it to
+      // directly use shader entry SGPRs.
+      // TODO: Handle root InlineBuffer specially in a similar way to PushConst. The default handling is
+      // suboptimal as it always loads from the spill table.
       Type *descTy = getDescTy(node->type);
       std::string callName = lgcName::RootDescriptor;
       addTypeMangling(descTy, {}, callName);
