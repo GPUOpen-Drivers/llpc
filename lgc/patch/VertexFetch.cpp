@@ -953,7 +953,11 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
 
   // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we can do a vertex fetch
   // operation to read the whole vertex. Otherwise, we have to do vertex per-component fetch operations.
-  if (((offset % formatInfo->vertexByteSize) == 0 && (stride % formatInfo->vertexByteSize) == 0) ||
+  if (((offset % formatInfo->vertexByteSize) == 0 && (stride % formatInfo->vertexByteSize) == 0 &&
+       // NOTE: For the vertex data format 8_8, 8_8_8_8, 16_16, and 16_16_16_16, tbuffer_load has a HW defect when
+       // vertex buffer is unaligned. Therefore, we have to split the vertex fetch to component-based ones
+       dfmt != BufDataFormat8_8 && dfmt != BufDataFormat8_8_8_8 && dfmt != BufDataFormat16_16 &&
+       dfmt != BufDataFormat16_16_16_16) ||
       formatInfo->compDfmt == dfmt) {
     // NOTE: If the vertex attribute offset is greater than vertex attribute stride, we have to adjust both vertex
     // buffer index and vertex attribute offset accordingly. Otherwise, vertex fetch might behave unexpectedly.
