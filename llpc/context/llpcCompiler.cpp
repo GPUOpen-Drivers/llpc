@@ -43,11 +43,13 @@
 #include "llpcSpirvLowerResourceCollect.h"
 #include "llpcSpirvLowerUtil.h"
 #include "llpcTimerProfiler.h"
+#include "llpcUtil.h"
 #include "spirvExt.h"
 #include "vkgcElfReader.h"
 #include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
 #include "lgc/ElfLinker.h"
+#include "lgc/EnumIterator.h"
 #include "lgc/PassManager.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
@@ -876,7 +878,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   bool isUnlinkedPipeline = context->getPipelineContext()->isUnlinked();
   context->getPipelineContext()->setUnlinked(true);
 
-  ElfPackage elf[UnlinkedStageCount];
+  ElfPackage elf[enumCount<UnlinkedShaderStage>()];
   assert(stageCacheAccesses.size() >= shaderInfo.size());
 
   const MetroHash::Hash originalCacheHash = context->getPipelineContext()->getCacheHashCodeWithoutCompact();
@@ -884,8 +886,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   LLPC_OUTS("LLPC version: " << VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION) << "\n");
   LLPC_OUTS("Hash for pipeline cache lookup: " << formatBytesLittleEndian<uint8_t>(originalCacheHash.bytes) << "\n");
 
-  for (UnlinkedShaderStage stage = static_cast<UnlinkedShaderStage>(0);
-       stage < UnlinkedStageCount && result == Result::Success; ++stage) {
+  for (UnlinkedShaderStage stage : lgc::enumRange<UnlinkedShaderStage>()) {
     if (!hasDataForUnlinkedShaderType(stage, shaderInfo))
       continue;
 
@@ -915,17 +916,17 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       auto data = reinterpret_cast<const char *>(elfBin.pCode);
       elf[stage].assign(data, data + elfBin.codeSize);
       LLPC_OUTS("Cache hit for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-      for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1)) {
-        if (shaderStageMask & shaderStageToMask(stage))
-          stageCacheAccesses[stage] =
+      for (ShaderStage gfxStage : gfxShaderStages()) {
+        if (shaderStageMask & shaderStageToMask(gfxStage))
+          stageCacheAccesses[gfxStage] =
               cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
       }
       continue;
     }
     LLPC_OUTS("Cache miss for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-    for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1)) {
-      if (shaderStageMask & shaderStageToMask(stage))
-        stageCacheAccesses[stage] = CacheAccessInfo::CacheMiss;
+    for (ShaderStage gfxStage : gfxShaderStages()) {
+      if (shaderStageMask & shaderStageToMask(gfxStage))
+        stageCacheAccesses[gfxStage] = CacheAccessInfo::CacheMiss;
     }
 
     // There was a cache miss, so we need to build the relocatable shader for
@@ -933,19 +934,20 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     const PipelineShaderInfo *singleStageShaderInfo[ShaderStageNativeStageCount] = {nullptr, nullptr, nullptr,
                                                                                     nullptr, nullptr, nullptr};
 
-    for (unsigned stage = ShaderStageVertex; stage != ShaderStageNativeStageCount; ++stage) {
-      if (shaderStageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
-        singleStageShaderInfo[stage] = shaderInfo[stage];
+    for (ShaderStage nativeStage : nativeShaderStages()) {
+      if (shaderStageMask & shaderStageToMask(nativeStage))
+        singleStageShaderInfo[nativeStage] = shaderInfo[nativeStage];
     }
 
-    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &elf[stage]);
+    Vkgc::ElfPackage &stageElf = elf[stage];
+    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &stageElf);
+    if (result != Result::Success)
+      break;
 
     // Add the result to the cache.
-    if (result == Result::Success) {
-      BinaryData elfBin = {elf[stage].size(), elf[stage].data()};
-      cacheAccessor.setElfInCache(elfBin);
-      LLPC_OUTS("Updating the cache for unlinked shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-    }
+    BinaryData elfBin = {stageElf.size(), stageElf.data()};
+    cacheAccessor.setElfInCache(elfBin);
+    LLPC_OUTS("Updating the cache for unlinked shader stage " << getUnlinkedShaderStageName(stage) << "\n");
   }
   context->getPipelineContext()->setHashForCacheLookUp(originalCacheHash);
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
@@ -964,10 +966,11 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
         result = Result::ErrorInvalidShader;
     } else {
       // Return the first relocatable shader, since we can only return one anyway.
-      for (unsigned stage = 0; stage < UnlinkedStageCount; ++stage) {
-        if (elf[stage].empty())
+      for (auto unlinkedStage : enumRange<UnlinkedShaderStage>()) {
+        auto &unlinkedStageElf = elf[unlinkedStage];
+        if (unlinkedStageElf.empty())
           continue;
-        *pipelineElf = elf[stage];
+        *pipelineElf = unlinkedStageElf;
         break;
       }
     }
@@ -1536,8 +1539,11 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   const bool buildingRelocatableElf =
       relocatableElfRequested && canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo);
 
-  for (unsigned i = 0; i < ShaderStageGfxCount && result == Result::Success; ++i)
-    result = validatePipelineShaderInfo(shaderInfo[i]);
+  for (ShaderStage stage : gfxShaderStages()) {
+    result = validatePipelineShaderInfo(shaderInfo[stage]);
+    if (result != Result::Success)
+      break;
+  }
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
@@ -1548,11 +1554,11 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC calculated hash results (graphics pipeline)\n\n");
     LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::compact64(&pipelineHash)) << "\n");
-    for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
-      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo[stage]->pModuleData);
+    for (ShaderStage stage : gfxShaderStages()) {
+      auto moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo[stage]->pModuleData);
       if (moduleData) {
         auto hash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
-        LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(static_cast<ShaderStage>(stage), true))
+        LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(stage, true))
                   << format("0x%016" PRIX64, MetroHash::compact64(hash)) << "\n");
       }
     }
@@ -1954,7 +1960,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
   auto pipelineOptions = context->getPipelineContext()->getPipelineOptions();
 
   // Build hash per shader stage
-  for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1)) {
+  for (ShaderStage stage : gfxShaderStages()) {
     if ((stageMask & shaderStageToMask(stage)) == 0)
       continue;
 
@@ -1979,7 +1985,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
 
-    // Add per stage hash code to fragmentHasher or nonFragmentHaser per shader stage
+    // Add per stage hash code to fragmentHasher or nonFragmentHasher per shader stage
     auto shaderHashCode = MetroHash::compact64(&hash);
     if (stage == ShaderStageFragment)
       fragmentHasher.Update(shaderHashCode);
@@ -2025,7 +2031,7 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
 
   // Create linker, passing ELFs to it.
   SmallVector<MemoryBufferRef, 3> elfs;
-  for (UnlinkedShaderStage stage = static_cast<UnlinkedShaderStage>(0); stage != UnlinkedStageCount; ++stage) {
+  for (auto stage : enumRange<UnlinkedShaderStage>()) {
     if (!shaderElfs[stage].empty())
       elfs.push_back(MemoryBufferRef(shaderElfs[stage].str(), getUnlinkedShaderStageName(stage)));
   }
