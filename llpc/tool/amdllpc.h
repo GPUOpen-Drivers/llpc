@@ -53,23 +53,12 @@ void doAutoLayoutDesc(Llpc::ShaderStage shaderStage, Llpc::BinaryData spirvBin,
 
 // Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running amdllpc on a single
 // SPIR-V or GLSL shader, rather than on a .pipe file.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
 void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
                           Llpc::ResourceMappingData *resourceMapping);
-#else
-void buildTopLevelMapping(Llpc::ShaderStage shaderStage, const ResourceMappingNodeMap &resNodeSets,
-                          unsigned pushConstSize,
-                          Llpc::PipelineShaderInfo *shaderInfo, unsigned &topLevelOffset);
-#endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
 bool checkResourceMappingComptible(const Llpc::ResourceMappingData *resourceMapping,
                                    unsigned autoLayoutUserDataNodeCount,
                                    const Llpc::ResourceMappingRootNode *autoLayoutUserDataNodes);
-#else
-bool checkShaderInfoComptible(Llpc::PipelineShaderInfo *shaderInfo, unsigned autoLayoutUserDataNodeCount,
-                              const Llpc::ResourceMappingNode *autoLayoutUserDataNodes);
-#endif
 
 bool checkPipelineStateCompatible(const Llpc::ICompiler *compiler, Llpc::GraphicsPipelineBuildInfo *pipelineInfo,
                                   Llpc::GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, Llpc::GfxIpVersion gfxIp);

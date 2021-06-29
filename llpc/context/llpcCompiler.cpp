@@ -1009,28 +1009,6 @@ static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *no
   return false;
 }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-// =====================================================================================================================
-// Returns true if any user data nodes inside the given shader infos contain an entry with a descriptor type that is
-// unsupported by relocatable shader compilation.
-//
-// @param [in] shaderInfos: Array of shader infos (not necessarily indexed by shader stage)
-static bool hasUnrelocatableDescriptorNode(const ArrayRef<const PipelineShaderInfo *> &shaderInfos) {
-  for (auto shaderInfo : shaderInfos) {
-    if (!shaderInfo || !shaderInfo->pModuleData)
-      continue;
-    for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
-      const ResourceMappingNode *node = shaderInfo->pUserDataNodes + i;
-      if (isUnrelocatableResourceMappingRootNode(node))
-        return true;
-    }
-    if (shaderInfo->descriptorRangeValueCount != 0) {
-      return true;
-    }
-  }
-  return false;
-}
-#else
 // =====================================================================================================================
 // Returns true if resourceMapping contains a user data node entry with a descriptor type that is unsupported by
 // relocatable shader compilation.
@@ -1059,7 +1037,6 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMa
 
   return false;
 }
-#endif
 
 // =====================================================================================================================
 // Returns true if a graphics pipeline can be built out of the given shader infos.
@@ -1081,13 +1058,8 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
   }
 
   // Check user data nodes for unsupported Descriptor types.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-  if (hasUnrelocatableDescriptorNode(shaderInfos))
-    return false;
-#else
   if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
     return false;
-#endif
 
   if (shaderInfos[0]) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfos[0]->pModuleData);
@@ -1117,12 +1089,7 @@ bool Compiler::canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo 
   }
 
   // Check UserDataNode for unsupported Descriptor types.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-  ArrayRef<const PipelineShaderInfo *> shaderInfos(&shaderInfo, 1);
-  if (hasUnrelocatableDescriptorNode(shaderInfos))
-#else
   if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
-#endif
     return false;
 
   if (cl::RelocatableShaderElfLimit != -1) {
@@ -2016,9 +1983,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher, false);
     hasher.Update(pipelineInfo->iaState.deviceIndex);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
     PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), &hasher, false);
-#endif
 
     // Update input/output usage (provided by middle-end caller of this callback).
     hasher.Update(stageHashes[stage].data(), stageHashes[stage].size());

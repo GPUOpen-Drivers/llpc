@@ -40,9 +40,6 @@ using Vkgc::BinaryType;
 using Vkgc::ColorTarget;
 using Vkgc::ComputePipelineBuildInfo;
 using Vkgc::DenormalMode;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-using Vkgc::DescriptorRangeValue;
-#endif
 using Vkgc::FsOutInfo;
 using Vkgc::GfxIpVersion;
 using Vkgc::GraphicsPipelineBuildInfo;

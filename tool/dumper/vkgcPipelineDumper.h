@@ -78,10 +78,8 @@ public:
   static void updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo, bool isCacheHash,
                                               MetroHash64 *hasher, bool isRelocatableShader);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   static void updateHashForResourceMappingInfo(const ResourceMappingData* pResourceMapping,
                                                MetroHash64 *hasher, bool isRelocatableShader);
-#endif
 
   static void updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
                                             MetroHash64 *hasher);
@@ -117,9 +115,7 @@ private:
 
   static void dumpVersionInfo(std::ostream &dumpFile);
   static void dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo, std::ostream &dumpFile);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   static void dumpResourceMappingInfo(const ResourceMappingData* pResourceMapping, std::ostream &dumpFile);
-#endif
   static void dumpResourceMappingNode(const ResourceMappingNode *userDataNode, const char *prefix,
                                       std::ostream &dumpFile);
   static void dumpComputeStateInfo(const ComputePipelineBuildInfo *pipelineInfo, const char *dumpDir,
