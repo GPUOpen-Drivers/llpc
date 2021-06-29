@@ -186,14 +186,11 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       auto pShaderInfoSection = reinterpret_cast<SectionShaderInfo *>(section);
       auto stage = pShaderInfoSection->getShaderStage();
       pShaderInfoSection->getSubState(*(shaderInfo[stage]));
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
       pShaderInfoSection->getSubState(m_resourceMappingNodes);
       pShaderInfoSection->getSubState(m_descriptorRangeValues);
-#endif
     }
   }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   ResourceMappingData* resourceMapping = nullptr;
   switch (m_pipelineState.pipelineType) {
   case VfxPipelineTypeGraphics:
@@ -218,7 +215,6 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     // was embedded in the pipeline shader infos.
     DeduplicateResourceMappingData(resourceMapping);
   }
-#endif
 
   return &m_pipelineState;
 }

@@ -57,7 +57,7 @@
 #endif
 #endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 40
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
 #error LLPC client version is too old
 #endif
 
@@ -265,17 +265,6 @@ struct ResourceMappingRootNode {
   ResourceMappingNode node; ///< Common node contents (between root and sub nodes)
   unsigned visibility;      ///< Mask composed of ShaderStageBit values
 };
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-/// Represents the info of static descriptor.
-struct DescriptorRangeValue {
-  ResourceMappingNodeType type; ///< Type of this resource mapping node (currently, only sampler is supported)
-  unsigned set;                 ///< ID of descriptor set
-  unsigned binding;             ///< ID of descriptor binding
-  unsigned arraySize;           ///< Element count for arrayed binding
-  const unsigned *pValue;       ///< Static SRDs
-};
-#endif
 
 /// Represents the info of static descriptor.
 struct StaticDescriptorValue {
@@ -686,18 +675,6 @@ struct PipelineShaderInfo {
   const VkSpecializationInfo *pSpecializationInfo; ///< Specialization constant info
   const char *pEntryTarget;                        ///< Name of the target entry point (for multi-entry)
   ShaderStage entryStage;                          ///< Shader stage of the target entry point
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-  unsigned descriptorRangeValueCount;           ///< Count of static descriptors
-  DescriptorRangeValue *pDescriptorRangeValues; ///< An array of static descriptors
-
-  unsigned userDataNodeCount; ///< Count of user data nodes
-
-  /// User data nodes, providing the root-level mapping of descriptors in user-data entries (physical registers or
-  /// GPU memory) to resources referenced in this pipeline shader.
-  /// NOTE: Normally, this user data will correspond to the GPU's user data registers. However, Compiler needs some
-  /// user data registers for internal use, so some user data may spill to internal GPU memory managed by Compiler.
-  const ResourceMappingNode *pUserDataNodes;
-#endif
   PipelineShaderOptions options; ///< Per shader stage tuning/debugging options
 };
 
@@ -725,9 +702,7 @@ struct GraphicsPipelineBuildInfo {
   PipelineShaderInfo gs;  ///< Geometry shader
   PipelineShaderInfo fs;  ///< Fragment shader
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
-#endif
 
   /// Create info of vertex input state
   const VkPipelineVertexInputStateCreateInfo *pVertexInput;
@@ -787,9 +762,7 @@ struct ComputePipelineBuildInfo {
 #endif
   unsigned deviceIndex;  ///< Device index for device group
   PipelineShaderInfo cs; ///< Compute shader
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
-#endif
   PipelineOptions options; ///< Per pipeline tuning options
   bool unlinked;           ///< True to build an "unlinked" half-pipeline ELF
 };

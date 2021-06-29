@@ -503,40 +503,6 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
     dumpFile << "\n";
   }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-  // Output descriptor range value
-  if (shaderInfo->descriptorRangeValueCount > 0) {
-    for (unsigned i = 0; i < shaderInfo->descriptorRangeValueCount; ++i) {
-      auto descriptorRangeValue = &shaderInfo->pDescriptorRangeValues[i];
-      dumpFile << "descriptorRangeValue[" << i << "].type = " << descriptorRangeValue->type << "\n";
-      dumpFile << "descriptorRangeValue[" << i << "].set = " << descriptorRangeValue->set << "\n";
-      dumpFile << "descriptorRangeValue[" << i << "].binding = " << descriptorRangeValue->binding << "\n";
-      dumpFile << "descriptorRangeValue[" << i << "].arraySize = " << descriptorRangeValue->arraySize << "\n";
-      for (unsigned j = 0; j < descriptorRangeValue->arraySize; ++j) {
-        dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
-        const unsigned descriptorSizeInDw =
-            descriptorRangeValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler ? 8 : 4;
-
-        for (unsigned k = 0; k < descriptorSizeInDw - 1; ++k)
-          dumpFile << descriptorRangeValue->pValue[k] << ", ";
-        dumpFile << descriptorRangeValue->pValue[descriptorSizeInDw - 1] << "\n";
-      }
-    }
-    dumpFile << "\n";
-  }
-
-  // Output resource node mapping
-  if (shaderInfo->userDataNodeCount > 0) {
-    char prefixBuff[64] = {};
-    for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
-      auto userDataNode = &shaderInfo->pUserDataNodes[i];
-      snprintf(prefixBuff, 64, "userDataNode[%u]", i);
-      dumpResourceMappingNode(userDataNode, prefixBuff, dumpFile);
-    }
-    dumpFile << "\n";
-  }
-#endif
-
   // Output pipeline shader options
   dumpFile << "options.trapPresent = " << shaderInfo->options.trapPresent << "\n";
   dumpFile << "options.debugMode = " << shaderInfo->options.debugMode << "\n";
@@ -565,7 +531,6 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "\n";
 }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
 // =====================================================================================================================
 // Dumps resource node and static descriptor value data to file.
 //
@@ -608,7 +573,6 @@ void PipelineDumper::dumpResourceMappingInfo(const ResourceMappingData* resource
         dumpFile << "\n";
     }
 }
-#endif
 
 // =====================================================================================================================
 // Dumps SPIR-V shader binary to external file
@@ -734,9 +698,7 @@ void PipelineDumper::dumpComputePipelineInfo(std::ostream *dumpFile, const char 
   // Output shader info
   dumpPipelineShaderInfo(&pipelineInfo->cs, *dumpFile);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   dumpResourceMappingInfo(&pipelineInfo->resourceMapping, *dumpFile);
-#endif
 
   dumpComputeStateInfo(pipelineInfo, dumpDir, *dumpFile);
 
@@ -866,9 +828,7 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
     dumpPipelineShaderInfo(shaderInfo, *dumpFile);
   }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   dumpResourceMappingInfo(&pipelineInfo->resourceMapping, *dumpFile);
-#endif
 
   dumpGraphicsStateInfo(pipelineInfo, dumpDir, *dumpFile);
 
@@ -911,9 +871,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
     break;
   }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isRelocatableShader);
-#endif
 
   hasher.Update(pipeline->iaState.deviceIndex);
 
@@ -947,9 +905,7 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
 
   updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher, isRelocatableShader);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isRelocatableShader);
-#endif
 
   hasher.Update(pipeline->deviceIndex);
   hasher.Update(pipeline->options.includeDisassembly);
@@ -1160,40 +1116,6 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(reinterpret_cast<const uint8_t *>(specializationInfo->pData), specializationInfo->dataSize);
     }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-    hasher->Update(shaderInfo->descriptorRangeValueCount);
-    if (shaderInfo->descriptorRangeValueCount > 0) {
-      for (unsigned i = 0; i < shaderInfo->descriptorRangeValueCount; ++i) {
-        auto descriptorRangeValue = &shaderInfo->pDescriptorRangeValues[i];
-        hasher->Update(descriptorRangeValue->type);
-        hasher->Update(descriptorRangeValue->set);
-        hasher->Update(descriptorRangeValue->binding);
-        hasher->Update(descriptorRangeValue->arraySize);
-
-        // TODO: We should query descriptor size from patch
-
-        // The second part of DescriptorRangeValue is YCbCrMetaData, which is 4 dwords.
-        // The hasher should be updated when the content changes, this is because YCbCrMetaData
-        // is engaged in pipeline compiling.
-        const unsigned descriptorSize =
-            descriptorRangeValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
-
-        hasher->Update(reinterpret_cast<const uint8_t *>(descriptorRangeValue->pValue),
-                       descriptorRangeValue->arraySize * descriptorSize);
-      }
-    }
-
-    if (!isRelocatableShader) {
-      hasher->Update(shaderInfo->userDataNodeCount);
-      if (shaderInfo->userDataNodeCount > 0) {
-        for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
-          auto userDataNode = &shaderInfo->pUserDataNodes[i];
-          updateHashForResourceMappingNode(userDataNode, true, hasher);
-        }
-      }
-    }
-#endif
-
     if (isCacheHash) {
       auto &options = shaderInfo->options;
       hasher->Update(options.trapPresent);
@@ -1227,7 +1149,6 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
   }
 }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
 // =====================================================================================================================
 // Updates hash code context for resource node and static descriptor value data.
 //
@@ -1270,7 +1191,6 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData*
     }
   }
 }
-#endif
 
 // =====================================================================================================================
 // Updates hash code context for resource mapping node.
