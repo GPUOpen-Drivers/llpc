@@ -430,7 +430,9 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorFmask:
   case ResourceMappingNodeType::DescriptorBufferCompact:
   case ResourceMappingNodeType::PushConst: {
-    dumpFile << prefix << ".set = " << userDataNode->srdRange.set << "\n";
+    char setHexvalue[64] = {};
+    snprintf(setHexvalue, 64, "0x%08" PRIX32, userDataNode->srdRange.set);
+    dumpFile << prefix << ".set = " << setHexvalue << "\n";
     dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
     break;
   }
