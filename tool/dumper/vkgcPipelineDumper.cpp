@@ -429,7 +429,7 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorBuffer:
   case ResourceMappingNodeType::DescriptorFmask:
   case ResourceMappingNodeType::DescriptorBufferCompact:
-  {
+  case ResourceMappingNodeType::PushConst: {
     dumpFile << prefix << ".set = " << userDataNode->srdRange.set << "\n";
     dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
     break;
@@ -447,11 +447,6 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
     break;
   }
   case ResourceMappingNodeType::StreamOutTableVaPtr: {
-    break;
-  }
-  case ResourceMappingNodeType::PushConst: {
-    dumpFile << prefix << ".set = " << userDataNode->srdRange.set << "\n";
-    dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
     break;
   }
   default: {
