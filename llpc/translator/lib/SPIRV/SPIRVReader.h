@@ -242,6 +242,20 @@ private:
   unsigned m_spirvOpMetaKindId;
   unsigned m_execModule;
 
+  enum class LlvmMemOpType : uint8_t { IS_LOAD, IS_STORE };
+  struct ScratchBoundsCheckData {
+    LlvmMemOpType memOpType;
+    SPIRVValue *instructionOrigin;
+    SmallVector<llvm::Instruction *, 1> llvmInstructions;
+  };
+
+  // Stores pointers of LLVM Functions to SPIRV memops to the translated LLVM memop(s) in a MapVector to preserve
+  // insertion order of the SPIRV memops and to preserve the function origins, as the bounds checks need to be
+  // inserted on a per-function level. To handle dependencies between the LLVM IR memops, e. g. using a load result as
+  // input for another load, we are using a vector here, which contains a pointer to the instruction along with it being
+  // either a load or store.
+  MapVector<Function *, MapVector<SPIRVValue *, ScratchBoundsCheckData>> m_spirvMemopToLlvmMemopMapping;
+
   lgc::Builder *getBuilder() const { return m_builder; }
 
   // Perform type translation for uncached types. Used in `transType`. Returns the new LLVM type.
@@ -337,32 +351,66 @@ private:
 
   Function *createLibraryEntryFunc();
 
+  // ========================================================================================================================
+  // Wrapper method for easier access to pipeline options.
+  // @returns : Pointer to the pipeline options of the current LLPC context.
+  // ========================================================================================================================
   const Vkgc::PipelineOptions *getPipelineOptions() const;
 
-  // This flag must explicitly be updated while translating if we want to continue inserting at the last insert point
-  // instead of omitting it.
-  bool continueAtLastInsertPoint = false;
+  // ========================================================================================================================
+  // Helper method for checking if the scratch out of bounds check was enabled.
+  // @returns : Whether the check is enabled or not.
+  // ========================================================================================================================
+  bool scratchBoundsChecksEnabled() const;
 
-  struct ScratchBoundsCheckInfo {
-    // true, if the bounds check preparation algorithm determined that we want to add an OOB check.
-    bool shouldInsertBoundsCheck;
+  // ========================================================================================================================
+  // Returns the source access chain (for SPVLoad *) or dest access chain (for SPVStore *) based on a given instruction
+  // type.
+  // @param [in] memOp: either a SPVLoad or a SPVStore.
+  // @param [in] instructionType: an enum value describing the kind of memOp.
+  // @returns : The access chain source (for SPVLoad) or access chain dest (for SPVStore).
+  // ========================================================================================================================
+  SPIRVAccessChainBase *deriveAccessChain(SPIRVValue *memOp, SPIRVToLLVM::LlvmMemOpType instructionType) const;
 
-    // The entry BB where the memory operation was discovered.
-    BasicBlock *entryBlock;
+  // ========================================================================================================================
+  // Checks if a given memOp is eligble for inserting the bounds check, e. g. if the access chain is of storage class
+  // "private" or "function".
+  // @param [in] memOp: either a SPVLoad or a SPVStore.
+  // @param [in] instructionType: an enum value describing the kind of memOp.
+  // @returns : If the out of bounds check should be inserted for memOp.
+  // ========================================================================================================================
+  bool shouldInsertScratchBoundsCheck(SPIRVValue *memOp, SPIRVToLLVM::LlvmMemOpType instructionType) const;
 
-    // A newly created BB wheere the memory operation will be moved to. Will be conditionally branched to from the entry
-    // block.
-    BasicBlock *intermediateBlock;
+  // ========================================================================================================================
+  // Helper method that returns the last instruction that was inserted in the current insertion block by the builder.
+  // @returns : a pointer to the last LLVM instruction.
+  // ========================================================================================================================
+  Instruction *getLastInsertedValue();
 
-    // A newly created BB where all subsequent instructions will be moved to. Will be conditionally branched to from the
-    // entry block and unconditionally branched from the intermediate block.
-    BasicBlock *finalBlock;
+  // ========================================================================================================================
+  // Inserts all instructions that were generated by a call to addLoadInstRecursively / addStoreInstRecursively and
+  // inserts them in the m_spirvMemopToLlvmMemopMapping map with some additional data.
+  // @param [in] spirvMemOp : the key part for the map.
+  // @param [in] baseNode : the last instruction inserted before an add*InstRecursively call.
+  // @param [in] baseNodeParent: baseNode's basic block.
+  // @param [in] instructionType: describes if spirvMemOp is either a SPVLoad or a SPVStore.
+  // @param [in] parent: baseNodeParent's function. Also used as key for the m_spirvMemopToLlvmMemopMapping.
+  // ========================================================================================================================
+  void gatherScratchBoundsChecksMemOps(SPIRVValue *spirvMemOp, Instruction *baseNode, BasicBlock *baseNodeParent,
+                                       SPIRVToLLVM::LlvmMemOpType instructionType, Function *parent);
 
-    // Describes the result of all ANDed out of bounds access checks, used for executing the conditional branch.
-    Value *finalCmpResult;
-  };
-
-  ScratchBoundsCheckInfo prepareScratchBoundsCheck(SPIRVValue *origin);
+  // ========================================================================================================================
+  // Goes through all recorded SPIRV memory instructions and wraps the corresponding LLVM instructions with out of
+  // bounds guards against the SPIRV access chain indices. This moves some LLVM instructions in new basic blocks. This
+  // also manipulates m_valueMap entries in case memOp is a SPVLoad.
+  // @param [in] memOp : the SPIRV memory instruction whose access chain indices should be checked for out of bounds
+  // accesses.
+  // @param [in] scratchBoundsCheckData : information about the type of SPIRV memory instruction, all LLVM instructions
+  // that were created during translation of memOp and additional information.
+  // @param [in] parent : the LLVM function that is currently translated.
+  // ========================================================================================================================
+  void insertScratchBoundsChecks(SPIRVValue *const memOp, const ScratchBoundsCheckData &scratchBoundsCheckData,
+                                 Function *parent);
 }; // class SPIRVToLLVM
 
 } // namespace SPIRV
