@@ -15,13 +15,11 @@
 ; SHADERTEST: %[[gep:[0-9]+]] = getelementptr [2048 x <4 x float>], [2048 x <4 x float>] addrspace(5)* %[[arr]], i32 0, i32 %[[idx1]]
 ; SHADERTEST: %[[cmp:[0-9]+]] = icmp ult i32 %[[idx1]], 2048
 ; SHADERTEST: br i1 %[[cmp]], label %{{.*}}, label %{{.*}}
-; SHADERTEST: {{.*}}:
-; SHADERTEST: {{.*}}:
 ; SHADERTEST: [[load:[a-z0-9]+]]:
 ; SHADERTEST: %[[loadResult:[0-9]+]] = load <4 x float>, <4 x float> addrspace(5)* %[[gep]], align 16
 ; SHADERTEST: br label %{{.*}}
 ; SHADERTEST: [[final:[a-z0-9]+]]:
-; SHADERTEST: %{{.*}} = phi reassoc nnan nsz arcp contract afn <4 x float> [ zeroinitializer, %[[check]] ], [ %[[loadResult]], %[[load]] ]
+; SHADERTEST: %{{.*}} = phi <4 x float> [ zeroinitializer, %[[check]] ], [ %[[loadResult]], %[[load]] ]
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
