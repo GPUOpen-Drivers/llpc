@@ -56,6 +56,9 @@ enum ShaderStage : unsigned {
   ShaderStageCountInternal,                 ///< Count of shader stages (internal-use)
 };
 
+// Enable iteration over shader stages with `lgc::enumRange<lgc::ShaderStage>()`.
+LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(ShaderStage, ShaderStage::ShaderStageCountInternal);
+
 // Enumerates the function of a particular node in a shader's resource mapping graph. Also used as descriptor
 // type in Builder descriptor functions.
 enum class ResourceNodeType : unsigned {

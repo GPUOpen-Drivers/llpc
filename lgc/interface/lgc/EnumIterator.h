@@ -160,16 +160,32 @@ private:
 // Creates the range of enum values: `[begin, end)`. By default, this will range over all enum values (except
 // `::Count`). EnumT must provide the `iterable_enum_traits` trait. E.g.:
 // - for (MyEnum value : enumRange<MyEnum>())  // Iterates over all values of `MyEnum`.
+// - for (MyEnum value : enumRange(MyEnum::C))  // Iterates over values of `MyEnum` until (but excluding `C`).
 // - llvm::is_contained(enumRange(MyEnum::A, MyEnum::C), value)  // Checks if `value` is in `[A, C)` (without `C`).
 // - llvm::is_contained(enumRange(MyEnum::A, enumInc(MyEnum::C)), value)  // Checks if `value` is in `[A, C]`.
 //
 // @param begin : The first value in the range. By default, this is the enum value `0`.
 // @param end : The one-past the last value in the range. By default, this is the enum value `::Count`.
 // @returns : The enum range: `begin, begin + 1, ..., end - 1`.
-template <typename EnumT>
-llvm::iterator_range<enum_iterator<EnumT>> enumRange(EnumT begin = iterable_enum_traits<EnumT>::first_value,
-                                                     EnumT end = iterable_enum_traits<EnumT>::end_value) {
+template <typename EnumT> llvm::iterator_range<enum_iterator<EnumT>> enumRange(EnumT begin, EnumT end) {
   return {enum_iterator<EnumT>(begin), enum_iterator<EnumT>(end)};
+}
+
+// =====================================================================================================================
+// Creates the range of enum values: `[first_val, end)`. See `enumRange(EnumT begin, EnumT end)` above.
+//
+// @param end : The one-past the last value in the range. By default, this is the enum value `::Count`.
+// @returns : The enum range: `first_value, first_value + 1, ..., end - 1`.
+template <typename EnumT> llvm::iterator_range<enum_iterator<EnumT>> enumRange(EnumT end) {
+  return enumRange<EnumT>(iterable_enum_traits<EnumT>::first_value, end);
+}
+
+// =====================================================================================================================
+// Creates the range of all enum values of `EnumT`. See `enumRange(EnumT begin, EnumT end)` above.
+//
+// @returns : The enum range: `first_value, first_value + 1, ..., end_value - 1`.
+template <typename EnumT> llvm::iterator_range<enum_iterator<EnumT>> enumRange() {
+  return enumRange<EnumT>(iterable_enum_traits<EnumT>::first_value, iterable_enum_traits<EnumT>::end_value);
 }
 
 } // namespace lgc
