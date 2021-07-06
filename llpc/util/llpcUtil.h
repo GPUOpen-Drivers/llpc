@@ -143,12 +143,12 @@ LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(Vkgc::UnlinkedShaderStage, Vkgc::UnlinkedSta
 namespace Llpc {
 // Returns the range of all native ShaderStages.
 inline auto nativeShaderStages() {
-  return lgc::enumRange(Vkgc::ShaderStage{}, Vkgc::ShaderStage::ShaderStageNativeStageCount);
+  return lgc::enumRange(Vkgc::ShaderStage::ShaderStageNativeStageCount);
 }
 
 // Returns the range of all graphics ShaderStages.
 inline auto gfxShaderStages() {
-  return lgc::enumRange(Vkgc::ShaderStage{}, Vkgc::ShaderStage::ShaderStageGfxCount);
+  return lgc::enumRange(Vkgc::ShaderStage::ShaderStageGfxCount);
 }
 
 // Returns the range of all internal ShaderStages.
