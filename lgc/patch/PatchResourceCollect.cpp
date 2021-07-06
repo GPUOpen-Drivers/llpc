@@ -2817,16 +2817,14 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   bool unknownElementsUsed = false;
   for (User *user : call->users()) {
     if (auto extract = dyn_cast<ExtractElementInst>(user)) {
-      // NOTE: If the extracted index is constant, we mark the specified indexing element as used. Otherwise, we have to
-      // mark all elements as used.
+      // NOTE: The extracted index is allowed to be constant or not. For non-constant, we just break the loop and mark
+      // as unknownElementsUsed.
       if (auto extractIndex = dyn_cast<ConstantInt>(extract->getIndexOperand())) {
         unsigned idx = extractIndex->getZExtValue();
         assert(idx < scalarizeBy);
         elementUsed[idx] = true;
-      } else {
-        memset(elementUsed, true, sizeof(elementUsed));
+        continue;
       }
-      continue;
     }
     if (auto shuffle = dyn_cast<ShuffleVectorInst>(user)) {
       SmallVector<int, 4> mask;
