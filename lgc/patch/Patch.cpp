@@ -62,10 +62,6 @@ namespace cl {
 // -disable-patch-opt: disable optimization for LLVM patching
 opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LLVM patching"));
 
-// -use-llvm-opt: Use LLVM's standard optimization set instead of the curated optimization set
-opt<bool> UseLlvmOpt("use-llvm-opt",
-                     desc("Use LLVM's standard optimization set instead of the curated optimization set"), init(false));
-
 // -opt: Set the optimization level
 opt<CodeGenOpt::Level> OptLevel("opt", desc("Set the optimization level:"), init(CodeGenOpt::Default),
                                 values(clEnumValN(CodeGenOpt::None, "none", "no optimizations"),
@@ -223,93 +219,58 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
 void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   LLPC_OUTS("PassManager optimization level = " << cl::OptLevel << "\n");
 
-  // Set up standard optimization passes.
-  if (!cl::UseLlvmOpt) {
-    passMgr.add(createForceFunctionAttrsLegacyPass());
-    passMgr.add(createIPSCCPPass());
-    passMgr.add(createInstructionCombiningPass(1));
-    passMgr.add(createPatchPeepholeOpt());
-    passMgr.add(createInstSimplifyLegacyPass());
-    passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createSROAPass());
-    passMgr.add(createEarlyCSEPass(true));
-    passMgr.add(createSpeculativeExecutionIfHasBranchDivergencePass());
-    passMgr.add(createCorrelatedValuePropagationPass());
-    passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createAggressiveInstCombinerPass());
-    passMgr.add(createInstructionCombiningPass(1));
-    passMgr.add(createPatchPeepholeOpt());
-    passMgr.add(createInstSimplifyLegacyPass());
-    passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createReassociatePass());
-    passMgr.add(createLoopRotatePass());
-    passMgr.add(createLICMPass());
-    passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createInstructionCombiningPass(1));
-    passMgr.add(createIndVarSimplifyPass());
-    passMgr.add(createLoopIdiomPass());
-    passMgr.add(createLoopDeletionPass());
-    passMgr.add(createSimpleLoopUnrollPass(cl::OptLevel));
-    passMgr.add(createPatchPeepholeOpt());
-    passMgr.add(createScalarizerPass());
-    passMgr.add(createPatchLoadScalarizer());
-    passMgr.add(createInstSimplifyLegacyPass());
-    passMgr.add(createNewGVNPass());
-    passMgr.add(createBitTrackingDCEPass());
-    passMgr.add(createInstructionCombiningPass(1));
-    passMgr.add(createPatchPeepholeOpt());
-    passMgr.add(createCorrelatedValuePropagationPass());
-    passMgr.add(createAggressiveDCEPass());
-    passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createLoopRotatePass());
-    passMgr.add(createCFGSimplificationPass(SimplifyCFGOptions()
-                                                .bonusInstThreshold(1)
-                                                .forwardSwitchCondToPhi(true)
-                                                .convertSwitchToLookupTable(true)
-                                                .needCanonicalLoops(true)
-                                                .sinkCommonInsts(true)));
-    passMgr.add(createPatchPeepholeOpt());
-    passMgr.add(createLoopUnrollPass(cl::OptLevel));
-    // uses DivergenceAnalysis
-    passMgr.add(createPatchReadFirstLane());
-    passMgr.add(createInstructionCombiningPass(1));
-    passMgr.add(createLICMPass());
-    passMgr.add(createConstantMergePass());
-    passMgr.add(createDivRemPairsPass());
-    passMgr.add(createCFGSimplificationPass());
-  } else {
-    PassManagerBuilder passBuilder;
-    passBuilder.OptLevel = cl::OptLevel;
-    passBuilder.DisableGVNLoadPRE = true;
-    passBuilder.DivergentTarget = true;
-
-    passBuilder.addExtension(PassManagerBuilder::EP_Peephole,
-                             [](const PassManagerBuilder &, legacy::PassManagerBase &passMgr) {
-                               passMgr.add(createPatchPeepholeOpt());
-                               passMgr.add(createInstSimplifyLegacyPass());
-                             });
-    passBuilder.addExtension(PassManagerBuilder::EP_LoopOptimizerEnd,
-                             [](const PassManagerBuilder &, legacy::PassManagerBase &passMgr) {
-                               // We run our peephole pass just before the scalarizer to ensure that our simplification
-                               // optimizations are performed before the scalarizer. One important case this helps with
-                               // is when you have bit casts whose source is a PHI - we want to make sure that the PHI
-                               // does not have an i8 type before the scalarizer is called, otherwise a different kind
-                               // of PHI mess is generated.
-                               passMgr.add(createPatchPeepholeOpt());
-
-                               // Run the scalarizer as it helps our register pressure in the backend significantly. The
-                               // scalarizer allows us to much more easily identify dead parts of vectors that we do not
-                               // need to do any computation for.
-                               passMgr.add(createScalarizerPass());
-
-                               // We add an extra inst simplify here to make sure that dead PHI nodes that are easily
-                               // identified post running the scalarizer can be folded away before instruction combining
-                               // tries to re-create them.
-                               passMgr.add(createInstSimplifyLegacyPass());
-                             });
-
-    passBuilder.populateModulePassManager(passMgr);
-  }
+  passMgr.add(createForceFunctionAttrsLegacyPass());
+  passMgr.add(createIPSCCPPass());
+  passMgr.add(createInstructionCombiningPass(1));
+  passMgr.add(createPatchPeepholeOpt());
+  passMgr.add(createInstSimplifyLegacyPass());
+  passMgr.add(createCFGSimplificationPass());
+  passMgr.add(createSROAPass());
+  passMgr.add(createEarlyCSEPass(true));
+  passMgr.add(createSpeculativeExecutionIfHasBranchDivergencePass());
+  passMgr.add(createCorrelatedValuePropagationPass());
+  passMgr.add(createCFGSimplificationPass());
+  passMgr.add(createAggressiveInstCombinerPass());
+  passMgr.add(createInstructionCombiningPass(1));
+  passMgr.add(createPatchPeepholeOpt());
+  passMgr.add(createInstSimplifyLegacyPass());
+  passMgr.add(createCFGSimplificationPass());
+  passMgr.add(createReassociatePass());
+  passMgr.add(createLoopRotatePass());
+  passMgr.add(createLICMPass());
+  passMgr.add(createCFGSimplificationPass());
+  passMgr.add(createInstructionCombiningPass(1));
+  passMgr.add(createIndVarSimplifyPass());
+  passMgr.add(createLoopIdiomPass());
+  passMgr.add(createLoopDeletionPass());
+  passMgr.add(createSimpleLoopUnrollPass(cl::OptLevel));
+  passMgr.add(createPatchPeepholeOpt());
+  passMgr.add(createScalarizerPass());
+  passMgr.add(createPatchLoadScalarizer());
+  passMgr.add(createInstSimplifyLegacyPass());
+  passMgr.add(createNewGVNPass());
+  passMgr.add(createBitTrackingDCEPass());
+  passMgr.add(createInstructionCombiningPass(1));
+  passMgr.add(createPatchPeepholeOpt());
+  passMgr.add(createCorrelatedValuePropagationPass());
+  passMgr.add(createAggressiveDCEPass());
+  passMgr.add(createCFGSimplificationPass());
+  passMgr.add(createLoopRotatePass());
+  passMgr.add(createCFGSimplificationPass(SimplifyCFGOptions()
+                                              .bonusInstThreshold(1)
+                                              .forwardSwitchCondToPhi(true)
+                                              .convertSwitchToLookupTable(true)
+                                              .needCanonicalLoops(true)
+                                              .sinkCommonInsts(true)));
+  passMgr.add(createPatchPeepholeOpt());
+  passMgr.add(createLoopUnrollPass(cl::OptLevel));
+  // uses DivergenceAnalysis
+  passMgr.add(createPatchReadFirstLane());
+  passMgr.add(createInstructionCombiningPass(1));
+  passMgr.add(createLICMPass());
+  passMgr.add(createConstantMergePass());
+  passMgr.add(createDivRemPairsPass());
+  passMgr.add(createCFGSimplificationPass());
 }
 
 // =====================================================================================================================
