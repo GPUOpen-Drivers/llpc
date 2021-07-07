@@ -59,9 +59,6 @@ namespace llvm {
 
 namespace cl {
 
-// -disable-patch-opt: disable optimization for LLVM patching
-opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LLVM patching"));
-
 // -opt: Set the optimization level
 opt<CodeGenOpt::Level> OptLevel("opt", desc("Set the optimization level:"), init(CodeGenOpt::Default),
                                 values(clEnumValN(CodeGenOpt::None, "none", "no optimizations"),
@@ -150,8 +147,7 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   passMgr.add(createPatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
 
   // Add some optimization passes
-  if (!cl::DisablePatchOpt)
-    addOptimizationPasses(passMgr);
+  addOptimizationPasses(passMgr);
 
   // Stop timer for optimization passes and restart timer for patching passes.
   if (patchTimer) {
