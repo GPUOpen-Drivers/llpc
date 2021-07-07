@@ -134,7 +134,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       // Force s_barrier to be present (ignore optimization)
       builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
     }
-    if (func->getCallingConv() == CallingConv::AMDGPU_CS) {
+    if (func->getCallingConv() == CallingConv::AMDGPU_CS || func->getCallingConv() == CallingConv::AMDGPU_Gfx) {
       // Set the work group size
       const auto &csBuiltInUsage = m_pipelineState->getShaderModes()->getComputeShaderMode();
       unsigned flatWorkGroupSize =
