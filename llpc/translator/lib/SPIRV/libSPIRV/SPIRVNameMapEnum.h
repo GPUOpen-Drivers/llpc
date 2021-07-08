@@ -119,6 +119,7 @@ template <> inline void SPIRVMap<ExecutionMode, std::string>::init() {
   add(ExecutionModeSignedZeroInfNanPreserve, "SignedZeroInfNanPreserve");
   add(ExecutionModeRoundingModeRTE, "RoundingModeRTE");
   add(ExecutionModeRoundingModeRTZ, "RoundingModeRTZ");
+  add(ExecutionModeSubgroupUniformControlFlowKHR, "SubgroupUniformControlFlowKHR");
 }
 SPIRV_DEF_NAMEMAP(ExecutionMode, SPIRVExecutionModeNameMap)
 

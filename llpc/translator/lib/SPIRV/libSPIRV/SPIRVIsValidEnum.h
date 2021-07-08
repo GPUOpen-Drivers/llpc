@@ -147,6 +147,7 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeSignedZeroInfNanPreserve:
   case ExecutionModeRoundingModeRTE:
   case ExecutionModeRoundingModeRTZ:
+  case ExecutionModeSubgroupUniformControlFlowKHR:
     return true;
   default:
     return false;

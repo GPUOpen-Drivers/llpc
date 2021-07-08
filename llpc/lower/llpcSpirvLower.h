@@ -101,8 +101,7 @@ llvm::ModulePass *createSpirvLowerTranslator(ShaderStage stage, const PipelineSh
 class SpirvLower {
 public:
   explicit SpirvLower()
-      : m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid), m_entryPoint(nullptr) {}
-
+    : m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid), m_entryPoint(nullptr) {}
   static void removeConstantExpr(Context *context, llvm::GlobalVariable *global);
   static void replaceConstWithInsts(Context *context, llvm::Constant *const constVal);
 

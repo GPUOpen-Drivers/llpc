@@ -37,10 +37,10 @@
 namespace Llpc {
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering ray tracing intrinsics.
-class SpirvLowerRayTracingIntrinsics : public SpirvLower, public llvm::InstVisitor<SpirvLowerRayTracingIntrinsics> {
+class SpirvLowerRayTracingIntrinsics : public LegacySpirvLower, public llvm::InstVisitor<SpirvLowerRayTracingIntrinsics> {
 public:
-  SpirvLowerRayTracingIntrinsics() : SpirvLower(ID) {}
-  SpirvLowerRayTracingIntrinsics(char &pid) : SpirvLower(pid) {}
+  SpirvLowerRayTracingIntrinsics() : LegacySpirvLower(ID) {}
+  SpirvLowerRayTracingIntrinsics(char &pid) : LegacySpirvLower(pid) {}
   virtual bool runOnModule(llvm::Module &module);
 
   static char ID; // ID of this pass

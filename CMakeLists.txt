@@ -72,6 +72,20 @@ else()
     )
 endif()
 
+# SPVGEN
+if(EXISTS ${PROJECT_SOURCE_DIR}/../spvgen)
+    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../spvgen CACHE PATH "Specify the path to SPVGEN.")
+elseif(EXISTS ${PROJECT_SOURCE_DIR}/../xgl/tools/spvgen)
+    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../xgl/tools/spvgen CACHE PATH "Specify the path to SPVGEN.")
+else()
+    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../../../tools/spvgen CACHE PATH "Specify the path to SPVGEN.")
+endif()
+
+if(EXISTS ${XGL_SPVGEN_PATH})
+    set(XGL_SPVGEN_BUILD_PATH ${CMAKE_BINARY_DIR}/spvgen)
+    add_subdirectory(${XGL_SPVGEN_PATH} ${XGL_SPVGEN_BUILD_PATH} EXCLUDE_FROM_ALL)
+endif()
+
 ### VKGC build LLPC ################################################################
 if(ICD_BUILD_LLPC)
     target_include_directories(vkgc

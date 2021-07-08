@@ -682,7 +682,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
           // Per-shader SPIR-V lowering passes.
           LegacySpirvLower::addPasses(context, static_cast<ShaderStage>(entryNames[i].stage), *lowerPassMgr,
-                                      timerProfiler.getTimer(TimerLower)
+                                timerProfiler.getTimer(TimerLower)
           );
 
           lowerPassMgr->add(createBitcodeWriterPass(moduleBinaryStream));
