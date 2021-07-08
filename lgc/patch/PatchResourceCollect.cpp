@@ -1175,20 +1175,22 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       // export call.
       m_deadCalls.push_back(&callInst);
 
-      InOutLocationInfo outLocInfo;
-      outLocInfo.setLocation(cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue());
-      outLocInfo.setComponent(cast<ConstantInt>(callInst.getArgOperand(1))->getZExtValue());
-      if (m_shaderStage == ShaderStageGeometry)
-        outLocInfo.setStreamId(cast<ConstantInt>(callInst.getArgOperand(2))->getZExtValue());
-      // Also, we remove the output location info from the map if it exists
-      auto &outLocInfoMap = m_resUsage->inOutUsage.outputLocInfoMap;
-      if (outLocInfoMap.count(outLocInfo) > 0)
-        outLocInfoMap.erase(outLocInfo);
-      // For GS, we remove transform feedback location info as well if it exists
-      if (m_shaderStage == ShaderStageGeometry) {
-        auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.gs.locInfoXfbOutInfoMap;
-        if (locInfoXfbOutInfoMap.count(outLocInfo) > 0)
-          locInfoXfbOutInfoMap.erase(outLocInfo);
+      if (m_pipelineState->canPackOutput(m_shaderStage)) {
+        InOutLocationInfo outLocInfo;
+        outLocInfo.setLocation(cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue());
+        outLocInfo.setComponent(cast<ConstantInt>(callInst.getArgOperand(1))->getZExtValue());
+        if (m_shaderStage == ShaderStageGeometry)
+          outLocInfo.setStreamId(cast<ConstantInt>(callInst.getArgOperand(2))->getZExtValue());
+        // Also, we remove the output location info from the map if it exists
+        auto &outLocInfoMap = m_resUsage->inOutUsage.outputLocInfoMap;
+        if (outLocInfoMap.count(outLocInfo) > 0)
+          outLocInfoMap.erase(outLocInfo);
+        // For GS, we remove transform feedback location info as well if it exists
+        if (m_shaderStage == ShaderStageGeometry) {
+          auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.gs.locInfoXfbOutInfoMap;
+          if (locInfoXfbOutInfoMap.count(outLocInfo) > 0)
+            locInfoXfbOutInfoMap.erase(outLocInfo);
+        }
       }
     } else {
       m_outputCalls.push_back(&callInst);
