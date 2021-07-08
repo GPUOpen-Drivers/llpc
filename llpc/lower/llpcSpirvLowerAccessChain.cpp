@@ -45,41 +45,23 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Initializes static members.
-char LegacySpirvLowerAccessChain::ID = 0;
+char SpirvLowerAccessChain::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for access chain
-ModulePass *createLegacySpirvLowerAccessChain() {
-  return new LegacySpirvLowerAccessChain();
+ModulePass *createSpirvLowerAccessChain() {
+  return new SpirvLowerAccessChain();
 }
 
 // =====================================================================================================================
-LegacySpirvLowerAccessChain::LegacySpirvLowerAccessChain() : LegacySpirvLower(ID) {
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool LegacySpirvLowerAccessChain::runOnModule(Module &module) {
-  return Impl.runImpl(module);
+SpirvLowerAccessChain::SpirvLowerAccessChain() : LegacySpirvLower(ID) {
 }
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-// @param [in/out] analysisManager : Analysis manager to use for this transformation
-PreservedAnalyses SpirvLowerAccessChain::run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerAccessChain::runImpl(llvm::Module &module) {
+bool SpirvLowerAccessChain::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Access-Chain\n");
 
   SpirvLower::init(&module);
@@ -188,4 +170,4 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for access chain.
-INITIALIZE_PASS(LegacySpirvLowerAccessChain, DEBUG_TYPE, "Lower SPIR-V access chain", false, false)
+INITIALIZE_PASS(SpirvLowerAccessChain, DEBUG_TYPE, "Lower SPIR-V access chain", false, false)

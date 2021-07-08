@@ -47,7 +47,7 @@ class PassManager;
 } // namespace legacy
 
 class PassRegistry;
-void initializeLegacySpirvLowerAccessChainPass(PassRegistry &);
+void initializeSpirvLowerAccessChainPass(PassRegistry &);
 void initializeSpirvLowerMathConstFoldingPass(PassRegistry &);
 void initializeSpirvLowerMathFloatOpPass(PassRegistry &);
 void initializeSpirvLowerConstImmediateStorePass(PassRegistry &);
@@ -62,7 +62,6 @@ void initializeLegacySpirvLowerTranslatorPass(PassRegistry &);
 namespace lgc {
 
 class Builder;
-class PassManager;
 
 } // namespace lgc
 
@@ -72,7 +71,7 @@ namespace Llpc {
 //
 // @param passRegistry : Pass registry
 inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
-  initializeLegacySpirvLowerAccessChainPass(passRegistry);
+  initializeSpirvLowerAccessChainPass(passRegistry);
   initializeSpirvLowerConstImmediateStorePass(passRegistry);
   initializeSpirvLowerMathConstFoldingPass(passRegistry);
   initializeSpirvLowerMathFloatOpPass(passRegistry);
@@ -86,7 +85,7 @@ inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
 
 class Context;
 
-llvm::ModulePass *createLegacySpirvLowerAccessChain();
+llvm::ModulePass *createSpirvLowerAccessChain();
 llvm::ModulePass *createSpirvLowerConstImmediateStore();
 llvm::ModulePass *createSpirvLowerMathConstFolding();
 llvm::ModulePass *createSpirvLowerMathFloatOp();
@@ -103,9 +102,6 @@ class SpirvLower {
 public:
   explicit SpirvLower()
       : m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid), m_entryPoint(nullptr) {}
-
-  // Add per-shader lowering passes to pass manager
-  static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer);
 
   static void removeConstantExpr(Context *context, llvm::GlobalVariable *global);
   static void replaceConstWithInsts(Context *context, llvm::Constant *const constVal);

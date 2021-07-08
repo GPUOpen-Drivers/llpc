@@ -98,11 +98,10 @@ private:
 
   // -----------------------------------------------------------------------------------------------------------------
 
-  ModuleAnalysisManager moduleAnalysisManager; // Module analysis manager used when running the passes.
+  ModuleAnalysisManager analysisManager;       // Analysis manager used when running the passes.
   PassInstrumentationCallbacks instrCallbacks; // Instrumentation callbacks ran when running the passes.
   VerifyInstrumentation instrVerify;           // Verify instrumentation, run module verifier after each pass.
-  unsigned *m_passIndex = nullptr;             // Pass Index.
-  bool initialized = false;                    // Wether the pass manager is initialized or not.
+  unsigned *m_passIndex = nullptr;             // Pass Index
 };
 
 } // namespace
@@ -168,6 +167,8 @@ PassManagerImpl::PassManagerImpl() : PassManager(), instrVerify(getLgcOuts()) {
   registerCallbacks();
   if (cl::VerifyIr)
     instrVerify.registerCallbacks(instrCallbacks);
+  PassBuilder passBuilder(nullptr, PipelineTuningOptions(), None, &instrCallbacks);
+  passBuilder.registerModuleAnalyses(analysisManager);
 }
 
 // =====================================================================================================================
@@ -175,16 +176,7 @@ PassManagerImpl::PassManagerImpl() : PassManager(), instrVerify(getLgcOuts()) {
 //
 // @param module : Module to run the passes on
 void PassManagerImpl::run(Module &module) {
-  // We register LLVM's default analysis sets late to be sure our custom
-  // analyses are added beforehand.
-  if (!initialized) {
-    PassBuilder passBuilder(nullptr, PipelineTuningOptions(), None, &instrCallbacks);
-    passBuilder.registerModuleAnalyses(moduleAnalysisManager);
-    passBuilder.registerFunctionAnalyses(functionAnalysisManager);
-    moduleAnalysisManager.registerPass([&] { return FunctionAnalysisManagerModuleProxy(functionAnalysisManager); });
-    initialized = true;
-  }
-  ModulePassManager::run(module, moduleAnalysisManager);
+  ModulePassManager::run(module, analysisManager);
 }
 
 // =====================================================================================================================
