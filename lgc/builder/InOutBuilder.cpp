@@ -580,6 +580,7 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
   resUsage->inOutUsage.streamXfbBuffers[streamId] |= 1 << xfbBuffer;
 
   if (m_shaderStage == ShaderStageGeometry) {
+
     // Mark the XFB output for copy shader generation.
     XfbOutInfo xfbOutInfo = {};
     xfbOutInfo.streamId = streamId;

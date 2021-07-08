@@ -347,20 +347,6 @@ target_link_libraries(amdllpc PRIVATE cwpack)
 endif()
 ### Add Subdirectories #################################################################################################
 if(ICD_BUILD_LLPC)
-# SPVGEN
-if(EXISTS ${PROJECT_SOURCE_DIR}/../../spvgen)
-    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../../spvgen CACHE PATH "Specify the path to SPVGEN.")
-else()
-    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../../../../tools/spvgen CACHE PATH "Specify the path to SPVGEN.")
-endif()
-
-if(EXISTS ${XGL_SPVGEN_PATH})
-    set(SPVGEN_ENABLE_WERROR ${LLPC_ENABLE_WERROR} CACHE BOOL "${PROJECT_NAME} override." FORCE)
-    add_subdirectory(${XGL_SPVGEN_PATH} ${CMAKE_BINARY_DIR}/spvgen EXCLUDE_FROM_ALL)
-    # Propagate the spvgen build directory to the parent scope so that XGL tests can use it.
-    set(XGL_SPVGEN_BUILD_PATH ${CMAKE_BINARY_DIR}/spvgen PARENT_SCOPE)
-endif()
-
 # Lit tests
 if(LLPC_BUILD_LIT)
     add_subdirectory(test)

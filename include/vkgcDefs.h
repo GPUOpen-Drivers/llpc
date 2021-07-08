@@ -230,7 +230,7 @@ enum class ResourceMappingNodeType : unsigned {
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
   DescriptorYCbCrSampler, ///< Generic descriptor: YCbCr sampler
-  Count,                  ///< Count of resource mapping node types.
+  Count, ///< Count of resource mapping node types.
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to

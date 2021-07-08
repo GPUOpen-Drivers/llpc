@@ -2342,8 +2342,10 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
 
   // For an image/sampler/sampledimage pointer that is a UniformConstant OpVariable, we need to materialize it by
   // generating the code to get the descriptor pointer(s).
-  SPIRVWord descriptorSet = 0, binding = 0;
-  spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
+  SPIRVWord binding = 0;
+  unsigned descriptorSet = 0;
+    spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
+
   spvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
 
   SPIRVType *spvTy = spvImagePtr->getType()->getPointerElementType();
@@ -6942,7 +6944,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       // Get values of descriptor binding and set based on corresponding
       // decorations
       SPIRVWord binding = SPIRVID_INVALID;
-      SPIRVWord descSet = SPIRVID_INVALID;
+      unsigned descSet = SPIRVID_INVALID;
       bool hasBinding = bv->hasDecorate(DecorationBinding, 0, &binding);
       bool hasDescSet = bv->hasDecorate(DecorationDescriptorSet, 0, &descSet);
 
@@ -7027,11 +7029,10 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
 
       // Get values of descriptor binding and set based on corresponding
       // decorations
-      SPIRVWord descSet = SPIRVID_INVALID;
+      unsigned descSet = SPIRVID_INVALID;
       SPIRVWord binding = SPIRVID_INVALID;
       bool hasBinding = bv->hasDecorate(DecorationBinding, 0, &binding);
       bool hasDescSet = bv->hasDecorate(DecorationDescriptorSet, 0, &descSet);
-
       // TODO: Currently, set default binding and descriptor to 0. Will be
       // changed later.
       if (!hasBinding)

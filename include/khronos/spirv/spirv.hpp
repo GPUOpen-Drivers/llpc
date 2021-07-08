@@ -2430,5 +2430,5 @@ inline FragmentShadingRateMask operator|(FragmentShadingRateMask a, FragmentShad
 
 }  // end namespace spv
 
-#endif // #ifndef spirv_HPP
+#endif
 
