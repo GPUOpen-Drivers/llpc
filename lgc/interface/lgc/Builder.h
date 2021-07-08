@@ -204,8 +204,8 @@ public:
 
   // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
   // where available.
-  // The accumulator input must be i32; use a value of 0 for no accumulation.
-  // The result type is i32.
+  // Use a value of 0 for no accumulation and the value type is consistent with the result type. The result is saturated
+  // if there is an accumulator. The component type of input vectors can have 8-bit/16-bit/32-bit and i32/i16/i8 result.
   //
   // @param vector1 : The integer vector 1
   // @param vector2 : The integer vector 2
