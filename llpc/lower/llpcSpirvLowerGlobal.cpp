@@ -1771,8 +1771,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 if (!call)
                   continue;
                 // If the call is our non uniform decoration, record we are non uniform.
-                if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform)) {
-                  isNonUniform = true;
+                if (auto callee = call->getCalledFunction()) {
+                  isNonUniform = callee->getName().startswith(gSPIRVName::NonUniform);
                   break;
                 }
               }
