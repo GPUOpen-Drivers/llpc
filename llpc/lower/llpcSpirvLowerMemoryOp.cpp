@@ -121,7 +121,7 @@ void SpirvLowerMemoryOp::visitExtractElementInst(ExtractElementInst &extractElem
       auto castPtrTy = castTy->getPointerTo(addrSpace);
       auto castPtr = new BitCastInst(loadPtr, castPtrTy, "", &extractElementInst);
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), extractElementInst.getOperand(1)};
-      auto elementPtr = GetElementPtrInst::Create(nullptr, castPtr, idxs, "", &extractElementInst);
+      auto elementPtr = GetElementPtrInst::Create(castTy, castPtr, idxs, "", &extractElementInst);
       auto elementTy = elementPtr->getType()->getPointerElementType();
       auto newLoad = new LoadInst(elementTy, elementPtr, "", &extractElementInst);
       extractElementInst.replaceAllUsesWith(newLoad);

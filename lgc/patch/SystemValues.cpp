@@ -329,7 +329,8 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
     Value *idxs[] = {ConstantInt::get(Type::getInt64Ty(*m_context), 0),
                      ConstantInt::get(Type::getInt64Ty(*m_context), xfbBuffer)};
 
-    auto streamOutBufDescPtr = GetElementPtrInst::Create(nullptr, streamOutTablePtr, idxs, "", insertPos);
+    auto streamOutTableType = streamOutTablePtr->getType()->getPointerElementType();
+    auto streamOutBufDescPtr = GetElementPtrInst::Create(streamOutTableType, streamOutTablePtr, idxs, "", insertPos);
     streamOutBufDescPtr->setMetadata(MetaNameUniform, MDNode::get(streamOutBufDescPtr->getContext(), {}));
     auto streamOutBufDescTy = streamOutBufDescPtr->getType()->getPointerElementType();
 
