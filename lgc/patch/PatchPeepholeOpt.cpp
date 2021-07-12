@@ -544,7 +544,8 @@ void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
 
   // Create a getelementptr instruction (using offset / size).
   const DataLayout &dataLayout = intToPtr.getModule()->getDataLayout();
-  const uint64_t size = dataLayout.getTypeAllocSize(intToPtr.getType()->getPointerElementType());
+  auto elementType = intToPtr.getType()->getPointerElementType();
+  const uint64_t size = dataLayout.getTypeAllocSize(elementType);
   APInt index = constOffset->getValue().udiv(size);
   if (constOffset->getValue().urem(size) != 0)
     return;
@@ -554,7 +555,7 @@ void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
   insertAfter(*newIntToPtr, *binaryOperator);
 
   auto *const getElementPtr =
-      GetElementPtrInst::Create(nullptr, newIntToPtr, ConstantInt::get(newIntToPtr->getContext(), index));
+      GetElementPtrInst::Create(elementType, newIntToPtr, ConstantInt::get(newIntToPtr->getContext(), index));
   insertAfter(*getElementPtr, *newIntToPtr);
 
   // Set every instruction to use the newly calculated pointer.

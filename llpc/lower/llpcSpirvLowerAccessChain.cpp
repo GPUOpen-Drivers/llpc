@@ -144,7 +144,8 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
     } while (!chainedInsts.empty());
 
     // Create the coalesced "getelementptr" instruction (do combining)
-    coalescedGetElemPtr = GetElementPtrInst::Create(nullptr, blockPtr, idxs, "", getElemPtr);
+    auto blockType = blockPtr->getType()->getPointerElementType();
+    coalescedGetElemPtr = GetElementPtrInst::Create(blockType, blockPtr, idxs, "", getElemPtr);
     getElemPtr->replaceAllUsesWith(coalescedGetElemPtr);
 
     // Remove dead "getelementptr" instructions where possible.

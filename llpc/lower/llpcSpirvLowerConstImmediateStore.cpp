@@ -157,7 +157,8 @@ StoreInst *SpirvLowerConstImmediateStore::findSingleStore(AllocaInst *allocaInst
 // @param storeInst : The single constant store into the "alloca"
 void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *storeInst) {
   auto allocaInst = cast<AllocaInst>(storeInst->getPointerOperand());
-  auto global = new GlobalVariable(*m_module, allocaInst->getType()->getElementType(),
+  auto globalType = allocaInst->getType()->getElementType();
+  auto global = new GlobalVariable(*m_module, globalType,
                                    true, // isConstant
                                    GlobalValue::InternalLinkage, cast<Constant>(storeInst->getValueOperand()), "",
                                    nullptr, GlobalValue::NotThreadLocal, SPIRAS_Constant);
@@ -178,7 +179,7 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *sto
         for (auto idxIt = origGetElemPtrInst->idx_begin(), idxItEnd = origGetElemPtrInst->idx_end(); idxIt != idxItEnd;
              ++idxIt)
           indices.push_back(*idxIt);
-        auto newGetElemPtrInst = GetElementPtrInst::Create(nullptr, global, indices, "", origGetElemPtrInst);
+        auto newGetElemPtrInst = GetElementPtrInst::Create(globalType, global, indices, "", origGetElemPtrInst);
         newGetElemPtrInst->takeName(origGetElemPtrInst);
         newGetElemPtrInst->setIsInBounds(origGetElemPtrInst->isInBounds());
         newGetElemPtrInst->copyMetadata(*origGetElemPtrInst);

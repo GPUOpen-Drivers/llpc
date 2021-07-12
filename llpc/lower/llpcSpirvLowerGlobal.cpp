@@ -2038,7 +2038,7 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
 
     new StoreInst(loadValue, interpPtr, &callInst);
 
-    auto interpElemPtr = GetElementPtrInst::Create(nullptr, interpPtr, operands, "", &callInst);
+    auto interpElemPtr = GetElementPtrInst::Create(inputTy, interpPtr, operands, "", &callInst);
     auto interpElemTy = interpElemPtr->getType()->getPointerElementType();
 
     // only get the value that the original getElemPtr points to
