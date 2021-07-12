@@ -303,6 +303,8 @@ private:
   bool m_hasTes; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs;  // Whether the pipeline has geometry shader
 
+  bool m_constPositionZ; // Whether the Z channel of vertex position data is constant
+
   // Base offsets (in dwords) of GS output vertex streams in GS-VS ring
   unsigned m_gsStreamBases[MaxGsStreams];
 
