@@ -59,7 +59,7 @@ namespace lgc {
 NggPrimShader::NggPrimShader(PipelineState *pipelineState)
     : m_pipelineState(pipelineState), m_context(&pipelineState->getContext()),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()), m_nggControl(m_pipelineState->getNggControl()),
-      m_ldsManager(nullptr), m_builder(new IRBuilder<>(*m_context)) {
+      m_ldsManager(nullptr), m_constPositionZ(false), m_builder(new IRBuilder<>(*m_context)) {
   assert(m_nggControl->enableNgg);
 
   // Always allow approximation, to change fdiv(1.0, x) to rcp(x)
@@ -1041,8 +1041,12 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
                              distributePrimitiveId ? endReadPrimIdBlock : entryBlock);
     position = positionPhi; // Update vertex position data
 
+    // NOTE: If the Z channel of vertex position data is constant, we can go into runtime passthrough mode. Otherwise,
+    // we will further check if this is a small subgroup and enable runtime passthrough mode accordingly.
     auto runtimePassthrough =
-        m_builder->CreateICmpULT(m_nggFactor.vertCountInSubgroup, m_builder->getInt32(NggSmallSubgroupThreshold));
+        m_constPositionZ
+            ? m_builder->getTrue()
+            : m_builder->CreateICmpULT(m_nggFactor.vertCountInSubgroup, m_builder->getInt32(NggSmallSubgroupThreshold));
     m_builder->CreateCondBr(runtimePassthrough, runtimePassthroughBlock, noRuntimePassthroughBlock);
   }
 
@@ -2947,6 +2951,7 @@ void NggPrimShader::splitEs(Module *module) {
         unsigned exportTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
         if (exportTarget == EXP_TARGET_POS_0) {
           // Get position value
+          m_constPositionZ = isa<Constant>(call->getArgOperand(4));
           for (unsigned i = 0; i < 4; ++i)
             position = m_builder->CreateInsertElement(position, call->getArgOperand(2 + i), i);
         } else if (exportTarget == clipCullPos) {
