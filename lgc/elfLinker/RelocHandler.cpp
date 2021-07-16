@@ -174,7 +174,7 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
   }
   if (name == reloc::Pushconst) {
     auto *pushConstantNode = m_pipelineState->findPushConstantResourceNode();
-    value = pushConstantNode->offsetInDwords;
+    value = pushConstantNode->offsetInDwords * 4;
     getPipelineState()->getPalMetadata()->setUserDataSpillUsage(pushConstantNode->offsetInDwords);
     return true;
   }
