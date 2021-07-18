@@ -74,6 +74,12 @@ public:
 
   static void updateMetaNote(Context *context, const ElfNote *note, ElfNote *newNote);
 
+  size_t getRelocPsOffset(const SectionBuffer *relocSection, size_t PsIsaOffset);
+
+  void mergeRelocSection(const SectionBuffer *fragmentRelocSection, size_t fragmentIsaOffset,
+                         const SectionBuffer *nonFragmentRelocSection, size_t nonFragmentIsaOffset,
+                         SectionBuffer *newSection);
+
   Result ReadFromBuffer(const void *buffer, size_t bufSize);
   Result copyFromReader(const ElfReader<Elf> &reader);
 
@@ -136,6 +142,8 @@ private:
   int m_relocSecIdx;  // Section index of relocation section
   int m_symSecIdx;    // Section index of symbol table section
   int m_strtabSecIdx; // Section index of string table section
+
+  bool m_dropRelocSec; // Indicates whether the reloc section should be dropped
 };
 
 } // namespace Llpc

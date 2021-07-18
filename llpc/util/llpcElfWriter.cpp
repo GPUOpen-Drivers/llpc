@@ -53,7 +53,7 @@ static const char *const HwStageNames[] = {".ls", ".hs", ".es", ".gs", ".vs", ".
 template <class Elf>
 ElfWriter<Elf>::ElfWriter(GfxIpVersion gfxIp)
     : m_gfxIp(gfxIp), m_textSecIdx(InvalidValue), m_noteSecIdx(InvalidValue), m_relocSecIdx(InvalidValue),
-      m_symSecIdx(InvalidValue), m_strtabSecIdx(InvalidValue) {
+      m_symSecIdx(InvalidValue), m_strtabSecIdx(InvalidValue), m_dropRelocSec(false) {
 }
 
 // =====================================================================================================================
@@ -431,8 +431,13 @@ template <class Elf> size_t ElfWriter<Elf>::getRequiredBufferSizeBytes() {
   size_t totalBytes = sizeof(typename Elf::FormatHeader);
 
   // Iterate through the section list
-  for (auto &section : m_sections)
+  for (auto &section : m_sections) {
+    if ((strcmp(section.name, RelocName) == 0) && (m_dropRelocSec == true)) {
+      m_header.e_shnum--;
+      continue;
+    }
     totalBytes += alignTo(section.secHead.sh_size, sizeof(unsigned));
+  }
 
   totalBytes += m_header.e_shentsize * m_header.e_shnum;
   totalBytes += m_header.e_phentsize * m_header.e_phnum;
@@ -550,6 +555,8 @@ template <class Elf> void ElfWriter<Elf>::calcSectionHeaderOffset() {
   sharedHdrOffset += m_header.e_phnum * hdrSize;
 
   for (auto &section : m_sections) {
+    if ((strcmp(section.name, RelocName) == 0) && (m_dropRelocSec == true))
+      continue;
     const unsigned secSzBytes = alignTo(section.secHead.sh_size, sizeof(unsigned));
     sharedHdrOffset += secSzBytes;
   }
@@ -588,6 +595,8 @@ template <class Elf> void ElfWriter<Elf>::writeToBuffer(ElfPackage *pElf) {
 
   // Write each section buffer
   for (auto &section : m_sections) {
+    if ((strcmp(section.name, RelocName) == 0) && (m_dropRelocSec == true))
+      continue;
     section.secHead.sh_offset = static_cast<unsigned>(buffer - data);
     const unsigned sizeBytes = section.secHead.sh_size;
     if (sizeBytes > 0)
@@ -597,6 +606,8 @@ template <class Elf> void ElfWriter<Elf>::writeToBuffer(ElfPackage *pElf) {
 
   const unsigned secHdrSize = sizeof(typename Elf::SectionHeader);
   for (auto &section : m_sections) {
+    if ((strcmp(section.name, RelocName) == 0) && (m_dropRelocSec == true))
+      continue;
     memcpy(buffer, &section.secHead, secHdrSize);
     buffer += secHdrSize;
   }
@@ -808,6 +819,144 @@ Result ElfWriter<Elf>::getSectionTextShader(const char *name, const void **data,
 }
 
 // =====================================================================================================================
+// Get the start pos of relocs used by Ps in the reloc section
+//
+// @param relocSection : Reloc section
+// @param psIsaOffset : Ps ISA offset in elf binary
+template <class Elf> size_t ElfWriter<Elf>::getRelocPsOffset(const SectionBuffer *relocSection, size_t psIsaOffset) {
+  size_t psStartPos = 0;
+
+  const size_t relocCount = static_cast<size_t>(relocSection->secHead.sh_size / relocSection->secHead.sh_entsize);
+
+  auto relocs = reinterpret_cast<typename Elf::Reloc *>(const_cast<uint8_t *>(relocSection->data));
+  while (psStartPos < relocCount) {
+    if (relocs[psStartPos].r_offset >= psIsaOffset)
+      break;
+    psStartPos++;
+  }
+
+  return psStartPos;
+}
+
+// =====================================================================================================================
+// Merge Reloc Section
+//
+// @param pFragmentRelocSection : Reloc section of fragement elf binary
+// @param fragmentIsaOffset : Ps ISA offset in fragement elf binary
+// @param pNonFragmentRelocSection : Reloc section of nonFragment elf binary
+// @param nonFragmentIsaOffset : Ps ISA offset in nonFragement elf binary
+// @param [out] pNewSection : Merged section
+template <class Elf>
+void ElfWriter<Elf>::mergeRelocSection(const SectionBuffer *pFragmentRelocSection, size_t fragmentIsaOffset,
+                                       const SectionBuffer *pNonFragmentRelocSection, size_t nonFragmentIsaOffset,
+                                       SectionBuffer *pNewSection) {
+  const unsigned fragmentRelocCount =
+      static_cast<unsigned>(pFragmentRelocSection->secHead.sh_size / pFragmentRelocSection->secHead.sh_entsize);
+
+  auto fragmentRelocs = reinterpret_cast<typename Elf::Reloc *>(const_cast<uint8_t *>(pFragmentRelocSection->data));
+
+  unsigned fragmentRelocPsStartPos = getRelocPsOffset(pFragmentRelocSection, fragmentIsaOffset);
+
+  // If fragment elf binary do not have relocs in Ps, then we do not need to merge
+  if (fragmentRelocPsStartPos < fragmentRelocCount) {
+
+    unsigned nonFragmentRelocPsStartPos = 0;
+    uint32_t relocSymbol = 0;
+
+    if (pNonFragmentRelocSection) {
+      // NonFragment elf binary have reloc section
+      // Get the start pos of relocs used by Ps in reloc section and the reloc symbol idx for merge
+      nonFragmentRelocPsStartPos = getRelocPsOffset(pNonFragmentRelocSection, nonFragmentIsaOffset);
+
+      auto nonFragmentRelocs =
+          reinterpret_cast<typename Elf::Reloc *>(const_cast<uint8_t *>(pNonFragmentRelocSection->data));
+
+      relocSymbol = nonFragmentRelocs[nonFragmentRelocPsStartPos].r_symbol;
+    } else {
+      // NonFragment elf binary do not have reloc section
+      // Fill new reloc section by fragment reloc section
+      pNewSection->secHead = pFragmentRelocSection->secHead;
+      pNewSection->name = pFragmentRelocSection->name;
+
+      // Add .rel.text string to StrTab section
+      const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentStrTabSection = nullptr;
+      auto nonFragmentStrTabSecIndex = GetSectionIndex(StrTabName);
+      getSectionDataBySectionIndex(nonFragmentStrTabSecIndex, &nonFragmentStrTabSection);
+
+      unsigned strTabSize = nonFragmentStrTabSection->secHead.sh_size;
+      pNewSection->secHead.sh_name = strTabSize;
+
+      auto strTabData = new uint8_t[strTabSize + 10];
+      memcpy(strTabData, nonFragmentStrTabSection->data, strTabSize);
+      memcpy(strTabData + strTabSize, ".rel.text", 10);
+
+      delete[] nonFragmentStrTabSection->data;
+
+      auto nonFragmentStrTabSectionWriter =
+          const_cast<ElfSectionBuffer<Elf64::SectionHeader> *>(nonFragmentStrTabSection);
+      nonFragmentStrTabSectionWriter->data = strTabData;
+
+      nonFragmentStrTabSectionWriter->secHead.sh_size += 10;
+
+      m_sections.push_back(*pNewSection);
+
+      m_relocSecIdx = m_sections.size() - 1;
+
+      m_map[RelocName] = m_relocSecIdx;
+
+      // Add symbol for relocs
+      ElfSymbol newSymbol = {};
+      newSymbol.pSymName = nullptr;
+      newSymbol.nameOffset = 0;
+      newSymbol.secIdx = m_map[TextName];
+      newSymbol.info.type = STT_SECTION;
+      newSymbol.info.binding = STB_LOCAL;
+      m_symbols.push_back(newSymbol);
+      // Insert the relocs symbol at idx 0, so the idx will not be changed during assembleSymbols().
+      m_symbols.insert(m_symbols.begin(), newSymbol);
+    }
+
+    // Merge the reloc section and update the relocs offset in .text binary
+    const ElfSectionBuffer<Elf64::SectionHeader> *relocSection = nullptr;
+
+    getSectionDataBySectionIndex(m_relocSecIdx, &relocSection);
+
+    const unsigned relocsSize = nonFragmentRelocPsStartPos + (fragmentRelocCount - fragmentRelocPsStartPos);
+    auto relocData = new uint8_t[relocsSize * pFragmentRelocSection->secHead.sh_entsize];
+
+    uint8_t *data = relocData;
+
+    memcpy(data, relocSection->data, nonFragmentRelocPsStartPos);
+    data += nonFragmentRelocPsStartPos;
+
+    auto textSecIndex = GetSectionIndex(TextName);
+    const ElfSectionBuffer<Elf64::SectionHeader> *textSection = nullptr;
+    getSectionDataBySectionIndex(textSecIndex, &textSection);
+
+    auto relocOffset = nonFragmentIsaOffset - fragmentIsaOffset;
+
+    for (auto i = nonFragmentRelocPsStartPos; i < relocsSize; ++i) {
+      typename Elf::Reloc reloc = {};
+      reloc.r_offset = fragmentRelocs[i].r_offset + relocOffset;
+      reloc.r_type = fragmentRelocs[i].r_type;
+      reloc.r_symbol = relocSymbol;
+
+      memcpy(data, &reloc, sizeof(typename Elf::Reloc));
+      data += sizeof(typename Elf::Reloc);
+
+      // Update the relocs offset in .text binary
+      auto binOffset = reinterpret_cast<uint32_t *>(const_cast<uint8_t *>(textSection->data) + reloc.r_offset);
+      *binOffset += relocOffset;
+    }
+    pNewSection->name = relocSection->name;
+    pNewSection->secHead = relocSection->secHead;
+    pNewSection->secHead.sh_size = relocsSize * pFragmentRelocSection->secHead.sh_entsize;
+    pNewSection->secHead.sh_link = m_map[SymTabName];
+    pNewSection->data = relocData;
+  }
+}
+
+// =====================================================================================================================
 // Update descriptor root offset in ELF binary
 //
 // @param pContext : Pipeline context
@@ -1002,6 +1151,27 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   fragmentMetaNote = reader.getNote(Util::Abi::MetadataNoteType);
   mergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
   setNote(&newMetaNote);
+
+  // Merge reloc section
+  const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentRelocSection = nullptr;
+  ElfSectionBuffer<Elf64::SectionHeader> *fragmentRelocSection = nullptr;
+
+  auto fragmentRelocSecIndex = reader.GetSectionIndex(RelocName);
+  auto nonFragmentRelocSecIndex = GetSectionIndex(RelocName);
+
+  reader.getSectionDataBySectionIndex(fragmentRelocSecIndex, &fragmentRelocSection);
+  getSectionDataBySectionIndex(nonFragmentRelocSecIndex, &nonFragmentRelocSection);
+
+  if (fragmentRelocSection) {
+    ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
+    mergeRelocSection(fragmentRelocSection, fragmentIsaSymbol->value, nonFragmentRelocSection, isaOffset, &newSection);
+
+    setSection(m_relocSecIdx, &newSection);
+  } else if (nonFragmentRelocSection) {
+    // if fragment elf don't have reloc section, but nonFragment elf has reloc section,
+    // we need to drop reloc section from the elf binary
+    m_dropRelocSec = true;
+  }
 
   writeToBuffer(pPipelineElf);
 }
