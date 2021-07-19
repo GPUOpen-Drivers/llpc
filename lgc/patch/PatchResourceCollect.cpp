@@ -171,7 +171,6 @@ void PatchResourceCollect::setNggControl(Module *module) {
 
   nggControl.enableNgg = canUseNgg(module);
   nggControl.enableGsUse = (options.nggFlags & NggFlagEnableGsUse);
-  nggControl.alwaysUsePrimShaderTable = (options.nggFlags & NggFlagDontAlwaysUsePrimShaderTable) == 0;
   nggControl.compactMode = (options.nggFlags & NggFlagCompactDisable) ? NggCompactDisable : NggCompactVertices;
 
   nggControl.enableVertexReuse = (options.nggFlags & NggFlagEnableVertexReuse);
@@ -201,16 +200,12 @@ void PatchResourceCollect::setNggControl(Module *module) {
     if (!nggControl.passthroughMode)
       nggControl.passthroughMode = !canUseNggCulling(module);
 
-    // Build NGG culling-control registers
-    buildNggCullingControlRegister(nggControl);
-
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC NGG control settings results\n\n");
 
     // Control option
     LLPC_OUTS("EnableNgg                    = " << nggControl.enableNgg << "\n");
     LLPC_OUTS("EnableGsUse                  = " << nggControl.enableGsUse << "\n");
-    LLPC_OUTS("AlwaysUsePrimShaderTable     = " << nggControl.alwaysUsePrimShaderTable << "\n");
     LLPC_OUTS("PassthroughMode              = " << nggControl.passthroughMode << "\n");
     LLPC_OUTS("CompactMode                  = ");
     switch (nggControl.compactMode) {
@@ -402,80 +397,6 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
 
   // We can safely enable NGG culling here
   return true;
-}
-
-// =====================================================================================================================
-// Builds NGG culling-control registers (fill part of compile-time primitive shader table).
-//
-// @param [in/out] nggControl : NggControl struct
-void PatchResourceCollect::buildNggCullingControlRegister(NggControl &nggControl) {
-  const auto &rsState = m_pipelineState->getRasterizerState();
-
-  auto &pipelineState = nggControl.primShaderTable.pipelineStateCb;
-
-  //
-  // Program register PA_SU_SC_MODE_CNTL
-  //
-  PaSuScModeCntl paSuScModeCntl;
-  paSuScModeCntl.u32All = 0;
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-  paSuScModeCntl.bits.polyOffsetFrontEnable = rsState.depthBiasEnable;
-  paSuScModeCntl.bits.polyOffsetBackEnable = rsState.depthBiasEnable;
-#endif
-  paSuScModeCntl.bits.multiPrimIbEna = true;
-
-  paSuScModeCntl.bits.polyMode = rsState.polygonMode != PolygonModeFill;
-
-  if (rsState.polygonMode == PolygonModeFill) {
-    paSuScModeCntl.bits.polymodeBackPtype = POLY_MODE_TRIANGLES;
-    paSuScModeCntl.bits.polymodeFrontPtype = POLY_MODE_TRIANGLES;
-  } else if (rsState.polygonMode == PolygonModeLine) {
-    paSuScModeCntl.bits.polymodeBackPtype = POLY_MODE_LINES;
-    paSuScModeCntl.bits.polymodeFrontPtype = POLY_MODE_LINES;
-  } else if (rsState.polygonMode == PolygonModePoint) {
-    paSuScModeCntl.bits.polymodeBackPtype = POLY_MODE_POINTS;
-    paSuScModeCntl.bits.polymodeFrontPtype = POLY_MODE_POINTS;
-  } else
-    llvm_unreachable("Should never be called!");
-
-  paSuScModeCntl.bits.cullFront = (rsState.cullMode & CullModeFront) != 0;
-  paSuScModeCntl.bits.cullBack = (rsState.cullMode & CullModeBack) != 0;
-
-  paSuScModeCntl.bits.face = rsState.frontFaceClockwise;
-
-  pipelineState.paSuScModeCntl = paSuScModeCntl.u32All;
-
-  //
-  // Program register PA_CL_CLIP_CNTL
-  //
-  PaClClipCntl paClClipCntl;
-  assert((rsState.usrClipPlaneMask & ~0x3F) == 0);
-  paClClipCntl.u32All = rsState.usrClipPlaneMask;
-
-  paClClipCntl.bits.dxClipSpaceDef = true;
-  paClClipCntl.bits.dxLinearAttrClipEna = true;
-
-  if (rsState.rasterizerDiscardEnable)
-    paClClipCntl.bits.dxRasterizationKill = true;
-
-  pipelineState.paClClipCntl = paClClipCntl.u32All;
-
-  //
-  // Program register PA_CL_VTE_CNTL
-  //
-  PaClVteCntl paClVteCntl;
-  paClVteCntl.u32All = 0;
-
-  paClVteCntl.bits.vportXScaleEna = true;
-  paClVteCntl.bits.vportXOffsetEna = true;
-  paClVteCntl.bits.vportYScaleEna = true;
-  paClVteCntl.bits.vportYOffsetEna = true;
-  paClVteCntl.bits.vportZScaleEna = true;
-  paClVteCntl.bits.vportZOffsetEna = true;
-  paClVteCntl.bits.vtxW0Fmt = true;
-
-  pipelineState.paClVteCntl = paClVteCntl.u32All;
 }
 
 // =====================================================================================================================

@@ -72,8 +72,6 @@ private:
   GraphicsContext(const GraphicsContext &) = delete;
   GraphicsContext &operator=(const GraphicsContext &) = delete;
 
-  void buildNggCullingControlRegister();
-
   const GraphicsPipelineBuildInfo *m_pipelineInfo; // Info to build a graphics pipeline
 
   unsigned m_stageMask;        // Mask of active shader stages bound to this graphics pipeline
