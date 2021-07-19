@@ -143,12 +143,6 @@ static cl::opt<bool> NggEnableGsUse("ngg-enable-gs-use", cl::desc("Enable NGG us
 static cl::opt<bool> NggForceCullingMode("ngg-force-culling-mode", cl::desc("Force NGG to run in culling mode"),
                                          cl::init(false));
 
-// -ngg-always-use-prim-shader-table: always use primitive shader table to fetch culling-control registers
-static cl::opt<bool>
-    NggAlwaysUsePrimShaderTable("ngg-always-use-prim-shader-table",
-                                cl::desc("Always use primitive shader table to fetch culling-control registers (NGG)"),
-                                cl::init(true));
-
 // -ngg-compact-mode: NGG compaction mode (NGG)
 static cl::opt<unsigned> NggCompactionMode("ngg-compaction-mode",
                                            cl::desc("Compaction mode after culling operations (NGG):\n"
@@ -489,7 +483,6 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 #else
     nggState.forceCullingMode = NggForceCullingMode;
 #endif
-    nggState.alwaysUsePrimShaderTable = NggAlwaysUsePrimShaderTable;
     nggState.compactMode = static_cast<NggCompactMode>(NggCompactionMode.getValue());
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
     nggState.enableFastLaunch = false;

@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 46
+#define LLPC_INTERFACE_MAJOR_VERSION 47
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -490,7 +490,9 @@ struct NggState {
 #else
   bool forceCullingMode;          ///< Force NGG to run in culling mode
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   bool alwaysUsePrimShaderTable; ///< Always use primitive shader table to fetch culling-control registers
+#endif
   NggCompactMode compactMode;    ///< Compaction mode after culling operations
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
@@ -733,8 +735,10 @@ struct GraphicsPipelineBuildInfo {
                                   ///  with this pipeline.
     uint8_t usrClipPlaneMask;     ///< Mask to indicate the enabled user defined clip planes
     VkPolygonMode polygonMode;    ///< Triangle rendering mode
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     VkCullModeFlags cullMode;     ///< Fragment culling mode
     VkFrontFace frontFace;        ///< Front-facing triangle orientation
+#endif
     bool depthBiasEnable;         ///< Whether to bias fragment depth values
   } rsState;                      ///< Rasterizer State
 
