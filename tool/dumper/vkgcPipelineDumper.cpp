@@ -54,8 +54,10 @@ std::ostream &operator<<(std::ostream &out, VkVertexInputRate inputRate);
 std::ostream &operator<<(std::ostream &out, VkFormat format);
 std::ostream &operator<<(std::ostream &out, VkPrimitiveTopology topology);
 std::ostream &operator<<(std::ostream &out, VkPolygonMode polygonMode);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
 std::ostream &operator<<(std::ostream &out, VkCullModeFlagBits cullMode);
 std::ostream &operator<<(std::ostream &out, VkFrontFace frontFace);
+#endif
 std::ostream &operator<<(std::ostream &out, ResourceMappingNodeType type);
 std::ostream &operator<<(std::ostream &out, NggSubgroupSizingType subgroupSizing);
 std::ostream &operator<<(std::ostream &out, NggCompactMode compactMode);
@@ -727,8 +729,10 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
   dumpFile << "polygonMode = " << pipelineInfo->rsState.polygonMode << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   dumpFile << "cullMode = " << static_cast<VkCullModeFlagBits>(pipelineInfo->rsState.cullMode) << "\n";
   dumpFile << "frontFace = " << pipelineInfo->rsState.frontFace << "\n";
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
   dumpFile << "depthBiasEnable = " << pipelineInfo->rsState.depthBiasEnable << "\n";
 #endif
@@ -753,7 +757,9 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
 #else
   dumpFile << "nggState.forceCullingMode = " << pipelineInfo->nggState.forceCullingMode << "\n";
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   dumpFile << "nggState.alwaysUsePrimShaderTable = " << pipelineInfo->nggState.alwaysUsePrimShaderTable << "\n";
+#endif
   dumpFile << "nggState.compactMode = " << pipelineInfo->nggState.compactMode << "\n";
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
   dumpFile << "nggState.enableFastLaunch = " << pipelineInfo->nggState.enableFastLaunch << "\n";
@@ -996,8 +1002,10 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
     hasher->Update(rsState->polygonMode);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     hasher->Update(rsState->cullMode);
     hasher->Update(rsState->frontFace);
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
     hasher->Update(rsState->depthBiasEnable);
 #endif
@@ -1012,7 +1020,9 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 #else
       hasher->Update(nggState->forceCullingMode);
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
       hasher->Update(nggState->alwaysUsePrimShaderTable);
+#endif
       hasher->Update(nggState->compactMode);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
       hasher->Update(nggState->enableFastLaunch);
@@ -1773,6 +1783,7 @@ std::ostream &operator<<(std::ostream &out, VkPolygonMode polygonMode) {
   return out << string;
 }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
 // =====================================================================================================================
 // Translates enum "VkCullModeFlagBits" to string and output to ostream.
 //
@@ -1814,6 +1825,7 @@ std::ostream &operator<<(std::ostream &out, VkFrontFace frontFace) {
 
   return out << string;
 }
+#endif
 
 // =====================================================================================================================
 // Translates enum "VkFormat" to string and output to ostream.

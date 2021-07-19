@@ -3813,11 +3813,7 @@ Value *NggPrimShader::doBackfaceCulling(Module *module, Value *cullFlag, Value *
     backfaceCuller = createBackfaceCuller(module);
 
   // Get register PA_SU_SC_MODE_CNTL
-  Value *paSuScModeCntl = nullptr;
-  if (m_nggControl->alwaysUsePrimShaderTable)
-    paSuScModeCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paSuScModeCntl);
-  else
-    paSuScModeCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paSuScModeCntl);
+  Value *paSuScModeCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paSuScModeCntl);
 
   // Get register PA_CL_VPORT_XSCALE
   auto paClVportXscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportXscale);
@@ -3848,11 +3844,7 @@ Value *NggPrimShader::doFrustumCulling(Module *module, Value *cullFlag, Value *v
     frustumCuller = createFrustumCuller(module);
 
   // Get register PA_CL_CLIP_CNTL
-  Value *paClClipCntl = nullptr;
-  if (m_nggControl->alwaysUsePrimShaderTable)
-    paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
-  else
-    paClClipCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClClipCntl);
+  Value *paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
 
   // Get register PA_CL_GB_HORZ_DISC_ADJ
   auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbHorzDiscAdj);
@@ -3885,11 +3877,7 @@ Value *NggPrimShader::doBoxFilterCulling(Module *module, Value *cullFlag, Value 
   Value *paClVteCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClVteCntl);
 
   // Get register PA_CL_CLIP_CNTL
-  Value *paClClipCntl = nullptr;
-  if (m_nggControl->alwaysUsePrimShaderTable)
-    paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
-  else
-    paClClipCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClClipCntl);
+  Value *paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
 
   // Get register PA_CL_GB_HORZ_DISC_ADJ
   auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbHorzDiscAdj);
@@ -3921,11 +3909,7 @@ Value *NggPrimShader::doSphereCulling(Module *module, Value *cullFlag, Value *ve
   Value *paClVteCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClVteCntl);
 
   // Get register PA_CL_CLIP_CNTL
-  Value *paClClipCntl = nullptr;
-  if (m_nggControl->alwaysUsePrimShaderTable)
-    paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
-  else
-    paClClipCntl = m_builder->getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClClipCntl);
+  Value *paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
 
   // Get register PA_CL_GB_HORZ_DISC_ADJ
   auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbHorzDiscAdj);

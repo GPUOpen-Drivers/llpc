@@ -53,19 +53,17 @@ class LgcContext;
 // Bit values of NGG flags. This is done as bit values rather than bitfields so the flags word appears
 // in a platform-independent way in IR metdata.
 enum NggFlag : unsigned {
-  NggFlagDisable = 0x0001,                      // Disable NGG
-  NggFlagEnableGsUse = 0x0002,                  // Enable NGG when pipeline has GS
-  NggFlagForceCullingMode = 0x0004,             // Force NGG to run in culling mode
-  NggFlagDontAlwaysUsePrimShaderTable = 0x0008, // Don't always use primitive shader table to fetch culling-control
-                                                //   registers
-  NggFlagCompactDisable = 0x0010,               // Vertex compaction is disabled
-  NggFlagEnableVertexReuse = 0x0020,            // Enable optimization to cull duplicate vertices
-  NggFlagEnableBackfaceCulling = 0x0040,        // Enable culling of primitives that don't meet facing criteria
-  NggFlagEnableFrustumCulling = 0x0080,         // Enable discarding of primitives outside of view frustum
-  NggFlagEnableBoxFilterCulling = 0x0100,       // Enable simpler frustum culler that is less accurate
-  NggFlagEnableSphereCulling = 0x0200,          // Enable frustum culling based on a sphere
-  NggFlagEnableSmallPrimFilter = 0x0400,        // Enable trivial sub-sample primitive culling
-  NggFlagEnableCullDistanceCulling = 0x0800,    // Enable culling when "cull distance" exports are present
+  NggFlagDisable = 0x0001,                   // Disable NGG
+  NggFlagEnableGsUse = 0x0002,               // Enable NGG when pipeline has GS
+  NggFlagForceCullingMode = 0x0004,          // Force NGG to run in culling mode
+  NggFlagCompactDisable = 0x0008,            // Vertex compaction is disabled
+  NggFlagEnableVertexReuse = 0x0010,         // Enable optimization to cull duplicate vertices
+  NggFlagEnableBackfaceCulling = 0x0020,     // Enable culling of primitives that don't meet facing criteria
+  NggFlagEnableFrustumCulling = 0x0040,      // Enable discarding of primitives outside of view frustum
+  NggFlagEnableBoxFilterCulling = 0x0080,    // Enable simpler frustum culler that is less accurate
+  NggFlagEnableSphereCulling = 0x0100,       // Enable frustum culling based on a sphere
+  NggFlagEnableSmallPrimFilter = 0x0200,     // Enable trivial sub-sample primitive culling
+  NggFlagEnableCullDistanceCulling = 0x0400, // Enable culling when "cull distance" exports are present
 };
 
 // Enumerates various sizing options of sub-group size for NGG primitive shader.
@@ -366,14 +364,6 @@ enum PolygonMode : unsigned {
   PolygonModePoint = 2,
 };
 
-// Fragment cull mode flags. These happen to have the same values as the corresponding Vulkan enum.
-enum CullModeFlags : unsigned {
-  CullModeNone = 0,
-  CullModeFront = 1,
-  CullModeBack = 2,
-  CullModeFrontAndBack = 3,
-};
-
 // Shading rate flags. These happen to have the same values as the corresponding SPIR-V enum.
 enum ShadingRateFlags : unsigned {
   ShadingRateNone = 0,
@@ -396,8 +386,6 @@ struct RasterizerState {
                                     //  with this pipeline.
   unsigned usrClipPlaneMask;        // Mask to indicate the enabled user defined clip planes
   PolygonMode polygonMode;          // Polygon mode
-  CullModeFlags cullMode;           // Fragment culling mode
-  unsigned frontFaceClockwise;      // Front-facing triangle orientation: false=counter, true=clockwise
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
   unsigned depthBiasEnable;         // Whether to bias fragment depth values
 #endif
