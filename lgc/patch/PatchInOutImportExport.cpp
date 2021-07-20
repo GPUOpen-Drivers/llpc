@@ -2267,7 +2267,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
                      ConstantInt::get(Type::getInt32Ty(*m_context), 4)};
     auto sampleId = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, {}, insertPos);
 
-    auto sampleMaskIn = sampleCoverage;
+    Value *sampleMaskIn = sampleCoverage;
     if (m_pipelineState->getRasterizerState().perSampleShading) {
       // gl_SampleMaskIn[0] = (SampleCoverage & (1 << gl_SampleID))
       sampleMaskIn =
@@ -2420,7 +2420,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 
     // Emulation for "in float gl_ClipDistance[]" or "in float gl_CullDistance[]"
     auto primMask = getFunctionArgument(m_entryPoint, entryArgIdxs.primMask);
-    auto ij = getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center);
+    Value *ij = getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center);
 
     ij = new BitCastInst(ij, FixedVectorType::get(Type::getFloatTy(*m_context), 2), "", insertPos);
     auto coordI = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
@@ -3672,7 +3672,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
   assert(xfbBuffer < MaxTransformFeedbackBuffers);
   assert(streamOffsets[xfbBuffer] != 0);
 
-  auto streamOffset = getFunctionArgument(m_entryPoint, streamOffsets[xfbBuffer]);
+  Value *streamOffset = getFunctionArgument(m_entryPoint, streamOffsets[xfbBuffer]);
 
   streamOffset =
       BinaryOperator::CreateMul(streamOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
@@ -3684,7 +3684,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
   Value *vertexCount = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), ubfeArgs, {}, &*insertPos);
 
   // Setup write index for stream-out
-  auto writeIndexVal = getFunctionArgument(m_entryPoint, writeIndex);
+  Value *writeIndexVal = getFunctionArgument(m_entryPoint, writeIndex);
 
   if (m_gfxIp.major >= 9)
     writeIndexVal = BinaryOperator::CreateAdd(writeIndexVal, m_threadId, "", insertPos);
@@ -4397,7 +4397,7 @@ void PatchInOutImportExport::storeTessFactorToBuffer(ArrayRef<Value *> tessFacto
   const auto &calcFactor = inOutUsage.calcFactor;
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl)->entryArgIdxs.tcs;
-  auto tfBufferBase = getFunctionArgument(m_entryPoint, entryArgIdxs.tfBufferBase);
+  Value *tfBufferBase = getFunctionArgument(m_entryPoint, entryArgIdxs.tfBufferBase);
 
   auto tessFactorStride = ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.tessFactorStride);
 

@@ -38,6 +38,7 @@
 
 namespace llvm {
 
+class Argument;
 class BasicBlock;
 class CallInst;
 class Function;
@@ -83,7 +84,7 @@ void getTypeName(llvm::Type *ty, llvm::raw_ostream &nameStream);
 std::string getTypeName(llvm::Type *ty);
 
 // Gets the argument from the specified function according to the argument index.
-llvm::Value *getFunctionArgument(llvm::Function *func, unsigned idx, const llvm::Twine &name = "");
+llvm::Argument *getFunctionArgument(llvm::Function *func, unsigned idx, const llvm::Twine &name = "");
 
 // Checks if one type can be bitcasted to the other (type1 -> type2).
 bool canBitCast(const llvm::Type *ty1, const llvm::Type *ty2);
