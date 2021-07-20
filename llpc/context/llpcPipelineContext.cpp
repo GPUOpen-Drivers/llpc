@@ -89,6 +89,9 @@ static cl::opt<bool> EnableSiScheduler("enable-si-scheduler", cl::desc("Enable t
 // for -disable-licm-threshold=1 which remains for backwards compatibility)
 static cl::opt<bool> DisableLicm("disable-licm", cl::desc("Disable LLVM LICM pass"), cl::init(false));
 
+// -disable-fetch-shader: disable the fetch shader when doing unlinked shaders.
+static cl::opt<bool> DisableFetchShader("disable-fetch-shader", cl::desc("Disable fetch shaders"), cl::init(false));
+
 // -disable-color-export-shader: disable the color export shader when doing unlinked shaders.
 static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl::desc("Disable color export shaders"),
                                               cl::init(false));
@@ -238,7 +241,7 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const 
   }
 
   if (isGraphics()) {
-    if (!unlinked) {
+    if (!unlinked || DisableFetchShader) {
       // Set vertex input descriptions to the middle-end.
       setVertexInputDescriptions(pipeline);
     }
