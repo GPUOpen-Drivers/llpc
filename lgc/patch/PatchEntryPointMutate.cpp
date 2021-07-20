@@ -889,6 +889,16 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
     spiPsInputAddr.bits.sampleCoverageEna = builtInUsage.sampleMaskIn;
 
     builder.addAttribute("InitialPSInputAddr", std::to_string(spiPsInputAddr.u32All));
+
+    bool hasDepthExport = builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth;
+    builder.addAttribute("amdgpu-depth-export", hasDepthExport ? "1" : "0");
+
+    // mmSPI_SHADER_COL_FORMAT is used for fully compiled shaders
+    unsigned colFormat = m_pipelineState->getPalMetadata()->getRegister(mmSPI_SHADER_COL_FORMAT);
+    // getColorExportCount() is used for partially compiled shaders
+    unsigned colorExportCount = m_pipelineState->getPalMetadata()->getColorExportCount();
+    bool hasColorExport = (colFormat != EXP_FORMAT_ZERO) || (colorExportCount > (hasDepthExport ? 1 : 0));
+    builder.addAttribute("amdgpu-color-export", hasColorExport ? "1" : "0");
   }
 
   // Set VGPR, SGPR, and wave limits
