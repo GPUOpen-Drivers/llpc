@@ -153,7 +153,7 @@ private:
 
   bool runPasses(lgc::LegacyPassManager *passMgr, llvm::Module *module) const;
   bool runPasses(lgc::PassManager *passMgr, llvm::Module *module) const;
-  void linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context);
+  bool linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context);
   bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo,
                                           const GraphicsPipelineBuildInfo *pipelineInfo);
   bool canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo);

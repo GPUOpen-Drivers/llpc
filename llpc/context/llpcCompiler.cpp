@@ -963,7 +963,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       bool hasError = false;
       context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
 
-      linkRelocatableShaderElf(elf, pipelineElf, context);
+      hasError |= !linkRelocatableShaderElf(elf, pipelineElf, context);
       context->setDiagnosticHandler(nullptr);
 
       if (hasError)
@@ -1505,10 +1505,12 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                                MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
   Context *context = acquireContext();
   context->attachPipelineContext(graphicsContext);
-  Result result = Result::Success;
+  Result result = Result::ErrorUnavailable;
   if (buildingRelocatableElf) {
     result = buildPipelineWithRelocatableElf(context, shaderInfo, pipelineElf, stageCacheAccesses);
-  } else {
+  }
+
+  if (result != Result::Success) {
     result = buildPipelineInternal(context, shaderInfo, /*unlinked=*/false, pipelineElf);
   }
   releaseContext(context);
@@ -1640,12 +1642,14 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
   std::vector<const PipelineShaderInfo *> shadersInfo = {
       nullptr, nullptr, nullptr, nullptr, nullptr, &pipelineInfo->cs,
   };
-  Result result;
+  Result result = Result::ErrorUnavailable;
   if (buildingRelocatableElf) {
     CacheAccessInfo stageCacheAccesses[ShaderStageCount] = {};
     result = buildPipelineWithRelocatableElf(context, shadersInfo, pipelineElf, stageCacheAccesses);
     *stageCacheAccess = stageCacheAccesses[ShaderStageCompute];
-  } else {
+  }
+
+  if (result != Result::Success) {
     result = buildPipelineInternal(context, shadersInfo, /*unlinked=*/false, pipelineElf);
   }
   releaseContext(context);
@@ -2030,13 +2034,13 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
 }
 
 // =====================================================================================================================
-// Link relocatable shader elf file into a pipeline elf file and apply relocations.
+// Link relocatable shader elf file into a pipeline elf file and apply relocations.  Returns true if successful.
 //
 // @param shaderElfs : An array of pipeline elf packages, indexed by stage, containing relocatable elf.
 //                     TODO: This has an implicit length of ShaderStageNativeStageCount. Use ArrayRef instead.
 // @param [out] pipelineElf : Elf package containing the pipeline elf
 // @param context : Acquired context
-void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context) {
+bool Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context) {
   assert(!context->getPipelineContext()->isUnlinked() && "Not supposed to link this pipeline.");
 
   // Set up middle-end objects, including setting up pipeline state.
@@ -2052,6 +2056,11 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
   }
   std::unique_ptr<ElfLinker> elfLinker(pipeline->createElfLinker(elfs));
 
+  if (elfLinker->fragmentShaderUsesMappedBuiltInInputs()) {
+    LLPC_OUTS("Failed to link relocatable shaders because FS uses builtin inputs.");
+    return false;
+  }
+
   setGlueBinaryBlobsInLinker(elfLinker.get(), context, this);
   // Do the link.
   raw_svector_ostream outStream(*pipelineElf);
@@ -2060,7 +2069,7 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
     // TODO: Action this failure by doing a full pipeline compile.
     report_fatal_error("Link failed; need full pipeline compile instead: " + pipeline->getLastError());
   }
-  return;
+  return true;
 }
 
 // =====================================================================================================================

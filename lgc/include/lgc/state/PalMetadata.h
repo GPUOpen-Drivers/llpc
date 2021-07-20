@@ -192,6 +192,9 @@ public:
   // Erase the PAL metadata for FS input mappings. Used when finalizing the PAL metadata in the link.
   void eraseFragmentInputInfo();
 
+  // Returns true if the fragment input info has an entry for a builtin.
+  bool fragmentShaderUsesMappedBuiltInInputs();
+
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
   void initialize();
