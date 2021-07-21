@@ -121,8 +121,10 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->rsState.samplePatternIdx = graphicState.samplePatternIdx;
     gfxPipelineInfo->rsState.usrClipPlaneMask = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
     gfxPipelineInfo->rsState.polygonMode = graphicState.polygonMode;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     gfxPipelineInfo->rsState.cullMode = graphicState.cullMode;
     gfxPipelineInfo->rsState.frontFace = graphicState.frontFace;
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
     gfxPipelineInfo->rsState.depthBiasEnable = graphicState.depthBiasEnable != 0;
 #endif

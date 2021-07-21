@@ -301,7 +301,6 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 #else
                          (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
 #endif
-                         (nggState.alwaysUsePrimShaderTable ? 0 : NggFlagDontAlwaysUsePrimShaderTable) |
                          (nggState.compactMode == NggCompactDisable ? NggFlagCompactDisable : 0) |
                          (nggState.enableVertexReuse ? NggFlagEnableVertexReuse : 0) |
                          (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
@@ -668,10 +667,7 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
   rasterizerState.numSamples = inputRsState.numSamples;
   rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
   rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
-  // PolygonMode and CullModeFlags happen to have the same values as their Vulkan equivalents.
   rasterizerState.polygonMode = static_cast<PolygonMode>(inputRsState.polygonMode);
-  rasterizerState.cullMode = static_cast<CullModeFlags>(inputRsState.cullMode);
-  rasterizerState.frontFaceClockwise = inputRsState.frontFace != VK_FRONT_FACE_COUNTER_CLOCKWISE;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
   rasterizerState.depthBiasEnable = inputRsState.depthBiasEnable;
 #endif

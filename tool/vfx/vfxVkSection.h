@@ -380,7 +380,9 @@ public:
 #else
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, forceCullingMode, MemberTypeBool, false);
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, alwaysUsePrimShaderTable, MemberTypeBool, false);
+#endif
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, compactMode, MemberTypeEnum, false);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableFastLaunch, MemberTypeBool, false);
@@ -424,8 +426,10 @@ public:
     StrToMemberAddr *tableItem = m_addrTable;
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, topology, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, polygonMode, MemberTypeEnum, false);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, cullMode, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, frontFace, MemberTypeEnum, false);
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, depthBiasEnable, MemberTypeInt, false);
 #endif

@@ -69,7 +69,6 @@ private:
   void setNggControl(llvm::Module *module);
   bool canUseNgg(llvm::Module *module);
   bool canUseNggCulling(llvm::Module *module);
-  void buildNggCullingControlRegister(NggControl &nggControl);
 
   void processShader();
   void processMissingFs();
