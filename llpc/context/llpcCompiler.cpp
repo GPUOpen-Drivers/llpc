@@ -1225,6 +1225,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
                       "===============================================================================\n"
                       "// LLPC SPIRV-to-LLVM translation results\n"));
         }
+
         // Stop timer for translate.
         timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
 
