@@ -93,7 +93,7 @@ public:
     if (!isInCache())
       return false;
     if (m_cacheResult == Result::Success) {
-      return true;
+      return m_internalCacheHit;
     }
     return getApplicationShaderCache() == m_shaderCache;
   }
@@ -157,6 +157,9 @@ private:
 
   // The result of checking the ICache.
   Result m_cacheResult = Result::ErrorUnknown;
+
+  // Whether the cache hit came from the internal cache.
+  bool m_internalCacheHit = false;
 
   // The handle to the entry in the cache.
   Vkgc::EntryHandle m_cacheEntry;
