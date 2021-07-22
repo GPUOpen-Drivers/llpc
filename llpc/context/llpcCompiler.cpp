@@ -41,13 +41,16 @@
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerResourceCollect.h"
+#include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
 #include "llpcTimerProfiler.h"
+#include "llpcUtil.h"
 #include "spirvExt.h"
 #include "vkgcElfReader.h"
 #include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
 #include "lgc/ElfLinker.h"
+#include "lgc/EnumIterator.h"
 #include "lgc/PassManager.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
@@ -158,6 +161,9 @@ opt<int> ContextReuseLimit("context-reuse-limit",
 
 // -fatal-llvm-errors: Make all LLVM errors fatal
 opt<bool> FatalLlvmErrors("fatal-llvm-errors", cl::desc("Make all LLVM errors fatal"), init(false));
+
+// -new-pass-manager: Use LLVM's new pass manager (experimental)
+opt<bool> NewPassManager("new-pass-manager", cl::desc("Use LLVM's new pass manager (experimental)"), init(false));
 
 extern opt<bool> EnableOuts;
 
@@ -876,7 +882,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   bool isUnlinkedPipeline = context->getPipelineContext()->isUnlinked();
   context->getPipelineContext()->setUnlinked(true);
 
-  ElfPackage elf[UnlinkedStageCount];
+  ElfPackage elf[enumCount<UnlinkedShaderStage>()];
   assert(stageCacheAccesses.size() >= shaderInfo.size());
 
   const MetroHash::Hash originalCacheHash = context->getPipelineContext()->getCacheHashCodeWithoutCompact();
@@ -884,8 +890,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   LLPC_OUTS("LLPC version: " << VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION) << "\n");
   LLPC_OUTS("Hash for pipeline cache lookup: " << formatBytesLittleEndian<uint8_t>(originalCacheHash.bytes) << "\n");
 
-  for (UnlinkedShaderStage stage = static_cast<UnlinkedShaderStage>(0);
-       stage < UnlinkedStageCount && result == Result::Success; ++stage) {
+  for (UnlinkedShaderStage stage : lgc::enumRange<UnlinkedShaderStage>()) {
     if (!hasDataForUnlinkedShaderType(stage, shaderInfo))
       continue;
 
@@ -915,17 +920,17 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       auto data = reinterpret_cast<const char *>(elfBin.pCode);
       elf[stage].assign(data, data + elfBin.codeSize);
       LLPC_OUTS("Cache hit for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-      for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1)) {
-        if (shaderStageMask & shaderStageToMask(stage))
-          stageCacheAccesses[stage] =
+      for (ShaderStage gfxStage : gfxShaderStages()) {
+        if (shaderStageMask & shaderStageToMask(gfxStage))
+          stageCacheAccesses[gfxStage] =
               cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
       }
       continue;
     }
     LLPC_OUTS("Cache miss for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-    for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1)) {
-      if (shaderStageMask & shaderStageToMask(stage))
-        stageCacheAccesses[stage] = CacheAccessInfo::CacheMiss;
+    for (ShaderStage gfxStage : gfxShaderStages()) {
+      if (shaderStageMask & shaderStageToMask(gfxStage))
+        stageCacheAccesses[gfxStage] = CacheAccessInfo::CacheMiss;
     }
 
     // There was a cache miss, so we need to build the relocatable shader for
@@ -933,19 +938,20 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     const PipelineShaderInfo *singleStageShaderInfo[ShaderStageNativeStageCount] = {nullptr, nullptr, nullptr,
                                                                                     nullptr, nullptr, nullptr};
 
-    for (unsigned stage = ShaderStageVertex; stage != ShaderStageNativeStageCount; ++stage) {
-      if (shaderStageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
-        singleStageShaderInfo[stage] = shaderInfo[stage];
+    for (ShaderStage nativeStage : nativeShaderStages()) {
+      if (shaderStageMask & shaderStageToMask(nativeStage))
+        singleStageShaderInfo[nativeStage] = shaderInfo[nativeStage];
     }
 
-    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &elf[stage]);
+    Vkgc::ElfPackage &stageElf = elf[stage];
+    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &stageElf);
+    if (result != Result::Success)
+      break;
 
     // Add the result to the cache.
-    if (result == Result::Success) {
-      BinaryData elfBin = {elf[stage].size(), elf[stage].data()};
-      cacheAccessor.setElfInCache(elfBin);
-      LLPC_OUTS("Updating the cache for unlinked shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-    }
+    BinaryData elfBin = {stageElf.size(), stageElf.data()};
+    cacheAccessor.setElfInCache(elfBin);
+    LLPC_OUTS("Updating the cache for unlinked shader stage " << getUnlinkedShaderStageName(stage) << "\n");
   }
   context->getPipelineContext()->setHashForCacheLookUp(originalCacheHash);
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
@@ -964,10 +970,11 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
         result = Result::ErrorInvalidShader;
     } else {
       // Return the first relocatable shader, since we can only return one anyway.
-      for (unsigned stage = 0; stage < UnlinkedStageCount; ++stage) {
-        if (elf[stage].empty())
+      for (auto unlinkedStage : enumRange<UnlinkedShaderStage>()) {
+        auto &unlinkedStageElf = elf[unlinkedStage];
+        if (unlinkedStageElf.empty())
           continue;
-        *pipelineElf = elf[stage];
+        *pipelineElf = unlinkedStageElf;
         break;
       }
     }
@@ -1005,28 +1012,6 @@ static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *no
   return false;
 }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-// =====================================================================================================================
-// Returns true if any user data nodes inside the given shader infos contain an entry with a descriptor type that is
-// unsupported by relocatable shader compilation.
-//
-// @param [in] shaderInfos: Array of shader infos (not necessarily indexed by shader stage)
-static bool hasUnrelocatableDescriptorNode(const ArrayRef<const PipelineShaderInfo *> &shaderInfos) {
-  for (auto shaderInfo : shaderInfos) {
-    if (!shaderInfo || !shaderInfo->pModuleData)
-      continue;
-    for (unsigned i = 0; i < shaderInfo->userDataNodeCount; ++i) {
-      const ResourceMappingNode *node = shaderInfo->pUserDataNodes + i;
-      if (isUnrelocatableResourceMappingRootNode(node))
-        return true;
-    }
-    if (shaderInfo->descriptorRangeValueCount != 0) {
-      return true;
-    }
-  }
-  return false;
-}
-#else
 // =====================================================================================================================
 // Returns true if resourceMapping contains a user data node entry with a descriptor type that is unsupported by
 // relocatable shader compilation.
@@ -1055,7 +1040,6 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMa
 
   return false;
 }
-#endif
 
 // =====================================================================================================================
 // Returns true if a graphics pipeline can be built out of the given shader infos.
@@ -1077,13 +1061,8 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
   }
 
   // Check user data nodes for unsupported Descriptor types.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-  if (hasUnrelocatableDescriptorNode(shaderInfos))
-    return false;
-#else
   if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
     return false;
-#endif
 
   if (shaderInfos[0]) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfos[0]->pModuleData);
@@ -1113,12 +1092,7 @@ bool Compiler::canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo 
   }
 
   // Check UserDataNode for unsupported Descriptor types.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-  ArrayRef<const PipelineShaderInfo *> shaderInfos(&shaderInfo, 1);
-  if (hasUnrelocatableDescriptorNode(shaderInfos))
-#else
   if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
-#endif
     return false;
 
   if (cl::RelocatableShaderElfLimit != -1) {
@@ -1233,31 +1207,57 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || (stageSkipMask & shaderStageToMask(entryStage)))
         continue;
 
-      std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
-      lowerPassMgr->setPassIndex(&passIndex);
-
       // Set the shader stage in the Builder.
       context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
 
-      // Start timer for translate.
-      timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
+      if (cl::NewPassManager) {
+        std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
+        lowerPassMgr->setPassIndex(&passIndex);
 
-      // SPIR-V translation, then dump the result.
-      lowerPassMgr->add(createSpirvLowerTranslator(entryStage, shaderInfoEntry));
-      if (EnableOuts()) {
-        lowerPassMgr->add(createPrintModulePass(
-            outs(), "\n"
-                    "===============================================================================\n"
-                    "// LLPC SPIRV-to-LLVM translation results\n"));
-      }
-      // Stop timer for translate.
-      timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, false);
+        // Start timer for translate.
+        timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 
-      // Run the passes.
-      bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
-      if (!success) {
-        LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-        result = Result::ErrorInvalidShader;
+        // SPIR-V translation, then dump the result.
+        lowerPassMgr->addPass(SpirvLowerTranslator(entryStage, shaderInfoEntry));
+        if (EnableOuts()) {
+          lowerPassMgr->addPass(PrintModulePass(
+              outs(), "\n"
+                      "===============================================================================\n"
+                      "// LLPC SPIRV-to-LLVM translation results\n"));
+        }
+
+        // Stop timer for translate.
+        timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
+
+        bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+        if (!success) {
+          LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
+          result = Result::ErrorInvalidShader;
+        }
+      } else {
+        std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
+        lowerPassMgr->setPassIndex(&passIndex);
+
+        // Start timer for translate.
+        timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
+
+        // SPIR-V translation, then dump the result.
+        lowerPassMgr->add(createSpirvLowerTranslator(entryStage, shaderInfoEntry));
+        if (EnableOuts()) {
+          lowerPassMgr->add(createPrintModulePass(
+              outs(), "\n"
+                      "===============================================================================\n"
+                      "// LLPC SPIRV-to-LLVM translation results\n"));
+        }
+        // Stop timer for translate.
+        timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, false);
+
+        // Run the passes.
+        bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+        if (!success) {
+          LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
+          result = Result::ErrorInvalidShader;
+        }
       }
     }
     SmallVector<Module *, 5> modulesToLink;
@@ -1536,8 +1536,11 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   const bool buildingRelocatableElf =
       relocatableElfRequested && canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo);
 
-  for (unsigned i = 0; i < ShaderStageGfxCount && result == Result::Success; ++i)
-    result = validatePipelineShaderInfo(shaderInfo[i]);
+  for (ShaderStage stage : gfxShaderStages()) {
+    result = validatePipelineShaderInfo(shaderInfo[stage]);
+    if (result != Result::Success)
+      break;
+  }
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
@@ -1548,11 +1551,11 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC calculated hash results (graphics pipeline)\n\n");
     LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::compact64(&pipelineHash)) << "\n");
-    for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
-      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo[stage]->pModuleData);
+    for (ShaderStage stage : gfxShaderStages()) {
+      auto moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo[stage]->pModuleData);
       if (moduleData) {
         auto hash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
-        LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(static_cast<ShaderStage>(stage), true))
+        LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(stage, true))
                   << format("0x%016" PRIX64, MetroHash::compact64(hash)) << "\n");
       }
     }
@@ -1907,11 +1910,33 @@ Context *Compiler::acquireContext() const {
 }
 
 // =====================================================================================================================
-// Run a pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
+// Run legacy pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
 //
 // @param passMgr : Pass manager
 // @param [in/out] module : Module
 bool Compiler::runPasses(lgc::LegacyPassManager *passMgr, Module *module) const {
+  bool success = false;
+#if LLPC_ENABLE_EXCEPTION
+  try
+#endif
+  {
+    passMgr->run(*module);
+    success = true;
+  }
+#if LLPC_ENABLE_EXCEPTION
+  catch (const char *) {
+    success = false;
+  }
+#endif
+  return success;
+}
+
+// =====================================================================================================================
+// Run pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
+//
+// @param passMgr : Pass manager
+// @param [in/out] module : Module
+bool Compiler::runPasses(lgc::PassManager *passMgr, Module *module) const {
   bool success = false;
 #if LLPC_ENABLE_EXCEPTION
   try
@@ -1954,7 +1979,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
   auto pipelineOptions = context->getPipelineContext()->getPipelineOptions();
 
   // Build hash per shader stage
-  for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1)) {
+  for (ShaderStage stage : gfxShaderStages()) {
     if ((stageMask & shaderStageToMask(stage)) == 0)
       continue;
 
@@ -1965,9 +1990,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher, false);
     hasher.Update(pipelineInfo->iaState.deviceIndex);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
     PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), &hasher, false);
-#endif
 
     // Update input/output usage (provided by middle-end caller of this callback).
     hasher.Update(stageHashes[stage].data(), stageHashes[stage].size());
@@ -1979,7 +2002,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
 
-    // Add per stage hash code to fragmentHasher or nonFragmentHaser per shader stage
+    // Add per stage hash code to fragmentHasher or nonFragmentHasher per shader stage
     auto shaderHashCode = MetroHash::compact64(&hash);
     if (stage == ShaderStageFragment)
       fragmentHasher.Update(shaderHashCode);
@@ -2025,7 +2048,7 @@ void Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
 
   // Create linker, passing ELFs to it.
   SmallVector<MemoryBufferRef, 3> elfs;
-  for (UnlinkedShaderStage stage = static_cast<UnlinkedShaderStage>(0); stage != UnlinkedStageCount; ++stage) {
+  for (auto stage : enumRange<UnlinkedShaderStage>()) {
     if (!shaderElfs[stage].empty())
       elfs.push_back(MemoryBufferRef(shaderElfs[stage].str(), getUnlinkedShaderStageName(stage)));
   }

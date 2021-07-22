@@ -125,6 +125,17 @@ void TimerProfiler::addTimerStartStopPass(lgc::LegacyPassManager *passMgr, Timer
 }
 
 // =====================================================================================================================
+// Adds pass to start or stop timer in PassManager
+//
+// @param passMgr : Pass Manager
+// @param timerKind : Kind of phase timer
+// @param start : Start or  stop timer
+void TimerProfiler::addTimerStartStopPass(lgc::PassManager &passMgr, TimerKind timerKind, bool start) {
+  if (TimePassesIsEnabled || cl::EnableTimerProfile)
+    lgc::LgcContext::createAndAddStartStopTimer(passMgr, &m_phaseTimers[timerKind], start);
+}
+
+// =====================================================================================================================
 // Starts or stop specified timer.
 //
 // @param timerKind : Kind of phase timer

@@ -40,6 +40,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     Linker
     MC
     Object
+    Passes
     ScalarOpts
     SelectionDAG
     Support

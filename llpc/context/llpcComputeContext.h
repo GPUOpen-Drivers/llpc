@@ -70,10 +70,6 @@ private:
   ComputeContext(const ComputeContext &) = delete;
   ComputeContext &operator=(const ComputeContext &) = delete;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-  void mergeResourceMappingData();
-#endif
-
   const ComputePipelineBuildInfo *m_pipelineInfo; // Info to build a compute pipeline
 };
 

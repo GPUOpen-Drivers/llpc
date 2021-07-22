@@ -81,7 +81,6 @@ static unsigned getTypeDataSize(const SPIRVType *ty) {
   }
 }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
 // =====================================================================================================================
 // Find VaPtr userDataNode with specified set.
 //
@@ -104,29 +103,6 @@ static const ResourceMappingRootNode *findDescriptorTableVaPtr(const ResourceMap
 
   return descriptorTableVaPtr;
 }
-#else
-// =====================================================================================================================
-// Find VaPtr userDataNode with specified set.
-//
-// @param shaderInfo : Shader info, will have user data nodes added to it
-// @param set : Accroding this set to find ResourceMappingNode
-static const ResourceMappingNode *findDescriptorTableVaPtr(PipelineShaderInfo *shaderInfo, unsigned set) {
-  const ResourceMappingNode *descriptorTableVaPtr = nullptr;
-
-  for (unsigned k = 0; k < shaderInfo->userDataNodeCount; ++k) {
-    const ResourceMappingNode *userDataNode = &shaderInfo->pUserDataNodes[k];
-
-    if (userDataNode->type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr) {
-      if (userDataNode->tablePtr.pNext[0].srdRange.set == set) {
-        descriptorTableVaPtr = userDataNode;
-        break;
-      }
-    }
-  }
-
-  return descriptorTableVaPtr;
-}
-#endif
 
 // =====================================================================================================================
 // Find userDataNode with specified set and binding. And return Node index.
@@ -153,7 +129,6 @@ static const ResourceMappingNode *findResourceNode(const ResourceMappingNode *us
   return resourceNode;
 }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
 // =====================================================================================================================
 // Find userDataNode with specified set and binding. And return Node index.
 //
@@ -266,95 +241,6 @@ bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, u
 
   return hit;
 }
-#else
-// =====================================================================================================================
-// Compare if pAutoLayoutUserDataNodes is subset of pUserDataNodes.
-//
-// @param [in/out] shaderInfo : Shader info, will have user data nodes added to it
-// @param autoLayoutUserDataNodeCount : UserData Node count
-// @param autoLayoutUserDataNodes : ResourceMappingNode
-bool checkShaderInfoComptible(PipelineShaderInfo *shaderInfo, unsigned autoLayoutUserDataNodeCount,
-                              const ResourceMappingNode *autoLayoutUserDataNodes) {
-  bool hit = false;
-
-  if (autoLayoutUserDataNodeCount == 0)
-    hit = true;
-  else if (shaderInfo->pDescriptorRangeValues || shaderInfo->pSpecializationInfo->dataSize != 0)
-    hit = false;
-  else if (shaderInfo->userDataNodeCount >= autoLayoutUserDataNodeCount) {
-    for (unsigned n = 0; n < autoLayoutUserDataNodeCount; ++n) {
-      const ResourceMappingNode *autoLayoutUserDataNode = &autoLayoutUserDataNodes[n];
-
-      // Multiple levels
-      if (autoLayoutUserDataNode->type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr) {
-        unsigned set = autoLayoutUserDataNode->tablePtr.pNext[0].srdRange.set;
-        const ResourceMappingNode *userDataNode = findDescriptorTableVaPtr(shaderInfo, set);
-
-        if (userDataNode) {
-          bool hitNode = false;
-          for (unsigned i = 0; i < autoLayoutUserDataNode->tablePtr.nodeCount; ++i) {
-            const ResourceMappingNode *autoLayoutNext = &autoLayoutUserDataNode->tablePtr.pNext[i];
-
-            unsigned index = 0;
-            const ResourceMappingNode *node =
-                findResourceNode(userDataNode->tablePtr.pNext, userDataNode->tablePtr.nodeCount,
-                                 autoLayoutNext->srdRange.set, autoLayoutNext->srdRange.binding, &index);
-
-            if (node) {
-              if (autoLayoutNext->type == node->type && autoLayoutNext->sizeInDwords == node->sizeInDwords &&
-                  autoLayoutNext->sizeInDwords <= OffsetStrideInDwords &&
-                  autoLayoutNext->offsetInDwords == (index * OffsetStrideInDwords)) {
-                hitNode = true;
-                continue;
-              } else {
-                outs() << "AutoLayoutNode:"
-                       << "\n ->type                    : "
-                       << format("0x%016" PRIX64, static_cast<unsigned>(autoLayoutNext->type))
-                       << "\n ->sizeInDwords            : " << autoLayoutNext->sizeInDwords
-                       << "\n ->offsetInDwords          : " << autoLayoutNext->offsetInDwords;
-
-                outs() << "\nShaderInfoNode:"
-                       << "\n ->type                    : "
-                       << format("0x%016" PRIX64, static_cast<unsigned>(node->type))
-                       << "\n ->sizeInDwords            : " << node->sizeInDwords
-                       << "\n OffsetStrideInDwords      : " << OffsetStrideInDwords
-                       << "\n index*OffsetStrideInDwords: " << (index * OffsetStrideInDwords) << "\n";
-                hitNode = false;
-                break;
-              }
-            } else
-              break;
-          }
-          if (!hitNode) {
-            hit = false;
-            break;
-          } else
-            hit = true;
-        } else {
-          hit = false;
-          break;
-        }
-      }
-      // Single level
-      else {
-        unsigned index = 0;
-        const ResourceMappingNode *node =
-            findResourceNode(shaderInfo->pUserDataNodes, shaderInfo->userDataNodeCount,
-                             autoLayoutUserDataNode->srdRange.set, autoLayoutUserDataNode->srdRange.binding, &index);
-        if (node && autoLayoutUserDataNode->sizeInDwords == node->sizeInDwords) {
-          hit = true;
-          continue;
-        } else {
-          hit = false;
-          break;
-        }
-      }
-    }
-  }
-
-  return hit;
-}
-#endif
 
 // =====================================================================================================================
 // Compare if neccessary pipeline state is same.
@@ -803,7 +689,6 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
   }
 }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
 // =====================================================================================================================
 // Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running amdllpc on a single
 // SPIR-V or GLSL shader, rather than on a .pipe file.
@@ -885,78 +770,3 @@ void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &res
   assert(static_cast<unsigned>(subNodes - reinterpret_cast<const ResourceMappingNode *>(
                                               resourceMapping->pUserDataNodes + topLevelCount)) <= subLevelCount);
 }
-#else
-// =====================================================================================================================
-// Lay out dummy top-level descriptors and populate PipelineShaderInfo. This is used when running amdllpc on a single
-// SPIR-V or GLSL shader, rather than on a .pipe file.
-//
-// @param [in] shaderStage : Shader stage
-// @param [in] resNodeSets : User-data nodes to be pointed to by top level nodes
-// @param [in] pushConstSize : Push constant node size
-// @param [in/out] shaderInfo : Shader info, will have user data nodes added to it
-// @param [in/out] topLevelOffset : Offset in dwords applied to all root nodes (to avoid overlap between stages)
-void buildTopLevelMapping(ShaderStage shaderStage, const ResourceMappingNodeMap &resNodeSets,
-                          unsigned pushConstSize, PipelineShaderInfo *shaderInfo,
-                          unsigned &topLevelOffset) {
-  // Only auto-layout descriptors if -auto-layout-desc is on.
-  if (!AutoLayoutDesc)
-    return;
-
-  // Add up how much memory we need and allocate it.
-  unsigned topLevelCount = resNodeSets.size();
-  topLevelCount += 3; // Allow one for push consts, one for XFB and one for vertex buffer.
-  unsigned subLevelCount = 0;
-  for (const auto &resNodeSet : resNodeSets)
-    subLevelCount += resNodeSet.second.nodes.size();
-
-  auto rootNodes = new ResourceMappingNode[topLevelCount + subLevelCount];
-  auto subNodes = rootNodes + topLevelCount;
-  shaderInfo->pUserDataNodes = rootNodes;
-
-  // Add a node for each set.
-  for (const auto &resNodeSet : resNodeSets) {
-    rootNodes->type = ResourceMappingNodeType::DescriptorTableVaPtr;
-    rootNodes->sizeInDwords = 1;
-    rootNodes->offsetInDwords = topLevelOffset;
-    topLevelOffset += rootNodes->sizeInDwords;
-    rootNodes->tablePtr.nodeCount = resNodeSet.second.nodes.size();
-    rootNodes->tablePtr.pNext = subNodes;
-    for (auto &resNode : resNodeSet.second.nodes)
-      *subNodes++ = resNode;
-    ++rootNodes;
-  }
-
-  if (shaderStage == ShaderStageVertex) {
-    // Add a node for vertex buffer.
-    rootNodes->type = ResourceMappingNodeType::IndirectUserDataVaPtr;
-    rootNodes->sizeInDwords = 1;
-    rootNodes->offsetInDwords = topLevelOffset;
-    topLevelOffset += rootNodes->sizeInDwords;
-    rootNodes->userDataPtr.sizeInDwords = 256;
-    ++rootNodes;
-  }
-
-  if (shaderStage == ShaderStageVertex || shaderStage == ShaderStageTessEval || shaderStage == ShaderStageGeometry) {
-    // Add a node for XFB.
-    rootNodes->type = ResourceMappingNodeType::StreamOutTableVaPtr;
-    rootNodes->sizeInDwords = 1;
-    rootNodes->offsetInDwords = topLevelOffset;
-    topLevelOffset += rootNodes->sizeInDwords;
-    ++rootNodes;
-  }
-
-  if (pushConstSize > 0) {
-    // Add push const node
-    rootNodes->type = ResourceMappingNodeType::PushConst;
-    rootNodes->sizeInDwords = pushConstSize;
-    rootNodes->offsetInDwords = topLevelOffset;
-    topLevelOffset += rootNodes->sizeInDwords;
-    ++rootNodes;
-  }
-
-  shaderInfo->userDataNodeCount = rootNodes - shaderInfo->pUserDataNodes;
-
-  assert(shaderInfo->userDataNodeCount <= topLevelCount);
-  assert(static_cast<unsigned>(subNodes - (shaderInfo->pUserDataNodes + topLevelCount)) <= subLevelCount);
-}
-#endif

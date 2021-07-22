@@ -31,8 +31,12 @@
 #include "lgc/PassManager.h"
 #include "lgc/util/Debug.h"
 #include "llvm/Analysis/CFGPrinter.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Scalar/JumpThreading.h"
 
 namespace llvm {
 namespace cl {
@@ -63,10 +67,10 @@ namespace {
 // =====================================================================================================================
 // LLPC's legacy::PassManager override.
 // This is the implementation subclass of the PassManager class declared in PassManager.h
-class PassManagerImpl final : public lgc::LegacyPassManager {
+class LegacyPassManagerImpl final : public lgc::LegacyPassManager {
 public:
-  PassManagerImpl();
-  ~PassManagerImpl() override {}
+  LegacyPassManagerImpl();
+  ~LegacyPassManagerImpl() override {}
 
   void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
   void add(Pass *pass) override;
@@ -78,6 +82,26 @@ private:
   AnalysisID m_printModule = nullptr;   // Pass id of dump pass "Print Module IR"
   AnalysisID m_jumpThreading = nullptr; // Pass id of opt pass "Jump Threading"
   unsigned *m_passIndex = nullptr;      // Pass Index
+};
+
+// =====================================================================================================================
+// LLPC's PassManager override.
+// This is the implementation subclass of the PassManager class declared in PassManager.h
+class PassManagerImpl final : public lgc::PassManager {
+public:
+  PassManagerImpl();
+  void run(Module &module) override;
+  void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
+
+private:
+  void registerCallbacks();
+
+  // -----------------------------------------------------------------------------------------------------------------
+
+  ModuleAnalysisManager analysisManager;       // Analysis manager used when running the passes.
+  PassInstrumentationCallbacks instrCallbacks; // Instrumentation callbacks ran when running the passes.
+  VerifyInstrumentation instrVerify;           // Verify instrumentation, run module verifier after each pass.
+  unsigned *m_passIndex = nullptr;             // Pass Index
 };
 
 } // namespace
@@ -108,13 +132,19 @@ static AnalysisID getPassIdFromName(StringRef passName) {
 }
 
 // =====================================================================================================================
-// Create a PassManagerImpl
+// Create a LegacyPassManagerImpl
 lgc::LegacyPassManager *lgc::LegacyPassManager::Create() {
+  return new LegacyPassManagerImpl;
+}
+
+// =====================================================================================================================
+// Create a PassManagerImpl
+lgc::PassManager *lgc::PassManager::Create() {
   return new PassManagerImpl;
 }
 
 // =====================================================================================================================
-PassManagerImpl::PassManagerImpl() : LegacyPassManager() {
+LegacyPassManagerImpl::LegacyPassManagerImpl() : LegacyPassManager() {
   if (!cl::DumpCfgAfter.empty())
     m_dumpCfgAfter = getPassIdFromName(cl::DumpCfgAfter);
 
@@ -123,10 +153,71 @@ PassManagerImpl::PassManagerImpl() : LegacyPassManager() {
 }
 
 // =====================================================================================================================
+PassManagerImpl::PassManagerImpl() : PassManager(), instrVerify(getLgcOuts()) {
+  if (!cl::DumpCfgAfter.empty()) {
+    // TODO: We need to support m_dumpCfgAfter in a way that is similar to what
+    // is done in the add() function of the legacy pass manager. We can use the
+    // getPassNameForClassName function of PassInstrumentationCallbacks to get
+    // a pass ID from its name but we need to provide a mechanism to register
+    // custom passes there too.
+    report_fatal_error("-dump-cfg-after cannot be used with the new pass manager yet.");
+  }
+  // Setup custom instrumentation callbacks and register LLVM's default module
+  // analyses to the analysis manager.
+  registerCallbacks();
+  if (cl::VerifyIr)
+    instrVerify.registerCallbacks(instrCallbacks);
+  PassBuilder passBuilder(nullptr, PipelineTuningOptions(), None, &instrCallbacks);
+  passBuilder.registerModuleAnalyses(analysisManager);
+}
+
+// =====================================================================================================================
+// Run all the added passes with the pass managers's module analysis manager
+//
+// @param module : Module to run the passes on
+void PassManagerImpl::run(Module &module) {
+  ModulePassManager::run(module, analysisManager);
+}
+
+// =====================================================================================================================
+// Register LLPC's custom callbacks
+//
+void PassManagerImpl::registerCallbacks() {
+  // Before running a pass, we increment the pass index if it exists, and we
+  // dump the pass name if needed.
+  auto beforePass = [this](StringRef passName, Any ir) {
+    if (passName != PrintModulePass::name() && m_passIndex) {
+      unsigned passIndex = (*m_passIndex)++;
+      if (cl::DumpPassName)
+        LLPC_OUTS("Pass[" << passIndex << "] = " << passName << "\n");
+    }
+  };
+  instrCallbacks.registerBeforeSkippedPassCallback(beforePass);
+  instrCallbacks.registerBeforeNonSkippedPassCallback(beforePass);
+
+  instrCallbacks.registerShouldRunOptionalPassCallback([this](StringRef passName, Any ir) {
+    // Skip the jump threading pass as it interacts really badly with the structurizer.
+    if (passName == JumpThreadingPass::name())
+      return false;
+    // Check if the user disabled that specific pass index.
+    if (passName != PrintModulePass::name() && m_passIndex) {
+      unsigned passIndex = *m_passIndex;
+      for (auto disableIndex : cl::DisablePassIndices) {
+        if (disableIndex == passIndex) {
+          LLPC_OUTS("Pass[" << passIndex << "] = " << passName << " (disabled)\n");
+          return false;
+        }
+      }
+    }
+    return true;
+  });
+}
+
+// =====================================================================================================================
 // Add a pass to the pass manager.
 //
 // @param pass : Pass to add to the pass manager
-void PassManagerImpl::add(Pass *pass) {
+void LegacyPassManagerImpl::add(Pass *pass) {
   // Do not add any passes after calling stop(), except immutable passes.
   if (m_stopped && !pass->getAsImmutablePass())
     return;
@@ -167,6 +258,6 @@ void PassManagerImpl::add(Pass *pass) {
 
 // =====================================================================================================================
 // Stop adding passes to the pass manager, except immutable ones.
-void PassManagerImpl::stop() {
+void LegacyPassManagerImpl::stop() {
   m_stopped = true;
 }

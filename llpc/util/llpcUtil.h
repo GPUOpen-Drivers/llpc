@@ -33,7 +33,9 @@
 
 #include "llpc.h"
 #include "spirv.hpp"
+#include "vkgcDefs.h"
 #include "vkgcUtil.h"
+#include "lgc/EnumIterator.h"
 #include "llvm/ADT/ArrayRef.h"
 
 namespace Llpc {
@@ -125,20 +127,32 @@ unsigned getShaderStageMaskForType(Vkgc::UnlinkedShaderStage type);
 // Returns the name of the given unlinked shader stage.
 const char *getUnlinkedShaderStageName(Vkgc::UnlinkedShaderStage type);
 
-// Pre-increment operator on the unlinked shader stage.
-inline Vkgc::UnlinkedShaderStage operator++(Vkgc::UnlinkedShaderStage &type) {
-  type = static_cast<Vkgc::UnlinkedShaderStage>(type + 1);
-  return type;
-}
-
-// Post-increment operator on the unlinked shader stage.
-inline Vkgc::UnlinkedShaderStage operator++(Vkgc::UnlinkedShaderStage &type, int) {
-  Vkgc::UnlinkedShaderStage oldValue = type;
-  type = static_cast<Vkgc::UnlinkedShaderStage>(type + 1);
-  return oldValue;
-}
-
 inline bool doesShaderStageExist(llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, ShaderStage stage) {
   return stage < shaderInfo.size() && shaderInfo[stage] && shaderInfo[stage]->pModuleData;
+}
+} // namespace Llpc
+
+namespace lgc {
+// Make Vkgc::UnlinkedShaderStage iterable using `lgc::enumRange<Vkgc::ShaderStage>()`.
+LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(Vkgc::ShaderStage, Vkgc::ShaderStageCountInternal);
+
+// Make Vkgc::UnlinkedShaderStage iterable using `lgc::enumRange<Vkgc::UnlinedShaderStage>()`.
+LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(Vkgc::UnlinkedShaderStage, Vkgc::UnlinkedStageCount);
+} // namespace lgc
+
+namespace Llpc {
+// Returns the range of all native ShaderStages.
+inline auto nativeShaderStages() {
+  return lgc::enumRange(Vkgc::ShaderStage::ShaderStageNativeStageCount);
+}
+
+// Returns the range of all graphics ShaderStages.
+inline auto gfxShaderStages() {
+  return lgc::enumRange(Vkgc::ShaderStage::ShaderStageGfxCount);
+}
+
+// Returns the range of all internal ShaderStages.
+inline auto internalShaderStages() {
+  return lgc::enumRange(Vkgc::ShaderStage::ShaderStageCopyShader, Vkgc::ShaderStage::ShaderStageCountInternal);
 }
 } // namespace Llpc

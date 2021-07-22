@@ -48,42 +48,8 @@ ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInf
                                MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
     : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {
   setUnlinked(pipelineInfo->unlinked);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   m_resourceMapping = pipelineInfo->resourceMapping;
-#else
-  mergeResourceMappingData();
-#endif
 }
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-// =====================================================================================================================
-// Converts the per-shader resource mapping struct into a per-pipeline resource mapping struct
-void ComputeContext::mergeResourceMappingData() {
-  const auto &shaderInfo = m_pipelineInfo->cs;
-
-  if (shaderInfo.userDataNodeCount > 0) {
-    m_userDataNodeStorage = std::make_unique<SmallVector<ResourceMappingRootNode, 8>>();
-    m_userDataNodeStorage->reserve(shaderInfo.userDataNodeCount);
-    for (unsigned i = 0; i < shaderInfo.userDataNodeCount; ++i)
-      m_userDataNodeStorage->push_back({shaderInfo.pUserDataNodes[i], ShaderStageBit::ShaderStageComputeBit});
-    m_resourceMapping.userDataNodeCount = m_userDataNodeStorage->size();
-    m_resourceMapping.pUserDataNodes = m_userDataNodeStorage->data();
-  }
-
-  if (shaderInfo.descriptorRangeValueCount > 0) {
-    m_staticDescriptorValueStorage = std::make_unique<SmallVector<StaticDescriptorValue, 8>>();
-    m_staticDescriptorValueStorage->reserve(shaderInfo.descriptorRangeValueCount);
-    for (unsigned i = 0; i < shaderInfo.descriptorRangeValueCount; ++i) {
-      const auto &descRangeValue = shaderInfo.pDescriptorRangeValues[i];
-      m_staticDescriptorValueStorage->push_back({descRangeValue.type, descRangeValue.set, descRangeValue.binding,
-                                                 descRangeValue.arraySize, descRangeValue.pValue,
-                                                 ShaderStageBit::ShaderStageComputeBit});
-    }
-    m_resourceMapping.staticDescriptorValueCount = m_staticDescriptorValueStorage->size();
-    m_resourceMapping.pStaticDescriptorValues = m_staticDescriptorValueStorage->data();
-  }
-}
-#endif
 
 // =====================================================================================================================
 // Gets pipeline shader info of the specified shader stage

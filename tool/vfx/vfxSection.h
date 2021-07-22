@@ -66,6 +66,7 @@ enum SectionType : unsigned {
   SectionTypeGlProgramParameter, // GL program parameter section
   SectionTypeGlGraphicsState,    // GL graphic pipeline state section
   SectionTypeGlComputeState,     // GL compute pipeline state section
+  SectionTypeGlTransformState,   // GL transform pipeline state section
   SectionTypeGlFfxPs,            // GL FFX PS state section
   SectionTypeGlFfxVs,            // GL FFX VS state section
   SectionTypeNameNum,            // Name num section

@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "PatchCheckShaderCache.h"
+#include "lgc/CommonDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "llvm/Support/Debug.h"
 
@@ -115,7 +116,7 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
   auto stageMask = pipelineState->getShaderStageMask();
 
   // Build input/output layout hash per shader stage
-  for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1)) {
+  for (const ShaderStage stage : enumRange(ShaderStageGfxCount)) {
     if ((stageMask & shaderStageToMask(stage)) == 0)
       continue;
 

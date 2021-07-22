@@ -47,6 +47,7 @@ class Module;
 namespace lgc {
 
 class LegacyPassManager;
+class PassManager;
 
 } // namespace lgc
 
@@ -151,6 +152,7 @@ private:
   void releaseContext(Context *context) const;
 
   bool runPasses(lgc::LegacyPassManager *passMgr, llvm::Module *module) const;
+  bool runPasses(lgc::PassManager *passMgr, llvm::Module *module) const;
   void linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context);
   bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo,
                                           const GraphicsPipelineBuildInfo *pipelineInfo);

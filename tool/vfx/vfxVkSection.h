@@ -6,11 +6,7 @@ namespace Vfx {
 // Represents the sub section descriptor range value
 class SectionDescriptorRangeValueItem : public Section {
 public:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-  typedef Vkgc::DescriptorRangeValue SubState;
-#else
   typedef Vkgc::StaticDescriptorValue SubState;
-#endif
 
   SectionDescriptorRangeValueItem() : Section(m_addrTable, MemberCount, SectionTypeUnset, "descriptorRangeValue") {
     m_intData = &m_bufMem;
@@ -20,9 +16,7 @@ public:
 
   static void initialAddrTable() {
     StrToMemberAddr *tableItem = m_addrTable;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, visibility, MemberTypeInt, false);
-#endif
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, type, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, set, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, binding, MemberTypeInt, false);
@@ -38,11 +32,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
   static const unsigned MemberCount = 7;
-#else
-  static const unsigned MemberCount = 6;
-#endif
   static StrToMemberAddr m_addrTable[MemberCount];
 
   std::vector<uint8_t> *m_intData;
@@ -210,20 +200,12 @@ public:
       m_descriptorRangeValues.resize(m_descriptorRangeValue.size());
       for (unsigned i = 0; i < static_cast<unsigned>(m_descriptorRangeValue.size()); ++i)
         m_descriptorRangeValue[i].getSubState(m_descriptorRangeValues[i]);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-      state.descriptorRangeValueCount = static_cast<unsigned>(m_descriptorRangeValue.size());
-      state.pDescriptorRangeValues = &m_descriptorRangeValues[0];
-#endif
     }
 
     if (m_userDataNode.size() > 0) {
       m_userDataNodes.resize(m_userDataNode.size());
       for (unsigned i = 0; i < static_cast<unsigned>(m_userDataNode.size()); ++i)
         m_userDataNode[i].getSubState(m_userDataNodes[i]);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
-      state.pUserDataNodes = &m_userDataNodes[0];
-      state.userDataNodeCount = static_cast<unsigned>(m_userDataNode.size());
-#endif
     }
   };
   SubState &getSubStateRef() { return m_state; };
@@ -284,7 +266,6 @@ public:
   void getSubState(SubState &state) {
     memset(&state, 0, sizeof(SubState));
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 41
     if (m_descriptorRangeValue.size() > 0) {
       m_descriptorRangeValues.resize(m_descriptorRangeValue.size());
       for (unsigned i = 0; i < m_descriptorRangeValue.size(); ++i)
@@ -300,7 +281,6 @@ public:
         m_userDataNode[i].getSubState(m_userDataNodes[i]);
       state.pUserDataNodes = &m_userDataNodes[0];
     }
-#endif
   };
   SubState &getSubStateRef() { return m_state; };
 

@@ -963,6 +963,8 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
   SPIRVType *ty = bv->getType();
   if (ty->isTypeVector())
     ty = ty->getVectorComponentType();
+  else if (ty->isTypeMatrix())
+    ty = ty->getMatrixColumnType()->getVectorComponentType();
   if (!ty->isTypeFloat())
     return fmf;
 
@@ -973,6 +975,8 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
   }
   // Enable contraction when "NoContraction" decoration is not specified
   bool allowContract = !bv->hasDecorate(DecorationNoContraction);
+  // If invariant variable is used, we cannot enable contraction
+  allowContract &= !m_moduleUsage->useInvariant;
   // Do not set AllowContract or AllowReassoc if DenormFlushToZero is on, to
   // avoid an FP operation being simplified to a move that does not flush
   // denorms.
@@ -7958,6 +7962,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
 
   case GLSLstd450PackSnorm4x8: {
     // Convert <4 x float> into signed normalized <4 x i8> then pack into i32.
+    // round(clamp(c, -1, +1) * 127.0)
     Value *val = getBuilder()->CreateFClamp(args[0], ConstantFP::get(args[0]->getType(), -1.0),
                                             ConstantFP::get(args[0]->getType(), 1.0));
     val = getBuilder()->CreateFMul(val, ConstantFP::get(args[0]->getType(), 127.0));
@@ -7968,28 +7973,33 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
 
   case GLSLstd450PackUnorm4x8: {
     // Convert <4 x float> into unsigned normalized <4 x i8> then pack into i32.
+    // round(clamp(c, 0, +1) * 255.0)
     Value *val = getBuilder()->CreateFClamp(args[0], Constant::getNullValue(args[0]->getType()),
                                             ConstantFP::get(args[0]->getType(), 1.0));
     val = getBuilder()->CreateFMul(val, ConstantFP::get(args[0]->getType(), 255.0));
+    val = getBuilder()->CreateUnaryIntrinsic(Intrinsic::rint, val);
     val = getBuilder()->CreateFPToUI(val, FixedVectorType::get(getBuilder()->getInt8Ty(), 4));
     return getBuilder()->CreateBitCast(val, getBuilder()->getInt32Ty());
   }
 
   case GLSLstd450PackSnorm2x16: {
     // Convert <2 x float> into signed normalized <2 x i16> then pack into i32.
+    // round(clamp(c, -1, +1) * 32767.0)
     Value *val = getBuilder()->CreateFClamp(args[0], ConstantFP::get(args[0]->getType(), -1.0),
                                             ConstantFP::get(args[0]->getType(), 1.0));
     val = getBuilder()->CreateFMul(val, ConstantFP::get(args[0]->getType(), 32767.0));
+    val = getBuilder()->CreateUnaryIntrinsic(Intrinsic::rint, val);
     val = getBuilder()->CreateFPToSI(val, FixedVectorType::get(getBuilder()->getInt16Ty(), 2));
     return getBuilder()->CreateBitCast(val, getBuilder()->getInt32Ty());
   }
 
   case GLSLstd450PackUnorm2x16: {
-    // Convert <2 x float> into unsigned normalized <2 x i16> then pack into
-    // i32.
+    // Convert <2 x float> into unsigned normalized <2 x i16> then pack into i32.
+    // round(clamp(c, 0, +1) * 65535.0)
     Value *val = getBuilder()->CreateFClamp(args[0], Constant::getNullValue(args[0]->getType()),
                                             ConstantFP::get(args[0]->getType(), 1.0));
     val = getBuilder()->CreateFMul(val, ConstantFP::get(args[0]->getType(), 65535.0));
+    val = getBuilder()->CreateUnaryIntrinsic(Intrinsic::rint, val);
     val = getBuilder()->CreateFPToUI(val, FixedVectorType::get(getBuilder()->getInt16Ty(), 2));
     return getBuilder()->CreateBitCast(val, getBuilder()->getInt32Ty());
   }

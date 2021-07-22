@@ -89,6 +89,15 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
       }
       break;
     }
+    case OpDecorate:
+    case OpMemberDecorate: {
+      auto decoration =
+          (opCode == OpDecorate) ? static_cast<Decoration>(codePos[2]) : static_cast<Decoration>(codePos[3]);
+      if (decoration == DecorationInvariant) {
+        shaderModuleUsage->useInvariant = true;
+      }
+      break;
+    }
     case OpDPdx:
     case OpDPdy:
     case OpDPdxCoarse:

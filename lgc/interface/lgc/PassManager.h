@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/PassManager.h"
 
 namespace lgc {
 
@@ -41,6 +42,16 @@ public:
   static LegacyPassManager *Create();
   virtual ~LegacyPassManager() {}
   virtual void stop() = 0;
+  virtual void setPassIndex(unsigned *passIndex) = 0;
+};
+
+// =====================================================================================================================
+// Public interface of LLPC middle-end's PassManager override
+class PassManager : public llvm::ModulePassManager {
+public:
+  static PassManager *Create();
+  virtual ~PassManager() {}
+  virtual void run(llvm::Module &module) = 0;
   virtual void setPassIndex(unsigned *passIndex) = 0;
 };
 
