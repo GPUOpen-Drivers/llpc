@@ -63,6 +63,8 @@ else()
     include(LLVMConfig)
 endif()
 
+find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
+    COMPONENTS Interpreter)
 include(AddLLVM)
 
 # required by lit.site.cfg.py.in
