@@ -298,8 +298,8 @@ GlobalVariable *Patch::getLdsVariable(PipelineState *pipelineState, Module *modu
   }
   // Now we can create LDS.
   // Construct LDS type: [ldsSize * i32], address space 3
-  auto ldsSize = pipelineState->getTargetInfo().getGpuProperty().ldsSizePerCu;
-  auto ldsTy = ArrayType::get(Type::getInt32Ty(*context), ldsSize / sizeof(unsigned));
+  auto ldsSize = pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup;
+  auto ldsTy = ArrayType::get(Type::getInt32Ty(*context), ldsSize);
 
   auto lds = new GlobalVariable(*module, ldsTy, false, GlobalValue::ExternalLinkage, nullptr, "lds", nullptr,
                                 GlobalValue::NotThreadLocal, ADDR_SPACE_LOCAL);

@@ -54,8 +54,7 @@ struct GfxIpVersion {
 struct GpuProperty {
   unsigned numShaderEngines;                  // Number of shader engines present
   unsigned waveSize;                          // Wavefront size
-  unsigned ldsSizePerCu;                      // LDS size per compute unit
-  unsigned ldsSizePerThreadGroup;             // LDS size per thread group
+  unsigned ldsSizePerThreadGroup;             // LDS size per thread group in dwords
   unsigned gsOnChipDefaultPrimsPerSubgroup;   // Default target number of primitives per subgroup for GS on-chip mode.
   unsigned gsOnChipDefaultLdsSizePerSubgroup; // Default value for the maximum LDS size per subgroup for
   unsigned gsOnChipMaxLdsSize;                // Max LDS size used by GS on-chip mode (in dwords)
