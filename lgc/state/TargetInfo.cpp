@@ -49,7 +49,6 @@ static void setGfx6BaseInfo(TargetInfo *targetInfo) {
   // Initial settings (could be adjusted later according to graphics IP version info)
   targetInfo->getGpuProperty().waveSize = 64;
 
-  targetInfo->getGpuProperty().ldsSizePerThreadGroup = 32 * 1024;
   targetInfo->getGpuProperty().numShaderEngines = 4;
   targetInfo->getGpuProperty().maxSgprsAvailable = 104;
   targetInfo->getGpuProperty().maxVgprsAvailable = 256;
@@ -77,7 +76,7 @@ static void setGfx6BaseInfo(TargetInfo *targetInfo) {
 // @param [in/out] targetInfo : Target info
 static void setGfx6Info(TargetInfo *targetInfo) {
   setGfx6BaseInfo(targetInfo);
-  targetInfo->getGpuProperty().ldsSizePerCu = 32768;
+  targetInfo->getGpuProperty().ldsSizePerThreadGroup = 8192;
   targetInfo->getGpuProperty().ldsSizeDwordGranularityShift = 6;
 
   // Hardware workarounds for GFX6 based GPU's:
@@ -125,7 +124,7 @@ static void setGfx602Info(TargetInfo *targetInfo) {
 // @param [in/out] targetInfo : Target info
 static void setGfx7BaseInfo(TargetInfo *targetInfo) {
   setGfx6BaseInfo(targetInfo);
-  targetInfo->getGpuProperty().ldsSizePerCu = 65536;
+  targetInfo->getGpuProperty().ldsSizePerThreadGroup = 16384;
   targetInfo->getGpuProperty().ldsSizeDwordGranularityShift = 7;
 }
 
