@@ -44,7 +44,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 47
+#define LLPC_INTERFACE_MAJOR_VERSION 48
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -71,7 +71,9 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     46.3 | Added enableInterpModePatch to PipelineOptions                                                       |
+//  |     48.0 | Removed the member 'polygonMode' of rsState                                                           |
+//  |     47.0 | Always get culling controls from primitive shader table                                               |
+//  |     46.3 | Added enableInterpModePatch to PipelineOptions                                                        |
 //  |     46.1 | Added dynamicVertexStride to GraphicsPipelineBuildInfo                                                |
 //  |     46.0 | Removed the member 'depthBiasEnable' of rsState                                                       |
 //  |     45.5 | Added new enum type ThreadGroupSwizzleMode for thread group swizzling for compute shaders             |
@@ -734,7 +736,9 @@ struct GraphicsPipelineBuildInfo {
                                   ///  matches the sample pattern used by the rasterizer when rendering
                                   ///  with this pipeline.
     uint8_t usrClipPlaneMask;     ///< Mask to indicate the enabled user defined clip planes
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
     VkPolygonMode polygonMode;    ///< Triangle rendering mode
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     VkCullModeFlags cullMode;     ///< Fragment culling mode
     VkFrontFace frontFace;        ///< Front-facing triangle orientation
