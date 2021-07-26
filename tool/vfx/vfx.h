@@ -464,7 +464,9 @@ struct DrawState {
   unsigned firstIndex;                                  // First index in draw index
   unsigned vertexOffset;                                // Vertex offset in draw index
   VkPrimitiveTopology topology;                         // Primitive topology
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
   VkPolygonMode polygonMode;                            // Triangle rendering mode
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   VkCullModeFlags cullMode;                             // Fragment culling mode
   VkFrontFace frontFace;                                // Front-facing triangle orientation
@@ -503,7 +505,9 @@ struct ColorBuffer {
 // Represents GraphicsPipelineState section.
 struct GraphicsPipelineState {
   VkPrimitiveTopology topology;     // Primitive type
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
   VkPolygonMode polygonMode;        // Triangle rendering mode
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   VkCullModeFlags cullMode;         // Fragment culling mode
   VkFrontFace frontFace;            // Front-facing triangle orientation

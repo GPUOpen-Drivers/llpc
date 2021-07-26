@@ -341,12 +341,6 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
     }
   }
 
-  // Check polygon mode, disable NGG culling if not filled mode
-  const auto polygonMode = m_pipelineState->getRasterizerState().polygonMode;
-  if (polygonMode == PolygonModeLine || polygonMode == PolygonModePoint) {
-    return false;
-  }
-
   // Check resource usage, disable culling if there are resource write operations (including atomic operations) in
   // non-GS NGG cases. This is because such write operations have side effect in execution sequences. But in GS NGG
   // cases, we can still enable culling. Culling is performed after GS execution.
