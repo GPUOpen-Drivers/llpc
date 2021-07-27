@@ -49,11 +49,17 @@
 using namespace std;
 using namespace SPIRVDebug::Operand;
 
+namespace llvm {
+namespace cl {
+extern opt<bool> TrimDebugInfo;
+} // namespace cl
+} // namespace llvm
+
 namespace SPIRV {
 
 SPIRVToLLVMDbgTran::SPIRVToLLVMDbgTran(SPIRVModule *TBM, Module *TM, SPIRVToLLVM *Reader)
     : BM(TBM), M(TM), Builder(*M), SPIRVReader(Reader) {
-  Enable = BM->hasDebugInfo();
+  Enable = BM->hasDebugInfo() && !llvm::cl::TrimDebugInfo;
 }
 
 void SPIRVToLLVMDbgTran::createCompilationUnit() {
