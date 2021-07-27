@@ -221,22 +221,25 @@ static_assert((1 << (ShaderStageCount - 1)) == ShaderStageComputeBit,
 /// Enumerates the function of a particular node in a shader's resource mapping graph.
 enum class ResourceMappingNodeType : unsigned {
   Unknown,                   ///< Invalid type
-  DescriptorResource,        ///< Generic descriptor: resource, including texture resource, image, input
-                             ///  attachment
+  DescriptorResource,        ///< Generic descriptor: resource, including texture resource,
   DescriptorSampler,         ///< Generic descriptor: sampler
   DescriptorCombinedTexture, ///< Generic descriptor: combined texture, combining resource descriptor with
                              ///  sampler descriptor of the same texture, starting with resource descriptor
-  DescriptorTexelBuffer,     ///< Generic descriptor: texel buffer, including texture buffer and image buffer
+  DescriptorTexelBuffer,     ///< Generic descriptor: texel buffer
   DescriptorFmask,           ///< Generic descriptor: F-mask
-  DescriptorBuffer,          ///< Generic descriptor: buffer, including uniform buffer and shader storage buffer
+  DescriptorBuffer,          ///< Generic descriptor: buffer, including shader storage buffer
   DescriptorTableVaPtr,      ///< Descriptor table VA pointer
   IndirectUserDataVaPtr,     ///< Indirect user data VA pointer
   PushConst,                 ///< Push constant
   DescriptorBufferCompact,   ///< Compact buffer descriptor, only contains the buffer address
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
-  DescriptorYCbCrSampler, ///< Generic descriptor: YCbCr sampler
-  Count, ///< Count of resource mapping node types.
+  DescriptorYCbCrSampler,       ///< Generic descriptor: YCbCr sampler
+  DescriptorConstBuffer,        ///< Generic descriptor: constBuffer,including uniform buffer
+  DescriptorConstBufferCompact, ///< Generic descriptor: constBuffer,including dynamic storage buffer
+  DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
+  DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including unifrom texel buffer
+  Count,                        ///< Count of resource mapping node types.
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to

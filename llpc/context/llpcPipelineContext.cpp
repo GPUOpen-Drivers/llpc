@@ -555,6 +555,14 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.type = ResourceNodeType::InlineBuffer;
       else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
         destNode.type = ResourceNodeType::DescriptorResource;
+      else if (node.type == ResourceMappingNodeType::DescriptorImage)
+        destNode.type = ResourceNodeType::DescriptorResource;
+      else if (node.type == ResourceMappingNodeType::DescriptorConstTexelBuffer)
+        destNode.type = ResourceNodeType::DescriptorTexelBuffer;
+      else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBufferCompact)
+        destNode.type = ResourceNodeType::DescriptorBufferCompact;
+      else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
+        destNode.type = ResourceNodeType::DescriptorBuffer;
       else
         destNode.type = static_cast<ResourceNodeType>(node.type);
 
@@ -563,6 +571,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
       switch (node.type) {
+      case ResourceMappingNodeType::DescriptorImage:
       case ResourceMappingNodeType::DescriptorResource:
       case ResourceMappingNodeType::DescriptorFmask:
         destNode.stride = DescriptorSizeResource / sizeof(uint32_t);
@@ -584,6 +593,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.stride = node.sizeInDwords;
         break;
       case ResourceMappingNodeType::DescriptorBufferCompact:
+      case ResourceMappingNodeType::DescriptorConstBufferCompact:
         destNode.stride = 2;
         break;
       default:
