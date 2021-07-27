@@ -141,7 +141,9 @@ public:
     return SrcLang;
   }
 
-  SPIRVString *getSourceFile(uint32_t FileId) const override { return get<SPIRVString>(SrcFiles[FileId]); }
+   SPIRVString *getSourceFile(uint32_t FileId) const override {
+    return SrcFiles.size() == 0 ? nullptr : get<SPIRVString>(SrcFiles[FileId]);
+  }
   std::set<std::string> &getSourceExtension() override { return SrcExtension; }
   virtual SPIRVEntryPoint* getEntryPoint(SPIRVId) const override;
   virtual SPIRVEntryPoint*
