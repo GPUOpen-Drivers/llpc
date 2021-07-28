@@ -23,55 +23,20 @@
  #
  #######################################################################################################################
 
-cmake_minimum_required(VERSION 3.13)
-
-set(SHADER_TEST_VERSION 0.0.1)
-project(shadertest
-    VERSION
-      ${SHADER_TEST_VERSION}
-    LANGUAGES
-      CXX
-  )
-
-if(DEFINED XGL_LLVM_SRC_PATH)
-  # This is a build where LLPC lit testing is integrated into AMDVLK cmake files.
-  set(AMDLLPC_TEST_DEPS amdllpc spvgen FileCheck llvm-objdump llvm-readelf count not)
-  set(LLVM_DIR ${XGL_LLVM_SRC_PATH})
-endif()
-
-if(DEFINED LLVM_DIR)
-  # Hack to allow for LLVM_DIR being set incorrectly in GPUOpen CI builds.
-  if(NOT EXISTS ${LLVM_DIR}/LLVMConfig)
-    string(REPLACE llvm/lib/cmake llpc/llvm/lib/cmake LLVM_DIR ${LLVM_DIR})
-  endif()
-  set(BUILD_EXTERNAL NO)
-else()
-  set(BUILD_EXTERNAL YES)
-endif()
-
-if (BUILD_EXTERNAL)
-    set(CMAKE_MODULE_PATH
-        ${CMAKE_MODULE_PATH}
-        ${CMAKE_CURRENT_SOURCE_DIR}/litScripts/cmake)
-    set(LLVM_BUILD_MAIN_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/litScripts)
-    set(LLVM_BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/litScripts/bin)
-    set(LLVM_TOOLS_BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/litScripts/bin)
-else()
-    set(CMAKE_MODULE_PATH
-        ${CMAKE_MODULE_PATH}
-        ${LLVM_DIR})
-    include(LLVMConfig)
-endif()
-
 find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
-    COMPONENTS Interpreter)
-include(AddLLVM)
+  COMPONENTS Interpreter)
 
-# required by lit.site.cfg.py.in
+list(APPEND CMAKE_MODULE_PATH "${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm")
+include(LLVMConfig)
+
+set(AMDLLPC_TEST_DEPS amdllpc spvgen FileCheck llvm-objdump llvm-readelf count not)
+
+# Required by lit.site.cfg.py.in.
 set(AMDLLPC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-# required by configure_lit_site_cfg
+# Required by configure_lit_site_cfg.
 set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
+# Main config for shaderdb tests.
 configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
   ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
