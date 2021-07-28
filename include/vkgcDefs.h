@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 48
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,6 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     48.1 | Added enableUberFetchShader to GraphicsPipelineBuildInfo                                              |
 //  |     48.0 | Removed the member 'polygonMode' of rsState                                                           |
 //  |     47.0 | Always get culling controls from primitive shader table                                               |
 //  |     46.3 | Added enableInterpModePatch to PipelineOptions                                                        |
@@ -127,7 +128,10 @@ namespace Vkgc {
 
 static const unsigned Version = LLPC_INTERFACE_MAJOR_VERSION;
 static const unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
+static const unsigned MaxVertexAttribs = 64;
 static const unsigned MaxColorTargets = 8;
+static const unsigned FetchShaderInternalBufferBinding = 4;
+static const unsigned MaxFetchShaderInternalBufferSize = 16 * MaxVertexAttribs;
 
 // Forward declarations
 class IShaderCache;
@@ -757,6 +761,7 @@ struct GraphicsPipelineBuildInfo {
   PipelineOptions options;  ///< Per pipeline tuning/debugging options
   bool unlinked;            ///< True to build an "unlinked" half-pipeline ELF
   bool dynamicVertexStride; ///< Dynamic Vertex input Stride is enabled.
+  bool enableUberFetchShader; ///< Use uber fetch shader
 };
 
 /// Represents info to build a compute pipeline.

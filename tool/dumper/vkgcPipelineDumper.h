@@ -82,7 +82,7 @@ public:
                                                MetroHash64 *hasher, bool isRelocatableShader);
 
   static void updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
-                                            MetroHash64 *hasher);
+                                            bool dynamicVertexStride, MetroHash64 *hasher);
 
   // Update hash for map object
   template <class MapType> static void updateHashForMap(MapType &m, MetroHash64 *hasher) {

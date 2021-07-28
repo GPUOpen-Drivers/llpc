@@ -887,8 +887,8 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   hasher.Update(pipeline->unlinked || isRelocatableShader);
 
   if (unlinkedShaderType != UnlinkedStageFragment) {
-    if (!isRelocatableShader)
-      updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
+    if (!isRelocatableShader && !pipeline->enableUberFetchShader)
+      updateHashForVertexInputState(pipeline->pVertexInput, pipeline->dynamicVertexStride, &hasher);
     updateHashForNonFragmentState(pipeline, isCacheHash, &hasher, isRelocatableShader);
   }
 
@@ -942,11 +942,19 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
 // @param vertexInput : Vertex input state
 // @param [in/out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
-                                                   MetroHash64 *hasher) {
+                                                   bool dynamicVertexStride, MetroHash64 *hasher) {
   if (vertexInput && vertexInput->vertexBindingDescriptionCount > 0) {
     hasher->Update(vertexInput->vertexBindingDescriptionCount);
-    hasher->Update(reinterpret_cast<const uint8_t *>(vertexInput->pVertexBindingDescriptions),
-                   sizeof(VkVertexInputBindingDescription) * vertexInput->vertexBindingDescriptionCount);
+    if (dynamicVertexStride) {
+      for (uint32_t i = 0; i < vertexInput->vertexBindingDescriptionCount; i++) {
+        auto attribBinding = vertexInput->pVertexBindingDescriptions[i];
+        attribBinding.stride = 0;
+        hasher->Update(attribBinding);
+      }
+    } else {
+      hasher->Update(reinterpret_cast<const uint8_t *>(vertexInput->pVertexBindingDescriptions),
+                     sizeof(VkVertexInputBindingDescription) * vertexInput->vertexBindingDescriptionCount);
+    }
     hasher->Update(vertexInput->vertexAttributeDescriptionCount);
     if (vertexInput->vertexAttributeDescriptionCount > 0) {
       hasher->Update(reinterpret_cast<const uint8_t *>(vertexInput->pVertexAttributeDescriptions),
@@ -994,6 +1002,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   }
 
   hasher->Update(pipeline->dynamicVertexStride);
+  hasher->Update(pipeline->enableUberFetchShader);
 
   bool passthroughMode = !nggState->enableVertexReuse && !nggState->enableBackfaceCulling &&
                          !nggState->enableFrustumCulling && !nggState->enableBoxFilterCulling &&
