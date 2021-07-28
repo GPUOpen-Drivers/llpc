@@ -2000,7 +2000,8 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
 
     // Update vertex input state
     if (stage == ShaderStageVertex)
-      PipelineDumper::updateHashForVertexInputState(pipelineInfo->pVertexInput, &hasher);
+      PipelineDumper::updateHashForVertexInputState(pipelineInfo->pVertexInput, pipelineInfo->dynamicVertexStride,
+                                                    &hasher);
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);

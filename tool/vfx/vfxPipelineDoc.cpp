@@ -143,6 +143,8 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
 
     gfxPipelineInfo->options = graphicState.options;
     gfxPipelineInfo->nggState = graphicState.nggState;
+    gfxPipelineInfo->dynamicVertexStride = graphicState.dynamicVertexStride;
+    gfxPipelineInfo->enableUberFetchShader = graphicState.enableUberFetchShader;
   }
 
   // Section "ComputePipelineState"
@@ -246,6 +248,12 @@ bool PipelineDocument::validate() {
       }
     }
   }
+
+  if (stageMask == 0) {
+    PARSE_ERROR(m_errorMsg, 0, "No Shader source section in pipeline!\n");
+    return false;
+  }
+
   const unsigned graphicsStageMask =
       ((1 << SpvGenStageVertex) | (1 << SpvGenStageTessControl) | (1 << SpvGenStageTessEvaluation) |
        (1 << SpvGenStageGeometry) | (1 << SpvGenStageFragment));
