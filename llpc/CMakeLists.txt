@@ -321,7 +321,6 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/builder
     ${PROJECT_SOURCE_DIR}/context
     ${PROJECT_SOURCE_DIR}/../imported/spirv
-    ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/../include
     ${PROJECT_SOURCE_DIR}/lower
     ${PROJECT_SOURCE_DIR}/patch
@@ -354,8 +353,11 @@ target_link_libraries(amdllpc PRIVATE cwpack)
 endif()
 ### Add Subdirectories #################################################################################################
 if(ICD_BUILD_LLPC)
-# Lit tests
-if(LLPC_BUILD_LIT)
-    add_subdirectory(test)
-endif()
+    if(LLPC_BUILD_TESTS OR LLPC_BUILD_LIT)
+        # Unit tests.
+        add_subdirectory(unittests)
+
+        # Lit tests.
+        add_subdirectory(test)
+    endif()
 endif()
