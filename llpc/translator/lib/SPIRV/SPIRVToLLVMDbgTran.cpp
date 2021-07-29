@@ -59,7 +59,7 @@ namespace SPIRV {
 
 SPIRVToLLVMDbgTran::SPIRVToLLVMDbgTran(SPIRVModule *TBM, Module *TM, SPIRVToLLVM *Reader)
     : BM(TBM), M(TM), Builder(*M), SPIRVReader(Reader) {
-  Enable = BM->hasDebugInfo() && !llvm::cl::TrimDebugInfo;
+  Enable = BM->hasDebugInfo() && !cl::TrimDebugInfo;
 }
 
 void SPIRVToLLVMDbgTran::createCompilationUnit() {
