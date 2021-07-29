@@ -608,6 +608,9 @@ struct PipelineShaderOptions {
 
   /// Threshold to use for loops with "DontUnroll" hint (0 = use llvm.llop.unroll.disable).
   unsigned dontUnrollHintThreshold;
+
+  ///< Whether fastmath contract could be disabled
+  bool useNoContract;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
