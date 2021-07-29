@@ -91,7 +91,7 @@ using namespace Llpc;
 
 namespace SPIRV {
 
-cl::opt<bool> SPIRVGenFastMath("spirv-gen-fast-math", cl::init(true),
+cl::opt<unsigned> SPIRVGenFastMath("spirv-gen-fast-math", cl::init(0),
                                cl::desc("Enable fast math mode with generating floating"
                                         "point binary ops"));
 
@@ -954,7 +954,28 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
 
   // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
   // flags on the handled instruction
-  if (!SPIRVGenFastMath)
+  if (SPIRVGenFastMath & FastMathFlags::AllowReassoc)
+    fmf.setAllowReassoc();
+
+  if (SPIRVGenFastMath & FastMathFlags::NoNaNs)
+    fmf.setNoNaNs();
+
+  if (SPIRVGenFastMath & FastMathFlags::NoInfs)
+    fmf.setNoInfs();
+
+  if (SPIRVGenFastMath & FastMathFlags::NoSignedZeros)
+    fmf.setNoSignedZeros();
+
+  if (SPIRVGenFastMath & FastMathFlags::AllowReciprocal)
+    fmf.setAllowReciprocal();
+
+  if (SPIRVGenFastMath & FastMathFlags::AllowContract)
+    fmf.setAllowContract();
+
+  if (SPIRVGenFastMath & FastMathFlags::ApproxFunc)
+    fmf.setApproxFunc();
+
+  if (SPIRVGenFastMath)
     return fmf;
 
   // Only do this for operations with floating point type.
@@ -981,7 +1002,6 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
   // avoid an FP operation being simplified to a move that does not flush
   // denorms.
   if (m_fpControlFlags.DenormFlushToZero == 0) {
-    fmf.setAllowContract(allowContract);
     // AllowRessociation should be same with AllowContract
     fmf.setAllowReassoc(allowContract);
   }
@@ -4024,6 +4044,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(SPIRVValue 
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpDot>(SPIRVValue *const spvValue) {
+  if (m_shaderOptions->useNoContract) {
+    auto fmf = getBuilder()->getFastMathFlags();
+    fmf.setAllowContract(false);
+    getBuilder()->setFastMathFlags(fmf);
+  }
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
   BasicBlock *const block = getBuilder()->GetInsertBlock();
