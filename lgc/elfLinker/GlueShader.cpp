@@ -156,7 +156,6 @@ private:
   // The encoded or hashed (in some way) single string version of the above.
   std::string m_shaderString;
   PipelineState *m_pipelineState; // The pipeline state.  Used to set meta data information.
-  bool m_killEnabled;             // True if this fragment shader has kill enabled.
 };
 } // anonymous namespace
 
@@ -362,11 +361,6 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
         static_cast<ExportFormat>(pipelineState->computeExportFormat(exp.ty, exp.location));
   }
   m_pipelineState = pipelineState;
-
-  PalMetadata *metadata = pipelineState->getPalMetadata();
-  DB_SHADER_CONTROL shaderControl = {};
-  shaderControl.u32All = metadata->getRegister(mmDB_SHADER_CONTROL);
-  m_killEnabled = shaderControl.bits.KILL_ENABLE;
 }
 
 // =====================================================================================================================
@@ -378,7 +372,6 @@ StringRef ColorExportShader::getString() {
     constexpr uint32_t estimatedTypeSize = 10;
     uint32_t sizeEstimate = (sizeof(ColorExportInfo) + estimatedTypeSize) * m_exports.size();
     sizeEstimate += sizeof(m_exportFormat);
-    sizeEstimate += sizeof(m_killEnabled);
     m_shaderString.reserve(sizeEstimate);
 
     for (ColorExportInfo colorExportInfo : m_exports) {
@@ -391,7 +384,6 @@ StringRef ColorExportShader::getString() {
       m_shaderString += getTypeName(colorExportInfo.ty);
     }
     m_shaderString += StringRef(reinterpret_cast<const char *>(m_exportFormat), sizeof(m_exportFormat)).str();
-    m_shaderString += StringRef(reinterpret_cast<const char *>(&m_killEnabled), sizeof(m_killEnabled));
   }
   return m_shaderString;
 }
@@ -418,7 +410,7 @@ Module *ColorExportShader::generate() {
     values[m_exports[idx].hwColorTarget] = colorExportFunc->getArg(idx);
   }
 
-  bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
+  bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10;
   fragColorExport->generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
   return colorExportFunc->getParent();
 }
@@ -461,5 +453,5 @@ void ColorExportShader::updatePalMetadata(PalMetadata &palMetadata) {
       break;
     }
   }
-  palMetadata.updateSpiShaderColFormat(m_exports, hasDepthExpFmtZero, m_killEnabled);
+  palMetadata.updateSpiShaderColFormat(m_exports, hasDepthExpFmtZero);
 }
