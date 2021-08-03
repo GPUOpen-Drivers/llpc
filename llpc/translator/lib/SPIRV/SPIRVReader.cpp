@@ -5334,8 +5334,6 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *desc) {
       return lgc::Builder::Dim1DArray;
     case Dim2D:
       return lgc::Builder::Dim2DArray;
-    case DimRect:
-      return lgc::Builder::Dim2DArray;
     case DimCube:
       return lgc::Builder::DimCubeArray;
     default:
