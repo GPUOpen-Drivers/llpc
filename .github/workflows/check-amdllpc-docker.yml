@@ -18,7 +18,7 @@ jobs:
         base-image-template: ["gcr.io/stadia-open-source/amdvlk_%s%s_%s:nightly"]
         config:              [Release]
         assertions:          ["OFF", "ON"]
-        feature-set:         ["+gcc", "+clang", "+clang+shadercache"]
+        feature-set:         ["+gcc", "+clang", "+clang+shadercache", "+clang+sanitizers"]
     steps:
       - name: Free up disk space
         if: contains(matrix.feature-set, '+sanitizers')
