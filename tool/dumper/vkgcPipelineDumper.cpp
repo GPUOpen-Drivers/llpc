@@ -780,6 +780,8 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "nggState.subgroupSizing = " << pipelineInfo->nggState.subgroupSizing << "\n";
   dumpFile << "nggState.primsPerSubgroup = " << pipelineInfo->nggState.primsPerSubgroup << "\n";
   dumpFile << "nggState.vertsPerSubgroup = " << pipelineInfo->nggState.vertsPerSubgroup << "\n";
+  dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
+  dumpFile << "enableUberFetchShader = " << pipelineInfo->enableUberFetchShader << "\n";
 
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
   dumpFile << "\n\n";
@@ -812,7 +814,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
     }
   }
 
-    dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
 }
 
 // =====================================================================================================================
