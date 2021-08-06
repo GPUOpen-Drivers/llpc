@@ -23,7 +23,7 @@
  #
  #######################################################################################################################
 cmake_minimum_required(VERSION 3.13.4)
-
+# test
 project(VKGC LANGUAGES C CXX)
 
 ### Standalone LLPC build handling
