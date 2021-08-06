@@ -387,7 +387,7 @@ struct RasterizerState {
   unsigned usrClipPlaneMask;        // Mask to indicate the enabled user defined clip planes
   PolygonMode polygonMode;          // Polygon mode
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-  unsigned depthBiasEnable;         // Whether to bias fragment depth values
+  unsigned depthBiasEnable; // Whether to bias fragment depth values
 #endif
 };
 

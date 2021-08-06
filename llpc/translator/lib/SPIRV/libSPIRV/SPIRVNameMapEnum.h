@@ -448,26 +448,8 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilitySubgroupBufferBlockIOINTEL, "SubgroupBufferBlockIOINTEL");
   add(CapabilitySubgroupImageBlockIOINTEL, "SubgroupImageBlockIOINTEL");
   add(CapabilityDemoteToHelperInvocationEXT, "DemoteToHelperInvocationEXT");
-#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
-  add(CapabilityDotProductInputAllKHR, "DotProductInputAllKHR");
-  add(CapabilityDotProductInput4x8BitKHR, "DotProductInput4x8BitKHR");
-  add(CapabilityDotProductInput4x8BitPackedKHR, "DotProductInput4x8BitPackedKHR");
-  add(CapabilityDotProductUnsignedKHR, "DotProductUnsignedKHR");
-  add(CapabilityDotProductMixedSignednessKHR, "DotProductMixedSignednessKHR");
-  add(CapabilityDotProductSignedKHR, "DotProductSignedKHR");
-  add(CapabilityDotProductAccSatUnsignedKHR, "DotProductAccSatUnsignedKHR");
-  add(CapabilityDotProductAccSatMixedSignednessKHR, "DotProductAccSatMixedSignednessKHR");
-  add(CapabilityDotProductAccSatSignedKHR, "DotProductAccSatSignedKHR");
-#endif
 }
 SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
-
-#if VKI_KHR_SHADER_INTEGER_DOT_PRODUCT
-template <> inline void SPIRVMap<PackedVectorFormat, std::string>::init() {
-  add(PackedVectorFormat4x8BitKHR, "4x8BitKHR");
-}
-SPIRV_DEF_NAMEMAP(PackedVectorFormat, SPIRVPackedVectorFormatNameMap);
-#endif
 
 } /* namespace SPIRV */
 

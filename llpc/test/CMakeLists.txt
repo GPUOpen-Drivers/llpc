@@ -31,10 +31,10 @@ include(LLVMConfig)
 
 set(AMDLLPC_TEST_DEPS amdllpc spvgen FileCheck llvm-objdump llvm-readelf count not)
 
-# Required by lit.site.cfg.py.in.
+# required by lit.site.cfg.py.in.
 set(AMDLLPC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Required by configure_lit_site_cfg.
+# required by configure_lit_site_cfg.
 set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
 # Main config for shaderdb tests.
 configure_lit_site_cfg(

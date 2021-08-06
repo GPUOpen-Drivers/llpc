@@ -31,7 +31,9 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/raw_os_ostream.h"
 
+#if !defined(_WIN32)
 #include <time.h>
+#endif
 
 #if __APPLE__ && __MACH__
 #include <mach/mach_time.h>
