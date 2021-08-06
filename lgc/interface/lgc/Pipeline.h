@@ -378,9 +378,6 @@ struct RasterizerState {
                                     //  matches the sample pattern used by the rasterizer when rendering
                                     //  with this pipeline.
   unsigned usrClipPlaneMask;        // Mask to indicate the enabled user defined clip planes
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-  unsigned depthBiasEnable; // Whether to bias fragment depth values
-#endif
 };
 
 // =====================================================================================================================

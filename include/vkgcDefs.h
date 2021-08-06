@@ -741,14 +741,16 @@ struct GraphicsPipelineBuildInfo {
                                   ///  with this pipeline.
     uint8_t usrClipPlaneMask;     ///< Mask to indicate the enabled user defined clip planes
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-    VkPolygonMode polygonMode;    ///< Triangle rendering mode
+    VkPolygonMode polygonMode; ///< Triangle rendering mode
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     VkCullModeFlags cullMode; ///< Fragment culling mode
     VkFrontFace frontFace;    ///< Front-facing triangle orientation
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
     bool depthBiasEnable; ///< Whether to bias fragment depth values
-  } rsState;              ///< Rasterizer State
+#endif
+  } rsState; ///< Rasterizer State
 
   struct {
     bool alphaToCoverageEnable; ///< Enable alpha to coverage
