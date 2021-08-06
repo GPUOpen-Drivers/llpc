@@ -31,7 +31,11 @@
 #include "vkgcUtil.h"
 #include "spirv.hpp"
 #include "vkgcElfReader.h"
+#if defined(_WIN32)
+#include <direct.h>
+#else
 #include <sys/stat.h>
+#endif
 
 #define DEBUG_TYPE "vkgc-util"
 
@@ -92,8 +96,13 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
 //
 // @param dir : The path of directory
 bool createDirectory(const char *dir) {
+#if defined(_WIN32)
+  int result = _mkdir(dir);
+  return (result == 0);
+#else
   int result = mkdir(dir, S_IRWXU);
   return result == 0;
+#endif
 }
 
 // =====================================================================================================================

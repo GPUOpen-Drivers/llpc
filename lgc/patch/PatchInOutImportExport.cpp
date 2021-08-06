@@ -5400,32 +5400,35 @@ void PatchInOutImportExport::exportShadingRate(Value *shadingRate, Instruction *
 
   assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
-  // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
-  // and 4-pixel mode is not supported. But the spec requires us to accept unsupported rates and clamp them to
-  // maxFragmentSize of HW. The mapping is therefore as follow:
-  //
-  //   VRS X rate: MaskNone -> 0b00, Horizontal2Pixels | Horizontal4Pixels -> 0b01
-  //   VRS Y rate: MaskNone -> 0b00, Vertical2Pixels | Vertical4Pixels -> 0b01
-  //
+  Value* hwShadingRate = nullptr;
 
-  // xRate = (shadingRate & (Horizontal2Pixels | Horizontal4Pixels) ? 0x1 : 0x0
-  Value *xRate2Pixels =
-      builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels));
-  xRate2Pixels = builder.CreateICmpNE(xRate2Pixels, builder.getInt32(0));
-  Value *xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(1), builder.getInt32(0));
+  {
+      // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
+      // and 4-pixel mode is not supported. But the spec requires us to accept unsupported rates and clamp them to
+      // maxFragmentSize of HW. The mapping is therefore as follow:
+      //
+      //   VRS X rate: MaskNone -> 0b00, Horizontal2Pixels | Horizontal4Pixels -> 0b01
+      //   VRS Y rate: MaskNone -> 0b00, Vertical2Pixels | Vertical4Pixels -> 0b01
+      //
+      // xRate = (shadingRate & (Horizontal2Pixels | Horizontal4Pixels) ? 0x1 : 0x0
+      Value *xRate2Pixels =
+          builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels));
+      xRate2Pixels = builder.CreateICmpNE(xRate2Pixels, builder.getInt32(0));
+      Value *xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(1), builder.getInt32(0));
 
-  // yRate = (shadingRate & (Vertical2Pixels | Vertical4Pixels)) ? 0x1 : 0x0
-  Value *yRate2Pixels =
-      builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
-  yRate2Pixels = builder.CreateICmpNE(yRate2Pixels, builder.getInt32(0));
-  Value *yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(1), builder.getInt32(0));
+      // yRate = (shadingRate & (Vertical2Pixels | Vertical4Pixels)) ? 0x1 : 0x0
+      Value *yRate2Pixels =
+          builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
+      yRate2Pixels = builder.CreateICmpNE(yRate2Pixels, builder.getInt32(0));
+      Value *yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(1), builder.getInt32(0));
 
-  // [5:4] = Y rate, [3:2] = X rate
-  // hwShadingRate = (xRate << 2) | (yRate << 4)
-  xRate = builder.CreateShl(xRate, 2);
-  yRate = builder.CreateShl(yRate, 4);
-  auto hwShadingRate = builder.CreateOr(xRate, yRate);
-  hwShadingRate = builder.CreateBitCast(hwShadingRate, builder.getFloatTy());
+      // [5:4] = Y rate, [3:2] = X rate
+      // hwShadingRate = (xRate << 2) | (yRate << 4)
+      xRate = builder.CreateShl(xRate, 2);
+      yRate = builder.CreateShl(yRate, 4);
+      hwShadingRate = builder.CreateOr(xRate, yRate);
+      hwShadingRate = builder.CreateBitCast(hwShadingRate, builder.getFloatTy());
+  }
 
   auto undef = UndefValue::get(builder.getFloatTy());
   // "Done" flag is valid for exporting position 0 ~ 3
@@ -5460,22 +5463,23 @@ Value *PatchInOutImportExport::getShadingRate(Instruction *insertPos) {
   Value *yRate = builder.CreateAnd(ancillary, 0x30);
   yRate = builder.CreateLShr(yRate, 4);
 
-  // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
-  // and 4-pixel mode is not supported. The mapping is as follow:
-  //
-  //   VRS X rate: 0b00 -> MaskNone, 0b01 -> Horizontal2Pixels
-  //   VRS Y rate: 0b00 -> MaskNone, 0b01 -> Vertical2Pixels
-  //
+  {
+      // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
+      // and 4-pixel mode is not supported. The mapping is as follow:
+      //
+      //   VRS X rate: 0b00 -> MaskNone, 0b01 -> Horizontal2Pixels
+      //   VRS Y rate: 0b00 -> MaskNone, 0b01 -> Vertical2Pixels
+      //
+      // xRate = xRate == 0x1 ? Horizontal2Pixels : None
+      auto xRate2Pixels = builder.CreateICmpEQ(xRate, builder.getInt32(1));
+      xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(ShadingRateHorizontal2Pixels),
+                                   builder.getInt32(ShadingRateNone));
 
-  // xRate = xRate == 0x1 ? Horizontal2Pixels : None
-  auto xRate2Pixels = builder.CreateICmpEQ(xRate, builder.getInt32(1));
-  xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(ShadingRateHorizontal2Pixels),
-                               builder.getInt32(ShadingRateNone));
-
-  // yRate = yRate == 0x1 ? Vertical2Pixels : None
-  auto yRate2Pixels = builder.CreateICmpEQ(yRate, builder.getInt32(1));
-  yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(ShadingRateVertical2Pixels),
-                               builder.getInt32(ShadingRateNone));
+      // yRate = yRate == 0x1 ? Vertical2Pixels : None
+      auto yRate2Pixels = builder.CreateICmpEQ(yRate, builder.getInt32(1));
+      yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(ShadingRateVertical2Pixels),
+                                   builder.getInt32(ShadingRateNone));
+  }
 
   return builder.CreateOr(xRate, yRate);
 }

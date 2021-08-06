@@ -49,7 +49,11 @@
 #include "vkgcDefs.h"
 #endif
 
+#ifdef _WIN32
+#define VFXAPI __cdecl
+#else
 #define VFXAPI
+#endif
 
 extern int Snprintf(char *pOutput, size_t bufSize, const char *pFormat, ...);
 
@@ -468,11 +472,11 @@ struct DrawState {
   VkPolygonMode polygonMode;                            // Triangle rendering mode
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-  VkCullModeFlags cullMode;                             // Fragment culling mode
-  VkFrontFace frontFace;                                // Front-facing triangle orientation
+  VkCullModeFlags cullMode; // Fragment culling mode
+  VkFrontFace frontFace;    // Front-facing triangle orientation
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-  unsigned depthBiasEnable;                             // Whether to bias fragment depth values
+  unsigned depthBiasEnable; // Whether to bias fragment depth values
 #endif
   unsigned patchControlPoints;                          // Patch control points
   IUFValue dispatch;                                    // Dispatch dimension
@@ -509,11 +513,11 @@ struct GraphicsPipelineState {
   VkPolygonMode polygonMode;        // Triangle rendering mode
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-  VkCullModeFlags cullMode;         // Fragment culling mode
-  VkFrontFace frontFace;            // Front-facing triangle orientation
+  VkCullModeFlags cullMode; // Fragment culling mode
+  VkFrontFace frontFace;    // Front-facing triangle orientation
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-  unsigned depthBiasEnable;         // Whether to bias fragment depth values
+  unsigned depthBiasEnable; // Whether to bias fragment depth values
 #endif
   unsigned patchControlPoints;      // Patch control points
   unsigned deviceIndex;             // Device index for device group

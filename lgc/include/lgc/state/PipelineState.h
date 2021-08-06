@@ -84,9 +84,9 @@ enum NggCompactMode : unsigned {
 
 // Represents NGG tuning options
 struct NggControl {
-  bool enableNgg;                // Enable NGG mode, use an implicit primitive shader
-  bool enableGsUse;              // Enable NGG use on geometry shader
-  NggCompactMode compactMode;    // Compaction mode after culling operations
+  bool enableNgg;             // Enable NGG mode, use an implicit primitive shader
+  bool enableGsUse;           // Enable NGG use on geometry shader
+  NggCompactMode compactMode; // Compaction mode after culling operations
 
   bool enableVertexReuse;         // Enable optimization to cull duplicate vertices
   bool enableBackfaceCulling;     // Enable culling of primitives that don't meet facing criteria

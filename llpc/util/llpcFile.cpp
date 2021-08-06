@@ -110,8 +110,13 @@ Result File::open(const char *filename, unsigned accessFlags) {
     }
 
     if (result == Result::Success) {
+#if defined(_WIN32)
+      // MS compilers provide fopen_s, which is supposedly "safer" than traditional fopen.
+      fopen_s(&m_fileHandle, filename, &fileMode[0]);
+#else
       // Just use the traditional fopen.
       m_fileHandle = fopen(filename, &fileMode[0]);
+#endif
       if (!m_fileHandle)
         result = Result::ErrorUnknown;
     }
@@ -231,8 +236,13 @@ Result File::printf(const char *formatStr,
     va_list argList;
     va_start(argList, formatStr);
 
+#if defined(_WIN32)
+    // MS compilers provide vfprintf_s, which is supposedly "safer" than traditional vfprintf.
+    if (vfprintf_s(m_fileHandle, formatStr, argList) != -1)
+#else
     // Just use the traditional vfprintf.
     if (vfprintf(m_fileHandle, formatStr, argList) >= 0)
+#endif
       result = Result::Success;
     else
       result = Result::ErrorUnknown;
@@ -252,8 +262,13 @@ Result File::vPrintf(const char *formatStr, va_list argList) {
   Result result = Result::ErrorUnavailable;
 
   if (m_fileHandle) {
+#if defined(_WIN32)
+    // MS compilers provide vfprintf_s, which is supposedly "safer" than traditional vfprintf.
+    if (vfprintf_s(m_fileHandle, formatStr, argList) != -1)
+#else
     // Just use the traditional vfprintf.
     if (vfprintf(m_fileHandle, formatStr, argList) >= 0)
+#endif
       result = Result::Success;
     else
       result = Result::ErrorUnknown;
@@ -302,9 +317,16 @@ void File::seek(int offset, bool fromOrigin) {
 //
 // @param filename : Name of the file to check
 size_t File::getFileSize(const char *filename) {
+#if defined(_WIN32)
+  // On MS compilers the function and structure to retrieve/store file status information is named '_stat' (with
+  // underbar)...
+  struct _stat fileStatus = {};
+  const int result = _stat(filename, &fileStatus);
+#else
   // ...however, on other compilers, they are named 'stat' (no underbar).
   struct stat fileStatus = {};
   const int result = stat(filename, &fileStatus);
+#endif
   // If the function call to retrieve file status information fails (returns 0), then the file does not exist (or is
   // inaccessible in some other manner).
   return result == 0 ? fileStatus.st_size : 0;
@@ -315,9 +337,16 @@ size_t File::getFileSize(const char *filename) {
 //
 // @param filename : Name of the file to check
 bool File::exists(const char *filename) {
+#if defined(_WIN32)
+  // On MS compilers the function and structure to retrieve/store file status information is named '_stat' (with
+  // underbar)...
+  struct _stat fileStatus = {};
+  const int result = _stat(filename, &fileStatus);
+#else
   // ...however, on other compilers, they are named 'stat' (no underbar).
   struct stat fileStatus = {};
   const int result = stat(filename, &fileStatus);
+#endif
   // If the function call to retrieve file status information fails (returns -1), then the file does not exist (or is
   // inaccessible in some other manner).
   return result != -1;

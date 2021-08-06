@@ -69,7 +69,13 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
     set(LLVM_ENABLE_ZLIB OFF CACHE BOOL Force)
+#if _WIN32
+    if (NOT WIN32)
+#endif
     set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
+#if _WIN32
+    endif()
+#endif
 
     if(EXISTS ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm)
         set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
@@ -279,14 +285,6 @@ target_link_libraries(llpc PUBLIC
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(llpc PRIVATE Threads::Threads)
-
-### Visual Studio Filters ##############################################################################################
-if(COMMAND target_find_headers)
-    target_find_headers(llpc)
-    if(MSVC)
-        target_source_groups(llpc)
-    endif()
-endif()
 
 ### VFX library for Standalone Compiler ###################################################################################
 if(ICD_BUILD_LLPC)

@@ -499,7 +499,7 @@ struct NggState {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   bool alwaysUsePrimShaderTable; ///< Always use primitive shader table to fetch culling-control registers
 #endif
-  NggCompactMode compactMode;    ///< Compaction mode after culling operations
+  NggCompactMode compactMode; ///< Compaction mode after culling operations
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
   bool enableFastLaunch; ///< Enable the hardware to launch subgroups of work at a faster rate
@@ -744,11 +744,11 @@ struct GraphicsPipelineBuildInfo {
     VkPolygonMode polygonMode;    ///< Triangle rendering mode
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-    VkCullModeFlags cullMode;     ///< Fragment culling mode
-    VkFrontFace frontFace;        ///< Front-facing triangle orientation
+    VkCullModeFlags cullMode; ///< Fragment culling mode
+    VkFrontFace frontFace;    ///< Front-facing triangle orientation
 #endif
-    bool depthBiasEnable;         ///< Whether to bias fragment depth values
-  } rsState;                      ///< Rasterizer State
+    bool depthBiasEnable; ///< Whether to bias fragment depth values
+  } rsState;              ///< Rasterizer State
 
   struct {
     bool alphaToCoverageEnable; ///< Enable alpha to coverage
