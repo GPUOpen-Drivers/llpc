@@ -476,7 +476,7 @@ static const ShaderInputDesc FsVgprInputs[] = {
 
 // VGPRs: CS
 static const ShaderInputDesc CsVgprInputs[] = {
-    {ShaderInput::LocalInvocationId, 0, true},
+    {ShaderInput::LocalInvocationId, offsetof(InterfaceData, entryArgIdxs.cs.localInvocationId), true},
 };
 
 // =====================================================================================================================

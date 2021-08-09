@@ -531,6 +531,11 @@ struct InterfaceData {
         unsigned ancillary;      // Ancillary
         unsigned sampleCoverage; // Sample coverage
       } fs;
+
+      // Compute shader
+      struct {
+        unsigned localInvocationId; // Local invocation ID
+      } cs;
     };
 
     bool initialized;                          // Whether entryArgIdxs has been initialized
