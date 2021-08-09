@@ -91,9 +91,9 @@ using namespace Llpc;
 
 namespace SPIRV {
 
-cl::opt<unsigned> SPIRVGenFastMath("spirv-gen-fast-math", cl::init(0),
-                               cl::desc("Enable fast math mode with generating floating"
-                                        "point binary ops"));
+cl::opt<unsigned> SPIRVGenFastMathFlags("spirv-gen-fast-math-flags", cl::init(0),
+                                        cl::desc("Enable fast math mode with generating floating"
+                                                 "point binary ops"));
 
 cl::opt<bool> SPIRVWorkaroundBadSPIRV("spirv-workaround-bad-spirv", cl::init(true),
                                       cl::desc("Enable workarounds for bad SPIR-V"));
@@ -954,28 +954,28 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
 
   // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
   // flags on the handled instruction
-  if (SPIRVGenFastMath & FastMathFlags::AllowReassoc)
+  if (SPIRVGenFastMathFlags & FastMathFlags::AllowReassoc)
     fmf.setAllowReassoc();
 
-  if (SPIRVGenFastMath & FastMathFlags::NoNaNs)
+  if (SPIRVGenFastMathFlags & FastMathFlags::NoNaNs)
     fmf.setNoNaNs();
 
-  if (SPIRVGenFastMath & FastMathFlags::NoInfs)
+  if (SPIRVGenFastMathFlags & FastMathFlags::NoInfs)
     fmf.setNoInfs();
 
-  if (SPIRVGenFastMath & FastMathFlags::NoSignedZeros)
+  if (SPIRVGenFastMathFlags & FastMathFlags::NoSignedZeros)
     fmf.setNoSignedZeros();
 
-  if (SPIRVGenFastMath & FastMathFlags::AllowReciprocal)
+  if (SPIRVGenFastMathFlags & FastMathFlags::AllowReciprocal)
     fmf.setAllowReciprocal();
 
-  if (SPIRVGenFastMath & FastMathFlags::AllowContract)
+  if (SPIRVGenFastMathFlags & FastMathFlags::AllowContract)
     fmf.setAllowContract();
 
-  if (SPIRVGenFastMath & FastMathFlags::ApproxFunc)
+  if (SPIRVGenFastMathFlags & FastMathFlags::ApproxFunc)
     fmf.setApproxFunc();
 
-  if (SPIRVGenFastMath)
+  if (SPIRVGenFastMathFlags)
     return fmf;
 
   // Only do this for operations with floating point type.
@@ -1002,6 +1002,8 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
   // avoid an FP operation being simplified to a move that does not flush
   // denorms.
   if (m_fpControlFlags.DenormFlushToZero == 0) {
+    // Allow contract
+    fmf.setAllowContract(allowContract);
     // AllowRessociation should be same with AllowContract
     fmf.setAllowReassoc(allowContract);
   }
@@ -4044,7 +4046,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(SPIRVValue 
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpDot>(SPIRVValue *const spvValue) {
-  if (m_shaderOptions->useNoContract) {
+  if (m_shaderOptions->noContract) {
     auto fmf = getBuilder()->getFastMathFlags();
     fmf.setAllowContract(false);
     getBuilder()->setFastMathFlags(fmf);
