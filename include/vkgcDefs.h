@@ -613,7 +613,7 @@ struct PipelineShaderOptions {
   unsigned dontUnrollHintThreshold;
 
   ///< Whether fastmath contract could be disabled
-  bool useNoContract;
+  bool noContract;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
