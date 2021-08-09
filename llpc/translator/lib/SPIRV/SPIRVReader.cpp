@@ -673,6 +673,18 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
 
 Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
                              bool explicitlyLaidOut) {
+  SPIRVTypeContext ctx(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+  auto it = m_fullTypeMap.find(ctx.asTuple());
+  if (it != m_fullTypeMap.end())
+    return it->second;
+
+  auto res = transTypeImpl(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+  m_fullTypeMap[ctx.asTuple()] = res;
+  return res;
+}
+
+Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
+                                 bool explicitlyLaidOut) {
   // If the type is not a sub-part of a pointer or it is a forward pointer, we can look in the map.
   if (!parentIsPointer || t->isTypeForwardPointer()) {
     auto loc = m_typeMap.find(t);
