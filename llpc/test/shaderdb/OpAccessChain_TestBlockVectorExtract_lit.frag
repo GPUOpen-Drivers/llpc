@@ -37,15 +37,15 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 
-; SHADERTEST: %llpc.matrix.column = type <{ [3 x float], [4 x i8] }>
-; SHADERTEST: %llpc.matrix.column.2 = type <{ [4 x double] }>
+; SHADERTEST: %[[COLUMN1:.*]] = type <{ [3 x float], [4 x i8] }>
+; SHADERTEST: %[[COLUMN2:.*]] = type <{ [4 x double] }>
 
-; SHADERTEST: getelementptr inbounds (<{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }>, <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 1
-; SHADERTEST: getelementptr <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }>, <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 2, i32 1, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }>, <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 2, i32 %{{[0-9]*}}, i32 0, i32 1
-; SHADERTEST: getelementptr <{ [4 x double], [4 x %llpc.matrix.column.2] }>, <{ [4 x double], [4 x %llpc.matrix.column.2] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr inbounds (<{ [4 x double], [4 x %llpc.matrix.column.2] }>, <{ [4 x double], [4 x %llpc.matrix.column.2] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 2, i32 0, i32 3
-; SHADERTEST: getelementptr <{ [4 x double], [4 x %llpc.matrix.column.2] }>, <{ [4 x double], [4 x %llpc.matrix.column.2] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}, i32 0, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr inbounds (<{ [3 x float], [4 x i8], [2 x %[[COLUMN1]]] }>, <{ [3 x float], [4 x i8], [2 x %[[COLUMN1]]] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 1
+; SHADERTEST: getelementptr <{ [3 x float], [4 x i8], [2 x %[[COLUMN1]]] }>, <{ [3 x float], [4 x i8], [2 x %[[COLUMN1]]] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 2, i32 1, i32 0, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr <{ [3 x float], [4 x i8], [2 x %[[COLUMN1]]] }>, <{ [3 x float], [4 x i8], [2 x %[[COLUMN1]]] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 2, i32 %{{[0-9]*}}, i32 0, i32 1
+; SHADERTEST: getelementptr <{ [4 x double], [4 x %[[COLUMN2]]] }>, <{ [4 x double], [4 x %[[COLUMN2]]] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr inbounds (<{ [4 x double], [4 x %[[COLUMN2]]] }>, <{ [4 x double], [4 x %[[COLUMN2]]] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 2, i32 0, i32 3
+; SHADERTEST: getelementptr <{ [4 x double], [4 x %[[COLUMN2]]] }>, <{ [4 x double], [4 x %[[COLUMN2]]] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}, i32 0, i32 %{{[0-9]*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

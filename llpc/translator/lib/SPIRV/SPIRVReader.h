@@ -180,6 +180,27 @@ public:
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
 
+private:
+  class SPIRVTypeContext {
+    SPIRVWord m_typeId;
+    uint32_t m_matrixStride;
+    uint8_t m_predicates;
+
+  public:
+    SPIRVTypeContext(SPIRVType *type, uint32_t matrixStride, bool columnMajor, bool isParentPointer,
+                     bool isExplicitlyLaidOut)
+        : m_typeId(type->getId()), m_matrixStride(matrixStride), m_predicates(0) {
+      m_predicates |= uint8_t(columnMajor);
+      m_predicates |= uint8_t(isParentPointer << 1);
+      m_predicates |= uint8_t(isExplicitlyLaidOut << 2);
+    }
+
+    // Tuple representation to make it easily hashable.
+    using TupleType = std::tuple<decltype(m_typeId), decltype(m_matrixStride), decltype(m_predicates)>;
+    TupleType asTuple() const { return std::make_tuple(m_typeId, m_matrixStride, m_predicates); }
+  };
+
+  typedef DenseMap<SPIRVTypeContext::TupleType, Type *> SPIRVToLLVMFullTypeMap;
   typedef DenseMap<SPIRVType *, Type *> SPIRVToLLVMTypeMap;
   typedef DenseMap<SPIRVValue *, Value *> SPIRVToLLVMValueMap;
   typedef DenseMap<SPIRVValue *, Value *> SPIRVBlockToLLVMStructMap;
@@ -192,7 +213,6 @@ public:
   // which are supposed to be replaced by the real values later.
   typedef std::map<SPIRVValue *, LoadInst *> SPIRVToLLVMPlaceholderMap;
 
-private:
   Module *m_m;
   BuiltinVarMap m_builtinGvMap;
   LLVMContext *m_context;
@@ -205,6 +225,7 @@ private:
   const SPIRVSpecConstMap &m_specConstMap;
   llvm::ArrayRef<ConvertingSampler> m_convertingSamplers;
   SPIRVToLLVMTypeMap m_typeMap;
+  SPIRVToLLVMFullTypeMap m_fullTypeMap;
   SPIRVToLLVMValueMap m_valueMap;
   SPIRVToLLVMFunctionMap m_funcMap;
   SPIRVBlockToLLVMStructMap m_blockMap;
@@ -222,6 +243,10 @@ private:
   unsigned m_execModule;
 
   lgc::Builder *getBuilder() const { return m_builder; }
+
+  // Perform type translation for uncached types. Used in `transType`. Returns the new LLVM type.
+  Type *transTypeImpl(SPIRVType *bt, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
+                      bool explicitlyLaidOut);
 
   Type *mapType(SPIRVType *bt, Type *t) {
     m_typeMap[bt] = t;
