@@ -842,9 +842,7 @@ llvm::Type *PalMetadata::getLlvmType(StringRef tyName) const {
 // =====================================================================================================================
 // Updates the SPI_SHADER_COL_FORMAT entry.
 //
-// @param exps : Array describing all color exports.
-// @param hasDepthExpFmtZero : Flag indicating absence of depth exports.
-void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero) {
+void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero, bool killEnabled) {
   unsigned spiShaderColFormat = 0;
   for (auto &exp : exps) {
     if (exp.hwColorTarget == MaxColorTargets)
@@ -854,7 +852,7 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool 
   }
 
   if (spiShaderColFormat == 0 && hasDepthExpFmtZero) {
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10) {
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || killEnabled) {
       // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
       // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
       // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
