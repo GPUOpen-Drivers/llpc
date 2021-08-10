@@ -488,12 +488,13 @@ bool LowerFragColorExport::runOnModule(Module &module) {
     exportFormat[exp.hwColorTarget] =
         static_cast<ExportFormat>(m_pipelineState->computeExportFormat(exp.ty, exp.location));
   }
-  bool dummyExport = m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10;
+  bool dummyExport =
+      (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_resUsage->builtInUsage.fs.discard);
   fragColorExport.generateExportInstructions(m_info, m_exportValues, exportFormat, dummyExport, builder);
 
   const auto &builtInUsage = m_resUsage->builtInUsage.fs;
   bool hasDepthExpFmtZero = !(builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth);
-  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(m_info, hasDepthExpFmtZero);
+  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(m_info, hasDepthExpFmtZero, builtInUsage.discard);
   return !m_info.empty() || dummyExport;
 }
 
