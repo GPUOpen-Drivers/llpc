@@ -45,6 +45,7 @@
 #include "SPIRVType.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace std;
 using namespace SPIRVDebug::Operand;
