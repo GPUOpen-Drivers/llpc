@@ -636,6 +636,8 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
 
   const auto &dataLayout = m_module->getDataLayout();
   Type *inputTy = input->getType()->getContainedType(0);
+  if (inputTy->isPointerTy())
+    inputTy = m_builder->getInt64Ty();
   Twine prefix = LlpcName::InputProxyPrefix;
   auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
@@ -674,6 +676,8 @@ void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
 
   const auto &dataLayout = m_module->getDataLayout();
   Type *outputTy = output->getType()->getContainedType(0);
+  if (outputTy->isPointerTy())
+    outputTy = m_builder->getInt64Ty();
   Twine prefix = LlpcName::OutputProxyPrefix;
 
   auto proxy = new AllocaInst(outputTy, dataLayout.getAllocaAddrSpace(), prefix + output->getName(), &*insertPos);
@@ -1117,6 +1121,9 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
       lgc::InOutInfo inOutInfo;
       if (!locOffset)
         locOffset = m_builder->getInt32(0);
+
+      if (inOutTy->isPointerTy())
+        inOutTy = m_builder->getInt64Ty();
 
       if (addrSpace == SPIRAS_Input) {
         if (m_shaderStage == ShaderStageFragment) {
