@@ -7136,8 +7136,8 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
   if (bt->hasDecorate(DecorationXfbStride, 0, &xfbStride))
     inOutDec.XfbStride = xfbStride;
 
-  if (bt->isTypeScalar() || bt->isTypeVector()) {
-    // Hanlde scalar or vector type
+  if (bt->isTypeScalar() || bt->isTypeVector() || bt->isTypePointer()) {
+    // Hanlde scalar or vector type or pointer type
     assert(inOutDec.Value.U32All != SPIRVID_INVALID);
 
     // Build metadata for the scala/vector
@@ -7175,7 +7175,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
 
     // Update next location value
     if (!inOutDec.IsBuiltIn) {
-      auto width = bt->getBitWidth();
+      unsigned width = bt->isTypePointer() ? 64 : bt->getBitWidth();
       if (bt->isTypeVector())
         width *= bt->getVectorComponentCount();
       assert(width <= 64 * 4);
