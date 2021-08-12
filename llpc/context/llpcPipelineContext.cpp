@@ -555,6 +555,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.type = ResourceNodeType::InlineBuffer;
       else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
         destNode.type = ResourceNodeType::DescriptorResource;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
       else if (node.type == ResourceMappingNodeType::DescriptorImage)
         destNode.type = ResourceNodeType::DescriptorResource;
       else if (node.type == ResourceMappingNodeType::DescriptorConstTexelBuffer)
@@ -563,6 +564,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.type = ResourceNodeType::DescriptorBufferCompact;
       else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
         destNode.type = ResourceNodeType::DescriptorBuffer;
+#endif
       else
         destNode.type = static_cast<ResourceNodeType>(node.type);
 
@@ -571,7 +573,9 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
       switch (node.type) {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
       case ResourceMappingNodeType::DescriptorImage:
+#endif
       case ResourceMappingNodeType::DescriptorResource:
       case ResourceMappingNodeType::DescriptorFmask:
         destNode.stride = DescriptorSizeResource / sizeof(uint32_t);
@@ -593,7 +597,9 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.stride = node.sizeInDwords;
         break;
       case ResourceMappingNodeType::DescriptorBufferCompact:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
       case ResourceMappingNodeType::DescriptorConstBufferCompact:
+#endif
         destNode.stride = 2;
         break;
       default:

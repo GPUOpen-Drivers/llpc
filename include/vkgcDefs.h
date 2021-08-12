@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 48
+#define LLPC_INTERFACE_MAJOR_VERSION 49
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,6 +71,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     49.0 | Added DescriptorConstBuffer, DescriptorConstBufferCompact, DescriptorImage, DescriptorConstTexelBuffer|
+//  |          | to ResourceMappingNodeType                                                                            |
 //  |     48.1 | Added enableUberFetchShader to GraphicsPipelineBuildInfo                                              |
 //  |     48.0 | Removed the member 'polygonMode' of rsState                                                           |
 //  |     47.0 | Always get culling controls from primitive shader table                                               |
@@ -234,12 +236,14 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorBufferCompact,   ///< Compact buffer descriptor, only contains the buffer address
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
-  DescriptorYCbCrSampler,       ///< Generic descriptor: YCbCr sampler
+  DescriptorYCbCrSampler, ///< Generic descriptor: YCbCr sampler
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
   DescriptorConstBuffer,        ///< Generic descriptor: constBuffer,including uniform buffer
   DescriptorConstBufferCompact, ///< Generic descriptor: constBuffer,including dynamic storage buffer
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including unifrom texel buffer
-  Count,                        ///< Count of resource mapping node types.
+#endif
+  Count, ///< Count of resource mapping node types.
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to

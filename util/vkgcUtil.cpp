@@ -127,10 +127,12 @@ const char *getResourceMappingNodeTypeName(ResourceMappingNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorTexelBuffer)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorFmask)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBuffer)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorConstBuffer)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorConstBufferCompact)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorImage)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorConstTexelBuffer)
+#endif
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorTableVaPtr)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, IndirectUserDataVaPtr)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, PushConst)
