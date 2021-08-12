@@ -1277,13 +1277,22 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       }
 
       context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
-      std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
-      lowerPassMgr->setPassIndex(&passIndex);
+      bool success;
+      if (cl::NewPassManager) {
+        std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
+        lowerPassMgr->setPassIndex(&passIndex);
 
-      LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
-      );
-      // Run the passes.
-      bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
+        // Run the passes.
+        success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+      } else {
+        std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
+        lowerPassMgr->setPassIndex(&passIndex);
+
+        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
+        // Run the passes.
+        success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+      }
       if (!success) {
         LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
         result = Result::ErrorInvalidShader;
@@ -1968,6 +1977,9 @@ bool Compiler::runPasses(lgc::PassManager *passMgr, Module *module) const {
   {
     passMgr->run(*module);
     success = true;
+    // TODO Only some passes have been ported to the new pass manager. So running
+    // the lowering passes with the new pass manager results in a fatal error for now.
+    report_fatal_error("The new pass manager is not fully implemented yet.");
   }
 #if LLPC_ENABLE_EXCEPTION
   catch (const char *) {

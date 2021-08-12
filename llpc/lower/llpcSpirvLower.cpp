@@ -31,6 +31,7 @@
 #include "llpcSpirvLower.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcSpirvLowerAccessChain.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
@@ -44,6 +45,7 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/ForceFunctionAttrs.h"
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
+#include "llvm/Transforms/IPO/GlobalDCE.h"
 #include "llvm/Transforms/IPO/InferFunctionAttrs.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Instrumentation.h"
@@ -145,6 +147,30 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 // @param stage : Shader stage
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param lowerTimer : Timer to time lower passes with, nullptr if not timing
+void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, Timer *lowerTimer) {
+  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
+  context->getLgcContext()->preparePassManager(passMgr);
+
+  // Start timer for lowering passes.
+  if (lowerTimer)
+    LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
+
+  // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
+  // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
+  passMgr.addPass(AlwaysInlinerPass());
+  passMgr.addPass(GlobalDCEPass());
+
+  // Lower SPIR-V access chain
+  passMgr.addPass(SpirvLowerAccessChain());
+}
+
+// =====================================================================================================================
+// Add per-shader lowering passes to pass manager
+//
+// @param context : LLPC context
+// @param stage : Shader stage
+// @param [in/out] passMgr : Pass manager to add passes to
+// @param lowerTimer : Timer to time lower passes with, nullptr if not timing
 void LegacySpirvLower::addPasses(Context *context, ShaderStage stage, legacy::PassManager &passMgr, Timer *lowerTimer
 ) {
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
@@ -160,7 +186,7 @@ void LegacySpirvLower::addPasses(Context *context, ShaderStage stage, legacy::Pa
   passMgr.add(createGlobalDCEPass());
 
   // Lower SPIR-V access chain
-  passMgr.add(createSpirvLowerAccessChain());
+  passMgr.add(createLegacySpirvLowerAccessChain());
 
   // Lower SPIR-V terminators
   passMgr.add(createSpirvLowerTerminator());
