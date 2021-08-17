@@ -167,8 +167,15 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
     }
     // Not shader entry-point.
     func.setLinkage(GlobalValue::InternalLinkage);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596
+    // Old version of the code
     if (func.getAttributes().hasFnAttribute(Attribute::NoInline))
       func.removeFnAttr(Attribute::NoInline);
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    if (func.getAttributes().hasAttributes(Attribute::NoInline))
+      func.removeFnAttr(Attribute::NoInline);
+#endif
     func.addFnAttr(Attribute::AlwaysInline);
   }
 }
