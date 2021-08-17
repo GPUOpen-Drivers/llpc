@@ -1,0 +1,28 @@
+name: Code style check
+
+on:
+  pull_request:
+
+jobs:
+  clang-tidy:
+    name: clang-tidy
+    runs-on: "ubuntu-20.04"
+    steps:
+      - name: Checkout LLPC
+        run: |
+          git clone https://github.com/${GITHUB_REPOSITORY}.git .
+          git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
+          git checkout ${GITHUB_SHA}
+      - name: Generate Docker base image tag string
+        run: |
+          echo "IMAGE_TAG=gcr.io/stadia-open-source/amdvlk_release_clang_on:nightly" | tee -a $GITHUB_ENV
+      - name: Fetch the latest prebuilt AMDVLK
+        run: docker pull "$IMAGE_TAG"
+      - name: Build and Test with Docker
+        run: docker build . --file docker/llpc-clang-tidy.Dockerfile
+                            --build-arg AMDVLK_IMAGE="$IMAGE_TAG"
+                            --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
+                            --build-arg LLPC_REPO_REF="${GITHUB_REF}"
+                            --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
+                            --build-arg LLPC_BASE_REF="${{ github.base_ref }}"
+                            --tag llpc/ci-shaderdb
