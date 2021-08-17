@@ -155,10 +155,19 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
     argAttrs.push_back((inRegMask >> idx) & 1 ? inRegAttrSet : emptyAttrSet);
   // Old arguments.
   for (unsigned idx = 0; idx != argTys.size(); ++idx)
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596
+    // Old version of the code
     argAttrs.push_back(oldAttrList.getParamAttributes(idx));
   // Construct new AttributeList and set it on the new function.
   newFunc->setAttributes(AttributeList::get(oldFunc->getContext(), oldAttrList.getFnAttributes(),
                                             oldAttrList.getRetAttributes(), argAttrs));
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    argAttrs.push_back(oldAttrList.getParamAttrs(idx));
+  // Construct new AttributeList and set it on the new function.
+  newFunc->setAttributes(
+      AttributeList::get(oldFunc->getContext(), oldAttrList.getFnAttrs(), oldAttrList.getRetAttrs(), argAttrs));
+#endif
 
   // Set the shader stage on the new function (implemented with IR metadata).
   setShaderStage(newFunc, getShaderStage(oldFunc));
