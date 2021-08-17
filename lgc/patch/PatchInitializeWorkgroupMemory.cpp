@@ -93,7 +93,8 @@ bool PatchInitializeWorkgroupMemory::runOnModule(Module &module) {
 
   SmallVector<GlobalVariable *> zeroGlobals;
   for (GlobalVariable &global : module.globals()) {
-    if (global.hasInitializer() && global.getInitializer()->isNullValue())
+    if (global.getType()->getPointerAddressSpace() == ADDR_SPACE_LOCAL && global.hasInitializer() &&
+        global.getInitializer()->isNullValue())
       zeroGlobals.push_back(&global);
   }
 
@@ -146,7 +147,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(Value *pointer, Type *va
     if (!isPowerOf2_32(alignment))
       alignment = NextPowerOf2(alignment);
     if (!indices.empty())
-      pointer = builder.CreateGEP(pointer, indices);
+      pointer = builder.CreateGEP(pointer->getType()->getPointerElementType(), pointer, indices);
     builder.CreateAlignedStore(zero, pointer, Align(alignment));
     return;
   } else if (valueTy->isArrayTy()) {
