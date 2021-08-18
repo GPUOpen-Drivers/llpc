@@ -190,8 +190,16 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     }
 
     builder.addAttribute("target-features", targetFeatures);
+
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396807
+    // Old version of the code
     AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
     func->addAttributes(attribIdx, builder);
+#else
+    // New version of the code (also handles unknown version, which we treat as
+    // latest)
+    func->addFnAttrs(builder);
+#endif
   }
 }
 

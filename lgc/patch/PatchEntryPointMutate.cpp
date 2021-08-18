@@ -934,8 +934,15 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
     builder.addAttribute("amdgpu-unroll-threshold", "700");
   }
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396807
+  // Old version of the code
   AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
   entryPoint->addAttributes(attribIdx, builder);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  entryPoint->addFnAttrs(builder);
+#endif
 
   // NOTE: Remove "readnone" attribute for entry-point. If GS is empty, this attribute will allow
   // LLVM optimization to remove sendmsg(GS_DONE). It is unexpected.
