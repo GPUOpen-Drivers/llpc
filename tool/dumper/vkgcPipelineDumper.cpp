@@ -57,7 +57,9 @@ namespace Vkgc {
 std::ostream &operator<<(std::ostream &out, VkVertexInputRate inputRate);
 std::ostream &operator<<(std::ostream &out, VkFormat format);
 std::ostream &operator<<(std::ostream &out, VkPrimitiveTopology topology);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
 std::ostream &operator<<(std::ostream &out, VkPolygonMode polygonMode);
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
 std::ostream &operator<<(std::ostream &out, VkCullModeFlagBits cullMode);
 std::ostream &operator<<(std::ostream &out, VkFrontFace frontFace);
@@ -733,7 +735,9 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "numSamples = " << pipelineInfo->rsState.numSamples << "\n";
   dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
   dumpFile << "polygonMode = " << pipelineInfo->rsState.polygonMode << "\n";
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   dumpFile << "cullMode = " << static_cast<VkCullModeFlagBits>(pipelineInfo->rsState.cullMode) << "\n";
   dumpFile << "frontFace = " << pipelineInfo->rsState.frontFace << "\n";
@@ -887,8 +891,8 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   hasher.Update(pipeline->unlinked || isRelocatableShader);
 
   if (unlinkedShaderType != UnlinkedStageFragment) {
-    if (!isRelocatableShader)
-      updateHashForVertexInputState(pipeline->pVertexInput, &hasher);
+    if (!isRelocatableShader && !pipeline->enableUberFetchShader)
+      updateHashForVertexInputState(pipeline->pVertexInput, pipeline->dynamicVertexStride, &hasher);
     updateHashForNonFragmentState(pipeline, isCacheHash, &hasher, isRelocatableShader);
   }
 
@@ -942,11 +946,19 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
 // @param vertexInput : Vertex input state
 // @param [in/out] hasher : Haher to generate hash code
 void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
-                                                   MetroHash64 *hasher) {
+                                                   bool dynamicVertexStride, MetroHash64 *hasher) {
   if (vertexInput && vertexInput->vertexBindingDescriptionCount > 0) {
     hasher->Update(vertexInput->vertexBindingDescriptionCount);
-    hasher->Update(reinterpret_cast<const uint8_t *>(vertexInput->pVertexBindingDescriptions),
-                   sizeof(VkVertexInputBindingDescription) * vertexInput->vertexBindingDescriptionCount);
+    if (dynamicVertexStride) {
+      for (uint32_t i = 0; i < vertexInput->vertexBindingDescriptionCount; i++) {
+        auto attribBinding = vertexInput->pVertexBindingDescriptions[i];
+        attribBinding.stride = 0;
+        hasher->Update(attribBinding);
+      }
+    } else {
+      hasher->Update(reinterpret_cast<const uint8_t *>(vertexInput->pVertexBindingDescriptions),
+                     sizeof(VkVertexInputBindingDescription) * vertexInput->vertexBindingDescriptionCount);
+    }
     hasher->Update(vertexInput->vertexAttributeDescriptionCount);
     if (vertexInput->vertexAttributeDescriptionCount > 0) {
       hasher->Update(reinterpret_cast<const uint8_t *>(vertexInput->pVertexAttributeDescriptions),
@@ -994,6 +1006,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   }
 
   hasher->Update(pipeline->dynamicVertexStride);
+  hasher->Update(pipeline->enableUberFetchShader);
 
   bool passthroughMode = !nggState->enableVertexReuse && !nggState->enableBackfaceCulling &&
                          !nggState->enableFrustumCulling && !nggState->enableBoxFilterCulling &&
@@ -1006,7 +1019,9 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   if (updateHashFromRs) {
     auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
     hasher->Update(rsState->polygonMode);
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     hasher->Update(rsState->cullMode);
     hasher->Update(rsState->frontFace);
@@ -1766,6 +1781,7 @@ std::ostream &operator<<(std::ostream &out, VkPrimitiveTopology topology) {
   return out << string;
 }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
 // =====================================================================================================================
 // Translates enum "VkPolygonMode" to string and output to ostream.
 //
@@ -1787,6 +1803,7 @@ std::ostream &operator<<(std::ostream &out, VkPolygonMode polygonMode) {
 
   return out << string;
 }
+#endif
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
 // =====================================================================================================================

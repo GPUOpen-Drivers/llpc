@@ -78,8 +78,8 @@ Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vect
 // =====================================================================================================================
 // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
 // where available.
-// The accumulator input must be i32; use a value of 0 for no accumulation.
-// The result type is i32.
+// Use a value of 0 for no accumulation and the value type is consistent with the result type. The result is saturated
+// if there is an accumulator. The component type of input vectors can have 8-bit/16-bit/32-bit and i32/i16/i8 result.
 //
 // @param vector1 : The integer vector 1
 // @param vector2 : The integer vector 2
@@ -91,23 +91,28 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
   Type *inputTy = vector1->getType();
   assert(inputTy->isVectorTy() && inputTy->getScalarType()->isIntegerTy());
   Value *scalar = nullptr;
+  Type *outputTy = accumulator->getType();
 
   const unsigned compBitWidth = inputTy->getScalarSizeInBits();
-  assert(compBitWidth == 8 || compBitWidth == 16);
-
-  bool isHwSupported = getPipelineState()->getTargetInfo().getGpuProperty().hasIntegerDot;
+  bool hasHwNativeSupport =
+      (getPipelineState()->getTargetInfo().getGpuProperty().hasIntegerDot && (compBitWidth == 8 || compBitWidth == 16));
   const bool isSigned = (flags & lgc::Builder::FirstVectorSigned);
   const bool isMixed = (flags == lgc::Builder::FirstVectorSigned);
   // The mixed mode "First vector is signed and secont vector is unsigned" is not supported
-  if (isHwSupported && isMixed)
-    isHwSupported = false;
+  if (hasHwNativeSupport && isMixed)
+    hasHwNativeSupport = false;
 
-  const bool hasNoAccumulator = isa<ConstantInt>(accumulator) && cast<ConstantInt>(accumulator)->isNullValue();
+  // NOTE: For opcodes with an accumulator, the spec said "If any of the multiplications or additions, with the
+  // exception of the final accumulation, overflow or underflow, the result of the instruction is undefined". For
+  // opcodes without accumulator, the spec said "The resulting value will equal the low-order N bits of the correct
+  // result R, where N is the result width and R is computed with enough precision to avoid overflow and underflow".
+  const bool hasAccumulator = !(isa<ConstantInt>(accumulator) && cast<ConstantInt>(accumulator)->isNullValue());
   const unsigned compCount = cast<FixedVectorType>(inputTy)->getNumElements();
-  if (!isHwSupported) {
+  Type *targetTy = hasHwNativeSupport ? getInt32Ty() : getInt64Ty();
+  accumulator = isSigned ? CreateSExt(accumulator, targetTy) : CreateZExt(accumulator, targetTy);
+  if (!hasHwNativeSupport) {
     // Emulate dot product with no HW support cases
-    scalar = getInt32(0);
-    Type *targetTy = getInt32Ty();
+    scalar = getIntN(targetTy->getScalarSizeInBits(), 0);
 
     for (unsigned elemIdx = 0; elemIdx < compCount; ++elemIdx) {
       Value *elem1 = CreateExtractElement(vector1, elemIdx);
@@ -117,8 +122,15 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
       Value *product = CreateMul(elem1, elem2);
       scalar = CreateAdd(product, scalar);
     }
-    if (!hasNoAccumulator)
-      scalar = CreateAdd(scalar, accumulator);
+    if (hasAccumulator) {
+      if (compBitWidth == 8 || compBitWidth == 16) {
+        scalar = CreateTrunc(scalar, getInt32Ty());
+        accumulator = CreateTrunc(accumulator, getInt32Ty());
+        scalar = CreateNamedCall("llvm.sadd.sat.i32", getInt32Ty(), {scalar, accumulator}, {}, instName);
+      } else {
+        scalar = CreateAdd(scalar, accumulator);
+      }
+    }
   } else {
     // <4xi8>, <3xi8>, <2xi8> are native supported by using v_dot4_i32_i8 or v_dot4_u32_u8
     // <2xi16> is native supported by using v_dot2_i32_i16 and v_dot2_u32_u16
@@ -127,12 +139,12 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
     Value *input2 = vector2;
 
     bool isDot4 = (compBitWidth == 8);
-    Value *clamp = hasNoAccumulator ? getInt1(false) : getInt1(true);
+    Value *clamp = hasAccumulator ? getTrue() : getFalse();
 
     if (isDot4) {
       if (compCount < 4) {
         // Extend <3xi8> or <2xi8> to <4xi8>
-        ArrayRef<int> indices = compCount == 3 ? ArrayRef<int>({0, 1, 2, 4}) : ArrayRef<int>({0, 1, 4, 4});
+        ArrayRef<int> indices = compCount == 3 ? ArrayRef<int>({0, 1, 2, 3}) : ArrayRef<int>({0, 1, 2, 2});
         input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
         input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
       }
@@ -148,7 +160,7 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
       } else {
         Value *intermediateRes = getInt32(0);
         auto indices = ArrayRef<int>({0, 1});
-        Value *product = getInt32(0);
+        scalar = getInt32(0);
         if (compCount == 3) {
           // Split <3xi16> up with an integer multiplication, a 16-bit integer dot product
           Value *w1 = CreateExtractElement(input1, 2);
@@ -159,7 +171,7 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
 
           input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
           input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
-          product =
+          scalar =
               CreateIntrinsic(intrinsicDot2, {}, {input1, input2, intermediateRes, getInt1(false)}, nullptr, instName);
         } else {
           assert(compCount == 4);
@@ -172,13 +184,45 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
           indices = ArrayRef<int>({2, 3});
           input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
           input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
-          product =
+          scalar =
               CreateIntrinsic(intrinsicDot2, {}, {input1, input2, intermediateRes, getInt1(false)}, nullptr, instName);
         }
         // Add a satruation add if required.
-        if (!hasNoAccumulator)
-          scalar = CreateNamedCall("llvm.sadd.sat.i32", getInt32Ty(), {product, accumulator}, {}, instName);
+        if (hasAccumulator)
+          scalar = CreateNamedCall("llvm.sadd.sat.i32", getInt32Ty(), {scalar, accumulator}, {}, instName);
       }
+    }
+  }
+
+  // Do clamp if it has an accumulator
+  // NOTE: 32-bit result is a saturating add result. Do the manual saturating for 8-bit/16-bit result.
+  if (scalar->getType() != outputTy) {
+    if (hasAccumulator) {
+      const unsigned bitWidth = outputTy->getScalarSizeInBits();
+      auto unsignedMax = (2ULL << (bitWidth - 1)) - 1;
+      auto signedMax = unsignedMax >> 1;
+      auto signedMin = -1ULL - signedMax;
+
+      Value *minimum = nullptr, *maximum = nullptr;
+      Value *isUnderflow = nullptr, *isOverflow = nullptr;
+      if (isSigned) {
+        scalar = CreateSExt(scalar, getInt64Ty());
+        minimum = ConstantInt::getSigned(getInt64Ty(), signedMin);
+        maximum = ConstantInt::getSigned(getInt64Ty(), signedMax);
+        isUnderflow = CreateICmpSLT(scalar, minimum);
+        isOverflow = CreateICmpSGT(scalar, maximum);
+      } else {
+        scalar = CreateZExt(scalar, getInt64Ty());
+        minimum = getInt64(0);
+        maximum = getInt64(unsignedMax);
+        isUnderflow = CreateICmpULT(scalar, minimum);
+        isOverflow = CreateICmpUGT(scalar, maximum);
+      }
+      scalar = CreateSelect(isUnderflow, minimum, scalar);
+      scalar = CreateSelect(isOverflow, maximum, scalar);
+      scalar = CreateTrunc(scalar, outputTy);
+    } else {
+      scalar = isSigned ? CreateSExtOrTrunc(scalar, outputTy) : CreateZExtOrTrunc(scalar, outputTy);
     }
   }
 

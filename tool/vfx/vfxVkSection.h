@@ -425,7 +425,9 @@ public:
   static void initialAddrTable() {
     StrToMemberAddr *tableItem = m_addrTable;
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, topology, MemberTypeEnum, false);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, polygonMode, MemberTypeEnum, false);
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, cullMode, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, frontFace, MemberTypeEnum, false);
@@ -452,6 +454,7 @@ public:
                                    Vkgc::MaxColorTargets, true);
 
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dynamicVertexStride, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableUberFetchShader, MemberTypeBool, false);
 
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
@@ -467,7 +470,7 @@ public:
 
 private:
   SectionNggState m_nggState;
-  static const unsigned MemberCount = 25;
+  static const unsigned MemberCount = 26;
   static StrToMemberAddr m_addrTable[MemberCount];
   SubState m_state;
   SectionColorBuffer m_colorBuffer[Vkgc::MaxColorTargets]; // Color buffer

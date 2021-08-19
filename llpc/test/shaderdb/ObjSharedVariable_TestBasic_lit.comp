@@ -17,7 +17,6 @@ void main()
     g_f = s1;
 }
 
-
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s

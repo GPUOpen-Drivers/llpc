@@ -120,7 +120,9 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->rsState.numSamples = graphicState.numSamples;
     gfxPipelineInfo->rsState.samplePatternIdx = graphicState.samplePatternIdx;
     gfxPipelineInfo->rsState.usrClipPlaneMask = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
     gfxPipelineInfo->rsState.polygonMode = graphicState.polygonMode;
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
     gfxPipelineInfo->rsState.cullMode = graphicState.cullMode;
     gfxPipelineInfo->rsState.frontFace = graphicState.frontFace;
@@ -141,6 +143,8 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
 
     gfxPipelineInfo->options = graphicState.options;
     gfxPipelineInfo->nggState = graphicState.nggState;
+    gfxPipelineInfo->dynamicVertexStride = graphicState.dynamicVertexStride;
+    gfxPipelineInfo->enableUberFetchShader = graphicState.enableUberFetchShader;
   }
 
   // Section "ComputePipelineState"
@@ -244,6 +248,12 @@ bool PipelineDocument::validate() {
       }
     }
   }
+
+  if (stageMask == 0) {
+    PARSE_ERROR(m_errorMsg, 0, "No Shader source section in pipeline!\n");
+    return false;
+  }
+
   const unsigned graphicsStageMask =
       ((1 << SpvGenStageVertex) | (1 << SpvGenStageTessControl) | (1 << SpvGenStageTessEvaluation) |
        (1 << SpvGenStageGeometry) | (1 << SpvGenStageFragment));

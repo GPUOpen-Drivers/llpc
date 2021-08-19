@@ -33,7 +33,10 @@ if(ICD_BUILD_LLPC)
 endif()
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_LIT        "LLPC build lit test"         OFF)
+# LLPC_BUIL_TESTS should be the only option once XGL and all scripts get updated.
+option(LLPC_BUILD_TESTS      "LLPC build all tests"        OFF)
+# Deprecated, use LLPC_BUILD_TESTS instead.
+option(LLPC_BUILD_LIT        "LLPC build lit tests"        OFF)
 option(LLPC_BUILD_LLVM_TOOLS "Build LLVM tools"            OFF)
 option(LLPC_ENABLE_WERROR    "Build LLPC with more errors" OFF)
 
@@ -57,7 +60,11 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_DOCS OFF CACHE BOOL Force)
     set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL Force)
     set(LLVM_INCLUDE_GO_TESTS OFF CACHE BOOL Force)
-    set(LLVM_INCLUDE_TESTS OFF CACHE BOOL Force)
+    if(LLPC_BUILD_TESTS OR LLPC_BUILD_LIT)
+        set(LLVM_INCLUDE_TESTS ON CACHE BOOL Force)
+    else()
+        set(LLVM_INCLUDE_TESTS OFF CACHE BOOL Force)
+    endif()
     set(LLVM_INCLUDE_TOOLS ON CACHE BOOL Force)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)

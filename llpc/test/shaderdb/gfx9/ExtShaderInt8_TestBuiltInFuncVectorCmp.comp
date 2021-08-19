@@ -40,7 +40,6 @@ void main()
     mOut9  = equal(m1, m2);
     mOut10 = equal(m3, m4);
 
-
     mOut11 = notEqual(m1, m2);
     mOut12 = notEqual(m3, m4);
 }

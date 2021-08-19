@@ -10,7 +10,6 @@ void main()
     m.y = m.x;
 }
 
-
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
@@ -20,7 +19,6 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = load float, float addrspace(7)* %{{[0-9]*}}, align 4
 ; SHADERTEST: %{{[0-9]*}} = getelementptr inbounds i8, i8 addrspace(7)* %{{[0-9]*}}, i64 4
 ; SHADERTEST: store float %{{[0-9]*}}, float addrspace(7)* %{{[0-9]*}}, align 4
-
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

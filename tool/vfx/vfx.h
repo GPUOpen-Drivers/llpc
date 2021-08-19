@@ -468,7 +468,9 @@ struct DrawState {
   unsigned firstIndex;          // First index in draw index
   unsigned vertexOffset;        // Vertex offset in draw index
   VkPrimitiveTopology topology; // Primitive topology
-  VkPolygonMode polygonMode;    // Triangle rendering mode
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
+  VkPolygonMode polygonMode; // Triangle rendering mode
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   VkCullModeFlags cullMode; // Fragment culling mode
   VkFrontFace frontFace;    // Front-facing triangle orientation
@@ -507,7 +509,9 @@ struct ColorBuffer {
 // Represents GraphicsPipelineState section.
 struct GraphicsPipelineState {
   VkPrimitiveTopology topology; // Primitive type
-  VkPolygonMode polygonMode;    // Triangle rendering mode
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
+  VkPolygonMode polygonMode; // Triangle rendering mode
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   VkCullModeFlags cullMode; // Fragment culling mode
   VkFrontFace frontFace;    // Front-facing triangle orientation
@@ -534,6 +538,7 @@ struct GraphicsPipelineState {
 
   ColorBuffer colorBuffer[Vkgc::MaxColorTargets]; // Color target state.
   bool dynamicVertexStride; // Dynamic Vertex input Stride is enabled.
+  bool enableUberFetchShader; // Use uber fetch shader
 };
 
 // =====================================================================================================================

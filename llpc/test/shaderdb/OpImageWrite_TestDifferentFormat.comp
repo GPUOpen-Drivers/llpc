@@ -10,7 +10,6 @@ void main()
     imageStore(_1206, ivec2(gl_GlobalInvocationID.xy), vec4(0));
 }
 
-
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
