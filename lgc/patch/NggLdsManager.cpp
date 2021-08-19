@@ -323,7 +323,7 @@ Value *NggLdsManager::readValueFromLds(Type *readTy, Value *ldsOffset, bool useD
   auto lds = ConstantExpr::getBitCast(
       m_lds, PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
 
-  Value *readPtr = m_builder->CreateGEP(lds, ldsOffset);
+  Value *readPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), lds, ldsOffset);
   readPtr = m_builder->CreateBitCast(readPtr, PointerType::get(readTy, ADDR_SPACE_LOCAL));
 
   return m_builder->CreateAlignedLoad(readTy, readPtr, Align(alignment));
@@ -350,7 +350,7 @@ void NggLdsManager::writeValueToLds(Value *writeValue, Value *ldsOffset, bool us
   auto lds = ConstantExpr::getBitCast(
       m_lds, PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
 
-  Value *writePtr = m_builder->CreateGEP(lds, ldsOffset);
+  Value *writePtr = m_builder->CreateGEP(m_builder->getInt8Ty(), lds, ldsOffset);
   writePtr = m_builder->CreateBitCast(writePtr, PointerType::get(writeTy, ADDR_SPACE_LOCAL));
 
   m_builder->CreateAlignedStore(writeValue, writePtr, Align(alignment));
@@ -369,7 +369,8 @@ void NggLdsManager::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomic
   // from byte offset.
   ldsOffset = m_builder->CreateLShr(ldsOffset, 2);
 
-  Value *atomicPtr = m_builder->CreateGEP(m_lds, {m_builder->getInt32(0), ldsOffset});
+  Value *atomicPtr = m_builder->CreateGEP(m_lds->getType()->getScalarType()->getPointerElementType(), m_lds,
+                                          {m_builder->getInt32(0), ldsOffset});
 
   auto atomicInst = m_builder->CreateAtomicRMW(atomicOp, atomicPtr, atomicValue, MaybeAlign(),
                                                AtomicOrdering::SequentiallyConsistent, SyncScope::System);

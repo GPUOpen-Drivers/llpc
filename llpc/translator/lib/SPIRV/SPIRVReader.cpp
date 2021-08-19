@@ -1182,7 +1182,8 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             Value *const columnSplat = getBuilder()->CreateVectorSplat(rowCount, indices[1]);
 
             Value *const newGetElemPtr = getBuilder()->CreateGEP(
-                remappedValueSplat, {getBuilder()->getInt32(0), rowSplat, getBuilder()->getInt32(0), columnSplat});
+                remappedValueSplat->getType()->getScalarType()->getPointerElementType(), remappedValueSplat,
+                {getBuilder()->getInt32(0), rowSplat, getBuilder()->getInt32(0), columnSplat});
 
             // Check if we are loading a scalar element of the matrix or not.
             if (indices.size() > 2)
@@ -1207,10 +1208,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
           // 3. We are loading a single scalar element, do a simple load.
 
           Value *const pointer = valueMap[load->getPointerOperand()];
+          Type *const pointerType = pointer->getType();
+          Type *const pointerEltType = pointerType->getScalarType()->getPointerElementType();
 
           // If the remapped pointer type isn't a pointer, it's a vector of pointers instead.
-          if (!pointer->getType()->isPointerTy()) {
-            Type *const pointerType = pointer->getType();
+          if (!pointerType->isPointerTy()) {
             assert(pointerType->isVectorTy());
 
             Value *newLoad = UndefValue::get(load->getType());
@@ -1231,7 +1233,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             }
 
             load->replaceAllUsesWith(newLoad);
-          } else if (isTypeWithPadRowMajorMatrix(pointer->getType()->getPointerElementType())) {
+          } else if (isTypeWithPadRowMajorMatrix(pointerEltType)) {
             Type *const newRowType = FixedVectorType::get(matrixElementType, columnCount);
             Type *const newLoadType = ArrayType::get(newRowType, rowCount);
             Value *newLoad = UndefValue::get(newLoadType);
@@ -1239,7 +1241,8 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             // If we are loading a full row major matrix, need to load the rows and then transpose.
             for (unsigned i = 0; i < rowCount; i++) {
               Value *pointerElem = getBuilder()->CreateGEP(
-                  pointer, {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
+                  pointerEltType, pointer,
+                  {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
               Type *castType = pointerElem->getType()->getPointerElementType();
               assert(castType->isArrayTy());
               castType = FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
@@ -1281,10 +1284,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
           // 3. We are storing a single scalar element, do a simple store.
 
           Value *const pointer = valueMap[store->getPointerOperand()];
+          Type *const pointerType = pointer->getType();
+          Type *const pointerEltType = pointer->getType()->getScalarType()->getPointerElementType();
 
           // If the remapped pointer type isn't a pointer, it's a vector of pointers instead.
-          if (!pointer->getType()->isPointerTy()) {
-            Type *const pointerType = pointer->getType();
+          if (!pointerType->isPointerTy()) {
             assert(pointerType->isVectorTy());
 
             for (unsigned i = 0; i < cast<FixedVectorType>(pointerType)->getNumElements(); i++) {
@@ -1305,7 +1309,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
               if (store->getMetadata(LLVMContext::MD_nontemporal))
                 transNonTemporalMetadata(newStoreElem);
             }
-          } else if (isTypeWithPadRowMajorMatrix(pointer->getType()->getPointerElementType())) {
+          } else if (isTypeWithPadRowMajorMatrix(pointerEltType)) {
             Value *storeValue = store->getValueOperand();
 
             Type *const storeType = storeValue->getType();
@@ -1338,7 +1342,8 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             // If we are storing a full row major matrix, need to transpose then store the rows.
             for (unsigned i = 0; i < rowCount; i++) {
               Value *pointerElem = getBuilder()->CreateGEP(
-                  pointer, {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
+                  pointerEltType, pointer,
+                  {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
               Type *castType = pointerElem->getType()->getPointerElementType();
               assert(castType->isArrayTy());
               castType = FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
@@ -1472,7 +1477,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++) {
       const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(spvType, i) : i;
 
-      Value *memberLoadPointer = getBuilder()->CreateGEP(loadPointer, {zero, getBuilder()->getInt32(memberIndex)});
+      Value *memberLoadPointer =
+          getBuilder()->CreateGEP(loadType, loadPointer, {zero, getBuilder()->getInt32(memberIndex)});
 
       // If the struct member was one which overlapped another member (as is common with HLSL cbuffer layout), we
       // need to handle the struct member carefully.
@@ -1515,7 +1521,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       if (needsPad)
         indices.push_back(zero);
 
-      Value *elementLoadPointer = getBuilder()->CreateGEP(loadPointer, indices);
+      Value *elementLoadPointer = getBuilder()->CreateGEP(loadType, loadPointer, indices);
 
       Value *const elementLoad =
           addLoadInstRecursively(spvElementType, elementLoadPointer, isVolatile, isCoherent, isNonTemporal);
@@ -1529,7 +1535,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     Type *elementType = transType(spvElementType);
     Value *load = UndefValue::get(VectorType::get(elementType, spvType->getVectorComponentCount(), false));
     for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
-      Value *const elementLoadPointer = getBuilder()->CreateGEP(loadPointer, {zero, getBuilder()->getInt32(i)});
+      Value *const elementLoadPointer =
+          getBuilder()->CreateGEP(loadType, loadPointer, {zero, getBuilder()->getInt32(i)});
       Value *const elementLoad =
           addLoadInstRecursively(spvElementType, elementLoadPointer, isVolatile, isCoherent, isNonTemporal);
       load = getBuilder()->CreateInsertElement(load, elementLoad, i);
@@ -1621,7 +1628,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
     for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++) {
       const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(spvType, i) : i;
       Value *const memberStorePointer =
-          getBuilder()->CreateGEP(storePointer, {zero, getBuilder()->getInt32(memberIndex)});
+          getBuilder()->CreateGEP(storeType, storePointer, {zero, getBuilder()->getInt32(memberIndex)});
       Value *const memberStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
       addStoreInstRecursively(spvType->getStructMemberType(i), memberStorePointer, memberStoreValue, isVolatile,
                               isCoherent, isNonTemporal);
@@ -1641,7 +1648,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
       if (needsPad)
         indices.push_back(zero);
 
-      Value *const elementStorePointer = getBuilder()->CreateGEP(storePointer, indices);
+      Value *const elementStorePointer = getBuilder()->CreateGEP(storeType, storePointer, indices);
       Value *const elementStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
       addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreValue, isVolatile, isCoherent,
                               isNonTemporal);
@@ -1651,7 +1658,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
     SPIRVType *spvElementType = spvType->getVectorComponentType();
 
     for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
-      Value *const elementStorePointer = getBuilder()->CreateGEP(storePointer, {zero, getBuilder()->getInt32(i)});
+      Value *const elementStorePointer =
+          getBuilder()->CreateGEP(storeType, storePointer, {zero, getBuilder()->getInt32(i)});
       Value *const elementStoreValue = getBuilder()->CreateExtractElement(storeValue, i);
       addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreValue, isVolatile, isCoherent,
                               isNonTemporal);
@@ -2723,10 +2731,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
       const ArrayRef<Value *> frontIndices(indexArray.take_front(split.first));
 
       // Get the pointer to our row major matrix first.
+      Type *const newBaseEltType = newBase->getType()->getScalarType()->getPointerElementType();
       if (spvAccessChain->isInBounds())
-        newBase = getBuilder()->CreateInBoundsGEP(newBase, frontIndices);
+        newBase = getBuilder()->CreateInBoundsGEP(newBaseEltType, newBase, frontIndices);
       else
-        newBase = getBuilder()->CreateGEP(newBase, frontIndices);
+        newBase = getBuilder()->CreateGEP(newBaseEltType, newBase, frontIndices);
 
       // Matrix splits are identified by having a nullptr as the .second of the pair.
       if (!split.second)
@@ -2749,15 +2758,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     }
 
     // Do the final index if we have one.
+    Type *const newBaseEltType = newBase->getType()->getScalarType()->getPointerElementType();
     if (spvAccessChain->isInBounds())
-      return getBuilder()->CreateInBoundsGEP(newBase, indices);
+      return getBuilder()->CreateInBoundsGEP(newBaseEltType, newBase, indices);
     else
-      return getBuilder()->CreateGEP(newBase, indices);
+      return getBuilder()->CreateGEP(newBaseEltType, newBase, indices);
   } else {
+    Type *const baseEltType = base->getType()->getScalarType()->getPointerElementType();
     if (spvAccessChain->isInBounds())
-      return getBuilder()->CreateInBoundsGEP(base, indices);
+      return getBuilder()->CreateInBoundsGEP(baseEltType, base, indices);
     else
-      return getBuilder()->CreateGEP(base, indices);
+      return getBuilder()->CreateGEP(baseEltType, base, indices);
   }
 }
 

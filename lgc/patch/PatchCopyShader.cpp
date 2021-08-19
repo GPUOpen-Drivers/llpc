@@ -608,7 +608,8 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
     assert(m_lds);
 
     Value *ringOffset = calcGsVsRingOffsetForInput(location, 0, streamId, builder);
-    Value *loadPtr = builder.CreateGEP(m_lds, {builder.getInt32(0), ringOffset});
+    Value *loadPtr = builder.CreateGEP(m_lds->getType()->getScalarType()->getPointerElementType(), m_lds,
+                                       {builder.getInt32(0), ringOffset});
     loadPtr = builder.CreateBitCast(loadPtr, PointerType::get(loadTy, m_lds->getType()->getPointerAddressSpace()));
 
     return builder.CreateAlignedLoad(loadTy, loadPtr, m_lds->getAlign());

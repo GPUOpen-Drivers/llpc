@@ -1865,9 +1865,9 @@ void SpirvLowerGlobal::lowerBufferBlock() {
               Value *newGetElemPtr = nullptr;
 
               if (getElemPtr->isInBounds())
-                newGetElemPtr = m_builder->CreateInBoundsGEP(base, newIndices);
+                newGetElemPtr = m_builder->CreateInBoundsGEP(elementType, base, newIndices);
               else
-                newGetElemPtr = m_builder->CreateGEP(base, newIndices);
+                newGetElemPtr = m_builder->CreateGEP(elementType, base, newIndices);
 
               getElemPtr->replaceAllUsesWith(newGetElemPtr);
               getElemPtr->eraseFromParent();

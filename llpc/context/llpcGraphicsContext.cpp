@@ -50,7 +50,7 @@ namespace Llpc {
 GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuildInfo *pipelineInfo,
                                  MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
     : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_stageMask(0),
-      m_activeStageCount(0), m_gsOnChip(false) {
+      m_activeStageCount(0) {
   setUnlinked(pipelineInfo->unlinked);
   const PipelineShaderInfo *shaderInfo[ShaderStageGfxCount] = {
       &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
