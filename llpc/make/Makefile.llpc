@@ -36,6 +36,10 @@ ifeq ($(VKI_BUILD_NAVI22), 1)
     LCXXDEFS += -DLLPC_BUILD_NAVI22=1
 endif
 
+ifeq ($(VKI_BUILD_NAVI23), 1)
+    LCXXDEFS += -DLLPC_BUILD_NAVI23=1
+endif
+
 ifeq ($(ICD_BUILD_LLPC), 1)
     LCXXINCS += -I$(LLVM_DEPTH)/include
     LCXXINCS += -I$(LLVM_BUILD_DIR)/include

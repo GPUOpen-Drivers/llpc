@@ -421,6 +421,7 @@ static Type *convertToFloatingPointType(Type *origTy) {
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
                                      Value *mipLevel, const Twine &instName) {
+  imageDesc = fixImageDescForRead(imageDesc);
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceRead = true;
@@ -768,6 +769,7 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
   Value *imageDesc = imageDescArray;
   if (isa<ArrayType>(imageDescArray->getType()))
     imageDesc = CreateExtractValue(imageDescArray, 0);
+  imageDesc = fixImageDescForRead(imageDesc);
 
   YCbCrSampleInfo sampleInfoLuma = {resultTy, dim, flags, imageDesc, samplerDescLuma, address, instName.str(), true};
 
@@ -779,6 +781,7 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
   // Set image descriptor for chroma channel
   for (unsigned planeIdx = 1; planeIdx < yCbCrMetaData.word1.planes; ++planeIdx) {
     imageDesc = CreateExtractValue(imageDescArray, planeIdx);
+    imageDesc = fixImageDescForRead(imageDesc);
     YCbCrConverter.SetImgDescChroma(planeIdx, imageDesc);
   }
 
@@ -1006,6 +1009,7 @@ Value *ImageBuilder::postprocessIntegerImageGather(Value *needDescPatch, unsigne
 Value *ImageBuilder::CreateImageSampleGather(Type *resultTy, unsigned dim, unsigned flags, Value *coord,
                                              Value *imageDesc, Value *samplerDesc, ArrayRef<Value *> address,
                                              const Twine &instName, bool isSample) {
+  imageDesc = fixImageDescForRead(imageDesc);
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
   getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
   // Set up the mask of address components provided, for use in searching the intrinsic ID table
@@ -1925,6 +1929,25 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
   }
 
   return coord;
+}
+
+// =====================================================================================================================
+// Fix image descriptor before an operation that reads the image, as long as we really have an image descriptor,
+// not a buffer descriptor for a texel buffer.
+//
+// @param imageDesc : Original image descriptor
+// @returns Image descriptor, modified if necessary
+Value *ImageBuilder::fixImageDescForRead(Value *imageDesc) {
+  if (getPipelineState()->getTargetInfo().getGpuWorkarounds().gfx10.waClearWriteCompressBit) {
+    if (cast<FixedVectorType>(imageDesc->getType())->getNumElements() == 8) {
+      // Need to clear the write_compress_enable bit, which is bit 212, or bit 20 of dword 6.
+      // I am hard-coding it here as it is only needed on a limited range of chips.
+      Value *dword6 = CreateExtractElement(imageDesc, 6);
+      dword6 = CreateAnd(dword6, getInt32(0xFFEFFFFF));
+      imageDesc = CreateInsertElement(imageDesc, dword6, 6);
+    }
+  }
+  return imageDesc;
 }
 
 // =====================================================================================================================
