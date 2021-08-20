@@ -132,7 +132,8 @@ struct WorkaroundFlags {
       unsigned waLimitedMaxOutputVertexCount : 1;
       unsigned waGeNggMaxVertOutWithGsInstancing : 1;
       unsigned waAdjustDepthImportVrs : 1;
-      unsigned : 1;
+      // Clear write compress bit in an image descriptor being used for a read operation.
+      unsigned waClearWriteCompressBit : 1;
       unsigned reserved : 11;
     };
     unsigned u32All;

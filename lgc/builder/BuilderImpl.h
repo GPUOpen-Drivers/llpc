@@ -426,6 +426,9 @@ private:
   // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
   llvm::Value *handleFragCoordViewIndex(llvm::Value *coord, unsigned flags, unsigned &dim);
 
+  // Fix image descriptor before an operation that reads the image
+  llvm::Value *fixImageDescForRead(llvm::Value *imageDesc);
+
   // Enforce readfirstlane on the image or sampler descripotrs
   void enforceReadFirstLane(llvm::Instruction *imageInst, unsigned descIdx);
 
