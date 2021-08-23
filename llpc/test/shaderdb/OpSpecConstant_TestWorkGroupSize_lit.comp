@@ -9,7 +9,6 @@ void main()
     f1[gl_LocalInvocationID.x] += 0.2;
 }
 
-
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s

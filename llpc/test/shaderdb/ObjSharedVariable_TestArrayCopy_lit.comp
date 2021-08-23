@@ -24,7 +24,6 @@ void main()
     g_ui = str1.uiarray[gl_LocalInvocationID.x];
 }
 
-
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s

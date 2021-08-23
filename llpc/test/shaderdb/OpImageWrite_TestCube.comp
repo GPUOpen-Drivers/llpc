@@ -14,7 +14,6 @@ void main()
     imageStore(imgCubeArray, ivec3(0, 0, 6), mIn);
 }
 
-
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s

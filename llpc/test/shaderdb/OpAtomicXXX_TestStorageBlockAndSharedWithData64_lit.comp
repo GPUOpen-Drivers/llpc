@@ -2,7 +2,6 @@
 #extension GL_ARB_gpu_shader_int64 : enable
 #extension GL_NV_shader_atomic_int64 : enable
 
-
 layout (local_size_x = 4) in;
 
 struct Result
@@ -76,9 +75,7 @@ void main ()
     ldsResult2 = lds.iMinResult + lds.iMaxResult + lds.iAndResult + lds.iOrResult + lds.iXorResult +
                  lds.addResult + lds.exchangeResult + lds.compSwapResult;
 
-
 }
-
 
 // BEGIN_SHADERTEST
 /*

@@ -390,6 +390,17 @@ static void setGfx1031Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 2;
 }
 
+// gfx1032
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1032Info(TargetInfo *targetInfo) {
+  setGfx10Info(targetInfo);
+  setGfx103Info(targetInfo);
+
+  targetInfo->getGpuProperty().numShaderEngines = 2;
+  targetInfo->getGpuWorkarounds().gfx10.waClearWriteCompressBit = 1;
+}
+
 // =====================================================================================================================
 // Set TargetInfo. Returns false if the GPU name is not found or not supported.
 //
@@ -430,6 +441,7 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
     {"gfx1012", &setGfx1012Info}, // gfx1012, navi14
     {"gfx1030", &setGfx1030Info}, // gfx1030, navi21
     {"gfx1031", &setGfx1031Info}, // gfx1031, navi22
+    {"gfx1032", &setGfx1032Info}, // gfx1032, navi23
   };
 
   void (*setTargetInfoFunc)(TargetInfo * targetInfo) = nullptr;

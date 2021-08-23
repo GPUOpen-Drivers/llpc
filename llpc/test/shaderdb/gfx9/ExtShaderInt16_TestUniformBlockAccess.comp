@@ -1,7 +1,6 @@
 #version 450 core
 #extension GL_AMD_gpu_shader_int16 : enable
 
-
 layout(set = 0, binding = 0) uniform UBO {
     int16_t m1;
     int16_t m2;
