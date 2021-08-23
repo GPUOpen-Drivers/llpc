@@ -155,7 +155,7 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
     argAttrs.push_back((inRegMask >> idx) & 1 ? inRegAttrSet : emptyAttrSet);
   // Old arguments.
   for (unsigned idx = 0; idx != argTys.size(); ++idx)
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396483
     // Old version of the code
     argAttrs.push_back(oldAttrList.getParamAttributes(idx));
   // Construct new AttributeList and set it on the new function.
