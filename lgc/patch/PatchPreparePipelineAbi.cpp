@@ -76,8 +76,6 @@ private:
 
   void addAbiMetadata(Module &module);
 
-  void setConstantGlobalSection(Module &module);
-
   PipelineState *m_pipelineState;     // Pipeline state
   PipelineShaders *m_pipelineShaders; // API shaders in the pipeline
 
@@ -134,8 +132,6 @@ bool PatchPreparePipelineAbi::runOnModule(Module &module) {
     setAbiEntryNames(module);
 
     addAbiMetadata(module);
-
-    setConstantGlobalSection(module);
 
     m_pipelineState->getPalMetadata()->finalizePipeline(m_pipelineState->isWholePipeline());
   }
@@ -385,20 +381,6 @@ void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
   } else {
     Gfx9::ConfigBuilder configBuilder(&module, m_pipelineState);
     configBuilder.buildPalMetadata();
-  }
-}
-
-// =====================================================================================================================
-// Set section name on each read-only global variable. For full pipeline compilation, we explicitly set the section
-// name to ".text", as the PAL pipeline ABI requires constant data to be in the same section as the code. For
-// shader/part-pipeline compilation, we leave it as default, which (after an LLVM change) puts the constant data
-// into the .rodata section.
-void PatchPreparePipelineAbi::setConstantGlobalSection(Module &module) {
-  if (!m_pipelineState->isWholePipeline())
-    return;
-  for (GlobalVariable &global : module.globals()) {
-    if (global.getAddressSpace() == ADDR_SPACE_CONST)
-      global.setSection(".text");
   }
 }
 

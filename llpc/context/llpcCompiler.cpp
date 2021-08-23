@@ -1448,17 +1448,23 @@ void GraphicsShaderCacheChecker::updateAndMerge(Result result, ElfPackage *outpu
   pipelineElf.codeSize = outputPipelineElf->size();
   pipelineElf.pCode = outputPipelineElf->data();
   if (m_nonFragmentCacheAccessor) {
-    if (!m_nonFragmentCacheAccessor->isInCache())
+    if (!m_nonFragmentCacheAccessor->isInCache()) {
       m_nonFragmentCacheAccessor->setElfInCache(pipelineElf);
-    else
+      LLPC_OUTS("Non fragment shader cache miss.\n");
+    } else {
       needToMergeElf = true;
+      LLPC_OUTS("Non fragment shader cache hit.\n");
+    }
   }
 
   if (m_fragmentCacheAccessor) {
-    if (!m_fragmentCacheAccessor->isInCache())
+    if (!m_fragmentCacheAccessor->isInCache()) {
       m_fragmentCacheAccessor->setElfInCache(pipelineElf);
-    else
+      LLPC_OUTS("Fragment shader cache miss.\n");
+    } else {
       needToMergeElf = true;
+      LLPC_OUTS("Fragment shader cache hit.\n");
+    }
   }
 
   // Now merge ELFs if one or both parts are from the cache. Nothing needs to be merged if we just compiled the full
