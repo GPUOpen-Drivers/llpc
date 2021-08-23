@@ -89,27 +89,6 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
 
   Patch::init(&module);
 
-  // NOTE: Global constants are either added to the end of the .text section, or in a separate .rodata section with
-  // relocs in the .text section to refer to them. We can't merge ELF binaries if relocs are used because llpcElfWriter
-  // doesn't know how to merge them.
-  for (auto &global : module.globals()) {
-    if (auto globalVar = dyn_cast<GlobalVariable>(&global)) {
-      if (globalVar->isConstant()) {
-        SmallVector<const Value *, 4> vals;
-        vals.push_back(globalVar);
-        for (unsigned i = 0; i != vals.size(); ++i) {
-          for (auto user : vals[i]->users()) {
-            if (isa<Constant>(user)) {
-              vals.push_back(user);
-              continue;
-            }
-            return false;
-          }
-        }
-      }
-    }
-  }
-
   std::string inOutUsageStreams[ShaderStageGfxCount];
   ArrayRef<uint8_t> inOutUsageValues[ShaderStageGfxCount];
   PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);

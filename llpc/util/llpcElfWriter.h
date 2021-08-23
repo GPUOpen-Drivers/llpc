@@ -61,6 +61,7 @@ class Context;
 template <class Elf> class ElfWriter {
 public:
   typedef ElfSectionBuffer<typename Elf::SectionHeader> SectionBuffer;
+  typedef typename Elf::Reloc ElfReloc;
 
   ElfWriter(GfxIpVersion gfxIp);
 
@@ -73,6 +74,22 @@ public:
   static void mergeMetaNote(Context *context, const ElfNote *note1, const ElfNote *note2, ElfNote *newNote);
 
   static void updateMetaNote(Context *context, const ElfNote *note, ElfNote *newNote);
+
+  static size_t numRelocs(const SectionBuffer *relocSection);
+
+  static size_t getRelocPsStartPos(const SectionBuffer *relocSection, size_t psIsaOffset);
+
+  SectionBuffer createNewSection(const char *sectionName, SectionBuffer *inputSection);
+
+  SectionBuffer mergeRelocSection(const ElfReader<Elf> &reader, const SectionBuffer *section1,
+                                  size_t section1RelocsCount, const SectionBuffer *section2,
+                                  size_t section2RelocsOffset, int64_t deltaOfPsOffset);
+
+  void addRelocSymbols(const ElfReader<Elf> &reader, ElfReloc inputRelocs);
+
+  uint32_t getRelocSymbolIndex(const char *inputSymolName);
+
+  void processRelocSection(const ElfReader<Elf> &reader, size_t nonFragmentPsIsaOffset, size_t fragmentPsIsaOffset);
 
   Result ReadFromBuffer(const void *buffer, size_t bufSize);
   Result copyFromReader(const ElfReader<Elf> &reader);

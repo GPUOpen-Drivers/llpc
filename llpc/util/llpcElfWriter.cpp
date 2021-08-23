@@ -47,6 +47,11 @@ static const char *const ApiStageNames[] = {".vertex", ".hull", ".domain", ".geo
 // The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.
 static const char *const HwStageNames[] = {".ls", ".hs", ".es", ".gs", ".vs", ".ps", ".cs"};
 
+// The suffix added to the rodata sections from the cached elf bin
+static const char CachedRodataSectionSuffix[] = ".cached";
+// The suffix added to the symbols of the rodata sections from the cached elf bin
+static const char CachedRodataSymbolSuffix[] = "_cached";
+
 // =====================================================================================================================
 //
 // @param gfxIp : Graphics IP version info
@@ -676,9 +681,6 @@ template <class Elf> Result ElfWriter<Elf>::copyFromReader(const ElfReader<Elf> 
     m_symbols.push_back(symbol);
   }
 
-  std::sort(m_symbols.begin(), m_symbols.end(), [](const ElfSymbol &a, const ElfSymbol &b) {
-    return a.secIdx < b.secIdx || (a.secIdx == b.secIdx && a.value < b.value);
-  });
   return result;
 }
 
@@ -733,6 +735,298 @@ template <class Elf> void ElfWriter<Elf>::updateMetaNote(Context *pContext, cons
   memcpy(data, blob.data(), blob.size());
   pNewNote->hdr.descSize = blob.size();
   pNewNote->data = data;
+}
+
+// =====================================================================================================================
+// Get the number of relocs in the reloc section
+//
+// @param relocSection : Reloc sectionN
+// @returns : Number of the relocs
+template <class Elf> size_t ElfWriter<Elf>::numRelocs(const SectionBuffer *relocSection) {
+  if (relocSection->secHead.sh_size == 0)
+    return 0;
+
+  return static_cast<unsigned>(relocSection->secHead.sh_size / relocSection->secHead.sh_entsize);
+}
+
+// =====================================================================================================================
+// Get the start pos of relocs used by PS in the reloc section
+//
+// @param relocSection : Reloc section
+// @param psIsaOffset : Ps ISA offset in the elf bin
+// @returns : Start pos of the relocs used by PS in the reloc section
+template <class Elf> size_t ElfWriter<Elf>::getRelocPsStartPos(const SectionBuffer *relocSection, size_t psIsaOffset) {
+  size_t relocCount = numRelocs(relocSection);
+  if (relocCount == 0)
+    return 0;
+
+  size_t psStartPos = 0;
+  auto relocs = reinterpret_cast<typename Elf::Reloc *>(const_cast<uint8_t *>(relocSection->data));
+  for (; psStartPos < relocCount; ++psStartPos)
+    if (relocs[psStartPos].r_offset >= psIsaOffset)
+      break;
+
+  return psStartPos;
+}
+
+// =====================================================================================================================
+// Create a new empty section based on the input section
+//
+// @param name : Name of the new section, the name should be point to the part of the elf bin
+// @param inputSection : The input section
+// @returns : New section
+template <class Elf>
+typename ElfWriter<Elf>::SectionBuffer ElfWriter<Elf>::createNewSection(const char *sectionName,
+                                                                        SectionBuffer *inputSection) {
+  SectionBuffer newSection = {};
+  newSection.secHead = inputSection->secHead;
+
+  // Add the section name to .strtab section.
+  const unsigned strTabSize = m_sections[m_strtabSecIdx].secHead.sh_size;
+  const unsigned secNameSize = strlen(const_cast<char *>(sectionName)) + 1;
+
+  newSection.secHead.sh_name = strTabSize;
+  newSection.name = const_cast<char *>(sectionName);
+
+  newSection.secHead.sh_link = m_symSecIdx;
+  newSection.secHead.sh_size = 0;
+
+  // The memory will be freed in ElfWrith destructor.
+  auto strTabData = new uint8_t[strTabSize + secNameSize];
+  memcpy(strTabData, m_sections[m_strtabSecIdx].data, strTabSize);
+  memcpy(strTabData + strTabSize, sectionName, secNameSize);
+
+  delete[] m_sections[m_strtabSecIdx].data;
+
+  m_sections[m_strtabSecIdx].data = strTabData;
+  m_sections[m_strtabSecIdx].secHead.sh_size = strTabSize + secNameSize;
+
+  return newSection;
+}
+
+// =====================================================================================================================
+// Add the reloc related symbols and sections based on the input reloc
+//
+// @param reader : The ElfReader to the input fragment elf bin
+// @param inputReloc : The input reloc
+template <class Elf> void ElfWriter<Elf>::addRelocSymbols(const ElfReader<Elf> &reader, ElfReloc inputReloc) {
+  ElfSymbol relocSym = {};
+  reader.getSymbol(inputReloc.r_symbol, &relocSym);
+
+  // Create a section named origSectionName.cached.
+  // If the section does not exist, the memory will be freed in ElfWrith destructor.
+  const size_t inputSecNameLen = strlen(relocSym.secName);
+  const size_t newSecNameSize = inputSecNameLen + strlen(CachedRodataSectionSuffix) + 1;
+  char *secName = new char[newSecNameSize];
+  memset(secName, 0, newSecNameSize);
+  memcpy(secName, relocSym.secName, inputSecNameLen);
+  memcpy(secName + inputSecNameLen, CachedRodataSectionSuffix, newSecNameSize - inputSecNameLen);
+
+  for (auto section : m_sections) {
+    if (strcmp(section.name, secName) == 0) {
+      delete[] secName;
+      return;
+    }
+  }
+
+  // If the section does not exist, create a new section and update the related symbols.
+  SectionBuffer *inputRodataSection = nullptr;
+  std::vector<ElfSymbol> inputRodataSymbols;
+  auto inputRodataSecIndex = reader.GetSectionIndex(relocSym.secName);
+  reader.getSectionDataBySectionIndex(inputRodataSecIndex, &inputRodataSection);
+  reader.GetSymbolsBySectionIndex(inputRodataSecIndex, inputRodataSymbols);
+
+  SectionBuffer newSection = createNewSection(secName, inputRodataSection);
+
+  // Update the data from the input section.
+  // The memory will be freed in ElfWrith destructor.
+  auto secData = new uint8_t[inputRodataSection->secHead.sh_size];
+  memcpy(secData, inputRodataSection->data, inputRodataSection->secHead.sh_size);
+  newSection.data = secData;
+  newSection.secHead.sh_size = inputRodataSection->secHead.sh_size;
+
+  m_sections.push_back(newSection);
+
+  // Update symbols.
+  for (auto rodataSymbol : inputRodataSymbols) {
+    ElfSymbol symbol = {};
+    // Create a new symbol named origSymbolName_cached.
+    // The memory will be freed in ElfWrith destructor.
+    const size_t inputSymbolNameLen = strlen(rodataSymbol.pSymName);
+    const size_t newSymSize = inputSymbolNameLen + strlen(CachedRodataSymbolSuffix) + 1;
+    char *newSymName = new char[newSymSize];
+    memset(newSymName, 0, newSymSize);
+    memcpy(newSymName, rodataSymbol.pSymName, inputSymbolNameLen);
+    memcpy(newSymName + inputSymbolNameLen, CachedRodataSymbolSuffix, newSymSize - inputSymbolNameLen);
+    symbol.secIdx = m_sections.size() - 1;
+    symbol.secName = secName;
+    symbol.size = rodataSymbol.size;
+    symbol.pSymName = newSymName;
+    symbol.value = rodataSymbol.value;
+    symbol.info.all = rodataSymbol.info.all;
+    symbol.nameOffset = InvalidValue;
+    m_symbols.push_back(symbol);
+  }
+}
+
+// =====================================================================================================================
+// Get the reloc symbol index based on the input reloc symbol
+//
+// @param inputSymbolName : The input reloc symbol name
+// @returns : Reloc symbol index
+template <class Elf> uint32_t ElfWriter<Elf>::getRelocSymbolIndex(const char *inputSymbolName) {
+  const size_t inputSymbolNameLen = strlen(inputSymbolName);
+  const size_t newSymSize = inputSymbolNameLen + strlen(CachedRodataSymbolSuffix) + 1;
+  char *newSymName = new char[newSymSize];
+  memset(newSymName, 0, newSymSize);
+  memcpy(newSymName, inputSymbolName, inputSymbolNameLen);
+  memcpy(newSymName + inputSymbolNameLen, CachedRodataSymbolSuffix, newSymSize - inputSymbolNameLen);
+
+  uint32_t index = 0;
+  for (auto symbol : m_symbols) {
+    if (symbol.secIdx == InvalidValue)
+      continue;
+    if (symbol.nameOffset == InvalidValue && strcmp(newSymName, symbol.pSymName) == 0)
+      break;
+    ++index;
+  }
+
+  delete[] newSymName;
+
+  return index;
+}
+
+// =====================================================================================================================
+// Merge base reloc section and input reloc section into merged section
+//
+// @param reader : The ElfReader to the input fragment elf bin
+// @param section1 : The first reloc section buffer to merge
+// @param section1RelocsCount : Relocs count of the first section
+// @param section2 : The second reloc section buffer to merge
+// @param section2RelocsOffset : Relocs count offset of the second section
+// @param diffOfPsOffset : The delta of ps Isa offset of the two sections
+// @returns : New section
+template <class Elf>
+typename ElfWriter<Elf>::SectionBuffer
+ElfWriter<Elf>::mergeRelocSection(const ElfReader<Elf> &reader, const SectionBuffer *section1,
+                                  size_t section1RelocsCount, const SectionBuffer *section2,
+                                  size_t section2RelocsOffset, int64_t diffOfPsOffset) {
+  SectionBuffer newSection = {};
+
+  newSection = *section1;
+
+  // The second section is null and the relocs count of the first section is zero,
+  // no data need to be merged, return a null section.
+  if (!section2 && (section1RelocsCount == 0)) {
+    newSection.data = nullptr;
+    newSection.secHead.sh_size = 0;
+    return newSection;
+  }
+
+  size_t section1Size = section1RelocsCount * section1->secHead.sh_entsize;
+
+  size_t newSectionSize = section1Size;
+  size_t relocsCount = section1RelocsCount;
+
+  if (section2) {
+    size_t section2Offset = section2RelocsOffset * section2->secHead.sh_entsize;
+    newSectionSize += (section2->secHead.sh_size - section2Offset);
+    relocsCount += (numRelocs(section2) - section2RelocsOffset);
+  }
+
+  // The memory will be freed in ElfWrith destructor.
+  auto mergedData = new uint8_t[newSectionSize];
+
+  newSection.data = mergedData;
+  newSection.secHead.sh_size = newSectionSize;
+
+  auto data = mergedData;
+
+  if (section1Size > 0) {
+    memcpy(data, section1->data, section1Size);
+    data += section1Size;
+  }
+
+  if (section2) {
+    auto section2Relocs = reinterpret_cast<typename Elf::Reloc *>(const_cast<uint8_t *>(section2->data));
+    size_t section2RelocsCount = numRelocs(section2);
+    size_t relocSize = section2->secHead.sh_entsize;
+
+    for (auto i = section2RelocsOffset; i < section2RelocsCount; ++i) {
+      addRelocSymbols(reader, section2Relocs[i]);
+
+      // Merge the relocs data.
+      typename Elf::Reloc reloc = {};
+      reloc.r_offset = section2Relocs[i].r_offset + diffOfPsOffset;
+      reloc.r_type = section2Relocs[i].r_type;
+      ElfSymbol section2RelocSymbol = {};
+      reader.getSymbol(section2Relocs[i].r_symbol, &section2RelocSymbol);
+      reloc.r_symbol = getRelocSymbolIndex(section2RelocSymbol.pSymName);
+      memcpy(data, &reloc, relocSize);
+      data += relocSize;
+    }
+  }
+
+  return newSection;
+}
+
+// =====================================================================================================================
+// Process the reloc section
+//
+// @param reader : The ElfReader to input fragment elf bin
+// @param nonFragmentPsIsaOffset : The offset of PS ISA in nonFragment elf bin
+// @param fragmentPsIsaOffset : The offset of PS ISA in input fragment elf bin
+template <class Elf>
+void ElfWriter<Elf>::processRelocSection(const ElfReader<Elf> &reader, size_t nonFragmentPsIsaOffset,
+                                         size_t fragmentPsIsaOffset) {
+  SectionBuffer *fragmentRelocSection = nullptr;
+  const SectionBuffer *nonFragmentRelocSection = nullptr;
+
+  auto fragmentRelocSecIndex = reader.GetSectionIndex(RelocName);
+  auto nonFragmentRelocSecIndex = GetSectionIndex(RelocName);
+
+  reader.getSectionDataBySectionIndex(fragmentRelocSecIndex, &fragmentRelocSection);
+  getSectionDataBySectionIndex(nonFragmentRelocSecIndex, &nonFragmentRelocSection);
+
+  bool isFragmentRelocUsedInPs = false;
+
+  // The start pos of the relocs which used by PS.
+  size_t fragmentRelocPsStartPos = 0;
+
+  if (fragmentRelocSection) {
+    size_t fragmentRelocCounts = numRelocs(fragmentRelocSection);
+    fragmentRelocPsStartPos = getRelocPsStartPos(fragmentRelocSection, fragmentPsIsaOffset);
+    isFragmentRelocUsedInPs = (fragmentRelocPsStartPos < fragmentRelocCounts);
+  }
+
+  if (!nonFragmentRelocSection && isFragmentRelocUsedInPs) {
+    // The input fragment elf bin has relocs used in PS, but nonFragment elf bin does not have reloc section,
+    // then a reloc section need to be created for nonFragment elf bin.
+    SectionBuffer newRelocSection = createNewSection(RelocName, fragmentRelocSection);
+
+    m_sections.push_back(newRelocSection);
+    // Update the reloc section index.
+    m_relocSecIdx = m_sections.size() - 1;
+    m_map[RelocName] = m_relocSecIdx;
+    nonFragmentRelocSecIndex = m_relocSecIdx;
+    getSectionDataBySectionIndex(nonFragmentRelocSecIndex, &nonFragmentRelocSection);
+  }
+
+  // Merge reloc section.
+  if (nonFragmentRelocSection) {
+    size_t nonFragmentRelocPsStartPos = getRelocPsStartPos(nonFragmentRelocSection, nonFragmentPsIsaOffset);
+
+    // If the input fragment elf bin does not have relocs used by PS,
+    // no need to merge any reloc from the input fragment elf bin.
+    SectionBuffer *tmpFragmentRelocSection = isFragmentRelocUsedInPs ? fragmentRelocSection : nullptr;
+
+    int64_t diffOfPsOffset = nonFragmentPsIsaOffset - fragmentPsIsaOffset;
+
+    SectionBuffer newSection = mergeRelocSection(reader, nonFragmentRelocSection, nonFragmentRelocPsStartPos,
+                                                 tmpFragmentRelocSection, fragmentRelocPsStartPos, diffOfPsOffset);
+
+    setSection(nonFragmentRelocSecIndex, &newSection);
+  }
 }
 
 // =====================================================================================================================
@@ -1003,6 +1297,9 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   mergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
   setNote(&newMetaNote);
 
+  // Process reloc Section.
+  processRelocSection(reader, isaOffset, fragmentIsaSymbol->value);
+
   writeToBuffer(pPipelineElf);
 }
 
@@ -1030,6 +1327,10 @@ template <class Elf> void ElfWriter<Elf>::reinitialize() {
   m_noteSecIdx = m_sections.size();
   m_sections.push_back({});
   m_map[NoteName] = m_noteSecIdx;
+
+  m_relocSecIdx = m_sections.size();
+  m_sections.push_back({});
+  m_map[RelocName] = m_relocSecIdx;
 }
 
 template class ElfWriter<Elf64>;
