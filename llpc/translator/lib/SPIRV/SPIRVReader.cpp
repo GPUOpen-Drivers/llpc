@@ -2466,8 +2466,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
   SPIRVStore *const spvStore = static_cast<SPIRVStore *>(spvValue);
 
   bool isVolatile = spvStore->SPIRVMemoryAccess::isVolatile(false);
-  const Vkgc::ExtendedRobustness &extendedRobustness =
-      static_cast<Llpc::Context *>(m_context)->getPipelineContext()->getPipelineOptions()->extendedRobustness;
+  const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
   if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
     isVolatile |= spvStore->getDst()->isVolatile();
 
@@ -8289,7 +8288,8 @@ const Vkgc::PipelineOptions *SPIRVToLLVM::getPipelineOptions() const {
 }
 
 bool SPIRVToLLVM::scratchBoundsChecksEnabled() const {
-  return getPipelineOptions()->enableScratchAccessBoundsChecks;
+  const Vkgc::GfxIpVersion gfxIp = static_cast<Llpc::Context *>(m_context)->getPipelineContext()->getGfxIpVersion();
+  return gfxIp.major >= 9 || getPipelineOptions()->enableScratchAccessBoundsChecks;
 }
 
 SPIRVAccessChainBase *SPIRVToLLVM::deriveAccessChain(SPIRVValue *memOp,

@@ -145,15 +145,6 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
 
     auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
-#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
-#warning[!amd-gfx] Scratch bounds checks not supported
-#else
-    // The backend currently only supports bounds checks for entry points
-    if (gfxIp.major >= 9 &&
-        isShaderEntryPoint(&*func))
-      targetFeatures += ",+enable-scratch-bounds-checks";
-#endif
-
     if (gfxIp.major >= 10) {
       // Setup wavefront size per shader stage
       unsigned waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
