@@ -390,6 +390,19 @@ void SPIRVExecutionMode::decode(std::istream &I) {
     getOrCreateTarget()->addExecutionMode(this);
 }
 
+void SPIRVExecutionModeId::decode(std::istream &I) {
+  getDecoder(I) >> Target >> ExecMode;
+  switch (ExecMode) {
+  case ExecutionModeLocalSizeId:
+    Operands.resize(3);
+    break;
+  default:
+    // Do nothing. Keep this to avoid VS2013 warning.
+    break;
+  }
+  getDecoder(I) >> Operands;
+}
+
 SPIRVForward *SPIRVAnnotationGeneric::getOrCreateTarget() const {
   SPIRVEntry *Entry = nullptr;
   bool Found = Module->exist(Target, &Entry);
