@@ -163,6 +163,7 @@ public:
   void setAddressingModel(SPIRVAddressingModelKind AM) override {
     AddrModel = AM;
   }
+  void postProcessExecutionModeId();
   void setMemoryModel(SPIRVMemoryModelKind MM) override { MemoryModel = MM; }
   void setName(SPIRVEntry *E, const std::string &Name) override;
   void setSourceLanguage(SourceLanguage Lang, SPIRVWord Ver) override {
@@ -382,6 +383,7 @@ private:
   typedef std::map<SPIRVTypeStruct *, std::vector<std::pair<unsigned, SPIRVId>>>
       SPIRVUnknownStructFieldMap;
 
+  SPIRVEntryVector ExecModeIdVec;
   SPIRVForwardPointerVec ForwardPointerVec;
   SPIRVTypeVec TypeVec;
   SPIRVIdToEntryMap IdEntryMap;
@@ -484,6 +486,28 @@ void SPIRVModuleImpl::optimizeDecorates() {
   }
 }
 
+void SPIRVModuleImpl::postProcessExecutionModeId() {
+  for (auto ExecModeId : ExecModeIdVec) {
+    SPIRVExecutionModeId *E = static_cast<SPIRVExecutionModeId *>(ExecModeId);
+    auto M = E->getExecutionMode();
+    switch (M) {
+    case ExecutionModeLocalSizeId: {
+      auto TId = E->getTargetId();
+      auto Ops = E->getOperands();
+      auto WorkGroupSizeX = static_cast<SPIRVConstant *>(getEntry(Ops[0]));
+      auto WorkGroupSizeY = static_cast<SPIRVConstant *>(getEntry(Ops[1]));
+      auto WorkGroupSizeZ = static_cast<SPIRVConstant *>(getEntry(Ops[2]));
+      auto ExecMode =
+          add(new SPIRVExecutionMode(getEntry(TId), ExecutionModeLocalSize, WorkGroupSizeX->getZExtIntValue(),
+                                     WorkGroupSizeY->getZExtIntValue(), WorkGroupSizeZ->getZExtIntValue()));
+      static_cast<SPIRVFunction *>(getEntry(TId))->addExecutionMode(ExecMode);
+    }
+    default:
+      break;
+    }
+  }
+}
+
 void SPIRVModuleImpl::addCapability(SPIRVCapabilityKind Cap) {
   addCapabilities(SPIRV::getCapability(Cap));
   if (hasCapability(Cap))
@@ -533,6 +557,10 @@ void SPIRVModuleImpl::layoutEntry(SPIRVEntry *E) {
         EI->getExtOp() != SPIRVDebug::NoScope) {
       DebugInstVec.push_back(EI);
     }
+    break;
+  }
+  case OpExecutionModeId: {
+    ExecModeIdVec.push_back(E);
     break;
   }
   default:
@@ -1292,6 +1320,7 @@ std::istream &operator>>(std::istream &I, SPIRVModule &M) {
   while(Decoder.getWordCountAndOpCode())
     Decoder.getEntry();
 
+  MI.postProcessExecutionModeId();
   MI.optimizeDecorates();
   MI.resolveUnknownStructFields();
   MI.createForwardPointers();

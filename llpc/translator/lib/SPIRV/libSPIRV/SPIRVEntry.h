@@ -594,6 +594,19 @@ protected:
   std::vector<SPIRVWord> WordLiterals;
 };
 
+class SPIRVExecutionModeId : public SPIRVAnnotation<OpExecutionModeId> {
+public:
+  // Incomplete constructor
+  SPIRVExecutionModeId() {}
+  _SPIRV_DCL_DECODE
+  const std::vector<SPIRVId> &getOperands() const { return Operands; }
+  SPIRVExecutionModeKind getExecutionMode() const { return ExecMode; }
+
+protected:
+  SPIRVExecutionModeKind ExecMode;
+  std::vector<SPIRVId> Operands;
+};
+
 class SPIRVComponentExecutionModes {
   typedef std::map<SPIRVExecutionModeKind, SPIRVExecutionMode *>
       SPIRVExecutionModeMap;
@@ -731,7 +744,6 @@ bool isa(SPIRVEntry *E) {
 // This is also an indication of how much work is left.
 #define _SPIRV_OP(x, ...) typedef SPIRVEntryOpCodeOnly<Op##x> SPIRV##x;
 _SPIRV_OP(SizeOf)
-_SPIRV_OP(ExecutionModeId)
 _SPIRV_OP(DecorateId)
 // NOTE: These 4 OpCodes are reserved by SPIR-V spec, they are invalid unless
 // some extensions expose them.
