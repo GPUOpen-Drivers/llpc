@@ -297,6 +297,7 @@ if(ICD_BUILD_LLPC)
 # Add a common library for standalone compilers based on LLPC.
 add_library(llpc_standalone_compiler
     tool/llpcAutoLayout.cpp
+    tool/llpcCompilationUtils.cpp
     tool/llpcInputUtils.cpp
 )
 add_dependencies(llpc_standalone_compiler llpc)
