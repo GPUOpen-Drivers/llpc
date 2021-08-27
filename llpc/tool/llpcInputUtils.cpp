@@ -36,6 +36,7 @@
 #endif
 
 #include "llpcDebug.h"
+#include "llpcFile.h"
 #include "llpcInputUtils.h"
 #include "vkgcElfReader.h"
 #include <cassert>
@@ -53,12 +54,12 @@ namespace StandaloneCompiler {
 // @param dataSize : Size of the input data
 // @returns : true if ELF binary
 bool isElfBinary(const void *data, size_t dataSize) {
-  bool isElfBin = false;
-  if (dataSize >= sizeof(Elf64::FormatHeader)) {
-    auto header = reinterpret_cast<const Elf64::FormatHeader *>(data);
-    isElfBin = header->e_ident32[EI_MAG0] == ElfMagic;
-  }
-  return isElfBin;
+  assert(data);
+  if (dataSize < sizeof(Elf64::FormatHeader))
+    return false;
+
+  auto header = reinterpret_cast<const Elf64::FormatHeader *>(data);
+  return header->e_ident32[EI_MAG0] == ElfMagic;
 }
 
 // =====================================================================================================================
@@ -68,8 +69,12 @@ bool isElfBinary(const void *data, size_t dataSize) {
 // @param dataSize : Size of the input data
 // @returns : true if LLVM bitcode
 bool isLlvmBitcode(const void *data, size_t dataSize) {
+  assert(data);
   const unsigned char magic[] = {'B', 'C', 0xC0, 0xDE};
-  return dataSize >= sizeof magic && memcmp(data, magic, sizeof magic) == 0;
+  if (dataSize < sizeof(magic))
+    return false;
+
+  return memcmp(data, magic, sizeof(magic)) == 0;
 }
 
 // =====================================================================================================================
@@ -79,8 +84,10 @@ bool isLlvmBitcode(const void *data, size_t dataSize) {
 // @param dataSize : Size of the input data
 // @returns : true if ISA text
 bool isIsaText(const void *data, size_t dataSize) {
-  // This is called by amdllpc to help distinguish between its three output types of ELF binary, LLVM IR assembler
-  // and ISA assembler. Here we use the fact that ISA assembler is the only one that starts with a tab character.
+  assert(data);
+  // This is called by LLPC standalone compilers to help distinguish between its three output types of ELF binary, LLVM
+  // IR assembler and ISA assembler. Here we use the fact that ISA assembler is the only one that starts with a tab
+  // character.
   return dataSize != 0 && (reinterpret_cast<const char *>(data))[0] == '\t';
 }
 
@@ -89,75 +96,35 @@ bool isIsaText(const void *data, size_t dataSize) {
 //
 // @param fileName : File path to check
 // @returns : true when fileName is a SPIR-V text file
-bool isSpirvTextFile(const std::string &fileName) {
-  bool isSpirvText = false;
-
-  size_t extPos = fileName.find_last_of(".");
-  std::string extName;
-  if (extPos != std::string::npos)
-    extName = fileName.substr(extPos, fileName.size() - extPos);
-
-  if (!extName.empty() && extName == Ext::SpirvText)
-    isSpirvText = true;
-
-  return isSpirvText;
+bool isSpirvTextFile(StringRef fileName) {
+  return fileName.endswith(Ext::SpirvText);
 }
 
 // =====================================================================================================================
 // Checks whether the specified file name represents a SPIR-V binary file (.spv).
 //
-// @param fileName : File name to check
+// @param fileName : File path to check
 // @returns : true when fileName is a SPIR-V binary file
-bool isSpirvBinaryFile(const std::string &fileName) {
-  bool isSpirvBin = false;
-
-  size_t extPos = fileName.find_last_of(".");
-  std::string extName;
-  if (extPos != std::string::npos)
-    extName = fileName.substr(extPos, fileName.size() - extPos);
-
-  if (!extName.empty() && extName == Ext::SpirvBin)
-    isSpirvBin = true;
-
-  return isSpirvBin;
-}
-
-// =====================================================================================================================
-// Checks whether the specified file name represents an LLPC pipeline info file (.pipe).
-//
-// @param fileName : File name to check
-// @returns : true when `fileName` is a pipelien info file
-bool isPipelineInfoFile(const std::string &fileName) {
-  bool isPipelineInfo = false;
-
-  size_t extPos = fileName.find_last_of(".");
-  std::string extName;
-  if (extPos != std::string::npos)
-    extName = fileName.substr(extPos, fileName.size() - extPos);
-
-  if (!extName.empty() && extName == Ext::PipelineInfo)
-    isPipelineInfo = true;
-
-  return isPipelineInfo;
+bool isSpirvBinaryFile(StringRef fileName) {
+  return fileName.endswith(Ext::SpirvBin);
 }
 
 // =====================================================================================================================
 // Checks whether the specified file name represents an LLVM IR file (.ll).
 //
-// @param fileName : File name to check
-// @returns : true when `fileName` is an LLVM IR file
-bool isLlvmIrFile(const std::string &fileName) {
-  bool isLlvmIr = false;
+// @param fileName : File path to check
+// @returns : true when fileName is an LLVM IR file
+bool isLlvmIrFile(StringRef fileName) {
+  return fileName.endswith(Ext::LlvmIr);
+}
 
-  size_t extPos = fileName.find_last_of(".");
-  std::string extName;
-  if (extPos != std::string::npos)
-    extName = fileName.substr(extPos, fileName.size() - extPos);
-
-  if (!extName.empty() && extName == Ext::LlvmIr)
-    isLlvmIr = true;
-
-  return isLlvmIr;
+// =====================================================================================================================
+// Checks whether the specified file name represents an LLPC pipeline info file (.pipe).
+//
+// @param fileName : File path to check
+// @returns : true when `fileName` is a pipelien info file
+bool isPipelineInfoFile(StringRef fileName) {
+  return fileName.endswith(Ext::PipelineInfo);
 }
 
 // =====================================================================================================================
@@ -172,6 +139,7 @@ StringLiteral fileExtFromBinary(BinaryData pipelineBin) {
     return Ext::LlvmBitcode;
   if (isIsaText(pipelineBin.pCode, pipelineBin.codeSize))
     return Ext::IsaText;
+
   return Ext::LlvmIr;
 }
 
@@ -242,32 +210,24 @@ Result expandInputFilenames(ArrayRef<std::string> inputFiles, std::vector<std::s
 // @param spvBinFile : Path to a SPIR-V binary file
 // @param [out] spvBin : SPIR-V binary code
 // @returns : Result::Success on success, Result::ErrorUnavailable when the input file cannot be accessed.
-Result getSpirvBinaryFromFile(const std::string &spvBinFile, BinaryData &spvBin) {
-  Result result = Result::Success;
+Result getSpirvBinaryFromFile(StringRef spvBinFile, BinaryData &spvBin) {
+  File file;
+  Result openRes = file.open(spvBinFile.str().c_str(), FileAccessRead | FileAccessBinary);
+  if (openRes != Result::Success)
+    return openRes;
 
-  FILE *binFile = fopen(spvBinFile.c_str(), "rb");
-  if (!binFile) {
-    LLPC_ERRS("Fails to open SPIR-V binary file: " << spvBinFile << "\n");
-    result = Result::ErrorUnavailable;
+  const size_t fileSize = File::getFileSize(spvBinFile.str().c_str());
+  char *bin = new char[fileSize]();
+  size_t bytesRead = 0;
+  Result readRes = file.read(bin, fileSize, &bytesRead);
+  if (readRes != Result::Success) {
+    delete[] bin;
+    return readRes;
   }
+  spvBin.codeSize = bytesRead;
+  spvBin.pCode = bin;
 
-  if (result == Result::Success) {
-    fseek(binFile, 0, SEEK_END);
-    size_t binSize = ftell(binFile);
-    fseek(binFile, 0, SEEK_SET);
-
-    char *bin = new char[binSize];
-    assert(bin);
-    memset(bin, 0, binSize);
-    binSize = fread(bin, 1, binSize, binFile);
-
-    spvBin.codeSize = binSize;
-    spvBin.pCode = bin;
-
-    fclose(binFile);
-  }
-
-  return result;
+  return Result::Success;
 }
 
 // =====================================================================================================================
@@ -277,27 +237,25 @@ Result getSpirvBinaryFromFile(const std::string &spvBinFile, BinaryData &spvBin)
 // @param fileName : Name of the file that should be written or "-" for stdout
 // @returns : Result::Success on success, Result::ErrorUnavailable on failure
 Result writeFile(BinaryData pipelineBin, StringRef fileName) {
-  Result result = Result::Success;
   FILE *outFile = stdout;
   if (fileName != "-")
     outFile = fopen(fileName.str().c_str(), "wb");
 
   if (!outFile) {
     LLPC_ERRS("Failed to open output file: " << fileName << "\n");
+    return Result::ErrorUnavailable;
+  }
+
+  auto result = Result::Success;
+  if (fwrite(pipelineBin.pCode, 1, pipelineBin.codeSize, outFile) != pipelineBin.codeSize)
     result = Result::ErrorUnavailable;
-  }
 
-  if (result == Result::Success) {
-    if (fwrite(pipelineBin.pCode, 1, pipelineBin.codeSize, outFile) != pipelineBin.codeSize)
-      result = Result::ErrorUnavailable;
+  if (outFile != stdout && fclose(outFile) != 0)
+    result = Result::ErrorUnavailable;
 
-    if (outFile != stdout && fclose(outFile) != 0)
-      result = Result::ErrorUnavailable;
+  if (result != Result::Success)
+    LLPC_ERRS("Failed to write output file: " << fileName << "\n");
 
-    if (result != Result::Success) {
-      LLPC_ERRS("Failed to write output file: " << fileName << "\n");
-    }
-  }
   return result;
 }
 

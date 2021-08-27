@@ -313,9 +313,10 @@ void File::seek(int offset, bool fromOrigin) {
 }
 
 // =====================================================================================================================
-// Returns true if a file with the given name exists.
+// Returns the size of the file, or 0 if the file is inaccessible.
 //
 // @param filename : Name of the file to check
+// @returns : The size of the file `filename` in bytes, or 0 if it is inaccessible
 size_t File::getFileSize(const char *filename) {
 #if defined(_WIN32)
   // On MS compilers the function and structure to retrieve/store file status information is named '_stat' (with
