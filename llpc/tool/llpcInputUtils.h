@@ -62,16 +62,16 @@ bool isLlvmBitcode(const void *data, size_t dataSize);
 bool isIsaText(const void *data, size_t dataSize);
 
 // Checks whether the specified file name represents a SPIR-V assembly text file (.spvasm).
-bool isSpirvTextFile(const std::string &fileName);
+bool isSpirvTextFile(llvm::StringRef fileName);
 
 // Checks whether the specified file name represents a SPIR-V binary file (.spv).
-bool isSpirvBinaryFile(const std::string &fileName);
+bool isSpirvBinaryFile(llvm::StringRef fileName);
 
 // Checks whether the specified file name represents an LLVM IR file (.ll).
-bool isLlvmIrFile(const std::string &fileName);
+bool isLlvmIrFile(llvm::StringRef fileName);
 
 // Checks whether the specified file name represents an LLPC pipeline info file (.pipe).
-bool isPipelineInfoFile(const std::string &fileName);
+bool isPipelineInfoFile(llvm::StringRef fileName);
 
 // Tries to detect the format of binary data and creates a file extension from it.
 llvm::StringLiteral fileExtFromBinary(BinaryData pipelineBin);
@@ -80,7 +80,7 @@ llvm::StringLiteral fileExtFromBinary(BinaryData pipelineBin);
 Result expandInputFilenames(llvm::ArrayRef<std::string> inputFiles, std::vector<std::string> &expandedFilenames);
 
 // Reads SPIR-V binary code from the specified binary file.
-Result getSpirvBinaryFromFile(const std::string &spvBinFile, BinaryData &spvBin);
+Result getSpirvBinaryFromFile(llvm::StringRef spvBinFile, BinaryData &spvBin);
 
 // Write a binary into a file or to stdout. The file will be overwritten if it exists.
 Result writeFile(BinaryData pipelineBin, llvm::StringRef fileName);
