@@ -34,6 +34,7 @@
 #endif
 
 #include "llpcAutoLayout.h"
+#include "llpcInputUtils.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
@@ -285,16 +286,6 @@ static opt<bool>
 static cl::opt<bool> AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when assert is hit"));
 #endif
 
-// Represents allowed extensions of LLPC source files.
-namespace LlpcExt {
-
-const char SpirvBin[] = ".spv";
-const char SpirvText[] = ".spvasm";
-const char PipelineInfo[] = ".pipe";
-const char LlvmIr[] = ".ll";
-
-} // namespace LlpcExt
-
 // Represents the module info for a shader module.
 struct ShaderModuleData {
   ShaderStage shaderStage;          // Shader stage
@@ -321,41 +312,6 @@ struct CompileInfo {
   bool checkAutoLayoutCompatible; // Whether to comapre if auto layout descriptors is
                                   // same as specified pipeline layout
 };
-
-// =====================================================================================================================
-// Checks whether the input data is actually a ELF binary
-//
-// @param data : Input data to check
-// @param dataSize : Size of the input data
-static bool isElfBinary(const void *data, size_t dataSize) {
-  bool isElfBin = false;
-  if (dataSize >= sizeof(Elf64::FormatHeader)) {
-    auto header = reinterpret_cast<const Elf64::FormatHeader *>(data);
-    isElfBin = header->e_ident32[EI_MAG0] == ElfMagic;
-  }
-  return isElfBin;
-}
-
-// =====================================================================================================================
-// Checks whether the input data is actually LLVM bitcode
-//
-// @param data : Input data to check
-// @param dataSize : Size of the input data
-static bool isLlvmBitcode(const void *data, size_t dataSize) {
-  const unsigned char magic[] = {'B', 'C', 0xC0, 0xDE};
-  return dataSize >= sizeof magic && memcmp(data, magic, sizeof magic) == 0;
-}
-
-// =====================================================================================================================
-// Checks whether the output data is actually ISA assembler text
-//
-// @param data : Input data to check
-// @param dataSize : Size of the input data
-static bool isIsaText(const void *data, size_t dataSize) {
-  // This is called by amdllpc to help distinguish between its three output types of ELF binary, LLVM IR assembler
-  // and ISA assembler. Here we use the fact that ISA assembler is the only one that starts with a tab character.
-  return dataSize != 0 && (reinterpret_cast<const char *>(data))[0] == '\t';
-}
 
 // =====================================================================================================================
 // Translates GLSL source language to corresponding shader stage.
@@ -548,109 +504,6 @@ void *VKAPI_CALL allocateBuffer(void *instance, void *userData, size_t size) {
 }
 
 // =====================================================================================================================
-// Checks whether the specified file name represents a SPIR-V assembly text file (.spvasm).
-static bool isSpirvTextFile(const std::string &fileName) {
-  bool isSpirvText = false;
-
-  size_t extPos = fileName.find_last_of(".");
-  std::string extName;
-  if (extPos != std::string::npos)
-    extName = fileName.substr(extPos, fileName.size() - extPos);
-
-  if (!extName.empty() && extName == LlpcExt::SpirvText)
-    isSpirvText = true;
-
-  return isSpirvText;
-}
-
-// =====================================================================================================================
-// Checks whether the specified file name represents a SPIR-V binary file (.spv).
-//
-// @param fileName : File name to check
-static bool isSpirvBinaryFile(const std::string &fileName) {
-  bool isSpirvBin = false;
-
-  size_t extPos = fileName.find_last_of(".");
-  std::string extName;
-  if (extPos != std::string::npos)
-    extName = fileName.substr(extPos, fileName.size() - extPos);
-
-  if (!extName.empty() && extName == LlpcExt::SpirvBin)
-    isSpirvBin = true;
-
-  return isSpirvBin;
-}
-
-// =====================================================================================================================
-// Checks whether the specified file name represents a LLPC pipeline info file (.pipe).
-//
-// @param fileName : File name to check
-static bool isPipelineInfoFile(const std::string &fileName) {
-  bool isPipelineInfo = false;
-
-  size_t extPos = fileName.find_last_of(".");
-  std::string extName;
-  if (extPos != std::string::npos)
-    extName = fileName.substr(extPos, fileName.size() - extPos);
-
-  if (!extName.empty() && extName == LlpcExt::PipelineInfo)
-    isPipelineInfo = true;
-
-  return isPipelineInfo;
-}
-
-// =====================================================================================================================
-// Checks whether the specified file name represents a LLVM IR file (.ll).
-//
-// @param fileName : File name to check
-static bool isLlvmIrFile(const std::string &fileName) {
-  bool isLlvmIr = false;
-
-  size_t extPos = fileName.find_last_of(".");
-  std::string extName;
-  if (extPos != std::string::npos)
-    extName = fileName.substr(extPos, fileName.size() - extPos);
-
-  if (!extName.empty() && extName == LlpcExt::LlvmIr)
-    isLlvmIr = true;
-
-  return isLlvmIr;
-}
-
-// =====================================================================================================================
-// Gets SPIR-V binary codes from the specified binary file.
-//
-// @param spvBinFile : SPIR-V binary file
-// @param [out] spvBin : SPIR-V binary codes
-static Result getSpirvBinaryFromFile(const std::string &spvBinFile, BinaryData *spvBin) {
-  Result result = Result::Success;
-
-  FILE *binFile = fopen(spvBinFile.c_str(), "rb");
-  if (!binFile) {
-    LLPC_ERRS("Fails to open SPIR-V binary file: " << spvBinFile << "\n");
-    result = Result::ErrorUnavailable;
-  }
-
-  if (result == Result::Success) {
-    fseek(binFile, 0, SEEK_END);
-    size_t binSize = ftell(binFile);
-    fseek(binFile, 0, SEEK_SET);
-
-    char *bin = new char[binSize];
-    assert(bin);
-    memset(bin, 0, binSize);
-    binSize = fread(bin, 1, binSize, binFile);
-
-    spvBin->codeSize = binSize;
-    spvBin->pCode = bin;
-
-    fclose(binFile);
-  }
-
-  return result;
-}
-
-// =====================================================================================================================
 // GLSL compiler, compiles GLSL source text file (input) to SPIR-V binary file (output).
 //
 // @param inFilename : Input filename, GLSL source text
@@ -680,7 +533,7 @@ static Result compileGlsl(const std::string &inFilename, ShaderStage *stage, std
 
   FILE *outFile = nullptr;
   if (result == Result::Success) {
-    outFilename = sys::path::filename(inFilename).str() + LlpcExt::SpirvBin;
+    outFilename = sys::path::filename(inFilename).str() + Ext::SpirvBin.str();
 
     outFile = fopen(outFilename.c_str(), "wb");
     if (!outFile) {
@@ -769,7 +622,7 @@ static Result assembleSpirv(const std::string &inFilename, std::string &outFilen
 
   FILE *outFile = nullptr;
   if (result == Result::Success) {
-    outFilename = sys::path::stem(sys::path::filename(inFilename)).str() + LlpcExt::SpirvBin;
+    outFilename = sys::path::stem(sys::path::filename(inFilename)).str() + Ext::SpirvBin.str();
 
     outFile = fopen(outFilename.c_str(), "wb");
     if (!outFile) {
@@ -1125,52 +978,6 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
 }
 
 // =====================================================================================================================
-// Tries to detect the format of binary data and creates a file extension from it.
-//
-// @param pipelineBin : Data that should be analyzed
-// @returns : The extension of the contained data, e.g. ".elf" or ".s"
-static const char* fileExtFromBinary(const BinaryData &pipelineBin) {
-  if (isElfBinary(pipelineBin.pCode, pipelineBin.codeSize))
-    return ".elf";
-  else if (isLlvmBitcode(pipelineBin.pCode, pipelineBin.codeSize))
-    return ".bc";
-  else if (isIsaText(pipelineBin.pCode, pipelineBin.codeSize))
-    return ".s";
-  else
-    return ".ll";
-}
-
-// =====================================================================================================================
-// Write a binary into a file or to stdout. The file will be overwritten if it exists.
-//
-// @param pipelineBin : Data to be written
-// @param fileName : Name of the file that should be written or "-" for stdout
-static Result writeFile(const BinaryData &pipelineBin, StringRef fileName) {
-  Result result = Result::Success;
-  FILE *outFile = stdout;
-  if (fileName != "-")
-    outFile = fopen(fileName.str().c_str(), "wb");
-
-  if (!outFile) {
-    LLPC_ERRS("Failed to open output file: " << fileName << "\n");
-    result = Result::ErrorUnavailable;
-  }
-
-  if (result == Result::Success) {
-    if (fwrite(pipelineBin.pCode, 1, pipelineBin.codeSize, outFile) != pipelineBin.codeSize)
-      result = Result::ErrorUnavailable;
-
-    if (outFile != stdout && fclose(outFile) != 0)
-      result = Result::ErrorUnavailable;
-
-    if (result != Result::Success) {
-      LLPC_ERRS("Failed to write output file: " << fileName << "\n");
-    }
-  }
-  return result;
-}
-
-// =====================================================================================================================
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 //
 // @param compileInfo : Compilation info of LLPC standalone tool
@@ -1184,7 +991,7 @@ static Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOut
   SmallString<64> outFileName(suppliedOutFile);
   if (outFileName.empty()) {
     // Detect the data type as we are unable to access the values of the options "-filetype" and "-emit-llvm".
-    const char *ext = fileExtFromBinary(pipelineBin);
+    StringRef ext = fileExtFromBinary(pipelineBin);
     outFileName = sys::path::filename(firstInFile);
     sys::path::replace_extension(outFileName, ext);
   }
@@ -1228,7 +1035,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
       BinaryData spvBin = {};
 
       if (result == Result::Success) {
-        result = getSpirvBinaryFromFile(spvBinFile, &spvBin);
+        result = getSpirvBinaryFromFile(spvBinFile, spvBin);
 
         if (result == Result::Success) {
           if (!InitSpvGen()) {
@@ -1432,7 +1239,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
 
         compileInfo.stageMask |= shaderStageToMask(stage);
         ::ShaderModuleData shaderModuleData = {};
-        result = getSpirvBinaryFromFile(spvBinFile, &shaderModuleData.spirvBin);
+        result = getSpirvBinaryFromFile(spvBinFile, shaderModuleData.spirvBin);
         shaderModuleData.shaderStage = stage;
         compileInfo.shaderModuleDatas.push_back(shaderModuleData);
       }
@@ -1474,66 +1281,6 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
   cleanupCompileInfo(&compileInfo);
 
   return result;
-}
-
-#ifdef WIN_OS
-// =====================================================================================================================
-// Finds all filenames which can match input file name
-//
-// @param       inFil    : Input file name, including a wildcard.
-// @param [out] outFiles :  Output vector with matching filenames.
-static void findAllMatchFiles(const std::string &inFile, std::vector<std::string> *outFiles) {
-  WIN32_FIND_DATAA data = {};
-
-  // Separate folder name.
-  std::string folderName;
-  auto separatorPos = inFile.find_last_of("/\\");
-  if (separatorPos != std::string::npos)
-    folderName = inFile.substr(0, separatorPos + 1);
-
-  // Search first file.
-  HANDLE searchHandle = FindFirstFileA(inFile.c_str(), &data);
-  if (searchHandle == INVALID_HANDLE_VALUE)
-    return;
-
-  // Copy first file's name.
-  outFiles->push_back(folderName + data.cFileName);
-
-  // Copy other file names.
-  while (FindNextFileA(searchHandle, &data))
-    outFiles->push_back(folderName + data.cFileName);
-
-  FindClose(searchHandle);
-}
-#endif
-
-// =====================================================================================================================
-// Expands all input files in a platform-specific way.
-//
-// @param [out] expandedFilenames : Returned expanded input filenames.
-// @returns : Result::Success on success, Result::ErrorInvalidValue when expansion fails.
-static Result expandInputFilenames(std::vector<std::string> &expandedFilenames) {
-  unsigned i = 0;
-  for (const auto &inFile : InFiles) {
-#ifdef WIN_OS
-    {
-      if (i > 0 && inFile.find_last_of("*?") != std::string::npos) {
-        LLPC_ERRS("\nCan't use wilecards with multiple inputs files\n");
-        return Result::ErrorInvalidValue;
-      }
-      size_t initialSize = expandedFilenames.size();
-      findAllMatchFiles(inFile, &expandedFilenames);
-      if (expandedFilenames.size() == initialSize) {
-        LLPC_ERRS("\nNo matching files found\n");
-        return Result::ErrorInvalidValue;
-      }
-    }
-#else  // WIN_OS
-    expandedFilenames.push_back(inFile);
-#endif
-    ++i;
-  }
-  return Result::Success;
 }
 
 #ifdef WIN_OS
@@ -1616,7 +1363,7 @@ int main(int argc, char *argv[]) {
     return onFailure();
 
   std::vector<std::string> expandedInputFiles;
-  result = expandInputFilenames(expandedInputFiles);
+  result = expandInputFilenames(InFiles, expandedInputFiles);
   if (isFailure())
     return onFailure();
 
