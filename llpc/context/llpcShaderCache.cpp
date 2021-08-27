@@ -29,6 +29,7 @@
 ***********************************************************************************************************************
 */
 #include "llpcShaderCache.h"
+#include "llpcFile.h"
 #include "vkgcUtil.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -114,7 +115,7 @@ static const uint64_t CrcLookup[256] = {
 ShaderCache::ShaderCache()
     : m_onDiskFile(), m_disableCache(true), m_shaderDataEnd(sizeof(ShaderCacheSerializedHeader)), m_totalShaders(0),
       m_serializedSize(sizeof(ShaderCacheSerializedHeader)), m_getValueFunc(nullptr), m_storeValueFunc(nullptr) {
-  memset(m_fileFullPath, 0, MaxFilePathLen);
+  memset(m_fileFullPath, 0, sizeof(m_fileFullPath));
   memset(&m_gfxIp, 0, sizeof(m_gfxIp));
 }
 
@@ -328,27 +329,27 @@ Result ShaderCache::buildFileName(const char *executableName, const char *cacheF
                                   bool *cacheFileExists) {
   // The file name is constructed by taking the executable file name, appending the client string, device ID and
   // GPU index then hashing the result.
-  char hashedFileName[MaxFilePathLen];
+  char hashedFileName[PathBufferLen];
   int length = 0;
   if (ShaderCacheFilename.empty()) {
-    length = snprintf(hashedFileName, MaxFilePathLen, "%s.%s.%u.%u.%u", executableName, ClientStr, gfxIp.major,
+    length = snprintf(hashedFileName, PathBufferLen, "%s.%s.%u.%u.%u", executableName, ClientStr, gfxIp.major,
                       gfxIp.minor, gfxIp.stepping);
 
     const unsigned nameHash = djbHash(hashedFileName, 0);
-    length = snprintf(hashedFileName, MaxFilePathLen, "%08x.bin", nameHash);
+    length = snprintf(hashedFileName, PathBufferLen, "%08x.bin", nameHash);
 
     // Combine the base path, the sub-path and the file name to get the fully qualified path to the cache file
-    length = snprintf(m_fileFullPath, MaxFilePathLen, "%s%s%s", cacheFilePath, CacheFileSubPath, hashedFileName);
+    length = snprintf(m_fileFullPath, PathBufferLen, "%s%s%s", cacheFilePath, CacheFileSubPath, hashedFileName);
   } else {
-    length = snprintf(m_fileFullPath, MaxFilePathLen, "%s%s%s", cacheFilePath, CacheFileSubPath,
-                      ShaderCacheFilename.c_str());
+    length =
+        snprintf(m_fileFullPath, PathBufferLen, "%s%s%s", cacheFilePath, CacheFileSubPath, ShaderCacheFilename.c_str());
   }
 
   assert(cacheFileExists);
   *cacheFileExists = File::exists(m_fileFullPath);
   Result result = Result::Success;
   if (!*cacheFileExists) {
-    length = snprintf(hashedFileName, MaxFilePathLen, "%s%s", cacheFilePath, CacheFileSubPath);
+    length = snprintf(hashedFileName, PathBufferLen, "%s%s", cacheFilePath, CacheFileSubPath);
     std::error_code errCode = sys::fs::create_directories(hashedFileName);
     if (!errCode)
       result = Result::Success;
@@ -633,7 +634,7 @@ void ShaderCache::addShaderToFile(const ShaderIndex *index) {
   // We only need to update the parts of the file that changed, which is the number of shaders, the new data section,
   // and the shaderDataEnd.
 
-  // Calculate the header offsets, then write the relavent data to the file.
+  // Calculate the header offsets, then write the relevant data to the file.
   const unsigned shaderCountOffset = offsetof(struct ShaderCacheSerializedHeader, shaderCount);
   const unsigned dataEndOffset = offsetof(struct ShaderCacheSerializedHeader, shaderDataEnd);
 
@@ -782,7 +783,7 @@ Result ShaderCache::populateIndexMap(void *dataStart, size_t dataSize) {
 }
 
 // =====================================================================================================================
-// Caclulates a 64-bit CRC of the data provided
+// Calculates a 64-bit CRC of the data provided
 //
 // @param data : Data need generate CRC
 // @param numBytes : Data size in bytes

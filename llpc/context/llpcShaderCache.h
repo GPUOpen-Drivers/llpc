@@ -112,8 +112,6 @@ struct ShaderCacheSerializedHeader {
   size_t shaderDataEnd;  // Offset to the end of shader data
 };
 
-constexpr unsigned MaxFilePathLen = 512;
-
 typedef void *CacheEntryHandle;
 
 // =====================================================================================================================
@@ -182,7 +180,7 @@ private:
   size_t m_shaderDataEnd;
   size_t m_totalShaders;
 
-  char m_fileFullPath[MaxFilePathLen]; // Full path/filename of the shader cache on-disk file
+  char m_fileFullPath[PathBufferLen]; // Full path/filename of the shader cache on-disk file
 
   std::list<std::pair<uint8_t *, size_t>> m_allocationList; // Memory allcoated by GetCacheSpace
   unsigned m_serializedSize;                                // Serialized byte size of whole shader cache
