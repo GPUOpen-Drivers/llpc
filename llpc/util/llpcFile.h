@@ -31,9 +31,26 @@
 #pragma once
 
 #include "llpc.h"
+#include <climits>
 #include <cstdio>
 
 namespace Llpc {
+
+// On Linux, NAME_MAX is the maximum filename length, while PATH_MAX defines the maximum path length.
+// On Windows, maximum file and path lengths are defined by _MAX_FNAME and MAX_PATH, respectively.
+#if defined(__unix__)
+constexpr size_t MaxFilenameLen = NAME_MAX;
+constexpr size_t MaxPathLen = PATH_MAX;
+#else
+constexpr size_t MaxFilenameLen = _MAX_FNAME;
+constexpr size_t MaxPathLen = _MAX_PATH;
+#endif
+
+// We add 1 to accommodate a null terminator.
+// Note that PathBufferLen already considers the full path length, including the file name part, so
+// there's no need to add them when creating buffers.
+constexpr size_t FilenameBufferLen = MaxFilenameLen + 1;
+constexpr size_t PathBufferLen = MaxPathLen + 1;
 
 // Enumerates access modes that may be required on an opened file. Can be bitwise ORed together to specify multiple
 // simultaneous modes.

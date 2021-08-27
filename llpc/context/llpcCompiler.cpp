@@ -414,7 +414,7 @@ Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *
     // LLVM fatal error handler only can be installed once.
     install_fatal_error_handler(fatalErrorHandler);
 
-    // Initiailze m_pContextPool.
+    // Initialize m_pContextPool.
     {
       std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
 
@@ -441,8 +441,8 @@ Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *
 #endif
   }
 
-  if (strlen(shaderCachePath) >= Llpc::MaxFilePathLen) {
-    LLPC_ERRS("The shader-cache-file-dir exceed the maximum length (" << Llpc::MaxFilePathLen << ")\n");
+  if (strlen(shaderCachePath) >= Llpc::MaxPathLen) {
+    LLPC_ERRS("The shader-cache-file-dir exceed the maximum length (" << Llpc::MaxPathLen << ")\n");
     llvm_unreachable("ShaderCacheFileDir is too long");
   }
   auxCreateInfo.cacheFilePath = shaderCachePath;

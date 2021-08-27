@@ -75,6 +75,7 @@
 #endif
 #include "llpc.h"
 #include "llpcDebug.h"
+#include "llpcFile.h"
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLowerUtil.h"
 #include "llpcUtil.h"
@@ -427,8 +428,7 @@ static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
     if (!envString)
       envString = getenv("LOCALAPPDATA");
 #else
-    constexpr unsigned MaxFilePathLen = 512;
-    char shaderCacheFileRootDir[MaxFilePathLen];
+    char shaderCacheFileRootDir[PathBufferLen];
 
     //   2. Find XDG_CACHE_HOME.
     //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
