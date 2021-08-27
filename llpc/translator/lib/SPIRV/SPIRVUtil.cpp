@@ -71,8 +71,10 @@ Function *getOrCreateFunction(Module *M, Type *RetTy, ArrayRef<Type *> ArgTypes,
       LLVM_DEBUG(
           dbgs() << "[getOrCreateFunction] Warning: function Name changed\n");
     }
-    LLVM_DEBUG(dbgs() << "[getOrCreateFunction] ";
-               if (F) dbgs() << *F << " => "; dbgs() << *NewF << '\n';);
+    LLVM_DEBUG(dbgs() << "[getOrCreateFunction] ");
+    if (F)
+      LLVM_DEBUG(dbgs() << *F << " => ");
+    LLVM_DEBUG(dbgs() << *NewF << '\n');
     F = NewF;
     F->setCallingConv(CallingConv::SPIR_FUNC);
     if (Attrs)
@@ -107,7 +109,8 @@ bool eraseIfNoUse(Function *F) {
     }
   }
   if (F->use_empty()) {
-    LLVM_DEBUG(dbgs() << "Erase "; F->printAsOperand(dbgs()); dbgs() << '\n');
+    LLVM_DEBUG(F->printAsOperand(dbgs() << "Erase "));
+    LLVM_DEBUG(dbgs() << '\n');
     F->eraseFromParent();
     Changed = true;
   }
