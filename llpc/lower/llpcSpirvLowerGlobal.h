@@ -33,6 +33,7 @@
 #include "SPIRVInternal.h"
 #include "llpcSpirvLower.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/PassManager.h"
 #include <list>
 #include <unordered_map>
 #include <unordered_set>
@@ -41,22 +42,22 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for globals (global variables, inputs, and outputs).
-class SpirvLowerGlobal : public LegacySpirvLower, public llvm::InstVisitor<SpirvLowerGlobal> {
+class SpirvLowerGlobal : public SpirvLower,
+                         public llvm::PassInfoMixin<SpirvLowerGlobal>,
+                         public llvm::InstVisitor<SpirvLowerGlobal> {
 public:
   SpirvLowerGlobal();
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  bool runImpl(llvm::Module &module);
 
-  virtual bool runOnModule(llvm::Module &module);
   virtual void visitReturnInst(llvm::ReturnInst &retInst);
   virtual void visitCallInst(llvm::CallInst &callInst);
   virtual void visitLoadInst(llvm::LoadInst &loadInst);
   virtual void visitStoreInst(llvm::StoreInst &storeInst);
 
-  static char ID; // ID of this pass
+  static llvm::StringRef name() { return "Lower SPIR-V globals (global variables, inputs, and outputs"; }
 
 private:
-  SpirvLowerGlobal(const SpirvLowerGlobal &) = delete;
-  SpirvLowerGlobal &operator=(const SpirvLowerGlobal &) = delete;
-
   void mapGlobalVariableToProxy(llvm::GlobalVariable *globalVar);
   void mapInputToProxy(llvm::GlobalVariable *input);
   void mapOutputToProxy(llvm::GlobalVariable *input);
@@ -131,6 +132,23 @@ private:
   std::unordered_set<llvm::StoreInst *> m_storeInsts; // "Store" instructions to be removed
   std::unordered_set<llvm::CallInst *> m_interpCalls; // "Call" instruction to do input interpolation
                                                       // (fragment shader)
+};
+
+// =====================================================================================================================
+// Legacy pass manager wrapper class
+class LegacySpirvLowerGlobal : public llvm::ModulePass {
+public:
+  LegacySpirvLowerGlobal();
+
+  virtual bool runOnModule(llvm::Module &module);
+
+  static char ID; // ID of this pass
+
+private:
+  LegacySpirvLowerGlobal(const LegacySpirvLowerGlobal &) = delete;
+  LegacySpirvLowerGlobal &operator=(const LegacySpirvLowerGlobal &) = delete;
+
+  SpirvLowerGlobal Impl;
 };
 
 } // namespace Llpc

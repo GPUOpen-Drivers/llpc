@@ -30,13 +30,13 @@
  *          These dead instructions can occur when functions calling terminators, such as OpKill, are inlined.
  ***********************************************************************************************************************
  */
+#include "llpcSpirvLowerTerminator.h"
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
-#include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
@@ -51,44 +51,42 @@ using namespace Llpc;
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering terminators.
-class SpirvLowerTerminator : public LegacySpirvLower, public llvm::InstVisitor<SpirvLowerTerminator> {
-public:
-  SpirvLowerTerminator();
-
-  virtual bool runOnModule(llvm::Module &module);
-  virtual void visitCallInst(llvm::CallInst &callInst);
-
-  static char ID; // ID of this pass
-
-private:
-  SpirvLowerTerminator(const SpirvLowerTerminator &) = delete;
-  SpirvLowerTerminator &operator=(const SpirvLowerTerminator &) = delete;
-
-  // Instructions to be removed; set for tests, vector for order
-  SmallPtrSet<llvm::Instruction *, 8> m_instsForRemoval;
-  SmallVector<llvm::Instruction *, 8> m_removalStack;
-};
-
-// =====================================================================================================================
 // Initializes static members.
-char SpirvLowerTerminator::ID = 0;
+char LegacySpirvLowerTerminator::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering terminator operations
-ModulePass *createSpirvLowerTerminator() {
-  return new SpirvLowerTerminator();
+ModulePass *createLegacySpirvLowerTerminator() {
+  return new LegacySpirvLowerTerminator();
 }
 
 // =====================================================================================================================
-SpirvLowerTerminator::SpirvLowerTerminator() : LegacySpirvLower(ID) {
+LegacySpirvLowerTerminator::LegacySpirvLowerTerminator() : ModulePass(ID) {
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+bool LegacySpirvLowerTerminator::runOnModule(Module &module) {
+  return Impl.runImpl(module);
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+PreservedAnalyses SpirvLowerTerminator::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  runImpl(module);
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool SpirvLowerTerminator::runOnModule(Module &module) {
+bool SpirvLowerTerminator::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Terminator\n");
 
   SpirvLower::init(&module);
@@ -173,4 +171,4 @@ void SpirvLowerTerminator::visitCallInst(CallInst &callInst) {
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering terminator operations..
-INITIALIZE_PASS(SpirvLowerTerminator, DEBUG_TYPE, "Lower SPIR-V terminator", false, false)
+INITIALIZE_PASS(LegacySpirvLowerTerminator, DEBUG_TYPE, "Lower SPIR-V terminator", false, false)
