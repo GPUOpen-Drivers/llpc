@@ -52,10 +52,10 @@ void initializeSpirvLowerMathConstFoldingPass(PassRegistry &);
 void initializeSpirvLowerMathFloatOpPass(PassRegistry &);
 void initializeSpirvLowerConstImmediateStorePass(PassRegistry &);
 void initializeSpirvLowerMemoryOpPass(PassRegistry &);
-void initializeSpirvLowerGlobalPass(PassRegistry &);
+void initializeLegacySpirvLowerGlobalPass(PassRegistry &);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry &);
 void initializeSpirvLowerResourceCollectPass(PassRegistry &);
-void initializeSpirvLowerTerminatorPass(PassRegistry &);
+void initializeLegacySpirvLowerTerminatorPass(PassRegistry &);
 void initializeLegacySpirvLowerTranslatorPass(PassRegistry &);
 } // namespace llvm
 
@@ -77,10 +77,10 @@ inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
   initializeSpirvLowerMathConstFoldingPass(passRegistry);
   initializeSpirvLowerMathFloatOpPass(passRegistry);
   initializeSpirvLowerMemoryOpPass(passRegistry);
-  initializeSpirvLowerGlobalPass(passRegistry);
+  initializeLegacySpirvLowerGlobalPass(passRegistry);
   initializeSpirvLowerInstMetaRemovePass(passRegistry);
   initializeSpirvLowerResourceCollectPass(passRegistry);
-  initializeSpirvLowerTerminatorPass(passRegistry);
+  initializeLegacySpirvLowerTerminatorPass(passRegistry);
   initializeLegacySpirvLowerTranslatorPass(passRegistry);
 }
 
@@ -91,10 +91,10 @@ llvm::ModulePass *createSpirvLowerConstImmediateStore();
 llvm::ModulePass *createSpirvLowerMathConstFolding();
 llvm::ModulePass *createSpirvLowerMathFloatOp();
 llvm::ModulePass *createSpirvLowerMemoryOp();
-llvm::ModulePass *createSpirvLowerGlobal();
+llvm::ModulePass *createLegacySpirvLowerGlobal();
 llvm::ModulePass *createSpirvLowerInstMetaRemove();
 llvm::ModulePass *createSpirvLowerResourceCollect(bool collectDetailUsage);
-llvm::ModulePass *createSpirvLowerTerminator();
+llvm::ModulePass *createLegacySpirvLowerTerminator();
 llvm::ModulePass *createSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo);
 
 // =====================================================================================================================

@@ -168,24 +168,45 @@ static_assert(lgc::ShadingRateHorizontal4Pixels ==
 
 // =====================================================================================================================
 // Initializes static members.
-char SpirvLowerGlobal::ID = 0;
+char LegacySpirvLowerGlobal::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for globals
-ModulePass *createSpirvLowerGlobal() {
-  return new SpirvLowerGlobal();
+ModulePass *createLegacySpirvLowerGlobal() {
+  return new LegacySpirvLowerGlobal();
 }
 
 // =====================================================================================================================
-SpirvLowerGlobal::SpirvLowerGlobal()
-    : LegacySpirvLower(ID), m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false) {
+SpirvLowerGlobal::SpirvLowerGlobal() : m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false) {
+}
+
+// =====================================================================================================================
+LegacySpirvLowerGlobal::LegacySpirvLowerGlobal() : ModulePass(ID) {
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+bool LegacySpirvLowerGlobal::runOnModule(Module &module) {
+  return Impl.runImpl(module);
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+PreservedAnalyses SpirvLowerGlobal::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  runImpl(module);
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool SpirvLowerGlobal::runOnModule(Module &module) {
+bool SpirvLowerGlobal::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Global\n");
 
   SpirvLower::init(&module);
@@ -2084,5 +2105,5 @@ Value *SpirvLowerGlobal::toInt32Value(Value *value, Instruction *insertPos) {
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for globals.
-INITIALIZE_PASS(SpirvLowerGlobal, DEBUG_TYPE, "Lower SPIR-V globals (global variables, inputs, and outputs)", false,
-                false)
+INITIALIZE_PASS(LegacySpirvLowerGlobal, DEBUG_TYPE, "Lower SPIR-V globals (global variables, inputs, and outputs)",
+                false, false)
