@@ -24,41 +24,44 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  amdllpc.h
- * @brief LLPC header file: common header for amdllpc command-line utility
+ * @file  llpcAutoLayout.h
+ * @brief LLPC header file: descriptor layout utilities for standalone LLPC compilers.
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "llpc.h"
-
-#include <vector>
 #include <map>
+#include <vector>
+
+namespace Llpc {
+namespace StandaloneCompiler {
 
 struct ResourceNodeSet {
-  std::vector<Llpc::ResourceMappingNode> nodes; // Vector of resource mapping nodes
+  std::vector<ResourceMappingNode> nodes;  // Vector of resource mapping nodes
   std::map<unsigned, unsigned> bindingMap; // Map from binding to index in nodes vector
   unsigned visibility = 0;                 // Mask of shader stages which this set is visible to
 };
 
 using ResourceMappingNodeMap = std::map<unsigned, ResourceNodeSet>;
 
-// Lay out dummy bottom-level descriptors and other information for one shader stage. This is used when running amdllpc
-// on a single SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does
-// not matter because we are running a short-lived command-line utility.
-void doAutoLayoutDesc(Llpc::ShaderStage shaderStage, Llpc::BinaryData spirvBin,
-                      Llpc::GraphicsPipelineBuildInfo *pipelineInfo, Llpc::PipelineShaderInfo *shaderInfo,
-                      ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
-                      bool checkAutoLayoutCompatible);
+// Lay out dummy bottom-level descriptors and other information for one shader stage. This is used when running
+// standalone compiler on a single SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be
+// leaked, but that does not matter because we are running a short-lived command-line utility.
+void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipelineBuildInfo *pipelineInfo,
+                      PipelineShaderInfo *shaderInfo, ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
+                      bool checkAutoLayoutCompatible, bool autoLayoutDesc);
 
-// Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running amdllpc on a single
-// SPIR-V or GLSL shader, rather than on a .pipe file.
+// Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running standalone compiler
+// on a single SPIR-V or GLSL shader, rather than on a .pipe file.
 void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
-                          Llpc::ResourceMappingData *resourceMapping);
+                          ResourceMappingData *resourceMapping, bool autoLayoutDesc);
 
-bool checkResourceMappingComptible(const Llpc::ResourceMappingData *resourceMapping,
-                                   unsigned autoLayoutUserDataNodeCount,
-                                   const Llpc::ResourceMappingRootNode *autoLayoutUserDataNodes);
+bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
+                                   const ResourceMappingRootNode *autoLayoutUserDataNodes);
 
-bool checkPipelineStateCompatible(const Llpc::ICompiler *compiler, Llpc::GraphicsPipelineBuildInfo *pipelineInfo,
-                                  Llpc::GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, Llpc::GfxIpVersion gfxIp);
+bool checkPipelineStateCompatible(const ICompiler *compiler, GraphicsPipelineBuildInfo *pipelineInfo,
+                                  GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, GfxIpVersion gfxIp);
+
+} // namespace StandaloneCompiler
+} // namespace Llpc

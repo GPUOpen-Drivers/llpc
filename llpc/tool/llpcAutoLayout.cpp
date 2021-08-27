@@ -33,26 +33,23 @@
 #define NOMINMAX
 #endif
 
+#include "llpcAutoLayout.h"
 #include "SPIRVFunction.h"
 #include "SPIRVInstruction.h"
 #include "SPIRVModule.h"
 #include "SPIRVType.h"
-#include "amdllpc.h"
 #include "llpcDebug.h"
 #include "llpcUtil.h"
 #include "vfx.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
 
 #define DEBUG_TYPE "llpc-auto-layout"
 
 using namespace llvm;
-using namespace Llpc;
 using namespace SPIRV;
 
-// -auto-layout-desc: automatically create descriptor layout based on resource usages
-static cl::opt<bool> AutoLayoutDesc("auto-layout-desc",
-                                    cl::desc("Automatically create descriptor layout based on resource usages"));
+namespace Llpc {
+namespace StandaloneCompiler {
 
 // Offset in Node will be a fixed number, which will be conveniently to identify offset in auto-layout.
 static const unsigned OffsetStrideInDwords = 12;
@@ -62,6 +59,7 @@ static const unsigned OffsetStrideInDwords = 12;
 // This does not need to be completely accurate, as it is only used to fake up a push constant user data node.
 //
 // @param ty : Type to determine the data size of
+// @returns : Type storage size in bytes
 static unsigned getTypeDataSize(const SPIRVType *ty) {
   switch (ty->getOpCode()) {
   case OpTypeVector:
@@ -82,10 +80,11 @@ static unsigned getTypeDataSize(const SPIRVType *ty) {
 }
 
 // =====================================================================================================================
-// Find VaPtr userDataNode with specified set.
+// Find VaPtr userDataNode with the specified set.
 //
 // @param resourceMapping : Resource mapping data, possibly containing user data nodes
 // @param set : Accroding this set to find ResourceMappingNode
+// @returns : userDataNode with the specified set
 static const ResourceMappingRootNode *findDescriptorTableVaPtr(const ResourceMappingData *resourceMapping,
                                                                unsigned set) {
   const ResourceMappingRootNode *descriptorTableVaPtr = nullptr;
@@ -137,6 +136,7 @@ static const ResourceMappingNode *findResourceNode(const ResourceMappingNode *us
 // @param set : Find same set in node array
 // @param binding : Find same binding in node array
 // @param [out] index : Return node position in node array
+// @returns : The Node index
 static const ResourceMappingRootNode *findResourceNode(const ResourceMappingRootNode *userDataNode, unsigned nodeCount,
                                                        unsigned set, unsigned binding, unsigned *index) {
   const ResourceMappingRootNode *resourceNode = nullptr;
@@ -155,11 +155,12 @@ static const ResourceMappingRootNode *findResourceNode(const ResourceMappingRoot
 }
 
 // =====================================================================================================================
-// Compare if pAutoLayoutUserDataNodes is subset of pUserDataNodes.
+// Check if autoLayoutUserDataNodes is a subset of userDataNodes.
 //
 // @param [in] resourceMapping : Resource mapping data, which can contain user data nodes
 // @param [in] autoLayoutUserDataNodeCount : UserData Node count
 // @param [in] autoLayoutUserDataNodes : ResourceMappingNode
+// @returns : true if compatible
 bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
                                    const ResourceMappingRootNode *autoLayoutUserDataNodes) {
   bool hit = false;
@@ -243,12 +244,13 @@ bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, u
 }
 
 // =====================================================================================================================
-// Compare if neccessary pipeline state is same.
+// Check if necessary pipeline state is same.
 //
 // @param compiler : LLPC compiler object
 // @param pipelineInfo : Graphics pipeline info
 // @param autoLayoutPipelineInfo : Layout pipeline info
 // @param gfxIp : Graphics IP version
+// @returns : true if compatible
 bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipelineBuildInfo *pipelineInfo,
                                   Llpc::GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, Llpc::GfxIpVersion gfxIp) {
   bool compatible = true;
@@ -283,21 +285,22 @@ bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipel
 }
 
 // =====================================================================================================================
-// Lay out dummy bottom-level descriptors and other information for one shader stage. This is used when running amdllpc
-// on a single SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does
-// not matter because we are running a short-lived command-line utility.
+// Lay out dummy bottom-level descriptors and other information for one shader stage. This is used when running
+// standalone compiler on a single SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be
+// leaked, but that does not matter because we are running a short-lived command-line utility.
 //
 // @param shaderStage : Shader stage
 // @param spirvBin : SPIR-V binary
 // @param [in/out] pipelineInfo : Graphics pipeline info, will have dummy information filled in. nullptr if not a
-// graphics pipeline.
+//                                graphics pipeline.
 // @param [in] shaderInfo : Shader info, used to check entry point name
 // @param [in/out] resNodeSets : Resource map, will have user data nodes added to it
 // @param [in/out] pushConstSize : Cumulative push constant node size
-// @param checkAutoLayoutCompatible : If check AutoLayout Compatiple
+// @param checkAutoLayoutCompatible : Whether to check if AutoLayout Compatible
+// @param autoLayourDesc : Whether to automatically create descriptor layout based on resource usages
 void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipelineBuildInfo *pipelineInfo,
                       PipelineShaderInfo *shaderInfo, ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
-                      bool checkAutoLayoutCompatible) {
+                      bool checkAutoLayoutCompatible, bool autoLayoutDesc) {
   // Read the SPIR-V.
   std::string spirvCode(static_cast<const char *>(spirvBin.pCode), spirvBin.codeSize);
   std::istringstream spirvStream(spirvCode);
@@ -320,7 +323,7 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
 
   // Shader stage specific processing
   auto inOuts = entryPoint->getInOuts();
-  if (shaderStage == ShaderStageVertex && AutoLayoutDesc) {
+  if (shaderStage == ShaderStageVertex && autoLayoutDesc) {
     // Create dummy vertex info (only if -auto-layout-desc is on).
     auto vertexBindings = new std::vector<VkVertexInputBindingDescription>;
     auto vertexAttribs = new std::vector<VkVertexInputAttributeDescription>;
@@ -428,7 +431,7 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
     else
       llvm_unreachable("Should never be called!");
     pipelineInfo->iaState.topology = topology;
-  } else if (shaderStage == ShaderStageFragment && AutoLayoutDesc) {
+  } else if (shaderStage == ShaderStageFragment && autoLayoutDesc) {
     // Set dummy color formats for fragment outputs, but only if -auto-layout-desc is on.
     for (auto varId : ArrayRef<SPIRVWord>(inOuts.first, inOuts.second)) {
       auto entry = module->getValue(varId);
@@ -564,7 +567,7 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
   }
 
   // Only auto-layout descriptors if -auto-layout-desc is on.
-  if (!AutoLayoutDesc)
+  if (!autoLayoutDesc)
     return;
 
   // Collect ResourceMappingNode entries in sets.
@@ -690,17 +693,18 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
 }
 
 // =====================================================================================================================
-// Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running amdllpc on a single
-// SPIR-V or GLSL shader, rather than on a .pipe file.
+// Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running standalone compiler
+// on a single SPIR-V or GLSL shader, rather than on a .pipe file.
 //
-// @param [in] shaderMask : Shader stage mask
-// @param [in] resNodeSets : User-data nodes to be pointed to by top level nodes
-// @param [in] pushConstSize : Push constant node size
+// @param shaderMask : Shader stage mask
+// @param resNodeSets : User-data nodes to be pointed to by top level nodes
+// @param pushConstSize : Push constant node size
 // @param [in/out] resourceMapping : Resource map, will have user data nodes added to it
+// @param autoLayourDesc : Whether to automatically create descriptor layout based on resource usages
 void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
-                          ResourceMappingData *resourceMapping) {
+                          ResourceMappingData *resourceMapping, bool autoLayoutDesc) {
   // Only auto-layout descriptors if -auto-layout-desc is on.
-  if (!AutoLayoutDesc)
+  if (!autoLayoutDesc)
     return;
 
   unsigned topLevelOffset = 0;
@@ -770,3 +774,6 @@ void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &res
   assert(static_cast<unsigned>(subNodes - reinterpret_cast<const ResourceMappingNode *>(
                                               resourceMapping->pUserDataNodes + topLevelCount)) <= subLevelCount);
 }
+
+} // namespace StandaloneCompiler
+} // namespace Llpc
