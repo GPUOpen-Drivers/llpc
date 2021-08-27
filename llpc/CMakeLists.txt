@@ -293,44 +293,42 @@ if(ICD_BUILD_LLPC)
 endif()
 ### Create Standalone Compiler ############################################################################################
 if(ICD_BUILD_LLPC)
-add_executable(amdllpc
-    tool/amdllpc.cpp
+
+# Add a common library for standalone compilers based on LLPC.
+add_library(llpc_standalone_compiler
     tool/llpcAutoLayout.cpp
 )
-add_dependencies(amdllpc llpc)
+add_dependencies(llpc_standalone_compiler llpc)
 
-target_compile_definitions(amdllpc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
-target_compile_definitions(amdllpc PRIVATE _SPIRV_LLVM_API)
+target_compile_definitions(llpc_standalone_compiler PUBLIC
+    ICD_BUILD_LLPC
+    ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU
+    _SPIRV_LLVM_API
+)
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
-    target_compile_definitions(amdllpc PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
-    target_compile_definitions(amdllpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
+    target_compile_definitions(llpc_standalone_compiler PUBLIC
+        LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION}
+        PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION}
+    )
 endif()
-
-target_compile_definitions(amdllpc PRIVATE ICD_BUILD_LLPC)
 
 if(LLPC_ENABLE_SHADER_CACHE)
-    target_compile_definitions(amdllpc PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
+    target_compile_definitions(llpc_standalone_compiler PUBLIC LLPC_ENABLE_SHADER_CACHE=1)
 endif()
 
-target_include_directories(amdllpc
-PUBLIC
-    ${PROJECT_SOURCE_DIR}/include
-PRIVATE
-    ${PROJECT_SOURCE_DIR}/builder
-    ${PROJECT_SOURCE_DIR}/context
+target_include_directories(llpc_standalone_compiler PUBLIC
     ${PROJECT_SOURCE_DIR}/../imported/spirv
     ${PROJECT_SOURCE_DIR}/../include
+    ${PROJECT_SOURCE_DIR}/../tool/dumper
+    ${PROJECT_SOURCE_DIR}/../util
+    ${PROJECT_SOURCE_DIR}/context
+    ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/lower
-    ${PROJECT_SOURCE_DIR}/patch
-    ${PROJECT_SOURCE_DIR}/patch/gfx6/chip
-    ${PROJECT_SOURCE_DIR}/patch/gfx9/chip
-    ${PROJECT_SOURCE_DIR}/patch/generate
+    ${PROJECT_SOURCE_DIR}/tool
     ${PROJECT_SOURCE_DIR}/translator/include
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
     ${PROJECT_SOURCE_DIR}/util
-    ${PROJECT_SOURCE_DIR}/../util
-    ${PROJECT_SOURCE_DIR}/../tool/dumper
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx6/chip
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip
     ${XGL_PAL_PATH}/inc/core
@@ -338,16 +336,47 @@ PRIVATE
     ${LLVM_INCLUDE_DIRS}
 )
 
+llvm_map_components_to_libnames(llvm_libs
+    lgc
+    aggressiveinstcombine
+    amdgpuasmparser
+    amdgpucodegen
+    amdgpudisassembler
+    amdgpuinfo
+    analysis
+    asmparser
+    bitreader
+    bitwriter
+    codegen
+    coroutines
+    ipo
+    irreader
+    linker
+    LTO
+    mc
+    passes
+    support
+    target
+    transformutils
+)
+target_link_libraries(llpc_standalone_compiler PUBLIC
+    cwpack
+    llpc
+    ${llvm_libs}
+    vfx
+)
+if(UNIX)
+    target_link_libraries(llpc_standalone_compiler PUBLIC dl)
+endif()
+
+set_compiler_options(llpc_standalone_compiler ${LLPC_ENABLE_WERROR})
+
+# Add an executable for the amdllpc standalone compiler.
+add_executable(amdllpc tool/amdllpc.cpp)
+add_dependencies(amdllpc llpc_standalone_compiler)
+target_link_libraries(amdllpc PRIVATE llpc_standalone_compiler)
 set_compiler_options(amdllpc ${LLPC_ENABLE_WERROR})
 
-if(UNIX)
-    target_link_libraries(amdllpc PRIVATE llpc vfx dl)
-elseif(WIN32)
-    target_link_libraries(amdllpc PRIVATE llpc vfx)
-endif()
-llvm_map_components_to_libnames(llvm_libs lgc amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler asmparser LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
-target_link_libraries(amdllpc PRIVATE ${llvm_libs})
-target_link_libraries(amdllpc PRIVATE cwpack)
 endif()
 ### Add Subdirectories #################################################################################################
 if(ICD_BUILD_LLPC)
