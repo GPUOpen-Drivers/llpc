@@ -33,7 +33,7 @@
 #define NOMINMAX
 #endif
 
-#include "amdllpc.h"
+#include "llpcAutoLayout.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
@@ -86,6 +86,7 @@
 
 using namespace llvm;
 using namespace Llpc;
+using namespace Llpc::StandaloneCompiler;
 using namespace Vkgc;
 
 // Represents options of LLPC standalone tool.
@@ -117,6 +118,11 @@ static cl::opt<std::string> OutFile("o", cl::desc("Output file"), cl::value_desc
 
 // -l: link pipeline
 static cl::opt<bool> ToLink("l", cl::desc("Link pipeline and generate ISA codes"), cl::init(true));
+
+// -auto-layout-desc: automatically create descriptor layout based on resource usages
+static cl::opt<bool> AutoLayoutDesc("auto-layout-desc",
+                                    cl::desc("Automatically create descriptor layout based on resource usages"),
+                                    cl::init(false));
 
 // -unlinked : build an "unlinked" shader/part-pipeline ELF that needs a further link step
 static cl::opt<bool> Unlinked("unlinked", cl::desc("Build \"unlinked\" shader/part-pipeline ELF"), cl::init(false));
@@ -896,12 +902,13 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
       shaderInfo->entryStage = compileInfo->shaderModuleDatas[i].shaderStage;
       if (checkAutoLayoutCompatible) {
         doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
-                         &pipelineInfoAuto, shaderInfo, nodeSets, pushConstSize, true);
+                         &pipelineInfoAuto, shaderInfo, nodeSets, pushConstSize, /*checkAutoLayoutCompatible = */ true,
+                         /*autoLayoutDesc = */ AutoLayoutDesc);
       }
     }
     if (compileInfo->checkAutoLayoutCompatible) {
       ResourceMappingData resourceMappingAuto = {};
-      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &resourceMappingAuto);
+      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &resourceMappingAuto, AutoLayoutDesc);
       if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
                                         resourceMappingAuto.pUserDataNodes) &&
           checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoAuto, ParsedGfxIp))
@@ -928,10 +935,11 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
       ResourceMappingNodeMap nodeSets;
       unsigned pushConstSize = 0;
       doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, &shaderInfoAuto,
-                       nodeSets, pushConstSize, true);
+                       nodeSets, pushConstSize, /*checkAutoLayoutCompatible = */ true,
+                       /*autoLayoutDesc = */ AutoLayoutDesc);
 
       ResourceMappingData resourceMappingAuto = {};
-      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &resourceMappingAuto);
+      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &resourceMappingAuto, AutoLayoutDesc);
       if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
                                         resourceMappingAuto.pUserDataNodes))
         outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " hit\n";
@@ -980,12 +988,14 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
       // If not compiling from pipeline, lay out user data now.
       if (compileInfo->doAutoLayout) {
         doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
-                         pipelineInfo, shaderInfo, nodeSets, pushConstSize, false);
+                         pipelineInfo, shaderInfo, nodeSets, pushConstSize, /*checkAutoLayoutCompatible =*/false,
+                         /*autoLayoutDesc = */ AutoLayoutDesc);
       }
     }
 
     if (compileInfo->doAutoLayout) {
-      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &pipelineInfo->resourceMapping);
+      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
+                           AutoLayoutDesc);
     }
 
     pipelineInfo->pInstance = nullptr; // Dummy, unused
@@ -1059,9 +1069,10 @@ static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
       ResourceMappingNodeMap nodeSets;
       unsigned pushConstSize = 0;
       doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, shaderInfo, nodeSets,
-                       pushConstSize, false);
+                       pushConstSize, /*checkAutoLayoutCompatible = */ false, /*autoLayoutDesc =*/AutoLayoutDesc);
 
-      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping);
+      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
+                           AutoLayoutDesc);
     }
 
     pipelineInfo->pInstance = nullptr; // Dummy, unused
