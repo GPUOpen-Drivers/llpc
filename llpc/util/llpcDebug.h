@@ -30,24 +30,24 @@
  */
 #pragma once
 
-#include <stdint.h>
+#include <cstdint>
 
 // Output error message
 #define LLPC_ERRS(_msg)                                                                                                \
-  {                                                                                                                    \
-    if (EnableErrs()) {                                                                                                \
-      outs() << "ERROR: " << _msg;                                                                                     \
-      outs().flush();                                                                                                  \
+  do                                                                                                                   \
+    if (Llpc::EnableErrs()) {                                                                                          \
+      llvm::outs() << "ERROR: " << _msg;                                                                               \
+      llvm::outs().flush();                                                                                            \
     }                                                                                                                  \
-  }
+  while (false)
 
 // Output general message
 #define LLPC_OUTS(_msg)                                                                                                \
-  {                                                                                                                    \
-    if (EnableOuts()) {                                                                                                \
-      outs() << _msg;                                                                                                  \
+  do                                                                                                                   \
+    if (Llpc::EnableOuts()) {                                                                                          \
+      llvm::outs() << _msg;                                                                                            \
     }                                                                                                                  \
-  }
+  while (false)
 
 namespace llvm {
 class raw_ostream;
