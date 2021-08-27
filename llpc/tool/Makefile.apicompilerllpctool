@@ -44,7 +44,8 @@ vpath %.cpp $(LLPC_DEPTH)/tool
 
 CPPFILES +=             \
     amdllpc.cpp         \
-    llpcAutoLayout.cpp
+    llpcAutoLayout.cpp  \
+    llpcInputUtils.cpp
 
 EXE_TARGET = amdllpc
 
