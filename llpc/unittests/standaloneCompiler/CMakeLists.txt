@@ -23,10 +23,10 @@
  #
  #######################################################################################################################
 
-add_llpc_unittest(LlpcUtilTests
-  placeholderTest.cpp
+add_llpc_unittest(LlpcStandaloneCompilerTests
+  testInputUtils.cpp
 )
 
-target_link_libraries(LlpcUtilTests PRIVATE
-  llpc
+target_link_libraries(LlpcStandaloneCompilerTests PRIVATE
+  llpc_standalone_compiler
 )
