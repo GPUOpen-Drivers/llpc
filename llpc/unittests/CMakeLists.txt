@@ -25,7 +25,7 @@
 
 # LLPC Unit tests.
 # To execute all LLPC unit tests, run:
-#   cmake --build . --target check-llpc-units
+#   cmake --build . --target check-amdllpc-units
 
 add_custom_target(LlpcUnitTests)
 set_target_properties(LlpcUnitTests PROPERTIES FOLDER "LLPC Tests")
@@ -73,6 +73,7 @@ function(add_llpc_unittest test_dirname)
   llpc_add_unittest_impl(LlpcUnitTests ${test_dirname} ${ARGN})
 endfunction()
 
+add_subdirectory(standaloneCompiler)
 add_subdirectory(util)
 
 # Add a LIT target to execute all unit tests.
