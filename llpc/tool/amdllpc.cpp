@@ -378,6 +378,7 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
 // @param argc : Count of arguments
 // @param argv : List of arguments
 // @param [out] ppCompiler : Created LLPC compiler object
+// @returns : Result::Success on success, other status codes on failure
 static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
   Result result = Result::Success;
 
@@ -475,6 +476,7 @@ static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
 // Performs per-pipeline initialization work for LLPC standalone tool.
 //
 // @param [out] compileInfo : Compilation info of LLPC standalone tool
+// @returns : Result::Success on success, other status codes on failure
 static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->gfxIp = ParsedGfxIp;
 
@@ -869,6 +871,7 @@ static Result buildShaderModules(const ICompiler *compiler, CompileInfo *compile
 //
 // @param compiler : LLPC compiler object
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool
+// @returns : Result::Success on success, other status codes on failure
 static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileInfo *compileInfo) {
   Result result = Result::Success;
 
@@ -957,6 +960,7 @@ static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileIn
 //
 // @param compiler : LLPC compiler object
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool
+// @returns : Result::Success on success, other status codes on failure
 static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
   Result result = Result::Success;
 
@@ -1188,34 +1192,6 @@ static Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOut
   return writeFile(pipelineBin, outFileName);
 }
 
-#ifdef WIN_OS
-// =====================================================================================================================
-// Callback function for SIGABRT.
-extern "C" void llpcSignalAbortHandler(int signal) // Signal type
-{
-  if (signal == SIGABRT) {
-    redirectLogOutput(true, 0, nullptr); // Restore redirecting to show crash in console window
-    LLVM_BUILTIN_TRAP;
-  }
-}
-#endif
-
-#if defined(LLPC_MEM_TRACK_LEAK) && defined(_DEBUG)
-// =====================================================================================================================
-// Enable VC run-time based memory leak detection.
-static void enableMemoryLeakDetection() {
-  // Retrieve the state of CRT debug reporting:
-  int dbgFlag = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
-
-  // Append custom flags to enable memory leak checks:
-  dbgFlag |= _CRTDBG_LEAK_CHECK_DF;
-  dbgFlag |= _CRTDBG_ALLOC_MEM_DF;
-
-  // Update the run-time settings:
-  _CrtSetDbgFlag(dbgFlag);
-}
-#endif
-
 // =====================================================================================================================
 // Process one pipeline.
 //
@@ -1223,6 +1199,7 @@ static void enableMemoryLeakDetection() {
 // @param inFiles : Input filename(s)
 // @param startFile : Index of the starting file name being processed in the file name array
 // @param [out] nextFile : Index of next file name being processed in the file name array
+// @returns : Result::Success on success, other status codes on failure
 static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles, unsigned startFile,
                               unsigned *nextFile) {
   Result result = Result::Success;
@@ -1559,13 +1536,41 @@ static Result expandInputFilenames(std::vector<std::string> &expandedFilenames) 
   return Result::Success;
 }
 
+#ifdef WIN_OS
+// =====================================================================================================================
+// Callback function for SIGABRT.
+//
+// @param signal : Signal type
+extern "C" void llpcSignalAbortHandler(int signal) {
+  if (signal == SIGABRT) {
+    redirectLogOutput(true, 0, nullptr); // Restore redirecting to show crash in console window
+    LLVM_BUILTIN_TRAP;
+  }
+}
+#endif
+
+#if defined(LLPC_MEM_TRACK_LEAK) && defined(_DEBUG)
+// =====================================================================================================================
+// Enable VC run-time based memory leak detection.
+static void enableMemoryLeakDetection() {
+  // Retrieve the state of CRT debug reporting:
+  int dbgFlag = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+
+  // Append custom flags to enable memory leak checks:
+  dbgFlag |= _CRTDBG_LEAK_CHECK_DF;
+  dbgFlag |= _CRTDBG_ALLOC_MEM_DF;
+
+  // Update the run-time settings:
+  _CrtSetDbgFlag(dbgFlag);
+}
+#endif
+
 // =====================================================================================================================
 // Main function of LLPC standalone tool, entry-point.
 //
-// Returns 0 if successful. Other numeric values indicate failure.
-//
 // @param argc : Count of arguments
 // @param argv : List of arguments
+// @returns : 0 if successful, other numeric values on failure
 int main(int argc, char *argv[]) {
   Result result = Result::Success;
 
