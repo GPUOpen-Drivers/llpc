@@ -98,7 +98,7 @@ public:
 
   virtual void VKAPI_CALL Destroy();
 
-  virtual Result BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) const;
+  virtual Result BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut);
 
   virtual unsigned ConvertColorBufferFormatToExportFormat(const ColorTarget *target,
                                                           const bool enableAlphaToCoverage) const;

@@ -843,7 +843,7 @@ static Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *c
 //
 // @param compiler : LLPC compiler object
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool
-static Result buildShaderModules(const ICompiler *compiler, CompileInfo *compileInfo) {
+static Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
   Result result = Result::Success;
 
   for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i) {
