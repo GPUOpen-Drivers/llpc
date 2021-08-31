@@ -518,7 +518,7 @@ void Compiler::Destroy() {
 //
 // @param shaderInfo : Info to build this shader module
 // @param [out] shaderOut : Output of building this shader module
-Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) const {
+Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) {
   Result result = Result::Success;
   void *allocBuf = nullptr;
   const void *cacheData = nullptr;

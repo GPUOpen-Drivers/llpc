@@ -228,8 +228,7 @@ public:
   /// @param [out] pShaderOut : Output of building this shader module
   ///
   /// @returns : Result::Success if successful. Other return codes indicate failure.
-  virtual Result BuildShaderModule(const ShaderModuleBuildInfo *pShaderInfo,
-                                   ShaderModuleBuildOut *pShaderOut) const = 0;
+  virtual Result BuildShaderModule(const ShaderModuleBuildInfo *pShaderInfo, ShaderModuleBuildOut *pShaderOut) = 0;
 
   /// Build graphics pipeline from the specified info.
   ///
