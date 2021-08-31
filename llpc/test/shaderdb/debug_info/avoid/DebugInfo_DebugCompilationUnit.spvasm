@@ -3,9 +3,8 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: {{![0-9]*}} = !{i32 {{[0-9]*}}, !"Dwarf Version", i32 4}
 ; SHADERTEST: {{![0-9]*}} = !{i32 {{[0-9]*}}, !"Debug Info Version", i32 3}
-; SHADERTEST: {{![0-9]*}} = distinct !DICompileUnit(language: DW_LANG_Cobol74, file: [[D1:![0-9]*]], producer: "spirv", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, enums: [[D2:![0-9]*]])
+; SHADERTEST: {{![0-9]*}} = distinct !DICompileUnit(language: DW_LANG_Cobol74, file: [[D1:![0-9]*]], producer: "spirv", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 ; SHADERTEST: [[D1]] = !DIFile(filename: "simple.hlsl", directory: ".")
-; SHADERTEST: [[D2]] = !{}
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

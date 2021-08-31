@@ -38,11 +38,11 @@ void main()
 ; SHADERTEST: [[D3]] = !{{.*}} i64, i64 }, { i64, i64 },
 ; SHADERTEST: [[D10:![0-9]*]] = !{i32 2, !"Dwarf Version", i32 4}
 ; SHADERTEST: [[D11:![0-9]*]] = !{i32 2, !"Debug Info Version", i32 3}
-; SHADERTEST: [[D12:![0-9]*]] = distinct !DICompileUnit(language: DW_LANG_C99, file: [[D13:![0-9]*]], producer: "spirv", isOptimized: false, runtimeVersion: 0, emissionKind: LineTablesOnly, enums: [[D14:![0-9]*]])
+; SHADERTEST: [[D12:![0-9]*]] = distinct !DICompileUnit(language: DW_LANG_C99, file: [[D13:![0-9]*]], producer: "spirv", isOptimized: false, runtimeVersion: 0, emissionKind: LineTablesOnly)
 ; SHADERTEST: [[D13]] = !DIFile(filename: "DebugInfo_TestVsBasic.vert", directory: "{{.*}}")
-; SHADERTEST: [[D14]] = !{}
-; SHADERTEST: [[D15]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: [[D13:![0-9]*]], file: [[D13]], line: 9, type: [[D16:![0-9]*]], scopeLine: 9, spFlags: DISPFlagDefinition, unit: [[D12]], retainedNodes: [[D14]])
+; SHADERTEST: [[D15]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: [[D13:![0-9]*]], file: [[D13]], line: 9, type: [[D16:![0-9]*]], scopeLine: 9, spFlags: DISPFlagDefinition, unit: [[D12]], retainedNodes: [[D14:![0-9]*]])
 ; SHADERTEST: [[D16]] = !DISubroutineType(types: [[D14]])
+; SHADERTEST: [[D14]] = !{}
 ; SHADERTEST: [[D4]] = !{i32 0}
 ; SHADERTEST: [[D5]] = !DILocation(line: 9, scope: [[D15]])
 ; SHADERTEST: [[D6:![0-9]*]] = !DILocation(line: 10, scope: [[D15]])

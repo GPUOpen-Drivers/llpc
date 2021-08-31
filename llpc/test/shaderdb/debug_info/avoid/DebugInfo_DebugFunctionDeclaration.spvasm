@@ -1,11 +1,11 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: [[D1:![0-9]*]] = !{}
-; SHADERTEST: [[D2:![0-9]*]] = distinct !DISubprogram(name: "main", linkageName: "v4f_main_f", scope: null, file: !{{[0-9]*}}, line: 12, type: [[D3:![0-9]*]], scopeLine: 13, flags: DIFlagPublic, spFlags: DISPFlagDefinition | DISPFlagMainSubprogram, unit: !{{[0-9]*}}, templateParams: [[D1]], declaration: [[D4:![0-9]*]], retainedNodes: !{{[0-9]*}})
+; SHADERTEST: [[D2:![0-9]*]] = distinct !DISubprogram(name: "main", linkageName: "v4f_main_f", scope: null, file: !{{[0-9]*}}, line: 12, type: [[D3:![0-9]*]], scopeLine: 13, flags: DIFlagPublic, spFlags: DISPFlagDefinition | DISPFlagMainSubprogram, unit: !{{[0-9]*}}, templateParams: [[D1:![0-9]*]], declaration: [[D4:![0-9]*]], retainedNodes: !{{[0-9]*}})
 ; SHADERTEST: [[D3]] = !DISubroutineType(types: [[D5:![0-9]*]])
 ; SHADERTEST: [[D5]] = !{null}
 ; SHADERTEST: [[D4]] = !DISubprogram(name: "main", linkageName: "v4f_main_f", scope: null, file: !{{[0-9]*}}, line: 12, type: [[D3]], flags: DIFlagPublic, spFlags: 0, templateParams: [[D1]])
+; SHADERTEST: [[D1]] = !{}
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
