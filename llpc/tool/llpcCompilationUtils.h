@@ -60,10 +60,15 @@ struct CompileInfo {
   void *pipelineBuf;                                                   // Alllocation buffer of building pipeline
   void *pipelineInfoFile;                                              // VFX-style file containing pipeline info
   const char *fileNames;                                               // Names of input shader source files
+  std::string entryTarget;                                             // Name of the entry target function.
   bool unlinked;                  // Whether to generate unlinked shader/part-pipeline ELF
+  bool relocatableShaderElf;      // Whether to enable relocatable shader compilation
   bool doAutoLayout;              // Whether to auto layout descriptors
   bool checkAutoLayoutCompatible; // Whether to comapre if auto layout descriptors is
                                   // same as specified pipeline layout
+  bool autoLayoutDesc;            // Whether to automatically create descriptor layout based on resource usages
+  bool robustBufferAccess;        // Whether to enable robust buffer access
+  bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
 };
 
 // Callback function to allocate buffer for building shader module and building pipeline.
@@ -84,6 +89,10 @@ Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileI
 
 // Builds shader module based on the specified SPIR-V binary.
 Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo);
+
+// Builds pipeline and does linking.
+Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
+                     llvm::Optional<Vkgc::PipelineDumpOptions> pipelineDumpOptions, bool timePasses);
 
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, llvm::StringRef firstInFile);

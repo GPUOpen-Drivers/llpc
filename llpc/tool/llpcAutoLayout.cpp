@@ -38,6 +38,7 @@
 #include "SPIRVInstruction.h"
 #include "SPIRVModule.h"
 #include "SPIRVType.h"
+#include "llpcCompilationUtils.h"
 #include "llpcDebug.h"
 #include "llpcUtil.h"
 #include "vfx.h"
@@ -282,6 +283,97 @@ bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipel
   // TODO: RsState and other members in CbState except target[].format
 
   return compatible;
+}
+
+// =====================================================================================================================
+// Check autolayout compatible.
+//
+// @param compiler : LLPC compiler object
+// @param [in/out] compileInfo : Compilation info of LLPC standalone tool
+// @returns : Result::Success on success, other status codes on failure
+Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileInfo *compileInfo) {
+  Result result = Result::Success;
+
+  bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) - 1)) != 0;
+  if (isGraphics) {
+    // Build graphics pipeline
+    GraphicsPipelineBuildInfo *pipelineInfo = &compileInfo->gfxPipelineInfo;
+
+    // Fill pipeline shader info
+    PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
+        &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
+    };
+
+    ResourceMappingNodeMap nodeSets;
+    unsigned pushConstSize = 0;
+    GraphicsPipelineBuildInfo pipelineInfoAuto = *pipelineInfo;
+    for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i) {
+
+      PipelineShaderInfo *shaderInfo = shaderInfos[compileInfo->shaderModuleDatas[i].shaderStage];
+      bool checkAutoLayoutCompatible = compileInfo->checkAutoLayoutCompatible;
+
+      if (compileInfo->shaderModuleDatas[i].shaderStage != Vkgc::ShaderStageFragment)
+        checkAutoLayoutCompatible = false;
+      const ShaderModuleBuildOut *shaderOut = &(compileInfo->shaderModuleDatas[i].shaderOut);
+
+      if (!shaderInfo->pEntryTarget) {
+        // If entry target is not specified, use the one from command line option
+        shaderInfo->pEntryTarget = compileInfo->entryTarget.c_str();
+      }
+      shaderInfo->pModuleData = shaderOut->pModuleData;
+      shaderInfo->entryStage = compileInfo->shaderModuleDatas[i].shaderStage;
+      if (checkAutoLayoutCompatible) {
+        doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
+                         &pipelineInfoAuto, shaderInfo, nodeSets, pushConstSize, /*checkAutoLayoutCompatible = */ true,
+                         /*autoLayoutDesc = */ compileInfo->autoLayoutDesc);
+      }
+    }
+    if (compileInfo->checkAutoLayoutCompatible) {
+      ResourceMappingData resourceMappingAuto = {};
+      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &resourceMappingAuto,
+                           compileInfo->autoLayoutDesc);
+      if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
+                                        resourceMappingAuto.pUserDataNodes) &&
+          checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoAuto, compileInfo->gfxIp))
+        outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " hit\n";
+      else
+        outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " failed to hit\n";
+      outs().flush();
+    }
+  } else if (compileInfo->stageMask == shaderStageToMask(ShaderStageCompute)) {
+    ComputePipelineBuildInfo *pipelineInfo = &compileInfo->compPipelineInfo;
+
+    PipelineShaderInfo *shaderInfo = &pipelineInfo->cs;
+    const ShaderModuleBuildOut *shaderOut = &compileInfo->shaderModuleDatas[0].shaderOut;
+
+    if (!shaderInfo->pEntryTarget) {
+      // If entry target is not specified, use the one from command line option
+      shaderInfo->pEntryTarget = compileInfo->entryTarget.c_str();
+    }
+    shaderInfo->entryStage = ShaderStageCompute;
+    shaderInfo->pModuleData = shaderOut->pModuleData;
+
+    if (compileInfo->checkAutoLayoutCompatible) {
+      PipelineShaderInfo shaderInfoAuto = *shaderInfo;
+      ResourceMappingNodeMap nodeSets;
+      unsigned pushConstSize = 0;
+      doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, &shaderInfoAuto,
+                       nodeSets, pushConstSize, /*checkAutoLayoutCompatible = */ true,
+                       /*autoLayoutDesc = */ compileInfo->autoLayoutDesc);
+
+      ResourceMappingData resourceMappingAuto = {};
+      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &resourceMappingAuto,
+                           compileInfo->autoLayoutDesc);
+      if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
+                                        resourceMappingAuto.pUserDataNodes))
+        outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " hit\n";
+      else
+        outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " failed to hit\n";
+      outs().flush();
+    }
+  }
+
+  return result;
 }
 
 // =====================================================================================================================

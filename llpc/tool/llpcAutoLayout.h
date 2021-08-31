@@ -37,6 +37,8 @@
 namespace Llpc {
 namespace StandaloneCompiler {
 
+struct CompileInfo; // Defined in llpcCompilationUtils.h.
+
 struct ResourceNodeSet {
   std::vector<ResourceMappingNode> nodes;  // Vector of resource mapping nodes
   std::map<unsigned, unsigned> bindingMap; // Map from binding to index in nodes vector
@@ -56,6 +58,9 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
 // on a single SPIR-V or GLSL shader, rather than on a .pipe file.
 void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
                           ResourceMappingData *resourceMapping, bool autoLayoutDesc);
+
+// Check autolayout compatible.
+Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileInfo *compileInfo);
 
 bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
                                    const ResourceMappingRootNode *autoLayoutUserDataNodes);
