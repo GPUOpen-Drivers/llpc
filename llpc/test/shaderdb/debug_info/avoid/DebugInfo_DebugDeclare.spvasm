@@ -1,15 +1,15 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: [[D3:![0-9]*]] = distinct !DICompileUnit(language: DW_LANG_Cobol74, file: [[D4:![0-9]*]], producer: "spirv", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, enums: [[D5:![0-9]*]])
+; SHADERTEST: [[D3:![0-9]*]] = distinct !DICompileUnit(language: DW_LANG_Cobol74, file: [[D4:![0-9]*]], producer: "spirv", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 ; SHADERTEST: [[D4]] = !DIFile(filename: "simple.hlsl", directory: ".")
-; SHADERTEST: [[D5]] = !{}
-; SHADERTEST: [[D8:![0-9]*]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: [[D4]], line: 1, type: [[D9:![0-9]*]], scopeLine: 1, flags: DIFlagPublic, spFlags: DISPFlagDefinition | DISPFlagMainSubprogram, unit: [[D3]], templateParams: [[D5]], retainedNodes: [[D11:![0-9]*]])
+; SHADERTEST: [[D8:![0-9]*]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: [[D4]], line: 1, type: [[D9:![0-9]*]], scopeLine: 1, flags: DIFlagPublic, spFlags: DISPFlagDefinition | DISPFlagMainSubprogram, unit: [[D3]], templateParams: [[D5:![0-9]*]], retainedNodes: [[D11:![0-9]*]])
 ; SHADERTEST: [[D9]] = !DISubroutineType(types: [[D10:![0-9]*]])
 ; SHADERTEST: [[D10]] = !{null}
 ; SHADERTEST: [[D11]] = !{[[D7:![0-9]*]]}
 ; SHADERTEST: [[D7]] = !DILocalVariable(name: "foo", scope: [[D8]], file: [[D4]], line: 1, type: [[D12:![0-9]*]])
 ; SHADERTEST: [[D12]] = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)
+; SHADERTEST: [[D5]] = !{}
 ; SHADERTEST: [[D6:![0-9]*]] = !{i32 0}
 ; SHADERTEST: [[D13:![0-9]*]] = !DILocation(line: 1, scope: [[D8]])
 ; SHADERTEST: {{^// LLPC}} SPIR-V lowering results
