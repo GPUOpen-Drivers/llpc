@@ -392,6 +392,12 @@ static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
 // @returns : Result::Success on success, other status codes on failure
 static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->gfxIp = ParsedGfxIp;
+  compileInfo->entryTarget = EntryTarget;
+  compileInfo->relocatableShaderElf = EnableRelocatableShaderElf;
+  compileInfo->checkAutoLayoutCompatible = CheckAutoLayoutCompatible;
+  compileInfo->autoLayoutDesc = AutoLayoutDesc;
+  compileInfo->robustBufferAccess = RobustBufferAccess;
+  compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
 
   // Set NGG control settings
   if (ParsedGfxIp.major >= 10) {
@@ -426,264 +432,6 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 }
 
 // =====================================================================================================================
-// Check autolayout compatible.
-//
-// @param compiler : LLPC compiler object
-// @param [in/out] compileInfo : Compilation info of LLPC standalone tool
-// @returns : Result::Success on success, other status codes on failure
-static Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileInfo *compileInfo) {
-  Result result = Result::Success;
-
-  bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) - 1)) != 0;
-  if (isGraphics) {
-    // Build graphics pipeline
-    GraphicsPipelineBuildInfo *pipelineInfo = &compileInfo->gfxPipelineInfo;
-
-    // Fill pipeline shader info
-    PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
-        &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
-    };
-
-    ResourceMappingNodeMap nodeSets;
-    unsigned pushConstSize = 0;
-    GraphicsPipelineBuildInfo pipelineInfoAuto = *pipelineInfo;
-    for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i) {
-
-      PipelineShaderInfo *shaderInfo = shaderInfos[compileInfo->shaderModuleDatas[i].shaderStage];
-      bool checkAutoLayoutCompatible = compileInfo->checkAutoLayoutCompatible;
-
-      if (compileInfo->shaderModuleDatas[i].shaderStage != Vkgc::ShaderStageFragment)
-        checkAutoLayoutCompatible = false;
-      const ShaderModuleBuildOut *shaderOut = &(compileInfo->shaderModuleDatas[i].shaderOut);
-
-      if (!shaderInfo->pEntryTarget) {
-        // If entry target is not specified, use the one from command line option
-        shaderInfo->pEntryTarget = EntryTarget.c_str();
-      }
-      shaderInfo->pModuleData = shaderOut->pModuleData;
-      shaderInfo->entryStage = compileInfo->shaderModuleDatas[i].shaderStage;
-      if (checkAutoLayoutCompatible) {
-        doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
-                         &pipelineInfoAuto, shaderInfo, nodeSets, pushConstSize, /*checkAutoLayoutCompatible = */ true,
-                         /*autoLayoutDesc = */ AutoLayoutDesc);
-      }
-    }
-    if (compileInfo->checkAutoLayoutCompatible) {
-      ResourceMappingData resourceMappingAuto = {};
-      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &resourceMappingAuto, AutoLayoutDesc);
-      if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
-                                        resourceMappingAuto.pUserDataNodes) &&
-          checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoAuto, ParsedGfxIp))
-        outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " hit\n";
-      else
-        outs() << "Auto Layout fragment shader in " << compileInfo->fileNames << " failed to hit\n";
-      outs().flush();
-    }
-  } else if (compileInfo->stageMask == shaderStageToMask(ShaderStageCompute)) {
-    ComputePipelineBuildInfo *pipelineInfo = &compileInfo->compPipelineInfo;
-
-    PipelineShaderInfo *shaderInfo = &pipelineInfo->cs;
-    const ShaderModuleBuildOut *shaderOut = &compileInfo->shaderModuleDatas[0].shaderOut;
-
-    if (!shaderInfo->pEntryTarget) {
-      // If entry target is not specified, use the one from command line option
-      shaderInfo->pEntryTarget = EntryTarget.c_str();
-    }
-    shaderInfo->entryStage = ShaderStageCompute;
-    shaderInfo->pModuleData = shaderOut->pModuleData;
-
-    if (compileInfo->checkAutoLayoutCompatible) {
-      PipelineShaderInfo shaderInfoAuto = *shaderInfo;
-      ResourceMappingNodeMap nodeSets;
-      unsigned pushConstSize = 0;
-      doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, &shaderInfoAuto,
-                       nodeSets, pushConstSize, /*checkAutoLayoutCompatible = */ true,
-                       /*autoLayoutDesc = */ AutoLayoutDesc);
-
-      ResourceMappingData resourceMappingAuto = {};
-      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &resourceMappingAuto, AutoLayoutDesc);
-      if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
-                                        resourceMappingAuto.pUserDataNodes))
-        outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " hit\n";
-      else
-        outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " failed to hit\n";
-      outs().flush();
-    }
-  }
-
-  return result;
-}
-
-// =====================================================================================================================
-// Builds pipeline and do linking.
-//
-// @param compiler : LLPC compiler object
-// @param [in/out] compileInfo : Compilation info of LLPC standalone tool
-// @returns : Result::Success on success, other status codes on failure
-static Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo) {
-  Result result = Result::Success;
-
-  bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) - 1)) != 0;
-  if (isGraphics) {
-    // Build graphics pipeline
-    GraphicsPipelineBuildInfo *pipelineInfo = &compileInfo->gfxPipelineInfo;
-    GraphicsPipelineBuildOut *pipelineOut = &compileInfo->gfxPipelineOut;
-
-    // Fill pipeline shader info
-    PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
-        &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
-    };
-
-    ResourceMappingNodeMap nodeSets;
-    unsigned pushConstSize = 0;
-    for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i) {
-
-      PipelineShaderInfo *shaderInfo = shaderInfos[compileInfo->shaderModuleDatas[i].shaderStage];
-      const ShaderModuleBuildOut *shaderOut = &(compileInfo->shaderModuleDatas[i].shaderOut);
-
-      if (!shaderInfo->pEntryTarget) {
-        // If entry target is not specified, use the one from command line option
-        shaderInfo->pEntryTarget = EntryTarget.c_str();
-      }
-      shaderInfo->pModuleData = shaderOut->pModuleData;
-      shaderInfo->entryStage = compileInfo->shaderModuleDatas[i].shaderStage;
-
-      // If not compiling from pipeline, lay out user data now.
-      if (compileInfo->doAutoLayout) {
-        doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
-                         pipelineInfo, shaderInfo, nodeSets, pushConstSize, /*checkAutoLayoutCompatible =*/false,
-                         /*autoLayoutDesc = */ AutoLayoutDesc);
-      }
-    }
-
-    if (compileInfo->doAutoLayout) {
-      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
-                           AutoLayoutDesc);
-    }
-
-    pipelineInfo->pInstance = nullptr; // Dummy, unused
-    pipelineInfo->pUserData = &compileInfo->pipelineBuf;
-    pipelineInfo->pfnOutputAlloc = allocateBuffer;
-    pipelineInfo->unlinked = compileInfo->unlinked;
-
-    // NOTE: If number of patch control points is not specified, we set it to 3.
-    if (pipelineInfo->iaState.patchControlPoints == 0)
-      pipelineInfo->iaState.patchControlPoints = 3;
-
-    pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
-    pipelineInfo->options.enableRelocatableShaderElf = EnableRelocatableShaderElf;
-    pipelineInfo->options.enableScratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
-
-    void *pipelineDumpHandle = nullptr;
-    if (cl::EnablePipelineDump) {
-      PipelineDumpOptions dumpOptions = {};
-      dumpOptions.pDumpDir = cl::PipelineDumpDir.c_str();
-      dumpOptions.filterPipelineDumpByType = cl::FilterPipelineDumpByType;
-      dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
-      dumpOptions.dumpDuplicatePipelines = cl::DumpDuplicatePipelines;
-
-      PipelineBuildInfo localPipelineInfo = {};
-      localPipelineInfo.pGraphicsInfo = pipelineInfo;
-      pipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, localPipelineInfo);
-    }
-
-    if (TimePassesIsEnabled || cl::EnableTimerProfile) {
-      auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pipelineInfo);
-      outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash) << " Files: " << compileInfo->fileNames << "\n";
-      outs().flush();
-    }
-
-    result = compiler->BuildGraphicsPipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
-
-    if (result == Result::Success) {
-      if (cl::EnablePipelineDump) {
-        Vkgc::BinaryData pipelineBinary = {};
-        pipelineBinary.codeSize = pipelineOut->pipelineBin.codeSize;
-        pipelineBinary.pCode = pipelineOut->pipelineBin.pCode;
-        Vkgc::IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
-
-        Vkgc::IPipelineDumper::EndPipelineDump(pipelineDumpHandle);
-      }
-
-      result = decodePipelineBinary(&pipelineOut->pipelineBin, compileInfo, true);
-    }
-  }
-  else {
-    // Build compute pipeline
-    assert(compileInfo->shaderModuleDatas.size() == 1);
-    assert(compileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
-
-    ComputePipelineBuildInfo *pipelineInfo = &compileInfo->compPipelineInfo;
-    ComputePipelineBuildOut *pipelineOut = &compileInfo->compPipelineOut;
-
-    PipelineShaderInfo *shaderInfo = &pipelineInfo->cs;
-    const ShaderModuleBuildOut *shaderOut = &compileInfo->shaderModuleDatas[0].shaderOut;
-
-    if (!shaderInfo->pEntryTarget) {
-      // If entry target is not specified, use the one from command line option
-      shaderInfo->pEntryTarget = EntryTarget.c_str();
-    }
-
-    shaderInfo->entryStage = ShaderStageCompute;
-    shaderInfo->pModuleData = shaderOut->pModuleData;
-
-    // If not compiling from pipeline, lay out user data now.
-    if (compileInfo->doAutoLayout) {
-      ResourceMappingNodeMap nodeSets;
-      unsigned pushConstSize = 0;
-      doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, shaderInfo, nodeSets,
-                       pushConstSize, /*checkAutoLayoutCompatible = */ false, /*autoLayoutDesc =*/AutoLayoutDesc);
-
-      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
-                           AutoLayoutDesc);
-    }
-
-    pipelineInfo->pInstance = nullptr; // Dummy, unused
-    pipelineInfo->pUserData = &compileInfo->pipelineBuf;
-    pipelineInfo->pfnOutputAlloc = allocateBuffer;
-    pipelineInfo->unlinked = compileInfo->unlinked;
-    pipelineInfo->options.robustBufferAccess = RobustBufferAccess;
-    pipelineInfo->options.enableRelocatableShaderElf = EnableRelocatableShaderElf;
-    pipelineInfo->options.enableScratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
-
-    void *pipelineDumpHandle = nullptr;
-    if (cl::EnablePipelineDump) {
-      PipelineDumpOptions dumpOptions = {};
-      dumpOptions.pDumpDir = cl::PipelineDumpDir.c_str();
-      dumpOptions.filterPipelineDumpByType = cl::FilterPipelineDumpByType;
-      dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
-      dumpOptions.dumpDuplicatePipelines = cl::DumpDuplicatePipelines;
-      PipelineBuildInfo localPipelineInfo = {};
-      localPipelineInfo.pComputeInfo = pipelineInfo;
-      pipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, localPipelineInfo);
-    }
-
-    if (TimePassesIsEnabled || cl::EnableTimerProfile) {
-      auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pipelineInfo);
-      outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash) << " Files: " << compileInfo->fileNames << "\n";
-      outs().flush();
-    }
-
-    result = compiler->BuildComputePipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
-
-    if (result == Result::Success) {
-      if (cl::EnablePipelineDump) {
-        Vkgc::BinaryData pipelineBinary = {};
-        pipelineBinary.codeSize = pipelineOut->pipelineBin.codeSize;
-        pipelineBinary.pCode = pipelineOut->pipelineBin.pCode;
-        Vkgc::IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
-
-        Vkgc::IPipelineDumper::EndPipelineDump(pipelineDumpHandle);
-      }
-
-      result = decodePipelineBinary(&pipelineOut->pipelineBin, compileInfo, false);
-    }
-  }
-
-  return result;
-}
-
-// =====================================================================================================================
 // Process one pipeline.
 //
 // @param compiler : LLPC context
@@ -698,7 +446,6 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
   std::string fileNames;
   compileInfo.unlinked = true;
   compileInfo.doAutoLayout = true;
-  compileInfo.checkAutoLayoutCompatible = CheckAutoLayoutCompatible;
 
   result = initCompileInfo(&compileInfo);
 
@@ -754,10 +501,10 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
 
       if (result == Result::Success) {
         // NOTE: If the entry target is not specified, we set it to the one gotten from SPIR-V binary.
-        if (EntryTarget.empty())
-          EntryTarget.setValue(Vkgc::getEntryPointNameFromSpirvBinary(&spvBin));
+        if (compileInfo.entryTarget.empty())
+          compileInfo.entryTarget = Vkgc::getEntryPointNameFromSpirvBinary(&spvBin);
 
-        unsigned stageMask = ShaderModuleHelper::getStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
+        unsigned stageMask = ShaderModuleHelper::getStageMaskFromSpirvBinary(&spvBin, compileInfo.entryTarget.c_str());
 
         if ((stageMask & compileInfo.stageMask) != 0)
           break;
@@ -773,7 +520,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
             }
           }
         } else {
-          LLPC_ERRS(format("Fails to identify shader stages by entry-point \"%s\"\n", EntryTarget.c_str()));
+          LLPC_ERRS(format("Fails to identify shader stages by entry-point \"%s\"\n", compileInfo.entryTarget.c_str()));
           result = Result::ErrorUnavailable;
         }
       }
@@ -912,11 +659,11 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
       // GLSL source text
 
       // NOTE: If the entry target is not specified, we set it to GLSL default ("main").
-      if (EntryTarget.empty())
-        EntryTarget.setValue("main");
+      if (compileInfo.entryTarget.empty())
+        compileInfo.entryTarget = "main";
 
       ShaderStage stage = ShaderStageInvalid;
-      result = compileGlsl(inFile, &stage, spvBinFile, EntryTarget);
+      result = compileGlsl(inFile, &stage, spvBinFile, compileInfo.entryTarget);
       if (result == Result::Success) {
         if (compileInfo.stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
           break;
@@ -953,8 +700,16 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
     // Build pipeline
     //
     if (result == Result::Success && ToLink) {
+      Optional<PipelineDumpOptions> dumpOptions = None;
+      if (cl::EnablePipelineDump) {
+        dumpOptions->pDumpDir = cl::PipelineDumpDir.c_str();
+        dumpOptions->filterPipelineDumpByType = cl::FilterPipelineDumpByType;
+        dumpOptions->filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
+        dumpOptions->dumpDuplicatePipelines = cl::DumpDuplicatePipelines;
+      }
+
       compileInfo.fileNames = fileNames.c_str();
-      result = buildPipeline(compiler, &compileInfo);
+      result = buildPipeline(compiler, &compileInfo, dumpOptions, TimePassesIsEnabled || cl::EnableTimerProfile);
       if (result == Result::Success)
         result = outputElf(&compileInfo, OutFile, inFiles[0]);
     }
