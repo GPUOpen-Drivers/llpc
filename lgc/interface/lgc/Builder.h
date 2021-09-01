@@ -867,16 +867,19 @@ public:
 
   // Atomic operation, for use in CreateImageAtomic.
   enum {
-    ImageAtomicSwap = 0, // Atomic operation: swap
-    ImageAtomicAdd = 2,  // Atomic operation: add
-    ImageAtomicSub = 3,  // Atomic operation: subtract
-    ImageAtomicSMin = 4, // Atomic operation: signed minimum
-    ImageAtomicUMin = 5, // Atomic operation: unsigned minimum
-    ImageAtomicSMax = 6, // Atomic operation: signed maximum
-    ImageAtomicUMax = 7, // Atomic operation: unsigned maximum
-    ImageAtomicAnd = 8,  // Atomic operation: and
-    ImageAtomicOr = 9,   // Atomic operation: or
-    ImageAtomicXor = 10  // Atomic operation: xor
+    ImageAtomicSwap = 0,  // Atomic operation: swap
+    ImageAtomicAdd = 2,   // Atomic operation: add
+    ImageAtomicSub = 3,   // Atomic operation: subtract
+    ImageAtomicSMin = 4,  // Atomic operation: signed minimum
+    ImageAtomicUMin = 5,  // Atomic operation: unsigned minimum
+    ImageAtomicSMax = 6,  // Atomic operation: signed maximum
+    ImageAtomicUMax = 7,  // Atomic operation: unsigned maximum
+    ImageAtomicAnd = 8,   // Atomic operation: and
+    ImageAtomicOr = 9,    // Atomic operation: or
+    ImageAtomicXor = 10,  // Atomic operation: xor
+    ImageAtomicFMin = 11, // Atomic operation: fmin
+    ImageAtomicFMax = 12, // Atomic operation: fmax
+    ImageAtomicFAdd = 13  // Atomic operation: fadd
   };
 
   // Create an image load.

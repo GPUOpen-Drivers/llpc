@@ -2365,6 +2365,11 @@ public:
       // 1. OpAtomicStore - need to check type of the Value operand
       CapVec.push_back(CapabilityInt64Atomics);
     }
+    if ((getOpCode() == OpAtomicFMinEXT) || (getOpCode() == OpAtomicFMaxEXT))
+      if (getType()->isTypeInt(64))
+        CapVec.push_back(CapabilityAtomicFloat64MinMaxEXT);
+      else
+        CapVec.push_back(CapabilityAtomicFloat32MinMaxEXT);
     return CapVec;
   }
 
@@ -2397,6 +2402,9 @@ _SPIRV_OP(AtomicSMax, true, 7)
 _SPIRV_OP(AtomicAnd, true, 7)
 _SPIRV_OP(AtomicOr, true, 7)
 _SPIRV_OP(AtomicXor, true, 7)
+_SPIRV_OP(AtomicFMinEXT, true, 7)
+_SPIRV_OP(AtomicFMaxEXT, true, 7)
+_SPIRV_OP(AtomicFAddEXT, true, 7)
 _SPIRV_OP(MemoryBarrier, false, 3)
 #undef _SPIRV_OP
 

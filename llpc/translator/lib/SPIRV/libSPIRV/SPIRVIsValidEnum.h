@@ -547,6 +547,8 @@ inline bool isValid(spv::Capability V) {
   case CapabilityStorageTexelBufferArrayNonUniformIndexingEXT:
 #endif
   case CapabilityDemoteToHelperInvocationEXT:
+  case CapabilityAtomicFloat32MinMaxEXT:
+  case CapabilityAtomicFloat64MinMaxEXT:
     return true;
   default:
     return false;
@@ -757,6 +759,9 @@ inline bool isValid(spv::Op V) {
   case OpAtomicAnd:
   case OpAtomicOr:
   case OpAtomicXor:
+  case OpAtomicFMinEXT:
+  case OpAtomicFMaxEXT:
+  case OpAtomicFAddEXT:
   case OpPhi:
   case OpLoopMerge:
   case OpSelectionMerge:
