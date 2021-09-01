@@ -1848,7 +1848,19 @@ Value *SPIRVToLLVM::transAtomicRMW(SPIRVValue *const spvValue, const AtomicRMWIn
   Value *const atomicValue = transValue(spvAtomicInst->getOpValue(3), getBuilder()->GetInsertBlock()->getParent(),
                                         getBuilder()->GetInsertBlock());
 
-  return getBuilder()->CreateAtomicRMW(binOp, atomicPointer, atomicValue, MaybeAlign(), ordering, scope);
+  // This is a workaround, buffer.atomic.swap.f64 is not supported, convert double to int64.
+  if ((binOp == AtomicRMWInst::Xchg) && atomicValue->getType()->isDoubleTy()) {
+    Value *const int64Value = getBuilder()->CreateBitCast(atomicValue, getBuilder()->getInt64Ty());
+
+    Value *const int64AtomicPointer = getBuilder()->CreateBitCast(
+        atomicPointer, PointerType::get(getBuilder()->getInt64Ty(),
+                                        dyn_cast<PointerType>(atomicPointer->getType())->getAddressSpace()));
+    Value *const atomicRes =
+        getBuilder()->CreateAtomicRMW(binOp, int64AtomicPointer, int64Value, MaybeAlign(), ordering, scope);
+
+    return getBuilder()->CreateBitCast(atomicRes, getBuilder()->getDoubleTy());
+  } else
+    return getBuilder()->CreateAtomicRMW(binOp, atomicPointer, atomicValue, MaybeAlign(), ordering, scope);
 }
 
 // =====================================================================================================================
@@ -2037,6 +2049,45 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicXor>(SPIRVValue *co
   }
 
   return transAtomicRMW(spvValue, AtomicRMWInst::Xor);
+}
+
+// =====================================================================================================================
+// Handle OpAtomicFMinEXT.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicFMinEXT>(SPIRVValue *const spvValue) {
+  // Image texel atomic operations use the older path for now.
+  if (static_cast<SPIRVInstruction *>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer) {
+    return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(spvValue), getBuilder()->GetInsertBlock());
+  }
+
+  return transAtomicRMW(spvValue, AtomicRMWInst::Min);
+}
+
+// =====================================================================================================================
+// Handle OpAtomicFMaxEXT.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicFMaxEXT>(SPIRVValue *const spvValue) {
+  // Image texel atomic operations use the older path for now.
+  if (static_cast<SPIRVInstruction *>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer) {
+    return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(spvValue), getBuilder()->GetInsertBlock());
+  }
+
+  return transAtomicRMW(spvValue, AtomicRMWInst::Max);
+}
+
+// =====================================================================================================================
+// Handle OpAtomicFAddEXT.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicFAddEXT>(SPIRVValue *const spvValue) {
+  // Image texel atomic operations use the older path for now.
+  if (static_cast<SPIRVInstruction *>(spvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer) {
+    return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(spvValue), getBuilder()->GetInsertBlock());
+  }
+
+  return transAtomicRMW(spvValue, AtomicRMWInst::FAdd);
 }
 
 // =====================================================================================================================
@@ -4874,6 +4925,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, transValueWithOpcode<OpAtomicOr>(bv));
   case OpAtomicXor:
     return mapValue(bv, transValueWithOpcode<OpAtomicXor>(bv));
+  case OpAtomicFMinEXT:
+    return mapValue(bv, transValueWithOpcode<OpAtomicFMinEXT>(bv));
+  case OpAtomicFMaxEXT:
+    return mapValue(bv, transValueWithOpcode<OpAtomicFMaxEXT>(bv));
+  case OpAtomicFAddEXT:
+    return mapValue(bv, transValueWithOpcode<OpAtomicFAddEXT>(bv));
   case OpCopyMemory:
     return mapValue(bv, transValueWithOpcode<OpCopyMemory>(bv));
   case OpLoad:
@@ -5851,7 +5908,15 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
   case OpAtomicXor:
     atomicOp = lgc::Builder::ImageAtomicXor;
     break;
-
+  case OpAtomicFMinEXT:
+    atomicOp = lgc::Builder::ImageAtomicFMin;
+    break;
+  case OpAtomicFMaxEXT:
+    atomicOp = lgc::Builder::ImageAtomicFMax;
+    break;
+  case OpAtomicFAddEXT:
+    atomicOp = lgc::Builder::ImageAtomicFAdd;
+    break;
   default:
     llvm_unreachable("Unknown image atomic op");
     break;

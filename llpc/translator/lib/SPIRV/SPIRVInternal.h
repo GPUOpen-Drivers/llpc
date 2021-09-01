@@ -278,7 +278,10 @@ enum SPIRVImageOpKind {
   ImageOpAtomicUMax,
   ImageOpAtomicAnd,
   ImageOpAtomicOr,
-  ImageOpAtomicXor
+  ImageOpAtomicXor,
+  ImageAtomicFMin,
+  ImageAtomicFMax,
+  ImageAtomicFAdd
 };
 
 template <> inline void SPIRVMap<SPIRVImageOpKind, std::string>::init() {
@@ -304,6 +307,9 @@ template <> inline void SPIRVMap<SPIRVImageOpKind, std::string>::init() {
   add(ImageOpAtomicAnd, "atomicand");
   add(ImageOpAtomicOr, "atomicor");
   add(ImageOpAtomicXor, "atomicxor");
+  add(ImageAtomicFMin, "atomicfmin");
+  add(ImageAtomicFMax, "atomicfmax");
+  add(ImageAtomicFAdd, "atomicfadd");
 }
 typedef SPIRVMap<SPIRVImageOpKind, std::string> SPIRVImageOpKindNameMap;
 
@@ -417,6 +423,9 @@ template <> inline void SPIRVMap<Op, SPIRVImageOpInfo>::init() {
   add(OpAtomicAnd, {ImageOpAtomicAnd, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
   add(OpAtomicOr, {ImageOpAtomicOr, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
   add(OpAtomicXor, {ImageOpAtomicXor, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
+  add(OpAtomicFMinEXT, {ImageAtomicFMin, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
+  add(OpAtomicFMaxEXT, {ImageAtomicFMax, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
+  add(OpAtomicFAddEXT, {ImageAtomicFAdd, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
 }
 typedef SPIRVMap<Op, SPIRVImageOpInfo> SPIRVImageOpInfoMap;
 

@@ -448,6 +448,8 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilitySubgroupBufferBlockIOINTEL, "SubgroupBufferBlockIOINTEL");
   add(CapabilitySubgroupImageBlockIOINTEL, "SubgroupImageBlockIOINTEL");
   add(CapabilityDemoteToHelperInvocationEXT, "DemoteToHelperInvocationEXT");
+  add(CapabilityAtomicFloat32MinMaxEXT, "AtomicFloat32MinMaxEXT");
+  add(CapabilityAtomicFloat64MinMaxEXT, "AtomicFloat64MinMaxEXT");
 }
 SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
 

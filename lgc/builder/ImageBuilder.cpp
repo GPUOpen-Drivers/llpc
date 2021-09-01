@@ -337,7 +337,8 @@ static const Intrinsic::ID StructBufferAtomicIntrinsicTable[] = {
     Intrinsic::amdgcn_struct_buffer_atomic_smin, Intrinsic::amdgcn_struct_buffer_atomic_umin,
     Intrinsic::amdgcn_struct_buffer_atomic_smax, Intrinsic::amdgcn_struct_buffer_atomic_umax,
     Intrinsic::amdgcn_struct_buffer_atomic_and,  Intrinsic::amdgcn_struct_buffer_atomic_or,
-    Intrinsic::amdgcn_struct_buffer_atomic_xor};
+    Intrinsic::amdgcn_struct_buffer_atomic_xor,  Intrinsic::amdgcn_struct_buffer_atomic_fmin,
+    Intrinsic::amdgcn_struct_buffer_atomic_fmax, Intrinsic::amdgcn_struct_buffer_atomic_fadd};
 
 // Intrinsic ID table for image atomic
 static const Intrinsic::ID ImageAtomicIntrinsicTable[][8] = {
@@ -385,7 +386,14 @@ static const Intrinsic::ID ImageAtomicIntrinsicTable[][8] = {
      Intrinsic::amdgcn_image_atomic_xor_3d, Intrinsic::amdgcn_image_atomic_xor_cube,
      Intrinsic::amdgcn_image_atomic_xor_1darray, Intrinsic::amdgcn_image_atomic_xor_2darray,
      Intrinsic::amdgcn_image_atomic_xor_2dmsaa, Intrinsic::amdgcn_image_atomic_xor_2darraymsaa},
-};
+    {Intrinsic::amdgcn_image_atomic_fmin_1d, Intrinsic::amdgcn_image_atomic_fmin_2d,
+     Intrinsic::amdgcn_image_atomic_fmin_3d, Intrinsic::amdgcn_image_atomic_fmin_cube,
+     Intrinsic::amdgcn_image_atomic_fmin_1darray, Intrinsic::amdgcn_image_atomic_fmin_2darray,
+     Intrinsic::amdgcn_image_atomic_fmin_2dmsaa, Intrinsic::amdgcn_image_atomic_fmin_2darraymsaa},
+    {Intrinsic::amdgcn_image_atomic_fmax_1d, Intrinsic::amdgcn_image_atomic_fmax_2d,
+     Intrinsic::amdgcn_image_atomic_fmax_3d, Intrinsic::amdgcn_image_atomic_fmax_cube,
+     Intrinsic::amdgcn_image_atomic_fmax_1darray, Intrinsic::amdgcn_image_atomic_fmax_2darray,
+     Intrinsic::amdgcn_image_atomic_fmax_2dmsaa, Intrinsic::amdgcn_image_atomic_fmax_2darraymsaa}};
 
 // =====================================================================================================================
 // Convert an integer or vector of integer type to the equivalent (vector of) half/float/double

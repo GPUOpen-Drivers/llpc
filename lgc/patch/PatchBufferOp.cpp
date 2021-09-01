@@ -245,120 +245,189 @@ void PatchBufferOp::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgInst)
 //
 // @param atomicRmwInst : The instruction
 void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
-  // If the type we are doing an atomic operation on is not a fat pointer, bail.
-  if (atomicRmwInst.getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    return;
+  if (atomicRmwInst.getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER) {
+    m_builder->SetInsertPoint(&atomicRmwInst);
 
-  m_builder->SetInsertPoint(&atomicRmwInst);
+    Value *const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
 
-  Value *const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
+    Type *const storeType = atomicRmwInst.getValOperand()->getType();
 
-  Type *const storeType = atomicRmwInst.getValOperand()->getType();
+    const bool isSlc = atomicRmwInst.getMetadata(LLVMContext::MD_nontemporal);
 
-  const bool isSlc = atomicRmwInst.getMetadata(LLVMContext::MD_nontemporal);
+    Value *const bufferDesc = m_replacementMap[pointer].first;
+    Value *const baseIndex = m_builder->CreatePtrToInt(m_replacementMap[pointer].second, m_builder->getInt32Ty());
+    copyMetadata(baseIndex, &atomicRmwInst);
 
-  Value *const bufferDesc = m_replacementMap[pointer].first;
-  Value *const baseIndex = m_builder->CreatePtrToInt(m_replacementMap[pointer].second, m_builder->getInt32Ty());
-  copyMetadata(baseIndex, &atomicRmwInst);
+    // If our buffer descriptor is divergent, need to handle it differently.
+    if (m_divergenceSet.count(bufferDesc) > 0) {
+      Value *const baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
 
-  // If our buffer descriptor is divergent, need to handle it differently.
-  if (m_divergenceSet.count(bufferDesc) > 0) {
-    Value *const baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
+      // The 2nd element in the buffer descriptor is the byte bound, we do this to support robust buffer access.
+      Value *const bound = m_builder->CreateExtractElement(bufferDesc, 2);
+      Value *const inBound = m_builder->CreateICmpULT(baseIndex, bound);
+      Value *const newBaseIndex = m_builder->CreateSelect(inBound, baseIndex, m_builder->getInt32(0));
 
-    // The 2nd element in the buffer descriptor is the byte bound, we do this to support robust buffer access.
-    Value *const bound = m_builder->CreateExtractElement(bufferDesc, 2);
-    Value *const inBound = m_builder->CreateICmpULT(baseIndex, bound);
-    Value *const newBaseIndex = m_builder->CreateSelect(inBound, baseIndex, m_builder->getInt32(0));
+      // Add on the index to the address.
+      Value *atomicPointer = m_builder->CreateGEP(m_builder->getInt8Ty(), baseAddr, newBaseIndex);
 
-    // Add on the index to the address.
-    Value *atomicPointer = m_builder->CreateGEP(m_builder->getInt8Ty(), baseAddr, newBaseIndex);
+      atomicPointer = m_builder->CreateBitCast(atomicPointer, storeType->getPointerTo(ADDR_SPACE_GLOBAL));
 
-    atomicPointer = m_builder->CreateBitCast(atomicPointer, storeType->getPointerTo(ADDR_SPACE_GLOBAL));
+      AtomicRMWInst *const newAtomicRmw =
+          m_builder->CreateAtomicRMW(atomicRmwInst.getOperation(), atomicPointer, atomicRmwInst.getValOperand(),
+                                     atomicRmwInst.getAlign(), atomicRmwInst.getOrdering());
+      newAtomicRmw->setVolatile(atomicRmwInst.isVolatile());
+      newAtomicRmw->setSyncScopeID(atomicRmwInst.getSyncScopeID());
+      copyMetadata(newAtomicRmw, &atomicRmwInst);
 
-    AtomicRMWInst *const newAtomicRmw =
-        m_builder->CreateAtomicRMW(atomicRmwInst.getOperation(), atomicPointer, atomicRmwInst.getValOperand(),
-                                   atomicRmwInst.getAlign(), atomicRmwInst.getOrdering());
-    newAtomicRmw->setVolatile(atomicRmwInst.isVolatile());
-    newAtomicRmw->setSyncScopeID(atomicRmwInst.getSyncScopeID());
-    copyMetadata(newAtomicRmw, &atomicRmwInst);
+      // Record the atomic instruction so we remember to delete it later.
+      m_replacementMap[&atomicRmwInst] = std::make_pair(nullptr, nullptr);
 
-    // Record the atomic instruction so we remember to delete it later.
-    m_replacementMap[&atomicRmwInst] = std::make_pair(nullptr, nullptr);
+      atomicRmwInst.replaceAllUsesWith(newAtomicRmw);
+    } else {
+      switch (atomicRmwInst.getOrdering()) {
+      case AtomicOrdering::Release:
+      case AtomicOrdering::AcquireRelease:
+      case AtomicOrdering::SequentiallyConsistent: {
+        FenceInst *const fence = m_builder->CreateFence(AtomicOrdering::Release, atomicRmwInst.getSyncScopeID());
+        copyMetadata(fence, &atomicRmwInst);
+        break;
+      }
+      default: {
+        break;
+      }
+      }
+      Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
+      switch (atomicRmwInst.getOperation()) {
+      case AtomicRMWInst::Xchg:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_swap;
+        break;
+      case AtomicRMWInst::Add:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_add;
+        break;
+      case AtomicRMWInst::Sub:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_sub;
+        break;
+      case AtomicRMWInst::And:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_and;
+        break;
+      case AtomicRMWInst::Or:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_or;
+        break;
+      case AtomicRMWInst::Xor:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_xor;
+        break;
+      case AtomicRMWInst::Max:
+        if (storeType->isFloatTy() || storeType->isDoubleTy())
+          intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmax;
+        else
+          intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smax;
+        break;
+      case AtomicRMWInst::Min:
+        if (storeType->isFloatTy() || storeType->isDoubleTy())
+          intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmin;
+        else
+          intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smin;
+        break;
+      case AtomicRMWInst::UMax:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umax;
+        break;
+      case AtomicRMWInst::UMin:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umin;
+        break;
+      case AtomicRMWInst::FAdd:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fadd;
+        break;
+      default:
+        llvm_unreachable("Should never be called!");
+        break;
+      }
 
-    atomicRmwInst.replaceAllUsesWith(newAtomicRmw);
-  } else {
-    switch (atomicRmwInst.getOrdering()) {
-    case AtomicOrdering::Release:
-    case AtomicOrdering::AcquireRelease:
-    case AtomicOrdering::SequentiallyConsistent: {
-      FenceInst *const fence = m_builder->CreateFence(AtomicOrdering::Release, atomicRmwInst.getSyncScopeID());
-      copyMetadata(fence, &atomicRmwInst);
-      break;
+      Value *const atomicCall = m_builder->CreateIntrinsic(intrinsic, cast<IntegerType>(storeType),
+                                                           {atomicRmwInst.getValOperand(), bufferDesc, baseIndex,
+                                                            m_builder->getInt32(0), m_builder->getInt32(isSlc * 2)});
+      copyMetadata(atomicCall, &atomicRmwInst);
+
+      switch (atomicRmwInst.getOrdering()) {
+      case AtomicOrdering::Acquire:
+      case AtomicOrdering::AcquireRelease:
+      case AtomicOrdering::SequentiallyConsistent: {
+        FenceInst *const fence = m_builder->CreateFence(AtomicOrdering::Acquire, atomicRmwInst.getSyncScopeID());
+        copyMetadata(fence, &atomicRmwInst);
+        break;
+      }
+      default: {
+        break;
+      }
+      }
+
+      // Record the atomic instruction so we remember to delete it later.
+      m_replacementMap[&atomicRmwInst] = std::make_pair(nullptr, nullptr);
+
+      atomicRmwInst.replaceAllUsesWith(atomicCall);
     }
-    default: {
-      break;
-    }
-    }
+  } else if (atomicRmwInst.getPointerAddressSpace() == ADDR_SPACE_GLOBAL) {
+    AtomicRMWInst::BinOp op = atomicRmwInst.getOperation();
+    Type *const storeType = atomicRmwInst.getValOperand()->getType();
+    if ((op == AtomicRMWInst::Min || op == AtomicRMWInst::Max || op == AtomicRMWInst::FAdd) &&
+        storeType->isFloatingPointTy()) {
+      Value *const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
+      m_builder->SetInsertPoint(&atomicRmwInst);
+      Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
+      switch (atomicRmwInst.getOperation()) {
+      case AtomicRMWInst::Min:
+        intrinsic = Intrinsic::amdgcn_global_atomic_fmin;
+        break;
+      case AtomicRMWInst::Max:
+        intrinsic = Intrinsic::amdgcn_global_atomic_fmax;
+        break;
+      case AtomicRMWInst::FAdd:
+        intrinsic = Intrinsic::amdgcn_global_atomic_fadd;
+        break;
+      default:
+        llvm_unreachable("Should never be called!");
+        break;
+      }
+      Value *const atomicCall = m_builder->CreateIntrinsic(intrinsic, {storeType, pointer->getType(), storeType},
+                                                           {pointer, atomicRmwInst.getValOperand()});
+      copyMetadata(atomicCall, &atomicRmwInst);
+      // Record the atomic instruction so we remember to delete it later.
+      m_replacementMap[&atomicRmwInst] = std::make_pair(nullptr, nullptr);
 
-    Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
-    switch (atomicRmwInst.getOperation()) {
-    case AtomicRMWInst::Xchg:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_swap;
-      break;
-    case AtomicRMWInst::Add:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_add;
-      break;
-    case AtomicRMWInst::Sub:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_sub;
-      break;
-    case AtomicRMWInst::And:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_and;
-      break;
-    case AtomicRMWInst::Or:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_or;
-      break;
-    case AtomicRMWInst::Xor:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_xor;
-      break;
-    case AtomicRMWInst::Max:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smax;
-      break;
-    case AtomicRMWInst::Min:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smin;
-      break;
-    case AtomicRMWInst::UMax:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umax;
-      break;
-    case AtomicRMWInst::UMin:
-      intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umin;
-      break;
-    default:
-      llvm_unreachable("Should never be called!");
-      break;
+      atomicRmwInst.replaceAllUsesWith(atomicCall);
     }
+  } else if (atomicRmwInst.getPointerAddressSpace() == ADDR_SPACE_LOCAL) {
+    AtomicRMWInst::BinOp op = atomicRmwInst.getOperation();
+    Type *const storeType = atomicRmwInst.getValOperand()->getType();
+    if ((op == AtomicRMWInst::Min || op == AtomicRMWInst::Max || op == AtomicRMWInst::FAdd) &&
+        storeType->isFloatingPointTy()) {
+      Value *const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
+      m_builder->SetInsertPoint(&atomicRmwInst);
+      Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
+      switch (atomicRmwInst.getOperation()) {
+      case AtomicRMWInst::Min:
+        intrinsic = Intrinsic::amdgcn_ds_fmin;
+        break;
+      case AtomicRMWInst::Max:
+        intrinsic = Intrinsic::amdgcn_ds_fmax;
+        break;
+      case AtomicRMWInst::FAdd:
+        intrinsic = Intrinsic::amdgcn_ds_fadd;
+        break;
+      default:
+        llvm_unreachable("Should never be called!");
+        break;
+      }
 
-    Value *const atomicCall = m_builder->CreateIntrinsic(
-        intrinsic, cast<IntegerType>(storeType),
-        {atomicRmwInst.getValOperand(), bufferDesc, baseIndex, m_builder->getInt32(0), m_builder->getInt32(isSlc * 2)});
-    copyMetadata(atomicCall, &atomicRmwInst);
-
-    switch (atomicRmwInst.getOrdering()) {
-    case AtomicOrdering::Acquire:
-    case AtomicOrdering::AcquireRelease:
-    case AtomicOrdering::SequentiallyConsistent: {
-      FenceInst *const fence = m_builder->CreateFence(AtomicOrdering::Acquire, atomicRmwInst.getSyncScopeID());
-      copyMetadata(fence, &atomicRmwInst);
-      break;
+      Value *const atomicCall = m_builder->CreateIntrinsic(
+          intrinsic, {storeType},
+          {pointer, atomicRmwInst.getValOperand(),
+           m_builder->getInt32(static_cast<uint32_t>(atomicRmwInst.getOrdering())),
+           m_builder->getInt32(atomicRmwInst.getSyncScopeID()), m_builder->getInt1(atomicRmwInst.isVolatile())});
+      copyMetadata(atomicCall, &atomicRmwInst);
+      // Record the atomic instruction so we remember to delete it later.
+      m_replacementMap[&atomicRmwInst] = std::make_pair(nullptr, nullptr);
+      atomicRmwInst.replaceAllUsesWith(atomicCall);
     }
-    default: {
-      break;
-    }
-    }
-
-    // Record the atomic instruction so we remember to delete it later.
-    m_replacementMap[&atomicRmwInst] = std::make_pair(nullptr, nullptr);
-
-    atomicRmwInst.replaceAllUsesWith(atomicCall);
   }
 }
 
