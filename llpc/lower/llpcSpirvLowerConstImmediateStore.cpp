@@ -45,23 +45,41 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Initializes static members.
-char SpirvLowerConstImmediateStore::ID = 0;
+char LegacySpirvLowerConstImmediateStore::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for constant immediate store
-ModulePass *createSpirvLowerConstImmediateStore() {
-  return new SpirvLowerConstImmediateStore();
+ModulePass *createLegacySpirvLowerConstImmediateStore() {
+  return new LegacySpirvLowerConstImmediateStore();
 }
 
 // =====================================================================================================================
-SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore() : LegacySpirvLower(ID) {
+LegacySpirvLowerConstImmediateStore::LegacySpirvLowerConstImmediateStore() : ModulePass(ID) {
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+bool LegacySpirvLowerConstImmediateStore::runOnModule(Module &module) {
+  return Impl.runImpl(module);
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+PreservedAnalyses SpirvLowerConstImmediateStore::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  runImpl(module);
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool SpirvLowerConstImmediateStore::runOnModule(Module &module) {
+bool SpirvLowerConstImmediateStore::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Const-Immediate-Store\n");
 
   SpirvLower::init(&module);
@@ -199,4 +217,4 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *sto
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering operations for constant immediate store.
-INITIALIZE_PASS(SpirvLowerConstImmediateStore, DEBUG_TYPE, "Lower SPIR-V constant immediate store", false, false)
+INITIALIZE_PASS(LegacySpirvLowerConstImmediateStore, DEBUG_TYPE, "Lower SPIR-V constant immediate store", false, false)

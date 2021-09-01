@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llpcSpirvLower.h"
+#include "llvm/IR/PassManager.h"
 
 namespace llvm {
 class AllocaInst;
@@ -41,21 +42,34 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations for constant immediate store
-class SpirvLowerConstImmediateStore : public LegacySpirvLower {
+class SpirvLowerConstImmediateStore : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerConstImmediateStore> {
 public:
-  SpirvLowerConstImmediateStore();
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  bool runImpl(llvm::Module &module);
+
+  static llvm::StringRef name() { return "Lower SPIR-V constant immediate store"; }
+
+private:
+  void processAllocaInsts(llvm::Function *func);
+  llvm::StoreInst *findSingleStore(llvm::AllocaInst *allocaInst);
+  void convertAllocaToReadOnlyGlobal(llvm::StoreInst *storeInst);
+};
+
+// =====================================================================================================================
+// Legacy pass manager wrapper class
+class LegacySpirvLowerConstImmediateStore : public llvm::ModulePass {
+public:
+  LegacySpirvLowerConstImmediateStore();
 
   virtual bool runOnModule(llvm::Module &module);
 
   static char ID; // ID of this pass
 
 private:
-  SpirvLowerConstImmediateStore(const SpirvLowerConstImmediateStore &) = delete;
-  SpirvLowerConstImmediateStore &operator=(const SpirvLowerConstImmediateStore &) = delete;
+  LegacySpirvLowerConstImmediateStore(const LegacySpirvLowerConstImmediateStore &) = delete;
+  LegacySpirvLowerConstImmediateStore &operator=(const LegacySpirvLowerConstImmediateStore &) = delete;
 
-  void processAllocaInsts(llvm::Function *func);
-  llvm::StoreInst *findSingleStore(llvm::AllocaInst *allocaInst);
-  void convertAllocaToReadOnlyGlobal(llvm::StoreInst *storeInst);
+  SpirvLowerConstImmediateStore Impl;
 };
 
 } // namespace Llpc

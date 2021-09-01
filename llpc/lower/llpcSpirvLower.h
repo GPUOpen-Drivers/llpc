@@ -48,9 +48,9 @@ class PassManager;
 
 class PassRegistry;
 void initializeLegacySpirvLowerAccessChainPass(PassRegistry &);
-void initializeSpirvLowerMathConstFoldingPass(PassRegistry &);
-void initializeSpirvLowerMathFloatOpPass(PassRegistry &);
-void initializeSpirvLowerConstImmediateStorePass(PassRegistry &);
+void initializeLegacySpirvLowerMathConstFoldingPass(PassRegistry &);
+void initializeLegacySpirvLowerMathFloatOpPass(PassRegistry &);
+void initializeLegacySpirvLowerConstImmediateStorePass(PassRegistry &);
 void initializeSpirvLowerMemoryOpPass(PassRegistry &);
 void initializeLegacySpirvLowerGlobalPass(PassRegistry &);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry &);
@@ -73,9 +73,9 @@ namespace Llpc {
 // @param passRegistry : Pass registry
 inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
   initializeLegacySpirvLowerAccessChainPass(passRegistry);
-  initializeSpirvLowerConstImmediateStorePass(passRegistry);
-  initializeSpirvLowerMathConstFoldingPass(passRegistry);
-  initializeSpirvLowerMathFloatOpPass(passRegistry);
+  initializeLegacySpirvLowerConstImmediateStorePass(passRegistry);
+  initializeLegacySpirvLowerMathConstFoldingPass(passRegistry);
+  initializeLegacySpirvLowerMathFloatOpPass(passRegistry);
   initializeSpirvLowerMemoryOpPass(passRegistry);
   initializeLegacySpirvLowerGlobalPass(passRegistry);
   initializeSpirvLowerInstMetaRemovePass(passRegistry);
@@ -87,9 +87,9 @@ inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
 class Context;
 
 llvm::ModulePass *createLegacySpirvLowerAccessChain();
-llvm::ModulePass *createSpirvLowerConstImmediateStore();
-llvm::ModulePass *createSpirvLowerMathConstFolding();
-llvm::ModulePass *createSpirvLowerMathFloatOp();
+llvm::ModulePass *createLegacySpirvLowerConstImmediateStore();
+llvm::ModulePass *createLegacySpirvLowerMathConstFolding();
+llvm::ModulePass *createLegacySpirvLowerMathFloatOp();
 llvm::ModulePass *createSpirvLowerMemoryOp();
 llvm::ModulePass *createLegacySpirvLowerGlobal();
 llvm::ModulePass *createSpirvLowerInstMetaRemove();
