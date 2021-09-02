@@ -76,6 +76,8 @@ private:
 
   unsigned m_stageMask;        // Mask of active shader stages bound to this graphics pipeline
   unsigned m_activeStageCount; // Count of active shader stages
+
+  bool m_gsOnChip; // Whether to enable GS on-chip mode
 };
 
 } // namespace Llpc

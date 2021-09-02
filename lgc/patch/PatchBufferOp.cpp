@@ -166,7 +166,7 @@ void PatchBufferOp::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgInst)
     Value *const newBaseIndex = m_builder->CreateSelect(inBound, baseIndex, m_builder->getInt32(0));
 
     // Add on the index to the address.
-    Value *atomicPointer = m_builder->CreateGEP(m_builder->getInt8Ty(), baseAddr, newBaseIndex);
+    Value *atomicPointer = m_builder->CreateGEP(baseAddr, newBaseIndex);
 
     atomicPointer = m_builder->CreateBitCast(atomicPointer, storeType->getPointerTo(ADDR_SPACE_GLOBAL));
 
@@ -271,7 +271,7 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
     Value *const newBaseIndex = m_builder->CreateSelect(inBound, baseIndex, m_builder->getInt32(0));
 
     // Add on the index to the address.
-    Value *atomicPointer = m_builder->CreateGEP(m_builder->getInt8Ty(), baseAddr, newBaseIndex);
+    Value *atomicPointer = m_builder->CreateGEP(baseAddr, newBaseIndex);
 
     atomicPointer = m_builder->CreateBitCast(atomicPointer, storeType->getPointerTo(ADDR_SPACE_GLOBAL));
 
@@ -511,13 +511,11 @@ void PatchBufferOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
   SmallVector<Value *, 8> indices(getElemPtrInst.idx_begin(), getElemPtrInst.idx_end());
 
   Value *newGetElemPtr = nullptr;
-  auto getElemPtrPtr = m_replacementMap[pointer].second;
-  auto getElemPtrEltTy = getElemPtrPtr->getType()->getScalarType()->getPointerElementType();
 
   if (getElemPtrInst.isInBounds())
-    newGetElemPtr = m_builder->CreateInBoundsGEP(getElemPtrEltTy, getElemPtrPtr, indices);
+    newGetElemPtr = m_builder->CreateInBoundsGEP(m_replacementMap[pointer].second, indices);
   else
-    newGetElemPtr = m_builder->CreateGEP(getElemPtrEltTy, getElemPtrPtr, indices);
+    newGetElemPtr = m_builder->CreateGEP(m_replacementMap[pointer].second, indices);
 
   copyMetadata(newGetElemPtr, pointer);
 
@@ -998,7 +996,7 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
         makeLoop(ConstantInt::get(lengthType, 0), length, ConstantInt::get(lengthType, stride), &memCpyInst);
 
     // Get the current index into our source pointer.
-    Value *const srcPtr = m_builder->CreateGEP(src->getType()->getScalarType()->getPointerElementType(), src, index);
+    Value *const srcPtr = m_builder->CreateGEP(src, index);
     copyMetadata(srcPtr, &memCpyInst);
 
     Value *const castSrc = m_builder->CreateBitCast(srcPtr, castSrcType);
@@ -1009,7 +1007,7 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     copyMetadata(srcLoad, &memCpyInst);
 
     // Get the current index into our destination pointer.
-    Value *const destPtr = m_builder->CreateGEP(dest->getType()->getScalarType()->getPointerElementType(), dest, index);
+    Value *const destPtr = m_builder->CreateGEP(dest, index);
     copyMetadata(destPtr, &memCpyInst);
 
     Value *const castDest = m_builder->CreateBitCast(destPtr, castDestType);
@@ -1145,7 +1143,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
         makeLoop(ConstantInt::get(lengthType, 0), length, ConstantInt::get(lengthType, stride), &memSetInst);
 
     // Get the current index into our destination pointer.
-    Value *const destPtr = m_builder->CreateGEP(dest->getType()->getScalarType()->getPointerElementType(), dest, index);
+    Value *const destPtr = m_builder->CreateGEP(dest, index);
     copyMetadata(destPtr, &memSetInst);
 
     Value *const castDest = m_builder->CreateBitCast(destPtr, castDestType);
@@ -1383,7 +1381,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
     Value *const newBaseIndex = m_builder->CreateSelect(inBound, baseIndex, m_builder->getInt32(0));
 
     // Add on the index to the address.
-    Value *pointer = m_builder->CreateGEP(m_builder->getInt8Ty(), baseAddr, newBaseIndex);
+    Value *pointer = m_builder->CreateGEP(baseAddr, newBaseIndex);
 
     pointer = m_builder->CreateBitCast(pointer, type->getPointerTo(ADDR_SPACE_GLOBAL));
 
