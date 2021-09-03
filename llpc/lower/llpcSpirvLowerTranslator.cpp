@@ -173,7 +173,7 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
       func.removeFnAttr(Attribute::NoInline);
 #else
     // New version of the code (also handles unknown version, which we treat as latest)
-    if (func.getAttributes().hasAttributes(Attribute::NoInline))
+    if (func.hasFnAttribute(Attribute::NoInline))
       func.removeFnAttr(Attribute::NoInline);
 #endif
     func.addFnAttr(Attribute::AlwaysInline);
