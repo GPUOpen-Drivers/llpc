@@ -1,0 +1,39 @@
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --spirv-convert-non-uniform-broadcast-to-shuffle | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: call i32 (...) @lgc.create.subgroup.shuffle.i32(
+; SHADERTEST-NOT: call i32 (...) @lgc.create.subgroup.broadcast.i32(
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.3
+; Generator: Khronos Glslang Reference Front End; 10
+; Bound: 14
+; Schema: 0
+               OpCapability Shader
+               OpCapability GroupNonUniform
+               OpCapability GroupNonUniformBallot
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main"
+               OpExecutionMode %main OriginLowerLeft
+               OpSource GLSL 450
+               OpSourceExtension "GL_KHR_shader_subgroup_ballot"
+               OpSourceExtension "GL_KHR_shader_subgroup_basic"
+               OpName %main "main"
+               OpName %i "i"
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+%_ptr_Function_int = OpTypePointer Function %int
+     %int_10 = OpConstant %int 10
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+     %uint_3 = OpConstant %uint 3
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+          %i = OpVariable %_ptr_Function_int Function
+         %13 = OpGroupNonUniformBroadcast %int %uint_3 %int_10 %uint_1
+               OpStore %i %13
+               OpReturn
+               OpFunctionEnd
