@@ -2365,11 +2365,12 @@ public:
       // 1. OpAtomicStore - need to check type of the Value operand
       CapVec.push_back(CapabilityInt64Atomics);
     }
-    if ((getOpCode() == OpAtomicFMinEXT) || (getOpCode() == OpAtomicFMaxEXT))
+    if ((getOpCode() == OpAtomicFMinEXT) || (getOpCode() == OpAtomicFMaxEXT)) {
       if (getType()->isTypeInt(64))
         CapVec.push_back(CapabilityAtomicFloat64MinMaxEXT);
       else
         CapVec.push_back(CapabilityAtomicFloat32MinMaxEXT);
+    }
     return CapVec;
   }
 
