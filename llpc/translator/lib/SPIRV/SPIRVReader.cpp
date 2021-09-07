@@ -99,6 +99,10 @@ cl::opt<unsigned> SPIRVGenFastMathFlags("spirv-gen-fast-math-flags", cl::init(0)
 cl::opt<bool> SPIRVWorkaroundBadSPIRV("spirv-workaround-bad-spirv", cl::init(true),
                                       cl::desc("Enable workarounds for bad SPIR-V"));
 
+cl::opt<bool> SPIRVConvertNonUniformBroadcastToShuffle(
+    "spirv-convert-non-uniform-broadcast-to-shuffle", cl::init(false),
+    cl::desc("Convert OpGroupNonUniformBroadcast instructions to OpGroupNonUniformShuffle instructions."));
+
 cl::opt<Vkgc::DenormalMode> Fp32DenormalModeOpt(
     "fp32-denormal-mode", cl::init(Vkgc::DenormalMode::Auto), cl::desc("Override denormal mode for FP32"),
     cl::values(clEnumValN(Vkgc::DenormalMode::Auto, "auto", "No override (default behaviour)"),
@@ -4990,8 +4994,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, transValueWithOpcode<OpGroupNonUniformAny>(bv));
   case OpGroupNonUniformAllEqual:
     return mapValue(bv, transValueWithOpcode<OpGroupNonUniformAllEqual>(bv));
-  case OpGroupNonUniformBroadcast:
+  case OpGroupNonUniformBroadcast: {
+    if (SPIRVConvertNonUniformBroadcastToShuffle) {
+      return mapValue(bv, transValueWithOpcode<OpGroupNonUniformShuffle>(bv));
+    }
     return mapValue(bv, transValueWithOpcode<OpGroupNonUniformBroadcast>(bv));
+  }
   case OpGroupNonUniformBroadcastFirst:
     return mapValue(bv, transValueWithOpcode<OpGroupNonUniformBroadcastFirst>(bv));
   case OpGroupNonUniformBallot:
