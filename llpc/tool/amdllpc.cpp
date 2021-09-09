@@ -129,8 +129,9 @@ static cl::opt<bool> AutoLayoutDesc("auto-layout-desc",
 // -unlinked : build an "unlinked" shader/part-pipeline ELF that needs a further link step
 static cl::opt<bool> Unlinked("unlinked", cl::desc("Build \"unlinked\" shader/part-pipeline ELF"), cl::init(false));
 
-// -val: validate input SPIR-V binary or text
-static cl::opt<bool> Validate("val", cl::desc("Validate input SPIR-V binary or text"), cl::init(true));
+// -validate-spirv: validate input SPIR-V binary or text
+static cl::opt<bool> ValidateSpirv("validate-spirv", cl::desc("Validate input SPIR-V binary or text (default: true)"),
+                                   cl::init(true));
 
 // -entry-target: name string of entry target (for multiple entry-points)
 static cl::opt<std::string> EntryTarget("entry-target", cl::desc("Name string of entry target"),
@@ -1056,7 +1057,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
         }
       }
 
-      if (result == Result::Success && Validate) {
+      if (result == Result::Success && ValidateSpirv) {
         char log[1024] = {};
         if (!InitSpvGen())
           errs() << "Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n";
