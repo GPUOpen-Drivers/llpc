@@ -313,7 +313,8 @@ attributes #0 = { nounwind }
 
 ; RUN: lgc -extract=10 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK10 %s
 ; CHECK10-LABEL: _amdgpu_cs_main:
-; CHECK10: s_mul_i32 [[PRODUCT0:s[0-9]+]], s3, 5
+; CHECK10: s_mov_b32 [[INPUT0:s[0-9]+]], s3
+; CHECK10: s_mul_i32 [[PRODUCT0:s[0-9]+]], [[INPUT0]], 5
 ; CHECK10: s_mul_i32 [[PRODUCT1:s[0-9]+]], s4, 6
 ; CHECK10: s_mul_i32 [[PRODUCT2:s[0-9]+]], s5, 7
 ; CHECK10: v_add_u32_e32 v0, vcc, [[PRODUCT0]], v0

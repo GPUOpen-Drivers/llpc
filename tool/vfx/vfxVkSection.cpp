@@ -63,6 +63,12 @@ public:
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, PushConst)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorBufferCompact)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, StreamOutTableVaPtr)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstBuffer)
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstBufferCompact)
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorImage)
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstTexelBuffer)
+#endif
 
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Auto)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, MaximumSize)

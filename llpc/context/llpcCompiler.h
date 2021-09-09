@@ -69,7 +69,8 @@ public:
   GraphicsShaderCacheChecker(Compiler *compiler, Context *context) : m_compiler(compiler), m_context(context) {}
 
   // Check shader caches, returning mask of which shader stages we want to keep in this compile.
-  unsigned check(const llvm::Module *module, unsigned stageMask, llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes);
+  unsigned check(const llvm::Module *module, unsigned stageMask, llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes,
+                 llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
 
   // Update shader caches with results of compile, and merge ELF outputs if necessary.
   void updateAndMerge(Result result, ElfPackage *pipelineElf);
@@ -121,7 +122,7 @@ public:
                                          llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
 
   Result buildPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
-                               ElfPackage *pipelineElf);
+                               ElfPackage *pipelineElf, llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
 
   // Gets the count of compiler instance.
   static unsigned getInstanceCount() { return m_instanceCount; }

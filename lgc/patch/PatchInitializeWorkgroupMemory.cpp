@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021-2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -34,12 +34,17 @@
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 
 #define DEBUG_TYPE "lgc-patch-initialize-workgroup-memory"
 
 using namespace lgc;
 using namespace llvm;
 
+static cl::opt<bool>
+    ForceInitWorkgroupMemory("force-init-workgroup-memory",
+                             cl::desc("Force to initialize the workgroup memory with zero for internal use"),
+                             cl::init(false));
 namespace lgc {
 
 // =====================================================================================================================
@@ -61,7 +66,11 @@ private:
   PatchInitializeWorkgroupMemory(const PatchInitializeWorkgroupMemory &) = delete;
   PatchInitializeWorkgroupMemory &operator=(const PatchInitializeWorkgroupMemory &) = delete;
 
-  void initializeWithZero(Value *pointer, Type *valueTy, SmallVectorImpl<Value *> &indices, BuilderBase &builder);
+  void initializeWithZero(GlobalVariable *lds, BuilderBase &builder);
+  unsigned getTypeSizeInDwords(Type *inputTy);
+
+  DenseMap<GlobalVariable *, Value *> m_globalLdsOffsetMap;
+  PipelineState *m_pipelineState = nullptr;
 };
 
 // =====================================================================================================================
@@ -85,18 +94,21 @@ PatchInitializeWorkgroupMemory::PatchInitializeWorkgroupMemory() : Patch(ID) {
 bool PatchInitializeWorkgroupMemory::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Initialize-Workgroup-Memory\n");
 
-  PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
   // This pass works on compute shader.
-  if (!pipelineState->hasShaderStage(ShaderStageCompute))
+  if (!m_pipelineState->hasShaderStage(ShaderStageCompute))
     return false;
 
-  SmallVector<GlobalVariable *> zeroGlobals;
+  SmallVector<GlobalVariable *> workgroupGlobals;
   for (GlobalVariable &global : module.globals()) {
-    if (global.hasInitializer() && global.getInitializer()->isNullValue())
-      zeroGlobals.push_back(&global);
+    // The pass process the cases that the workgroup memory is forced to be initialized or the workgorup variable has an
+    // zero initializer
+    if (global.getType()->getPointerAddressSpace() == ADDR_SPACE_LOCAL &&
+        (ForceInitWorkgroupMemory || (global.hasInitializer() && global.getInitializer()->isNullValue())))
+      workgroupGlobals.push_back(&global);
   }
 
-  if (zeroGlobals.empty())
+  if (workgroupGlobals.empty())
     return false;
 
   Patch::init(&module);
@@ -106,65 +118,152 @@ bool PatchInitializeWorkgroupMemory::runOnModule(Module &module) {
   Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
   builder.SetInsertPoint(insertPos);
 
-  for (auto global : zeroGlobals) {
-    Type *globalTy = global->getType();
-    // Create new global with null initializer to replace the original global. The global with zeroinitializer is not
-    // supported by back-end
-    GlobalVariable *newGlobal =
-        new GlobalVariable(module, globalTy->getPointerElementType(), false, GlobalValue::ExternalLinkage, nullptr,
-                           "lds", nullptr, GlobalValue::NotThreadLocal, globalTy->getPointerAddressSpace());
-    newGlobal->setAlignment(MaybeAlign(global->getAlignment()));
-    global->replaceAllUsesWith(newGlobal);
+  // Fill the map of each variable with zeroinitializer and calculate its corresponding offset on LDS
+  unsigned offset = 0;
+  for (auto global : workgroupGlobals) {
+    unsigned varSize = getTypeSizeInDwords(global->getType()->getPointerElementType());
+    m_globalLdsOffsetMap.insert({global, builder.getInt32(offset)});
+    offset += varSize;
+  }
 
-    Type *ptrElemTy = globalTy->getPointerElementType();
-    SmallVector<Value *> indices;
-    if (ptrElemTy->isAggregateType())
-      indices.push_back(builder.getInt32(0));
-    initializeWithZero(newGlobal, ptrElemTy, indices, builder);
+  // The new LDS is an i32 array
+  const unsigned ldsSize = offset;
+  auto ldsTy = ArrayType::get(builder.getInt32Ty(), ldsSize);
+  auto lds = new GlobalVariable(module, ldsTy, false, GlobalValue::ExternalLinkage, nullptr, "lds", nullptr,
+                                GlobalValue::NotThreadLocal, ADDR_SPACE_LOCAL);
+  lds->setAlignment(MaybeAlign(16));
 
+  // Replace the original LDS variables with the new LDS variable
+  for (auto globalOffsetPair : m_globalLdsOffsetMap) {
+    GlobalVariable *global = globalOffsetPair.first;
+    Value *offset = globalOffsetPair.second;
+
+    Value *pointer = builder.CreateGEP(lds->getType()->getPointerElementType(), lds, {builder.getInt32(0), offset});
+    pointer = builder.CreateBitCast(pointer, global->getType());
+
+    global->replaceAllUsesWith(pointer);
     global->eraseFromParent();
   }
+
+  initializeWithZero(lds, builder);
 
   return true;
 }
 
 // =====================================================================================================================
-// Recursively search the single value for a given type and write the corresponding zero value to the specified address
-// on LDS.
-
+// Initialize the given LDS variable with zero.
 //
-// @param pointer : The pointer to the address on LDS
-// @param valueTy : The checking value type
-// @param indices : The index list required for an aggregative type
+// @param lds : The LDS variable to be initialized
 // @param builder : BuilderBase to use for instruction constructing
-void PatchInitializeWorkgroupMemory::initializeWithZero(Value *pointer, Type *valueTy,
-                                                        SmallVectorImpl<Value *> &indices, BuilderBase &builder) {
-  if (valueTy->isSingleValueType()) {
-    Value *zero = Constant::getNullValue(valueTy);
-    unsigned alignment = valueTy->getPrimitiveSizeInBits() / 8;
-    if (!isPowerOf2_32(alignment))
-      alignment = NextPowerOf2(alignment);
-    if (!indices.empty())
-      pointer = builder.CreateGEP(pointer, indices);
-    builder.CreateAlignedStore(zero, pointer, Align(alignment));
-    return;
-  } else if (valueTy->isArrayTy()) {
-    const unsigned elemCount = valueTy->getArrayNumElements();
-    valueTy = valueTy->getContainedType(0);
-    for (unsigned idx = 0; idx < elemCount; ++idx) {
-      indices.push_back(builder.getInt32(idx));
-      initializeWithZero(pointer, valueTy, indices, builder);
-      indices.pop_back();
+void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, BuilderBase &builder) {
+  auto entryInsertPos = &*m_entryPoint->front().getFirstInsertionPt();
+  auto originBlock = entryInsertPos->getParent();
+  auto endInitBlock = originBlock->splitBasicBlock(entryInsertPos);
+  endInitBlock->setName(".endInit");
+
+  auto initBlock = BasicBlock::Create(*m_context, ".init", originBlock->getParent(), endInitBlock);
+  auto bodyBlock = BasicBlock::Create(*m_context, ".body", originBlock->getParent(), initBlock);
+  auto forHeaderBlock = BasicBlock::Create(*m_context, ".for.header", originBlock->getParent(), bodyBlock);
+
+  builder.SetInsertPoint(originBlock->getTerminator());
+  // Get thread info
+  auto &shaderMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+  const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs;
+  Value *localInvocationId = getFunctionArgument(m_entryPoint, entryArgIdxs.cs.localInvocationId);
+  const unsigned actualNumThreads = shaderMode.workgroupSizeX * shaderMode.workgroupSizeY * shaderMode.workgroupSizeZ;
+
+  Value *threadId = builder.CreateExtractElement(localInvocationId, uint64_t(0));
+  if (shaderMode.workgroupSizeY > 1) {
+    Value *stride = builder.CreateMul(builder.getInt32(shaderMode.workgroupSizeX),
+                                      builder.CreateExtractElement(localInvocationId, 1));
+    threadId = builder.CreateAdd(threadId, stride);
+  }
+  if (shaderMode.workgroupSizeZ > 1) {
+    Value *stride = builder.CreateMul(builder.getInt32(shaderMode.workgroupSizeX * shaderMode.workgroupSizeY),
+                                      builder.CreateExtractElement(localInvocationId, 2));
+    threadId = builder.CreateAdd(threadId, stride);
+  }
+  originBlock->getTerminator()->replaceUsesOfWith(endInitBlock, forHeaderBlock);
+
+  // Each thread stores a zero to the continues LDS
+  // for (int loopIdx = 0; loopIdx < loopCount; ++loopIdx) {
+  //   if (threadId * loopCount + loopIdx < requiredNumThreads) {
+  //      unsigned ldsOffset = (threadId * loopCount) + loopIdx;
+  //      CreateStore(zero, ldsOffset);
+  //   }
+  //  }
+
+  PHINode *loopIdxPhi = nullptr;
+  const unsigned requiredNumThreads = lds->getType()->getPointerElementType()->getArrayNumElements();
+  Value *loopCount = builder.getInt32((requiredNumThreads + actualNumThreads - 1) / actualNumThreads);
+
+  // Contruct ".for.Header" block
+  {
+    builder.SetInsertPoint(forHeaderBlock);
+
+    loopIdxPhi = builder.CreatePHI(builder.getInt32Ty(), 2);
+    loopIdxPhi->addIncoming(builder.getInt32(0), originBlock);
+
+    Value *isInLoop = builder.CreateICmpULT(loopIdxPhi, loopCount);
+    builder.CreateCondBr(isInLoop, bodyBlock, endInitBlock);
+  }
+
+  // Construct ".body" block
+  {
+    builder.SetInsertPoint(bodyBlock);
+    // The active thread is : threadId x loopCount + loopIdx < requiredNumThreads
+    Value *index = builder.CreateMul(threadId, loopCount);
+    index = builder.CreateAdd(index, loopIdxPhi);
+    Value *isActiveThread = builder.CreateICmpULT(index, builder.getInt32(requiredNumThreads));
+    builder.CreateCondBr(isActiveThread, initBlock, endInitBlock);
+
+    // Construct ".init" block
+    {
+      builder.SetInsertPoint(initBlock);
+      // ldsOffset = (threadId * loopCount) + loopIdx
+      Value *ldsOffset = builder.CreateMul(threadId, loopCount);
+      ldsOffset = builder.CreateAdd(ldsOffset, loopIdxPhi);
+      Value *writePtr =
+          builder.CreateGEP(lds->getType()->getPointerElementType(), lds, {builder.getInt32(0), ldsOffset});
+      builder.CreateAlignedStore(builder.getInt32(0), writePtr, Align(4));
+
+      // Update loop index
+      Value *loopNext = builder.CreateAdd(loopIdxPhi, builder.getInt32(1));
+      loopIdxPhi->addIncoming(loopNext, initBlock);
+
+      builder.CreateBr(forHeaderBlock);
     }
+  }
+  {
+    // Set barrier after writing LDS
+    builder.SetInsertPoint(&*endInitBlock->getFirstInsertionPt());
+    builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  }
+}
+
+// =====================================================================================================================
+// Return the size in dwords of a variable type
+//
+// @param inputTy : The type to be caculated
+unsigned PatchInitializeWorkgroupMemory::getTypeSizeInDwords(Type *inputTy) {
+  if (inputTy->isSingleValueType()) {
+    // Variabl in LDS is stored in dwords and padded as 4 dowrds
+    unsigned dwordCount = 4;
+    unsigned elemCount = inputTy->isVectorTy() ? cast<FixedVectorType>(inputTy)->getNumElements() : 1;
+    if (inputTy->getScalarSizeInBits() == 64 && elemCount > 1)
+      dwordCount = 8;
+    return dwordCount;
+  }
+  if (inputTy->isArrayTy()) {
+    const unsigned elemSize = getTypeSizeInDwords(inputTy->getContainedType(0));
+    return inputTy->getArrayNumElements() * elemSize;
   } else {
-    assert(valueTy->isStructTy());
-    const unsigned memberCount = valueTy->getStructNumElements();
-    for (unsigned idx = 0; idx < memberCount; ++idx) {
-      Type *memberTy = valueTy->getStructElementType(idx);
-      indices.push_back(builder.getInt32(idx));
-      initializeWithZero(pointer, memberTy, indices, builder);
-      indices.pop_back();
-    }
+    assert(inputTy->isStructTy());
+    const unsigned memberCount = inputTy->getStructNumElements();
+    unsigned memberSize = 0;
+    for (unsigned idx = 0; idx < memberCount; ++idx)
+      memberSize += getTypeSizeInDwords(inputTy->getStructElementType(idx));
+    return memberSize;
   }
 }
 

@@ -895,6 +895,27 @@ Value *ImageBuilder::preprocessIntegerImageGather(unsigned dim, Value *&imageDes
     return nullptr;
   }
 
+  if (dim != DimCube && dim != DimCubeArray) {
+    // If not cube/cube array, just add (-0.5/width, -0.5/height) to the x,y coordinates
+    Value *zero = getInt32(0);
+    Value *resInfo =
+        CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim], {FixedVectorType::get(getFloatTy(), 4), getInt32Ty()},
+                        {getInt32(15), zero, imageDesc, zero, zero});
+    resInfo = CreateBitCast(resInfo, FixedVectorType::get(getInt32Ty(), 4));
+
+    Value *widthHeight = CreateShuffleVector(resInfo, resInfo, ArrayRef<int>{0, 1});
+    widthHeight = CreateSIToFP(widthHeight, FixedVectorType::get(getFloatTy(), 2));
+    Value *valueToAdd = CreateFDiv(ConstantFP::get(widthHeight->getType(), -0.5), widthHeight);
+    unsigned coordCount = cast<FixedVectorType>(coord->getType())->getNumElements();
+    if (coordCount > 2) {
+      valueToAdd = CreateShuffleVector(valueToAdd, Constant::getNullValue(valueToAdd->getType()),
+                                       ArrayRef<int>({0, 1, 2, 3}).slice(0, coordCount));
+    }
+    coord = CreateFAdd(coord, valueToAdd);
+
+    return nullptr;
+  }
+
   // Check whether the descriptor needs patching. It does if it does not have format 32, 32_32 or 32_32_32_32.
   Value *descDword1 = CreateExtractElement(imageDesc, 1);
   Value *dataFormat = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(), {descDword1, getInt32(20), getInt32(6)});
@@ -903,7 +924,7 @@ Value *ImageBuilder::preprocessIntegerImageGather(unsigned dim, Value *&imageDes
   Value *isDataFormat32323232 = CreateICmpEQ(dataFormat, getInt32(IMG_DATA_FORMAT_32_32_32_32));
   Value *cond = CreateOr(isDataFormat3232, isDataFormat32);
   cond = CreateOr(isDataFormat32323232, cond);
-  Value *needDescPatch = CreateXor(cond, getInt1(true));
+  Value *needDescPatch = CreateNot(cond);
 
   // Create the if..else..endif, where the condition is whether the descriptor needs patching.
   InsertPoint savedInsertPoint = saveIP();

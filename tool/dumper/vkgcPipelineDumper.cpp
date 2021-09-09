@@ -438,6 +438,12 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorFmask:
   case ResourceMappingNodeType::DescriptorBufferCompact:
   case ResourceMappingNodeType::PushConst:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
+  case ResourceMappingNodeType::DescriptorConstBuffer:
+  case ResourceMappingNodeType::DescriptorConstBufferCompact:
+  case ResourceMappingNodeType::DescriptorImage:
+  case ResourceMappingNodeType::DescriptorConstTexelBuffer:
+#endif
   {
     char setHexvalue[64] = {};
     snprintf(setHexvalue, 64, "0x%08" PRIX32, userDataNode->srdRange.set);
@@ -784,6 +790,8 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "nggState.subgroupSizing = " << pipelineInfo->nggState.subgroupSizing << "\n";
   dumpFile << "nggState.primsPerSubgroup = " << pipelineInfo->nggState.primsPerSubgroup << "\n";
   dumpFile << "nggState.vertsPerSubgroup = " << pipelineInfo->nggState.vertsPerSubgroup << "\n";
+  dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
+  dumpFile << "enableUberFetchShader = " << pipelineInfo->enableUberFetchShader << "\n";
 
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
   dumpFile << "\n\n";
@@ -816,7 +824,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
     }
   }
 
-    dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
 }
 
 // =====================================================================================================================
@@ -1240,7 +1247,14 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   case ResourceMappingNodeType::DescriptorTexelBuffer:
   case ResourceMappingNodeType::DescriptorBuffer:
   case ResourceMappingNodeType::DescriptorFmask:
-  case ResourceMappingNodeType::DescriptorBufferCompact: {
+  case ResourceMappingNodeType::DescriptorBufferCompact:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
+  case ResourceMappingNodeType::DescriptorConstBuffer:
+  case ResourceMappingNodeType::DescriptorConstBufferCompact:
+  case ResourceMappingNodeType::DescriptorImage:
+  case ResourceMappingNodeType::DescriptorConstTexelBuffer:
+#endif
+  {
     hasher->Update(userDataNode->srdRange);
     break;
   }

@@ -25,7 +25,7 @@
 ; SHADERTEST: %[[loadResult:[0-9]+]] = load <4 x float>, <4 x float> addrspace(5)* %[[gep]], align 16
 ; SHADERTEST: br label %{{.*}}
 ; SHADERTEST: [[final:[a-z0-9]+]]:
-; SHADERTEST: %{{.*}} = phi reassoc nnan nsz arcp contract afn <4 x float> [ zeroinitializer, %{{.*}} ], [ %[[loadResult]], %[[load]] ]
+; SHADERTEST: %{{.*}} = phi <4 x float> [ zeroinitializer, %{{.*}} ], [ %[[loadResult]], %[[load]] ]
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

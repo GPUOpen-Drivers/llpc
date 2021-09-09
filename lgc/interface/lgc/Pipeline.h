@@ -378,9 +378,6 @@ struct RasterizerState {
                                     //  matches the sample pattern used by the rasterizer when rendering
                                     //  with this pipeline.
   unsigned usrClipPlaneMask;        // Mask to indicate the enabled user defined clip planes
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-  unsigned depthBiasEnable; // Whether to bias fragment depth values
-#endif
 };
 
 // =====================================================================================================================
@@ -618,11 +615,12 @@ public:
   // Typedef of function passed in to Generate to check the shader cache.
   // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages
   // that got a hit in the cache.
-  typedef std::function<unsigned(const llvm::Module *module,                         // [in] Module
-                                 unsigned stageMask,                                 // Shader stage mask
-                                 llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes // Per-stage hash of in/out usage
-                                 )>
-      CheckShaderCacheFunc;
+  //    @param module : Module
+  //    @param stageMask : Shader stage mask
+  //    @param stageHashes : Per-stage hash of in/out usage
+  //    @returns : Stage mask of stages not found in cache
+  using CheckShaderCacheFunc = std::function<unsigned(const llvm::Module *module, unsigned stageMask,
+                                                      llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes)>;
 
   // Do an early check for ability to use unlinked shader compilation then ELF linking.
   // Intended to be used when doing unlinked shader compilation with pipeline state already available.

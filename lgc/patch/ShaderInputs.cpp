@@ -310,7 +310,7 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
     for (unsigned kind = 0; kind != static_cast<unsigned>(ShaderInput::Count); ++kind) {
       ShaderInputUsage *inputUsage = inputsUsage->inputs[kind].get();
       if (inputUsage && inputUsage->entryArgIdx != 0) {
-        Argument *arg = func.getArg(inputUsage->entryArgIdx);
+        Argument *arg = getFunctionArgument(&func, inputUsage->entryArgIdx);
         arg->setName(getInputName(static_cast<ShaderInput>(kind)));
         for (Instruction *&call : inputUsage->users) {
           if (call && call->getFunction() == &func) {
@@ -476,7 +476,7 @@ static const ShaderInputDesc FsVgprInputs[] = {
 
 // VGPRs: CS
 static const ShaderInputDesc CsVgprInputs[] = {
-    {ShaderInput::LocalInvocationId, 0, true},
+    {ShaderInput::LocalInvocationId, offsetof(InterfaceData, entryArgIdxs.cs.localInvocationId), true},
 };
 
 // =====================================================================================================================
@@ -488,7 +488,8 @@ static const ShaderInputDesc CsVgprInputs[] = {
 // @param [in/out] argNames : Argument names vector to add to
 // @returns : Bitmap with bits set for SGPR arguments so caller can set "inreg" attribute on the args
 uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage,
-                                       SmallVectorImpl<Type *> &argTys, SmallVectorImpl<std::string> &argNames) {
+                                       SmallVectorImpl<Type *> &argTys, SmallVectorImpl<std::string> &argNames,
+                                       unsigned argOffset) {
 
   bool hasTs = pipelineState->hasShaderStage(ShaderStageTessControl);
   bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
@@ -608,9 +609,10 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
       }
       // Store the argument index.
       if (inputDesc.entryArgIdx != 0)
-        *reinterpret_cast<unsigned *>((reinterpret_cast<char *>(intfData) + inputDesc.entryArgIdx)) = argTys.size();
+        *reinterpret_cast<unsigned *>((reinterpret_cast<char *>(intfData) + inputDesc.entryArgIdx)) =
+            argTys.size() + argOffset;
       if (inputUsage)
-        inputUsage->entryArgIdx = argTys.size();
+        inputUsage->entryArgIdx = argTys.size() + argOffset;
       // Add the argument type.
       argTys.push_back(getInputType(inputDesc.inputKind, *pipelineState->getLgcContext()));
       argNames.push_back(ShaderInputs::getInputName(inputDesc.inputKind));

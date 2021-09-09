@@ -36,7 +36,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && apt-get update \
     && TOOLCHAIN_PACKAGES="gcc g++ binutils-gold" \
     && if echo "$FEATURES" | grep -q "+clang" ; then \
-         TOOLCHAIN_PACKAGES="clang-9 libclang-common-9-dev lld-9"; \
+         TOOLCHAIN_PACKAGES="clang-9 libclang-common-9-dev lld-9 clang-tidy-10"; \
        fi \
     && apt-get install -yqq --no-install-recommends \
        build-essential pkg-config ninja-build \
@@ -66,6 +66,9 @@ RUN wget -P /usr/bin/ https://storage.googleapis.com/git-repo-downloads/repo \
     && touch ./env.sh \
     && cd /vulkandriver/drivers/spvgen/external \
     && python3 fetch_external_sources.py
+
+# Copy update script into container
+COPY docker/update-llpc.sh /vulkandriver/
 
 # Build LLPC.
 WORKDIR /vulkandriver/builds/ci-build
@@ -108,8 +111,8 @@ RUN EXTRA_FLAGS="" \
 
 # Run the lit test suite.
 RUN source /vulkandriver/env.sh \
-    && cmake --build . --target check-amdllpc -- -v \
-    && cmake --build . --target check-lgc -- -v
+    && cmake --build . --target check-amdllpc check-amdllpc-units -- -v \
+    && cmake --build . --target check-lgc check-lgc-units -- -v
 
 # Save build info to /vulkandriver/build_info.txt.
 RUN cd /vulkandriver \

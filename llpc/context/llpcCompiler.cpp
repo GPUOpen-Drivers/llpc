@@ -944,7 +944,7 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
     }
 
     Vkgc::ElfPackage &stageElf = elf[stage];
-    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &stageElf);
+    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &stageElf, stageCacheAccesses);
     if (result != Result::Success)
       break;
 
@@ -1111,8 +1111,10 @@ bool Compiler::canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo 
 // @param shaderInfo : Shader info of this pipeline
 // @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs
 // @param [out] pipelineElf : Output Elf package
+// @param [out] pipelineElf : Stage cache acccess info.
 Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
-                                       ElfPackage *pipelineElf) {
+                                       ElfPackage *pipelineElf,
+                                       llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
   Result result = Result::Success;
   unsigned passIndex = 0;
   const PipelineShaderInfo *fragmentShaderInfo = nullptr;
@@ -1275,13 +1277,22 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       }
 
       context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
-      std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
-      lowerPassMgr->setPassIndex(&passIndex);
+      bool success;
+      if (cl::NewPassManager) {
+        std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
+        lowerPassMgr->setPassIndex(&passIndex);
 
-      LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
-      );
-      // Run the passes.
-      bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
+        // Run the passes.
+        success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+      } else {
+        std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
+        lowerPassMgr->setPassIndex(&passIndex);
+
+        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
+        // Run the passes.
+        success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+      }
       if (!success) {
         LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
         result = Result::ErrorInvalidShader;
@@ -1305,13 +1316,14 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   GraphicsShaderCacheChecker graphicsShaderCacheChecker(this, context);
 
   Pipeline::CheckShaderCacheFunc checkShaderCacheFunc =
-      [&graphicsShaderCacheChecker](
-          const Module *module, unsigned stageMask,
-          ArrayRef<ArrayRef<uint8_t>> stageHashes //
-                                                  // @param module : Module
-                                                  // @param stageMask : Shader stage mask
-                                                  // @param stageHashes : Per-stage hash of in/out usage
-      ) { return graphicsShaderCacheChecker.check(module, stageMask, stageHashes); };
+      // @param module : Module
+      // @param stageMask : Shader stage mask
+      // @param stageHashes : Per-stage hash of in/out usage
+      // @returns : Stage mask of stages not found in cache
+      [&graphicsShaderCacheChecker, stageCacheAccesses](const Module *module, unsigned stageMask,
+                                                        ArrayRef<ArrayRef<uint8_t>> stageHashes) {
+        return graphicsShaderCacheChecker.check(module, stageMask, stageHashes, stageCacheAccesses);
+      };
 
   // Only enable per stage cache for full graphic pipeline
   bool checkPerStageCache =
@@ -1368,29 +1380,46 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 // @param module : Module
 // @param stageMask : Shader stage mask
 // @param stageHashes : Per-stage hash of in/out usage
-unsigned GraphicsShaderCacheChecker::check(const Module *module, unsigned stageMask,
-                                           ArrayRef<ArrayRef<uint8_t>> stageHashes) {
+// @param [out] stageCacheAccesses : Stage cache access info to fill out
+// @returns : Stage mask of the stages left to compile.
+unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned stageMask,
+                                           ArrayRef<ArrayRef<uint8_t>> stageHashes,
+                                           llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
   // Check per stage shader cache
   MetroHash::Hash fragmentHash = {};
   MetroHash::Hash nonFragmentHash = {};
   Compiler::buildShaderCacheHash(m_context, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
+  unsigned stagesLeftToCompile = stageMask;
 
   if (stageMask & shaderStageToMask(ShaderStageFragment)) {
     m_fragmentCacheAccessor.emplace(m_context, fragmentHash, m_compiler->getInternalCaches());
     if (m_fragmentCacheAccessor->isInCache()) {
       // Remove fragment shader stages.
-      stageMask &= ~shaderStageToMask(ShaderStageFragment);
+      stagesLeftToCompile &= ~shaderStageToMask(ShaderStageFragment);
+      stageCacheAccesses[ShaderStageFragment] =
+          m_fragmentCacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+    } else {
+      stageCacheAccesses[ShaderStageFragment] = CacheAccessInfo::CacheMiss;
     }
   }
 
   if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
+    auto accessInfo = CacheAccessInfo::CacheNotChecked;
     m_nonFragmentCacheAccessor.emplace(m_context, nonFragmentHash, m_compiler->getInternalCaches());
     if (m_nonFragmentCacheAccessor->isInCache()) {
       // Remove non-fragment shader stages.
-      stageMask &= shaderStageToMask(ShaderStageFragment);
+      stagesLeftToCompile &= shaderStageToMask(ShaderStageFragment);
+      accessInfo = m_nonFragmentCacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit
+                                                                  : CacheAccessInfo::CacheHit;
+    } else {
+      accessInfo = CacheAccessInfo::CacheMiss;
     }
+
+    for (ShaderStage stage : gfxShaderStages())
+      if (stage != ShaderStageFragment && (shaderStageToMask(stage) & stageMask))
+        stageCacheAccesses[stage] = accessInfo;
   }
-  return stageMask;
+  return stagesLeftToCompile;
 }
 
 // =====================================================================================================================
@@ -1513,7 +1542,7 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
   }
 
   if (result != Result::Success) {
-    result = buildPipelineInternal(context, shaderInfo, /*unlinked=*/false, pipelineElf);
+    result = buildPipelineInternal(context, shaderInfo, /*unlinked=*/false, pipelineElf, stageCacheAccesses);
   }
   releaseContext(context);
   return result;
@@ -1645,14 +1674,14 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
       nullptr, nullptr, nullptr, nullptr, nullptr, &pipelineInfo->cs,
   };
   Result result = Result::ErrorUnavailable;
+  CacheAccessInfo stageCacheAccesses[ShaderStageCount] = {};
   if (buildingRelocatableElf) {
-    CacheAccessInfo stageCacheAccesses[ShaderStageCount] = {};
     result = buildPipelineWithRelocatableElf(context, shadersInfo, pipelineElf, stageCacheAccesses);
     *stageCacheAccess = stageCacheAccesses[ShaderStageCompute];
   }
 
   if (result != Result::Success) {
-    result = buildPipelineInternal(context, shadersInfo, /*unlinked=*/false, pipelineElf);
+    result = buildPipelineInternal(context, shadersInfo, /*unlinked=*/false, pipelineElf, stageCacheAccesses);
   }
   releaseContext(context);
   return result;
@@ -1948,6 +1977,9 @@ bool Compiler::runPasses(lgc::PassManager *passMgr, Module *module) const {
   {
     passMgr->run(*module);
     success = true;
+    // TODO Only some passes have been ported to the new pass manager. So running
+    // the lowering passes with the new pass manager results in a fatal error for now.
+    report_fatal_error("The new pass manager is not fully implemented yet.");
   }
 #if LLPC_ENABLE_EXCEPTION
   catch (const char *) {

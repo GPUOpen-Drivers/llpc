@@ -39,6 +39,7 @@
 #include "lgc/Pipeline.h"
 #include "lgc/state/AbiMetadata.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
+#include <map>
 
 namespace llvm {
 class Module;
@@ -219,6 +220,18 @@ private:
 
   // The maximum possible value for the spill threshold entry in the PAL meatadata.
   static constexpr uint64_t MAX_SPILL_THRESHOLD = UINT_MAX;
+
+  unsigned getUserDataCount(unsigned callingConv);
+  unsigned getCallingConventionForFirstHardwareShaderStage();
+  unsigned getFirstUserDataReg(unsigned callingConv);
+  unsigned getNumberOfSgprsBeforeUserData(unsigned conv);
+  unsigned getOffsetOfUserDataReg(std::map<llvm::msgpack::DocNode, llvm::msgpack::DocNode>::iterator firstUserDataNode,
+                                  UserDataMapping userDataMapping);
+  unsigned getNumberOfSgprsAfterUserData(unsigned callingConv);
+  unsigned getVertexIdOffset(unsigned callingConv);
+  unsigned getInstanceIdOffset(unsigned callingConv);
+  unsigned getVgprCount(unsigned callingConv);
+  bool isWave32(unsigned callingConv);
 
   PipelineState *m_pipelineState;             // PipelineState
   llvm::msgpack::Document *m_document;        // The MsgPack document

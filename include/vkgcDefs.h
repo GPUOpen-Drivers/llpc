@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 48
+#define LLPC_INTERFACE_MAJOR_VERSION 49
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,6 +71,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     49.0 | Added DescriptorConstBuffer, DescriptorConstBufferCompact, DescriptorImage, DescriptorConstTexelBuffer|
+//  |          | to ResourceMappingNodeType                                                                            |
 //  |     48.1 | Added enableUberFetchShader to GraphicsPipelineBuildInfo                                              |
 //  |     48.0 | Removed the member 'polygonMode' of rsState                                                           |
 //  |     47.0 | Always get culling controls from primitive shader table                                               |
@@ -221,14 +223,13 @@ static_assert((1 << (ShaderStageCount - 1)) == ShaderStageComputeBit,
 /// Enumerates the function of a particular node in a shader's resource mapping graph.
 enum class ResourceMappingNodeType : unsigned {
   Unknown,                   ///< Invalid type
-  DescriptorResource,        ///< Generic descriptor: resource, including texture resource, image, input
-                             ///  attachment
+  DescriptorResource,        ///< Generic descriptor: resource, including texture resource,
   DescriptorSampler,         ///< Generic descriptor: sampler
   DescriptorCombinedTexture, ///< Generic descriptor: combined texture, combining resource descriptor with
                              ///  sampler descriptor of the same texture, starting with resource descriptor
-  DescriptorTexelBuffer,     ///< Generic descriptor: texel buffer, including texture buffer and image buffer
+  DescriptorTexelBuffer,     ///< Generic descriptor: texel buffer
   DescriptorFmask,           ///< Generic descriptor: F-mask
-  DescriptorBuffer,          ///< Generic descriptor: buffer, including uniform buffer and shader storage buffer
+  DescriptorBuffer,          ///< Generic descriptor: buffer, including shader storage buffer
   DescriptorTableVaPtr,      ///< Descriptor table VA pointer
   IndirectUserDataVaPtr,     ///< Indirect user data VA pointer
   PushConst,                 ///< Push constant
@@ -236,6 +237,12 @@ enum class ResourceMappingNodeType : unsigned {
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
   DescriptorYCbCrSampler, ///< Generic descriptor: YCbCr sampler
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
+  DescriptorConstBuffer,        ///< Generic descriptor: constBuffer,including uniform buffer
+  DescriptorConstBufferCompact, ///< Generic descriptor: constBuffer,including dynamic storage buffer
+  DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
+  DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including unifrom texel buffer
+#endif
   Count, ///< Count of resource mapping node types.
 };
 
@@ -608,6 +615,9 @@ struct PipelineShaderOptions {
 
   /// Threshold to use for loops with "DontUnroll" hint (0 = use llvm.llop.unroll.disable).
   unsigned dontUnrollHintThreshold;
+
+  ///< Whether fastmath contract could be disabled
+  bool noContract;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -747,8 +757,10 @@ struct GraphicsPipelineBuildInfo {
     VkCullModeFlags cullMode; ///< Fragment culling mode
     VkFrontFace frontFace;    ///< Front-facing triangle orientation
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
     bool depthBiasEnable; ///< Whether to bias fragment depth values
-  } rsState;              ///< Rasterizer State
+#endif
+  } rsState; ///< Rasterizer State
 
   struct {
     bool alphaToCoverageEnable; ///< Enable alpha to coverage

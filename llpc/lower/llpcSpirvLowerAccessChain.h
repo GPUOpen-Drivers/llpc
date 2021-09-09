@@ -32,25 +32,40 @@
 
 #include "llpcSpirvLower.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/PassManager.h"
 
 namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for access chain.
-class SpirvLowerAccessChain : public LegacySpirvLower, public llvm::InstVisitor<SpirvLowerAccessChain> {
+class SpirvLowerAccessChain : public SpirvLower, public llvm::InstVisitor<SpirvLowerAccessChain> {
 public:
-  SpirvLowerAccessChain();
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
+
+  bool runImpl(llvm::Module &module);
+
+  static llvm::StringRef name() { return "Lower SPIR-V access chain"; }
+
+private:
+  llvm::GetElementPtrInst *tryToCoalesceChain(llvm::GetElementPtrInst *getElemPtr, unsigned addrSpace);
+};
+
+// =====================================================================================================================
+// Represents the pass of SPIR-V lowering opertions for access chain.
+class LegacySpirvLowerAccessChain : public llvm::ModulePass {
+public:
+  LegacySpirvLowerAccessChain();
 
   virtual bool runOnModule(llvm::Module &module);
-  virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
 
   static char ID; // ID of this pass
 
 private:
-  SpirvLowerAccessChain(const SpirvLowerAccessChain &) = delete;
-  SpirvLowerAccessChain &operator=(const SpirvLowerAccessChain &) = delete;
+  LegacySpirvLowerAccessChain(const LegacySpirvLowerAccessChain &) = delete;
+  LegacySpirvLowerAccessChain &operator=(const LegacySpirvLowerAccessChain &) = delete;
 
-  llvm::GetElementPtrInst *tryToCoalesceChain(llvm::GetElementPtrInst *getElemPtr, unsigned addrSpace);
+  SpirvLowerAccessChain Impl;
 };
 
 } // namespace Llpc

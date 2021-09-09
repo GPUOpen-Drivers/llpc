@@ -180,11 +180,11 @@ private:
   void processShader(ShaderInputs *shaderInputs);
   void processComputeFuncs(ShaderInputs *shaderInputs, Module &module);
   void processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys,
-                    SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask);
+                    SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask, unsigned argOffset);
   void setFuncAttrs(Function *entryPoint);
 
   uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys,
-                                    SmallVectorImpl<std::string> &argNames);
+                                    SmallVectorImpl<std::string> &argNames, unsigned argOffset);
 
   void addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
                               SmallVectorImpl<UserDataArg> &specialUserDataArgs, IRBuilder<> &builder);
@@ -494,7 +494,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
     AddressExtender addressExtender(&func);
     if (userDataUsage->spillTable.entryArgIdx != 0) {
       builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
-      Argument *arg = func.getArg(userDataUsage->spillTable.entryArgIdx);
+      Argument *arg = getFunctionArgument(&func, userDataUsage->spillTable.entryArgIdx);
       spillTable = addressExtender.extend(arg, builder.getInt32(HighAddrPc),
                                           builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), builder);
     }
@@ -515,7 +515,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
         if (pushConstOffset.entryArgIdx) {
           // This offset into the push constant is unspilled. Replace the loads with the entry arg, with a
           // bitcast. (We know that all loads are non-aggregates of the same size, so we can bitcast.)
-          Argument *arg = func.getArg(pushConstOffset.entryArgIdx);
+          Argument *arg = getFunctionArgument(&func, pushConstOffset.entryArgIdx);
           for (Instruction *&load : pushConstOffset.users) {
             if (load && load->getFunction() == &func) {
               builder.SetInsertPoint(load);
@@ -586,7 +586,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
         continue;
       if (rootDescriptor.entryArgIdx != 0) {
         // The root descriptor is unspilled, and uses an entry arg.
-        Argument *arg = func.getArg(rootDescriptor.entryArgIdx);
+        Argument *arg = getFunctionArgument(&func, rootDescriptor.entryArgIdx);
         for (Instruction *&call : rootDescriptor.users) {
           if (call && call->getFunction() == &func) {
             call->replaceAllUsesWith(arg);
@@ -625,7 +625,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           std::string namePrefix = "descTable";
           if (descriptorTable.entryArgIdx != 0) {
             // The descriptor set is unspilled, and uses an entry arg.
-            descTableVal = func.getArg(descriptorTable.entryArgIdx);
+            descTableVal = getFunctionArgument(&func, descriptorTable.entryArgIdx);
             if (isa<ConstantInt>(highHalf)) {
               // Set builder to insert the 32-to-64 extension code at the start of the function.
               builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
@@ -684,7 +684,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           // it with UndefValue.
           arg = UndefValue::get(specialUserData.users[0]->getType());
         } else {
-          arg = func.getArg(specialUserData.entryArgIdx);
+          arg = getFunctionArgument(&func, specialUserData.entryArgIdx);
         }
         for (Instruction *&inst : specialUserData.users) {
           if (inst && inst->getFunction() == &func) {
@@ -716,7 +716,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   // Create new entry-point from the original one
   SmallVector<Type *, 8> argTys;
   SmallVector<std::string, 8> argNames;
-  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, argTys, argNames);
+  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, argTys, argNames, 0);
 
   Function *origEntryPoint = m_entryPoint;
 
@@ -728,8 +728,9 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   setFuncAttrs(entryPoint);
 
   // Remove original entry-point
+  int argOffset = origEntryPoint->getFunctionType()->getNumParams();
   origEntryPoint->eraseFromParent();
-  processCalls(*entryPoint, argTys, argNames, inRegMask);
+  processCalls(*entryPoint, argTys, argNames, inRegMask, argOffset);
 }
 
 // =====================================================================================================================
@@ -744,21 +745,24 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
   if (m_pipelineState->getLgcContext()->getPalAbiVersion() < 624)
     report_fatal_error("Compute shader not supported before PAL version 624");
 
-  // Determine what args need to be added on to all functions.
-  SmallVector<Type *, 20> shaderInputTys;
-  SmallVector<std::string, 20> shaderInputNames;
-  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, shaderInputTys, shaderInputNames);
-
   // Process each function definition.
   SmallVector<Function *, 4> origFuncs;
   for (Function &func : module) {
     if (!func.isDeclaration())
       origFuncs.push_back(&func);
   }
+
   for (Function *origFunc : origFuncs) {
+    auto *origType = origFunc->getFunctionType();
+    // Determine what args need to be added on to all functions.
+    SmallVector<Type *, 20> shaderInputTys;
+    SmallVector<std::string, 20> shaderInputNames;
+    uint64_t inRegMask =
+        generateEntryPointArgTys(shaderInputs, shaderInputTys, shaderInputNames, origType->getNumParams());
+
     // Create the new function and transfer code and attributes to it.
-    Function *newFunc = addFunctionArgs(origFunc, origFunc->getFunctionType()->getReturnType(), shaderInputTys,
-                                        shaderInputNames, inRegMask);
+    Function *newFunc =
+        addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
 
     // Set Attributes on new function.
     setFuncAttrs(newFunc);
@@ -772,16 +776,11 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
       *use = bitCastFunc;
 
     // Remove original function.
+    int argOffset = origType->getNumParams();
     origFunc->eraseFromParent();
-  }
 
-  if (!isComputeWithCalls())
-    return;
-
-  for (Function &func : module) {
-    if (func.isDeclaration())
-      continue;
-    processCalls(func, shaderInputTys, shaderInputNames, inRegMask);
+    if (isComputeWithCalls())
+      processCalls(*newFunc, shaderInputTys, shaderInputNames, inRegMask, argOffset);
   }
 }
 
@@ -790,19 +789,18 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
 //
 // @param [in/out] module : Module
 void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys,
-                                         SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask) {
+                                         SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask,
+                                         unsigned argOffset) {
   // This is one of:
   // - a compute pipeline with non-inlined functions;
   // - a compute pipeline with calls to library functions;
   // - a compute library.
-  // We need to scan the code and modify each call to prepend the extra args.
+  // We need to scan the code and modify each call to append the extra args.
   IRBuilder<> builder(func.getContext());
   for (BasicBlock &block : func) {
-    for (auto it = block.begin(), end = block.end(); it != end;) {
-      // Get the instruction and increment the iterator beyond it, so we can safely erase the instruction.
-      Instruction *inst = &*it;
-      ++it;
-      auto call = dyn_cast<CallInst>(inst);
+    // Use early increment iterator, so we can safely erase the instruction.
+    for (Instruction &inst : make_early_inc_range(block)) {
+      auto call = dyn_cast<CallInst>(&inst);
       if (!call)
         continue;
       // Got a call. Skip it if it calls an intrinsic or an internal lgc.* function.
@@ -818,13 +816,13 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       // inputs), plus the original args on the call.
       SmallVector<Type *, 20> argTys;
       SmallVector<Value *, 20> args;
-      for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
-        argTys.push_back(func.getArg(idx)->getType());
-        args.push_back(func.getArg(idx));
-      }
       for (unsigned idx = 0; idx != call->getNumArgOperands(); ++idx) {
         argTys.push_back(call->getArgOperand(idx)->getType());
         args.push_back(call->getArgOperand(idx));
+      }
+      for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
+        argTys.push_back(func.getArg(idx + argOffset)->getType());
+        args.push_back(func.getArg(idx + argOffset));
       }
       // Get the new called value as a bitcast of the old called value. If the old called value is already
       // the inverse bitcast, just drop that bitcast.
@@ -848,7 +846,7 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       // Mark sgpr arguments as inreg
       for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
         if ((inRegMask >> idx) & 1)
-          newCall->addParamAttr(idx, Attribute::InReg);
+          newCall->addParamAttr(idx + call->getNumArgOperands(), Attribute::InReg);
       }
 
       // Replace and erase the old one.
@@ -934,8 +932,15 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
     builder.addAttribute("amdgpu-unroll-threshold", "700");
   }
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396807
+  // Old version of the code
   AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
   entryPoint->addAttributes(attribIdx, builder);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  entryPoint->addFnAttrs(builder);
+#endif
 
   // NOTE: Remove "readnone" attribute for entry-point. If GS is empty, this attribute will allow
   // LLVM optimization to remove sendmsg(GS_DONE). It is unexpected.
@@ -970,7 +975,7 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 //                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
 //
 uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys,
-                                                         SmallVectorImpl<std::string> &argNames) {
+                                                         SmallVectorImpl<std::string> &argNames, unsigned argOffset) {
 
   uint64_t inRegMask = 0;
   IRBuilder<> builder(*m_context);
@@ -1017,7 +1022,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   unsigned userDataIdx = 0;
   for (const auto &userDataArg : unspilledArgs) {
     if (userDataArg.argIndex)
-      *userDataArg.argIndex = argTys.size();
+      *userDataArg.argIndex = argTys.size() + argOffset;
     unsigned dwordSize = userDataArg.argDwordSize;
     if (userDataArg.userDataValue != static_cast<unsigned>(UserDataMapping::Invalid)) {
       m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, userDataArg.userDataValue,
@@ -1026,7 +1031,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
         unsigned index = userDataArg.userDataValue - static_cast<unsigned>(UserDataMapping::GlobalTable);
         auto &specialUserData = getUserDataUsage(m_shaderStage)->specialUserData;
         if (index < specialUserData.size())
-          specialUserData[index].entryArgIdx = argTys.size();
+          specialUserData[index].entryArgIdx = argTys.size() + argOffset;
       }
     }
     argTys.push_back(userDataArg.argTy);
@@ -1038,7 +1043,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   inRegMask = (1ull << argTys.size()) - 1;
 
   // Push the fixed system (not user data) register args.
-  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames);
+  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames, argOffset);
 
   return inRegMask;
 }

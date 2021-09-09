@@ -26,12 +26,10 @@ ARG LLPC_REPO_SHA
 # Use bash instead of sh in this docker file.
 SHELL ["/bin/bash", "-c"]
 
+COPY docker/update-llpc.sh /vulkandriver/
+
 # Sync the repos. Replace the base LLPC with a freshly checked-out one.
-RUN cat /vulkandriver/build_info.txt \
-    && (cd /vulkandriver && repo sync -c --no-clone-bundle -j$(nproc)) \
-    && git -C /vulkandriver/drivers/llpc remote add origin https://github.com/"$LLPC_REPO_NAME".git \
-    && git -C /vulkandriver/drivers/llpc fetch origin +"$LLPC_REPO_SHA":"$LLPC_REPO_REF" --update-head-ok \
-    && git -C /vulkandriver/drivers/llpc checkout "$LLPC_REPO_SHA"
+RUN /vulkandriver/update-llpc.sh
 
 # Build LLPC.
 WORKDIR /vulkandriver/builds/ci-build
@@ -42,5 +40,5 @@ RUN source /vulkandriver/env.sh \
 
 # Run the lit test suite.
 RUN source /vulkandriver/env.sh \
-    && cmake --build . --target check-amdllpc -- -v \
-    && cmake --build . --target check-lgc -- -v
+    && cmake --build . --target check-amdllpc check-amdllpc-units -- -v \
+    && cmake --build . --target check-lgc check-lgc-units -- -v

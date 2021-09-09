@@ -5484,14 +5484,14 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
 
     primShaderTableAddr = m_builder->CreateBitCast(primShaderTableAddr, m_builder->getInt64Ty());
 
-    auto primShaderTablePtrTy = PointerType::get(ArrayType::get(m_builder->getInt32Ty(), 256),
-                                                 ADDR_SPACE_CONST); // [256 x i32]
+    auto primShaderTableEltTy = ArrayType::get(m_builder->getInt32Ty(), 256);
+    auto primShaderTablePtrTy = PointerType::get(primShaderTableEltTy, ADDR_SPACE_CONST); // [256 x i32]
     auto primShaderTablePtr = m_builder->CreateIntToPtr(primShaderTableAddr, primShaderTablePtrTy);
 
     // regOffset = regOffset >> 2
     regOffset = m_builder->CreateLShr(regOffset, 2); // To dword offset
 
-    auto loadPtr = m_builder->CreateGEP(primShaderTablePtr, {m_builder->getInt32(0), regOffset});
+    auto loadPtr = m_builder->CreateGEP(primShaderTableEltTy, primShaderTablePtr, {m_builder->getInt32(0), regOffset});
     cast<Instruction>(loadPtr)->setMetadata(MetaNameUniform, MDNode::get(m_builder->getContext(), {}));
 
     auto regValue = m_builder->CreateAlignedLoad(m_builder->getInt32Ty(), loadPtr, Align(4));
