@@ -1289,7 +1289,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
         lowerPassMgr->setPassIndex(&passIndex);
 
-        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
+        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
+      );
         // Run the passes.
         success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       }

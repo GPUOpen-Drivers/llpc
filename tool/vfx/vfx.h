@@ -460,16 +460,16 @@ struct PushConstRange {
 // =====================================================================================================================
 // Represents DrawState section
 struct DrawState {
-  unsigned instance;                                    // Instance count for draw array
-  unsigned vertex;                                      // Vertex count for draw array
-  unsigned firstInstance;                               // First instance in draw array
-  unsigned firstVertex;                                 // First vertex in draw array
-  unsigned index;                                       // Index count for draw index
-  unsigned firstIndex;                                  // First index in draw index
-  unsigned vertexOffset;                                // Vertex offset in draw index
-  VkPrimitiveTopology topology;                         // Primitive topology
+  unsigned instance;            // Instance count for draw array
+  unsigned vertex;              // Vertex count for draw array
+  unsigned firstInstance;       // First instance in draw array
+  unsigned firstVertex;         // First vertex in draw array
+  unsigned index;               // Index count for draw index
+  unsigned firstIndex;          // First index in draw index
+  unsigned vertexOffset;        // Vertex offset in draw index
+  VkPrimitiveTopology topology; // Primitive topology
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-  VkPolygonMode polygonMode;                            // Triangle rendering mode
+  VkPolygonMode polygonMode; // Triangle rendering mode
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   VkCullModeFlags cullMode; // Fragment culling mode
@@ -508,9 +508,9 @@ struct ColorBuffer {
 // =====================================================================================================================
 // Represents GraphicsPipelineState section.
 struct GraphicsPipelineState {
-  VkPrimitiveTopology topology;     // Primitive type
+  VkPrimitiveTopology topology; // Primitive type
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-  VkPolygonMode polygonMode;        // Triangle rendering mode
+  VkPolygonMode polygonMode; // Triangle rendering mode
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
   VkCullModeFlags cullMode; // Fragment culling mode
