@@ -188,6 +188,18 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "determinant";
   case Opcode::MatrixInverse:
     return "matrix.inverse";
+  case Opcode::CooperativeMatrixLoad:
+    return "cooperative.matrix.load";
+  case Opcode::CooperativeMatrixStore:
+    return "cooperative.matrix.store";
+  case Opcode::CooperativeMatrixConvert:
+    return "cooperative.matrix.convert";
+  case Opcode::CooperativeMatrixBinaryOp:
+    return "cooperative.matrix.binaryOp";
+  case Opcode::CooperativeMatrixExtract:
+    return "cooperative.matrix.extract";
+  case Opcode::CooperativeMatrixConstruct:
+    return "cooperative.matrix.construct";
   case Opcode::EmitVertex:
     return "emit.vertex";
   case Opcode::EndPrimitive:
@@ -1841,6 +1853,92 @@ Value *BuilderRecorder::CreateSubgroupMbcnt(Value *const mask, const Twine &inst
 }
 
 // =====================================================================================================================
+// Create cooperative matrix load.
+//
+// @param pointer : The pointer to a data array.
+// @param stride : The number of elements in the array in memory between the first component of consecutive rows (or
+// columns) in the result.
+// @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
+// @param alignment : The alignment for physical buffer storage operation.
+// @param instName : Name to give instruction(s).
+Value *BuilderRecorder::CreateCooperativeMatrixLoad(Value *pointer, Value *stride, Value *colMajor, Value *alignment,
+                                                    const Twine &instName) {
+  // A row (a column) of a cooperative matrix is implemented as a vector and the vector form is determined by the data
+  // format: <16 x float> or <16 x i32> if the data format is f32/i32, <8 x float> if the data format is f16, <4 x i32>
+  // if the data format is i8.
+  Type *loadTy = pointer->getType()->getPointerElementType();
+  Type *elemTy = loadTy->isIntegerTy() ? getInt32Ty() : getFloatTy();
+  const unsigned elemCount = loadTy->getScalarSizeInBits() / 2;
+  Type *resultTy = FixedVectorType::get(elemTy, elemCount);
+  return record(Opcode::CooperativeMatrixLoad, resultTy, {pointer, stride, colMajor, alignment}, instName);
+}
+
+// =====================================================================================================================
+// Create cooperative matrix store.
+//
+// @param pointer : The pointer to a data array.
+// @param object : The cooperative matrix to store.
+// @param stride : The number of elements in the array in memory between the first component of consecutive rows (or
+// columns) in the result.
+// @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
+// @param alignment : The alignment for physical buffer storage operation.
+// @param instName : Name to give instruction(s).
+Value *BuilderRecorder::CreateCooperativeMatrixStore(Value *pointer, Value *object, Value *stride, Value *colMajor,
+                                                     Value *alignment, const Twine &instName) {
+  return record(Opcode::CooperativeMatrixStore, nullptr, {pointer, object, stride, colMajor, alignment}, instName);
+}
+
+// =====================================================================================================================
+// Create cooperative matrix conversion.
+//
+// @param source : The source cooperative matrix.
+// @param dest : The convertion target.
+// @param instName : Name to give instruction(s).
+Value *BuilderRecorder::CreateCooperativeMatrixConvert(Value *source, Value *dest, const Twine &instName) {
+  return record(Opcode::CooperativeMatrixConvert, dest->getType(), {source, dest}, instName);
+}
+
+// =====================================================================================================================
+// Create cooparetive matrix binary operation
+//
+// @param coopMatArithOp : The cooperative matrix arithemtic operation to perform.
+// @param operand1 : The first operand.
+// @param operand2 : The second operand.
+// @param instName : Name to give instruction(s).
+Value *BuilderRecorder::CreateCooperativeMatrixBinaryOp(CooperativeMatrixArithOp coopMatArithOp, Value *operand1,
+                                                        Value *operand2, const Twine &instName) {
+  return record(Opcode::CooperativeMatrixBinaryOp, operand2->getType(),
+                {getInt32(static_cast<unsigned>(coopMatArithOp)), operand1, operand2}, instName);
+}
+
+// =====================================================================================================================
+// Create extracted component from a row of cooperative matrix.
+//
+// @param coopMat : The cooperative matrix.
+// @param index : The component index of the cooperative matrix.
+// @param instName : Name to give instruction(s).
+Value *BuilderRecorder::CreateCooperativeMatrixExtract(Value *coopMatRow, Value *index, const Twine &instName) {
+  auto vecTy = cast<FixedVectorType>(coopMatRow->getType());
+  const unsigned elemCount = vecTy->getNumElements();
+  Type *resultTy = vecTy->getElementType();
+  if (elemCount == 8)
+    resultTy = getHalfTy();
+  else if (elemCount == 4)
+    resultTy = getInt8Ty();
+  return record(Opcode::CooperativeMatrixExtract, resultTy, {coopMatRow, index}, instName);
+}
+
+// =====================================================================================================================
+// Create a row of cooperative matrix from a constant.
+//
+// @param coopMat : The cooperative matrix.
+// @param constVal : The constant value used to construct a cooperative matrix.
+// @param instName : Name to give instruction(s).
+Value *BuilderRecorder::CreateCooperativeMatrixConstruct(Value *coopMatRow, Value *constVal, const Twine &instName) {
+  return record(Opcode::CooperativeMatrixConstruct, coopMatRow->getType(), {coopMatRow, constVal}, instName);
+}
+
+// =====================================================================================================================
 // Record one Builder call
 //
 // @param opcode : Opcode of Builder method call being recorded
@@ -1940,6 +2038,12 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::SmoothStep:
     case Opcode::TransposeMatrix:
     case Opcode::VectorTimesMatrix:
+    case Opcode::CooperativeMatrixLoad:
+    case Opcode::CooperativeMatrixStore:
+    case Opcode::CooperativeMatrixConvert:
+    case Opcode::CooperativeMatrixBinaryOp:
+    case Opcode::CooperativeMatrixExtract:
+    case Opcode::CooperativeMatrixConstruct:
     case Power:
     case Sinh:
     case Tan:
