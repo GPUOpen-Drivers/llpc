@@ -34,7 +34,9 @@
 #include "llpcSpirvLowerAccessChain.h"
 #include "llpcSpirvLowerConstImmediateStore.h"
 #include "llpcSpirvLowerGlobal.h"
+#include "llpcSpirvLowerInstMetaRemove.h"
 #include "llpcSpirvLowerMath.h"
+#include "llpcSpirvLowerMemoryOp.h"
 #include "llpcSpirvLowerTerminator.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
@@ -50,14 +52,21 @@
 #include "llvm/Transforms/IPO/ForceFunctionAttrs.h"
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
+#include "llvm/Transforms/IPO/GlobalOpt.h"
 #include "llvm/Transforms/IPO/InferFunctionAttrs.h"
+#include "llvm/Transforms/IPO/SCCP.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/ADCE.h"
+#include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
+#include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Scalar/SimpleLoopUnswitch.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils.h"
+#include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Vectorize.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower"
@@ -178,6 +187,38 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 
   // Lower SPIR-V constant folding - must be done before instruction combining pass.
   passMgr.addPass(SpirvLowerMathConstFolding());
+
+  // Lower SPIR-V memory operations
+  passMgr.addPass(SpirvLowerMemoryOp());
+
+  // Remove redundant load/store operations and do minimal optimization
+  // It is required by SpirvLowerImageOp.
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SROA()));
+  passMgr.addPass(GlobalOptPass());
+  passMgr.addPass(createModuleToFunctionPassAdaptor(PromotePass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(ADCEPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(2)));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(EarlyCSEPass()));
+  passMgr.addPass(IPSCCPPass());
+
+  // Lower SPIR-V floating point optimisation
+  passMgr.addPass(SpirvLowerMathFloatOp());
+
+  // Lower SPIR-V instruction metadata remove
+  passMgr.addPass(SpirvLowerInstMetaRemove());
+
+  // Stop timer for lowering passes.
+  if (lowerTimer)
+    LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, false);
+
+  // Dump the result
+  if (EnableOuts()) {
+    passMgr.addPass(PrintModulePass(outs(),
+                                    "\n"
+                                    "===============================================================================\n"
+                                    "// LLPC SPIR-V lowering results\n"));
+  }
 }
 
 // =====================================================================================================================
@@ -217,9 +258,9 @@ void LegacySpirvLower::addPasses(Context *context, ShaderStage stage, legacy::Pa
   passMgr.add(createLegacySpirvLowerMathConstFolding());
 
   // Lower SPIR-V memory operations
-  passMgr.add(createSpirvLowerMemoryOp());
+  passMgr.add(createLegacySpirvLowerMemoryOp());
 
-  // Remove reduant load/store operations and do minimal optimization
+  // Remove redundant load/store operations and do minimal optimization
   // It is required by SpirvLowerImageOp.
   passMgr.add(createSROAPass());
   passMgr.add(createGlobalOptimizerPass());
@@ -234,7 +275,7 @@ void LegacySpirvLower::addPasses(Context *context, ShaderStage stage, legacy::Pa
   passMgr.add(createLegacySpirvLowerMathFloatOp());
 
   // Lower SPIR-V instruction metadata remove
-  passMgr.add(createSpirvLowerInstMetaRemove());
+  passMgr.add(createLegacySpirvLowerInstMetaRemove());
 
   // Stop timer for lowering passes.
   if (lowerTimer)

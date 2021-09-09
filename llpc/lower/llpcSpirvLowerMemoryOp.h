@@ -32,6 +32,7 @@
 
 #include "llpcSpirvLower.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/PassManager.h"
 #include <unordered_set>
 
 namespace llvm {
@@ -51,20 +52,19 @@ struct StoreExpandInfo {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering memory operations.
-class SpirvLowerMemoryOp : public LegacySpirvLower, public llvm::InstVisitor<SpirvLowerMemoryOp> {
+class SpirvLowerMemoryOp : public SpirvLower,
+                           public llvm::InstVisitor<SpirvLowerMemoryOp>,
+                           public llvm::PassInfoMixin<SpirvLowerMemoryOp> {
 public:
-  SpirvLowerMemoryOp();
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  bool runImpl(llvm::Module &module);
 
-  virtual bool runOnModule(llvm::Module &module);
+  static llvm::StringRef name() { return "Lower SPIR-V memory operations"; }
+
   virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElementPtrInst);
   virtual void visitExtractElementInst(llvm::ExtractElementInst &extractElementInst);
 
-  static char ID; // ID of this pass
-
 private:
-  SpirvLowerMemoryOp(const SpirvLowerMemoryOp &) = delete;
-  SpirvLowerMemoryOp &operator=(const SpirvLowerMemoryOp &) = delete;
-
   bool needExpandDynamicIndex(llvm::GetElementPtrInst *getElemPtr, unsigned *operandIndex,
                               unsigned *dynIndexBound) const;
   void expandLoadInst(llvm::LoadInst *loadInst, llvm::ArrayRef<llvm::GetElementPtrInst *> getElemPtrs,
@@ -77,6 +77,23 @@ private:
   std::unordered_set<llvm::Instruction *> m_removeInsts;
   std::unordered_set<llvm::Instruction *> m_preRemoveInsts;
   llvm::SmallVector<StoreExpandInfo, 1> m_storeExpandInfo;
+};
+
+// =====================================================================================================================
+// Represents the pass of SPIR-V lowering memory operations.
+class LegacySpirvLowerMemoryOp : public llvm::ModulePass, public llvm::InstVisitor<LegacySpirvLowerMemoryOp> {
+public:
+  LegacySpirvLowerMemoryOp();
+
+  virtual bool runOnModule(llvm::Module &module);
+
+  static char ID; // ID of this pass
+
+private:
+  LegacySpirvLowerMemoryOp(const LegacySpirvLowerMemoryOp &) = delete;
+  LegacySpirvLowerMemoryOp &operator=(const LegacySpirvLowerMemoryOp &) = delete;
+
+  SpirvLowerMemoryOp Impl;
 };
 
 } // namespace Llpc
