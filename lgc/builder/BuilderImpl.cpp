@@ -144,9 +144,8 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
     if (isDot4) {
       if (compCount < 4) {
         // Extend <3xi8> or <2xi8> to <4xi8>
-        std::array<int, 4> indices = {0, 1, 2, 3};
-        input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
-        input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
+        input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), ArrayRef<int>({0, 1, 2, 3}));
+        input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), ArrayRef<int>({0, 1, 2, 3}));
       }
       // Cast <4xi8> to i32
       input1 = CreateBitCast(input1, getInt32Ty());
@@ -160,7 +159,6 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
       } else {
         Value *intermediateRes = getInt32(0);
         scalar = getInt32(0);
-        std::array<int, 2> indices = {0, 1};
         if (compCount == 3) {
           // Split <3xi16> up with an integer multiplication, a 16-bit integer dot product
           Value *w1 = CreateExtractElement(input1, 2);
@@ -169,22 +167,20 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
           w2 = isSigned ? CreateSExt(w2, getInt32Ty()) : CreateZExt(w2, getInt32Ty());
           intermediateRes = CreateMul(w1, w2);
 
-          input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
-          input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
+          input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), ArrayRef<int>({0, 1}));
+          input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), ArrayRef<int>({0, 1}));
           scalar =
               CreateIntrinsic(intrinsicDot2, {}, {input1, input2, intermediateRes, getInt1(false)}, nullptr, instName);
         } else {
           assert(compCount == 4);
           // Split <4xi16> up with two 16-bit integer dot product
-          Value *vec1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
-          Value *vec2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
+          Value *vec1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), ArrayRef<int>({0, 1}));
+          Value *vec2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), ArrayRef<int>({0, 1}));
           intermediateRes =
               CreateIntrinsic(intrinsicDot2, {}, {vec1, vec2, getInt32(0), getInt1(false)}, nullptr, instName);
 
-          indices[0] = 2;
-          indices[1] = 3;
-          input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), indices);
-          input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), indices);
+          input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), ArrayRef<int>({2, 3}));
+          input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), ArrayRef<int>({2, 3}));
           scalar =
               CreateIntrinsic(intrinsicDot2, {}, {input1, input2, intermediateRes, getInt1(false)}, nullptr, instName);
         }
