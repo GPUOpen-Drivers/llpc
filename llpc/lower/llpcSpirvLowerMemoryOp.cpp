@@ -46,23 +46,33 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Initializes static members.
-char SpirvLowerMemoryOp::ID = 0;
+char LegacySpirvLowerMemoryOp::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering memory operations.
-ModulePass *createSpirvLowerMemoryOp() {
-  return new SpirvLowerMemoryOp();
+ModulePass *createLegacySpirvLowerMemoryOp() {
+  return new LegacySpirvLowerMemoryOp();
 }
 
 // =====================================================================================================================
-SpirvLowerMemoryOp::SpirvLowerMemoryOp() : LegacySpirvLower(ID) {
+LegacySpirvLowerMemoryOp::LegacySpirvLowerMemoryOp() : ModulePass(ID) {
 }
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool SpirvLowerMemoryOp::runOnModule(Module &module) {
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+PreservedAnalyses SpirvLowerMemoryOp::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  runImpl(module);
+  return PreservedAnalyses::none();
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+bool SpirvLowerMemoryOp::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Memory-Op\n");
 
   SpirvLower::init(&module);
@@ -93,6 +103,14 @@ bool SpirvLowerMemoryOp::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Memory-Op " << module);
 
   return true;
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+bool LegacySpirvLowerMemoryOp::runOnModule(Module &module) {
+  return Impl.runImpl(module);
 }
 
 // =====================================================================================================================
@@ -422,4 +440,4 @@ void SpirvLowerMemoryOp::expandStoreInst(StoreInst *storeInst, ArrayRef<GetEleme
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering the memory operations.
-INITIALIZE_PASS(SpirvLowerMemoryOp, DEBUG_TYPE, "Lower SPIR-V memory operations", false, false)
+INITIALIZE_PASS(LegacySpirvLowerMemoryOp, DEBUG_TYPE, "Lower SPIR-V memory operations", false, false)

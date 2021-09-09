@@ -1978,9 +1978,6 @@ bool Compiler::runPasses(lgc::PassManager *passMgr, Module *module) const {
   {
     passMgr->run(*module);
     success = true;
-    // TODO Only some passes have been ported to the new pass manager. So running
-    // the lowering passes with the new pass manager results in a fatal error for now.
-    report_fatal_error("The new pass manager is not fully implemented yet.");
   }
 #if LLPC_ENABLE_EXCEPTION
   catch (const char *) {

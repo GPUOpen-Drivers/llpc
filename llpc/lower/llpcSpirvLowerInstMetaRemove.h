@@ -31,24 +31,40 @@
 #pragma once
 
 #include "llpcSpirvLower.h"
+#include "llvm/IR/PassManager.h"
 
 namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for removing the instruction metadata.
-class SpirvLowerInstMetaRemove : public LegacySpirvLower {
+class SpirvLowerInstMetaRemove : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerInstMetaRemove> {
 public:
   SpirvLowerInstMetaRemove();
+
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  bool runImpl(llvm::Module &module);
+
+  static llvm::StringRef name() { return "Lower SPIR-V instruction metadata by removing those targeted"; }
+
+private:
+  bool m_changed; // Whether the module is changed
+};
+
+// =====================================================================================================================
+// Legacy pass manager wrapper class
+class LegacySpirvLowerInstMetaRemove : public llvm::ModulePass {
+public:
+  LegacySpirvLowerInstMetaRemove();
 
   virtual bool runOnModule(llvm::Module &module);
 
   static char ID; // ID of this pass
 
 private:
-  SpirvLowerInstMetaRemove(const SpirvLowerInstMetaRemove &) = delete;
-  SpirvLowerInstMetaRemove &operator=(const SpirvLowerInstMetaRemove &) = delete;
+  LegacySpirvLowerInstMetaRemove(const LegacySpirvLowerInstMetaRemove &) = delete;
+  LegacySpirvLowerInstMetaRemove &operator=(const LegacySpirvLowerInstMetaRemove &) = delete;
 
-  bool m_changed; // Whether the module is changed
+  SpirvLowerInstMetaRemove Impl;
 };
 
 } // namespace Llpc
