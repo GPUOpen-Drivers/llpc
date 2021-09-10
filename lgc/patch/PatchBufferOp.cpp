@@ -342,7 +342,7 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
         break;
       }
 
-      Value *const atomicCall = m_builder->CreateIntrinsic(intrinsic, cast<IntegerType>(storeType),
+      Value *const atomicCall = m_builder->CreateIntrinsic(intrinsic, storeType,
                                                            {atomicRmwInst.getValOperand(), bufferDesc, baseIndex,
                                                             m_builder->getInt32(0), m_builder->getInt32(isSlc * 2)});
       copyMetadata(atomicCall, &atomicRmwInst);
