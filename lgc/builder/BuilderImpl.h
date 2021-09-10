@@ -659,6 +659,10 @@ public:
   llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
                                        const llvm::Twine &instName) override final;
 
+  // Create a subgroup broadcast that may have non-uniform index.
+  llvm::Value *CreateSubgroupBroadcastWaterfall(llvm::Value *const value, llvm::Value *const index,
+                                                const llvm::Twine &instName) override final;
+
   // Create a subgroup broadcast first.
   llvm::Value *CreateSubgroupBroadcastFirst(llvm::Value *const value, const llvm::Twine &instName) override final;
 

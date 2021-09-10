@@ -732,6 +732,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderRecorder::Opcode::SubgroupBroadcast: {
     return m_builder->CreateSubgroupBroadcast(args[0], args[1]);
   }
+  case BuilderRecorder::Opcode::SubgroupBroadcastWaterfall: {
+    return m_builder->CreateSubgroupBroadcastWaterfall(args[0], args[1]);
+  }
   case BuilderRecorder::Opcode::SubgroupBroadcastFirst: {
     return m_builder->CreateSubgroupBroadcastFirst(args[0]);
   }

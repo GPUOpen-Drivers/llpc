@@ -144,6 +144,22 @@ Value *SubgroupBuilder::CreateSubgroupBroadcast(Value *const value, Value *const
 }
 
 // =====================================================================================================================
+// Create a subgroup broadcast call using waterfall for non-uniform index
+//
+// @param value : The value to read from the chosen lane to all active lanes.
+// @param index : The index to broadcast from. Must be an i32.
+// @param instName : Name to give final instruction.
+Value *SubgroupBuilder::CreateSubgroupBroadcastWaterfall(Value *const value, Value *const index,
+                                                         const Twine &instName) {
+  auto mapFunc = [this](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    Value *const readlane =
+        builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
+    return createWaterfallLoop(cast<Instruction>(readlane), 1);
+  };
+  return CreateMapToInt32(mapFunc, value, index);
+}
+
+// =====================================================================================================================
 // Create a subgroup broadcastfirst call.
 //
 // @param value : The value to read from the first active lane into all other active lanes.

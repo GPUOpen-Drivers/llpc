@@ -1348,6 +1348,14 @@ public:
   virtual llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
                                                const llvm::Twine &instName = "") = 0;
 
+  // Create a subgroup broadcast that can potentially have a non-uniform index
+  //
+  // @param value : The value to broadcast
+  // @param index : The index to broadcast from
+  // @param instName : Name to give instruction(s)
+  virtual llvm::Value *CreateSubgroupBroadcastWaterfall(llvm::Value *const value, llvm::Value *const index,
+                                                        const llvm::Twine &instName = "") = 0;
+
   // Create a subgroup broadcast first.
   //
   // @param value : The value to broadcast
