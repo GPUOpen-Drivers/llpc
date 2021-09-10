@@ -5934,6 +5934,9 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
     result = getBuilder()->CreateImageAtomic(atomicOp, imageInfo.dim, imageInfo.flags, ordering, imageInfo.imageDesc,
                                              coord, inputData);
   }
+  if (bi->getOpCode() == OpAtomicLoad && bi->getType()->isTypeFloat())
+    result = getBuilder()->CreateBitCast(result, transFPType(bi->getType()));
+
   return result;
 }
 
