@@ -189,6 +189,7 @@ public:
     SubgroupAny,
     SubgroupAllEqual,
     SubgroupBroadcast,
+    SubgroupBroadcastWaterfall,
     SubgroupBroadcastFirst,
     SubgroupBallot,
     SubgroupInverseBallot,
@@ -503,6 +504,8 @@ public:
   llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, bool wqm, const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
                                        const llvm::Twine &instName) override final;
+  llvm::Value *CreateSubgroupBroadcastWaterfall(llvm::Value *const value, llvm::Value *const index,
+                                                const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupBroadcastFirst(llvm::Value *const value, const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupBallot(llvm::Value *const value, const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupInverseBallot(llvm::Value *const value, const llvm::Twine &instName) override final;

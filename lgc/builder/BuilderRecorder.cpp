@@ -242,6 +242,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "subgroup.all.equal";
   case SubgroupBroadcast:
     return "subgroup.broadcast";
+  case SubgroupBroadcastWaterfall:
+    return "subgroup.broadcast.waterfall";
   case SubgroupBroadcastFirst:
     return "subgroup.broadcast.first";
   case SubgroupBallot:
@@ -1579,6 +1581,17 @@ Value *BuilderRecorder::CreateSubgroupBroadcast(Value *const value, Value *const
 }
 
 // =====================================================================================================================
+// Create a subgroup broadcast that may have a non-uniform index.
+//
+// @param value : The value to broadcast
+// @param index : The index to broadcast from
+// @param instName : Name to give instruction(s)
+Value *BuilderRecorder::CreateSubgroupBroadcastWaterfall(Value *const value, Value *const index,
+                                                         const Twine &instName) {
+  return record(Opcode::SubgroupBroadcastWaterfall, value->getType(), {value, index}, instName);
+}
+
+// =====================================================================================================================
 // Create a subgroup broadcast first.
 //
 // @param value : The value to broadcast
@@ -1970,6 +1983,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::SubgroupAny:
     case Opcode::SubgroupBallot:
     case Opcode::SubgroupBroadcast:
+    case Opcode::SubgroupBroadcastWaterfall:
     case Opcode::SubgroupBroadcastFirst:
     case Opcode::SubgroupClusteredExclusive:
     case Opcode::SubgroupClusteredInclusive:

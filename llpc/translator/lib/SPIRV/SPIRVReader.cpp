@@ -3196,7 +3196,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupBroadcast(value, index);
+  return getBuilder()->CreateSubgroupBroadcastWaterfall(value, index);
 }
 
 // =====================================================================================================================
