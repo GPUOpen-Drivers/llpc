@@ -28,7 +28,7 @@ if(COMMAND cmake_policy)
 endif(COMMAND cmake_policy)
 
 set(ICD_BUILD_LLPC ON)
-set(LLPC_BUILD_LIT ON)
+set(LLPC_BUILD_TESTS ON)
 
 set(XGL_VKGC_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
