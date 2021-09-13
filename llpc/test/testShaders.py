@@ -177,7 +177,7 @@ if __name__=='__main__':
                             file = open(SHADER_SRC + "/" + gfx + "/" + f, "r")
                             fileContents = file.read()
                             file.close()
-                            if re.search("RUN:.*-val=false", fileContents):
+                            if re.search("RUN:.*-validate-spirv=false", fileContents):
                                 val = "-val=false"
 
                         cmd = COMPILER + gfxip + " " + val + " -enable-outs=0 " + SHADER_SRC + "/" + gfx + "/" + f + " 2>&1 >> " + RESULT + "/" + gfx + "/" + f + ".log"
