@@ -908,14 +908,9 @@ static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMa
 bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfos,
                                                   const GraphicsPipelineBuildInfo *pipelineInfo) {
   if (!pipelineInfo->unlinked) {
-    for (unsigned stage = 0; stage < shaderInfos.size(); ++stage) {
-      if (stage != ShaderStageVertex && stage != ShaderStageFragment && stage != ShaderStageGeometry) {
-        if (shaderInfos[stage] && shaderInfos[stage]->pModuleData)
-          return false;
-      } else if (stage != ShaderStageGeometry && (!shaderInfos[stage] || !shaderInfos[stage]->pModuleData)) {
-        // TODO: Generate pass-through shaders when the fragment or vertex shaders are missing.
-        return false;
-      }
+    if (!shaderInfos[ShaderStageFragment] || !shaderInfos[ShaderStageFragment]->pModuleData) {
+      // TODO: Generate a null fragment shader when linking.
+      return false;
     }
   }
 
