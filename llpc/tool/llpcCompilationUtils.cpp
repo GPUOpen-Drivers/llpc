@@ -29,6 +29,10 @@
  * @brief LLPC source file: contains the implementation of standalone LLPC compilation logic.
  ***********************************************************************************************************************
  */
+#ifdef WIN_OS
+// NOTE: Disable Windows-defined min()/max() because we use STL-defined std::min()/std::max() in LLPC.
+#define NOMINMAX
+#endif
 
 #include "llpcCompilationUtils.h"
 #include "llpcDebug.h"
@@ -59,7 +63,7 @@ namespace StandaloneCompiler {
 // @param userData : User data
 // @param size : Requested allocation size
 // @returns : Pointer to the allocated memory
-void *allocateBuffer(void *instance, void *userData, size_t size) {
+void *VKAPI_CALL allocateBuffer(void *instance, void *userData, size_t size) {
   (void)instance;
   void *allocBuf = malloc(size);
   memset(allocBuf, 0, size);
