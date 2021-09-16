@@ -32,6 +32,7 @@
 #include "lgc/util/Debug.h"
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/PrintPasses.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
@@ -90,6 +91,7 @@ private:
 class PassManagerImpl final : public lgc::PassManager {
 public:
   PassManagerImpl();
+  void registerPass(StringRef passName, StringRef className) override;
   void run(Module &module) override;
   void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
 
@@ -98,13 +100,14 @@ private:
 
   // -----------------------------------------------------------------------------------------------------------------
 
-  LoopAnalysisManager loopAnalysisManager;     // Loop analysis manager used when running the passes.
-  CGSCCAnalysisManager cgsccAnalysisManager;   // CGSCC analysis manager used when running the passes.
-  ModuleAnalysisManager moduleAnalysisManager; // Module analysis manager used when running the passes.
-  PassInstrumentationCallbacks instrCallbacks; // Instrumentation callbacks ran when running the passes.
-  VerifyInstrumentation instrVerify;           // Verify instrumentation, run module verifier after each pass.
-  unsigned *m_passIndex = nullptr;             // Pass Index.
-  bool initialized = false;                    // Wether the pass manager is initialized or not.
+  LoopAnalysisManager loopAnalysisManager;               // Loop analysis manager used when running the passes.
+  CGSCCAnalysisManager cgsccAnalysisManager;             // CGSCC analysis manager used when running the passes.
+  ModuleAnalysisManager moduleAnalysisManager;           // Module analysis manager used when running the passes.
+  PassInstrumentationCallbacks instrumentationCallbacks; // Instrumentation callbacks ran when running the passes.
+  PrintIRInstrumentation instrumentationPrintIR; // Print IR instrumentation, to print IR before/after the passes.
+  VerifyInstrumentation instrumentationVerify;   // Verify instrumentation, run module verifier after each pass.
+  unsigned *m_passIndex = nullptr;               // Pass Index.
+  bool initialized = false;                      // Whether the pass manager is initialized or not
 };
 
 } // namespace
@@ -156,7 +159,7 @@ LegacyPassManagerImpl::LegacyPassManagerImpl() : LegacyPassManager() {
 }
 
 // =====================================================================================================================
-PassManagerImpl::PassManagerImpl() : PassManager(), instrVerify(getLgcOuts()) {
+PassManagerImpl::PassManagerImpl() : PassManager(), instrumentationVerify(getLgcOuts()) {
   if (!cl::DumpCfgAfter.empty()) {
     // TODO: We need to support m_dumpCfgAfter in a way that is similar to what
     // is done in the add() function of the legacy pass manager. We can use the
@@ -169,7 +172,20 @@ PassManagerImpl::PassManagerImpl() : PassManager(), instrVerify(getLgcOuts()) {
   // analyses to the analysis manager.
   registerCallbacks();
   if (cl::VerifyIr)
-    instrVerify.registerCallbacks(instrCallbacks);
+    instrumentationVerify.registerCallbacks(instrumentationCallbacks);
+
+  // Add IR printing instrumentation callbacks if needed.
+  if (shouldPrintBeforeSomePass() || shouldPrintAfterSomePass())
+    instrumentationPrintIR.registerCallbacks(instrumentationCallbacks);
+}
+
+// =====================================================================================================================
+// Register a pass to identify it with a short name in the pass manager
+//
+// @param passName : Dash-case short name to use for registration
+// @param className : Full pass name
+void PassManagerImpl::registerPass(StringRef passName, StringRef className) {
+  instrumentationCallbacks.addClassToPassName(className, passName);
 }
 
 // =====================================================================================================================
@@ -180,7 +196,7 @@ void PassManagerImpl::run(Module &module) {
   // We register LLVM's default analysis sets late to be sure our custom
   // analyses are added beforehand.
   if (!initialized) {
-    PassBuilder passBuilder(nullptr, PipelineTuningOptions(), None, &instrCallbacks);
+    PassBuilder passBuilder(nullptr, PipelineTuningOptions(), None, &instrumentationCallbacks);
     passBuilder.registerModuleAnalyses(moduleAnalysisManager);
     passBuilder.registerCGSCCAnalyses(cgsccAnalysisManager);
     passBuilder.registerFunctionAnalyses(functionAnalysisManager);
@@ -205,10 +221,10 @@ void PassManagerImpl::registerCallbacks() {
         LLPC_OUTS("Pass[" << passIndex << "] = " << passName << "\n");
     }
   };
-  instrCallbacks.registerBeforeSkippedPassCallback(beforePass);
-  instrCallbacks.registerBeforeNonSkippedPassCallback(beforePass);
+  instrumentationCallbacks.registerBeforeSkippedPassCallback(beforePass);
+  instrumentationCallbacks.registerBeforeNonSkippedPassCallback(beforePass);
 
-  instrCallbacks.registerShouldRunOptionalPassCallback([this](StringRef passName, Any ir) {
+  instrumentationCallbacks.registerShouldRunOptionalPassCallback([this](StringRef passName, Any ir) {
     // Skip the jump threading pass as it interacts really badly with the structurizer.
     if (passName == JumpThreadingPass::name())
       return false;
