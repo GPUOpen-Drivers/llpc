@@ -38,6 +38,7 @@
 #include "llpcSpirvLowerMath.h"
 #include "llpcSpirvLowerMemoryOp.h"
 #include "llpcSpirvLowerTerminator.h"
+#include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
@@ -219,6 +220,15 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
                                     "===============================================================================\n"
                                     "// LLPC SPIR-V lowering results\n"));
   }
+}
+
+// =====================================================================================================================
+// Register a pass to identify it with a short name in the pass manager
+//
+// @param [in/out] passMgr : Pass manager
+void SpirvLower::registerPasses(lgc::PassManager &passMgr) {
+#define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, decltype(CLASS)::name());
+#include "PassRegistry.def"
 }
 
 // =====================================================================================================================

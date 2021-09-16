@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,43 +24,19 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  PassManager.h
- * @brief LLPC header file: contains declaration of class lgc::LegacyPassManager.
+ * @file  PassRegistry.def
+ * @brief LLPC header file: used as the registry of LLPC lowering passes
  ***********************************************************************************************************************
  */
-#pragma once
 
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/PassManager.h"
+LLPC_PASS("llpc-spirv-lower-access-chain", SpirvLowerAccessChain())
+LLPC_PASS("llpc-spirv-lower-const-immediate-store", SpirvLowerConstImmediateStore())
+LLPC_PASS("llpc-spirv-lower-inst-meta-remove", SpirvLowerInstMetaRemove())
+LLPC_PASS("llpc-spirv-lower-terminator", SpirvLowerTerminator())
+LLPC_PASS("llpc-spirv-lower-translator", SpirvLowerTranslator())
+LLPC_PASS("llpc-spirv-lower-global", SpirvLowerGlobal())
+LLPC_PASS("llpc-spirv-lower-math-const-folding", SpirvLowerMathConstFolding())
+LLPC_PASS("llpc-spirv-lower-math-float-op", SpirvLowerMathFloatOp())
+LLPC_PASS("llpc-spirv-lower-memory-op", SpirvLowerMemoryOp())
 
-namespace lgc {
-
-// =====================================================================================================================
-// Public interface of LLPC middle-end's legacy::PassManager override
-class LegacyPassManager : public llvm::legacy::PassManager {
-public:
-  static LegacyPassManager *Create();
-  virtual ~LegacyPassManager() {}
-  virtual void stop() = 0;
-  virtual void setPassIndex(unsigned *passIndex) = 0;
-};
-
-// =====================================================================================================================
-// Public interface of LLPC middle-end's PassManager override
-class PassManager : public llvm::ModulePassManager {
-public:
-  static PassManager *Create();
-  virtual ~PassManager() {}
-  template <typename PassBuilderT> bool registerFunctionAnalysis(PassBuilderT &&PassBuilder) {
-    return functionAnalysisManager.registerPass(std::forward<PassBuilderT>(PassBuilder));
-  }
-  // Register a pass to identify it with a short name in the pass manager
-  virtual void registerPass(llvm::StringRef passName, llvm::StringRef className) = 0;
-  virtual void run(llvm::Module &module) = 0;
-  virtual void setPassIndex(unsigned *passIndex) = 0;
-
-protected:
-  llvm::FunctionAnalysisManager functionAnalysisManager;
-};
-
-} // namespace lgc
+#undef LLPC_PASS

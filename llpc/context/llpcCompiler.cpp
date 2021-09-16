@@ -1215,6 +1215,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (cl::NewPassManager) {
         std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
         lowerPassMgr->setPassIndex(&passIndex);
+        SpirvLower::registerPasses(*lowerPassMgr);
 
         // Start timer for translate.
         timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
@@ -1281,6 +1282,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (cl::NewPassManager) {
         std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
         lowerPassMgr->setPassIndex(&passIndex);
+        SpirvLower::registerPasses(*lowerPassMgr);
 
         SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
         // Run the passes.

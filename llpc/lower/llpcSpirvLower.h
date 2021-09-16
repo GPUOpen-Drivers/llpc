@@ -106,6 +106,8 @@ public:
 
   // Add per-shader lowering passes to pass manager
   static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer);
+  // Register all the lowering passes into the given pass manager
+  static void registerPasses(lgc::PassManager &passMgr);
 
   static void removeConstantExpr(Context *context, llvm::GlobalVariable *global);
   static void replaceConstWithInsts(Context *context, llvm::Constant *const constVal);
