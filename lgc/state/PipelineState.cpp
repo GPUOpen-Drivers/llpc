@@ -1370,6 +1370,20 @@ void PipelineState::initializeInOutPackState() {
     m_outputPackState[ShaderStageVertex] = true;
     m_outputPackState[ShaderStageTessEval] = true;
     m_outputPackState[ShaderStageGeometry] = true;
+  } else {
+    // For unlinked shaders, we can do in-out packing if the pipeline has two adjacent shaders.
+    // We are assuming that if any of the vertex processing, then the vertex processing stages are complete.  For
+    // example, if we see a vertex shader and geometry shader with no tessellation shaders, then we will assume we can
+    // pack the vertex outputs and geometry inputs because no tessellation shader will be added later.
+    for (ShaderStage stage : lgc::enumRange(ShaderStage::ShaderStageGfxCount)) {
+      if ((m_stageMask & shaderStageToMask(stage)) == 0)
+        continue;
+      ShaderStage preStage = getPrevShaderStage(stage);
+      if (preStage == ShaderStageInvalid)
+        continue;
+      m_inputPackState[stage] = true;
+      m_outputPackState[preStage] = true;
+    }
   }
 }
 
