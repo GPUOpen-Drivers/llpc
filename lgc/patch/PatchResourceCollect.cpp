@@ -2389,7 +2389,13 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
       newLocationInfo.setData(0);
       if (m_shaderStage == ShaderStageGeometry) {
         const unsigned streamId = locInfoPair.first.getStreamId();
-        newLocationInfo.setLocation(inOutUsage.gs.outLocCount[streamId]++);
+        if (canChangeOutputLocationsForGs()) {
+          newLocationInfo.setLocation(inOutUsage.gs.outLocCount[streamId]++);
+        } else {
+          newLocationInfo.setLocation(locInfoPair.first.getLocation());
+          inOutUsage.gs.outLocCount[streamId] =
+              std::max(inOutUsage.gs.outLocCount[streamId], newLocationInfo.getLocation() + 1);
+        }
         newLocationInfo.setStreamId(streamId);
       } else {
         newLocationInfo.setLocation(nextMapLoc++);
@@ -2410,6 +2416,19 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
   }
   m_outputCalls.clear();
   m_importedOutputCalls.clear();
+}
+
+// =====================================================================================================================
+// Returns true if the locations for the Gs output can be compressed.
+bool PatchResourceCollect::canChangeOutputLocationsForGs() {
+  // The Gs outputs can only be changed if LGC has access to the fragment shader's inputs.
+  if (!m_pipelineState->isUnlinked())
+    return true;
+  if (m_pipelineState->getPalMetadata()->haveFsInputMappings())
+    return true;
+  if (m_pipelineState->getNextShaderStage(ShaderStageGeometry) != ShaderStageInvalid)
+    return true;
+  return false;
 }
 
 // =====================================================================================================================

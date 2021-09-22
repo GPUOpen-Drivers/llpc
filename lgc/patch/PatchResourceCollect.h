@@ -86,6 +86,7 @@ private:
 
   void updateInputLocInfoMapWithUnpack();
   void updateOutputLocInfoMapWithUnpack();
+  bool canChangeOutputLocationsForGs();
   void updateInputLocInfoMapWithPack();
   void updateOutputLocInfoMapWithPack();
   void reassembleOutputExportCalls();
