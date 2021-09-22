@@ -142,9 +142,6 @@ opt<unsigned> ShaderCacheMode("shader-cache-mode",
 static opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
                                        init("amdllpc"));
 
-// -enable-spirv-opt: enable optimization for SPIR-V binary
-opt<bool> EnableSpirvOpt("enable-spirv-opt", desc("Enable optimization for SPIR-V binary"), init(false));
-
 // -enable-shader-module-opt: Enable translate & lower phase in shader module build.
 opt<bool> EnableShaderModuleOpt("enable-shader-module-opt",
                                 cl::desc("Enable translate & lower phase in shader module build."), init(false));
