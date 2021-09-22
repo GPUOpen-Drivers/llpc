@@ -1795,8 +1795,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
               // Run the users of the GEP to check for any nonuniform calls.
               for (User *const user : getElemPtr->users()) {
                 CallInst *const call = dyn_cast<CallInst>(user);
-                // If the user is not a call, bail.
-                if (!call)
+                // If the user is not a call or the call is the function pointer call, bail.
+                if (!call || !call->getCalledFunction())
                   continue;
                 // If the call is our non uniform decoration, record we are non uniform.
                 if (auto callee = call->getCalledFunction()) {
