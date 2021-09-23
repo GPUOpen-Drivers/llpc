@@ -602,6 +602,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     bool enableOpt = cl::EnableShaderModuleOpt;
     enableOpt = enableOpt || shaderInfo->options.enableOpt;
     enableOpt = moduleDataEx.common.usage.useSpecConstant ? false : enableOpt;
+    enableOpt = false;
 
     if (enableOpt) {
       // Check internal cache for shader module build result
