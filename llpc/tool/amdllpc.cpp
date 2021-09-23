@@ -436,24 +436,22 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 //
 // @param compiler : LLPC context
 // @param inFiles : Input filename(s)
-// @param startFile : Index of the starting file name being processed in the file name array
-// @param [out] nextFile : Index of next file name being processed in the file name array
 // @returns : Result::Success on success, other status codes on failure
-static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles, unsigned startFile,
-                              unsigned *nextFile) {
-  Result result = Result::Success;
+static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles) {
   CompileInfo compileInfo = {};
-  std::string fileNames;
   compileInfo.unlinked = true;
   compileInfo.doAutoLayout = true;
+  Result result = initCompileInfo(&compileInfo);
 
-  result = initCompileInfo(&compileInfo);
-
+  std::string fileNames;
   //
   // Translate sources to SPIR-V binary
   //
-  for (unsigned i = startFile; i < inFiles.size() && result == Result::Success; ++i) {
-    const std::string &inFile = inFiles[i];
+  for (const std::string &inFile : inFiles) {
+    if (result != Result::Success)
+      break;
+
+    fileNames += inFile + " ";
     std::string spvBinFile;
 
     if (isSpirvTextFile(inFile) || isSpirvBinaryFile(inFile)) {
@@ -592,9 +590,6 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
                 isGraphics ? compileInfo.gfxPipelineInfo.options : compileInfo.compPipelineInfo.options;
           }
 
-          fileNames += inFile;
-          fileNames += " ";
-          *nextFile = i + 1;
           // For a .pipe, build an "unlinked" shader/part-pipeline ELF if -unlinked is on.
           compileInfo.unlinked = Unlinked;
           compileInfo.doAutoLayout = false;
@@ -674,15 +669,6 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
         shaderModuleData.shaderStage = stage;
         compileInfo.shaderModuleDatas.push_back(shaderModuleData);
       }
-    }
-
-    fileNames += inFile;
-    fileNames += " ";
-    *nextFile = i + 1;
-
-    if (Unlinked) {
-      // Build unlinked shaders individually.
-      break;
     }
   }
 
@@ -806,23 +792,17 @@ int main(int argc, char *argv[]) {
   if (isFailure())
     return onFailure();
 
-  if (isPipelineInfoFile(expandedInputFiles[0]) || isLlvmIrFile(expandedInputFiles[0])) {
-    // The first input file is a pipeline file or LLVM IR file. Assume they all are, and compile each one
-    // separately but in the same context.
-    unsigned nextFile = 0;
-
-    for (const std::string &file : expandedInputFiles) {
-      result = processPipeline(compiler, {file}, 0, &nextFile);
-      if (isFailure())
-        return onFailure();
-    }
-  } else {
-    // Otherwise, join all input files into the same pipeline.
-    for (unsigned nextFile = 0; nextFile < unsigned(expandedInputFiles.size());) {
-      result = processPipeline(compiler, expandedInputFiles, nextFile, &nextFile);
-      if (isFailure())
-        return onFailure();
-    }
+  auto inputGroupsOrErr = groupInputFiles(expandedInputFiles);
+  if (Error err = inputGroupsOrErr.takeError()) {
+    LLPC_ERRS(err);
+    consumeError(std::move(err));
+    result = Result::ErrorInvalidValue;
+    return onFailure();
+  }
+  for (InputFilesGroup &inputGroup : *inputGroupsOrErr) {
+    result = processPipeline(compiler, inputGroup);
+    if (isFailure())
+      return onFailure();
   }
 
   assert(!isFailure());

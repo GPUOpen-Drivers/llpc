@@ -32,11 +32,18 @@
 
 #include "llpc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 #include <vector>
 
 namespace Llpc {
 namespace StandaloneCompiler {
+
+using InputFilesGroup = llvm::SmallVector<std::string, 2>;
+// Split the list of input file paths into groups. Each group will be compiled in its own context.
+// Validates the input files and returns Error on failure.
+llvm::Expected<llvm::SmallVector<InputFilesGroup>> groupInputFiles(llvm::ArrayRef<std::string> inputFiles);
 
 // Represents allowed extensions of LLPC source files.
 namespace Ext {

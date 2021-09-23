@@ -51,13 +51,12 @@ function(llpc_add_unittest_impl test_suite test_name)
 
   target_link_libraries(${test_name} PRIVATE ${LLVM_GTEST_LIBS})
   target_compile_definitions(${test_name} PRIVATE
-    ${LLVM_DEFINITIONS}
     LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION}  # Required by vkgcDefs.h.
   )
   target_include_directories(${test_name} PRIVATE
-    ${XGL_LLVM_SRC_PATH}/include
     ${LLVM_INCLUDE_DIRS}  # This is necessary to discover the auto-generated llvm-config.h header.
   )
+  set_compiler_options(${test_name} ${LLPC_ENABLE_WERROR})
 
   get_target_property(test_suite_folder ${test_suite} FOLDER)
   if(test_suite_folder)
