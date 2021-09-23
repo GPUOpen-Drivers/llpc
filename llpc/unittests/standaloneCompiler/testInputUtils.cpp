@@ -25,10 +25,16 @@
 
 #include "llpcInputUtils.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/FileSystem.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include <array>
 
 using namespace llvm;
+using ::testing::ElementsAre;
+using ::testing::ElementsAreArray;
 
 namespace Llpc {
 namespace StandaloneCompiler {
@@ -207,6 +213,124 @@ TEST(InputUtilsTest, ExpandInputFilenames) {
   EXPECT_EQ(expanded, inputs);
 }
 #endif // WIN_OS
+
+// =====================================================================================================================
+// Checks if the expected value is an Error value. If so, prints the error message to stderr and consumes the error.
+//
+// @param valueOrError : Value to check
+// @returns : true on error state, false on success
+template <typename T> bool expectedToBool(Expected<T> &valueOrErr) {
+  Error err = valueOrErr.takeError();
+  if (err)
+    errs() << "Error: " << err << "\n";
+  return errorToBool(std::move(err));
+}
+
+// Test class for groupInputFiles tests. Manages temporary files created by tests.
+class GroupInputFilesTest : public ::testing::Test {
+public:
+  // Creates a new temporary file in the form `some/temp/dir/<prefix>some_chars.<extension>`. The file will be
+  // automatically removed at the end of the test. Sets `finalPath` to the full path of the created file.
+  void createTestFile(StringRef prefix, StringRef extension, std::string &finalPath) {
+    SmallVector<char> bytes;
+    std::error_code err = sys::fs::createTemporaryFile(prefix, extension, bytes);
+    ASSERT_FALSE(err) << "Failed to create temporary test file: " << err;
+    m_createdFiles.emplace_back(bytes.begin(), bytes.end());
+    finalPath = m_createdFiles.back();
+  }
+
+  // Cleans up all the temporary files created.
+  void TearDown() override {
+    for (auto &filePath : m_createdFiles) {
+      std::error_code err = sys::fs::remove(filePath, false);
+      ASSERT_FALSE(err) << "Failed to remove temporary test file: " << err;
+    }
+  }
+
+private:
+  SmallVector<std::string> m_createdFiles;
+};
+
+TEST_F(GroupInputFilesTest, NoInputs) {
+  auto groupsOrErr = groupInputFiles({});
+  ASSERT_FALSE(expectedToBool(groupsOrErr));
+  EXPECT_TRUE(groupsOrErr->empty());
+}
+
+TEST_F(GroupInputFilesTest, NonExistentInput) {
+  auto groupsOrErr = groupInputFiles({"/this/path/does/not/exit.pipe"});
+  EXPECT_TRUE(expectedToBool(groupsOrErr));
+}
+
+TEST_F(GroupInputFilesTest, OnePipe) {
+  std::string pipePath;
+  createTestFile("a", "pipe", pipePath);
+
+  auto groupsOrErr = groupInputFiles({pipePath});
+  ASSERT_FALSE(expectedToBool(groupsOrErr));
+  ASSERT_EQ(groupsOrErr->size(), 1);
+
+  InputFilesGroup &group = groupsOrErr->front();
+  EXPECT_THAT(group, ElementsAre(pipePath));
+}
+
+// Check that multiple pipe files are places in separate one-element groups.
+TEST_F(GroupInputFilesTest, MultiplePipe) {
+  std::string inputPathA;
+  createTestFile("a", "pipe", inputPathA);
+  std::string inputPathB;
+  createTestFile("b", "pipe", inputPathB);
+  auto groupsOrErr = groupInputFiles({inputPathA, inputPathB});
+  ASSERT_FALSE(expectedToBool(groupsOrErr));
+  ASSERT_EQ(groupsOrErr->size(), 2);
+
+  InputFilesGroup &group1 = groupsOrErr->front();
+  EXPECT_THAT(group1, ElementsAre(inputPathA));
+  InputFilesGroup &group2 = groupsOrErr->back();
+  EXPECT_THAT(group2, ElementsAre(inputPathB));
+}
+
+TEST_F(GroupInputFilesTest, OneShader) {
+  std::string shaderPath;
+  createTestFile("a", "spv", shaderPath);
+
+  auto groupsOrErr = groupInputFiles({shaderPath});
+  ASSERT_FALSE(expectedToBool(groupsOrErr));
+  ASSERT_EQ(groupsOrErr->size(), 1);
+
+  InputFilesGroup &group = groupsOrErr->front();
+  EXPECT_THAT(group, ElementsAre(shaderPath));
+}
+
+// Check that multiple shader inputs are placed in a single group.
+TEST_F(GroupInputFilesTest, MultipleShaders) {
+  std::array<std::string, 3> shaderPaths = {};
+  createTestFile("a", "spv", shaderPaths[0]);
+  createTestFile("b", "spvasm", shaderPaths[1]);
+  createTestFile("c", "frag", shaderPaths[2]);
+
+  auto groupsOrErr = groupInputFiles({shaderPaths[0], shaderPaths[1], shaderPaths[2]});
+  ASSERT_FALSE(expectedToBool(groupsOrErr));
+  ASSERT_EQ(groupsOrErr->size(), 1);
+
+  InputFilesGroup &group = groupsOrErr->front();
+  EXPECT_THAT(group, ElementsAreArray(shaderPaths));
+}
+
+// Check that an Error is returned when mixing .pipe and shader inputs.
+TEST_F(GroupInputFilesTest, MixShaderPipe) {
+  std::string shaderPath;
+  createTestFile("a", "spv", shaderPath);
+  std::string pipePath;
+  createTestFile("b", "pipe", pipePath);
+
+  auto groupsOrErr1 = groupInputFiles({shaderPath, pipePath});
+  EXPECT_TRUE(expectedToBool(groupsOrErr1));
+
+  // The other order should also resul in an error.
+  auto groupsOrErr2 = groupInputFiles({pipePath, shaderPath});
+  EXPECT_TRUE(expectedToBool(groupsOrErr2));
+}
 
 } // namespace
 } // namespace StandaloneCompiler

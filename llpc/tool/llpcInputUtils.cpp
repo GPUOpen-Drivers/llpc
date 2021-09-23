@@ -39,13 +39,59 @@
 #include "llpcFile.h"
 #include "llpcInputUtils.h"
 #include "vkgcElfReader.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/FileSystem.h"
 #include <cassert>
+#include <system_error>
 
 using namespace llvm;
 using namespace Vkgc;
 
 namespace Llpc {
 namespace StandaloneCompiler {
+
+// =====================================================================================================================
+// Split the list of input file paths into groups. Each group will be compiled in its own context.
+// Validates the input files and returns Error on failure.
+//
+// @param inputFiles : Input files to group and validate
+// @returns : List of input groups on success, Error on failure
+Expected<SmallVector<InputFilesGroup>> groupInputFiles(ArrayRef<std::string> inputFiles) {
+  const size_t numInputs = inputFiles.size();
+  const size_t numPipe = count_if(inputFiles, isPipelineInfoFile);
+  if (numPipe > 0 && numPipe != numInputs)
+    return createStringError(std::make_error_code(std::errc::invalid_argument),
+                             "Mixing .pipe and shader inputs is not allowed");
+
+  // Check that all files exist and are accessible.
+  for (StringRef filePath : inputFiles) {
+    const char *errorMessage = nullptr;
+    if (!sys::fs::exists(filePath))
+      errorMessage = "Input file does not exist";
+    else if (!sys::fs::is_regular_file(filePath))
+      errorMessage = "Input path is not a regular file";
+
+    if (errorMessage)
+      return createStringError(std::make_error_code(std::errc::file_exists), Twine(errorMessage) + ": " + filePath);
+  }
+
+  // All input shaders form one group.
+  SmallVector<InputFilesGroup> groups;
+  if (numInputs == 0)
+    return groups;
+
+  if (numPipe == 0) {
+    groups.push_back({inputFiles.begin(), inputFiles.end()});
+    return groups;
+  }
+
+  // Each .pipe file forms its own group.
+  groups.reserve(numInputs);
+  for (const std::string &file : inputFiles)
+    groups.push_back({file});
+  return groups;
+}
 
 // =====================================================================================================================
 // Checks whether the input data is actually an ELF binary.
