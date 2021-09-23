@@ -142,10 +142,6 @@ opt<unsigned> ShaderCacheMode("shader-cache-mode",
 static opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
                                        init("amdllpc"));
 
-// -enable-shader-module-opt: Enable translate & lower phase in shader module build.
-opt<bool> EnableShaderModuleOpt("enable-shader-module-opt",
-                                cl::desc("Enable translate & lower phase in shader module build."), init(false));
-
 // -trim-debug-info: Trim debug information in SPIR-V binary
 opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(true));
 
@@ -518,7 +514,6 @@ void Compiler::Destroy() {
 Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) {
   Result result = Result::Success;
   void *allocBuf = nullptr;
-  const void *cacheData = nullptr;
   uint8_t *allocData = nullptr;
   size_t allocSize = 0;
   ShaderModuleDataEx moduleDataEx = {};
@@ -585,8 +580,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
       trimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
       ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, trimmedCode);
       moduleDataEx.common.binCode.pCode = trimmedCode;
-    } else
+    } else {
       moduleDataEx.common.binCode.pCode = shaderInfo->shaderBin.pCode;
+    }
 
     // Calculate SPIR-V cache hash
     MetroHash::Hash cacheHash = {};
@@ -594,150 +590,6 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
                       moduleDataEx.common.binCode.codeSize, cacheHash.bytes);
     static_assert(sizeof(moduleDataEx.common.cacheHash) == sizeof(cacheHash), "Unexpected value!");
     memcpy(moduleDataEx.common.cacheHash, cacheHash.dwords, sizeof(cacheHash));
-    HashId cacheHashId = {};
-    static_assert(sizeof(HashId) == sizeof(cacheHash), "Hash size is different!");
-    memcpy(cacheHashId.dwords, cacheHash.dwords, sizeof(cacheHash));
-
-    // Do SPIR-V translate & lower if possible
-    bool enableOpt = cl::EnableShaderModuleOpt;
-    enableOpt = enableOpt || shaderInfo->options.enableOpt;
-    enableOpt = moduleDataEx.common.usage.useSpecConstant ? false : enableOpt;
-
-    if (enableOpt) {
-      // Check internal cache for shader module build result
-      // NOTE: We should not cache non-opt result, we may compile shader module multiple
-      // times in async-compile mode.
-      if (m_cache) {
-        cacheResult = m_cache->GetEntry(cacheHashId, allocateOnMiss, &cacheEntry);
-        if (cacheResult == Result::NotReady)
-          cacheResult = cacheEntry.WaitForEntry();
-        if (cacheResult == Result::Success) {
-          cacheResult = cacheEntry.GetValueZeroCopy(&cacheData, &allocSize);
-          if (cacheResult == Result::Unsupported && !cacheData) {
-            cacheResult = cacheEntry.GetValue(nullptr, &allocSize);
-            if (cacheResult == Result::Success && allocSize > 0) {
-              cacheData = allocData = new uint8_t[allocSize];
-              cacheResult = cacheEntry.GetValue(const_cast<void *>(cacheData), &allocSize);
-            }
-          }
-        }
-      } else {
-        cacheEntryState = m_shaderCache->findShader(cacheHash, allocateOnMiss, &hEntry);
-        if (cacheEntryState == ShaderEntryState::Ready)
-          result = m_shaderCache->retrieveShader(hEntry, &cacheData, &allocSize);
-      }
-      if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
-        bool hasError = false;
-        Context *context = acquireContext();
-
-        context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
-        context->setBuilder(context->getLgcContext()->createBuilder(nullptr, true));
-
-        for (unsigned i = 0; i < entryNames.size(); ++i) {
-          ShaderModuleEntry moduleEntry = {};
-          ShaderModuleEntryData moduleEntryData = {};
-
-          moduleEntryData.pShaderEntry = &moduleEntry;
-          moduleEntryData.stage = entryNames[i].stage;
-          moduleEntryData.pEntryName = entryNames[i].name;
-          moduleEntry.entryOffset = moduleBinary.size();
-          MetroHash::Hash entryNamehash = {};
-          MetroHash64::Hash(reinterpret_cast<const uint8_t *>(entryNames[i].name), strlen(entryNames[i].name),
-                            entryNamehash.bytes);
-          memcpy(moduleEntry.entryNameHash, entryNamehash.dwords, sizeof(entryNamehash));
-
-          // Create empty modules and set target machine in each.
-          Module *module = new Module(
-              (Twine("llpc") + getShaderStageName(static_cast<ShaderStage>(entryNames[i].stage))).str(), *context);
-
-          context->setModuleTargetMachine(module);
-
-          unsigned passIndex = 0;
-          std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
-          lowerPassMgr->setPassIndex(&passIndex);
-
-          // Set the shader stage in the Builder.
-          context->getBuilder()->setShaderStage(getLgcShaderStage(static_cast<ShaderStage>(entryNames[i].stage)));
-
-          // Start timer for translate.
-          timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
-
-          // SPIR-V translation, then dump the result.
-          PipelineShaderInfo shaderInfo = {};
-          shaderInfo.pModuleData = &moduleDataEx.common;
-          shaderInfo.entryStage = entryNames[i].stage;
-          shaderInfo.pEntryTarget = entryNames[i].name;
-          lowerPassMgr->add(createSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage), &shaderInfo));
-          bool collectDetailUsage =
-              entryNames[i].stage == ShaderStageFragment || entryNames[i].stage == ShaderStageCompute;
-          auto resCollectPass =
-              static_cast<SpirvLowerResourceCollect *>(createSpirvLowerResourceCollect(collectDetailUsage));
-          lowerPassMgr->add(resCollectPass);
-          if (EnableOuts()) {
-            lowerPassMgr->add(createPrintModulePass(
-                outs(), "\n"
-                        "===============================================================================\n"
-                        "// LLPC SPIRV-to-LLVM translation results\n"));
-          }
-
-          // Stop timer for translate.
-          timerProfiler.addTimerStartStopPass(&*lowerPassMgr, TimerTranslate, false);
-
-          // Per-shader SPIR-V lowering passes.
-          LegacySpirvLower::addPasses(context, static_cast<ShaderStage>(entryNames[i].stage), *lowerPassMgr,
-                                timerProfiler.getTimer(TimerLower)
-          );
-
-          lowerPassMgr->add(createBitcodeWriterPass(moduleBinaryStream));
-
-          // Run the passes.
-          bool success = runPasses(&*lowerPassMgr, module);
-          if (!success) {
-            LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-            result = Result::ErrorInvalidShader;
-            delete module;
-            break;
-          }
-
-          moduleEntry.entrySize = moduleBinary.size() - moduleEntry.entryOffset;
-
-          moduleEntry.passIndex = passIndex;
-          if (resCollectPass->detailUsageValid()) {
-            auto &resNodeDatas = resCollectPass->getResourceNodeDatas();
-            moduleEntryData.resNodeDataCount = resNodeDatas.size();
-            for (auto resNodeData : resNodeDatas) {
-              ResourceNodeData data = {};
-              data.type = resNodeData.second;
-              data.set = resNodeData.first.value.set;
-              data.binding = resNodeData.first.value.binding;
-              data.arraySize = resNodeData.first.value.arraySize;
-              entryResourceNodeDatas[i].push_back(data);
-            }
-
-            moduleEntryData.pushConstSize = resCollectPass->getPushConstSize();
-            auto &fsOutInfosFromPass = resCollectPass->getFsOutInfos();
-            for (auto &fsOutInfo : fsOutInfosFromPass)
-              fsOutInfos.push_back(fsOutInfo);
-          }
-          moduleEntries.push_back(moduleEntry);
-          moduleEntryDatas.push_back(moduleEntryData);
-          delete module;
-        }
-
-        if (result == Result::Success) {
-          if (!hasError) {
-            moduleDataEx.common.binType = BinaryType::MultiLlvmBc;
-            moduleDataEx.common.binCode.pCode = moduleBinary.data();
-            moduleDataEx.common.binCode.codeSize = moduleBinary.size();
-          } else {
-            result = Result::ErrorInvalidShader;
-          }
-        }
-
-        context->setDiagnosticHandler(nullptr);
-      }
-      moduleDataEx.extra.entryCount = entryNames.size();
-    }
   }
 
   // Allocate memory and copy output data
@@ -783,8 +635,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
       moduleDataExCopy->entryOffset = entryOffset;
       moduleDataExCopy->resNodeOffset = resNodeOffset;
       moduleDataExCopy->fsOutInfoOffset = fsOutInfoOffset;
-    } else
-      memcpy(moduleDataExCopy, cacheData, allocSize);
+    }
 
     ShaderModuleEntry *entry =
         reinterpret_cast<ShaderModuleEntry *>(voidPtrInc(allocBuf, moduleDataExCopy->entryOffset));

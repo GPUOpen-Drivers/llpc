@@ -44,7 +44,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 49
+#define LLPC_INTERFACE_MAJOR_VERSION 50
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -71,6 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
 //  |     49.0 | Added DescriptorConstBuffer, DescriptorConstBufferCompact, DescriptorImage, DescriptorConstTexelBuffer|
 //  |          | to ResourceMappingNodeType                                                                            |
 //  |     48.1 | Added enableUberFetchShader to GraphicsPipelineBuildInfo                                              |
