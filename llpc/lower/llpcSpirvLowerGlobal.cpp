@@ -1803,6 +1803,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                   continue;
                 // If the call is our non uniform decoration, record we are non uniform.
                 isNonUniform = callee->getName().startswith(gSPIRVName::NonUniform);
+                break;
               }
               if (!isNonUniform) {
                 // Run the users of the block index to check for any nonuniform calls.
@@ -1812,9 +1813,9 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                   // If the user is not a call, bail.
                   if (!call)
                     continue;
-
                   // If the call is our non uniform decoration, record we are non uniform.
-                  if (call->getCalledFunction()->getName().startswith(gSPIRVName::NonUniform)) {
+                  auto callee = call->getCalledFunction();
+                  if (callee && callee->getName().startswith(gSPIRVName::NonUniform)) {
                     isNonUniform = true;
                     break;
                   }
