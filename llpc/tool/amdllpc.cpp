@@ -692,6 +692,7 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
     if (result == Result::Success && ToLink) {
       Optional<PipelineDumpOptions> dumpOptions = None;
       if (cl::EnablePipelineDump) {
+        dumpOptions.emplace();
         dumpOptions->pDumpDir = cl::PipelineDumpDir.c_str();
         dumpOptions->filterPipelineDumpByType = cl::FilterPipelineDumpByType;
         dumpOptions->filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
