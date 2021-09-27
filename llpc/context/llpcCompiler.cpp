@@ -160,7 +160,10 @@ opt<int> ContextReuseLimit("context-reuse-limit",
 opt<bool> FatalLlvmErrors("fatal-llvm-errors", cl::desc("Make all LLVM errors fatal"), init(false));
 
 // -new-pass-manager: Use LLVM's new pass manager (experimental)
-opt<bool> NewPassManager("new-pass-manager", cl::desc("Use LLVM's new pass manager (experimental)"), init(false));
+opt<unsigned> NewPassManager("new-pass-manager",
+                             cl::desc("0 - Legacy pass manager, 1 - New pass manager front-end, 2 - New pass manager "
+                                      "front-end and middle-end (experimental)"),
+                             init(1));
 
 extern opt<bool> EnableOuts;
 
