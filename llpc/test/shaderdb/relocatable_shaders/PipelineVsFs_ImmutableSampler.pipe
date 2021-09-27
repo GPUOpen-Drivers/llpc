@@ -4,7 +4,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} calculated hash results (graphics pipeline)
-; SHADERTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible
+; SHADERTEST-LABEL: Building pipeline with relocatable shader elf.
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: {{^=====}} AMDLLPC SUCCESS
 ; END_SHADERTEST

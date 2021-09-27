@@ -872,10 +872,6 @@ static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *no
 //
 // @param [in] resourceMapping : resource mapping data, containing user data nodes
 static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMapping) {
-  // The code to handle an immutable sampler cannot be easily patched.
-  if (resourceMapping->staticDescriptorValueCount != 0)
-    return true;
-
   for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
     if (isUnrelocatableResourceMappingRootNode(&resourceMapping->pUserDataNodes[i].node))
       return true;
