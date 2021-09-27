@@ -393,6 +393,7 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
 
     pipelineInfo->options.robustBufferAccess = compileInfo->robustBufferAccess;
     pipelineInfo->options.enableRelocatableShaderElf = compileInfo->relocatableShaderElf;
+    pipelineInfo->options.scalarBlockLayout = compileInfo->scalarBlockLayout;
     pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo->scratchAccessBoundsChecks;
 
     void *pipelineDumpHandle = nullptr;
@@ -460,6 +461,7 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
     pipelineInfo->unlinked = compileInfo->unlinked;
     pipelineInfo->options.robustBufferAccess = compileInfo->robustBufferAccess;
     pipelineInfo->options.enableRelocatableShaderElf = compileInfo->relocatableShaderElf;
+    pipelineInfo->options.scalarBlockLayout = compileInfo->scalarBlockLayout;
     pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo->scratchAccessBoundsChecks;
 
     void *pipelineDumpHandle = nullptr;
