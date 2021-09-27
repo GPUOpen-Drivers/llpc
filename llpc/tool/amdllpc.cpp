@@ -229,6 +229,9 @@ static cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load 
 static cl::opt<bool> RobustBufferAccess("robust-buffer-access", cl::desc("Validate if the index is out of bounds"),
                                         cl::init(false));
 
+static cl::opt<bool> ScalarBlockLayout("scalar-block-layout", cl::desc("Allows scalar block layout of types"),
+                                       cl::init(false));
+
 static cl::opt<bool> EnableRelocatableShaderElf("enable-relocatable-shader-elf",
                                                 cl::desc("Compile pipelines using relocatable shader elf"),
                                                 cl::init(false));
@@ -397,6 +400,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->checkAutoLayoutCompatible = CheckAutoLayoutCompatible;
   compileInfo->autoLayoutDesc = AutoLayoutDesc;
   compileInfo->robustBufferAccess = RobustBufferAccess;
+  compileInfo->scalarBlockLayout = ScalarBlockLayout;
   compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
 
   // Set NGG control settings

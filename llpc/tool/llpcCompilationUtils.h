@@ -57,12 +57,13 @@ struct CompileInfo {
   Llpc::GraphicsPipelineBuildOut gfxPipelineOut;                       // Output of building graphics pipeline
   Llpc::ComputePipelineBuildInfo compPipelineInfo;                     // Info to build compute pipeline
   Llpc::ComputePipelineBuildOut compPipelineOut;                       // Output of building compute pipeline
-  void *pipelineBuf;                                                   // Alllocation buffer of building pipeline
+  void *pipelineBuf;                                                   // Allocation buffer of building pipeline
   void *pipelineInfoFile;                                              // VFX-style file containing pipeline info
   const char *fileNames;                                               // Names of input shader source files
   std::string entryTarget;                                             // Name of the entry target function.
   bool unlinked;                  // Whether to generate unlinked shader/part-pipeline ELF
   bool relocatableShaderElf;      // Whether to enable relocatable shader compilation
+  bool scalarBlockLayout;         // Whether to enable scalar block layout
   bool doAutoLayout;              // Whether to auto layout descriptors
   bool checkAutoLayoutCompatible; // Whether to comapre if auto layout descriptors is
                                   // same as specified pipeline layout
