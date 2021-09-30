@@ -539,6 +539,7 @@ struct GraphicsPipelineState {
   ColorBuffer colorBuffer[Vkgc::MaxColorTargets]; // Color target state.
   bool dynamicVertexStride; // Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader; // Use uber fetch shader
+  bool enableEarlyCompile; // Enaable early compile
 };
 
 // =====================================================================================================================

@@ -408,38 +408,6 @@ enum FPRoundingMode {
     FPRoundingModeMax = 0x7fffffff,
 };
 
-enum FPDenormMode {
-    FPDenormModePreserve = 0,
-    FPDenormModeFlushToZero = 1,
-    FPDenormModeMax = 0x7fffffff,
-};
-
-enum FPOperationMode {
-    FPOperationModeIEEE = 0,
-    FPOperationModeALT = 1,
-    FPOperationModeMax = 0x7fffffff,
-};
-
-enum QuantizationModes {
-    QuantizationModesTRN = 0,
-    QuantizationModesTRN_ZERO = 1,
-    QuantizationModesRND = 2,
-    QuantizationModesRND_ZERO = 3,
-    QuantizationModesRND_INF = 4,
-    QuantizationModesRND_MIN_INF = 5,
-    QuantizationModesRND_CONV = 6,
-    QuantizationModesRND_CONV_ODD = 7,
-    QuantizationModesMax = 0x7fffffff,
-};
-
-enum OverflowModes {
-    OverflowModesWRAP = 0,
-    OverflowModesSAT = 1,
-    OverflowModesSAT_ZERO = 2,
-    OverflowModesSAT_SYM = 3,
-    OverflowModesMax = 0x7fffffff,
-};
-
 enum LinkageType {
     LinkageTypeExport = 0,
     LinkageTypeImport = 1,
@@ -685,6 +653,7 @@ enum BuiltIn {
     BuiltInHitTNV = 5332,
     BuiltInHitKindKHR = 5333,
     BuiltInHitKindNV = 5333,
+    BuiltInCurrentRayTimeNV = 5334,
     BuiltInIncomingRayFlagsKHR = 5351,
     BuiltInIncomingRayFlagsNV = 5351,
     BuiltInRayGeometryIndexKHR = 5352,
@@ -754,6 +723,7 @@ enum FunctionControlShift {
     FunctionControlDontInlineShift = 1,
     FunctionControlPureShift = 2,
     FunctionControlConstShift = 3,
+    FunctionControlOptNoneINTELShift = 16,
     FunctionControlMax = 0x7fffffff,
 };
 
@@ -763,6 +733,7 @@ enum FunctionControlMask {
     FunctionControlDontInlineMask = 0x00000002,
     FunctionControlPureMask = 0x00000004,
     FunctionControlConstMask = 0x00000008,
+    FunctionControlOptNoneINTELMask = 0x00010000,
 };
 
 enum MemorySemanticsShift {
@@ -1021,6 +992,7 @@ enum Capability {
     CapabilityStorageTexelBufferArrayNonUniformIndexing = 5312,
     CapabilityStorageTexelBufferArrayNonUniformIndexingEXT = 5312,
     CapabilityRayTracingNV = 5340,
+    CapabilityRayTracingMotionBlurNV = 5341,
     CapabilityVulkanMemoryModel = 5345,
     CapabilityVulkanMemoryModelKHR = 5345,
     CapabilityVulkanMemoryModelDeviceScope = 5346,
@@ -1073,9 +1045,17 @@ enum Capability {
     CapabilityIOPipesINTEL = 5943,
     CapabilityBlockingPipesINTEL = 5945,
     CapabilityFPGARegINTEL = 5948,
+    CapabilityDotProductInputAllKHR = 6016,
+    CapabilityDotProductInput4x8BitKHR = 6017,
+    CapabilityDotProductInput4x8BitPackedKHR = 6018,
+    CapabilityDotProductKHR = 6019,
+    CapabilityBitInstructions = 6025,
     CapabilityAtomicFloat32AddEXT = 6033,
     CapabilityAtomicFloat64AddEXT = 6034,
     CapabilityLongConstantCompositeINTEL = 6089,
+    CapabilityOptNoneINTEL = 6094,
+    CapabilityAtomicFloat16AddEXT = 6095,
+    CapabilityDebugInfoModuleINTEL = 6114,
     CapabilityMax = 0x7fffffff,
 };
 
@@ -1140,6 +1120,43 @@ enum FragmentShadingRateMask {
     FragmentShadingRateVertical4PixelsMask = 0x00000002,
     FragmentShadingRateHorizontal2PixelsMask = 0x00000004,
     FragmentShadingRateHorizontal4PixelsMask = 0x00000008,
+};
+
+enum FPDenormMode {
+    FPDenormModePreserve = 0,
+    FPDenormModeFlushToZero = 1,
+    FPDenormModeMax = 0x7fffffff,
+};
+
+enum FPOperationMode {
+    FPOperationModeIEEE = 0,
+    FPOperationModeALT = 1,
+    FPOperationModeMax = 0x7fffffff,
+};
+
+enum QuantizationModes {
+    QuantizationModesTRN = 0,
+    QuantizationModesTRN_ZERO = 1,
+    QuantizationModesRND = 2,
+    QuantizationModesRND_ZERO = 3,
+    QuantizationModesRND_INF = 4,
+    QuantizationModesRND_MIN_INF = 5,
+    QuantizationModesRND_CONV = 6,
+    QuantizationModesRND_CONV_ODD = 7,
+    QuantizationModesMax = 0x7fffffff,
+};
+
+enum OverflowModes {
+    OverflowModesWRAP = 0,
+    OverflowModesSAT = 1,
+    OverflowModesSAT_ZERO = 2,
+    OverflowModesSAT_SYM = 3,
+    OverflowModesMax = 0x7fffffff,
+};
+
+enum PackedVectorFormat {
+    PackedVectorFormatPackedVectorFormat4x8BitKHR = 0,
+    PackedVectorFormatMax = 0x7fffffff,
 };
 
 enum Op {
@@ -1499,6 +1516,12 @@ enum Op {
     OpConvertUToAccelerationStructureKHR = 4447,
     OpIgnoreIntersectionKHR = 4448,
     OpTerminateRayKHR = 4449,
+    OpSDotKHR = 4450,
+    OpUDotKHR = 4451,
+    OpSUDotKHR = 4452,
+    OpSDotAccSatKHR = 4453,
+    OpUDotAccSatKHR = 4454,
+    OpSUDotAccSatKHR = 4455,
     OpTypeRayQueryKHR = 4472,
     OpRayQueryInitializeKHR = 4473,
     OpRayQueryTerminateKHR = 4474,
@@ -1525,6 +1548,8 @@ enum Op {
     OpIgnoreIntersectionNV = 5335,
     OpTerminateRayNV = 5336,
     OpTraceNV = 5337,
+    OpTraceMotionNV = 5338,
+    OpTraceRayMotionNV = 5339,
     OpTypeAccelerationStructureKHR = 5341,
     OpTypeAccelerationStructureNV = 5341,
     OpExecuteCallableNV = 5344,
@@ -2139,6 +2164,12 @@ inline void HasResultAndType(Op opcode, bool *hasResult, bool *hasResultType) {
     case OpConvertUToAccelerationStructureKHR: *hasResult = true; *hasResultType = true; break;
     case OpIgnoreIntersectionKHR: *hasResult = false; *hasResultType = false; break;
     case OpTerminateRayKHR: *hasResult = false; *hasResultType = false; break;
+    case OpSDotKHR: *hasResult = true; *hasResultType = true; break;
+    case OpUDotKHR: *hasResult = true; *hasResultType = true; break;
+    case OpSUDotKHR: *hasResult = true; *hasResultType = true; break;
+    case OpSDotAccSatKHR: *hasResult = true; *hasResultType = true; break;
+    case OpUDotAccSatKHR: *hasResult = true; *hasResultType = true; break;
+    case OpSUDotAccSatKHR: *hasResult = true; *hasResultType = true; break;
     case OpTypeRayQueryKHR: *hasResult = true; *hasResultType = false; break;
     case OpRayQueryInitializeKHR: *hasResult = false; *hasResultType = false; break;
     case OpRayQueryTerminateKHR: *hasResult = false; *hasResultType = false; break;
@@ -2164,6 +2195,8 @@ inline void HasResultAndType(Op opcode, bool *hasResult, bool *hasResultType) {
     case OpIgnoreIntersectionNV: *hasResult = false; *hasResultType = false; break;
     case OpTerminateRayNV: *hasResult = false; *hasResultType = false; break;
     case OpTraceNV: *hasResult = false; *hasResultType = false; break;
+    case OpTraceMotionNV: *hasResult = false; *hasResultType = false; break;
+    case OpTraceRayMotionNV: *hasResult = false; *hasResultType = false; break;
     case OpTypeAccelerationStructureNV: *hasResult = true; *hasResultType = false; break;
     case OpExecuteCallableNV: *hasResult = false; *hasResultType = false; break;
     case OpTypeCooperativeMatrixNV: *hasResult = true; *hasResultType = false; break;
@@ -2373,8 +2406,6 @@ inline void HasResultAndType(Op opcode, bool *hasResult, bool *hasResultType) {
     case OpArbitraryFloatPowRINTEL: *hasResult = true; *hasResultType = true; break;
     case OpArbitraryFloatPowNINTEL: *hasResult = true; *hasResultType = true; break;
     case OpLoopControlINTEL: *hasResult = false; *hasResultType = false; break;
-    case OpPtrCastToCrossWorkgroupINTEL: *hasResult = true; *hasResultType = true; break;
-    case OpCrossWorkgroupCastToPtrINTEL: *hasResult = true; *hasResultType = true; break;
     case OpFixedSqrtINTEL: *hasResult = true; *hasResultType = true; break;
     case OpFixedRecipINTEL: *hasResult = true; *hasResultType = true; break;
     case OpFixedRsqrtINTEL: *hasResult = true; *hasResultType = true; break;
@@ -2386,6 +2417,8 @@ inline void HasResultAndType(Op opcode, bool *hasResult, bool *hasResultType) {
     case OpFixedSinCosPiINTEL: *hasResult = true; *hasResultType = true; break;
     case OpFixedLogINTEL: *hasResult = true; *hasResultType = true; break;
     case OpFixedExpINTEL: *hasResult = true; *hasResultType = true; break;
+    case OpPtrCastToCrossWorkgroupINTEL: *hasResult = true; *hasResultType = true; break;
+    case OpCrossWorkgroupCastToPtrINTEL: *hasResult = true; *hasResultType = true; break;
     case OpReadPipeBlockingINTEL: *hasResult = true; *hasResultType = true; break;
     case OpWritePipeBlockingINTEL: *hasResult = true; *hasResultType = true; break;
     case OpFPGARegINTEL: *hasResult = true; *hasResultType = true; break;

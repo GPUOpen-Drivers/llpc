@@ -145,6 +145,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->nggState = graphicState.nggState;
     gfxPipelineInfo->dynamicVertexStride = graphicState.dynamicVertexStride;
     gfxPipelineInfo->enableUberFetchShader = graphicState.enableUberFetchShader;
+    gfxPipelineInfo->enableEarlyCompile = graphicState.enableEarlyCompile;
   }
 
   // Section "ComputePipelineState"
