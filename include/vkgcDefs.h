@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 50
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,6 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     50.1 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
 //  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
 //  |     49.1 | Added enableEarlyCompile to GraphicsPipelineBuildInfo                                                 |
 //  |     49.0 | Added DescriptorConstBuffer, DescriptorConstBufferCompact, DescriptorImage, DescriptorConstTexelBuffer|
@@ -688,6 +689,22 @@ struct SamplerYCbCrConversionMetaData {
     };
     unsigned u32All;
   } word3;
+
+  union {
+    struct {
+      unsigned lumaWidth : 16;  ///< Actual width of luma plane
+      unsigned lumaHeight : 16; ///< Actual height of luma plane
+    };
+    unsigned u32All;
+  } word4;
+
+  union {
+    struct {
+      unsigned lumaDepth : 16; ///< Actual array slices of luma plane
+      unsigned : 16;
+    };
+    unsigned u32All;
+  } word5;
 };
 
 /// Represents info of a shader attached to a to-be-built pipeline.
