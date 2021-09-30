@@ -6,8 +6,7 @@
 ; SHADERTEST: %{{.*}} = load atomic i32, i32 addrspace({{.*}})* {{.*}} monotonic
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST:  %{{.*}} = call i32 @llvm.amdgcn.raw.atomic.buffer.load.i32
-; SHADERTEST: %{{.*}} = ptrtoint i32 addrspace({{.*}})* %{{.*}} to i32
+; SHADERTEST: %{{.*}} = call i32 @llvm.amdgcn.raw.atomic.buffer.load.i32
 
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
