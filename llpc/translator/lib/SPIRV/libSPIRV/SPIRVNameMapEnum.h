@@ -450,8 +450,17 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityDemoteToHelperInvocationEXT, "DemoteToHelperInvocationEXT");
   add(CapabilityAtomicFloat32MinMaxEXT, "AtomicFloat32MinMaxEXT");
   add(CapabilityAtomicFloat64MinMaxEXT, "AtomicFloat64MinMaxEXT");
+  add(CapabilityDotProductKHR, "DotProductKHR");
+  add(CapabilityDotProductInputAllKHR, "DotProductInputAllKHR");
+  add(CapabilityDotProductInput4x8BitKHR, "DotProductInput4x8BitKHR");
+  add(CapabilityDotProductInput4x8BitPackedKHR, "DotProductInput4x8BitPackedKHR");
 }
 SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
+
+template <> inline void SPIRVMap<PackedVectorFormat, std::string>::init() {
+  add(PackedVectorFormatPackedVectorFormat4x8BitKHR, "4x8BitKHR");
+}
+SPIRV_DEF_NAMEMAP(PackedVectorFormat, SPIRVPackedVectorFormatNameMap);
 
 } /* namespace SPIRV */
 
