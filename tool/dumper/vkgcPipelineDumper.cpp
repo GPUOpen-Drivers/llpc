@@ -792,7 +792,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "nggState.vertsPerSubgroup = " << pipelineInfo->nggState.vertsPerSubgroup << "\n";
   dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
   dumpFile << "enableUberFetchShader = " << pipelineInfo->enableUberFetchShader << "\n";
-
+  dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
   dumpFile << "\n\n";
 
@@ -896,6 +896,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked || isRelocatableShader);
+  hasher.Update(pipeline->enableEarlyCompile);
 
   if (unlinkedShaderType != UnlinkedStageFragment) {
     if (!isRelocatableShader && !pipeline->enableUberFetchShader)

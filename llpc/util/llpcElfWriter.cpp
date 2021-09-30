@@ -39,6 +39,7 @@
 
 using namespace llvm;
 using namespace Vkgc;
+using namespace Util;
 
 namespace Llpc {
 // The names of API shader stages used in PAL metadata, in ShaderStage order.
@@ -191,8 +192,13 @@ void ElfWriter<Elf>::mergeMapItem(msgpack::MapDocNode &destMap, msgpack::MapDocN
 // @param context : Context related to ElfNote
 // @param [in/out] document : The parsed message pack document of the metadata note.
 static void updateRootDescriptorRegisters(Context *context, msgpack::Document &document) {
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
+  auto pipeline = document.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
+  auto registers = pipeline.getMap(true)[PalAbi::PipelineMetadataKey::Registers].getMap(true);
+#else
   auto pipeline = document.getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
   auto registers = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
+#endif
   const unsigned mmSpiShaderUserDataVs0 = 0x2C4C;
   const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
   const unsigned mmComputeUserData0 = 0x2E40;
@@ -228,9 +234,16 @@ static void updateRootDescriptorRegisters(Context *context, msgpack::Document &d
               unsigned value = userDataNode->offsetInDwords;
               keyIt->second = registers.getDocument()->getNode(value);
               // Update userDataLimit if neccessary
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
+              unsigned userDataLimit = pipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit].getUInt();
+              pipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit] =
+                  document.getNode(std::max(userDataLimit, value + 1));
+#else
               unsigned userDataLimit = pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
               pipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
                   document.getNode(std::max(userDataLimit, value + 1));
+#endif
+
               break;
             }
           }
@@ -260,42 +273,79 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
       srcDocument.readFromBlob(StringRef(reinterpret_cast<const char *>(pNote2->data), pNote2->hdr.descSize), false);
   assert(success);
   (void(success)); // unused
-
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
   auto destPipeline =
-      destDocument.getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
+      destDocument.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
   auto srcPipeline =
-      srcDocument.getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
+      srcDocument.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
+
+  // Copy .num_interpolants
+  auto srcNumIterpIt = srcPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::NumInterpolants));
+  if (srcNumIterpIt != srcPipeline.getMap(true).end())
+    destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::NumInterpolants] = srcNumIterpIt->second;
+#else
+  auto destPipeline = destDocument.getRoot().getMap(true)[Util::Abi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
+  auto srcPipeline = srcDocument.getRoot().getMap(true)[Util::Abi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
 
   // Copy .num_interpolants
   auto srcNumIterpIt = srcPipeline.getMap(true).find(StringRef(Util::Abi::PipelineMetadataKey::NumInterpolants));
   if (srcNumIterpIt != srcPipeline.getMap(true).end())
     destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::NumInterpolants] = srcNumIterpIt->second;
+#endif
 
   // Copy .spill_threshold
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
+  auto destSpillThreshold = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold].getUInt();
+  auto srcSpillThreshold = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold].getUInt();
+  destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold] =
+      destDocument.getNode(std::min(srcSpillThreshold, destSpillThreshold));
+#else
   auto destSpillThreshold = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::SpillThreshold].getUInt();
   auto srcSpillThreshold = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::SpillThreshold].getUInt();
   destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::SpillThreshold] =
       destDocument.getNode(std::min(srcSpillThreshold, destSpillThreshold));
+#endif
 
   // Copy .user_data_limit
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
+  auto destUserDataLimit = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit].getUInt();
+  auto srcUserDataLimit = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit].getUInt();
+  destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit] =
+      destDocument.getNode(std::max(destUserDataLimit, srcUserDataLimit));
+#else
   auto destUserDataLimit = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
   auto srcUserDataLimit = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
   destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
       destDocument.getNode(std::max(destUserDataLimit, srcUserDataLimit));
+#endif
 
   // Copy whole .ps hw stage
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
+  auto destHwStages = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::HardwareStages].getMap(true);
+  auto srcHwStages = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::HardwareStages].getMap(true);
+#else
   auto destHwStages = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
   auto srcHwStages = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
+#endif
   auto hwPsStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Ps)];
   destHwStages[hwPsStageName] = srcHwStages[hwPsStageName];
 
   // Copy whole .pixel shader
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
+  auto destShaders = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::Shaders].getMap(true);
+  auto srcShaders = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::Shaders].getMap(true);
+#else
   auto destShaders = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Shaders].getMap(true);
   auto srcShaders = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Shaders].getMap(true);
+#endif
   destShaders[ApiStageNames[ShaderStageFragment]] = srcShaders[ApiStageNames[ShaderStageFragment]];
 
   // Update pipeline hash
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
+  auto pipelineHash = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+#else
   auto pipelineHash = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+#endif
   pipelineHash[0] = destDocument.getNode(pContext->getPipelineHashCode());
   pipelineHash[1] = destDocument.getNode(pContext->getPipelineHashCode());
 
@@ -330,8 +380,13 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   // Merge fragment shader related registers. For each of the registers listed above, plus the input
   // control registers and the user data registers, copy the value from srcRegisters to destRegisters.
   // Where the register is set in destRegisters but not srcRegisters, clear it.
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
+  auto destRegisters = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::Registers].getMap(true);
+  auto srcRegisters = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::Registers].getMap(true);
+#else
   auto destRegisters = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
   auto srcRegisters = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
+#endif
 
   for (unsigned regNumber : ArrayRef<unsigned>(PsRegNumbers))
     mergeMapItem(destRegisters, srcRegisters, regNumber);

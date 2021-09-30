@@ -72,6 +72,7 @@
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
 //  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
+//  |     49.1 | Added enableEarlyCompile to GraphicsPipelineBuildInfo                                                 |
 //  |     49.0 | Added DescriptorConstBuffer, DescriptorConstBufferCompact, DescriptorImage, DescriptorConstTexelBuffer|
 //  |          | to ResourceMappingNodeType                                                                            |
 //  |     48.1 | Added enableUberFetchShader to GraphicsPipelineBuildInfo                                              |
@@ -776,6 +777,7 @@ struct GraphicsPipelineBuildInfo {
   bool unlinked;            ///< True to build an "unlinked" half-pipeline ELF
   bool dynamicVertexStride; ///< Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader; ///< Use uber fetch shader
+  bool enableEarlyCompile;  ///< Whether enable early compile
 };
 
 /// Represents info to build a compute pipeline.

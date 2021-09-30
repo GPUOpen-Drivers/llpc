@@ -5106,6 +5106,13 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, transValueWithOpcode<OpDemoteToHelperInvocationEXT>(bv));
   case OpIsHelperInvocationEXT:
     return mapValue(bv, transValueWithOpcode<OpIsHelperInvocationEXT>(bv));
+  case OpSDotKHR:
+  case OpUDotKHR:
+  case OpSUDotKHR:
+  case OpSDotAccSatKHR:
+  case OpUDotAccSatKHR:
+  case OpSUDotAccSatKHR:
+    return mapValue(bv, transSPIRVIntegerDotProductFromInst(static_cast<SPIRVInstruction *>(bv), bb));
   default: {
     auto oc = bv->getOpCode();
     if (isSPIRVCmpInstTransToLLVMInst(static_cast<SPIRVInstruction *>(bv)))
@@ -6331,6 +6338,36 @@ Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicB
   }
 
   return result;
+}
+
+// =============================================================================
+// Translate integer dot product to LLVM IR
+Value *SPIRVToLLVM::transSPIRVIntegerDotProductFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
+  auto bc = static_cast<SPIRVIntegerDotProductInstBase *>(bi);
+  Value *vector1 = transValue(bc->getOperand(0), bb->getParent(), bb);
+  Value *vector2 = transValue(bc->getOperand(1), bb->getParent(), bb);
+
+  auto oc = bc->getOpCode();
+  unsigned flags = 0;
+  if (oc == OpSDotKHR || oc == OpSDotAccSatKHR)
+    flags = lgc::Builder::FirstVectorSigned | lgc::Builder::SecondVectorSigned;
+  else if (oc == OpSUDotKHR || oc == OpSUDotAccSatKHR)
+    flags = lgc::Builder::FirstVectorSigned;
+
+  Value *accumulator = nullptr;
+  Type *returnTy = transType(bc->getType());
+  const bool hasAccumulator = (oc == OpSDotAccSatKHR || oc == OpUDotAccSatKHR || oc == OpSUDotAccSatKHR);
+  accumulator = hasAccumulator ? transValue(bc->getOperand(2), bb->getParent(), bb)
+                               : getBuilder()->getIntN(returnTy->getScalarSizeInBits(), 0);
+
+  if (vector1->getType()->isIntegerTy(32)) {
+    // Cast i32 to <4xi8>
+    auto vecTy = FixedVectorType::get(getBuilder()->getInt8Ty(), 4);
+    vector1 = getBuilder()->CreateBitCast(vector1, vecTy);
+    vector2 = getBuilder()->CreateBitCast(vector2, vecTy);
+  }
+  Value *scalar = getBuilder()->CreateIntegerDotProduct(vector1, vector2, accumulator, flags);
+  return scalar;
 }
 
 // =============================================================================
