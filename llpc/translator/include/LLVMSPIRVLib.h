@@ -86,9 +86,10 @@ typedef std::map<uint32_t, SPIRVSpecConstEntry> SPIRVSpecConstMap;
 struct ConvertingSampler {
   unsigned set;                    // Descriptor set
   unsigned binding;                // Binding
-  llvm::ArrayRef<uint32_t> values; // Values; 8 uint32_t per array entry
+  llvm::ArrayRef<uint32_t> values; // Values; 10 uint32_t per array entry
 };
-static const unsigned ConvertingSamplerDwordCount = 8;
+
+static const unsigned ConvertingSamplerDwordCount = 10;
 
 /// \brief Check if a string contains SPIR-V binary.
 bool IsSPIRVBinary(std::string &Img);

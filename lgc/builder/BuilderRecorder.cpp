@@ -1189,7 +1189,7 @@ Value *BuilderRecorder::CreateImageSample(Type *resultTy, unsigned dim, unsigned
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
 // @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
-// @param convertingSamplerDesc : Converting sampler descriptor (constant v8i32)
+// @param convertingSamplerDesc : Converting sampler descriptor (constant v10i32)
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescArray,

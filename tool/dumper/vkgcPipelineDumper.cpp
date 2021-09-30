@@ -563,7 +563,9 @@ void PipelineDumper::dumpResourceMappingInfo(const ResourceMappingData* resource
             for (unsigned j = 0; j < staticDescriptorValue->arraySize; ++j) {
                 dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
                 const unsigned descriptorSizeInDw =
-                    staticDescriptorValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler ? 8 : 4;
+                    4 + (staticDescriptorValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler
+                             ? (sizeof(SamplerYCbCrConversionMetaData) / 4)
+                             : 0);
 
                 for (unsigned k = 0; k < descriptorSizeInDw - 1; ++k)
                     dumpFile << staticDescriptorValue->pValue[k] << ", ";
@@ -1207,7 +1209,9 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData*
           // The hasher should be updated when the content changes, this is because YCbCrMetaData
           // is engaged in pipeline compiling.
           const unsigned descriptorSize =
-              staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
+              16 + (staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler
+                        ? 0
+                        : sizeof(SamplerYCbCrConversionMetaData));
 
           hasher->Update(reinterpret_cast<const uint8_t *>(staticDescriptorValue->pValue),
                          staticDescriptorValue->arraySize * descriptorSize);

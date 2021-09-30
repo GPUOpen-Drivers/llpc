@@ -954,7 +954,7 @@ public:
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
   // @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
-  // @param convertingSamplerDesc : Converting sampler descriptor (constant v8i32)
+  // @param convertingSamplerDesc : Converting sampler descriptor (constant v10i32)
   // @param address : Address and other arguments
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags,
