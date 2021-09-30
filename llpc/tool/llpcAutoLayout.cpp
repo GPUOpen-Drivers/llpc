@@ -331,7 +331,7 @@ Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileInfo *com
     if (compileInfo->checkAutoLayoutCompatible) {
       ResourceMappingData resourceMappingAuto = {};
       buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &resourceMappingAuto,
-                           compileInfo->autoLayoutDesc);
+		           compileInfo->autoLayoutDesc);
       if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
                                         resourceMappingAuto.pUserDataNodes) &&
           checkPipelineStateCompatible(compiler, pipelineInfo, &pipelineInfoAuto, compileInfo->gfxIp))
@@ -363,7 +363,7 @@ Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileInfo *com
 
       ResourceMappingData resourceMappingAuto = {};
       buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &resourceMappingAuto,
-                           compileInfo->autoLayoutDesc);
+		           compileInfo->autoLayoutDesc);
       if (checkResourceMappingComptible(&pipelineInfo->resourceMapping, resourceMappingAuto.userDataNodeCount,
                                         resourceMappingAuto.pUserDataNodes))
         outs() << "Auto Layout compute shader in " << compileInfo->fileNames << " hit\n";

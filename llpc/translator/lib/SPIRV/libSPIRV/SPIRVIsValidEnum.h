@@ -66,7 +66,8 @@ inline bool isValid(spv::SourceLanguage V) {
 }
 
 inline bool isValid(spv::ExecutionModel V) {
-  switch (V) {
+  uint32_t ExecModel = V;
+  switch (ExecModel) {
   case ExecutionModelVertex:
   case ExecutionModelTessellationControl:
   case ExecutionModelTessellationEvaluation:
@@ -109,8 +110,8 @@ inline bool isValid(spv::MemoryModel V) {
 }
 
 inline bool isValid(spv::ExecutionMode V) {
-  uint32_t execMode = V;
-  switch (execMode) {
+  uint32_t ExecMode = V;
+  switch (ExecMode) {
   case ExecutionModeInvocations:
   case ExecutionModeSpacingEqual:
   case ExecutionModeSpacingFractionalEven:
@@ -271,7 +272,8 @@ inline bool isValid(spv::LinkageType V) {
 }
 
 inline bool isValid(spv::Decoration V) {
-  switch (V) {
+  uint32_t Decor = V;
+  switch (Decor) {
   case DecorationRelaxedPrecision:
   case DecorationSpecId:
   case DecorationBlock:
@@ -549,6 +551,10 @@ inline bool isValid(spv::Capability V) {
   case CapabilityDemoteToHelperInvocationEXT:
   case CapabilityAtomicFloat32MinMaxEXT:
   case CapabilityAtomicFloat64MinMaxEXT:
+  case CapabilityDotProductKHR:
+  case CapabilityDotProductInputAllKHR:
+  case CapabilityDotProductInput4x8BitKHR:
+  case CapabilityDotProductInput4x8BitPackedKHR:
     return true;
   default:
     return false;
@@ -854,6 +860,12 @@ inline bool isValid(spv::Op V) {
   case OpSubgroupAllKHR:
   case OpSubgroupAnyKHR:
   case OpSubgroupAllEqualKHR:
+  case OpSDotKHR:
+  case OpUDotKHR:
+  case OpSUDotKHR:
+  case OpSDotAccSatKHR:
+  case OpUDotAccSatKHR:
+  case OpSUDotAccSatKHR:
   case OpFragmentMaskFetchAMD:
   case OpFragmentFetchAMD:
   case OpGroupIAddNonUniformAMD:
@@ -875,6 +887,15 @@ inline bool isValid(spv::Op V) {
   case OpSubgroupImageBlockWriteINTEL:
   case OpDemoteToHelperInvocationEXT:
   case OpIsHelperInvocationEXT:
+    return true;
+  default:
+    return false;
+  }
+}
+
+inline bool isValidPackedVectorFormat(spv::PackedVectorFormat V) {
+  switch (V) {
+  case PackedVectorFormatPackedVectorFormat4x8BitKHR:
     return true;
   default:
     return false;

@@ -206,7 +206,7 @@ TEST(InputUtilsTest, ExpandInputFilenames) {
   EXPECT_EQ(expandInputFilenames(inputs, expanded), Result::Success);
   EXPECT_EQ(expanded, inputs);
 }
-#endif // WIN_OS
+#endif
 
 } // namespace
 } // namespace StandaloneCompiler

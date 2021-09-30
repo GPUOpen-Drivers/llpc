@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 49
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,6 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     49.1 | Added enableEarlyCompile to GraphicsPipelineBuildInfo                                                 |
 //  |     49.0 | Added DescriptorConstBuffer, DescriptorConstBufferCompact, DescriptorImage, DescriptorConstTexelBuffer|
 //  |          | to ResourceMappingNodeType                                                                            |
 //  |     48.1 | Added enableUberFetchShader to GraphicsPipelineBuildInfo                                              |
@@ -775,6 +776,7 @@ struct GraphicsPipelineBuildInfo {
   bool unlinked;            ///< True to build an "unlinked" half-pipeline ELF
   bool dynamicVertexStride; ///< Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader; ///< Use uber fetch shader
+  bool enableEarlyCompile;  ///< Whether enable early compile
 };
 
 /// Represents info to build a compute pipeline.
