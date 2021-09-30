@@ -21,10 +21,10 @@ void main()
 ; SHADERTEST: call i32 (...) @lgc.create.smod.i32(i32
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: srem i32 %{{.*}}, 6
-; SHADERTEST: icmp slt i32 %{{[0-9]*}}, 0
-; SHADERTEST: icmp ne i32 %{{[0-9]*}}, 0
-; SHADERTEST: and i1 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: add nsw i32 %{{[0-9]*}}, 6
+; SHADERTEST-DAG: icmp slt i32 %{{[0-9]*}}, 0
+; SHADERTEST-DAG: icmp ne i32 %{{[0-9]*}}, 0
+; SHADERTEST-DAG: and i1 %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST-DAG: add {{.*}}i32{{.*}} 6
 ; SHADERTEST: select i1 %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 %{{[0-9]*}}
 ; SHADERTEST: getelementptr <{ [6 x [4 x float]] }>,
 ; SHADERTEST: AMDLLPC SUCCESS
