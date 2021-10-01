@@ -980,7 +980,7 @@ unsigned PalMetadata::getFirstUserDataReg(unsigned callingConv) {
       {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0}, {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_GS_0},
       {CallingConv::AMDGPU_VS, mmSPI_SHADER_USER_DATA_VS_0}, {CallingConv::AMDGPU_CS, mmCOMPUTE_PGM_RSRC1}};
   static const ArrayMap shaderTableGfx9 = {
-      {CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0}, {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_LS_0},
+      {CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0}, {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_HS_0},
       {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0}, {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_ES_0},
       {CallingConv::AMDGPU_VS, mmSPI_SHADER_USER_DATA_VS_0}, {CallingConv::AMDGPU_CS, mmCOMPUTE_USER_DATA_0}};
 

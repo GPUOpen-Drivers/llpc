@@ -122,6 +122,7 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
   argTys.push_back(Type::getInt32Ty(*m_context)); // Step rate
   argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
 
+  appendVertexFetchTypes(argTys);
   return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
 }
 
@@ -266,6 +267,8 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   Value *relVertexId = (arg + 3);
   Value *stepRate = (arg + 4);
   Value *instanceId = (arg + 5);
+  auto vertexFetchesStart = (arg + 6);
+  auto vertexFetchesEnd = entryPoint->arg_end();
 
   args.clear();
   args.push_back(mergeWaveInfo);
@@ -358,8 +361,8 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
       ++lsArgIdx;
     }
 
-    assert(lsArgIdx == lsArgCount); // Must have visit all arguments of LS entry point
-
+    appendArguments(args, vertexFetchesStart, vertexFetchesEnd);
+    lsArgIdx += (vertexFetchesEnd - vertexFetchesStart);
     CallInst::Create(lsEntryPoint, args, "", beginLsBlock);
   }
   BranchInst::Create(endLsBlock, beginLsBlock);
@@ -533,14 +536,7 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
     argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
   }
 
-  if (m_pipelineState->getPalMetadata()->getVertexFetchCount() != 0) {
-    SmallVector<VertexFetchInfo> fetches;
-    m_pipelineState->getPalMetadata()->getVertexFetchInfo(fetches);
-    m_pipelineState->getPalMetadata()->addVertexFetchInfo(fetches);
-    for (const auto &fetchInfo : fetches) {
-      argTys.push_back(fetchInfo.ty);
-    }
-  }
+  appendVertexFetchTypes(argTys);
 
   return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
 }
@@ -732,6 +728,8 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   Value *relVertexId = (arg + 6);
   Value *vsPrimitiveId = (arg + 7);
   Value *instanceId = (arg + 8);
+  auto vertexFetchesStart = (arg + 9);
+  auto vertexFetchesEnd = entryPoint->arg_end();
 
   // Construct ".begines" block
   unsigned spillTableIdx = 0;
@@ -835,13 +833,8 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
       }
     }
 
-    // Add the vertex attributes that are loaded by the fetch shader.
-    for (unsigned argOffset = 9; (esArgIdx != esArgCount); ++argOffset) {
-      assert(arg + argOffset != entryPoint->arg_end());
-      args.push_back((arg + argOffset));
-      ++esArgIdx;
-    }
-
+    appendArguments(args, vertexFetchesStart, vertexFetchesEnd);
+    esArgIdx += (vertexFetchesEnd - vertexFetchesStart);
     CallInst::Create(esEntryPoint, args, "", beginEsBlock);
   }
   BranchInst::Create(endEsBlock, beginEsBlock);
@@ -995,4 +988,31 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   ReturnInst::Create(*m_context, endGsBlock);
 
   return entryPoint;
+}
+
+// =====================================================================================================================
+// Appends the type for each of the vertex fetches found in the PAL metadata.
+//
+// @param [in/out] argTys : The vector to which the type will be appended.
+void ShaderMerger::appendVertexFetchTypes(std::vector<Type *> &argTys) const {
+  if (m_pipelineState->getPalMetadata()->getVertexFetchCount() != 0) {
+    SmallVector<VertexFetchInfo> fetches;
+    m_pipelineState->getPalMetadata()->getVertexFetchInfo(fetches);
+    m_pipelineState->getPalMetadata()->addVertexFetchInfo(fetches);
+    for (const auto &fetchInfo : fetches) {
+      argTys.push_back(fetchInfo.ty);
+    }
+  }
+}
+
+// =====================================================================================================================
+// Appends the arguments in the range [begin,end) to the vector.
+//
+// @param [in/out] args : The vector to which the arguments will be appends.
+// @param begin : The start of the argument to add.
+// @param end : One past the last argument to add.
+void ShaderMerger::appendArguments(std::vector<Value *> &args, Argument *begin, Argument *end) const {
+  for (auto &fetch : make_range(begin, end)) {
+    args.push_back(&fetch);
+  }
 }
