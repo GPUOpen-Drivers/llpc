@@ -221,7 +221,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   passMgr.add(createForceFunctionAttrsLegacyPass());
   passMgr.add(createIPSCCPPass());
   passMgr.add(createInstructionCombiningPass(1));
-  passMgr.add(createPatchPeepholeOpt());
   passMgr.add(createInstSimplifyLegacyPass());
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createSROAPass());
@@ -243,14 +242,12 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   passMgr.add(createLoopIdiomPass());
   passMgr.add(createLoopDeletionPass());
   passMgr.add(createSimpleLoopUnrollPass(cl::OptLevel));
-  passMgr.add(createPatchPeepholeOpt());
   passMgr.add(createScalarizerPass());
   passMgr.add(createPatchLoadScalarizer());
   passMgr.add(createInstSimplifyLegacyPass());
   passMgr.add(createNewGVNPass());
   passMgr.add(createBitTrackingDCEPass());
   passMgr.add(createInstructionCombiningPass(1));
-  passMgr.add(createPatchPeepholeOpt());
   passMgr.add(createCorrelatedValuePropagationPass());
   passMgr.add(createAggressiveDCEPass());
   passMgr.add(createCFGSimplificationPass());
@@ -261,7 +258,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
                                               .convertSwitchToLookupTable(true)
                                               .needCanonicalLoops(true)
                                               .sinkCommonInsts(true)));
-  passMgr.add(createPatchPeepholeOpt());
   passMgr.add(createLoopUnrollPass(cl::OptLevel));
   // uses DivergenceAnalysis
   passMgr.add(createPatchReadFirstLane());

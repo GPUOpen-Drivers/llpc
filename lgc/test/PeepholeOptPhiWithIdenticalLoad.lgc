@@ -2,7 +2,10 @@
 
 ; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-peephole-opt -o - - <%s 2>&1 | FileCheck --check-prefixes=CHECK %s
 
-; CHECK: %{{[0-9]+}} = phi i32 [ %.load1, %.block3 ], [ %.load0, %.block0 ]
+; CHECK: [[LOAD:%[0-9a-z]*]] = load i32, i32 addrspace(3)* @lds, align 16
+; CHECK: [[PHI:%[0-9a-z]*]] = phi i32 [ [[LOAD]], %.entry ], [ [[INC:%[0-9a-z]*]], %.block2 ]
+; CHECK: .block2:
+; CHECK-NEXT: [[INC]] = add i32 [[PHI]], 1
 
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
 target triple = "amdgcn--amdpal"
@@ -12,28 +15,28 @@ target triple = "amdgcn--amdpal"
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !spirv.ExecutionModel !0 !lgc.shaderstage !0 {
 .entry:
-  %.load0 = load i32, i32 addrspace(3)* @lds, align 16
+  %load0 = load i32, i32 addrspace(3)* @lds, align 16
   br label %.block0
 
-.block0:                                                ; preds = %.entry
-  store i32 0 , i32 addrspace(3)* @lds, align 16
+.block0:                                          ; preds = %.entry
+  store i32 0, i32 addrspace(3)* @lds, align 16
   br label %.block1
 
-.block1:                                                ; preds = %.block0, %.block3
-  %0 = phi i32 [%.load1, %.block3], [%.load0, %.block0]
-  %1 = icmp uge i32 %0, 1
-  br i1 %1, label %.block2, label %.exit
+.block1:                                          ; preds = %.block3, %.block0
+  %i = phi i32 [ %load1, %.block3 ], [ %load0, %.block0 ]
+  %i1 = icmp uge i32 %i, 1
+  br i1 %i1, label %.block2, label %.exit
 
-.block2:                                                ; preds = %.block1
-  %2 = add i32 %0, 1
-  store i32 %2 , i32 addrspace(3)* @lds, align 16
+.block2:                                          ; preds = %.block1
+  %i2 = add i32 %i, 1
+  store i32 %i2, i32 addrspace(3)* @lds, align 16
   br label %.block3
 
-.block3:                                                ; preds = %.block2
-  %.load1 = load i32, i32 addrspace(3)* @lds, align 16
+.block3:                                          ; preds = %.block2
+  %load1 = load i32, i32 addrspace(3)* @lds, align 16
   br label %.block1
 
-.exit:                                                  ; preds = %.block1
+.exit:                                            ; preds = %.block1
   ret void
 }
 
