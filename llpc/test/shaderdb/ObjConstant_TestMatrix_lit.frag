@@ -25,7 +25,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: @{{.*}} = {{.*}} addrspace(4) constant [4 x <4 x float>] zeroinitializer
-; SHADERTEST: getelementptr [4 x <4 x float>], [4 x <4 x float>] addrspace(4)* @{{.*}}, i64 0, i64 %{{[0-9]*}}
+; SHADERTEST: getelementptr [4 x <4 x float>], [4 x <4 x float>] addrspace(4)* @{{.*}}, i64 0, i64 %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

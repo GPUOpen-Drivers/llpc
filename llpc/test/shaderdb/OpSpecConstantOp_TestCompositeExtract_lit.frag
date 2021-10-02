@@ -16,7 +16,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: insertelement <4 x float> %{{[0-9]*}}, float %{{[0-9]*}}
+; SHADERTEST: insertelement <4 x float> %{{[^, ]+}}, float %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

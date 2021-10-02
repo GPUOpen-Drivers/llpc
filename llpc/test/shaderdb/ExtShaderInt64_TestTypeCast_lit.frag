@@ -37,17 +37,17 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: fptosi <3 x float> %{{[0-9]*}} to <3 x i64>
-; SHADERTEST: fptosi <3 x double> %{{[0-9]*}} to <3 x i64>
-; SHADERTEST: fptoui <3 x float> %{{[0-9]*}} to <3 x i64>
-; SHADERTEST: fptoui <3 x double> %{{[0-9]*}} to <3 x i64>
-; SHADERTEST: sitofp <3 x i64> %{{[0-9]*}} to <3 x float>
-; SHADERTEST: uitofp <3 x i64> %{{[0-9]*}} to <3 x float>
-; SHADERTEST: sitofp <3 x i64> %{{[0-9]*}} to <3 x double>
-; SHADERTEST: uitofp <3 x i64> %{{[0-9]*}} to <3 x double>
-; SHADERTEST: trunc <3 x i64> %{{[0-9]*}} to <3 x i32>
-; SHADERTEST: sext <3 x i32> %{{[0-9]*}} to <3 x i64>
-; SHADERTEST: zext <3 x i32> %{{[0-9]*}} to <3 x i64>
+; SHADERTEST: fptosi <3 x float> %{{[^ ]+}} to <3 x i64>
+; SHADERTEST: fptosi <3 x double> %{{[^ ]+}} to <3 x i64>
+; SHADERTEST: fptoui <3 x float> %{{[^ ]+}} to <3 x i64>
+; SHADERTEST: fptoui <3 x double> %{{[^ ]+}} to <3 x i64>
+; SHADERTEST: sitofp <3 x i64> %{{[^ ]+}} to <3 x float>
+; SHADERTEST: uitofp <3 x i64> %{{[^ ]+}} to <3 x float>
+; SHADERTEST: sitofp <3 x i64> %{{[^ ]+}} to <3 x double>
+; SHADERTEST: uitofp <3 x i64> %{{[^ ]+}} to <3 x double>
+; SHADERTEST: trunc <3 x i64> %{{[^ ]+}} to <3 x i32>
+; SHADERTEST: sext <3 x i32> %{{[^ ]+}} to <3 x i64>
+; SHADERTEST: zext <3 x i32> %{{[^ ]+}} to <3 x i64>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

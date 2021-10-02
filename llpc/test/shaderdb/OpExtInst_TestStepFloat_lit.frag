@@ -23,9 +23,9 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = fcmp reassoc nnan nsz arcp contract afn olt <3 x float>
-; SHADERTEST: = select reassoc nnan nsz arcp contract afn <3 x i1> %{{.*}}, <3 x float> zeroinitializer, <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
+; SHADERTEST: = select reassoc nnan nsz arcp contract afn <3 x i1> %{{[^, ]+}}, <3 x float> zeroinitializer, <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
 ; SHADERTEST: = fcmp reassoc nnan nsz arcp contract afn olt <4 x float>
-; SHADERTEST: = select reassoc nnan nsz arcp contract afn <4 x i1> %{{.*}}, <4 x float> zeroinitializer, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
+; SHADERTEST: = select reassoc nnan nsz arcp contract afn <4 x i1> %{{[^, ]+}}, <4 x float> zeroinitializer, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

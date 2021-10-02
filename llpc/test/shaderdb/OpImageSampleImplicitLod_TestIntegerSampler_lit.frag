@@ -16,8 +16,8 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call <4 x i32> (...) @lgc.create.image.sample.v4i32(i32 1, i32 4, <8 x i32> %{{[-0-9A-Za0z_.]+}}, <4 x i32> %{{[-0-9A-Za0z_.]+}}, i32 1, <2 x float> <float 0.000000e+00, float 1.000000e+00>)
-; SHADERTEST: call <4 x i32> (...) @lgc.create.image.sample.v4i32(i32 1, i32 0, <8 x i32> %{{[-0-9A-Za0z_.]+}}, <4 x i32> %{{[-0-9A-Za0z_.]+}}, i32 1, <2 x float> <float 0.000000e+00, float 1.000000e+00>)
+; SHADERTEST: call <4 x i32> (...) @lgc.create.image.sample.v4i32(i32 1, i32 4, <8 x i32> %{{[^, ]+}}, <4 x i32> %{{[^, ]+}}, i32 1, <2 x float> <float 0.000000e+00, float 1.000000e+00>)
+; SHADERTEST: call <4 x i32> (...) @lgc.create.image.sample.v4i32(i32 1, i32 0, <8 x i32> %{{[^, ]+}}, <4 x i32> %{{[^, ]+}}, i32 1, <2 x float> <float 0.000000e+00, float 1.000000e+00>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
@@ -26,12 +26,12 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4i32(i32 1, i32 0, {{.*}}, {{.*}}, i32 1, <2 x float> <float 0.000000e+00, float 1.000000e+00>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: call <4 x i32> @llvm.amdgcn.image.sample.2d.v4i32.f32(i32 15, float 0.000000e+00, float 1.000000e+00, <8 x i32> %{{[-0-9A-Za0z_.]+}}, <4 x i32> %{{[-0-9A-Za0z_.]+}}, i1 false, i32 0, i32 0)
-; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: call <4 x i32> @llvm.amdgcn.image.sample.2d.v4i32.f32(i32 15, float 0.000000e+00, float 1.000000e+00, <8 x i32> %{{[-0-9A-Za0z_.]+}}, <4 x i32> %{{[-0-9A-Za0z_.]+}}, i1 false, i32 0, i32 0)
+; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: call <4 x i32> @llvm.amdgcn.image.sample.2d.v4i32.f32(i32 15, float 0.000000e+00, float 1.000000e+00, <8 x i32> %{{[^, ]+}}, <4 x i32> %{{[^, ]+}}, i1 false, i32 0, i32 0)
+; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: call <4 x i32> @llvm.amdgcn.image.sample.2d.v4i32.f32(i32 15, float 0.000000e+00, float 1.000000e+00, <8 x i32> %{{[^, ]+}}, <4 x i32> %{{[^, ]+}}, i1 false, i32 0, i32 0)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

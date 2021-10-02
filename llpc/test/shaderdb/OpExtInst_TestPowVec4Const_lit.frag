@@ -15,7 +15,7 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.power.v4f32(<4 x float>
-; SHADERTEST: store float 1.200000e+01, float addrspace(5)* %{{.*}}
+; SHADERTEST: store float 1.200000e+01, float addrspace(5)* %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.pow.v4f32(<4 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results

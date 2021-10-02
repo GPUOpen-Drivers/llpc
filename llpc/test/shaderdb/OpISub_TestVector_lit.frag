@@ -20,11 +20,11 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = sub <3 x i32> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = sub <2 x i32> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: %{{[^ ]+}} = sub <3 x i32> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = sub <2 x i32> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: sub i32 %{{.*}}, %{{.*}}
+; SHADERTEST: sub i32 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

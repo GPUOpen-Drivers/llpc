@@ -19,18 +19,18 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: add i32 %{{[0-9]*}}, 1
-; SHADERTEST: getelementptr [4 x <4 x float>], [4 x <4 x float>] addrspace({{.*}})* %{{.*}}, i32 0, i32 %{{[0-9]*}}, i32 %{{[0-9]*}}
-; SHADERTEST: load i32, i32 addrspace({{.*}})* %{{[0-9]*}}
+; SHADERTEST: add i32 %{{[^, ]+}}, 1
+; SHADERTEST: getelementptr [4 x <4 x float>], [4 x <4 x float>] addrspace({{.*}})* %{{[^, ]+}}, i32 0, i32 %{{[^, ]+}}, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: load i32, i32 addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
 
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 1
-; SHADERTEST: select i1 %{{[0-9]*}}, float addrspace({{.*}})* %{{.*}}, float addrspace({{.*}})* %{{.*}}
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 2
-; SHADERTEST: select i1 %{{[0-9]*}}, float addrspace({{.*}})* %{{.*}}, float addrspace({{.*}})* %{{[0-9]*}}
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 3
-; SHADERTEST: select i1 %{{[0-9]*}}, float addrspace({{.*}})* %{{.*}}, float addrspace({{.*}})* %{{[0-9]*}}
-; SHADERTEST: store float %{{[0-9]*}}, float addrspace({{.*}})* %{{[0-9]*}}
-; SHADERTEST: store float 0x3FD99999A0000000, float addrspace({{.*}})* %{{.*}}
+; SHADERTEST: icmp eq i32 %{{[^, ]+}}, 1
+; SHADERTEST: select i1 %{{[^, ]+}}, float addrspace({{.*}})* %{{[^, ]+}}, float addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp eq i32 %{{[^, ]+}}, 2
+; SHADERTEST: select i1 %{{[^, ]+}}, float addrspace({{.*}})* %{{[^, ]+}}, float addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp eq i32 %{{[^, ]+}}, 3
+; SHADERTEST: select i1 %{{[^, ]+}}, float addrspace({{.*}})* %{{[^, ]+}}, float addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: store float %{{[^, ]+}}, float addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: store float 0x3FD99999A0000000, float addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

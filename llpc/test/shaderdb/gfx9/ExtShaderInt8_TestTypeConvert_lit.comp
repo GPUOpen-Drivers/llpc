@@ -82,18 +82,18 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: fptosi half %{{[0-9]*}} to i8
-; SHADERTEST: fptosi float %{{[0-9]*}} to i8
-; SHADERTEST: fptosi double %{{[0-9]*}} to i8
-; SHADERTEST: fptoui half %{{[0-9]*}} to i8
-; SHADERTEST: fptoui float %{{[0-9]*}} to i8
-; SHADERTEST: fptoui double %{{[0-9]*}} to i8
-; SHADERTEST: sitofp i8 %{{[0-9]*}} to half
-; SHADERTEST: sitofp i8 %{{[0-9]*}} to float
-; SHADERTEST: sitofp i8 %{{[0-9]*}} to double
-; SHADERTEST: uitofp i8 %{{[0-9]*}} to half
-; SHADERTEST: uitofp i8 %{{[0-9]*}} to float
-; SHADERTEST: uitofp i8 %{{[0-9]*}} to double
+; SHADERTEST: fptosi half %{{[^ ]+}} to i8
+; SHADERTEST: fptosi float %{{[^ ]+}} to i8
+; SHADERTEST: fptosi double %{{[^ ]+}} to i8
+; SHADERTEST: fptoui half %{{[^ ]+}} to i8
+; SHADERTEST: fptoui float %{{[^ ]+}} to i8
+; SHADERTEST: fptoui double %{{[^ ]+}} to i8
+; SHADERTEST: sitofp i8 %{{[^ ]+}} to half
+; SHADERTEST: sitofp i8 %{{[^ ]+}} to float
+; SHADERTEST: sitofp i8 %{{[^ ]+}} to double
+; SHADERTEST: uitofp i8 %{{[^ ]+}} to half
+; SHADERTEST: uitofp i8 %{{[^ ]+}} to float
+; SHADERTEST: uitofp i8 %{{[^ ]+}} to double
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -25,13 +25,13 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[LDS:[^ ]*]] = addrspace(3) global { i32, [16 x i32] }
-; SHADERTEST: store i32 %{{[0-9]*}}, i32 addrspace(3)* getelementptr inbounds ({ i32, [16 x i32] }, { i32, [16 x i32] } addrspace(3)* @[[LDS]], i32 0, i32 0)
-; SHADERTEST: %{{[0-9]*}} = load i32, i32 addrspace(3)* getelementptr inbounds ({ i32, [16 x i32] }, { i32, [16 x i32] } addrspace(3)* @[[LDS]], i32 0, i32 0)
+; SHADERTEST: store i32 %{{[^, ]+}}, i32 addrspace(3)* getelementptr inbounds ({ i32, [16 x i32] }, { i32, [16 x i32] } addrspace(3)* @[[LDS]], i32 0, i32 0)
+; SHADERTEST: %{{[^ ]+}} = load i32, i32 addrspace(3)* getelementptr inbounds ({ i32, [16 x i32] }, { i32, [16 x i32] } addrspace(3)* @[[LDS]], i32 0, i32 0)
 
-; SHADERTEST: %{{[0-9]*}} = getelementptr { i32, [16 x i32] }, { i32, [16 x i32] } addrspace(3)* @[[LDS]], i32 0, i32 1, i32 %{{[0-9]*}}
-; SHADERTEST: store i32 %{{[0-9]*}}, i32 addrspace(3)* %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = getelementptr { i32, [16 x i32] }, { i32, [16 x i32] } addrspace(3)* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = load i32, i32 addrspace(3)* %{{[0-9]*}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr { i32, [16 x i32] }, { i32, [16 x i32] } addrspace(3)* @[[LDS]], i32 0, i32 1, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: store i32 %{{[^, ]+}}, i32 addrspace(3)* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr { i32, [16 x i32] }, { i32, [16 x i32] } addrspace(3)* @{{.*}}, i32 0, i32 1, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = load i32, i32 addrspace(3)* %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

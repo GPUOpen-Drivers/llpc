@@ -23,11 +23,11 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.tan.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.tan.v3f32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn <3 x float> @llvm.sin.v3f32(<3 x float>
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn <3 x float> @llvm.cos.v3f32(<3 x float>
-; SHADERTEST: %{{[0-9]*}} = fdiv reassoc nnan nsz arcp contract afn <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>,
-; SHADERTEST: %{{[0-9]*}} = fmul reassoc nnan nsz arcp contract afn <3 x float>
-; SHADERTEST: %{{[0-9]*}} = fcmp {{[ou]}}ne float %{{.*}}, %{{.*}}
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn <3 x float> @llvm.sin.v3f32(<3 x float>
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn <3 x float> @llvm.cos.v3f32(<3 x float>
+; SHADERTEST: %{{[^ ]+}} = fdiv reassoc nnan nsz arcp contract afn <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>,
+; SHADERTEST: %{{[^ ]+}} = fmul reassoc nnan nsz arcp contract afn <3 x float>
+; SHADERTEST: %{{[^ ]+}} = fcmp {{[ou]}}ne float %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

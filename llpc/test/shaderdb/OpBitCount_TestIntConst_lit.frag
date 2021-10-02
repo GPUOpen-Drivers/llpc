@@ -12,7 +12,7 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
 ; SHADERTEST: call i32 @llvm.ctpop.i32
-; SHADERTEST: add nuw nsw i32 %{{[0-9*]}}, 2
+; SHADERTEST: add nuw nsw i32 %{{[^, ]+}}, 2
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

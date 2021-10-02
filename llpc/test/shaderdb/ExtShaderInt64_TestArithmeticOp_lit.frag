@@ -34,17 +34,17 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: add <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: sub <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: mul <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: udiv <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: urem <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: add i64 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: sub i64 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: mul i64 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: sdiv i64 %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: add <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: sub <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: mul <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: udiv <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: urem <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: add i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: sub i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: mul i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: sdiv i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: call i64 (...) @lgc.create.smod.i64(i64
-; SHADERTEST: sub nsw i64 0, %{{[0-9]*}}
+; SHADERTEST: sub nsw i64 0, %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

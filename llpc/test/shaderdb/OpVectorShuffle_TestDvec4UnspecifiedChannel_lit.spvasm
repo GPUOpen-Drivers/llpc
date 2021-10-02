@@ -2,18 +2,18 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{.*}} = extractelement <4 x double> %{{.*}}, i32 -5
-; SHADERTEST: %{{.*}} = insertelement <2 x double> %{{.*}}, double %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = extractelement <2 x double> %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = insertelement <4 x double> undef, double %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = extractelement <2 x double> %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = insertelement <4 x double> %{{.*}}, double %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = extractelement <4 x double> %{{.*}}, i32 2
-; SHADERTEST: %{{.*}} = insertelement <4 x double> %{{.*}}, double %{{.*}}, i32 2
-; SHADERTEST: %{{.*}} = extractelement <4 x double> %{{.*}}, i32 3
-; SHADERTEST: %{{.*}} = insertelement <4 x double> %{{.*}}, double %{{.*}}, i32 3
+; SHADERTEST: %{{[^ ]+}} = extractelement <4 x double> %{{[^, ]+}}, i32 -5
+; SHADERTEST: %{{[^ ]+}} = insertelement <2 x double> %{{[^, ]+}}, double %{{[^, ]+}}, i32 1
+; SHADERTEST: %{{[^ ]+}} = extractelement <2 x double> %{{[^, ]+}}, i32 0
+; SHADERTEST: %{{[^ ]+}} = insertelement <4 x double> undef, double %{{[^, ]+}}, i32 0
+; SHADERTEST: %{{[^ ]+}} = extractelement <2 x double> %{{[^, ]+}}, i32 1
+; SHADERTEST: %{{[^ ]+}} = insertelement <4 x double> %{{[^, ]+}}, double %{{[^, ]+}}, i32 1
+; SHADERTEST: %{{[^ ]+}} = extractelement <4 x double> %{{[^, ]+}}, i32 2
+; SHADERTEST: %{{[^ ]+}} = insertelement <4 x double> %{{[^, ]+}}, double %{{[^, ]+}}, i32 2
+; SHADERTEST: %{{[^ ]+}} = extractelement <4 x double> %{{[^, ]+}}, i32 3
+; SHADERTEST: %{{[^ ]+}} = insertelement <4 x double> %{{[^, ]+}}, double %{{[^, ]+}}, i32 3
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{.*}} = shufflevector <4 x double> %{{.*}}, <4 x double> undef, <4 x i32> <i32 3, i32 undef, i32 2, i32 3>
+; SHADERTEST: %{{[^ ]+}} = shufflevector <4 x double> %{{[^, ]+}}, <4 x double> undef, <4 x i32> <i32 3, i32 undef, i32 2, i32 3>
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

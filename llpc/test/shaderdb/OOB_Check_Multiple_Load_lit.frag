@@ -9,24 +9,24 @@
 ; SHADERTEST: .[[entry:[a-z0-9]+]]:
 ; SHADERTEST: %[[arr:[0-9]+]] = alloca <4 x float>, align 16, addrspace(5)
 ; SHADERTEST: load i32, i32 addrspace(7)* getelementptr inbounds (<{ i32 }>, <{ i32 }> addrspace(7)* @0, i32 0, i32 0), align 4
-; SHADERTEST: %[[idx1:[0-9]+]] = add i32 %{{.*}}, 1
+; SHADERTEST: %[[idx1:[0-9]+]] = add i32 %{{[^, ]+}}, 1
 ; SHADERTEST: %[[gep1:[0-9]+]] = getelementptr <4 x float>, <4 x float> addrspace(5)* %[[arr]], i32 0, i32 %[[idx1]]
 ; SHADERTEST-NEXT: %[[cmp1:[0-9]+]] = icmp ult i32 %[[idx1]], 4
-; SHADERTEST-NEXT: br i1 %[[cmp1]], label %{{.*}}, label %{{.*}}
+; SHADERTEST-NEXT: br i1 %[[cmp1]], label %{{[^, ]+}}, label %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: [[load1:[a-z0-9]+]]:
 ; SHADERTEST: %[[loadResult1:[0-9]+]] = load float, float addrspace(5)* %[[gep1]], align 4
 ; SHADERTEST: [[final1:[a-z0-9]+]]:
-; SHADERTEST: %{{.*}} = phi float [ 0.000000e+00, %.[[entry]] ], [ %[[loadResult1]], %[[load1]] ]
-; SHADERTEST: store float %{{.*}}, float addrspace(5)* %{{.*}}, align 4
+; SHADERTEST: %{{[^ ]+}} = phi float [ 0.000000e+00, %.[[entry]] ], [ %[[loadResult1]], %[[load1]] ]
+; SHADERTEST: store float %{{[^, ]+}}, float addrspace(5)* %{{[^, ]+}}, align 4
 ; SHADERTEST: load i32, i32 addrspace(7)* getelementptr inbounds (<{ i32 }>, <{ i32 }> addrspace(7)* @0, i32 0, i32 0), align 4
-; SHADERTEST: %[[idx2:[0-9]+]] = add i32 %{{.*}}, 2
+; SHADERTEST: %[[idx2:[0-9]+]] = add i32 %{{[^, ]+}}, 2
 ; SHADERTEST: %[[gep2:[0-9]+]] = getelementptr <4 x float>, <4 x float> addrspace(5)* %[[arr]], i32 0, i32 %[[idx2]]
 ; SHADERTEST-NEXT: %[[cmp2:[0-9]+]] = icmp ult i32 %[[idx2]], 4
-; SHADERTEST-NEXT: br i1 %[[cmp2]], label %{{.*}}, label %{{.*}}
+; SHADERTEST-NEXT: br i1 %[[cmp2]], label %{{[^, ]+}}, label %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: [[load2:[a-z0-9]+]]:
 ; SHADERTEST: %[[loadResult2:[0-9]+]] = load float, float addrspace(5)* %[[gep2]], align 4
 ; SHADERTEST: [[final2:[a-z0-9]+]]:
-; SHADERTEST: %{{.*}} = phi float [ 0.000000e+00, %[[final1]] ], [ %[[loadResult2]], %[[load2]] ]
+; SHADERTEST: %{{[^ ]+}} = phi float [ 0.000000e+00, %[[final1]] ], [ %[[loadResult2]], %[[load2]] ]
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -1,10 +1,10 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: store float -0.000000e+00, float addrspace(7)* %{{[0-9]*}}
+; SHADERTEST: store float -0.000000e+00, float addrspace(7)* %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: store float -0.000000e+00, float addrspace(7)* %{{[0-9]*}}
+; SHADERTEST: store float -0.000000e+00, float addrspace(7)* %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32

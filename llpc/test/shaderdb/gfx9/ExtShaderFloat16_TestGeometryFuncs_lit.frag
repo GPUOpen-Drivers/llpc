@@ -73,9 +73,9 @@ void main()
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.sqrt.f16(half
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<4 x half>
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.sqrt.f16(half
-; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<3 x half> %{{.*}}, <3 x half> %{{.*}})
-; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<4 x half> %{{.*}}, <4 x half> %{{.*}})
-; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<2 x half> %{{.*}}, <2 x half> %{{.*}})
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<3 x half> %{{[^, ]+}}, <3 x half> %{{[^) ]+}})
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<4 x half> %{{[^, ]+}}, <4 x half> %{{[^) ]+}})
+; SHADERTEST: = call {{.*}} half (...) @lgc.create.dot.product.f16(<2 x half> %{{[^, ]+}}, <2 x half> %{{[^) ]+}})
 ; SHADERTEST: = call {{.*}} <3 x half> (...) @lgc.create.cross.product.v3f16(<3 x half>
 ; SHADERTEST: = call {{.*}} half (...) @lgc.create.normalize.vector.f16(half
 ; SHADERTEST: = call {{.*}} <2 x half> (...) @lgc.create.normalize.vector.v2f16(<2 x half>

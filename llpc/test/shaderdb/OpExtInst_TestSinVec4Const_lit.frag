@@ -17,10 +17,10 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.sin.v4f32(
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.sin.f32(float %{{.*}})
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.sin.f32(float %{{.*}})
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.sin.f32(float %{{.*}})
-; SHADERTEST-NOT: = call{{.*}} float @llvm.sin.f32(float %{{.*}})
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.sin.f32(float %{{[^) ]+}})
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.sin.f32(float %{{[^) ]+}})
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.sin.f32(float %{{[^) ]+}})
+; SHADERTEST-NOT: = call{{.*}} float @llvm.sin.f32(float %{{[^) ]+}})
 ; SHADERTEST: ret
 ; SHADERTEST: AMDLLPC SUCCESS
 */

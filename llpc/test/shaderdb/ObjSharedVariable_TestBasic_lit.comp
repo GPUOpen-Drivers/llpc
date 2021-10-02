@@ -23,8 +23,8 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[LDS:[^ ]*]] = addrspace(3) global <4 x float> undef
-; SHADERTEST: store <4 x float> %{{[0-9]*}}, <4 x float> addrspace(3)* @[[LDS]]
-; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(3)* @[[LDS]]
+; SHADERTEST: store <4 x float> %{{[^, ]+}}, <4 x float> addrspace(3)* @[[LDS]]
+; SHADERTEST: %{{[^ ]+}} = load <4 x float>, <4 x float> addrspace(3)* @[[LDS]]
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

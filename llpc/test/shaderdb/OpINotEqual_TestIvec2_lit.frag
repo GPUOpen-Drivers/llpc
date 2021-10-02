@@ -15,10 +15,10 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = icmp ne <2 x i32> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: %{{[^ ]+}} = icmp ne <2 x i32> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: icmp ne i32 %{{.*}}, %{{.*}}
+; SHADERTEST: icmp ne i32 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

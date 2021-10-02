@@ -2,10 +2,10 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call i64 (...) @lgc.create.read.generic.input.i64(i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
-; SHADERTEST: call void (...) @lgc.create.write.generic.output(i64 %{{[0-9]*}}, i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
-; SHADERTEST: %{{[0-9]*}} = call i64 (...) @lgc.create.read.generic.input.i64(i32 1, i32 0, i32 0, i32 0, i32 17, i32 undef)
-; SHADERTEST: inttoptr i64 %{{[0-9]*}} to <{ [4294967295 x [4 x float]] }> addrspace(1)*
+; SHADERTEST: %{{[^ ]+}} = call i64 (...) @lgc.create.read.generic.input.i64(i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
+; SHADERTEST: call void (...) @lgc.create.write.generic.output(i64 %{{[^, ]+}}, i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
+; SHADERTEST: %{{[^ ]+}} = call i64 (...) @lgc.create.read.generic.input.i64(i32 1, i32 0, i32 0, i32 0, i32 17, i32 undef)
+; SHADERTEST: inttoptr i64 %{{[^ ]+}} to <{ [4294967295 x [4 x float]] }> addrspace(1)*
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

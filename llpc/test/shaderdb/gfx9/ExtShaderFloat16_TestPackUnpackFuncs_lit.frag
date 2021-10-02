@@ -20,8 +20,8 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = load <2 x half>, <2 x half> addrspace(7)* %{{[0-9]*}}, align 4
-; SHADERTEST: store <2 x half> %{{[0-9]*}}, <2 x half> addrspace(7)* %{{[0-9]*}}, align 4
+; SHADERTEST: %{{[^ ]+}} = load <2 x half>, <2 x half> addrspace(7)* %{{[^, ]+}}, align 4
+; SHADERTEST: store <2 x half> %{{[^, ]+}}, <2 x half> addrspace(7)* %{{[^, ]+}}, align 4
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */

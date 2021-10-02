@@ -20,10 +20,10 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[LDS:[^ ]*]] = addrspace(3) global [16 x i32] undef
-; SHADERTEST: %{{[0-9]*}} = getelementptr [16 x i32], [16 x i32] addrspace(3)* @[[LDS]], i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: store i32 %{{[0-9]*}}, i32 addrspace(3)* %{{[0-9]*}}
-; SHADERTEST: store i32 %{{[0-9]*}}, i32 addrspace(3)* getelementptr inbounds ([16 x i32], [16 x i32] addrspace(3)* @[[LDS]], i32 0, i32 3)
-; SHADERTEST: %{{[0-9]*}} = load i32, i32 addrspace(3)* getelementptr inbounds ([16 x i32], [16 x i32] addrspace(3)* @[[LDS]], i32 0, i32 4)
+; SHADERTEST: %{{[^ ]+}} = getelementptr [16 x i32], [16 x i32] addrspace(3)* @[[LDS]], i32 0, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: store i32 %{{[^, ]+}}, i32 addrspace(3)* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: store i32 %{{[^, ]+}}, i32 addrspace(3)* getelementptr inbounds ([16 x i32], [16 x i32] addrspace(3)* @[[LDS]], i32 0, i32 3)
+; SHADERTEST: %{{[^ ]+}} = load i32, i32 addrspace(3)* getelementptr inbounds ([16 x i32], [16 x i32] addrspace(3)* @[[LDS]], i32 0, i32 4)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

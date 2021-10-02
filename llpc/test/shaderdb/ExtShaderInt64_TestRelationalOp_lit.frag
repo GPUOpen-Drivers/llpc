@@ -33,18 +33,18 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: icmp eq <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp ne <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp uge <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp ule <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp ugt <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp ult <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp eq i64 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp ne i64 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp sge i64 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp sle i64 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp sgt i64 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp slt i64 %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: icmp eq <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp ne <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp uge <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp ule <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp ugt <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp ult <3 x i64> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp eq i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp ne i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp sge i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp sle i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp sgt i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp slt i64 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

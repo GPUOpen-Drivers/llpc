@@ -17,7 +17,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = bitcast double %{{.*}} to <2 x i32>
+; SHADERTEST: = bitcast double %{{[^ ]+}} to <2 x i32>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

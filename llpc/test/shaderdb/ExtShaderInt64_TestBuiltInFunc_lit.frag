@@ -47,22 +47,22 @@ void main()
 ; SHADERTEST: = call <3 x i64> (...) @lgc.create.sabs.v3i64(<3 x i64>
 ; SHADERTEST: call <3 x i64> (...) @lgc.create.ssign.v3i64(<3 x i64>
 
-; SHADERTEST: = call <3 x i64> @llvm.umin.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
+; SHADERTEST: = call <3 x i64> @llvm.umin.v3i64(<3 x i64> %{{[^, ]+}}, <3 x i64> %{{[^) ]+}})
 
-; SHADERTEST: = call <3 x i64> @llvm.smin.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
+; SHADERTEST: = call <3 x i64> @llvm.smin.v3i64(<3 x i64> %{{[^, ]+}}, <3 x i64> %{{[^) ]+}})
 
-; SHADERTEST: = call <3 x i64> @llvm.umax.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
+; SHADERTEST: = call <3 x i64> @llvm.umax.v3i64(<3 x i64> %{{[^, ]+}}, <3 x i64> %{{[^) ]+}})
 
-; SHADERTEST: = call <3 x i64> @llvm.smax.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
+; SHADERTEST: = call <3 x i64> @llvm.smax.v3i64(<3 x i64> %{{[^, ]+}}, <3 x i64> %{{[^) ]+}})
 
-; SHADERTEST:  %[[UCLAMPMAX:.*]] = call <3 x i64> @llvm.umax.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
-; SHADERTEST:  = call <3 x i64> @llvm.umin.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64>  %[[UCLAMPMAX:.*]])
+; SHADERTEST:  %[[UCLAMPMAX:.*]] = call <3 x i64> @llvm.umax.v3i64(<3 x i64> %{{[^, ]+}}, <3 x i64> %{{[^) ]+}})
+; SHADERTEST:  = call <3 x i64> @llvm.umin.v3i64(<3 x i64> %{{[^, ]+}}, <3 x i64>  %[[UCLAMPMAX:.*]])
 
-; SHADERTEST:  %[[SCLAMPMAX:.*]] = call <3 x i64> @llvm.smax.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64> %{{[0-9]*}})
-; SHADERTEST:  = call <3 x i64> @llvm.smin.v3i64(<3 x i64> %{{[0-9]*}}, <3 x i64>  %[[SCLAMPMAX:.*]])
+; SHADERTEST:  %[[SCLAMPMAX:.*]] = call <3 x i64> @llvm.smax.v3i64(<3 x i64> %{{[^, ]+}}, <3 x i64> %{{[^) ]+}})
+; SHADERTEST:  = call <3 x i64> @llvm.smin.v3i64(<3 x i64> %{{[^, ]+}}, <3 x i64>  %[[SCLAMPMAX:.*]])
 
-; SHADERTEST: bitcast <3 x double> %{{[0-9]*}} to <3 x i64>
-; SHADERTEST: bitcast <3 x i64> %{{[0-9]*}} to <3 x double>
+; SHADERTEST: bitcast <3 x double> %{{[^ ]+}} to <3 x i64>
+; SHADERTEST: bitcast <3 x i64> %{{[^ ]+}} to <3 x double>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: AMDLLPC SUCCESS

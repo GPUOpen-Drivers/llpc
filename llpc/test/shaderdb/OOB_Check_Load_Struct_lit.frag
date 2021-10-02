@@ -16,13 +16,13 @@
 ; SHADERTEST: %[[gep:[0-9]+]] = getelementptr [5 x { [10 x <4 x float>], [12 x <4 x float>] }], [5 x { [10 x <4 x float>], [12 x <4 x float>] }] addrspace(5)* %[[arr]], i32 0, i32 %[[idx1]], i32 1, i32 %[[idx2]]
 ; SHADERTEST-NEXT: icmp ult i32 %[[idx1]], 5
 ; SHADERTEST-NEXT: icmp ult i32 %[[idx2]], 12
-; SHADERTEST-NEXT: %[[cmp:[0-9]+]] = and i1 %{{.*}}, %{{.*}}
-; SHADERTEST-NEXT: br i1 %[[cmp]], label %{{.*}}, label %{{.*}}
+; SHADERTEST-NEXT: %[[cmp:[0-9]+]] = and i1 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST-NEXT: br i1 %[[cmp]], label %{{[^, ]+}}, label %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: [[load:[0-9]+]]:
 ; SHADERTEST: %[[loadResult:[0-9]+]] = load <4 x float>, <4 x float> addrspace(5)* %[[gep]], align 16
-; SHADERTEST: br label %{{.*}}
+; SHADERTEST: br label %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: [[final:[0-9]+]]:
-; SHADERTEST: %{{.*}} = phi <4 x float> [ zeroinitializer, %[[parent]] ], [ %[[loadResult]], %[[load]] ]
+; SHADERTEST: %{{[^ ]+}} = phi <4 x float> [ zeroinitializer, %[[parent]] ], [ %[[loadResult]], %[[load]] ]
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

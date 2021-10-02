@@ -23,9 +23,9 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]+}} = call reassoc nnan nsz arcp contract double (...) @lgc.create.dot.product.f64(<3 x double> %{{[0-9]+}}, <3 x double> %{{[0-9]+}})
-; SHADERTEST: %{{[0-9]+}} = call reassoc nnan nsz arcp contract double (...) @lgc.create.dot.product.f64(<4 x double> %{{[0-9]+}}, <4 x double> %{{[0-9]+}})
-; SHADERTEST: %{{[0-9]+}} = call reassoc nnan nsz arcp contract double (...) @lgc.create.dot.product.f64(<2 x double> %{{[0-9]+}}, <2 x double> %{{[0-9]+}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract double (...) @lgc.create.dot.product.f64(<3 x double> %{{[^, ]+}}, <3 x double> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract double (...) @lgc.create.dot.product.f64(<4 x double> %{{[^, ]+}}, <4 x double> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract double (...) @lgc.create.dot.product.f64(<2 x double> %{{[^, ]+}}, <2 x double> %{{[^) ]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

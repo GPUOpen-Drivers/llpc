@@ -20,12 +20,12 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call i32 (...) @lgc.create.smod.i32(i32
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: srem i32 %{{.*}}, 6
-; SHADERTEST-DAG: icmp slt i32 %{{[0-9]*}}, 0
-; SHADERTEST-DAG: icmp ne i32 %{{[0-9]*}}, 0
-; SHADERTEST-DAG: and i1 %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: srem i32 %{{[^, ]+}}, 6
+; SHADERTEST-DAG: icmp slt i32 %{{[^, ]+}}, 0
+; SHADERTEST-DAG: icmp ne i32 %{{[^, ]+}}, 0
+; SHADERTEST-DAG: and i1 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST-DAG: add {{.*}}i32{{.*}} 6
-; SHADERTEST: select i1 %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 %{{[0-9]*}}
+; SHADERTEST: select i1 %{{[^, ]+}}, i32 %{{[^, ]+}}, i32 %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: getelementptr <{ [6 x [4 x float]] }>,
 ; SHADERTEST: AMDLLPC SUCCESS
 */

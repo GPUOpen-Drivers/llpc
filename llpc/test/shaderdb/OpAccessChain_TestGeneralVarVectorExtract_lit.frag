@@ -27,25 +27,25 @@ void main()
 
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: getelementptr <3 x double>, <3 x double> addrspace({{.*}})* %{{.*}}, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr <3 x float>, <3 x float> addrspace({{.*}})* %{{.*}}, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr <3 x float>, <3 x float> addrspace({{.*}})* %{{.*}}, i32 0, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr <3 x double>, <3 x double> addrspace({{.*}})* %{{[^, ]+}}, i32 0, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: getelementptr <3 x float>, <3 x float> addrspace({{.*}})* %{{[^, ]+}}, i32 0, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: getelementptr <3 x float>, <3 x float> addrspace({{.*}})* %{{[^, ]+}}, i32 0, i32 %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: cmp eq i32 %{{[0-9]*}}, 1
-; SHADERTEST: select i1 %{{[0-9]*}}, double addrspace({{.*}})* %{{.*}}, double addrspace({{.*}})* %{{.*}}
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 2
-; SHADERTEST: select i1 %{{[0-9]*}}, double addrspace({{.*}})* %{{.*}}, double addrspace({{.*}})* %{{[0-9]*}}
+; SHADERTEST: cmp eq i32 %{{[^, ]+}}, 1
+; SHADERTEST: select i1 %{{[^, ]+}}, double addrspace({{.*}})* %{{[^, ]+}}, double addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp eq i32 %{{[^, ]+}}, 2
+; SHADERTEST: select i1 %{{[^, ]+}}, double addrspace({{.*}})* %{{[^, ]+}}, double addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
 
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 1
-; SHADERTEST: select i1 %{{[0-9]*}}, float addrspace({{.*}})* %{{.*}}, float addrspace({{.*}})* %{{.*}}
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 2
-; SHADERTEST: select i1 %{{[0-9]*}}, float addrspace({{.*}})* %{{.*}}, float addrspace({{.*}})* %{{[0-9]*}}
+; SHADERTEST: icmp eq i32 %{{[^, ]+}}, 1
+; SHADERTEST: select i1 %{{[^, ]+}}, float addrspace({{.*}})* %{{[^, ]+}}, float addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp eq i32 %{{[^, ]+}}, 2
+; SHADERTEST: select i1 %{{[^, ]+}}, float addrspace({{.*}})* %{{[^, ]+}}, float addrspace({{.*}})* %{{[A-Za-z0-9_.]+}}
 
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 1
-; SHADERTEST: select i1 %{{[0-9]*}}, float %{{.*}}, float %{{.*}}
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 2
-; SHADERTEST: select i1 %{{[0-9]*}}, float %{{.*}}, float %{{[0-9]*}}
+; SHADERTEST: icmp eq i32 %{{[^, ]+}}, 1
+; SHADERTEST: select i1 %{{[^, ]+}}, float %{{[^, ]+}}, float %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp eq i32 %{{[^, ]+}}, 2
+; SHADERTEST: select i1 %{{[^, ]+}}, float %{{[^, ]+}}, float %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -20,8 +20,8 @@ void main()
 ; SHADERTEST: = call double (...) @lgc.create.extract.significand.f64(double
 ; SHADERTEST: = call i32 (...) @lgc.create.extract.exponent.i32(double
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{.*}})
+; SHADERTEST: %{{[^ ]+}} = call double @llvm.amdgcn.frexp.mant.f64(double %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{[^) ]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

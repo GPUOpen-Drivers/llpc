@@ -30,9 +30,9 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: switch i32 %{{[0-9]*}}, label %{{[0-9]*}} [
-; SHADERTEST:    i32 0, label %{{[0-9]*}}
-; SHADERTEST:    i32 1, label %{{[0-9]*}}
+; SHADERTEST: switch i32 %{{[^, ]+}}, label %{{[^ ]+}} [
+; SHADERTEST:    i32 0, label %{{[A-Za-z0-9_.]+}}
+; SHADERTEST:    i32 1, label %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST:  ]
 ; SHADERTEST: {{^[A-Za-z0-9]+:}}
 

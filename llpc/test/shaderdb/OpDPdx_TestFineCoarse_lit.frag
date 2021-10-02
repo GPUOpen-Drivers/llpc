@@ -16,13 +16,13 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 false)
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 true)
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.derivative.v3f32(<3 x float> %{{[^, ]+}}, i1 false, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.derivative.v3f32(<3 x float> %{{[^, ]+}}, i1 false, i1 true)
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.derivative.v3f32(<3 x float> %{{[^, ]+}}, i1 false, i1 false)
 ; SHADERTEST-LABEL: {{^// LLPC.*}} patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32(i32 {{[%0-9]+}}, i32 85, i32 15, i32 15, i1 true)
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32(i32 {{[%0-9]+}}, i32 0, i32 15, i32 15, i1 true)
-; SHADERTEST: call {{.*}}float @llvm.amdgcn.wqm.f32(float %{{[0-9]+}})
+; SHADERTEST: call {{.*}}float @llvm.amdgcn.wqm.f32(float %{{[^) ]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

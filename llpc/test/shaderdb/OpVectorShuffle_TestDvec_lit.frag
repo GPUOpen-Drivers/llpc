@@ -28,12 +28,12 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{.*}} = extractelement <3 x double> %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = insertelement <2 x double> {{undef|poison}}, double %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = extractelement <3 x double> %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = insertelement <2 x double> %{{.*}}, double %{{.*}}, i32 1
+; SHADERTEST: %{{[^ ]+}} = extractelement <3 x double> %{{[^, ]+}}, i32 1
+; SHADERTEST: %{{[^ ]+}} = insertelement <2 x double> {{undef|poison}}, double %{{[^, ]+}}, i32 0
+; SHADERTEST: %{{[^ ]+}} = extractelement <3 x double> %{{[^, ]+}}, i32 0
+; SHADERTEST: %{{[^ ]+}} = insertelement <2 x double> %{{[^, ]+}}, double %{{[^, ]+}}, i32 1
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{.*}} = shufflevector <3 x double> %{{.*}}, <3 x double> {{undef|poison}}, <4 x i32> <i32 0, i32 1, i32 {{undef|poison}}, i32 {{undef|poison}}>
+; SHADERTEST: %{{[^ ]+}} = shufflevector <3 x double> %{{[^, ]+}}, <3 x double> {{undef|poison}}, <4 x i32> <i32 0, i32 1, i32 {{undef|poison}}, i32 {{undef|poison}}>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

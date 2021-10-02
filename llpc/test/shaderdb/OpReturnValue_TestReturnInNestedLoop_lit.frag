@@ -34,7 +34,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: float @{{.*}}
 ; SHADERTEST: {{^[A-Za-z0-9]+:}}
-; SHADERTEST: ret float %{{[0-9]*}}
+; SHADERTEST: ret float %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: {{^[A-Za-z0-9]+:}}
 ; SHADERTEST: ret float 1.000000e+00
 

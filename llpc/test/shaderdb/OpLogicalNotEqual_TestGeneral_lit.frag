@@ -26,11 +26,11 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: icmp ne i1 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: icmp ne <3 x i1> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: icmp ne i1 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: icmp ne <3 x i1> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: icmp ne i32 %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: icmp ne i32 %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -23,7 +23,7 @@ void main(void)
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}f32(i32 0, i32 0, i32 0, i32 -1, float 0x3FE6666660000000)
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}f32(i32 0, i32 0, i32 1, i32 -1, float 4.500000e+00)
 ; SHADERTEST: call float @lgc.output.import.generic.f32{{.*}}(i32 0, i32 0, i32 1, i32 -1)
-; SHADERTEST: call void @lgc.output.export.generic{{.*}}f32(i32 0, i32 0, i32 2, i32 -1, float %{{[0-9]*}})
+; SHADERTEST: call void @lgc.output.export.generic{{.*}}f32(i32 0, i32 0, i32 2, i32 -1, float %{{[^) ]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

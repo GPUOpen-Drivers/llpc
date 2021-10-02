@@ -29,13 +29,13 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>] addrspace(7)* @{{[0-9]}}, i32 0, i32 %{{[0-9]*}}, i32 3, i32 %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>] addrspace(7)* @{{[0-9]}}, i32 0, i32 %{{[0-9]*}}, i32 0
-; SHADERTEST: %{{[0-9]*}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>] addrspace(7)* @{{[0-9]}}, i32 0, i32 %{{[0-9]*}}, i32 2
-; SHADERTEST: %{{[0-9]*}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>] addrspace(7)* @{{[0-9]}}, i32 0, i32 %{{[0-9]*}}, i32 3, i32 %{{[0-9]*}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>] addrspace(7)* @{{[0-9]}}, i32 0, i32 %{{[^, ]+}}, i32 3, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>] addrspace(7)* @{{[0-9]}}, i32 0, i32 %{{[^, ]+}}, i32 0
+; SHADERTEST: %{{[^ ]+}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>] addrspace(7)* @{{[0-9]}}, i32 0, i32 %{{[^, ]+}}, i32 2
+; SHADERTEST: %{{[^ ]+}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>] addrspace(7)* @{{[0-9]}}, i32 0, i32 %{{[^, ]+}}, i32 3, i32 %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-COUNT-3: call i8 addrspace(7)* {{.*}} @lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 0, i32 %{{[0-9]*}},
+; SHADERTEST-COUNT-3: call i8 addrspace(7)* {{.*}} @lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 0, i32 %{{[^, ]+}},
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

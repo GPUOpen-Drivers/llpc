@@ -40,12 +40,12 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = fcmp oeq <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = fcmp {{[ou]}}ne <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = fcmp olt <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = fcmp ogt <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = fcmp ole <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: %{{[0-9]*}} = fcmp oge <2 x half> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: %{{[^ ]+}} = fcmp oeq <2 x half> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = fcmp {{[ou]}}ne <2 x half> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = fcmp olt <2 x half> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = fcmp ogt <2 x half> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = fcmp ole <2 x half> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = fcmp oge <2 x half> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -15,9 +15,9 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.fract.v4f32(<4 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.fract.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.fract.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.fract.f32(float %{{.*}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.fract.f32(float %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.fract.f32(float %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.fract.f32(float %{{[^) ]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

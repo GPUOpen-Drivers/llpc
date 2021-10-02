@@ -14,10 +14,10 @@
 ; SHADERTEST-NEXT: %[[B:[0-9]+]] = icmp ult i32 %[[A:[0-9]+]], 2048
 ; SHADERTEST-NEXT: %[[D:[0-9]+]] = icmp ult i32 %[[C:[0-9]+]], 2
 ; SHADERTEST-NEXT: %[[cmp:[0-9]+]] = and i1 %[[B]], %[[D]]
-; SHADERTEST-NEXT: br i1 %[[cmp]], label %{{.*}}, label %{{.*}}
+; SHADERTEST-NEXT: br i1 %[[cmp]], label %{{[^, ]+}}, label %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: [[store:[a-z0-9]+]]:
-; SHADERTEST: store <4 x float> %{{.*}}, <4 x float> addrspace(5)* %[[gep]], align 16
-; SHADERTEST: br label %{{.*}}
+; SHADERTEST: store <4 x float> %{{[^, ]+}}, <4 x float> addrspace(5)* %[[gep]], align 16
+; SHADERTEST: br label %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: [[final:[a-z0-9]+]]:
 
 ; SHADERTEST: AMDLLPC SUCCESS

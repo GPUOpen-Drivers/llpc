@@ -23,8 +23,8 @@ void main()
 ; SHADERTEST: [4 x <3 x float>] (...) @lgc.create.matrix.times.matrix.a4v3f32
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: fmul {{.*}}float %{{[^, ]*}}, %{{[^, ]*}}
-; SHADERTEST: fadd {{.*}}float %{{[^, ]*}}, %{{[^, ]*}}
+; SHADERTEST: fmul {{.*}}float %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: fadd {{.*}}float %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

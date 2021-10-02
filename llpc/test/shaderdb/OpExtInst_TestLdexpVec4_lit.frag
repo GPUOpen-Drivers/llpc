@@ -14,12 +14,12 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.ldexp.v4f32(<4 x float> %{{.*}}, <4 x i32>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.ldexp.v4f32(<4 x float> %{{[^, ]+}}, <4 x i32>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{[^, ]+}}, i32 %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{[^, ]+}}, i32 %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{[^, ]+}}, i32 %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{[^, ]+}}, i32 %{{[^) ]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

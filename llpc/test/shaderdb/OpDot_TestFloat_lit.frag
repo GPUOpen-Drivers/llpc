@@ -13,7 +13,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]+}} = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.dot.product.f32(<4 x float> %{{[0-9]+}}, <4 x float> %{{[0-9]+}})
+; SHADERTEST: %{{[^ ]+}} = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.dot.product.f32(<4 x float> %{{[^, ]+}}, <4 x float> %{{[^) ]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

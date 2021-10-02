@@ -23,8 +23,8 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.f32(i32 3, i32 0, {{.*}}, {{.*}}, i32 513, {{.*}}, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
+; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubesc
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubetc
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubema

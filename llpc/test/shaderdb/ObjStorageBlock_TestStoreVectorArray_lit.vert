@@ -21,8 +21,8 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 16, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> <i32 1065353216, i32 1065353216, i32 1065353216, i32 1065353216>, <4 x i32> %{{[0-9]*}}, i32 32, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> %{{[^, ]+}}, <4 x i32> %{{[^, ]+}}, i32 16, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> <i32 1065353216, i32 1065353216, i32 1065353216, i32 1065353216>, <4 x i32> %{{[^, ]+}}, i32 32, i32 0, i32 0)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

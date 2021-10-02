@@ -27,10 +27,10 @@ void main()
 ; SHADERTEST: = call <3 x float> (...) @lgc.create.extract.significand.v3f32(<3 x float>
 ; SHADERTEST: = call <3 x i32> (...) @lgc.create.extract.exponent.v3i32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.frexp.mant.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.frexp.mant.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float %{{.*}})
+; SHADERTEST: %{{[^ ]+}} = call float @llvm.amdgcn.frexp.mant.f32(float %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call float @llvm.amdgcn.frexp.mant.f32(float %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float %{{[^) ]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

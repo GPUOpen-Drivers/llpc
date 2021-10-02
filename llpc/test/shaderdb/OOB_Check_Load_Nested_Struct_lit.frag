@@ -20,12 +20,12 @@
 ; SHADERTEST: %[[C:[0-9]+]] = and i1 %[[A]], %[[B]]
 ; SHADERTEST: %[[D:[0-9]+]] = icmp ult i32 %[[idx3]], 4
 ; SHADERTEST: %[[cmp:[0-9]+]] = and i1 %[[C]], %[[D]]
-; SHADERTEST: br i1 %[[cmp]], label %{{.*}}, label %{{.*}}
+; SHADERTEST: br i1 %[[cmp]], label %{{[^, ]+}}, label %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: [[load:[a-z0-9]+]]:
 ; SHADERTEST: %[[loadResult:[0-9]+]] = load <4 x float>, <4 x float> addrspace(5)* %[[gep]], align 16
-; SHADERTEST: br label %{{.*}}
+; SHADERTEST: br label %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: [[final:[a-z0-9]+]]:
-; SHADERTEST: %{{.*}} = phi <4 x float> [ zeroinitializer, %{{.*}} ], [ %[[loadResult]], %[[load]] ]
+; SHADERTEST: %{{[^ ]+}} = phi <4 x float> [ zeroinitializer, %{{[^ ]+}} ], [ %[[loadResult]], %[[load]] ]
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

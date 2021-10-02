@@ -27,22 +27,22 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @interpolateAtOffset.p64v4f32.v2f32(<4 x float> addrspace(64)* %{{.*}}, <2 x float> {{.*}})
+; SHADERTEST: %{{[^ ]+}} = call {{.*}} <4 x float> @interpolateAtOffset.p64v4f32.v2f32(<4 x float> addrspace(64)* %{{[^, ]+}}, <2 x float> {{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: = call <3 x float> @lgc.input.import.builtin.InterpPullMode
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 12, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 13, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 14, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 15, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 16, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 17, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 21, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 22, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 23, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 24, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 25, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 26, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 12, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 13, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 14, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 15, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 16, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 17, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 21, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 22, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 23, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 24, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 25, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
+; SHADERTEST: %{{[^ ]+}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 26, i32 0, i32 0, i32 0, <2 x float> %{{[^) ]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -25,9 +25,9 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: fadd reassoc nnan nsz arcp contract afn float %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: fadd reassoc nnan nsz arcp contract afn <4 x float> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: fadd reassoc nnan nsz arcp contract afn <2 x float> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: fadd reassoc nnan nsz arcp contract afn float %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: fadd reassoc nnan nsz arcp contract afn <4 x float> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: fadd reassoc nnan nsz arcp contract afn <2 x float> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call void @lgc.output.export.builtin.Position{{.*}}v4f32(i32 0, <4 x float> <float 5.000000e+01, float 4.200000e+01, float -8.000000e+00, float -8.000000e+00>)
 ; SHADERTEST: AMDLLPC SUCCESS

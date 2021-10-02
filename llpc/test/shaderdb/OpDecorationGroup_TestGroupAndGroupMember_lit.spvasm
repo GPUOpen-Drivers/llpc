@@ -1,12 +1,12 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

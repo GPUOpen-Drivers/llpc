@@ -23,10 +23,10 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.fsign.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.fsign.v3f32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = fcmp reassoc nnan nsz arcp contract afn ogt float %{{.*}}, 0.000000e+00
-; SHADERTEST: %{{[0-9]*}} = fcmp reassoc nnan nsz arcp contract afn ogt float %{{.*}}, 0.000000e+00
-; SHADERTEST: %{{[0-9]*}} = fcmp reassoc nnan nsz arcp contract afn oge float %{{.*}}, 0.000000e+00
-; SHADERTEST: %{{[0-9]*}} = fcmp reassoc nnan nsz arcp contract afn oge float %{{.*}}, 0.000000e+00
+; SHADERTEST: %{{[^ ]+}} = fcmp reassoc nnan nsz arcp contract afn ogt float %{{[^, ]+}}, 0.000000e+00
+; SHADERTEST: %{{[^ ]+}} = fcmp reassoc nnan nsz arcp contract afn ogt float %{{[^, ]+}}, 0.000000e+00
+; SHADERTEST: %{{[^ ]+}} = fcmp reassoc nnan nsz arcp contract afn oge float %{{[^, ]+}}, 0.000000e+00
+; SHADERTEST: %{{[^ ]+}} = fcmp reassoc nnan nsz arcp contract afn oge float %{{[^, ]+}}, 0.000000e+00
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

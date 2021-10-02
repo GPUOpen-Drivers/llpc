@@ -16,11 +16,11 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{.*}} = insertelement <4 x i32> undef, i32 %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = insertelement <4 x i32> %{{.*}}, i32 %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = insertelement <4 x i32> %{{.*}}, i32 %{{.*}}, i32 2
-; SHADERTEST: %{{.*}} = insertelement <4 x i32> %{{.*}}, i32 %{{.*}}, i32 3
-; SHADERTEST: %{{.*}} = mul <4 x i32> %{{.*}}, %{{.*}}
+; SHADERTEST: %{{[^ ]+}} = insertelement <4 x i32> undef, i32 %{{[^, ]+}}, i32 0
+; SHADERTEST: %{{[^ ]+}} = insertelement <4 x i32> %{{[^, ]+}}, i32 %{{[^, ]+}}, i32 1
+; SHADERTEST: %{{[^ ]+}} = insertelement <4 x i32> %{{[^, ]+}}, i32 %{{[^, ]+}}, i32 2
+; SHADERTEST: %{{[^ ]+}} = insertelement <4 x i32> %{{[^, ]+}}, i32 %{{[^, ]+}}, i32 3
+; SHADERTEST: %{{[^ ]+}} = mul <4 x i32> %{{[^, ]+}}, %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

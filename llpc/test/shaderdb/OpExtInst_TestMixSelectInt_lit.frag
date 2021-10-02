@@ -23,8 +23,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = select <3 x i1> %{{.*}}, <3 x i32> %{{.*}}, <3 x i32> %{{.*}}
+; SHADERTEST: %{{[^ ]+}} = select i1 %{{[^, ]+}}, i32 %{{[^, ]+}}, i32 %{{[A-Za-z0-9_.]+}}
+; SHADERTEST: %{{[^ ]+}} = select <3 x i1> %{{[^, ]+}}, <3 x i32> %{{[^, ]+}}, <3 x i32> %{{[A-Za-z0-9_.]+}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

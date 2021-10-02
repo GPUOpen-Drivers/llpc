@@ -17,7 +17,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %[[BITCAST:.*]] = bitcast i32 %{{.*}} to <2 x i16>
+; SHADERTEST: %[[BITCAST:.*]] = bitcast i32 %{{[^ ]+}} to <2 x i16>
 ; SHADERTEST: %[[CONV:.*]] = sitofp <2 x i16> %[[BITCAST]] to <2 x float>
 ; SHADERTEST: %[[SCALE:.*]] = fmul reassoc nnan nsz arcp contract afn <2 x float> %[[CONV]], <float 0x3F00002000000000, float 0x3F00002000000000>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.fclamp.v2f32(<2 x float> %[[SCALE]], <2 x float> <float -1.000000e+00, float -1.000000e+00>, <2 x float> <float 1.000000e+00, float 1.000000e+00>)

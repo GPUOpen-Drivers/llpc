@@ -18,7 +18,7 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.sbfe.i32
-; SHADERTEST: add i32 %{{[0-9]*}}, 3423
+; SHADERTEST: add i32 %{{[^, ]+}}, 3423
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

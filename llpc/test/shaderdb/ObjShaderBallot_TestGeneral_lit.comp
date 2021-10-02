@@ -50,10 +50,10 @@ void main()
 ; SHADERTEST: call <3 x i32> (...) @lgc.create.subgroup.broadcast.first.v3i32(
 
 ; SHADERTEST-LABEL: {{^// LLPC.*}} pipeline patching results
-; SHADERTEST: call i32 @llvm.amdgcn.readlane(i32 %{{.*}}, i32 %{{.*}})
-; SHADERTEST: call i32 @llvm.amdgcn.readfirstlane(i32 %{{.*}})
-; SHADERTEST-COUNT-5: call i32 @llvm.amdgcn.readlane(i32 %{{.*}}, i32 %{{.*}})
-; SHADERTEST-COUNT-7: call i32 @llvm.amdgcn.readfirstlane(i32 %{{.*}})
+; SHADERTEST: call i32 @llvm.amdgcn.readlane(i32 %{{[^, ]+}}, i32 %{{[^) ]+}})
+; SHADERTEST: call i32 @llvm.amdgcn.readfirstlane(i32 %{{[^) ]+}})
+; SHADERTEST-COUNT-5: call i32 @llvm.amdgcn.readlane(i32 %{{[^, ]+}}, i32 %{{[^) ]+}})
+; SHADERTEST-COUNT-7: call i32 @llvm.amdgcn.readfirstlane(i32 %{{[^) ]+}})
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
