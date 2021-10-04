@@ -333,7 +333,7 @@ Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
 }
 
 // =====================================================================================================================
-// Builds pipeline and do linking.
+// Builds pipeline and does linking.
 //
 // @param compiler : LLPC compiler object
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool
@@ -341,7 +341,7 @@ Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
 // @param timePasses : Whether to time compiler passes
 // @returns : Result::Success on success, other status codes on failure
 Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
-		     llvm::Optional<Vkgc::PipelineDumpOptions> pipelineDumpOptions, bool timePasses) {
+                     llvm::Optional<Vkgc::PipelineDumpOptions> pipelineDumpOptions, bool timePasses) {
   Result result = Result::Success;
 
   bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) - 1)) != 0;
@@ -448,7 +448,7 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
       unsigned pushConstSize = 0;
       doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, shaderInfo, nodeSets,
                        pushConstSize, /*checkAutoLayoutCompatible = */ false,
-		       /*autoLayoutDesc =*/compileInfo->autoLayoutDesc);
+                       /*autoLayoutDesc =*/compileInfo->autoLayoutDesc);
 
       buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
                            compileInfo->autoLayoutDesc);
