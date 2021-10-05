@@ -200,7 +200,13 @@ unsigned Compiler::m_outRedirectCount = 0;
 // @param userData : An argument which will be passed to the installed error handler
 // @param reason : Error reason
 // @param genCrashDiag : Whether diagnostic should be generated
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 400826
+// Old version of the code
 static void fatalErrorHandler(void *userData, const std::string &reason, bool genCrashDiag) {
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
+static void fatalErrorHandler(void *userData, const char *reason, bool genCrashDiag) {
+#endif
   LLPC_ERRS("LLVM FATAL ERROR: " << reason << "\n");
 #if LLPC_ENABLE_EXCEPTION
   throw("LLVM fatal error");
