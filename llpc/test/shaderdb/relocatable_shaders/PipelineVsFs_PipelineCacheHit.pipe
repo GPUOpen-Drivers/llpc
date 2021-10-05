@@ -1,0 +1,50 @@
+; Test that there is a pipeline cache hit when the same pipeline is compiled twice.
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% \
+; RUN:         -shader-cache-mode=1 \
+; RUN:         -enable-relocatable-shader-elf \
+; RUN:         -o %t.elf %gfxip %s %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: Cache miss for graphics pipeline.
+; SHADERTEST: Cache hit for graphics pipeline.
+; END_SHADERTEST
+
+; Test that `-cache-full-pipelines=false` disables the cache.
+; BEGIN_SHADERTEST2
+; RUN: amdllpc -spvgen-dir=%spvgendir% \
+; RUN:         -shader-cache-mode=1 \
+; RUN:         -cache-full-pipelines=false \
+; RUN:         -enable-relocatable-shader-elf \
+; RUN:         -o %t.elf %gfxip %s %s -v | FileCheck -check-prefix=SHADERTEST2 %s
+; SHADERTEST2: Cache miss for graphics pipeline.
+; SHADERTEST2: Cache miss for graphics pipeline.
+; END_SHADERTEST2
+
+[Version]
+version = 40
+
+[VsGlsl]
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+void main() {
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+layout(location = 0) out vec4 outputColor;
+void main() {
+    outputColor = vec4(0.0, 0.0, 0.0, 1.0);
+}
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0

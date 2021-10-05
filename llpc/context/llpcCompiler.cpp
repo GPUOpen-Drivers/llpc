@@ -138,6 +138,10 @@ opt<unsigned> ShaderCacheMode("shader-cache-mode",
                                    "load on-disk cache for read/write, 4 - load on-disk cache for read only"),
                               init(0));
 
+// -cache-full-pipelines: Add full pipelines to the caches that are provided.
+opt<bool> CacheFullPipelines("cache-full-pipelines", desc("Add full pipelines to the caches that are provided."),
+                             init(true));
+
 // -executable-name: executable file name
 static opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
                                        init("amdllpc"));
@@ -1423,7 +1427,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   };
 
   const bool relocatableElfRequested = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
-  const bool buildingRelocatableElf =
+  const bool buildUsingRelocatableElf =
       relocatableElfRequested && canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo);
 
   for (ShaderStage stage : gfxShaderStages()) {
@@ -1449,7 +1453,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
                   << format("0x%016" PRIX64, MetroHash::compact64(hash)) << "\n");
       }
     }
-    if (relocatableElfRequested && !buildingRelocatableElf) {
+    if (relocatableElfRequested && !buildUsingRelocatableElf) {
       LLPC_OUTS("\nWarning: Relocatable shader compilation requested but not possible. "
                 << "Falling back to whole-pipeline compilation.\n");
     }
@@ -1466,16 +1470,16 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   }
 
   Optional<CacheAccessor> cacheAccessor;
-  if (!buildingRelocatableElf) {
+  if (cl::CacheFullPipelines) {
     cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
   }
 
   ElfPackage candidateElf;
 
   if (!cacheAccessor || !cacheAccessor->isInCache()) {
-
+    LLPC_OUTS("Cache miss for graphics pipeline.\n");
     GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
-    result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildingRelocatableElf, &candidateElf,
+    result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildUsingRelocatableElf, &candidateElf,
                                            pipelineOut->stageCacheAccesses);
 
     if (result == Result::Success) {
@@ -1486,6 +1490,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
       pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
   } else {
+    LLPC_OUTS("Cache hit for graphics pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
     if (cacheAccessor->isInCache()) {
       pipelineOut->pipelineCacheAccess =
@@ -1510,6 +1515,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   }
 
   if (cacheAccessor && !cacheAccessor->isInCache() && result == Result::Success) {
+    LLPC_OUTS("Adding graphics pipeline to the cache.\n");
     cacheAccessor->setElfInCache(elfBin);
   }
   return result;
@@ -1557,14 +1563,14 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   BinaryData elfBin = {};
 
   const bool relocatableElfRequested = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
-  const bool buildingRelocatableElf = relocatableElfRequested && canUseRelocatableComputeShaderElf(pipelineInfo);
+  const bool buildUsingRelocatableElf = relocatableElfRequested && canUseRelocatableComputeShaderElf(pipelineInfo);
 
   Result result = validatePipelineShaderInfo(&pipelineInfo->cs);
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, buildingRelocatableElf);
-  pipelineHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false, buildingRelocatableElf);
+  cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, false);
+  pipelineHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false, false);
 
   if (result == Result::Success && EnableOuts()) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(pipelineInfo->cs.pModuleData);
@@ -1574,7 +1580,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::compact64(&pipelineHash)) << "\n");
     LLPC_OUTS(format("%-4s : ", getShaderStageAbbreviation(ShaderStageCompute, true))
               << format("0x%016" PRIX64, MetroHash::compact64(moduleHash)) << "\n");
-    if (relocatableElfRequested && !buildingRelocatableElf) {
+    if (relocatableElfRequested && !buildUsingRelocatableElf) {
       LLPC_OUTS("\nWarning: Relocatable shader compilation requested but not possible. "
                 << "Falling back to whole-pipeline compilation.\n");
     }
@@ -1590,16 +1596,16 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), &extraInfo);
   }
 
-  std::unique_ptr<CacheAccessor> cacheAccessor;
-
-  if (!buildingRelocatableElf) {
-    cacheAccessor = std::make_unique<CacheAccessor>(pipelineInfo, cacheHash, getInternalCaches());
+  Optional<CacheAccessor> cacheAccessor;
+  if (cl::CacheFullPipelines) {
+    cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
   }
 
   ElfPackage candidateElf;
   if (!cacheAccessor || !cacheAccessor->isInCache()) {
+    LLPC_OUTS("Cache miss for compute pipeline.\n");
     ComputeContext computeContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
-    result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildingRelocatableElf, &candidateElf,
+    result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildUsingRelocatableElf, &candidateElf,
                                           &pipelineOut->stageCacheAccess);
 
     if (result == Result::Success) {
@@ -1609,11 +1615,10 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
       pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
   } else {
+    LLPC_OUTS("Cache hit for compute pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
-    if (cacheAccessor->isInCache()) {
-      pipelineOut->pipelineCacheAccess =
-          cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
-    }
+    pipelineOut->pipelineCacheAccess =
+        cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
   }
 
   if (result == Result::Success) {

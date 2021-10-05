@@ -5,7 +5,9 @@
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -enable-scratch-bounds-checks | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
+; SHADERTEST: define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main
 ; SHADERTEST-NOT: phi
+; SHADERTEST: ret
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

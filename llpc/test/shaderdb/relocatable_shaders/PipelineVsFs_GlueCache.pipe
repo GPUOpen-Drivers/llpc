@@ -8,6 +8,7 @@
 ; RUN:         -shader-cache-mode=2 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
 ; RUN:         -enable-relocatable-shader-elf \
+; RUN:         -cache-full-pipelines=false \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=CREATE %s
 ; REQUIRES: llpc-shader-cache
 ; CREATE: Building pipeline with relocatable shader elf.
@@ -38,6 +39,7 @@
 ; RUN:         -shader-cache-mode=4 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
 ; RUN:         -enable-relocatable-shader-elf \
+; RUN:         -cache-full-pipelines=false \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=LOAD %s
 ; REQUIRES: llpc-shader-cache
 ; LOAD: Building pipeline with relocatable shader elf.
