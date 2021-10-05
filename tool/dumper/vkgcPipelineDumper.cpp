@@ -944,6 +944,9 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
   hasher.Update(pipeline->options.extendedRobustness.robustImageAccess);
   hasher.Update(pipeline->options.extendedRobustness.nullDescriptor);
 
+  // Relocatable shaders force an unlinked compilation.
+  hasher.Update(pipeline->unlinked || isRelocatableShader);
+
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
 
