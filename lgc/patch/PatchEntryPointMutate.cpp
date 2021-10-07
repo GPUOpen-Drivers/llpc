@@ -614,57 +614,75 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
     }
 
     // Descriptor tables
+    Type *ptrType = builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST);
     for (unsigned userDataIdx = 0; userDataIdx != userDataUsage->descriptorTables.size(); ++userDataIdx) {
       auto &descriptorTable = userDataUsage->descriptorTables[userDataIdx];
-      Instruction *load = nullptr;
+      Instruction *spillTableLoad = nullptr;
+      const bool isDescTableSpilled = descriptorTable.entryArgIdx == 0;
+
+      SmallDenseMap<Value *, Value *> addrExtMap[2];
       for (Instruction *&inst : descriptorTable.users) {
         Value *descTableVal = nullptr;
         if (inst && inst->getFunction() == &func) {
           auto call = cast<CallInst>(inst);
-          Value *highHalf = call->getArgOperand(3);
-          std::string namePrefix = "descTable";
-          if (descriptorTable.entryArgIdx != 0) {
-            // The descriptor set is unspilled, and uses an entry arg.
-            descTableVal = getFunctionArgument(&func, descriptorTable.entryArgIdx);
-            if (isa<ConstantInt>(highHalf)) {
-              // Set builder to insert the 32-to-64 extension code at the start of the function.
-              builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
+          assert(call->getType() == ptrType);
+
+          if (isDescTableSpilled && !spillTableLoad) {
+            // The descriptor table is spilled. At the start of the function, create the GEP and load which are then
+            // shared by all users.
+            std::string namePrefix = "descTable";
+            builder.SetInsertPoint(spillTable->getNextNode());
+            Value *offset = nullptr;
+            if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
+              const ResourceNode *node = &m_pipelineState->getUserDataNodes()[userDataIdx];
+              m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+              offset = builder.getInt32(node->offsetInDwords * 4);
             } else {
-              // Set builder to insert the 32-to-64 extension code after the instruction containing the high half.
-              Instruction *highHalfInst = cast<Instruction>(highHalf);
-              builder.SetInsertPoint(highHalfInst->getNextNode());
+              // Shader compilation. Use a relocation to get the descriptor
+              // table offset for the descriptor set userDataIdx.
+              offset = builder.CreateRelocationConstant("descset_" + Twine(userDataIdx));
+              namePrefix = "descSet";
             }
-          } else {
-            // The descriptor table is spilled, so we GEP an offset from the spill table and load from that. For all
-            // users, we share a single load at the start of the function.
-            if (!load) {
-              // This is the first use we have seen in this function. Create the GEP and load, straight after the
-              // code at the start of the function that extends the spill table pointer.
-              builder.SetInsertPoint(spillTable->getNextNode());
-              Value *offset = nullptr;
-              if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-                const ResourceNode *node = &m_pipelineState->getUserDataNodes()[userDataIdx];
-                m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
-                offset = builder.getInt32(node->offsetInDwords * 4);
-              } else {
-                // Shader compilation. Use a relocation to get the descriptor
-                // table offset for the descriptor set userDataIdx.
-                offset = builder.CreateRelocationConstant("descset_" + Twine(userDataIdx));
-                namePrefix = "descSet";
-              }
-              Value *addr = builder.CreateGEP(builder.getInt8Ty(), spillTable, offset);
-              addr = builder.CreateBitCast(addr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
-              load = builder.CreateLoad(builder.getInt32Ty(), addr);
-            }
-            descTableVal = load;
-            descTableVal->setName(namePrefix + Twine(userDataIdx));
-            // Set builder to insert the 32-to-64 extension code just after the load.
-            builder.SetInsertPoint(load->getNextNode());
+            Value *addr = builder.CreateGEP(builder.getInt8Ty(), spillTable, offset);
+            addr = builder.CreateBitCast(addr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
+            spillTableLoad = builder.CreateLoad(builder.getInt32Ty(), addr);
+            spillTableLoad->setName(namePrefix + Twine(userDataIdx));
           }
 
-          // Now we want to extend the loaded 32-bit value to a 64-bit pointer, using either PC or the provided
-          // high half.
-          descTableVal = addressExtender.extend(descTableVal, highHalf, call->getType(), builder);
+          // The address extension code only depends on descriptorTable (which is constant for the lifetime of the map)
+          // and highHalf. Use map with highHalf keys to avoid creating redundant nodes for the extensions.
+          Value *highHalf = call->getArgOperand(3);
+          auto it = addrExtMap[isDescTableSpilled].find(highHalf);
+          if (it != addrExtMap[isDescTableSpilled].end()) {
+            descTableVal = it->second;
+          } else {
+
+            if (!isDescTableSpilled) {
+              // The descriptor set is unspilled, and uses an entry arg.
+              descTableVal = getFunctionArgument(&func, descriptorTable.entryArgIdx);
+              if (isa<ConstantInt>(highHalf)) {
+                // Set builder to insert the 32-to-64 extension code at the start of the function.
+                builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
+              } else {
+                // Set builder to insert the 32-to-64 extension code after the instruction containing the high half.
+                Instruction *highHalfInst = cast<Instruction>(highHalf);
+                builder.SetInsertPoint(highHalfInst->getNextNode());
+              }
+            } else {
+              // The descriptor table is spilled, the load at the start of the function has been created.
+              assert(descriptorTable.entryArgIdx == 0);
+              assert(spillTableLoad);
+              descTableVal = spillTableLoad;
+              // Set builder to insert the 32-to-64 extension code just after the load.
+              builder.SetInsertPoint(spillTableLoad->getNextNode());
+            }
+
+            // Now we want to extend the loaded 32-bit value to a 64-bit pointer, using either PC or the provided
+            // high half.
+            descTableVal = addressExtender.extend(descTableVal, highHalf, ptrType, builder);
+            addrExtMap[isDescTableSpilled].insert({highHalf, descTableVal});
+          }
+
           // Replace uses of the call and erase it.
           call->replaceAllUsesWith(descTableVal);
           call->eraseFromParent();
