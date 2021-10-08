@@ -278,7 +278,11 @@ static void setGfx900Info(TargetInfo *targetInfo) {
 // @param [in/out] targetInfo : Target info
 static void setGfx906Info(TargetInfo *targetInfo) {
   setGfx9Info(targetInfo);
-  targetInfo->getGpuProperty().hasIntegerDot = true;
+
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth16 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth8 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.sameSignedness = true;
 }
 
 // gfx10
@@ -337,7 +341,10 @@ static void setGfx1011Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waWarFpAtomicDenormHazard = 1;
   targetInfo->getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
-  targetInfo->getGpuProperty().hasIntegerDot = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth16 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth8 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.sameSignedness = true;
 }
 
 // gfx1012
@@ -358,7 +365,10 @@ static void setGfx1012Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waWarFpAtomicDenormHazard = 1;
   targetInfo->getGpuWorkarounds().gfx10.waNggDisabled = 1;
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
-  targetInfo->getGpuProperty().hasIntegerDot = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth16 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth8 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.sameSignedness = true;
 }
 
 // gfx103
@@ -367,7 +377,10 @@ static void setGfx1012Info(TargetInfo *targetInfo) {
 static void setGfx103Info(TargetInfo *targetInfo) {
   // Hardware workarounds for GFX10.3 based GPU's:
   targetInfo->getGpuWorkarounds().gfx10.waAdjustDepthImportVrs = 1;
-  targetInfo->getGpuProperty().hasIntegerDot = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth16 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth8 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;
+  targetInfo->getGpuProperty().supportIntegerDotFlag.sameSignedness = true;
 }
 
 // gfx1030
