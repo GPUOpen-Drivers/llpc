@@ -349,6 +349,27 @@ void SpirvLowerGlobal::visitCallInst(CallInst &callInst) {
 }
 
 // =====================================================================================================================
+// Check if the given metadata value has a vertex index.
+//
+// @param metaVal : Metadata
+static bool hasVertexIdx(const Constant &metaVal) {
+  assert(metaVal.getNumOperands() == 4);
+  ShaderInOutMetadata inOutMeta = {};
+  inOutMeta.U64All[0] = cast<ConstantInt>(metaVal.getOperand(2))->getZExtValue();
+  inOutMeta.U64All[1] = cast<ConstantInt>(metaVal.getOperand(3))->getZExtValue();
+
+  if (inOutMeta.IsBuiltIn) {
+    unsigned builtInId = inOutMeta.Value;
+    return (builtInId == spv::BuiltInPerVertex || // GLSL style per-vertex data
+            builtInId == spv::BuiltInPosition ||  // HLSL style per-vertex data
+            builtInId == spv::BuiltInPointSize || builtInId == spv::BuiltInClipDistance ||
+            builtInId == spv::BuiltInCullDistance);
+  }
+
+  return !static_cast<bool>(inOutMeta.PerPatch);
+}
+
+// =====================================================================================================================
 // Visits "load" instruction.
 //
 // @param loadInst : "Load" instruction
@@ -367,74 +388,39 @@ void SpirvLowerGlobal::visitLoadInst(LoadInst &loadInst) {
   if (!static_cast<bool>(m_instVisitFlags.checkLoad) || (!isTcsInput && !isTcsOutput && !isTesInput))
     return;
 
+  Value *loadValue = nullptr;
+
   if (GetElementPtrInst *const getElemPtr = dyn_cast<GetElementPtrInst>(loadSrc)) {
     std::vector<Value *> indexOperands;
 
-    GlobalVariable *inOut = nullptr;
+    assert(cast<ConstantInt>(getElemPtr->getOperand(1))->isZero() && "Non-zero GEP first index\n");
 
-    // Loop back through the get element pointer to find the global variable.
-    for (GetElementPtrInst *currGetElemPtr = getElemPtr; currGetElemPtr;
-         currGetElemPtr = dyn_cast<GetElementPtrInst>(currGetElemPtr->getPointerOperand())) {
-      assert(currGetElemPtr);
+    GlobalVariable *inOut = dyn_cast<GlobalVariable>(getElemPtr->getPointerOperand());
+    assert(!dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
+           "Chained GEPs should have been coalesced by SpirvLowerAccessChain.");
+    assert(inOut && "The root of the GEP should always be the global variable.");
 
-      SmallVector<Value *, 8> indices;
-
-      assert(cast<ConstantInt>(currGetElemPtr->getOperand(1))->isZero() && "Non-zero GEP first index\n");
-      // by-pass first zero offset
-      for (auto i = currGetElemPtr->idx_begin() + 1, e = currGetElemPtr->idx_end(); i != e; ++i)
-        indices.push_back(toInt32Value(*i, &loadInst));
-
-      indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
-
-      inOut = dyn_cast<GlobalVariable>(currGetElemPtr->getPointerOperand());
-    }
-
-    // The root of the GEP should always be the global variable.
-    assert(inOut);
+    for (auto i = getElemPtr->idx_begin() + 1, e = getElemPtr->idx_end(); i != e; ++i)
+      indexOperands.push_back(toInt32Value(*i, &loadInst));
 
     unsigned operandIdx = 0;
-
+    Value *vertexIdx = nullptr;
     auto inOutTy = inOut->getType()->getContainedType(0);
 
     MDNode *metaNode = inOut->getMetadata(gSPIRVMD::InOut);
     assert(metaNode);
     auto inOutMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-    Value *vertexIdx = nullptr;
-
     // If the input/output is arrayed, the outermost index might be used for vertex indexing
-    if (inOutTy->isArrayTy()) {
-      bool isVertexIdx = false;
-
-      assert(inOutMetaVal->getNumOperands() == 4);
-      ShaderInOutMetadata inOutMeta = {};
-
-      inOutMeta.U64All[0] = cast<ConstantInt>(inOutMetaVal->getOperand(2))->getZExtValue();
-      inOutMeta.U64All[1] = cast<ConstantInt>(inOutMetaVal->getOperand(3))->getZExtValue();
-
-      if (inOutMeta.IsBuiltIn) {
-        unsigned builtInId = inOutMeta.Value;
-        isVertexIdx = (builtInId == spv::BuiltInPerVertex || // GLSL style per-vertex data
-                       builtInId == spv::BuiltInPosition ||  // HLSL style per-vertex data
-                       builtInId == spv::BuiltInPointSize || builtInId == spv::BuiltInClipDistance ||
-                       builtInId == spv::BuiltInCullDistance);
-      } else
-        isVertexIdx = !static_cast<bool>(inOutMeta.PerPatch);
-
-      if (isVertexIdx) {
-        inOutTy = inOutTy->getArrayElementType();
-        vertexIdx = indexOperands[0];
-        ++operandIdx;
-
-        inOutMetaVal = cast<Constant>(inOutMetaVal->getOperand(1));
-      }
+    if (inOutTy->isArrayTy() && hasVertexIdx(*inOutMetaVal)) {
+      inOutTy = inOutTy->getArrayElementType();
+      vertexIdx = indexOperands[0];
+      ++operandIdx;
+      inOutMetaVal = cast<Constant>(inOutMetaVal->getOperand(1));
     }
 
-    auto loadValue = loadInOutMember(inOutTy, addrSpace, indexOperands, operandIdx, 0, inOutMetaVal, nullptr, vertexIdx,
-                                     InterpLocUnknown, nullptr, &loadInst);
-
-    m_loadInsts.insert(&loadInst);
-    loadInst.replaceAllUsesWith(loadValue);
+    loadValue = loadInOutMember(inOutTy, addrSpace, indexOperands, operandIdx, 0, inOutMetaVal, nullptr, vertexIdx,
+                                InterpLocUnknown, nullptr, &loadInst);
   } else {
     assert(isa<GlobalVariable>(loadSrc));
 
@@ -445,30 +431,9 @@ void SpirvLowerGlobal::visitLoadInst(LoadInst &loadInst) {
     assert(metaNode);
     auto inOutMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-    Value *loadValue = UndefValue::get(inOutTy);
-    bool hasVertexIdx = false;
+    loadValue = UndefValue::get(inOutTy);
 
-    if (inOutTy->isArrayTy()) {
-      // Arrayed input/output
-      assert(inOutMetaVal->getNumOperands() == 4);
-      ShaderInOutMetadata inOutMeta = {};
-      inOutMeta.U64All[0] = cast<ConstantInt>(inOutMetaVal->getOperand(2))->getZExtValue();
-      inOutMeta.U64All[1] = cast<ConstantInt>(inOutMetaVal->getOperand(3))->getZExtValue();
-
-      // If the input/output is arrayed, the outermost dimension might for vertex indexing
-      if (inOutMeta.IsBuiltIn) {
-        unsigned builtInId = inOutMeta.Value;
-        hasVertexIdx = (builtInId == spv::BuiltInPerVertex || // GLSL style per-vertex data
-                        builtInId == spv::BuiltInPosition ||  // HLSL style per-vertex data
-                        builtInId == spv::BuiltInPointSize || builtInId == spv::BuiltInClipDistance ||
-                        builtInId == spv::BuiltInCullDistance);
-      } else
-        hasVertexIdx = !static_cast<bool>(inOutMeta.PerPatch);
-    }
-
-    if (hasVertexIdx) {
-      assert(inOutTy->isArrayTy());
-
+    if (inOutTy->isArrayTy() && hasVertexIdx(*inOutMetaVal)) {
       auto elemTy = inOutTy->getArrayElementType();
       auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
 
@@ -483,10 +448,9 @@ void SpirvLowerGlobal::visitLoadInst(LoadInst &loadInst) {
       loadValue = addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, nullptr, 0, nullptr, nullptr,
                                             InterpLocUnknown, nullptr, &loadInst);
     }
-
-    m_loadInsts.insert(&loadInst);
-    loadInst.replaceAllUsesWith(loadValue);
   }
+  m_loadInsts.insert(&loadInst);
+  loadInst.replaceAllUsesWith(loadValue);
 }
 
 // =====================================================================================================================
@@ -510,69 +474,32 @@ void SpirvLowerGlobal::visitStoreInst(StoreInst &storeInst) {
   if (GetElementPtrInst *const getElemPtr = dyn_cast<GetElementPtrInst>(storeDest)) {
     std::vector<Value *> indexOperands;
 
-    GlobalVariable *output = nullptr;
+    GlobalVariable *output = dyn_cast<GlobalVariable>(getElemPtr->getPointerOperand());
+    assert(!dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
+           "Chained GEPs should have been coalesced by SpirvLowerAccessChain.");
+    assert(output && "The root of the GEP should always be the global variable.");
 
-    // Loop back through the get element pointer to find the global variable.
-    for (GetElementPtrInst *currGetElemPtr = getElemPtr; currGetElemPtr;
-         currGetElemPtr = dyn_cast<GetElementPtrInst>(currGetElemPtr->getPointerOperand())) {
-      assert(currGetElemPtr);
-
-      // If we have previous index operands, we need to remove the first operand (a zero index into the pointer)
-      // when concatenating two GEP indices together.
-      if (!indexOperands.empty())
-        indexOperands.erase(indexOperands.begin());
-
-      SmallVector<Value *, 8> indices;
-
-      for (Value *const index : currGetElemPtr->indices())
-        indices.push_back(toInt32Value(index, &storeInst));
-
-      indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
-
-      output = dyn_cast<GlobalVariable>(currGetElemPtr->getPointerOperand());
-    }
+    for (Value *const index : getElemPtr->indices())
+      indexOperands.push_back(toInt32Value(index, &storeInst));
 
     unsigned operandIdx = 0;
-
+    Value *vertexIdx = nullptr;
     auto outputTy = output->getType()->getContainedType(0);
 
     MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
     assert(metaNode);
     auto outputMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-    Value *vertexIdx = nullptr;
-
     // If the output is arrayed, the outermost index might be used for vertex indexing
-    if (outputTy->isArrayTy()) {
-      bool isVertexIdx = false;
-
-      assert(outputMetaVal->getNumOperands() == 4);
-      ShaderInOutMetadata outputMeta = {};
-      outputMeta.U64All[0] = cast<ConstantInt>(outputMetaVal->getOperand(2))->getZExtValue();
-      outputMeta.U64All[1] = cast<ConstantInt>(outputMetaVal->getOperand(3))->getZExtValue();
-
-      if (outputMeta.IsBuiltIn) {
-        unsigned builtInId = outputMeta.Value;
-        isVertexIdx = (builtInId == spv::BuiltInPerVertex || // GLSL style per-vertex data
-                       builtInId == spv::BuiltInPosition ||  // HLSL style per-vertex data
-                       builtInId == spv::BuiltInPointSize || builtInId == spv::BuiltInClipDistance ||
-                       builtInId == spv::BuiltInCullDistance);
-      } else
-        isVertexIdx = !static_cast<bool>(outputMeta.PerPatch);
-
-      if (isVertexIdx) {
-        outputTy = outputTy->getArrayElementType();
-        vertexIdx = indexOperands[1];
-        ++operandIdx;
-
-        outputMetaVal = cast<Constant>(outputMetaVal->getOperand(1));
-      }
+    if (outputTy->isArrayTy() && hasVertexIdx(*outputMetaVal)) {
+      outputTy = outputTy->getArrayElementType();
+      vertexIdx = indexOperands[1];
+      ++operandIdx;
+      outputMetaVal = cast<Constant>(outputMetaVal->getOperand(1));
     }
 
     storeOutputMember(outputTy, storeValue, indexOperands, operandIdx, 0, outputMetaVal, nullptr, vertexIdx,
                       &storeInst);
-
-    m_storeInsts.insert(&storeInst);
   } else {
     assert(isa<GlobalVariable>(storeDest));
 
@@ -583,27 +510,8 @@ void SpirvLowerGlobal::visitStoreInst(StoreInst &storeInst) {
     assert(metaNode);
     auto outputMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-    bool hasVertexIdx = false;
-
     // If the input/output is arrayed, the outermost dimension might for vertex indexing
-    if (outputy->isArrayTy()) {
-      assert(outputMetaVal->getNumOperands() == 4);
-      ShaderInOutMetadata outputMeta = {};
-      outputMeta.U64All[0] = cast<ConstantInt>(outputMetaVal->getOperand(2))->getZExtValue();
-      outputMeta.U64All[1] = cast<ConstantInt>(outputMetaVal->getOperand(3))->getZExtValue();
-
-      if (outputMeta.IsBuiltIn) {
-        unsigned builtInId = outputMeta.Value;
-        hasVertexIdx = (builtInId == spv::BuiltInPerVertex || // GLSL style per-vertex data
-                        builtInId == spv::BuiltInPosition ||  // HLSL style per-vertex data
-                        builtInId == spv::BuiltInPointSize || builtInId == spv::BuiltInClipDistance ||
-                        builtInId == spv::BuiltInCullDistance);
-      } else
-        hasVertexIdx = !static_cast<bool>(outputMeta.PerPatch);
-    }
-
-    if (hasVertexIdx) {
-      assert(outputy->isArrayTy());
+    if (outputy->isArrayTy() && hasVertexIdx(*outputMetaVal)) {
       auto elemMeta = cast<Constant>(outputMetaVal->getOperand(1));
 
       const unsigned elemCount = outputy->getArrayNumElements();
@@ -617,9 +525,8 @@ void SpirvLowerGlobal::visitStoreInst(StoreInst &storeInst) {
       addCallInstForOutputExport(storeValue, outputMetaVal, nullptr, 0, InvalidValue, 0, nullptr, nullptr, InvalidValue,
                                  &storeInst);
     }
-
-    m_storeInsts.insert(&storeInst);
   }
+  m_storeInsts.insert(&storeInst);
 }
 
 // =====================================================================================================================
