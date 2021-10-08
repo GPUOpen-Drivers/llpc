@@ -199,8 +199,11 @@ public:
   virtual llvm::Value *CreateDotProduct(llvm::Value *const vector1, llvm::Value *const vector2,
                                         const llvm::Twine &instName = "") = 0;
 
-  // Bit settings in flags argument for integer dot product
-  enum { FirstVectorSigned = 1, SecondVectorSigned = 2 };
+  // Bit settings for integer dot product
+  enum : unsigned {
+    FirstVectorSigned = 1, // The components of the first vector are signed
+    SecondVectorSigned,    // The components of the second vector are signed
+  };
 
   // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
   // where available.
