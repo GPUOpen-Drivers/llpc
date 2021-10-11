@@ -471,7 +471,7 @@ Value *SubgroupBuilder::CreateSubgroupShuffleDown(Value *const value, Value *con
 //
 // @param groupArithOp : The group arithmetic operation.
 // @param value : An LLVM value.
-// @param clusterSize : The cluster size.
+// @param ctSize : The cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, Value *const value,
                                                          Value *const ctSize, const Twine &instName) {
@@ -622,7 +622,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
 //
 // @param groupArithOp : The group arithmetic operation.
 // @param value : An LLVM value.
-// @param clusterSize : The cluster size.
+// @param ctSize : The cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, Value *const value,
                                                          Value *const ctSize, const Twine &instName) {
@@ -771,7 +771,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArith
 //
 // @param groupArithOp : The group arithmetic operation.
 // @param value : An LLVM value.
-// @param clusterSize : The cluster size.
+// @param ctSize : The cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Value *const value,
                                                          Value *const ctSize, const Twine &instName) {
