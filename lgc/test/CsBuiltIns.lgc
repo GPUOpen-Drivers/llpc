@@ -205,11 +205,10 @@ attributes #0 = { nounwind }
 ; ----------------------------------------------------------------------
 ; Extract 7: SubgroupSize, constant 32 or 64
 
-; RUN: lgc -extract=7 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK7,CHECK7_WAVE64 %s
-; RUN: lgc -extract=7 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK7,CHECK7_WAVE32 %s
+; RUN: lgc -extract=7 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK7,CHECK7_SUBGROUP %s
+; RUN: lgc -extract=7 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK7,CHECK7_SUBGROUP %s
 ; CHECK7-LABEL: _amdgpu_cs_main:
-; CHECK7_WAVE64: v_mov_b32_e32 v0, 64
-; CHECK7_WAVE32: v_mov_b32_e32 v0, 32
+; CHECK7_SUBGROUP: v_mov_b32_e32 v0, 0
 ; CHECK7: buffer_store_dword v0,
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {

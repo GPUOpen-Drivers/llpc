@@ -783,7 +783,7 @@ Value *InOutBuilder::readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy
     // Handle the subgroup mask built-ins directly.
     Value *result = nullptr;
     Value *localInvocationId = readBuiltIn(false, BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr, "");
-    if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
+    if (getPipelineState()->getShaderSubgroupSize(m_shaderStage) == 64)
       localInvocationId = CreateZExt(localInvocationId, getInt64Ty());
 
     switch (builtIn) {
@@ -807,7 +807,7 @@ Value *InOutBuilder::readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy
     default:
       llvm_unreachable("Should never be called!");
     }
-    if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64) {
+    if (getPipelineState()->getShaderSubgroupSize(m_shaderStage) == 64) {
       result = CreateInsertElement(Constant::getNullValue(FixedVectorType::get(getInt64Ty(), 2)), result, uint64_t(0));
       result = CreateBitCast(result, resultTy);
     } else
@@ -818,7 +818,7 @@ Value *InOutBuilder::readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy
 
   case BuiltInSubgroupSize:
     // SubgroupSize is a constant.
-    return getInt32(getPipelineState()->getShaderWaveSize(m_shaderStage));
+    return getInt32(getPipelineState()->getShaderSubgroupSize(m_shaderStage));
 
   case BuiltInSubgroupLocalInvocationId:
     // SubgroupLocalInvocationId is the lane number within the wave.

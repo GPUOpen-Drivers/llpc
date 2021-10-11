@@ -640,6 +640,9 @@ class SubgroupBuilder : virtual public BuilderImplBase {
 public:
   SubgroupBuilder(LgcContext *builderContext) : BuilderImplBase(builderContext) {}
 
+  // Create a get wave size query.
+  llvm::Value *CreateGetWaveSize(const llvm::Twine &instName) override final;
+
   // Create a get subgroup size query.
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName) override final;
 
@@ -758,6 +761,7 @@ private:
   SubgroupBuilder &operator=(const SubgroupBuilder &) = delete;
 
   unsigned getShaderSubgroupSize();
+  unsigned getShaderWaveSize();
   llvm::Value *createGroupArithmeticIdentity(GroupArithOp groupArithOp, llvm::Type *const type);
   llvm::Value *createGroupArithmeticOperation(GroupArithOp groupArithOp, llvm::Value *const x, llvm::Value *const y);
   llvm::Value *createInlineAsmSideEffect(llvm::Value *const value);

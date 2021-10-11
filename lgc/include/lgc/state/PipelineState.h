@@ -274,6 +274,8 @@ public:
 
   // Gets wave size for the specified shader stage
   unsigned getShaderWaveSize(ShaderStage stage);
+  // Gets wave size for the specified shader stage
+  unsigned getShaderSubgroupSize(ShaderStage stage);
 
   // Set the default wave size for the specified shader stage
   void setShaderDefaultWaveSize(ShaderStage stage);
@@ -476,6 +478,7 @@ private:
   std::unique_ptr<InterfaceData> m_interfaceData[ShaderStageCompute + 1] = {}; // Per-shader InterfaceData
   PalMetadata *m_palMetadata = nullptr;                                        // PAL metadata object
   unsigned m_waveSize[ShaderStageCountInternal] = {};                          // Per-shader wave size
+  unsigned m_subgroupSize[ShaderStageCountInternal] = {};                      // Per-shader wave size
   bool m_inputPackState[ShaderStageGfxCount] = {};  // The input packable state per shader stage
   bool m_outputPackState[ShaderStageGfxCount] = {}; // The output packable state per shader stage
 };

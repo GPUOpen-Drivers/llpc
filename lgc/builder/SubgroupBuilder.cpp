@@ -41,6 +41,14 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
+// Get shader wave size.
+//
+// @param instName : Name to give final instruction.
+Value *SubgroupBuilder::CreateGetWaveSize(const Twine &instName) {
+  return getInt32(getShaderWaveSize());
+}
+
+// =====================================================================================================================
 // Create a subgroup get subgroup size.
 //
 // @param instName : Name to give final instruction.
@@ -51,6 +59,10 @@ Value *SubgroupBuilder::CreateGetSubgroupSize(const Twine &instName) {
 // =====================================================================================================================
 // Get the shader subgroup size for the current insertion block.
 unsigned SubgroupBuilder::getShaderSubgroupSize() {
+  return getPipelineState()->getShaderSubgroupSize(getShaderStage(GetInsertBlock()->getParent()));
+}
+
+unsigned SubgroupBuilder::getShaderWaveSize() {
   return getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
 }
 
@@ -462,7 +474,9 @@ Value *SubgroupBuilder::CreateSubgroupShuffleDown(Value *const value, Value *con
 // @param clusterSize : The cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, Value *const value,
-                                                         Value *const clusterSize, const Twine &instName) {
+                                                         Value *const ctSize, const Twine &instName) {
+  auto waveSize = getInt32(getShaderWaveSize());
+  Value *clusterSize = CreateSelect(CreateICmpUGT(ctSize, waveSize), waveSize, ctSize);
   if (supportDpp()) {
     // Start the WWM section by setting the inactive lanes.
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
@@ -611,7 +625,9 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
 // @param clusterSize : The cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, Value *const value,
-                                                         Value *const clusterSize, const Twine &instName) {
+                                                         Value *const ctSize, const Twine &instName) {
+  auto waveSize = getInt32(getShaderWaveSize());
+  Value *clusterSize = CreateSelect(CreateICmpUGT(ctSize, waveSize), waveSize, ctSize);
   if (supportDpp()) {
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
@@ -758,7 +774,9 @@ Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArith
 // @param clusterSize : The cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Value *const value,
-                                                         Value *const clusterSize, const Twine &instName) {
+                                                         Value *const ctSize, const Twine &instName) {
+  auto waveSize = getInt32(getShaderWaveSize());
+  Value *clusterSize = CreateSelect(CreateICmpUGT(ctSize, waveSize), waveSize, ctSize);
   if (supportDpp()) {
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
@@ -776,7 +794,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArith
       shiftRight = createPermLane16(setInactive, setInactive, 0x6543210F, 0xEDCBA987, true, false);
 
       // Only needed for wave size 64.
-      if (getShaderSubgroupSize() == 64) {
+      if (getShaderWaveSize() == 64) {
         // Need to write the value from the 16th invocation into the 48th.
         shiftRight = CreateSubgroupWriteInvocation(shiftRight, CreateSubgroupBroadcast(shiftRight, getInt32(16), ""),
                                                    getInt32(48), "");
@@ -1430,11 +1448,12 @@ Value *SubgroupBuilder::createGroupBallot(Value *const value) {
   Constant *const predicateNe = getInt32(33);
 
   // icmp has a new signature (requiring the return type as the first type).
-  Value *result = CreateIntrinsic(Intrinsic::amdgcn_icmp, {getIntNTy(getShaderSubgroupSize()), getInt32Ty()},
+  unsigned waveSize = getShaderWaveSize();
+  Value *result = CreateIntrinsic(Intrinsic::amdgcn_icmp, {getIntNTy(waveSize), getInt32Ty()},
                                   {valueAsInt32, getInt32(0), predicateNe});
 
   // If we have a 32-bit subgroup size, we need to turn the 32-bit ballot result into a 64-bit result.
-  if (getShaderSubgroupSize() <= 32)
+  if (waveSize <= 32)
     result = CreateZExt(result, getInt64Ty(), "");
 
   return result;
