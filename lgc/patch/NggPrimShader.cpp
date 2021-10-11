@@ -3186,7 +3186,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
         assert(call);
         m_builder->SetInsertPoint(call);
 
-        assert(call->getNumArgOperands() == 4);
+        assert(call->arg_size() == 4);
         const unsigned location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
         const unsigned compIdx = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
         const unsigned streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
@@ -3331,7 +3331,7 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
 
         m_builder->SetInsertPoint(call);
 
-        assert(call->getNumArgOperands() == 2);
+        assert(call->arg_size() == 2);
         const unsigned location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
         const unsigned streamId = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
         assert(streamId < MaxGsStreams);

@@ -701,7 +701,7 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
       if (callInst->getFunction() != module)
         continue;
 
-      Value *output = callInst->getOperand(callInst->getNumArgOperands() - 1); // Last argument
+      Value *output = callInst->getOperand(callInst->arg_size() - 1); // Last argument
       unsigned builtInId = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
       switch (builtInId) {
       case BuiltInFragDepth: {

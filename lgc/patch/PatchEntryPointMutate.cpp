@@ -690,7 +690,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           if (inst && inst->getFunction() == &func) {
             Value *replacementVal = arg;
             auto call = dyn_cast<CallInst>(inst);
-            if (call->getNumArgOperands() >= 2) {
+            if (call->arg_size() >= 2) {
               // There is a second operand, used by ShaderInputs::getSpecialUserDataAsPoint to indicate that we
               // need to extend the loaded 32-bit value to a 64-bit pointer, using either PC or the provided
               // high half.
@@ -816,7 +816,7 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       // inputs), plus the original args on the call.
       SmallVector<Type *, 20> argTys;
       SmallVector<Value *, 20> args;
-      for (unsigned idx = 0; idx != call->getNumArgOperands(); ++idx) {
+      for (unsigned idx = 0; idx != call->arg_size(); ++idx) {
         argTys.push_back(call->getArgOperand(idx)->getType());
         args.push_back(call->getArgOperand(idx));
       }
@@ -846,7 +846,7 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       // Mark sgpr arguments as inreg
       for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {
         if ((inRegMask >> idx) & 1)
-          newCall->addParamAttr(idx + call->getNumArgOperands(), Attribute::InReg);
+          newCall->addParamAttr(idx + call->arg_size(), Attribute::InReg);
       }
 
       // Replace and erase the old one.
