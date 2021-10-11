@@ -1116,6 +1116,18 @@ unsigned PipelineState::getShaderWaveSize(ShaderStage stage) {
   return m_waveSize[stage];
 }
 
+unsigned PipelineState::getShaderSubgroupSize(ShaderStage stage) {
+  if (stage == ShaderStageCopyShader) {
+    // Treat copy shader as part of geometry shader
+    stage = ShaderStageGeometry;
+  }
+
+  assert(stage <= ShaderStageCompute);
+  if (!m_subgroupSize[stage])
+    setShaderDefaultWaveSize(stage);
+  return m_subgroupSize[stage];
+}
+
 // =====================================================================================================================
 // Set the default wave size for the specified shader stage
 //
@@ -1157,7 +1169,12 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
       // If subgroup size is used in any shader in the pipeline, use the specified subgroup size as wave size.
       if (getShaderModes()->getAnyUseSubgroupSize()) {
         unsigned subgroupSize = getShaderOptions(checkingStage).subgroupSize;
-        if (subgroupSize != 0)
+        // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
+        subgroupSize = (subgroupSize == 0) ? waveSize : subgroupSize;
+
+        m_subgroupSize[checkingStage] = subgroupSize;
+
+        if (subgroupSize < waveSize)
           waveSize = subgroupSize;
       }
 
