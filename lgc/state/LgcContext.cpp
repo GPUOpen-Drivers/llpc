@@ -45,7 +45,13 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/CommandLine.h"
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 401324
+// Old version
 #include "llvm/Support/TargetRegistry.h"
+#else
+// New version (and unknown version)
+#include "llvm/MC/TargetRegistry.h"
+#endif
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
