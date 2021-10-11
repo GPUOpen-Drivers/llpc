@@ -203,7 +203,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     m_builder->clearFastMathFlags();
 
   // Get the args.
-  auto args = ArrayRef<Use>(&call->getOperandList()[0], call->getNumArgOperands());
+  auto args = ArrayRef<Use>(&call->getOperandList()[0], call->arg_size());
 
   switch (opcode) {
   case BuilderRecorder::Opcode::Nop:

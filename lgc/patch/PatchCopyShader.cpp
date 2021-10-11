@@ -360,8 +360,8 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
         if (!callInst || callInst->getParent()->getParent() != gsEntryPoint)
           continue;
 
-        assert(callInst->getNumArgOperands() == 4);
-        Value *output = callInst->getOperand(callInst->getNumArgOperands() - 1); // Last argument
+        assert(callInst->arg_size() == 4);
+        Value *output = callInst->getOperand(callInst->arg_size() - 1); // Last argument
         auto outputTy = output->getType();
 
         InOutLocationInfo origLocInfo;

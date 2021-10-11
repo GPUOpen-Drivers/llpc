@@ -500,10 +500,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         // Builtin Call has different number of operands
         Value *elemIdx = nullptr;
         Value *vertexIdx = nullptr;
-        if (callInst.getNumArgOperands() > 1)
+        if (callInst.arg_size() > 1)
           elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
 
-        if (callInst.getNumArgOperands() > 2)
+        if (callInst.arg_size() > 2)
           vertexIdx = isDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
 
         input = patchTcsBuiltInInputImport(inputTy, builtInId, elemIdx, vertexIdx, &callInst);
@@ -513,10 +513,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         // Builtin Call has different number of operands
         Value *elemIdx = nullptr;
         Value *vertexIdx = nullptr;
-        if (callInst.getNumArgOperands() > 1)
+        if (callInst.arg_size() > 1)
           elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
 
-        if (callInst.getNumArgOperands() > 2)
+        if (callInst.arg_size() > 2)
           vertexIdx = isDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
         input = patchTesBuiltInInputImport(inputTy, builtInId, elemIdx, vertexIdx, &callInst);
         break;
@@ -524,7 +524,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       case ShaderStageGeometry: {
         // Builtin Call has different number of operands
         Value *vertexIdx = nullptr;
-        if (callInst.getNumArgOperands() > 1)
+        if (callInst.arg_size() > 1)
           vertexIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
 
         input = patchGsBuiltInInputImport(inputTy, builtInId, vertexIdx, &callInst);
@@ -532,7 +532,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       case ShaderStageFragment: {
         Value *sampleId = nullptr;
-        if (callInst.getNumArgOperands() >= 2)
+        if (callInst.arg_size() >= 2)
           sampleId = callInst.getArgOperand(1);
         input = patchFsBuiltInInputImport(inputTy, builtInId, sampleId, &callInst);
         break;
@@ -620,7 +620,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
       switch (m_shaderStage) {
       case ShaderStageTessControl: {
-        assert(callInst.getNumArgOperands() == 4);
+        assert(callInst.arg_size() == 4);
 
         if (!elemIdx) {
           elemIdx = callInst.getOperand(2);
@@ -634,7 +634,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         break;
       }
       case ShaderStageTessEval: {
-        assert(callInst.getNumArgOperands() == 4);
+        assert(callInst.arg_size() == 4);
 
         auto elemIdx = callInst.getOperand(2);
         assert(isDontCareValue(elemIdx) == false);
@@ -645,7 +645,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         break;
       }
       case ShaderStageGeometry: {
-        assert(callInst.getNumArgOperands() == 3);
+        assert(callInst.arg_size() == 3);
         if (!elemIdx)
           elemIdx = cast<ConstantInt>(callInst.getOperand(1));
 
@@ -669,13 +669,13 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         Value *auxInterpValue = nullptr;
 
         if (isGenericInputImport) {
-          assert(callInst.getNumArgOperands() == 4);
+          assert(callInst.arg_size() == 4);
 
           interpMode = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
           interpLoc = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
         } else {
           assert(isInterpolantInputImport);
-          assert(callInst.getNumArgOperands() == 5);
+          assert(callInst.arg_size() == 5);
 
           interpMode = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
           interpLoc = InOutInfo::InterpLocUnknown;
@@ -717,7 +717,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
     if (isBuiltInOutputImport) {
       const unsigned builtInId = value;
 
-      assert(callInst.getNumArgOperands() == 3);
+      assert(callInst.arg_size() == 3);
       Value *elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
       Value *vertexIdx = isDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
 
@@ -748,7 +748,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       assert(loc != InvalidValue);
 
-      assert(callInst.getNumArgOperands() == 4);
+      assert(callInst.arg_size() == 4);
       auto elemIdx = callInst.getOperand(2);
       assert(isDontCareValue(elemIdx) == false);
       auto vertexIdx = isDontCareValue(callInst.getOperand(3)) ? nullptr : callInst.getOperand(3);
@@ -761,7 +761,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
     // Output exports
     assert(isOutput);
 
-    Value *output = callInst.getOperand(callInst.getNumArgOperands() - 1); // Last argument
+    Value *output = callInst.getOperand(callInst.arg_size() - 1); // Last argument
 
     // Generic value (location or SPIR-V built-in ID or XFB buffer ID)
     unsigned value = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
@@ -815,7 +815,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         break;
       }
       case ShaderStageTessControl: {
-        assert(callInst.getNumArgOperands() == 4);
+        assert(callInst.arg_size() == 4);
         Value *elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
         Value *vertexIdx = isDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
 
@@ -919,14 +919,14 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
         switch (m_shaderStage) {
         case ShaderStageVertex: {
-          assert(callInst.getNumArgOperands() == 3);
+          assert(callInst.arg_size() == 3);
           if (elemIdx == InvalidValue)
             elemIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
           patchVsGenericOutputExport(output, loc, elemIdx, &callInst);
           break;
         }
         case ShaderStageTessControl: {
-          assert(callInst.getNumArgOperands() == 5);
+          assert(callInst.arg_size() == 5);
 
           auto elemIdx = callInst.getOperand(2);
           assert(isDontCareValue(elemIdx) == false);
@@ -937,14 +937,14 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           break;
         }
         case ShaderStageTessEval: {
-          assert(callInst.getNumArgOperands() == 3);
+          assert(callInst.arg_size() == 3);
           if (elemIdx == InvalidValue)
             elemIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
           patchTesGenericOutputExport(output, loc, elemIdx, &callInst);
           break;
         }
         case ShaderStageGeometry: {
-          assert(callInst.getNumArgOperands() == 4);
+          assert(callInst.arg_size() == 4);
           if (elemIdx == InvalidValue)
             elemIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
           const unsigned streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
@@ -952,7 +952,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           break;
         }
         case ShaderStageFragment: {
-          assert(callInst.getNumArgOperands() == 3);
+          assert(callInst.arg_size() == 3);
           llvm_unreachable("Fragment shader export should have been handled by the LowerFragColorExport pass");
           break;
         }
