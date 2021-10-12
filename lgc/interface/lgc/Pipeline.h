@@ -115,6 +115,7 @@ struct Options {
                                        //  Only valid if the NGG backface culler is enabled.
                                        //  A value of 0 will disable the threshold.
   NggSubgroupSizing nggSubgroupSizing; // NGG subgroup sizing type
+  unsigned fullSubgroups;              // Use full subgroup lanes
   unsigned nggVertsPerSubgroup;        // How to determine NGG verts per subgroup
   unsigned nggPrimsPerSubgroup;        // How to determine NGG prims per subgroup
   unsigned shadowDescriptorTable;      // High dword of shadow descriptor table address, or
