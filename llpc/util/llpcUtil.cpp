@@ -76,16 +76,19 @@ const char *getShaderStageName(ShaderStage shaderStage) {
 ShaderStage convertToShaderStage(unsigned execModel) {
   switch (execModel) {
   case spv::ExecutionModelVertex:
+    return ShaderStageVertex;
   case spv::ExecutionModelTessellationControl:
+    return ShaderStageTessControl;
   case spv::ExecutionModelTessellationEvaluation:
+    return ShaderStageTessEval;
   case spv::ExecutionModelGeometry:
+    return ShaderStageGeometry;
   case spv::ExecutionModelFragment:
-  case spv::ExecutionModelGLCompute: {
-    return static_cast<ShaderStage>(execModel);
-  }
-  case spv::ExecutionModelCopyShader: {
+    return ShaderStageFragment;
+  case spv::ExecutionModelGLCompute:
+    return ShaderStageCompute;
+  case spv::ExecutionModelCopyShader:
     return ShaderStageCopyShader;
-  }
   }
 
   llvm_unreachable("Should never be called!");
@@ -99,21 +102,23 @@ ShaderStage convertToShaderStage(unsigned execModel) {
 spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
   switch (shaderStage) {
   case ShaderStageVertex:
+    return spv::ExecutionModelVertex;
   case ShaderStageTessControl:
+    return spv::ExecutionModelTessellationControl;
   case ShaderStageTessEval:
+    return spv::ExecutionModelTessellationEvaluation;
   case ShaderStageGeometry:
+    return spv::ExecutionModelGeometry;
   case ShaderStageFragment:
-  case ShaderStageCompute: {
-    return static_cast<spv::ExecutionModel>(shaderStage);
-  }
-  case ShaderStageCopyShader: {
+    return spv::ExecutionModelFragment;
+  case ShaderStageCompute:
+    return spv::ExecutionModelGLCompute;
+  case ShaderStageCopyShader:
     return spv::ExecutionModelCopyShader;
   }
-  default: {
-    llvm_unreachable("Should never be called!");
-    return static_cast<spv::ExecutionModel>(0);
-  }
-  }
+
+  llvm_unreachable("Should never be called!");
+  return spv::ExecutionModelMax;
 }
 
 // =====================================================================================================================
