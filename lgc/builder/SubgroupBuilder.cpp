@@ -471,12 +471,12 @@ Value *SubgroupBuilder::CreateSubgroupShuffleDown(Value *const value, Value *con
 //
 // @param groupArithOp : The group arithmetic operation.
 // @param value : An LLVM value.
-// @param ctSize : The cluster size.
+// @param inClusterSize : The expected cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, Value *const value,
-                                                         Value *const ctSize, const Twine &instName) {
+                                                         Value *const inClusterSize, const Twine &instName) {
   auto waveSize = getInt32(getShaderWaveSize());
-  Value *clusterSize = CreateSelect(CreateICmpUGT(ctSize, waveSize), waveSize, ctSize);
+  Value *clusterSize = CreateSelect(CreateICmpUGT(inClusterSize, waveSize), waveSize, inClusterSize);
   if (supportDpp()) {
     // Start the WWM section by setting the inactive lanes.
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
@@ -622,12 +622,12 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
 //
 // @param groupArithOp : The group arithmetic operation.
 // @param value : An LLVM value.
-// @param ctSize : The cluster size.
+// @param inClusterSize : The expected cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, Value *const value,
-                                                         Value *const ctSize, const Twine &instName) {
+                                                         Value *const inClusterSize, const Twine &instName) {
   auto waveSize = getInt32(getShaderWaveSize());
-  Value *clusterSize = CreateSelect(CreateICmpUGT(ctSize, waveSize), waveSize, ctSize);
+  Value *clusterSize = CreateSelect(CreateICmpUGT(inClusterSize, waveSize), waveSize, inClusterSize);
   if (supportDpp()) {
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
@@ -771,12 +771,12 @@ Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArith
 //
 // @param groupArithOp : The group arithmetic operation.
 // @param value : An LLVM value.
-// @param ctSize : The cluster size.
+// @param inClusterSize : The expected cluster size.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Value *const value,
-                                                         Value *const ctSize, const Twine &instName) {
+                                                         Value *const inClusterSize, const Twine &instName) {
   auto waveSize = getInt32(getShaderWaveSize());
-  Value *clusterSize = CreateSelect(CreateICmpUGT(ctSize, waveSize), waveSize, ctSize);
+  Value *clusterSize = CreateSelect(CreateICmpUGT(inClusterSize, waveSize), waveSize, inClusterSize);
   if (supportDpp()) {
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
