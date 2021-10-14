@@ -98,6 +98,9 @@ public:
   unsigned getArraySize() const { return m_data.bits.arraySize; }
   void setArraySize(unsigned arraySize) { m_data.bits.arraySize = arraySize; }
 
+  bool isPerVertex() const { return m_data.bits.perVertex; }
+  void setPerVertex(bool perVertex = true) { m_data.bits.perVertex = perVertex; }
+
 private:
   union {
     struct {
@@ -111,6 +114,7 @@ private:
       unsigned arraySize : 4;    // Built-in array input: shader-defined array size. Must be set for
                                  //    a read or write of ClipDistance or CullDistance that is of the
                                  //    whole array or of an element with a variable index.
+      unsigned perVertex : 1;    // FS input: adjust the index of the per-vertex input variable
     } bits;
     unsigned u32All;
   } m_data;

@@ -276,6 +276,9 @@ struct ResourceUsage {
         unsigned baryCoordSmoothCentroid : 1;  // Whether gl_BaryCoordSmoothCentroid is used (AMD extension)
         unsigned baryCoordSmoothSample : 1;    // Whether gl_BaryCoordSmoothSample is used (AMD extension)
         unsigned baryCoordPullModel : 1;       // Whether gl_BaryCoordPullModel is used (AMD extension)
+        unsigned baryCoord : 1;                // Whether gl_BaryCoordKHR is used
+        unsigned baryCoordNoPerspKHR : 1;      // Whether gl_BaryCoordNoPerspKHR is used, distinction from
+                                               // gl_BaryCoordNoPersp
         // Output
         unsigned fragDepth : 1;      // Whether gl_FragDepth is used
         unsigned sampleMask : 1;     // Whether gl_SampleMask[] is used

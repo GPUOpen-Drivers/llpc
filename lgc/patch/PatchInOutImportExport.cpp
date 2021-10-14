@@ -2525,6 +2525,59 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     input = getSamplePosition(inputTy, insertPos);
     break;
   }
+  case BuiltInBaryCoord:
+  case BuiltInBaryCoordNoPerspKHR: {
+    unsigned int idx = 0;
+    if (BuiltInBaryCoord == builtInId) {
+      assert(entryArgIdxs.perspInterp.center != 0);
+      idx = entryArgIdxs.perspInterp.center;
+    } else {
+      assert(entryArgIdxs.linearInterp.center != 0);
+      idx = entryArgIdxs.linearInterp.center;
+    }
+
+    auto iJCoord = getFunctionArgument(m_entryPoint, idx);
+    builder.SetInsertPoint(insertPos);
+    auto iCoord = builder.CreateExtractElement(iJCoord, uint64_t(0));
+    auto jCoord = builder.CreateExtractElement(iJCoord, 1);
+    unsigned vertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
+    switch (vertsPerPrim) {
+    case 1: {
+      // Points
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 1.0), uint64_t(0));
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 1);
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 2);
+      break;
+    }
+    case 2: {
+      // Lines
+      // The weight of vertex0 is (1 - i - j), the weight of vertex1 is (i + j).
+      auto kCoord = builder.CreateFSub(ConstantFP::get(Type::getFloatTy(*m_context), 1.0), iCoord);
+      kCoord = builder.CreateFSub(kCoord, jCoord);
+      jCoord = builder.CreateFAdd(iCoord, jCoord);
+      input = builder.CreateInsertElement(input, kCoord, uint64_t(0));
+      input = builder.CreateInsertElement(input, jCoord, 1);
+      break;
+    }
+    case 3: {
+      // Triangles
+      // V0 ==> Attr_indx2
+      // V1 ==> Attr_indx0
+      // V2 ==> Attr_indx1
+      auto kCoord = builder.CreateFSub(ConstantFP::get(Type::getFloatTy(*m_context), 1.0), iCoord);
+      kCoord = builder.CreateFSub(kCoord, jCoord);
+      input = builder.CreateInsertElement(input, iCoord, uint64_t(2));
+      input = builder.CreateInsertElement(input, jCoord, uint64_t(0));
+      input = builder.CreateInsertElement(input, kCoord, uint64_t(1));
+      break;
+    }
+    default: {
+      llvm_unreachable("Should never be called!");
+      break;
+    }
+    }
+    break;
+  }
   default: {
     llvm_unreachable("Should never be called!");
     break;
