@@ -98,6 +98,9 @@ public:
   unsigned getArraySize() const { return m_data.bits.arraySize; }
   void setArraySize(unsigned arraySize) { m_data.bits.arraySize = arraySize; }
 
+  bool isAdjustIj() const { return m_data.bits.adjustIj; }
+  void setAdjustIj(bool adjust = true) { m_data.bits.adjustIj = adjust; }
+
 private:
   union {
     struct {
@@ -111,6 +114,7 @@ private:
       unsigned arraySize : 4;    // Built-in array input: shader-defined array size. Must be set for
                                  //    a read or write of ClipDistance or CullDistance that is of the
                                  //    whole array or of an element with a variable index.
+      unsigned adjustIj : 1;     // FS input: adjust the index of the per-vertex input variable
     } bits;
     unsigned u32All;
   } m_data;

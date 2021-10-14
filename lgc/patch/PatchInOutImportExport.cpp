@@ -2525,6 +2525,88 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     input = getSamplePosition(inputTy, insertPos);
     break;
   }
+  case BuiltInBaryCoord: {
+    assert(entryArgIdxs.perspInterp.center != 0);
+    builder.SetInsertPoint(insertPos);
+    auto iJCoord = getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.center);
+    auto iCoord = builder.CreateExtractElement(iJCoord, uint64_t(0));
+    auto jCoord = builder.CreateExtractElement(iJCoord, 1);
+    unsigned primitiveMode = m_pipelineState->getVerticesPerPrimitive();
+    switch (primitiveMode) {
+    case 1: {
+      // points
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 1.0), uint64_t(0));
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 1);
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 2);
+      break;
+    }
+    case 2: {
+      // lines
+      input = builder.CreateInsertElement(input, iCoord, uint64_t(0));
+      input = builder.CreateInsertElement(input, jCoord, uint64_t(1));
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 2);
+      break;
+    }
+    case 3: {
+      // triangles
+      // V0	==> Attr_indx2
+      // V1 ==> Attr_indx0
+      // V2 ==> Attr_indx1
+      auto kCoord = builder.CreateFSub(ConstantFP::get(Type::getFloatTy(*m_context), 1.0), iCoord);
+      kCoord = builder.CreateFSub(kCoord, jCoord);
+      input = builder.CreateInsertElement(input, iCoord, uint64_t(2));
+      input = builder.CreateInsertElement(input, jCoord, uint64_t(0));
+      input = builder.CreateInsertElement(input, kCoord, uint64_t(1));
+      break;
+    }
+    default: {
+      llvm_unreachable("Should never be called!");
+      break;
+    }
+    }
+    break;
+  }
+  case BuiltInBaryCoordNoPerspKHR: {
+    assert(entryArgIdxs.linearInterp.center != 0);
+    builder.SetInsertPoint(insertPos);
+    auto iJCoord = getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center);
+    auto iCoord = builder.CreateExtractElement(iJCoord, uint64_t(0));
+    auto jCoord = builder.CreateExtractElement(iJCoord, 1);
+    unsigned primitiveMode = m_pipelineState->getVerticesPerPrimitive();
+    switch (primitiveMode) {
+    case 1: {
+      // points
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 1.0), uint64_t(0));
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 1);
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 2);
+      break;
+    }
+    case 2: {
+      // lines
+      input = builder.CreateInsertElement(input, iCoord, uint64_t(0));
+      input = builder.CreateInsertElement(input, jCoord, 1);
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 2);
+      break;
+    }
+    case 3: {
+      // triangles
+      // V0	==> Attr_indx2
+      // V1 ==> Attr_indx0
+      // V2 ==> Attr_indx1
+      auto kCoord = builder.CreateFSub(ConstantFP::get(Type::getFloatTy(*m_context), 1.0), iCoord);
+      kCoord = builder.CreateFSub(kCoord, jCoord);
+      input = builder.CreateInsertElement(input, iCoord, uint64_t(2));
+      input = builder.CreateInsertElement(input, jCoord, uint64_t(0));
+      input = builder.CreateInsertElement(input, kCoord, uint64_t(1));
+      break;
+    }
+    default:
+      llvm_unreachable("Should never be called!");
+      break;
+    }
+    break;
+  }
+
   default: {
     llvm_unreachable("Should never be called!");
     break;

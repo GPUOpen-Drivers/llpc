@@ -51,6 +51,8 @@
 //
 // If this file is included without the BUILTIN macro defined, then it declares the BuiltInKind enum.
 
+BUILTIN(BaryCoord, 5286, N, P, v3f32)                    // Perspective-interpolated (I,J,K) at pixel center
+BUILTIN(BaryCoordNoPerspKHR, 5287, N, P, v3f32)          // Linearly-interpolated (I,J,K) at pixel center
 BUILTIN(BaryCoordNoPersp, 4992, N, P, v2f32)             // Linearly-interpolated (I,J) at pixel center
 BUILTIN(BaryCoordNoPerspCentroid, 4993, N, P, v2f32)     // Linearly-interpolated (I,J) at pixel centroid
 BUILTIN(BaryCoordNoPerspSample, 4994, N, P, v2f32)       // Linearly-interpolated (I,J) at each covered sample

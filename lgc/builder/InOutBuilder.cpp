@@ -479,8 +479,33 @@ Value *InOutBuilder::modifyAuxInterpValue(Value *auxInterpValue, InOutInfo input
       else
         auxInterpValue = evalIjOffsetSmooth(auxInterpValue);
     }
-  } else
+  } else {
     assert(inputInfo.getInterpMode() == InOutInfo::InterpModeCustom);
+    if (inputInfo.isAdjustIj()) {
+      unsigned primitiveMode = getPipelineState()->getVerticesPerPrimitive();
+      switch (primitiveMode) {
+      case 1:
+        // points
+        break;
+      case 2:
+        // lines
+        break;
+      case 3: {
+        // triangles
+        // V0 ==> Attr_indx2
+        // V1 ==> Attr_indx0
+        // V2 ==> Attr_indx1
+        // just satisfies (idx + 2)%3.
+        Value *T = CreateAdd(getInt32(2), auxInterpValue);
+        auxInterpValue = CreateSRem(T, getInt32(3));
+        break;
+      }
+      default:
+        llvm_unreachable("Should never be called!");
+        break;
+      }
+    }
+  }
   return auxInterpValue;
 }
 
@@ -1248,6 +1273,12 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySiz
       break;
     case BuiltInBaryCoordPullModel:
       usage.fs.baryCoordPullModel = true;
+      break;
+    case BuiltInBaryCoord:
+      usage.fs.baryCoord = true;
+      break;
+    case BuiltInBaryCoordNoPerspKHR:
+      usage.fs.baryCoordNoPerspKHR = true;
       break;
 
     // Internal built-ins.
