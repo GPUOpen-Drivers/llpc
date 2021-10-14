@@ -1298,6 +1298,13 @@ void PatchResourceCollect::clearInactiveBuiltInInput() {
     if (builtInUsage.fs.baryCoordPullModel &&
         m_activeInputBuiltIns.find(BuiltInBaryCoordPullModel) == m_activeInputBuiltIns.end())
       builtInUsage.fs.baryCoordPullModel = false;
+
+    if (builtInUsage.fs.baryCoord && m_activeInputBuiltIns.find(BuiltInBaryCoord) == m_activeInputBuiltIns.end())
+      builtInUsage.fs.baryCoord = false;
+
+    if (builtInUsage.fs.baryCoordNoPerspKHR &&
+        m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspKHR) == m_activeInputBuiltIns.end())
+      builtInUsage.fs.baryCoordNoPerspKHR = false;
   }
 }
 
