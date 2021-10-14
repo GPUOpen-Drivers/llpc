@@ -11,6 +11,11 @@ or
 cmake --build xgl/builds/Release64 --target check-lgc check-lgc-units check-amdllpc check-amdllpc-units
 ```
 
+LLPC also contains amber tests that need an actual GPU to run. See the [test directory](../../test/) for more information.
+```
+cmake --build xgl/builds/Release64 --target check-amber
+```
+
 Building the `check-amdllpc` target also builds spvgen.so.
 If the spvgen.so build fails with an error like this:
 ```

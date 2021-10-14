@@ -96,6 +96,10 @@ if(ICD_BUILD_LLPC)
 
     add_subdirectory(llpc ${PROJECT_BINARY_DIR}/llpc)
 
+    if(LLPC_BUILD_TESTS OR LLPC_BUILD_LIT)
+        add_subdirectory(test)
+    endif()
+
     # Export the LLVM and spvgen build paths so that they are available in XGL,
     # when this is not an LLPC standalone build.
     if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -107,4 +111,3 @@ if(ICD_BUILD_LLPC)
 
     target_link_libraries(vkgc INTERFACE llpc)
 endif()
-

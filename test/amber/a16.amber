@@ -1,0 +1,140 @@
+#!amber
+# Copyright 2019 The Amber Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# TODO Remove the not once this is fixed in LLVM
+# RUN: not run_amber_test.py --icd %icd %s | FileCheck %s
+# REQUIRES: gfx10+
+
+# Test a16 image samples with bias. The bias needs to be converted to 16 bit.
+
+DEVICE_EXTENSION VK_KHR_shader_float16_int8
+
+SHADER vertex vert_shader_mipclear PASSTHROUGH
+
+SHADER vertex vert_shader_lod GLSL
+#version 430
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+
+layout(location = 0) in vec3 position_in;
+layout(location = 0) out vec2 position_out;
+layout(location = 1) out float vert_i;
+layout(set = 0, binding = 0) uniform highp sampler2D tex;
+
+void main() {
+  gl_Position = vec4(position_in, 1.0);
+  position_out = gl_Position.xy;
+  vert_i = gl_VertexIndex % 4;
+}
+END
+
+SHADER fragment frag_shader GLSL
+#version 430
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+
+layout(location = 0) in vec2 position_in;
+layout(location = 1) in float vert_i;
+layout(location = 0) out vec4 color_out;
+layout(set = 0, binding = 0) uniform highp sampler2D tex;
+
+void main() {
+// CHECK: image_sample_b {{.*}} a16
+  vec2 pos = (position_in + vec2(1.0)) / 2.0;
+  float vi = round(vert_i); // Round to integer to get striped pattern
+  // Convert address and bias to f16 to generate an a16 sample.
+  color_out = vec4(texture(tex, vec2(f16vec2(pos)), float(float16_t(vi))));
+  // Render the texture, run with `amber <file> -i image.png` to view.
+  //color_out = vec4(textureLod(tex, pos, 0));
+}
+END
+
+SHADER fragment frag_passthrough_shader GLSL
+#version 430
+
+layout(location = 0) in vec4 color_in;
+layout(location = 0) out vec4 color_out;
+
+void main() {
+  color_out = color_in;
+}
+END
+
+BUFFER texture FORMAT B8G8R8A8_UNORM MIP_LEVELS 4
+BUFFER framebuffer FORMAT B8G8R8A8_UNORM
+SAMPLER sampler MAX_LOD 4.0
+
+PIPELINE graphics mipclear_pipeline0
+  ATTACH vert_shader_mipclear
+  ATTACH frag_passthrough_shader
+  BIND BUFFER texture AS color LOCATION 0 BASE_MIP_LEVEL 0
+  FRAMEBUFFER_SIZE 512 512
+END
+
+PIPELINE graphics mipclear_pipeline1
+  ATTACH vert_shader_mipclear
+  ATTACH frag_passthrough_shader
+  BIND BUFFER texture AS color LOCATION 0 BASE_MIP_LEVEL 1
+  FRAMEBUFFER_SIZE 256 256
+END
+
+PIPELINE graphics mipclear_pipeline2
+  ATTACH vert_shader_mipclear
+  ATTACH frag_passthrough_shader
+  BIND BUFFER texture AS color LOCATION 0 BASE_MIP_LEVEL 2
+  FRAMEBUFFER_SIZE 128 128
+END
+
+PIPELINE graphics mipclear_pipeline3
+  ATTACH vert_shader_mipclear
+  ATTACH frag_passthrough_shader
+  BIND BUFFER texture AS color LOCATION 0 BASE_MIP_LEVEL 3
+  FRAMEBUFFER_SIZE 64 64
+END
+
+PIPELINE graphics lod_pipeline
+  ATTACH vert_shader_lod
+  ATTACH frag_shader
+  BIND BUFFER texture AS combined_image_sampler SAMPLER sampler DESCRIPTOR_SET 0 BINDING 0
+  BIND BUFFER framebuffer AS color LOCATION 0
+  FRAMEBUFFER_SIZE 512 512
+END
+
+# Clear all mip levels to different color.
+# The generated image has a striped pattern where the lower 3/4 are filled with color0,
+# the lower 3/4 of the upper 1/4 are filled with color1, etc. for color2 and 3.
+# On mip level 1, only stripes with color1, 2 and 3 are visible where color1 fills the lower 3/4.
+# Analogous for mip level 2 and 3 where 3 only consists of color3.
+CLEAR_COLOR mipclear_pipeline0 255 0 0 255
+CLEAR mipclear_pipeline0
+CLEAR_COLOR mipclear_pipeline1 0 255 0 255
+CLEAR mipclear_pipeline1
+CLEAR_COLOR mipclear_pipeline2 0 0 255 255
+CLEAR mipclear_pipeline2
+CLEAR_COLOR mipclear_pipeline3 255 255 0 255
+CLEAR mipclear_pipeline3
+
+CLEAR_COLOR lod_pipeline 0 0 0 255
+CLEAR lod_pipeline
+RUN lod_pipeline DRAW_RECT POS 0 0 SIZE 512 512
+
+# Rounding the vertex id in the fs generates diagonal stripes from the lower left corner into
+# the upper right corner.
+
+# Check corners of the frame buffer: each should have a color from a different mip level.
+# Sorted by vertex id 0, 1, 2, 3
+EXPECT framebuffer IDX 0   511 SIZE 1 1 EQ_RGBA 255 0   0   255
+# Check the bottom of the stripe, the top is color3 because the texture is striped at mip level 1
+EXPECT framebuffer IDX 200 511 SIZE 1 1 EQ_RGBA 0   255 0   255
+EXPECT framebuffer IDX 511 511 SIZE 1 1 EQ_RGBA 0   0   255 255
+EXPECT framebuffer IDX 511 0   SIZE 1 1 EQ_RGBA 255 255 0   255
