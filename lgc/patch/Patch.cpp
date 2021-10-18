@@ -119,6 +119,9 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   // Lower fragment export operations.
   passMgr.add(createLowerFragColorExport());
 
+  // Run IPSCCP before EntryPointMutate to avoid adding unnecessary arguments to an entry point.
+  passMgr.add(createIPSCCPPass());
+
   // Patch entry-point mutation (should be done before external library link)
   passMgr.add(createPatchEntryPointMutate());
 
@@ -219,9 +222,7 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   LLPC_OUTS("PassManager optimization level = " << cl::OptLevel << "\n");
 
   passMgr.add(createForceFunctionAttrsLegacyPass());
-  passMgr.add(createIPSCCPPass());
   passMgr.add(createInstructionCombiningPass(1));
-  passMgr.add(createInstSimplifyLegacyPass());
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createSROAPass());
   passMgr.add(createEarlyCSEPass(true));
@@ -231,7 +232,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   passMgr.add(createAggressiveInstCombinerPass());
   passMgr.add(createInstructionCombiningPass(1));
   passMgr.add(createPatchPeepholeOpt());
-  passMgr.add(createInstSimplifyLegacyPass());
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createReassociatePass());
   passMgr.add(createLoopRotatePass());
@@ -250,7 +250,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   passMgr.add(createInstructionCombiningPass(1));
   passMgr.add(createCorrelatedValuePropagationPass());
   passMgr.add(createAggressiveDCEPass());
-  passMgr.add(createCFGSimplificationPass());
   passMgr.add(createLoopRotatePass());
   passMgr.add(createCFGSimplificationPass(SimplifyCFGOptions()
                                               .bonusInstThreshold(1)
@@ -262,7 +261,6 @@ void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
   // uses DivergenceAnalysis
   passMgr.add(createPatchReadFirstLane());
   passMgr.add(createInstructionCombiningPass(1));
-  passMgr.add(createLICMPass());
   passMgr.add(createConstantMergePass());
   passMgr.add(createDivRemPairsPass());
   passMgr.add(createCFGSimplificationPass());
