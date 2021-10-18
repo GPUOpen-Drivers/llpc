@@ -197,12 +197,10 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // It is required by SpirvLowerImageOp.
   passMgr.addPass(createModuleToFunctionPassAdaptor(SROA()));
   passMgr.addPass(GlobalOptPass());
-  passMgr.addPass(createModuleToFunctionPassAdaptor(PromotePass()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(ADCEPass()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(2)));
   passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(EarlyCSEPass()));
-  passMgr.addPass(IPSCCPPass());
 
   // Lower SPIR-V floating point optimisation
   passMgr.addPass(SpirvLowerMathFloatOp());
@@ -275,12 +273,10 @@ void LegacySpirvLower::addPasses(Context *context, ShaderStage stage, legacy::Pa
   // It is required by SpirvLowerImageOp.
   passMgr.add(createSROAPass());
   passMgr.add(createGlobalOptimizerPass());
-  passMgr.add(createPromoteMemoryToRegisterPass());
   passMgr.add(createAggressiveDCEPass());
   passMgr.add(createInstructionCombiningPass(2));
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createEarlyCSEPass());
-  passMgr.add(createIPSCCPPass());
 
   // Lower SPIR-V floating point optimisation
   passMgr.add(createLegacySpirvLowerMathFloatOp());
