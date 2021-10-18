@@ -32,6 +32,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
@@ -81,6 +82,15 @@ bool EnableOuts() {
 // Gets the value of option "allow-err".
 bool EnableErrs() {
   return cl::EnableErrs;
+}
+
+// =====================================================================================================================
+// Prints the error message in `err` to LLPC_ERRS and consumes the error.
+//
+// @param err : The error to handle.
+void reportError(Error &&err) {
+  // For details on llvm error handling, see https://llvm.org/docs/ProgrammersManual.html#recoverable-errors.
+  handleAllErrors(std::move(err), [](const ErrorInfoBase &baseError) { LLPC_ERRS(baseError.message() << "\n"); });
 }
 
 // =====================================================================================================================
