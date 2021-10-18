@@ -799,8 +799,7 @@ int main(int argc, char *argv[]) {
 
   auto inputGroupsOrErr = groupInputFiles(expandedInputFiles);
   if (Error err = inputGroupsOrErr.takeError()) {
-    LLPC_ERRS(err);
-    consumeError(std::move(err));
+    reportError(std::move(err));
     result = Result::ErrorInvalidValue;
     return onFailure();
   }

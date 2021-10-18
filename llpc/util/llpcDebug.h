@@ -50,15 +50,14 @@
   while (false)
 
 namespace llvm {
-class raw_ostream;
-}
-namespace llvm {
 class raw_fd_ostream;
-}
+class raw_ostream;
+class Error;
+} // namespace llvm
 
 namespace MetroHash {
 struct Hash;
-};
+} // namespace MetroHash
 
 namespace Llpc {
 
@@ -67,6 +66,9 @@ bool EnableOuts();
 
 // Gets the value of option "enable-errs"
 bool EnableErrs();
+
+// Prints the error to LLPC_ERRS and consumes it.
+void reportError(llvm::Error &&err);
 
 // Redirects the output of logs, It affects the behavior of llvm::outs(), dbgs() and errs().
 void redirectLogOutput(bool restoreToDefault, unsigned optionCount, const char *const *options);

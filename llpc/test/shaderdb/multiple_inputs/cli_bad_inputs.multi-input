@@ -1,0 +1,11 @@
+; Negative tests to make sure that amdllpc reports errors when invalid inputs are passed.
+
+; Check that mixing .pipe and shader inputs is not allowed.
+; BEGIN_SHADERTEST_1
+; RUN: not amdllpc -spvgen-dir=%spvgendir% -v \
+; RUN:      %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
+; RUN:      %S/test_inputs/Fs1.frag \
+; RUN: | FileCheck -check-prefix=SHADERTEST_1 %s
+; SHADERTEST_1-LABEL: {{^}}ERROR: Mixing .pipe and shader inputs is not allowed
+; SHADERTEST_1-LABEL: {{^}}===== AMDLLPC FAILED =====
+; END_SHADERTEST_1

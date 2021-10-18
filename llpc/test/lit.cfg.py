@@ -71,6 +71,6 @@ config.substitutions.append(('%spvgendir%', config.spvgen_dir))
 
 tool_dirs = [config.llvm_tools_dir, config.amdllpc_dir]
 
-tools = ['amdllpc', 'llvm-objdump', 'llvm-readelf']
+tools = ['amdllpc', 'llvm-objdump', 'llvm-readelf', 'not', 'count']
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)
