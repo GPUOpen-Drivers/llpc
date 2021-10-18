@@ -39,9 +39,9 @@ config.name = 'LLPC_SHADERTEST'
 config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
 
 # suffixes: A list of file extensions to treat as test files.
-config.suffixes = ['.vert', '.tesc', '.tese', '.geom', '.frag', '.comp', '.spvasm', '.pipe', '.ll']
+config.suffixes = ['.vert', '.tesc', '.tese', '.geom', '.frag', '.comp', '.spvasm', '.pipe', '.ll', '.multi-input']
 
-# excludes: A list of directories  and fles to exclude from the testsuite.
+# excludes: A list of directories and files to exclude from the testsuite.
 config.excludes = ['CMakeLists.txt', 'litScripts', 'internal', 'avoid', 'error']
 
 # test_source_root: The root path where tests are located.
