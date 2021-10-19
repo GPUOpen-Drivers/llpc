@@ -89,118 +89,112 @@ using namespace Llpc;
 using namespace Llpc::StandaloneCompiler;
 using namespace Vkgc;
 
-// Represents options of LLPC standalone tool.
+namespace {
+// Represents options of the amdllpc standalone tool.
 
 // -gfxip: graphics IP version
-static cl::opt<std::string> GfxIp("gfxip", cl::desc("Graphics IP version"), cl::value_desc("major.minor.step"),
-                                  cl::init("8.0.2"));
+cl::opt<std::string> GfxIp("gfxip", cl::desc("Graphics IP version"), cl::value_desc("major.minor.step"),
+                           cl::init("8.0.2"));
 
 // The GFXIP version parsed out of the -gfxip option before normal option processing occurs.
-static GfxIpVersion ParsedGfxIp = {8, 0, 2};
+GfxIpVersion ParsedGfxIp = {8, 0, 2};
 
 // Input sources
-static cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueRequired,
-                                     cl::desc("<source>...\n"
-                                              "Type of input file is determined by its filename extension:\n"
-                                              "  .spv      SPIR-V binary\n"
-                                              "  .spvasm   SPIR-V assembly text\n"
-                                              "  .vert     GLSL vertex shader\n"
-                                              "  .tesc     GLSL tessellation control shader\n"
-                                              "  .tese     GLSL tessellation evaluation shader\n"
-                                              "  .geom     GLSL geometry shader\n"
-                                              "  .frag     GLSL fragment shader\n"
-                                              "  .comp     GLSL compute shader\n"
-                                              "  .pipe     Pipeline info file\n"
-                                              "  .ll       LLVM IR assembly text"));
+cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueRequired,
+                              cl::desc("<source>...\n"
+                                       "Type of input file is determined by its filename extension:\n"
+                                       "  .spv      SPIR-V binary\n"
+                                       "  .spvasm   SPIR-V assembly text\n"
+                                       "  .vert     GLSL vertex shader\n"
+                                       "  .tesc     GLSL tessellation control shader\n"
+                                       "  .tese     GLSL tessellation evaluation shader\n"
+                                       "  .geom     GLSL geometry shader\n"
+                                       "  .frag     GLSL fragment shader\n"
+                                       "  .comp     GLSL compute shader\n"
+                                       "  .pipe     Pipeline info file\n"
+                                       "  .ll       LLVM IR assembly text"));
 
 // -o: output
-static cl::opt<std::string> OutFile("o", cl::desc("Output file"), cl::value_desc("filename (\"-\" for stdout)"));
+cl::opt<std::string> OutFile("o", cl::desc("Output file"), cl::value_desc("filename (\"-\" for stdout)"));
 
 // -l: link pipeline
-static cl::opt<bool> ToLink("l", cl::desc("Link pipeline and generate ISA codes"), cl::init(true));
+cl::opt<bool> ToLink("l", cl::desc("Link pipeline and generate ISA codes"), cl::init(true));
 
 // -auto-layout-desc: automatically create descriptor layout based on resource usages
-static cl::opt<bool> AutoLayoutDesc("auto-layout-desc",
-                                    cl::desc("Automatically create descriptor layout based on resource usages"),
-                                    cl::init(false));
-
-// -unlinked : build an "unlinked" shader/part-pipeline ELF that needs a further link step
-static cl::opt<bool> Unlinked("unlinked", cl::desc("Build \"unlinked\" shader/part-pipeline ELF"), cl::init(false));
-
-// -validate-spirv: validate input SPIR-V binary or text
-static cl::opt<bool> ValidateSpirv("validate-spirv", cl::desc("Validate input SPIR-V binary or text (default: true)"),
-                                   cl::init(true));
-
-// -entry-target: name string of entry target (for multiple entry-points)
-static cl::opt<std::string> EntryTarget("entry-target", cl::desc("Name string of entry target"),
-                                        cl::value_desc("entryname"), cl::init(""));
-
-// -ignore-color-attachment-formats: ignore color attachment formats
-static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
-                                                  cl::desc("Ignore color attachment formats"), cl::init(false));
-
-// -enable-ngg: enable NGG mode
-static cl::opt<bool> EnableNgg("enable-ngg", cl::desc("Enable implicit primitive shader (NGG) mode"), cl::init(true));
-
-// -enable-gs-use: enable NGG use on geometry shader
-static cl::opt<bool> NggEnableGsUse("ngg-enable-gs-use", cl::desc("Enable NGG use on geometry shader"),
-                                    cl::init(false));
-
-// -ngg-force-culling-mode: force NGG to run in culling mode
-static cl::opt<bool> NggForceCullingMode("ngg-force-culling-mode", cl::desc("Force NGG to run in culling mode"),
-                                         cl::init(false));
-
-// -ngg-compact-mode: NGG compaction mode (NGG)
-static cl::opt<unsigned> NggCompactionMode("ngg-compaction-mode",
-                                           cl::desc("Compaction mode after culling operations (NGG):\n"
-                                                    "0: Compaction is disabled\n"
-                                                    "1: Compaction is based on vertices"),
-                                           cl::value_desc("mode"), cl::init(static_cast<unsigned>(NggCompactVertices)));
-
-// -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
-static cl::opt<bool> NggEnableVertexReuse("ngg-enable-vertex-reuse",
-                                          cl::desc("Enable optimization to cull duplicate vertices (NGG)"),
-                                          cl::init(false));
-
-// -ngg-enable-backface-culling: enable culling of primitives that don't meet facing criteria (NGG)
-static cl::opt<bool>
-    NggEnableBackfaceCulling("ngg-enable-backface-culling",
-                             cl::desc("Enable culling of primitives that don't meet facing criteria (NGG)"),
+cl::opt<bool> AutoLayoutDesc("auto-layout-desc",
+                             cl::desc("Automatically create descriptor layout based on resource usages"),
                              cl::init(false));
 
+// -unlinked : build an "unlinked" shader/part-pipeline ELF that needs a further link step
+cl::opt<bool> Unlinked("unlinked", cl::desc("Build \"unlinked\" shader/part-pipeline ELF"), cl::init(false));
+
+// -validate-spirv: validate input SPIR-V binary or text
+cl::opt<bool> ValidateSpirv("validate-spirv", cl::desc("Validate input SPIR-V binary or text (default: true)"),
+                            cl::init(true));
+
+// -entry-target: name string of entry target (for multiple entry-points)
+cl::opt<std::string> EntryTarget("entry-target", cl::desc("Name string of entry target"), cl::value_desc("entryname"),
+                                 cl::init(""));
+
+// -ignore-color-attachment-formats: ignore color attachment formats
+cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
+                                           cl::desc("Ignore color attachment formats"), cl::init(false));
+
+// -enable-ngg: enable NGG mode
+cl::opt<bool> EnableNgg("enable-ngg", cl::desc("Enable implicit primitive shader (NGG) mode"), cl::init(true));
+
+// -enable-gs-use: enable NGG use on geometry shader
+cl::opt<bool> NggEnableGsUse("ngg-enable-gs-use", cl::desc("Enable NGG use on geometry shader"), cl::init(false));
+
+// -ngg-force-culling-mode: force NGG to run in culling mode
+cl::opt<bool> NggForceCullingMode("ngg-force-culling-mode", cl::desc("Force NGG to run in culling mode"),
+                                  cl::init(false));
+
+// -ngg-compact-mode: NGG compaction mode (NGG)
+cl::opt<unsigned> NggCompactionMode("ngg-compaction-mode",
+                                    cl::desc("Compaction mode after culling operations (NGG):\n"
+                                             "0: Compaction is disabled\n"
+                                             "1: Compaction is based on vertices"),
+                                    cl::value_desc("mode"), cl::init(static_cast<unsigned>(NggCompactVertices)));
+
+// -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
+cl::opt<bool> NggEnableVertexReuse("ngg-enable-vertex-reuse",
+                                   cl::desc("Enable optimization to cull duplicate vertices (NGG)"), cl::init(false));
+
+// -ngg-enable-backface-culling: enable culling of primitives that don't meet facing criteria (NGG)
+cl::opt<bool> NggEnableBackfaceCulling("ngg-enable-backface-culling",
+                                       cl::desc("Enable culling of primitives that don't meet facing criteria (NGG)"),
+                                       cl::init(false));
+
 // -ngg-enable-frustum-culling: enable discarding of primitives outside of view frustum (NGG)
-static cl::opt<bool> NggEnableFrustumCulling("ngg-enable-frustum-culling",
-                                             cl::desc("Enable discarding of primitives outside of view frustum (NGG)"),
-                                             cl::init(false));
+cl::opt<bool> NggEnableFrustumCulling("ngg-enable-frustum-culling",
+                                      cl::desc("Enable discarding of primitives outside of view frustum (NGG)"),
+                                      cl::init(false));
 
 // -ngg-enable-box-filter-culling: enable simpler frustum culler that is less accurate (NGG)
-static cl::opt<bool> NggEnableBoxFilterCulling("ngg-enable-box-filter-culling",
-                                               cl::desc("Enable simpler frustum culler that is less accurate (NGG)"),
-                                               cl::init(false));
+cl::opt<bool> NggEnableBoxFilterCulling("ngg-enable-box-filter-culling",
+                                        cl::desc("Enable simpler frustum culler that is less accurate (NGG)"),
+                                        cl::init(false));
 
 // -ngg-enable-sphere-culling: enable frustum culling based on a sphere (NGG)
-static cl::opt<bool> NggEnableSphereCulling("ngg-enable-sphere-culling",
-                                            cl::desc("Enable frustum culling based on a sphere (NGG)"),
-                                            cl::init(false));
+cl::opt<bool> NggEnableSphereCulling("ngg-enable-sphere-culling",
+                                     cl::desc("Enable frustum culling based on a sphere (NGG)"), cl::init(false));
 
 // -ngg-enable-small-prim-filter: enable trivial sub-sample primitive culling (NGG)
-static cl::opt<bool> NggEnableSmallPrimFilter("ngg-enable-small-prim-filter",
-                                              cl::desc("Enable trivial sub-sample primitive culling (NGG)"),
-                                              cl::init(false));
+cl::opt<bool> NggEnableSmallPrimFilter("ngg-enable-small-prim-filter",
+                                       cl::desc("Enable trivial sub-sample primitive culling (NGG)"), cl::init(false));
 
 // -ngg-cull-distance-culling: enable culling when "cull distance" exports are present (NGG)
-static cl::opt<bool>
-    NggEnableCullDistanceCulling("ngg-enable-cull-distance-culling",
-                                 cl::desc("Enable culling when \"cull distance\" exports are present (NGG)"),
-                                 cl::init(false));
+cl::opt<bool> NggEnableCullDistanceCulling("ngg-enable-cull-distance-culling",
+                                           cl::desc("Enable culling when \"cull distance\" exports are present (NGG)"),
+                                           cl::init(false));
 
 // -ngg-backface-exponent: control backface culling algorithm (NGG, 1 ~ UINT32_MAX, 0 disables it)
-static cl::opt<unsigned> NggBackfaceExponent("ngg-backface-exponent",
-                                             cl::desc("Control backface culling algorithm (NGG)"),
-                                             cl::value_desc("exp"), cl::init(0));
+cl::opt<unsigned> NggBackfaceExponent("ngg-backface-exponent", cl::desc("Control backface culling algorithm (NGG)"),
+                                      cl::value_desc("exp"), cl::init(0));
 
 // -ngg-subgroup-sizing: NGG sub-group sizing type (NGG)
-static cl::opt<unsigned> NggSubgroupSizing(
+cl::opt<unsigned> NggSubgroupSizing(
     "ngg-subgroup-sizing",
     cl::desc("NGG sub-group sizing type (NGG):\n"
              "0: Sub-group size is allocated as optimally determined\n"
@@ -212,43 +206,68 @@ static cl::opt<unsigned> NggSubgroupSizing(
     cl::value_desc("sizing"), cl::init(static_cast<unsigned>(NggSubgroupSizingType::Auto)));
 
 // -ngg-prims-per-subgroup: preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)
-static cl::opt<unsigned>
+cl::opt<unsigned>
     NggPrimsPerSubgroup("ngg-prims-per-subgroup",
                         cl::desc("Preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)"),
                         cl::value_desc("prims"), cl::init(256));
 
 // -ngg-verts-per-subgroup: preferred number of vertices consumed by a primitive shader sub-group (NGG)
-static cl::opt<unsigned>
+cl::opt<unsigned>
     NggVertsPerSubgroup("ngg-verts-per-subgroup",
                         cl::desc("Preferred number of vertices consumed by a primitive shader sub-group (NGG)"),
                         cl::value_desc("verts"), cl::init(256));
 
 // -spvgen-dir: load SPVGEN from specified directory
-static cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load SPVGEN library from"));
+cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load SPVGEN library from"));
 
-static cl::opt<bool> RobustBufferAccess("robust-buffer-access", cl::desc("Validate if the index is out of bounds"),
-                                        cl::init(false));
+cl::opt<bool> RobustBufferAccess("robust-buffer-access", cl::desc("Validate if the index is out of bounds"),
+                                 cl::init(false));
 
-static cl::opt<bool> ScalarBlockLayout("scalar-block-layout", cl::desc("Allows scalar block layout of types"),
-                                       cl::init(false));
+cl::opt<bool> ScalarBlockLayout("scalar-block-layout", cl::desc("Allows scalar block layout of types"),
+                                cl::init(false));
 
-static cl::opt<bool> EnableRelocatableShaderElf("enable-relocatable-shader-elf",
-                                                cl::desc("Compile pipelines using relocatable shader elf"),
-                                                cl::init(false));
+cl::opt<bool> EnableRelocatableShaderElf("enable-relocatable-shader-elf",
+                                         cl::desc("Compile pipelines using relocatable shader elf"), cl::init(false));
 
 // -check-auto-layout-compatible: check if auto descriptor layout got from spv file is compatible with real layout
-static cl::opt<bool> CheckAutoLayoutCompatible(
+cl::opt<bool> CheckAutoLayoutCompatible(
     "check-auto-layout-compatible",
     cl::desc("Check if auto descriptor layout got from spv file is compatible with real layout"));
 
 // -enable-scratch-bounds-checks: insert scratch access bounds checks on loads and stores
-static cl::opt<bool>
-    EnableScratchAccessBoundsChecks("enable-scratch-bounds-checks",
-                                    cl::desc("Insert scratch access bounds checks on loads and stores"),
-                                    cl::init(false));
+cl::opt<bool> EnableScratchAccessBoundsChecks("enable-scratch-bounds-checks",
+                                              cl::desc("Insert scratch access bounds checks on loads and stores"),
+                                              cl::init(false));
+
+// -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
+cl::opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
+                                           cl::desc("Filter which types of pipeline dump are disabled\n"
+                                                    "0x00 - Always enable pipeline logging\n"
+                                                    "0x01 - Disable logging for CS pipelines\n"
+                                                    "0x02 - Disable logging for NGG pipelines\n"
+                                                    "0x04 - Disable logging for GS pipelines\n"
+                                                    "0x08 - Disable logging for TS pipelines\n"
+                                                    "0x10 - Disable logging for VS-PS pipelines"),
+                                           cl::init(0));
+
+// -filter-pipeline-dump-by-hash: only dump the pipeline whose computed hash is equal to the specified (if non-zero).
+cl::opt<uint64_t> FilterPipelineDumpByHash(
+    "filter-pipeline-dump-by-hash",
+    cl::desc("Only dump the pipeline whose computed hash is equal to the specified (if non-zero)"), cl::init(0));
+
+//-dump-duplicate-pipelines: dump duplicated pipeline, attaching a numeric suffix
+cl::opt<bool> DumpDuplicatePipelines(
+    "dump-duplicate-pipelines",
+    cl::desc("If TRUE, duplicate pipelines will be dumped to a file with a numeric suffix attached"), cl::init(false));
+
+#ifdef WIN_OS
+// -assert-to-msgbox: pop message box when an assert is hit, only valid in Windows
+cl::opt<bool> AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when assert is hit"));
+#endif
+
+} // namespace
 
 namespace llvm {
-
 namespace cl {
 
 extern opt<bool> EnablePipelineDump;
@@ -256,37 +275,8 @@ extern opt<std::string> PipelineDumpDir;
 extern opt<bool> EnableTimerProfile;
 extern opt<bool> BuildShaderCache;
 
-// -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
-static opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
-                                              desc("Filter which types of pipeline dump are disabled\n"
-                                                   "0x00 - Always enable pipeline logging\n"
-                                                   "0x01 - Disable logging for CS pipelines\n"
-                                                   "0x02 - Disable logging for NGG pipelines\n"
-                                                   "0x04 - Disable logging for GS pipelines\n"
-                                                   "0x08 - Disable logging for TS pipelines\n"
-                                                   "0x10 - Disable logging for VS-PS pipelines"),
-                                              init(0));
-
-//// -filter-pipeline-dump-by-hash: only dump the pipeline whose computed hash is equal to the specified (if non-zero).
-static opt<uint64_t>
-    FilterPipelineDumpByHash("filter-pipeline-dump-by-hash",
-                             desc("Only dump the pipeline whose computed hash is equal to the specified (if non-zero)"),
-                             init(0));
-
-//-dump-duplicate-pipelines: dump duplicated pipeline, attaching a numeric suffix
-static opt<bool>
-    DumpDuplicatePipelines("dump-duplicate-pipelines",
-                           desc("If TRUE, duplicate pipelines will be dumped to a file with a numeric suffix attached"),
-                           init(false));
-
 } // namespace cl
-
 } // namespace llvm
-
-#ifdef WIN_OS
-// -assert-to-msgbox: pop message box when an assert is hit, only valid in Windows
-static cl::opt<bool> AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when assert is hit"));
-#endif
 
 // =====================================================================================================================
 // Performs initialization work for LLPC standalone tool.
@@ -694,9 +684,9 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
       if (cl::EnablePipelineDump) {
         dumpOptions.emplace();
         dumpOptions->pDumpDir = cl::PipelineDumpDir.c_str();
-        dumpOptions->filterPipelineDumpByType = cl::FilterPipelineDumpByType;
-        dumpOptions->filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
-        dumpOptions->dumpDuplicatePipelines = cl::DumpDuplicatePipelines;
+        dumpOptions->filterPipelineDumpByType = FilterPipelineDumpByType;
+        dumpOptions->filterPipelineDumpByHash = FilterPipelineDumpByHash;
+        dumpOptions->dumpDuplicatePipelines = DumpDuplicatePipelines;
       }
 
       compileInfo.fileNames = fileNames.c_str();
