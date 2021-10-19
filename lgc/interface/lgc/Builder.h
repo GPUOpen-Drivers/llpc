@@ -127,6 +127,10 @@ public:
   // NOTE: We rely on casting this implicitly to an integer, so we cannot use an enum class.
   enum GroupArithOp { IAdd = 0, FAdd, IMul, FMul, SMin, UMin, FMin, SMax, UMax, FMax, And, Or, Xor };
 
+  // The cooperative matrix arithmetic operations the builder can consume.
+  // NOTE: We rely on casting this implicitly to an integer, so we cannot use an enum class.
+  enum class CooperativeMatrixArithOp { IAdd = 0, FAdd, ISub, FSub, IMul, FMul, UDiv, SDiv, FDiv };
+
   virtual ~Builder() {}
 
   // Static methods to create a BuilderImpl or BuilderRecorder. These are not used as part of the LGC
@@ -1257,6 +1261,65 @@ public:
   // @param matrix : Matrix
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateMatrixInverse(llvm::Value *const matrix, const llvm::Twine &instName = "") = 0;
+
+  // -----------------------------------------------------------------------------------------------------------------
+  // Cooperative matrix operation.
+
+  // Create cooperative matrix load.
+  //
+  // @param pointer : The pointer to a data array.
+  // @param stride : The number of elements in the array in memory between the first component of consecutive rows (or
+  // columns) in the result.
+  // @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
+  // @param alignment : The alignment for physical buffer storage operation.
+  // @param instName : Name to give instruction(s)
+  virtual llvm::Value *CreateCooperativeMatrixLoad(llvm::Value *pointer, llvm::Value *stride, llvm::Value *colMajor,
+                                                   llvm::Value *alignment, const llvm::Twine &instName = "") = 0;
+
+  // Create cooperative matrix store.
+  // @param pointer : The pointer to a data array.
+  // @param object : The cooperative matrix to store.
+  // @param stride : The number of elements in the array in memory between the first component of consecutive rows (or
+  // columns) in the result.
+  // @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
+  // @param alignment : The alignment for physical buffer storage operation.
+  // @param instName : Name to give instruction(s).
+  virtual llvm::Value *CreateCooperativeMatrixStore(llvm::Value *pointer, llvm::Value *object, llvm::Value *stride,
+                                                    llvm::Value *colMajor, llvm::Value *alignment,
+                                                    const llvm::Twine &instName = "") = 0;
+
+  // Create cooperative matrix conversion.
+  //
+  // @param source : The source cooperative matrix.
+  // @param dest : The convertion target.
+  // @param instName : Name to give instruction(s).
+  virtual llvm::Value *CreateCooperativeMatrixConvert(llvm::Value *source, llvm::Value *dest,
+                                                      const llvm::Twine &instName = "") = 0;
+
+  // Create cooparetive matrix binary operation
+  //
+  // @param coopMatArithOp : The cooperative matrix arithemtic operation to perform.
+  // @param operand1 : The first operand.
+  // @param operand2 : The second operand.
+  // @param instName : Name to give instruction(s).
+  virtual llvm::Value *CreateCooperativeMatrixBinaryOp(CooperativeMatrixArithOp coopMatArithOp, llvm::Value *operand1,
+                                                       llvm::Value *operand2, const llvm::Twine &instName = "") = 0;
+
+  // Create extracted component from a cooperative matrix.
+  //
+  // @param coopMatRow : The row of cooperative matrix.
+  // @param index : The component index of the cooperative matrix.
+  // @param instName : Name to give instruction(s).
+  virtual llvm::Value *CreateCooperativeMatrixExtract(llvm::Value *coopMatRow, llvm::Value *index,
+                                                      const llvm::Twine &instName = "") = 0;
+
+  // Create a row of cooperative matrix from a constant.
+  //
+  // @param coopMatRow : The row of cooperative matrix.
+  // @param constVal : The constant value used to construct a cooperative matrix.
+  // @param instName : Name to give instruction(s).
+  virtual llvm::Value *CreateCooperativeMatrixConstruct(llvm::Value *coopMatRow, llvm::Value *constVal,
+                                                        const llvm::Twine &instName = "") = 0;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Miscellaneous operations

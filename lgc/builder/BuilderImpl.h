@@ -583,6 +583,39 @@ public:
   // Create matrix inverse operation.
   llvm::Value *CreateMatrixInverse(llvm::Value *const matrix, const llvm::Twine &instName = "") override final;
 
+  // Represent the info of a cooperative matrix
+  struct CooperativeMatrixInfo {
+    unsigned elemCount;
+    unsigned subElemCount;
+    llvm::Type *elemType;
+    llvm::Type *subElemType;
+  };
+
+  // Create cooperative matrix load operation.
+  llvm::Value *CreateCooperativeMatrixLoad(llvm::Value *pointer, llvm::Value *stride, llvm::Value *colMajor,
+                                           llvm::Value *alignment, const llvm::Twine &instName = "") override final;
+
+  // Create cooperative matrix store operation.
+  llvm::Value *CreateCooperativeMatrixStore(llvm::Value *pointer, llvm::Value *object, llvm::Value *stride,
+                                            llvm::Value *colMajor, llvm::Value *alignment,
+                                            const llvm::Twine &instName = "") override final;
+
+  // Create cooperative matrix convert operation
+  llvm::Value *CreateCooperativeMatrixConvert(llvm::Value *source, llvm::Value *dest,
+                                              const llvm::Twine &instName = "") override final;
+
+  // Create cooperative matrix binary operation
+  llvm::Value *CreateCooperativeMatrixBinaryOp(CooperativeMatrixArithOp coopMatArithOp, llvm::Value *operand1,
+                                               llvm::Value *operand2, const llvm::Twine &instName = "") override final;
+
+  // Create cooperative matrix composite extract operation
+  llvm::Value *CreateCooperativeMatrixExtract(llvm::Value *coopMatRow, llvm::Value *index,
+                                              const llvm::Twine &instName = "") override final;
+
+  // Create cooperative matrix composite construct operation
+  llvm::Value *CreateCooperativeMatrixConstruct(llvm::Value *coopMatRow, llvm::Value *constVal,
+                                                const llvm::Twine &instName = "") override final;
+
 private:
   MatrixBuilder() = delete;
   MatrixBuilder(const MatrixBuilder &) = delete;
@@ -594,6 +627,12 @@ private:
   // Get submatrix by deleting specified row and column
   void getSubmatrix(llvm::ArrayRef<llvm::Value *> matrix, llvm::MutableArrayRef<llvm::Value *> submatrix,
                     unsigned order, unsigned rowToDelete, unsigned columnToDelete);
+
+  // Calculate the info of cooperative matrix
+  void calcCooperativeMatrixInfo(CooperativeMatrixInfo &coopMatInfo, llvm::Value *data);
+
+  // Load or store data from the specified location of the memory.
+  void doMemoryAccess(llvm::Value *dataPtr, llvm::Value *stride, llvm::Value *alignment, llvm::Value *&vecVal);
 };
 
 // =====================================================================================================================
