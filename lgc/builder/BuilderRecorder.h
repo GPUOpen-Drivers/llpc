@@ -189,6 +189,7 @@ public:
     Derivative,
     DemoteToHelperInvocation,
     IsHelperInvocation,
+    GetWaveSize,
 
     // Subgroup
     GetSubgroupSize,
@@ -520,7 +521,7 @@ public:
 
   // -----------------------------------------------------------------------------------------------------------------
   // Subgroup operations
-
+  llvm::Value *CreateGetWaveSize(const llvm::Twine &instName) override final;
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupElect(const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupAll(llvm::Value *const value, bool wqm, const llvm::Twine &instName) override final;

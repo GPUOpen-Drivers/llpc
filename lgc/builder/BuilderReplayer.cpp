@@ -712,6 +712,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderRecorder::Opcode::MatrixInverse: {
     return m_builder->CreateMatrixInverse(args[0]);
   }
+  case BuilderRecorder::Opcode::GetWaveSize: {
+    return m_builder->CreateGetWaveSize();
+  }
   case BuilderRecorder::Opcode::CooperativeMatrixLoad: {
     return m_builder->CreateCooperativeMatrixLoad(args[0], args[1], args[2], args[3]);
   }

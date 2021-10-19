@@ -1470,8 +1470,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
   Constant *const zero = getBuilder()->getInt32(0);
 
-  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
-  ) {
+  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage) {
     // For structs we lookup the mapping of the elements and use it to reverse map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -1624,8 +1623,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
   Constant *const zero = getBuilder()->getInt32(0);
 
-  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
-  ) {
+  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage) {
     // For structs we lookup the mapping of the elements and use it to map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -3397,11 +3395,11 @@ Value *SPIRVToLLVM::transGroupArithOp(Builder::GroupArithOp groupArithOp, SPIRVV
 
   switch (static_cast<SPIRVConstant *>(spvOperands[1])->getZExtIntValue()) {
   case GroupOperationReduce:
-    return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp, value, getBuilder()->CreateGetSubgroupSize());
+    return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp, value, getBuilder()->CreateGetWaveSize());
   case GroupOperationInclusiveScan:
-    return getBuilder()->CreateSubgroupClusteredInclusive(groupArithOp, value, getBuilder()->CreateGetSubgroupSize());
+    return getBuilder()->CreateSubgroupClusteredInclusive(groupArithOp, value, getBuilder()->CreateGetWaveSize());
   case GroupOperationExclusiveScan:
-    return getBuilder()->CreateSubgroupClusteredExclusive(groupArithOp, value, getBuilder()->CreateGetSubgroupSize());
+    return getBuilder()->CreateSubgroupClusteredExclusive(groupArithOp, value, getBuilder()->CreateGetWaveSize());
   case GroupOperationClusteredReduce:
     return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp, value, transValue(spvOperands[3], func, block));
   default:
@@ -6785,12 +6783,12 @@ bool SPIRVToLLVM::transMetadata() {
           }
         }
 
-          // Give the workgroup size to the middle-end.
-          ComputeShaderMode computeMode = {};
-          computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
-          computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
-          computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
-          getBuilder()->setComputeShaderMode(computeMode);
+        // Give the workgroup size to the middle-end.
+        ComputeShaderMode computeMode = {};
+        computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
+        computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
+        computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
+        getBuilder()->setComputeShaderMode(computeMode);
       } else
         llvm_unreachable("Invalid execution model");
 

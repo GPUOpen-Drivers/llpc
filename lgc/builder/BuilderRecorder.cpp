@@ -242,6 +242,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "image.get.lod";
   case Opcode::Reserved1:
     return "reserved1";
+  case GetWaveSize:
+    return "get.wave.size";
   case GetSubgroupSize:
     return "get.subgroup.size";
   case SubgroupElect:
@@ -1537,6 +1539,14 @@ Instruction *BuilderRecorder::CreateWriteBuiltInOutput(Value *valueToWrite, Buil
 }
 
 // =====================================================================================================================
+// Create a get wave size query.
+//
+// @param instName : Name to give instruction(s)
+Value *BuilderRecorder::CreateGetWaveSize(const Twine &instName) {
+  return record(Opcode::GetWaveSize, getInt32Ty(), {}, instName);
+}
+
+// =====================================================================================================================
 // Create a get subgroup size query.
 //
 // @param instName : Name to give instruction(s)
@@ -2018,6 +2028,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::GetBufferDescLength:
     case Opcode::GetDescPtr:
     case Opcode::GetDescStride:
+    case Opcode::GetWaveSize:
     case Opcode::GetSubgroupSize:
     case Opcode::InsertBitField:
     case Opcode::IsInf:
