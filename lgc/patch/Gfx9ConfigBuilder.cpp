@@ -1803,9 +1803,39 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_CNTDWN_ENABLE, true);
   SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_REZ_ENABLE, true);
 
+  bool enableEarlyTests = fragmentMode.earlyFragmentTests;
+  if (!enableEarlyTests) {
+    bool isEnableFront = false;
+    bool isEnableBack = false;
+    auto depthStencilState = m_pipelineState->getDepthStencilState();
+    if (fragmentMode.conservativeStencilFront == ConservativeDepth::LessEqual)
+      if (depthStencilState.stencilCompFront == REF_LEQUAL ||
+        depthStencilState.stencilCompFront == REF_LESS ||
+        depthStencilState.stencilCompFront == REF_EQUAL)
+        isEnableFront = true;
+      else if (fragmentMode.conservativeStencilFront == ConservativeDepth::GreaterEqual)
+        if (depthStencilState.stencilCompFront == REF_GEQUAL ||
+            depthStencilState.stencilCompFront == REF_GREATER ||
+            depthStencilState.stencilCompFront == REF_EQUAL)
+          isEnableFront = true;
+
+      if (fragmentMode.conservativeStencilBack == ConservativeDepth::LessEqual)
+        if (depthStencilState.stencilCompBack == REF_LEQUAL ||
+            depthStencilState.stencilCompBack == REF_LESS ||
+            depthStencilState.stencilCompBack == REF_EQUAL)
+          isEnableBack = true;
+      else if (fragmentMode.conservativeStencilBack == ConservativeDepth::GreaterEqual)
+        if (depthStencilState.stencilCompBack == REF_GEQUAL ||
+            depthStencilState.stencilCompBack == REF_GREATER ||
+            depthStencilState.stencilCompBack == REF_EQUAL)
+          isEnableBack = true;
+
+      enableEarlyTests = (isEnableBack && isEnableFront);
+  }
+
   ZOrder zOrder = LATE_Z;
   bool execOnHeirFail = false;
-  if (fragmentMode.earlyFragmentTests)
+  if (enableEarlyTests)
     zOrder = EARLY_Z_THEN_LATE_Z;
   else if (resUsage->resourceWrite) {
     zOrder = LATE_Z;
@@ -1827,7 +1857,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, STENCIL_TEST_VAL_EXPORT_ENABLE, builtInUsage.fragStencilRef);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, MASK_EXPORT_ENABLE, builtInUsage.sampleMask);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE, 0); // Set during pipeline finalization.
-  SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, fragmentMode.earlyFragmentTests);
+  SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, enableEarlyTests);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                 (fragmentMode.earlyFragmentTests && resUsage->resourceWrite));
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
