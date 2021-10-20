@@ -689,6 +689,20 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
   rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
 
   pipeline->setGraphicsState(inputAssemblyState, rasterizerState);
+
+  const auto &inputDsState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dsState;
+  DepthStencilState depthStencilState = {};
+  if (inputDsState.depthTestEnable) {
+    depthStencilState.depthTestEnable = inputDsState.depthTestEnable;
+    depthStencilState.depthCompareOp = inputDsState.depthCompareOp;
+  }
+  if (inputDsState.stencilTestEnable) {
+    depthStencilState.stencilTestEnable = inputDsState.stencilTestEnable;
+    depthStencilState.stencilCompareOpFront = inputDsState.front.compareOp;
+    depthStencilState.stencilCompareOpBack = inputDsState.back.compareOp;
+  }
+
+  pipeline->setDepthStencilState(depthStencilState);
 }
 
 // =====================================================================================================================

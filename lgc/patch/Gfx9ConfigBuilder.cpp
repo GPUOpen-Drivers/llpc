@@ -1803,9 +1803,49 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_CNTDWN_ENABLE, true);
   SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_REZ_ENABLE, true);
 
+  auto depthStencilState = m_pipelineState->getDepthStencilState();
+  bool enableEarlyTests = fragmentMode.earlyFragmentTests;
+  if (!enableEarlyTests && fragmentMode.earlyAndLatFragmentTests && depthStencilState.stencilTestEnable) {
+    bool enableStencilFrontTest = false;
+    bool enableStencilBackTest = false;
+    // Never/always - enable early z
+    if (depthStencilState.stencilCompareOpFront == REF_NEVER || depthStencilState.stencilCompareOpFront == REF_ALWAYS)
+      enableStencilFrontTest = true;
+    // LessEqual
+    else if (fragmentMode.conservativeStencilFront == ConservativeDepth::LessEqual) {
+      if (depthStencilState.stencilCompareOpFront == REF_LEQUAL || depthStencilState.stencilCompareOpFront == REF_LESS)
+        enableStencilFrontTest = true;
+    } else if (fragmentMode.conservativeStencilFront == ConservativeDepth::GreaterEqual) {
+      if (depthStencilState.stencilCompareOpFront == REF_GEQUAL ||
+          depthStencilState.stencilCompareOpFront == REF_GREATER)
+        enableStencilFrontTest = true;
+    } else {
+      // Unchanged
+      if (depthStencilState.stencilCompareOpFront == REF_EQUAL ||
+          depthStencilState.stencilCompareOpFront == REF_NOTEQUAL)
+        enableStencilFrontTest = true;
+    }
+
+    if (depthStencilState.stencilCompareOpBack == REF_NEVER || depthStencilState.stencilCompareOpBack == REF_ALWAYS)
+      enableStencilBackTest = true;
+    else if (fragmentMode.conservativeStencilBack == ConservativeDepth::LessEqual) {
+      if (depthStencilState.stencilCompareOpBack == REF_LEQUAL || depthStencilState.stencilCompareOpBack == REF_EQUAL)
+        enableStencilBackTest = true;
+    } else if (fragmentMode.conservativeStencilBack == ConservativeDepth::GreaterEqual) {
+      if (depthStencilState.stencilCompareOpBack == REF_GEQUAL || depthStencilState.stencilCompareOpBack == REF_GREATER)
+        enableStencilBackTest = true;
+    } else {
+      // Unchanged
+      if (depthStencilState.stencilCompareOpBack == REF_EQUAL || depthStencilState.stencilCompareOpBack == REF_NOTEQUAL)
+        enableStencilFrontTest = true;
+    }
+
+    enableEarlyTests = (enableStencilBackTest && enableStencilFrontTest);
+  }
+
   ZOrder zOrder = LATE_Z;
   bool execOnHeirFail = false;
-  if (fragmentMode.earlyFragmentTests)
+  if (enableEarlyTests)
     zOrder = EARLY_Z_THEN_LATE_Z;
   else if (resUsage->resourceWrite) {
     zOrder = LATE_Z;
@@ -1827,7 +1867,7 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *pConfig) {
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, STENCIL_TEST_VAL_EXPORT_ENABLE, builtInUsage.fragStencilRef);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, MASK_EXPORT_ENABLE, builtInUsage.sampleMask);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE, 0); // Set during pipeline finalization.
-  SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, fragmentMode.earlyFragmentTests);
+  SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, enableEarlyTests);
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                 (fragmentMode.earlyFragmentTests && resUsage->resourceWrite));
   SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);

@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 50
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -71,6 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     50.2 | Add the member dsState to GraphicsPipelineBuildInfo                                                   |
 //  |     50.1 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
 //  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
 //  |     49.1 | Added enableEarlyCompile to GraphicsPipelineBuildInfo                                                 |
@@ -747,6 +748,9 @@ struct GraphicsPipelineBuildInfo {
   /// Create info of vertex input state
   const VkPipelineVertexInputStateCreateInfo *pVertexInput;
 
+  // Depth/stencil state
+  VkPipelineDepthStencilStateCreateInfo dsState;
+
   struct {
     VkPrimitiveTopology topology; ///< Primitive topology
     unsigned patchControlPoints;  ///< Number of control points per patch (valid when the topology is
@@ -783,7 +787,6 @@ struct GraphicsPipelineBuildInfo {
     bool depthBiasEnable; ///< Whether to bias fragment depth values
 #endif
   } rsState; ///< Rasterizer State
-
   struct {
     bool alphaToCoverageEnable; ///< Enable alpha to coverage
     bool dualSourceBlendEnable; ///< Blend state bound at draw time will use a dual source blend mode
