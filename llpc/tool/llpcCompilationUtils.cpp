@@ -100,14 +100,23 @@ void cleanupCompileInfo(CompileInfo *compileInfo) {
 //
 // @param sourceLang : GLSL source language
 static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
-  static_assert(SpvGenStageVertex == 0, "Unexpected value!");
-  static_assert(SpvGenStageTessControl == 1, "Unexpected value!");
-  static_assert(SpvGenStageTessEvaluation == 2, "Unexpected value!");
-  static_assert(SpvGenStageGeometry == 3, "Unexpected value!");
-  static_assert(SpvGenStageFragment == 4, "Unexpected value!");
-  static_assert(SpvGenStageCompute == 5, "Unexpected value!");
+  switch (sourceLang) {
+  case SpvGenStageVertex:
+    return ShaderStage::ShaderStageVertex;
+  case SpvGenStageTessControl:
+    return ShaderStage::ShaderStageTessControl;
+  case SpvGenStageTessEvaluation:
+    return ShaderStage::ShaderStageTessEval;
+  case SpvGenStageGeometry:
+    return ShaderStage::ShaderStageGeometry;
+  case SpvGenStageFragment:
+    return ShaderStage::ShaderStageFragment;
+  case SpvGenStageCompute:
+    return ShaderStage::ShaderStageCompute;
+  }
 
-  return static_cast<ShaderStage>(sourceLang);
+  llvm_unreachable("Unexpected shading language type!");
+  return ShaderStage::ShaderStageInvalid;
 }
 
 // =====================================================================================================================

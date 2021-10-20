@@ -210,6 +210,8 @@ enum ShaderStageBit : unsigned {
   ShaderStageGeometryBit = (1 << ShaderStageGeometry),       ///< Geometry shader bit
   ShaderStageFragmentBit = (1 << ShaderStageFragment),       ///< Fragment shader bit
   ShaderStageComputeBit = (1 << ShaderStageCompute),         ///< Compute shader bit
+  ShaderStageAllGraphicsBit = ShaderStageVertexBit | ShaderStageTessControlBit | ShaderStageTessEvalBit |
+                              ShaderStageGeometryBit | ShaderStageFragmentBit, ///< All graphics bits
 };
 
 /// Enumerates LLPC types of unlinked shader elf.

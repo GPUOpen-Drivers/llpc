@@ -255,10 +255,8 @@ bool PipelineDocument::validate() {
     return false;
   }
 
-  const unsigned graphicsStageMask =
-      ((1 << SpvGenStageVertex) | (1 << SpvGenStageTessControl) | (1 << SpvGenStageTessEvaluation) |
-       (1 << SpvGenStageGeometry) | (1 << SpvGenStageFragment));
-  const unsigned computeStageMask = (1 << SpvGenStageCompute);
+  const unsigned graphicsStageMask = ShaderStageBit::ShaderStageAllGraphicsBit;
+  const unsigned computeStageMask = ShaderStageBit::ShaderStageComputeBit;
 
   if (((stageMask & graphicsStageMask) && (stageMask & computeStageMask))
   ) {
