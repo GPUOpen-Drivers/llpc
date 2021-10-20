@@ -154,6 +154,9 @@ public:
   // Set graphics state (input-assembly, viewport, rasterizer).
   void setGraphicsState(const InputAssemblyState &iaState, const RasterizerState &rsState) override final;
 
+  // Set depth/stencil state
+  void setDepthStencilState(const DepthStencilState &dsState) override final;
+
   // Set the finalized 128-bit cache hash that is used to find this pipeline in the cache for the given version of LLPC.
   void set128BitCacheHash(const Hash128 &finalizedCacheHash, const llvm::VersionTuple &version) override final;
 
@@ -259,6 +262,7 @@ public:
   unsigned getDeviceIndex() const { return m_deviceIndex; }
   const InputAssemblyState &getInputAssemblyState() const { return m_inputAssemblyState; }
   const RasterizerState &getRasterizerState() const { return m_rasterizerState; }
+  const DepthStencilState &getDepthStencilState() const { return m_depthStencilState; }
 
   // Determine whether to use off-chip tessellation mode
   bool isTessOffChip();
@@ -474,6 +478,7 @@ private:
   ColorExportState m_colorExportState = {};                                    // Color export state
   InputAssemblyState m_inputAssemblyState = {};                                // Input-assembly state
   RasterizerState m_rasterizerState = {};                                      // Rasterizer state
+  DepthStencilState m_depthStencilState = {};                                  // Depth/stencil state
   std::unique_ptr<ResourceUsage> m_resourceUsage[ShaderStageCompute + 1] = {}; // Per-shader ResourceUsage
   std::unique_ptr<InterfaceData> m_interfaceData[ShaderStageCompute + 1] = {}; // Per-shader InterfaceData
   PalMetadata *m_palMetadata = nullptr;                                        // PAL metadata object

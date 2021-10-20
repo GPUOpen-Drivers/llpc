@@ -1048,6 +1048,14 @@ void PipelineState::setGraphicsState(const InputAssemblyState &iaState, const Ra
 }
 
 // =====================================================================================================================
+// Set depth/stencil state.
+//
+// @param dsState : Depth/stencil state
+void PipelineState::setDepthStencilState(const DepthStencilState &dsState) {
+  m_depthStencilState = dsState;
+}
+
+// =====================================================================================================================
 // Set the finalized 128-bit cache hash that is used to find this pipeline in the cache.
 //
 // @param finalizedCacheHash: The 128-bit hash value.

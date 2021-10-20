@@ -381,6 +381,15 @@ struct RasterizerState {
   unsigned usrClipPlaneMask;        // Mask to indicate the enabled user defined clip planes
 };
 
+// Struct to pass to depth/stencil state
+struct DepthStencilState {
+  bool depthTestEnable;           // Whether enable depth test
+  unsigned depthCompareOp;        // Depth compare operation
+  bool stencilTestEnable;         // Whether enable stencil test
+  unsigned stencilCompareOpFront; // Stencil compare operation for front face
+  unsigned stencilCompareOpBack;  // Stencil compare operation for back face
+};
+
 // =====================================================================================================================
 // Structs for setting shader modes, e.g. Builder::SetCommonShaderMode
 
@@ -470,7 +479,7 @@ struct GeometryShaderMode {
   unsigned outputVertices;          // Max number of vertices the shader will emit in one invocation
 };
 
-// Kind of conservative depth
+// Kind of conservative depth/stencil
 enum class ConservativeDepth : unsigned { Any, LessEqual, GreaterEqual };
 
 // Struct to pass to SetFragmentShaderMode.
@@ -481,7 +490,10 @@ struct FragmentShaderMode {
   unsigned pixelCenterInteger;
   unsigned earlyFragmentTests;
   unsigned postDepthCoverage;
+  unsigned earlyAndLatFragmentTests;
   ConservativeDepth conservativeDepth;
+  ConservativeDepth conservativeStencilFront;
+  ConservativeDepth conservativeStencilBack;
 };
 
 // Struct to pass to SetComputeShaderMode.
@@ -563,6 +575,9 @@ public:
   // Set graphics state (input-assembly, rasterizer).
   // The front-end should zero-initialize each struct with "= {}" in case future changes add new fields.
   virtual void setGraphicsState(const InputAssemblyState &iaState, const RasterizerState &rsState) = 0;
+
+  // Set depth/stencil state
+  virtual void setDepthStencilState(const DepthStencilState &dsState) = 0;
 
   // Set the finalized 128-bit cache hash that is used to find this pipeline in the cache for the given version of LLPC.
   virtual void set128BitCacheHash(const Hash128 &finalizedCacheHash, const llvm::VersionTuple &version) = 0;
