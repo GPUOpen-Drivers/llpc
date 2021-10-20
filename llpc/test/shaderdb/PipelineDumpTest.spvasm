@@ -1,10 +1,23 @@
+; Check that enabling pipeline dumps produces the expected files (.pipe, .spv, and .elf).
 
-; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --enable-pipeline-dump --pipeline-dump-dir=%basename_t
-; RUN: ls %basename_t/*pipe
-; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: AMDLLPC SUCCESS
-; END_SHADERTEST
+; Create a fresh directory for pipeline dump files.
+; RUN: mkdir -p %t/dump
+
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --enable-pipeline-dump --pipeline-dump-dir=%t/dump \
+; RUN:   | FileCheck -check-prefix=COMPILE %s
+; COMPILE-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; COMPILE-LABEL: ==== AMDLLPC SUCCESS ====
+
+; Check that all the expected dump files are in place.
+; RUN: ls -1 %t/dump | FileCheck -check-prefix=FILES %s
+; FILES:     {{^}}PipelineVsFs_0x[[PIPE_HASH:[0-9A-F]+]].elf{{$}}
+; FILES:     {{^}}PipelineVsFs_0x[[PIPE_HASH]].pipe{{$}}
+; FILES-NOT: {{^}}Pipeline
+; FILES:     {{^}}Shader_0x{{[0-9A-F]+}}.spv{{$}}
+; FILES-NOT: {{^}}Shader_
+
+; Cleanup.
+; RUN: rm -rf %t/dump
 
                OpCapability Shader
                OpMemoryModel Logical GLSL450
