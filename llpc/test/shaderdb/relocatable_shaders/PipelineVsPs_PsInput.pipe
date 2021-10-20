@@ -1,5 +1,6 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v \
+; RUN:   | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: SPI_PS_INPUT_CNTL_0                           0x0000000000000000
 ; SHADERTEST: SPI_PS_INPUT_ENA                              0x0000000000000002
 ; SHADERTEST: SPI_PS_INPUT_ADDR                             0x0000000000000002
@@ -54,7 +55,7 @@ entryPoint = main
 entryPoint = main
 
 [GraphicsPipelineState]
-olorBuffer[0].format = VK_FORMAT_R16G16B16A16_SFLOAT
+colorBuffer[0].format = VK_FORMAT_R16G16B16A16_SFLOAT
 colorBuffer[0].channelWriteMask = 15
 colorBuffer[0].blendEnable = 0
 colorBuffer[0].blendSrcAlphaToColor = 0
