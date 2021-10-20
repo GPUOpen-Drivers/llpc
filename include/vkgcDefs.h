@@ -783,6 +783,14 @@ struct GraphicsPipelineBuildInfo {
   } rsState; ///< Rasterizer State
 
   struct {
+    bool stencilTestEnable;    ///< Whether enable depth test
+    unsigned depthComp;        ///< Depth compare operation
+    bool depthTestEnable;      ///< Whether enable stencil test
+    unsigned stencilCompFront; ///< Stencil compare operation for front face
+    unsigned stencilCompBack;  ///< Stencil compare operation for back face
+  } dsState;                   ///< depth State
+
+  struct {
     bool alphaToCoverageEnable; ///< Enable alpha to coverage
     bool dualSourceBlendEnable; ///< Blend state bound at draw time will use a dual source blend mode
 
