@@ -1,0 +1,33 @@
+// Check that an error/warning is reported when no SPVGEN dir is provided or a wrong dir is passed.
+
+; BEGIN_SHADERTEST_1
+; RUN: not amdllpc -spvgen-dir=/spvgen/is/definitely/not/here -v %gfxip %s \
+; RUN:   | FileCheck -check-prefix=SHADERTEST_1 %s
+; SHADERTEST_1-LABEL: {{^}}ERROR: Failed to load SPVGEN from specified directory
+; SHADERTEST_1-LABEL: {{^}}===== AMDLLPC FAILED =====
+; END_SHADERTEST_1
+
+; BEGIN_SHADERTEST_2
+; RUN: not amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_2 %s
+; SHADERTEST_2-LABEL: {{^}}ERROR: Failed to parse input file:
+; SHADERTEST_2-LABEL: {{^}}Parse error at line {{[0-9]+}}: Failed to load SPVGEN: cannot compile GLSL
+; SHADERTEST_2-LABEL: {{^}}===== AMDLLPC FAILED =====
+; END_SHADERTEST_2
+
+[VsGlsl]
+#version 460 core
+
+void main() {
+  gl_Position = vec4(0);
+}
+
+[VsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+patchControlPoints = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+colorBuffer[0].format = VK_FORMAT_B8G8R8A8_UNORM
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
