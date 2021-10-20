@@ -36,6 +36,7 @@
 #include "llpcAutoLayout.h"
 #include "llpcCompilationUtils.h"
 #include "llpcInputUtils.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
@@ -63,9 +64,6 @@
 #endif
 #endif
 
-#include <sstream>
-#include <stdlib.h> // getenv
-
 // NOTE: To enable VLD, please add option BUILD_WIN_VLD=1 in build option.To run amdllpc with VLD enabled,
 // please copy vld.ini and all files in.\winVisualMemDetector\bin\Win64 to current directory of amdllpc.
 #ifdef BUILD_WIN_VLD
@@ -81,6 +79,7 @@
 #include "spvgen.h"
 #include "vfx.h"
 #include "vkgcElfReader.h"
+#include <cstdlib> // getenv, EXIT_FAILURE, EXIT_SUCCESS
 
 #define DEBUG_TYPE "amd-llpc"
 
@@ -283,99 +282,95 @@ extern opt<bool> BuildShaderCache;
 //
 // @param argc : Count of arguments
 // @param argv : List of arguments
-// @param [out] ppCompiler : Created LLPC compiler object
+// @param [out] compiler : Created LLPC compiler object
 // @returns : Result::Success on success, other status codes on failure
-static Result init(int argc, char *argv[], ICompiler **ppCompiler) {
-  Result result = Result::Success;
-
-  if (result == Result::Success) {
-    // Before we get to LLVM command-line option parsing, we need to find the -gfxip option value.
-    for (int i = 1; i != argc; ++i) {
-      StringRef arg = argv[i];
-      if (arg.startswith("--gfxip"))
-        arg = arg.drop_front(1);
-      if (!arg.startswith("-gfxip"))
-        continue;
-      StringRef gfxipStr;
-      arg = arg.slice(strlen("-gfxip"), StringRef::npos);
-      if (arg.empty() && i + 1 != argc)
-        gfxipStr = argv[i + 1];
-      else if (arg[0] == '=')
-        gfxipStr = arg.slice(1, StringRef::npos);
-      else
-        continue;
-      if (!gfxipStr.consumeInteger(10, ParsedGfxIp.major)) {
-        ParsedGfxIp.minor = 0;
-        ParsedGfxIp.stepping = 0;
-        if (gfxipStr.startswith(".")) {
+static Result init(int argc, char *argv[], ICompiler *&compiler) {
+  // Before we get to LLVM command-line option parsing, we need to find the -gfxip option value.
+  for (int i = 1; i != argc; ++i) {
+    StringRef arg = argv[i];
+    if (arg.startswith("--gfxip"))
+      arg = arg.drop_front(1);
+    if (!arg.startswith("-gfxip"))
+      continue;
+    StringRef gfxipStr;
+    arg = arg.slice(strlen("-gfxip"), StringRef::npos);
+    if (arg.empty() && i + 1 != argc)
+      gfxipStr = argv[i + 1];
+    else if (arg[0] == '=')
+      gfxipStr = arg.slice(1, StringRef::npos);
+    else
+      continue;
+    if (!gfxipStr.consumeInteger(10, ParsedGfxIp.major)) {
+      ParsedGfxIp.minor = 0;
+      ParsedGfxIp.stepping = 0;
+      if (gfxipStr.startswith(".")) {
+        gfxipStr = gfxipStr.slice(1, StringRef::npos);
+        if (!gfxipStr.consumeInteger(10, ParsedGfxIp.minor) && gfxipStr.startswith(".")) {
           gfxipStr = gfxipStr.slice(1, StringRef::npos);
-          if (!gfxipStr.consumeInteger(10, ParsedGfxIp.minor) && gfxipStr.startswith(".")) {
-            gfxipStr = gfxipStr.slice(1, StringRef::npos);
-            gfxipStr.consumeInteger(10, ParsedGfxIp.stepping);
-          }
+          gfxipStr.consumeInteger(10, ParsedGfxIp.stepping);
         }
       }
-      break;
     }
+    break;
+  }
 
-    // Change defaults of NGG options according to GFX IP
-    if (ParsedGfxIp >= GfxIpVersion{10, 3}) {
-      // For GFX10.3+, we always prefer to enable NGG. Backface culling and small primitive filter are enabled as
-      // well. Also, the compaction mode is set to compactionless.
-      EnableNgg.setValue(true);
-      NggCompactionMode.setValue(static_cast<unsigned>(NggCompactDisable));
-      NggEnableBackfaceCulling.setValue(true);
-      NggEnableSmallPrimFilter.setValue(true);
-    }
+  // Change defaults of NGG options according to GFX IP
+  if (ParsedGfxIp >= GfxIpVersion{10, 3}) {
+    // For GFX10.3+, we always prefer to enable NGG. Backface culling and small primitive filter are enabled as
+    // well. Also, the compaction mode is set to compactionless.
+    EnableNgg.setValue(true);
+    NggCompactionMode.setValue(static_cast<unsigned>(NggCompactDisable));
+    NggEnableBackfaceCulling.setValue(true);
+    NggEnableSmallPrimFilter.setValue(true);
+  }
 
-    // Provide a default for -shader-cache-file-dir, as long as the environment variables below are
-    // not set.
-    // TODO: Was this code intended to set the default of -shader-cache-file-dir in the case that it
-    // does find an environment variable setting? It did not, so I have preserved that behavior.
-    // Steps:
-    //   1. Find AMD_SHADER_DISK_CACHE_PATH to keep backward compatibility.
-    const char *envString = getenv("AMD_SHADER_DISK_CACHE_PATH");
+  // Provide a default for -shader-cache-file-dir, as long as the environment variables below are
+  // not set.
+  // TODO: Was this code intended to set the default of -shader-cache-file-dir in the case that it
+  // does find an environment variable setting? It did not, so I have preserved that behavior.
+  // Steps:
+  //   1. Find AMD_SHADER_DISK_CACHE_PATH to keep backward compatibility.
+  const char *envString = getenv("AMD_SHADER_DISK_CACHE_PATH");
 
 #ifdef WIN_OS
-    //   2. Find LOCALAPPDATA.
-    if (!envString)
-      envString = getenv("LOCALAPPDATA");
+  //   2. Find LOCALAPPDATA.
+  if (!envString)
+    envString = getenv("LOCALAPPDATA");
 #else
-    char shaderCacheFileRootDir[PathBufferLen];
+  char shaderCacheFileRootDir[PathBufferLen];
 
-    //   2. Find XDG_CACHE_HOME.
-    //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
-    //      use "$HOME/.cache".
-    if (!envString)
-      envString = getenv("XDG_CACHE_HOME");
+  //   2. Find XDG_CACHE_HOME.
+  //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
+  //      use "$HOME/.cache".
+  if (!envString)
+    envString = getenv("XDG_CACHE_HOME");
 
-    if (!envString) {
-      envString = getenv("HOME");
-      if (envString) {
-        snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir), "%s/.cache", envString);
-        envString = &shaderCacheFileRootDir[0];
-      }
+  if (!envString) {
+    envString = getenv("HOME");
+    if (envString) {
+      snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir), "%s/.cache", envString);
+      envString = &shaderCacheFileRootDir[0];
     }
+  }
 #endif
-    if (!envString) {
-      auto optIterator = cl::getRegisteredOptions().find("shader-cache-file-dir");
-      assert(optIterator != cl::getRegisteredOptions().end());
-      cl::Option *opt = optIterator->second;
-      *static_cast<cl::opt<std::string> *>(opt) = ".";
-    }
-
-    result = ICompiler::Create(ParsedGfxIp, argc, argv, ppCompiler);
+  if (!envString) {
+    auto optIterator = cl::getRegisteredOptions().find("shader-cache-file-dir");
+    assert(optIterator != cl::getRegisteredOptions().end());
+    cl::Option *opt = optIterator->second;
+    *static_cast<cl::opt<std::string> *>(opt) = ".";
   }
 
-  if (result == Result::Success && SpvGenDir != "") {
+  Result result = ICompiler::Create(ParsedGfxIp, argc, argv, &compiler);
+  if (result != Result::Success)
+    return result;
+
+  if (SpvGenDir != "" && !InitSpvGen(SpvGenDir.c_str())) {
     // -spvgen-dir option: preload spvgen from the given directory
-    if (!InitSpvGen(SpvGenDir.c_str())) {
-      LLPC_ERRS("Failed to load SPVGEN from specified directory\n");
-      result = Result::ErrorUnavailable;
-    }
+    LLPC_ERRS("Failed to load SPVGEN from specified directory\n");
+    return Result::ErrorUnavailable;
   }
 
-  return result;
+  return Result::Success;
 }
 
 // =====================================================================================================================
@@ -739,10 +734,6 @@ static void enableMemoryLeakDetection() {
 // @param argv : List of arguments
 // @returns : 0 if successful, other numeric values on failure
 int main(int argc, char *argv[]) {
-  Result result = Result::Success;
-
-  ICompiler *compiler = nullptr;
-
   //
   // Initialization
   //
@@ -760,47 +751,46 @@ int main(int argc, char *argv[]) {
 #endif
 #endif
 
-  result = init(argc, argv, &compiler);
-
 #ifdef WIN_OS
   if (AssertToMsgBox) {
     _set_error_mode(_OUT_TO_MSGBOX);
   }
 #endif
 
-  // Simplify error handling and enable early returns. These assume that result statuses
-  // are always written to the |result| local variable.
-  auto isFailure = [&result] { return result != Result::Success; };
-  auto onFailure = [compiler, &result] {
-    assert(result != Result::Success);
-    (void)result;
-    compiler->Destroy();
-    LLPC_ERRS("\n=====  AMDLLPC FAILED  =====\n");
-    return 1;
-  };
+  ICompiler *compiler = nullptr;
+  Result result = init(argc, argv, compiler);
 
-  if (isFailure())
-    return onFailure();
+  // Cleanup code that gets run automatically before returning.
+  auto onExit = make_scope_exit([compiler, &result] {
+    if (compiler)
+      compiler->Destroy();
+
+    if (result == Result::Success)
+      LLPC_OUTS("\n=====  AMDLLPC SUCCESS  =====\n");
+    else
+      LLPC_ERRS("\n=====  AMDLLPC FAILED  =====\n");
+  });
+
+  if (result != Result::Success)
+    return EXIT_FAILURE;
 
   std::vector<std::string> expandedInputFiles;
   result = expandInputFilenames(InFiles, expandedInputFiles);
-  if (isFailure())
-    return onFailure();
+  if (result != Result::Success)
+    return EXIT_FAILURE;
 
   auto inputGroupsOrErr = groupInputFiles(expandedInputFiles);
   if (Error err = inputGroupsOrErr.takeError()) {
     reportError(std::move(err));
     result = Result::ErrorInvalidValue;
-    return onFailure();
+    return EXIT_FAILURE;
   }
   for (InputFilesGroup &inputGroup : *inputGroupsOrErr) {
     result = processPipeline(compiler, inputGroup);
-    if (isFailure())
-      return onFailure();
+    if (result != Result::Success)
+      return EXIT_FAILURE;
   }
 
-  assert(!isFailure());
-  compiler->Destroy();
-  LLPC_OUTS("\n=====  AMDLLPC SUCCESS  =====\n");
-  return 0;
+  assert(result == Result::Success);
+  return EXIT_SUCCESS;
 }
