@@ -381,7 +381,7 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
       // If not compiling from pipeline, lay out user data now.
       if (compileInfo->doAutoLayout) {
         doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
-                         pipelineInfo, shaderInfo, nodeSets, pushConstSize, /*checkAutoLayoutCompatible =*/false,
+                         pipelineInfo, shaderInfo, nodeSets, pushConstSize,
                          /*autoLayoutDesc = */ compileInfo->autoLayoutDesc);
       }
     }
@@ -457,7 +457,7 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
       ResourceMappingNodeMap nodeSets;
       unsigned pushConstSize = 0;
       doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, shaderInfo, nodeSets,
-                       pushConstSize, /*checkAutoLayoutCompatible = */ false,
+                       pushConstSize,
                        /*autoLayoutDesc =*/compileInfo->autoLayoutDesc);
 
       buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,

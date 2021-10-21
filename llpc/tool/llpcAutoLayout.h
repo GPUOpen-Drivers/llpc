@@ -52,21 +52,12 @@ using ResourceMappingNodeMap = std::map<unsigned, ResourceNodeSet>;
 // leaked, but that does not matter because we are running a short-lived command-line utility.
 void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipelineBuildInfo *pipelineInfo,
                       PipelineShaderInfo *shaderInfo, ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
-                      bool checkAutoLayoutCompatible, bool autoLayoutDesc);
+                      bool autoLayoutDesc);
 
 // Lay out dummy top-level descriptors and populate ResourceMappingData. This is used when running standalone compiler
 // on a single SPIR-V or GLSL shader, rather than on a .pipe file.
 void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
                           ResourceMappingData *resourceMapping, bool autoLayoutDesc);
-
-// Check autolayout compatible.
-Result checkAutoLayoutCompatibleFunc(const ICompiler *compiler, CompileInfo *compileInfo);
-
-bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
-                                   const ResourceMappingRootNode *autoLayoutUserDataNodes);
-
-bool checkPipelineStateCompatible(const ICompiler *compiler, GraphicsPipelineBuildInfo *pipelineInfo,
-                                  GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, GfxIpVersion gfxIp);
 
 } // namespace StandaloneCompiler
 } // namespace Llpc
