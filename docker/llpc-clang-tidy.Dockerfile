@@ -29,10 +29,6 @@ ARG LLPC_BASE_REF
 # Use bash instead of sh in this docker file.
 SHELL ["/bin/bash", "-c"]
 
-# TODO Remove once the base image is rebuilt
-RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
-    && apt-get update \
-    && apt-get install -yqq --no-install-recommends clang-tidy-10
 COPY docker/update-llpc.sh /vulkandriver/
 
 RUN /vulkandriver/update-llpc.sh
@@ -46,8 +42,9 @@ RUN source /vulkandriver/env.sh \
 # Run clang-tidy. Detect failures by searching for a colon. An empty line or "No relevant changes found." signals success.
 WORKDIR /vulkandriver/drivers/llpc
 RUN ln -s /vulkandriver/builds/ci-build/compile_commands.json \
-    && git diff "origin/$LLPC_BASE_REF" -U0 | /vulkandriver/drivers/llvm-project/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py \
-        -p1 -j$(nproc) >not-tidy.diff \
+    && git diff "origin/$LLPC_BASE_REF" -U0 \
+         | /vulkandriver/drivers/llvm-project/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py \
+             -p1 -j$(nproc) >not-tidy.diff \
     && if ! grep -q : not-tidy.diff ; then \
         echo "Clean code. Success."; \
     else \
