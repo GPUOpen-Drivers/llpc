@@ -34,13 +34,10 @@ SHELL ["/bin/bash", "-c"]
 # too old for LLVM.
 RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && apt-get update \
-    && TOOLCHAIN_PACKAGES="gcc g++ binutils-gold" \
-    && if echo "$FEATURES" | grep -q "+clang" ; then \
-         TOOLCHAIN_PACKAGES="clang-9 libclang-common-9-dev lld-9 clang-tidy-10"; \
-       fi \
     && apt-get install -yqq --no-install-recommends \
        build-essential pkg-config ninja-build \
-       $TOOLCHAIN_PACKAGES \
+       gcc g++ binutils-gold \
+       llvm-11 clang-11 clang-tidy-11 libclang-common-11-dev lld-11 \
        python python3 python3-distutils python3-pip \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
@@ -49,12 +46,10 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir --upgrade cmake \
-    && if echo "$FEATURES" | grep -q "+clang" ; then \
-         update-alternatives --install /usr/bin/lld lld /usr/bin/lld-9 10 ; \
-         update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-9 10 ; \
-       else \
-        update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10 ; \
-      fi
+    && for tool in clang clang++ clang-tidy llvm-symbolizer lld ld.lld ; do \
+         update-alternatives --install /usr/bin/"$tool" "$tool" /usr/bin/"$tool"-11 10 ; \
+        done \
+    && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
 
 # Checkout all repositories. Replace llpc with the version in LLPC_SOURCE_DIR.
 # The /vulkandriver/env.sh file is for extra env variables used by later commands.
@@ -78,8 +73,8 @@ RUN EXTRA_FLAGS="" \
          EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_CXX_COMPILER=g++"; \
        fi \
     && if echo "$FEATURES" | grep -q "+clang" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_C_COMPILER=clang-9"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_CXX_COMPILER=clang++-9"; \
+         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_C_COMPILER=clang"; \
+         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_CXX_COMPILER=clang++"; \
          EXTRA_FLAGS="$EXTRA_FLAGS -DLLVM_USE_LINKER=lld"; \
          EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"; \
          EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld"; \
@@ -90,7 +85,7 @@ RUN EXTRA_FLAGS="" \
     && if echo "$FEATURES" | grep -q "+sanitizers" ; then \
          EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_USE_SANITIZER=Address;Undefined"; \
          echo "export ASAN_OPTIONS=detect_leaks=0" >> /vulkandriver/env.sh; \
-         echo "export LD_PRELOAD=/usr/lib/llvm-9/lib/clang/9.0.1/lib/linux/libclang_rt.asan-x86_64.so" >> /vulkandriver/env.sh; \
+         echo "export LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan-x86_64.so)" >> /vulkandriver/env.sh; \
        else \
          EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_BUILD_CACHE_CREATOR=ON"; \
        fi \
