@@ -28,7 +28,7 @@
  * @brief LLPC source file: BuilderRecorder implementation
  ***********************************************************************************************************************
  */
-#include "BuilderRecorder.h"
+#include "lgc/builder/BuilderRecorder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineState.h"

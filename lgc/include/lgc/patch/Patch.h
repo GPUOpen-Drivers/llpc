@@ -54,7 +54,7 @@ void initializePatchInOutImportExportPass(PassRegistry &);
 void initializePatchLlvmIrInclusionPass(PassRegistry &);
 void initializePatchLoadScalarizerPass(PassRegistry &);
 void initializePatchLoopMetadataPass(PassRegistry &);
-void initializePatchNullFragShaderPass(PassRegistry &);
+void initializeLegacyPatchNullFragShaderPass(PassRegistry &);
 void initializePatchPeepholeOptPass(PassRegistry &);
 void initializePatchPreparePipelineAbiPass(PassRegistry &);
 void initializePatchResourceCollectPass(PassRegistry &);
@@ -84,7 +84,7 @@ inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializePatchLlvmIrInclusionPass(passRegistry);
   initializePatchLoadScalarizerPass(passRegistry);
   initializePatchLoopMetadataPass(passRegistry);
-  initializePatchNullFragShaderPass(passRegistry);
+  initializeLegacyPatchNullFragShaderPass(passRegistry);
   initializePatchPeepholeOptPass(passRegistry);
   initializePatchPreparePipelineAbiPass(passRegistry);
   initializePatchResourceCollectPass(passRegistry);
@@ -105,7 +105,7 @@ llvm::ModulePass *createPatchInOutImportExport();
 llvm::ModulePass *createPatchLlvmIrInclusion();
 llvm::FunctionPass *createPatchLoadScalarizer();
 llvm::LoopPass *createPatchLoopMetadata();
-llvm::ModulePass *createPatchNullFragShader();
+llvm::ModulePass *createLegacyPatchNullFragShader();
 llvm::FunctionPass *createPatchPeepholeOpt();
 llvm::ModulePass *createPatchPreparePipelineAbi(bool onlySetCallingConvs);
 llvm::ModulePass *createPatchResourceCollect();
@@ -116,18 +116,17 @@ llvm::ModulePass *createPatchWaveSizeAdjust();
 llvm::ModulePass *createPatchInitializeWorkgroupMemory();
 
 class PipelineState;
+class PassManager;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations, as the base class.
-class Patch : public llvm::ModulePass {
+class Patch {
 public:
-  explicit Patch(char &pid)
-      : llvm::ModulePass(pid), m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid),
-        m_entryPoint(nullptr) {}
+  Patch() : m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid), m_entryPoint(nullptr) {}
   virtual ~Patch() {}
 
-  static void addPasses(PipelineState *pipelineState, llvm::legacy::PassManager &passMgr,
-                        llvm::ModulePass *replayerPass, llvm::Timer *patchTimer, llvm::Timer *optTimer,
+  static void addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, bool addReplayerPass,
+                        llvm::Timer *patchTimer, llvm::Timer *optTimer,
                         Pipeline::CheckShaderCacheFunc checkShaderCacheFunc);
 
   static llvm::GlobalVariable *getLdsVariable(PipelineState *pipelineState, llvm::Module *module);
@@ -139,12 +138,25 @@ protected:
   llvm::LLVMContext *m_context; // Associated LLVM context of the LLVM module that passes run on
   ShaderStage m_shaderStage;    // Shader stage
   llvm::Function *m_entryPoint; // Entry-point
+};
+
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations, as the base class.
+class LegacyPatch : public llvm::ModulePass, public Patch {
+public:
+  explicit LegacyPatch(char &pid) : llvm::ModulePass(pid) {}
+  virtual ~LegacyPatch() {}
+
+  static void addPasses(PipelineState *pipelineState, llvm::legacy::PassManager &passMgr,
+                        llvm::ModulePass *replayerPass, llvm::Timer *patchTimer, llvm::Timer *optTimer,
+                        Pipeline::CheckShaderCacheFunc checkShaderCacheFunc);
 
 private:
   static void addOptimizationPasses(llvm::legacy::PassManager &passMgr);
 
-  Patch() = delete;
-  Patch(const Patch &) = delete;
-  Patch &operator=(const Patch &) = delete;
+  LegacyPatch() = delete;
+  LegacyPatch(const LegacyPatch &) = delete;
+  LegacyPatch &operator=(const LegacyPatch &) = delete;
 };
+
 } // namespace lgc

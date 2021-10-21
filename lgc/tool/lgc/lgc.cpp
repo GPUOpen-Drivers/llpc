@@ -324,7 +324,7 @@ int main(int argc, char **argv) {
         }
       } else {
         // Run the middle-end compiler.
-        if (!pipeline->generate(std::move(module), outStream, nullptr, {}))
+        if (!pipeline->generate(std::move(module), outStream, nullptr, {}, false))
           err = pipeline->getLastError();
       }
 

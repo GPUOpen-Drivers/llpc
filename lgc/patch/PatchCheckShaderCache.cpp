@@ -72,7 +72,7 @@ static void streamMapEntries(MapType &map, raw_ostream &stream) {
 } // namespace
 
 // =====================================================================================================================
-PatchCheckShaderCache::PatchCheckShaderCache() : Patch(ID) {
+PatchCheckShaderCache::PatchCheckShaderCache() : LegacyPatch(ID) {
 }
 
 // =====================================================================================================================
@@ -87,11 +87,11 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
     return false;
   }
 
-  Patch::init(&module);
+  LegacyPatch::init(&module);
 
   std::string inOutUsageStreams[ShaderStageGfxCount];
   ArrayRef<uint8_t> inOutUsageValues[ShaderStageGfxCount];
-  PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   auto stageMask = pipelineState->getShaderStageMask();
 
   // Build input/output layout hash per shader stage

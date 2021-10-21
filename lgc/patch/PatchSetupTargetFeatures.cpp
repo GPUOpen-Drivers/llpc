@@ -43,13 +43,13 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to set up target features on shader entry-points
-class PatchSetupTargetFeatures : public Patch {
+class PatchSetupTargetFeatures : public LegacyPatch {
 public:
   static char ID;
-  PatchSetupTargetFeatures() : Patch(ID) {}
+  PatchSetupTargetFeatures() : LegacyPatch(ID) {}
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   }
 
   bool runOnModule(Module &module) override;
@@ -80,9 +80,9 @@ ModulePass *lgc::createPatchSetupTargetFeatures() {
 bool PatchSetupTargetFeatures::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
 
-  Patch::init(&module);
+  LegacyPatch::init(&module);
 
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   setupTargetFeatures(&module);
 
   return true; // Modified the module.

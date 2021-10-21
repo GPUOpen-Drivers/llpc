@@ -65,8 +65,8 @@ public:
   LowerFragColorExport &operator=(const LowerFragColorExport &) = delete;
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
-    analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
   }
 
   virtual bool runOnModule(Module &module) override;
@@ -449,10 +449,10 @@ ModulePass *lgc::createLowerFragColorExport() {
 // @param [in/out] module : Module
 bool LowerFragColorExport::runOnModule(Module &module) {
   m_context = &module.getContext();
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   m_resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
 
-  auto pipelineShaders = &getAnalysis<PipelineShaders>();
+  auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
   Function *fragEntryPoint = pipelineShaders->getEntryPoint(ShaderStageFragment);
   if (!fragEntryPoint)
     return false;

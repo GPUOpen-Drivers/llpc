@@ -56,7 +56,7 @@ ModulePass *createPatchWorkarounds() {
   return new PatchWorkarounds();
 }
 
-PatchWorkarounds::PatchWorkarounds() : Patch(ID) {
+PatchWorkarounds::PatchWorkarounds() : LegacyPatch(ID) {
 }
 
 // =====================================================================================================================
@@ -66,9 +66,9 @@ PatchWorkarounds::PatchWorkarounds() : Patch(ID) {
 bool PatchWorkarounds::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Workarounds\n");
 
-  Patch::init(&module);
+  LegacyPatch::init(&module);
 
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   m_builder = std::make_unique<IRBuilder<>>(*m_context);
   m_processed.clear();
 
@@ -222,9 +222,9 @@ void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLas
 //
 // @param [out] analysisUsage : The analysis usage.
 void PatchWorkarounds::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.addRequired<PipelineStateWrapper>();
-  analysisUsage.addRequired<PipelineShaders>();
-  analysisUsage.addPreserved<PipelineShaders>();
+  analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+  analysisUsage.addRequired<LegacyPipelineShaders>();
+  analysisUsage.addPreserved<LegacyPipelineShaders>();
 }
 
 } // namespace lgc

@@ -36,7 +36,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patch operations of including LLVM IR as a separate section in the ELF binary.
-class PatchLlvmIrInclusion : public Patch {
+class PatchLlvmIrInclusion : public LegacyPatch {
 public:
   PatchLlvmIrInclusion();
 

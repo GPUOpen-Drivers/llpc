@@ -63,9 +63,9 @@ PatchLoadScalarizer::PatchLoadScalarizer() : FunctionPass(ID) {
 //
 // @param [out] analysisUsage : The analysis usage.
 void PatchLoadScalarizer::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.addRequired<PipelineStateWrapper>();
-  analysisUsage.addRequired<PipelineShaders>();
-  analysisUsage.addPreserved<PipelineShaders>();
+  analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+  analysisUsage.addRequired<LegacyPipelineShaders>();
+  analysisUsage.addPreserved<LegacyPipelineShaders>();
 }
 
 // =====================================================================================================================
@@ -75,8 +75,8 @@ void PatchLoadScalarizer::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
 bool PatchLoadScalarizer::runOnFunction(Function &function) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Load-Scalarizer-Opt\n");
 
-  auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(function.getParent());
-  auto pipelineShaders = &getAnalysis<PipelineShaders>();
+  auto pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
+  auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
   auto shaderStage = pipelineShaders->getShaderStage(&function);
 
   // If the function is not a valid shader stage, or the optimization is disabled, bail.

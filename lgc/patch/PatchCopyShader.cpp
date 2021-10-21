@@ -60,16 +60,16 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to generate copy shader if required
-class PatchCopyShader : public Patch {
+class PatchCopyShader : public LegacyPatch {
 public:
   static char ID;
-  PatchCopyShader() : Patch(ID) {}
+  PatchCopyShader() : LegacyPatch(ID) {}
 
   bool runOnModule(Module &module) override;
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
-    analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
     // Pass does not preserve PipelineShaders as it adds a new shader.
   }
 
@@ -117,9 +117,9 @@ ModulePass *lgc::createPatchCopyShader() {
 bool PatchCopyShader::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Copy-Shader\n");
 
-  Patch::init(&module);
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
-  auto pipelineShaders = &getAnalysis<PipelineShaders>();
+  LegacyPatch::init(&module);
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
   auto gsEntryPoint = pipelineShaders->getEntryPoint(ShaderStageGeometry);
   if (!gsEntryPoint) {
     // No geometry shader -- copy shader not required.
@@ -245,7 +245,7 @@ bool PatchCopyShader::runOnModule(Module &module) {
   }
 
   if (m_pipelineState->isGsOnChip())
-    m_lds = Patch::getLdsVariable(m_pipelineState, &module);
+    m_lds = LegacyPatch::getLdsVariable(m_pipelineState, &module);
   else
     m_gsVsRingBufDesc = loadGsVsRingBufferDescriptor(builder);
 

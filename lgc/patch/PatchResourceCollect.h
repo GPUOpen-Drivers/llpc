@@ -43,14 +43,14 @@ typedef std::map<InOutLocationInfo, InOutLocationInfo> InOutLocationInfoMap;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for resource collecting
-class PatchResourceCollect : public Patch, public llvm::InstVisitor<PatchResourceCollect> {
+class PatchResourceCollect : public LegacyPatch, public llvm::InstVisitor<PatchResourceCollect> {
 public:
   PatchResourceCollect();
 
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
-    analysisUsage.addRequired<PipelineShaders>();
-    analysisUsage.addPreserved<PipelineShaders>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
+    analysisUsage.addPreserved<LegacyPipelineShaders>();
   }
 
   virtual bool runOnModule(llvm::Module &module) override;
@@ -96,7 +96,7 @@ private:
   void scalarizeGenericInput(llvm::CallInst *call);
   void scalarizeGenericOutput(llvm::CallInst *call);
 
-  PipelineShaders *m_pipelineShaders; // Pipeline shaders
+  LegacyPipelineShaders *m_pipelineShaders; // Pipeline shaders
   PipelineState *m_pipelineState;     // Pipeline state
 
   std::vector<llvm::CallInst *> m_deadCalls; // Dead calls

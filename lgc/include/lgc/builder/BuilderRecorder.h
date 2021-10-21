@@ -40,7 +40,7 @@ namespace llvm {
 class ModulePass;
 class PassRegistry;
 
-void initializeBuilderReplayerPass(PassRegistry &);
+void initializeLegacyBuilderReplayerPass(PassRegistry &);
 
 } // namespace llvm
 
@@ -588,6 +588,6 @@ private:
 };
 
 // Create BuilderReplayer pass
-llvm::ModulePass *createBuilderReplayer(Pipeline *pipeline);
+llvm::ModulePass *createLegacyBuilderReplayer(Pipeline *pipeline);
 
 } // namespace lgc

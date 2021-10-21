@@ -36,7 +36,7 @@
 #include <algorithm>
 // TODO: Fix the code in this file so it does not break the builder abstraction. It should
 // not be including files directly in the LGC directory tree like this.
-#include "../../lgc/builder/BuilderRecorder.h"
+#include "../../lgc/include/lgc/builder/BuilderRecorder.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerResourceCollect.h"
 

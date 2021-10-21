@@ -210,7 +210,7 @@ static CompSetting computeCompSetting(BufDataFormat dfmt) {
 
 namespace lgc {
 // Create BuilderReplayer pass
-ModulePass *createBuilderReplayer(Pipeline *pipeline);
+ModulePass *createLegacyBuilderReplayer(Pipeline *pipeline);
 } // namespace lgc
 
 // =====================================================================================================================
@@ -1489,7 +1489,7 @@ unsigned PipelineState::getVerticesPerPrimitive() {
 // Get (create if necessary) the PipelineState from this wrapper pass.
 //
 // @param module : IR module
-PipelineState *PipelineStateWrapper::getPipelineState(Module *module) {
+PipelineState *LegacyPipelineStateWrapper::getPipelineState(Module *module) {
   if (!m_pipelineState) {
     m_allocatedPipelineState = std::make_unique<PipelineState>(m_builderContext);
     m_pipelineState = &*m_allocatedPipelineState;
@@ -1500,60 +1500,122 @@ PipelineState *PipelineStateWrapper::getPipelineState(Module *module) {
 }
 
 // =====================================================================================================================
+// Execute this analysis on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this analysis
+// @returns : PipelineStateWrapper result object
+PipelineStateWrapper::Result PipelineStateWrapper::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  if (!m_pipelineState) {
+    m_allocatedPipelineState = std::make_unique<PipelineState>(m_builderContext);
+    m_pipelineState = &*m_allocatedPipelineState;
+    m_pipelineState->readState(&module);
+    m_pipelineState->initializeInOutPackState();
+  }
+  return Result(m_pipelineState);
+}
+
+// =====================================================================================================================
 // Pass to clear pipeline state out of the IR
-class PipelineStateClearer : public ModulePass {
+class LegacyPipelineStateClearer : public ModulePass {
 public:
-  PipelineStateClearer() : ModulePass(ID) {}
+  LegacyPipelineStateClearer() : ModulePass(ID) {}
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   }
 
   bool runOnModule(Module &module) override;
 
   static char ID; // ID of this pass
+private:
+  PipelineStateClearer m_impl;
 };
 
-char PipelineStateClearer::ID = 0;
+char LegacyPipelineStateClearer::ID = 0;
 
 // =====================================================================================================================
 // Create pipeline state clearer pass
-ModulePass *lgc::createPipelineStateClearer() {
-  return new PipelineStateClearer();
+ModulePass *lgc::createLegacyPipelineStateClearer() {
+  return new LegacyPipelineStateClearer();
 }
 
 // =====================================================================================================================
 // Run PipelineStateClearer pass to clear the pipeline state out of the IR
 //
 // @param [in/out] module : IR module
-bool PipelineStateClearer::runOnModule(Module &module) {
-  auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPipelineStateClearer::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  return m_impl.runImpl(module, pipelineState);
+}
+
+// =====================================================================================================================
+// Run PipelineStateClearer pass to clear the pipeline state out of the IR
+//
+// @param [in/out] module : IR module
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preverved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PipelineStateClearer::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  runImpl(module, pipelineState);
+  return PreservedAnalyses::none();
+}
+
+// =====================================================================================================================
+// Run PipelineStateClearer pass to clear the pipeline state out of the IR
+//
+// @param [in/out] module : IR module
+// @param : PipelineState object to clear
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PipelineStateClearer::runImpl(Module &module, PipelineState *pipelineState) {
   pipelineState->clear(&module);
   return true;
 }
 
 // =====================================================================================================================
 // Initialize the pipeline state clearer pass
-INITIALIZE_PASS(PipelineStateClearer, "llpc-pipeline-state-clearer", "LLPC pipeline state clearer", false, true)
+INITIALIZE_PASS(LegacyPipelineStateClearer, "llpc-pipeline-state-clearer", "LLPC pipeline state clearer", false, true)
 
 // =====================================================================================================================
-char PipelineStateWrapper::ID = 0;
+char LegacyPipelineStateWrapper::ID = 0;
+
+// =====================================================================================================================
+AnalysisKey PipelineStateWrapper::Key;
+
+// =====================================================================================================================
+//
+// @param pipelineState : Pipeline state to wrap
+PipelineStateWrapperResult::PipelineStateWrapperResult(PipelineState *pipelineState) : m_pipelineState(pipelineState) {
+}
 
 // =====================================================================================================================
 //
 // @param builderContext : LgcContext
-PipelineStateWrapper::PipelineStateWrapper(LgcContext *builderContext)
+PipelineStateWrapper::PipelineStateWrapper(LgcContext *builderContext) : m_builderContext(builderContext) {
+}
+
+// =====================================================================================================================
+//
+// @param pipelineState : Pipeline state to wrap
+PipelineStateWrapper::PipelineStateWrapper(PipelineState *pipelineState) : m_pipelineState(pipelineState) {
+}
+
+// =====================================================================================================================
+//
+// @param builderContext : LgcContext
+LegacyPipelineStateWrapper::LegacyPipelineStateWrapper(LgcContext *builderContext)
     : ImmutablePass(ID), m_builderContext(builderContext) {
 }
 
 // =====================================================================================================================
-// Clean-up of PipelineStateWrapper at end of pass manager run
+// Clean-up of LegacyPipelineStateWrapper at end of pass manager run
 //
 // @param module : Module
-bool PipelineStateWrapper::doFinalization(Module &module) {
+bool LegacyPipelineStateWrapper::doFinalization(Module &module) {
   return false;
 }
 
 // =====================================================================================================================
 // Initialize the pipeline state wrapper pass
-INITIALIZE_PASS(PipelineStateWrapper, DEBUG_TYPE, "LLPC pipeline state wrapper", false, true)
+INITIALIZE_PASS(LegacyPipelineStateWrapper, DEBUG_TYPE, "LLPC pipeline state wrapper", false, true)

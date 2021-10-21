@@ -46,7 +46,7 @@ namespace lgc {
 //   require a fix so the hardware will ignore this difference (actually an app error, but common enough to require
 //   handling)
 //
-class PatchWorkarounds final : public Patch {
+class PatchWorkarounds final : public LegacyPatch {
 public:
   PatchWorkarounds();
 

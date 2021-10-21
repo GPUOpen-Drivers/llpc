@@ -58,7 +58,7 @@ ModulePass *createPatchInOutImportExport() {
 }
 
 // =====================================================================================================================
-PatchInOutImportExport::PatchInOutImportExport() : Patch(ID), m_lds(nullptr) {
+PatchInOutImportExport::PatchInOutImportExport() : LegacyPatch(ID), m_lds(nullptr) {
   memset(&m_gfxIp, 0, sizeof(m_gfxIp));
   initPerShader();
 }
@@ -90,9 +90,9 @@ void PatchInOutImportExport::initPerShader() {
 bool PatchInOutImportExport::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-In-Out-Import-Export\n");
 
-  Patch::init(&module);
+  LegacyPatch::init(&module);
 
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   m_pipelineSysValues.initialize(m_pipelineState);
 
@@ -112,7 +112,7 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
   // Create the global variable that is to model LDS
   // NOTE: ES -> GS ring is always on-chip on GFX9.
   if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)))
-    m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
+    m_lds = LegacyPatch::getLdsVariable(m_pipelineState, m_module);
 
   // Set buffer formats based on specific GFX
   static const std::array<unsigned char, 4> BufferFormatsGfx9 = {
@@ -139,7 +139,7 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
 
   // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
   // set by TCS).
-  auto pipelineShaders = &getAnalysis<PipelineShaders>();
+  auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
   for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage) {
     auto entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
     if (entryPoint) {

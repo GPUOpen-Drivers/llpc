@@ -82,7 +82,7 @@ public:
   LowerVertexFetch &operator=(const LowerVertexFetch &) = delete;
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   }
 
   virtual bool runOnModule(Module &module) override;
@@ -363,7 +363,7 @@ ModulePass *lgc::createLowerVertexFetch() {
 //
 // @param [in/out] module : Module
 bool LowerVertexFetch::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(pipelineState->getLgcContext()));
 
   // Gather vertex fetch calls. We can assume they're all in one function, the vertex shader.

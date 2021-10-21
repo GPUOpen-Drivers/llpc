@@ -72,7 +72,7 @@ using namespace lgc;
 using namespace llvm;
 
 namespace llvm {
-void initializeBuilderReplayerPass(PassRegistry &);
+void initializeLegacyBuilderReplayerPass(PassRegistry &);
 } // namespace llvm
 
 static codegen::RegisterCodeGenFlags CGF;
@@ -151,7 +151,7 @@ void LgcContext::initialize() {
   // Initialize LGC passes so they can be referenced by -stop-before etc.
   initializeUtilPasses(passRegistry);
   initializeStatePasses(passRegistry);
-  initializeBuilderReplayerPass(passRegistry);
+  initializeLegacyBuilderReplayerPass(passRegistry);
   initializePatchPasses(passRegistry);
 
   // Initialize some command-line option defaults.

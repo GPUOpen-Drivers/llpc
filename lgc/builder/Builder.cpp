@@ -29,8 +29,8 @@
  ***********************************************************************************************************************
  */
 #include "BuilderImpl.h"
-#include "BuilderRecorder.h"
 #include "lgc/LgcContext.h"
+#include "lgc/builder/BuilderRecorder.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ShaderModes.h"
 #include "lgc/state/TargetInfo.h"

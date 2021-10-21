@@ -48,7 +48,7 @@ using namespace lgc;
 //
 // @param pipelineState : Pipeline state
 // @param pipelineShaders : API shaders in the pipeline
-ShaderMerger::ShaderMerger(PipelineState *pipelineState, PipelineShaders *pipelineShaders)
+ShaderMerger::ShaderMerger(PipelineState *pipelineState, LegacyPipelineShaders *pipelineShaders)
     : m_pipelineState(pipelineState), m_context(&pipelineState->getContext()),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()) {
   assert(m_gfxIp.major >= 9);

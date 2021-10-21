@@ -39,12 +39,12 @@
 using namespace lgc;
 using namespace llvm;
 
-char PipelineShaders::ID = 0;
+char LegacyPipelineShaders::ID = 0;
 
 // =====================================================================================================================
 // Create an instance of the pass.
-ModulePass *createPipelineShaders() {
-  return new PipelineShaders();
+ModulePass *createLegacyPipelineShaders() {
+  return new LegacyPipelineShaders();
 }
 
 // =====================================================================================================================
@@ -54,7 +54,7 @@ ModulePass *createPipelineShaders() {
 // and it has metadata giving the SPIR-V execution model.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PipelineShaders::runOnModule(Module &module) {
+bool LegacyPipelineShaders::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
 
   m_entryPointMap.clear();
@@ -78,7 +78,7 @@ bool PipelineShaders::runOnModule(Module &module) {
 // Get the shader for a particular API shader stage, or nullptr if none
 //
 // @param shaderStage : Shader stage
-Function *PipelineShaders::getEntryPoint(ShaderStage shaderStage) const {
+Function *LegacyPipelineShaders::getEntryPoint(ShaderStage shaderStage) const {
   assert((unsigned)shaderStage < ShaderStageCountInternal);
   return m_entryPoints[shaderStage];
 }
@@ -87,7 +87,7 @@ Function *PipelineShaders::getEntryPoint(ShaderStage shaderStage) const {
 // Get the ABI shader stage for a particular function, or ShaderStageInvalid if not a shader entrypoint.
 //
 // @param func : Function to look up
-ShaderStage PipelineShaders::getShaderStage(const Function *func) const {
+ShaderStage LegacyPipelineShaders::getShaderStage(const Function *func) const {
   auto entryMapIt = m_entryPointMap.find(func);
   if (entryMapIt == m_entryPointMap.end())
     return ShaderStageInvalid;
@@ -96,4 +96,4 @@ ShaderStage PipelineShaders::getShaderStage(const Function *func) const {
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(PipelineShaders, DEBUG_TYPE, "LLVM pass for getting pipeline shaders", false, true)
+INITIALIZE_PASS(LegacyPipelineShaders, DEBUG_TYPE, "LLVM pass for getting pipeline shaders", false, true)

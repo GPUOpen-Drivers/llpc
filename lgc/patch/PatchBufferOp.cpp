@@ -71,7 +71,7 @@ PatchBufferOp::PatchBufferOp() : FunctionPass(ID) {
 // @param [out] analysisUsage : The analysis usage.
 void PatchBufferOp::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.addRequired<LegacyDivergenceAnalysis>();
-  analysisUsage.addRequired<PipelineStateWrapper>();
+  analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   analysisUsage.addRequired<TargetTransformInfoWrapperPass>();
   analysisUsage.addPreserved<TargetTransformInfoWrapperPass>();
 }
@@ -83,7 +83,7 @@ void PatchBufferOp::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
 bool PatchBufferOp::runOnFunction(Function &function) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
 
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(function.getParent());
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
   m_context = &function.getContext();
   m_builder = std::make_unique<IRBuilder<>>(*m_context);
 

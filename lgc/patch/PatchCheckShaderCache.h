@@ -38,13 +38,13 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for checking shader cache
-class PatchCheckShaderCache : public Patch {
+class PatchCheckShaderCache : public LegacyPatch {
 public:
   PatchCheckShaderCache();
 
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
-    analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
   }
 
   virtual bool runOnModule(llvm::Module &module) override;
