@@ -229,11 +229,6 @@ cl::opt<bool> ScalarBlockLayout("scalar-block-layout", cl::desc("Allows scalar b
 cl::opt<bool> EnableRelocatableShaderElf("enable-relocatable-shader-elf",
                                          cl::desc("Compile pipelines using relocatable shader elf"), cl::init(false));
 
-// -check-auto-layout-compatible: check if auto descriptor layout got from spv file is compatible with real layout
-cl::opt<bool> CheckAutoLayoutCompatible(
-    "check-auto-layout-compatible",
-    cl::desc("Check if auto descriptor layout got from spv file is compatible with real layout"));
-
 // -enable-scratch-bounds-checks: insert scratch access bounds checks on loads and stores
 cl::opt<bool> EnableScratchAccessBoundsChecks("enable-scratch-bounds-checks",
                                               cl::desc("Insert scratch access bounds checks on loads and stores"),
@@ -387,7 +382,6 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->gfxIp = ParsedGfxIp;
   compileInfo->entryTarget = EntryTarget;
   compileInfo->relocatableShaderElf = EnableRelocatableShaderElf;
-  compileInfo->checkAutoLayoutCompatible = CheckAutoLayoutCompatible;
   compileInfo->autoLayoutDesc = AutoLayoutDesc;
   compileInfo->robustBufferAccess = RobustBufferAccess;
   compileInfo->scalarBlockLayout = ScalarBlockLayout;
@@ -666,34 +660,29 @@ static Result processPipeline(ICompiler *compiler, ArrayRef<std::string> inFiles
     }
   }
 
-  if (result == Result::Success && compileInfo.checkAutoLayoutCompatible) {
-    compileInfo.fileNames = fileNames.c_str();
-    result = checkAutoLayoutCompatibleFunc(compiler, &compileInfo);
-  } else {
-    //
-    // Build shader modules
-    //
-    if (result == Result::Success && compileInfo.stageMask != 0)
-      result = buildShaderModules(compiler, &compileInfo);
+  //
+  // Build shader modules
+  //
+  if (result == Result::Success && compileInfo.stageMask != 0)
+    result = buildShaderModules(compiler, &compileInfo);
 
-    //
-    // Build pipeline
-    //
-    if (result == Result::Success && ToLink) {
-      Optional<PipelineDumpOptions> dumpOptions = None;
-      if (cl::EnablePipelineDump) {
-        dumpOptions.emplace();
-        dumpOptions->pDumpDir = cl::PipelineDumpDir.c_str();
-        dumpOptions->filterPipelineDumpByType = FilterPipelineDumpByType;
-        dumpOptions->filterPipelineDumpByHash = FilterPipelineDumpByHash;
-        dumpOptions->dumpDuplicatePipelines = DumpDuplicatePipelines;
-      }
-
-      compileInfo.fileNames = fileNames.c_str();
-      result = buildPipeline(compiler, &compileInfo, dumpOptions, TimePassesIsEnabled || cl::EnableTimerProfile);
-      if (result == Result::Success)
-        result = outputElf(&compileInfo, OutFile, inFiles[0]);
+  //
+  // Build pipeline
+  //
+  if (result == Result::Success && ToLink) {
+    Optional<PipelineDumpOptions> dumpOptions = None;
+    if (cl::EnablePipelineDump) {
+      dumpOptions.emplace();
+      dumpOptions->pDumpDir = cl::PipelineDumpDir.c_str();
+      dumpOptions->filterPipelineDumpByType = FilterPipelineDumpByType;
+      dumpOptions->filterPipelineDumpByHash = FilterPipelineDumpByHash;
+      dumpOptions->dumpDuplicatePipelines = DumpDuplicatePipelines;
     }
+
+    compileInfo.fileNames = fileNames.c_str();
+    result = buildPipeline(compiler, &compileInfo, dumpOptions, TimePassesIsEnabled || cl::EnableTimerProfile);
+    if (result == Result::Success)
+      result = outputElf(&compileInfo, OutFile, inFiles[0]);
   }
   //
   // Clean up

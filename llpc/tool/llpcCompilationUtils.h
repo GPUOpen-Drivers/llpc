@@ -65,8 +65,6 @@ struct CompileInfo {
   bool relocatableShaderElf;      // Whether to enable relocatable shader compilation
   bool scalarBlockLayout;         // Whether to enable scalar block layout
   bool doAutoLayout;              // Whether to auto layout descriptors
-  bool checkAutoLayoutCompatible; // Whether to comapre if auto layout descriptors is
-                                  // same as specified pipeline layout
   bool autoLayoutDesc;            // Whether to automatically create descriptor layout based on resource usages
   bool robustBufferAccess;        // Whether to enable robust buffer access
   bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
