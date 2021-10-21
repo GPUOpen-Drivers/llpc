@@ -1,0 +1,11 @@
+; Check that an error is produced when a file with unknown extensions is passed.
+
+; BEGIN_SHADERTEST
+; RUN: not amdllpc -validate-spirv=true -spvgen-dir=%spvgendir% -v %gfxip %s \
+; RUN:   | FileCheck --check-prefix=SHADERTEST %s
+;
+; SHADERTEST-LABEL: {{^}}ERROR: {{.*}}: Bad file extension; try -help
+; SHADERTEST-LABEL: {{^}}===== AMDLLPC FAILED =====
+; END_SHADERTEST
+
+Nothing more to see here.

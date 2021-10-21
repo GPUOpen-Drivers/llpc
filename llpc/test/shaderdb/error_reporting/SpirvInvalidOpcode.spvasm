@@ -1,0 +1,13 @@
+; Check that an error is produced when bad SPIR-V is passed and it is not possible to assemble it.
+
+; BEGIN_SHADERTEST
+; RUN: not amdllpc -validate-spirv=false -spvgen-dir=%spvgendir% -v %gfxip %s \
+; RUN:   | FileCheck %s --check-prefix=SHADERTEST
+;
+; SHADERTEST-LABEL: {{^}}ERROR: Fails to assemble SPIR-V:
+; SHADERTEST-LABEL: {{^}}error: {{[0-9]+}}: {{[0-9]+}}: Invalid Opcode name 'OpThisSpirvIsBad'
+; SHADERTEST-LABEL: {{^}}===== AMDLLPC FAILED =====
+; END_SHADERTEST
+
+               OpCapability Shader
+               OpThisSpirvIsBad Please Fail
