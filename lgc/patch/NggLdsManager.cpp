@@ -124,7 +124,7 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
   //
   // Create global variable modeling LDS
   //
-  m_lds = Patch::getLdsVariable(m_pipelineState, module);
+  m_lds = LegacyPatch::getLdsVariable(m_pipelineState, module);
 
   memset(&m_ldsRegionStart, InvalidValue, sizeof(m_ldsRegionStart)); // Initialized to invalid value (0xFFFFFFFF)
 

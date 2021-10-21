@@ -52,7 +52,10 @@ public:
   static PassManager *Create();
   virtual ~PassManager() {}
   template <typename PassBuilderT> bool registerFunctionAnalysis(PassBuilderT &&PassBuilder) {
-    return functionAnalysisManager.registerPass(std::forward<PassBuilderT>(PassBuilder));
+    return m_functionAnalysisManager.registerPass(std::forward<PassBuilderT>(PassBuilder));
+  }
+  template <typename PassBuilderT> bool registerModuleAnalysis(PassBuilderT &&passBuilder) {
+    return m_moduleAnalysisManager.registerPass(std::forward<PassBuilderT>(passBuilder));
   }
   // Register a pass to identify it with a short name in the pass manager
   virtual void registerPass(llvm::StringRef passName, llvm::StringRef className) = 0;
@@ -60,7 +63,8 @@ public:
   virtual void setPassIndex(unsigned *passIndex) = 0;
 
 protected:
-  llvm::FunctionAnalysisManager functionAnalysisManager;
+  llvm::FunctionAnalysisManager m_functionAnalysisManager;
+  llvm::ModuleAnalysisManager m_moduleAnalysisManager;
 };
 
 } // namespace lgc

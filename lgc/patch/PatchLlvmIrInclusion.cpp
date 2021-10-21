@@ -50,7 +50,7 @@ ModulePass *createPatchLlvmIrInclusion() {
 }
 
 // =====================================================================================================================
-PatchLlvmIrInclusion::PatchLlvmIrInclusion() : Patch(ID) {
+PatchLlvmIrInclusion::PatchLlvmIrInclusion() : LegacyPatch(ID) {
 }
 
 // =====================================================================================================================
@@ -61,7 +61,7 @@ PatchLlvmIrInclusion::PatchLlvmIrInclusion() : Patch(ID) {
 //
 // @param [in/out] module : LLVM module to be run on
 bool PatchLlvmIrInclusion::runOnModule(Module &module) {
-  Patch::init(&module);
+  LegacyPatch::init(&module);
 
   std::string moduleStr;
   raw_string_ostream llvmIr(moduleStr);

@@ -55,7 +55,7 @@ public:
   static char ID; // ID of this pass
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   }
 
   MDNode *updateMetadata(MDNode *loopId, ArrayRef<StringRef> prefixesToRemove, Metadata *addMetadata, bool conditional);
@@ -137,16 +137,16 @@ bool PatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) {
 
   Module *module = loop->getHeader()->getModule();
   Function *func = loop->getHeader()->getFirstNonPHI()->getFunction();
-  PipelineState *m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(module);
+  PipelineState *mPipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(module);
   m_context = &loop->getHeader()->getContext();
 
-  m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  m_gfxIp = mPipelineState->getTargetInfo().getGfxIpVersion();
   bool changed = false;
 
   ShaderStage stage = getShaderStage(func);
   if (stage == ShaderStageInvalid)
     return false;
-  if (auto shaderOptions = &m_pipelineState->getShaderOptions(stage)) {
+  if (auto shaderOptions = &mPipelineState->getShaderOptions(stage)) {
     m_disableLoopUnroll = shaderOptions->disableLoopUnroll;
     m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
     m_disableLicmThreshold = shaderOptions->disableLicmThreshold;

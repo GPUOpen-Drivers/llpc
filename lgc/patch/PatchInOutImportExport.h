@@ -43,16 +43,16 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for input import and output export.
-class PatchInOutImportExport : public Patch {
+class PatchInOutImportExport : public LegacyPatch {
 public:
   PatchInOutImportExport();
   ~PatchInOutImportExport();
 
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
-    analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
     analysisUsage.addRequired<llvm::PostDominatorTreeWrapperPass>();
-    analysisUsage.addPreserved<PipelineShaders>();
+    analysisUsage.addPreserved<LegacyPipelineShaders>();
   }
 
   bool runOnModule(llvm::Module &module) override;

@@ -51,8 +51,8 @@ public:
   PatchWaveSizeAdjust();
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineShaders>();
-    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
     analysisUsage.setPreservesAll();
   }
 
@@ -92,7 +92,7 @@ PatchWaveSizeAdjust::PatchWaveSizeAdjust() : ModulePass(ID) {
 bool PatchWaveSizeAdjust::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Running the pass of adjusting wave size heuristic\n");
 
-  auto pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  auto pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   for (int stageIdx = 0; stageIdx < ShaderStageCount; ++stageIdx) {
     ShaderStage shaderStage = static_cast<ShaderStage>(stageIdx);
     if (pipelineState->hasShaderStage(shaderStage)) {

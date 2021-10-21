@@ -48,16 +48,17 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to prepare the pipeline ABI
-class PatchPreparePipelineAbi final : public Patch {
+class PatchPreparePipelineAbi final : public LegacyPatch {
 public:
   static char ID;
-  PatchPreparePipelineAbi(bool onlySetCallingConvs = false) : Patch(ID), m_onlySetCallingConvs(onlySetCallingConvs) {}
+  PatchPreparePipelineAbi(bool onlySetCallingConvs = false)
+      : LegacyPatch(ID), m_onlySetCallingConvs(onlySetCallingConvs) {}
 
   bool runOnModule(Module &module) override;
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
-    analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
   }
 
 private:
@@ -77,7 +78,7 @@ private:
   void addAbiMetadata(Module &module);
 
   PipelineState *m_pipelineState;     // Pipeline state
-  PipelineShaders *m_pipelineShaders; // API shaders in the pipeline
+  LegacyPipelineShaders *m_pipelineShaders; // API shaders in the pipeline
 
   bool m_hasVs;  // Whether the pipeline has vertex shader
   bool m_hasTcs; // Whether the pipeline has tessellation control shader
@@ -108,10 +109,10 @@ ModulePass *lgc::createPatchPreparePipelineAbi(bool onlySetCallingConvs) {
 bool PatchPreparePipelineAbi::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Pipeline-Abi\n");
 
-  Patch::init(&module);
+  LegacyPatch::init(&module);
 
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
-  m_pipelineShaders = &getAnalysis<PipelineShaders>();
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
 
   m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
   m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);

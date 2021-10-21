@@ -28,6 +28,7 @@
  * @brief LLPC source file: contains declaration and implementation of class lgc::PatchNullFragShader.
  ***********************************************************************************************************************
  */
+#include "PatchNullFragShader.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/IntrinsDefs.h"
@@ -48,42 +49,66 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to generate null fragment shader if required
-class PatchNullFragShader : public Patch {
+class LegacyPatchNullFragShader : public ModulePass {
 public:
   static char ID;
-  PatchNullFragShader() : Patch(ID) {}
+  LegacyPatchNullFragShader() : ModulePass(ID) {}
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   }
 
   bool runOnModule(Module &module) override;
 
 private:
-  PatchNullFragShader(const PatchNullFragShader &) = delete;
-  PatchNullFragShader &operator=(const PatchNullFragShader &) = delete;
+  LegacyPatchNullFragShader(const LegacyPatchNullFragShader &) = delete;
+  LegacyPatchNullFragShader &operator=(const LegacyPatchNullFragShader &) = delete;
+
+  PatchNullFragShader m_impl;
 };
 
-char PatchNullFragShader::ID = 0;
+char LegacyPatchNullFragShader::ID = 0;
 
 } // namespace lgc
 
 // =====================================================================================================================
 // Create the pass that generates a null fragment shader if required.
-ModulePass *lgc::createPatchNullFragShader() {
-  return new PatchNullFragShader();
+ModulePass *lgc::createLegacyPatchNullFragShader() {
+  return new LegacyPatchNullFragShader();
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchNullFragShader::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchNullFragShader::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  return m_impl.runImpl(module, pipelineState);
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preverved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PatchNullFragShader::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  if (runImpl(module, pipelineState))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchNullFragShader::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Null-Frag-Shader\n");
 
   Patch::init(&module);
-
-  PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
 
   // Do not add a null fragment shader if not generating a whole pipeline.
   if (!pipelineState->isWholePipeline())
@@ -162,4 +187,4 @@ bool PatchNullFragShader::runOnModule(Module &module) {
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(PatchNullFragShader, DEBUG_TYPE, "Patch LLVM for null fragment shader generation", false, false)
+INITIALIZE_PASS(LegacyPatchNullFragShader, DEBUG_TYPE, "Patch LLVM for null fragment shader generation", false, false)

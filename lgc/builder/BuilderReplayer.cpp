@@ -28,8 +28,9 @@
  * @brief LLPC source file: BuilderReplayer pass
  ***********************************************************************************************************************
  */
-#include "BuilderRecorder.h"
+#include "lgc/builder/BuilderReplayer.h"
 #include "lgc/LgcContext.h"
+#include "lgc/builder/BuilderRecorder.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/Internal.h"
 #include "llvm/Support/Debug.h"
@@ -43,13 +44,13 @@ namespace {
 
 // =====================================================================================================================
 // Pass to replay Builder calls recorded by BuilderRecorder
-class BuilderReplayer final : public ModulePass, BuilderRecorderMetadataKinds {
+class LegacyBuilderReplayer final : public ModulePass, BuilderRecorderMetadataKinds {
 public:
-  BuilderReplayer() : ModulePass(ID) {}
-  BuilderReplayer(Pipeline *pipeline);
+  LegacyBuilderReplayer() : ModulePass(ID), m_impl(nullptr) {}
+  LegacyBuilderReplayer(Pipeline *pipeline);
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   }
 
   bool runOnModule(Module &module) override;
@@ -57,30 +58,22 @@ public:
   static char ID;
 
 private:
-  BuilderReplayer(const BuilderReplayer &) = delete;
-  BuilderReplayer &operator=(const BuilderReplayer &) = delete;
+  LegacyBuilderReplayer(const LegacyBuilderReplayer &) = delete;
+  LegacyBuilderReplayer &operator=(const LegacyBuilderReplayer &) = delete;
 
-  void replayCall(unsigned opcode, CallInst *call);
-
-  Value *processCall(unsigned opcode, CallInst *call);
-
-  std::unique_ptr<Builder> m_builder;                 // The LLPC builder that the builder
-                                                      //  calls are being replayed on.
-  std::map<Function *, ShaderStage> m_shaderStageMap; // Map function -> shader stage
-  Function *m_enclosingFunc = nullptr;                // Last function written with current
-                                                      //  shader stage
+  BuilderReplayer m_impl;
 };
 
 } // namespace
 
-char BuilderReplayer::ID = 0;
+char LegacyBuilderReplayer::ID = 0;
 
 // =====================================================================================================================
 // Create BuilderReplayer pass
 //
 // @param pipeline : Pipeline object
-ModulePass *lgc::createBuilderReplayer(Pipeline *pipeline) {
-  return new BuilderReplayer(pipeline);
+ModulePass *lgc::createLegacyBuilderReplayer(Pipeline *pipeline) {
+  return new LegacyBuilderReplayer(pipeline);
 }
 
 // =====================================================================================================================
@@ -88,18 +81,47 @@ ModulePass *lgc::createBuilderReplayer(Pipeline *pipeline) {
 //
 // @param pipeline : Pipeline object
 BuilderReplayer::BuilderReplayer(Pipeline *pipeline)
-    : ModulePass(ID), BuilderRecorderMetadataKinds(static_cast<LLVMContext &>(pipeline->getContext())) {
+    : BuilderRecorderMetadataKinds(static_cast<LLVMContext &>(pipeline->getContext())) {
+}
+
+// =====================================================================================================================
+// Constructor
+//
+// @param pipeline : Pipeline object
+LegacyBuilderReplayer::LegacyBuilderReplayer(Pipeline *pipeline) : ModulePass(ID), m_impl(pipeline) {
+}
+
+// =====================================================================================================================
+// Run the BuilderReplayer pass on a module
+//
+// @param [in/out] module : LLVM module to be run on
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyBuilderReplayer::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  return m_impl.runImpl(module, pipelineState);
+}
+
+// =====================================================================================================================
+// Run the BuilderReplayer pass on a module
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preverved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses BuilderReplayer::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  runImpl(module, pipelineState);
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
 // Run the BuilderReplayer pass on a module
 //
 // @param module : Module to run this pass on
-bool BuilderReplayer::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Running the pass of replaying LLPC builder calls\n");
 
   // Set up the pipeline state from the specified linked IR module.
-  PipelineState *pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
   pipelineState->readState(&module);
 
   // Create the BuilderImpl to replay into, passing it the PipelineState
@@ -837,4 +859,4 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(BuilderReplayer, DEBUG_TYPE, "Replay LLPC builder calls", false, false)
+INITIALIZE_PASS(LegacyBuilderReplayer, DEBUG_TYPE, "Replay LLPC builder calls", false, false)

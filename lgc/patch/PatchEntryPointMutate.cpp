@@ -89,15 +89,15 @@ namespace {
 
 // =====================================================================================================================
 // The entry-point mutation pass
-class PatchEntryPointMutate : public Patch {
+class PatchEntryPointMutate : public LegacyPatch {
 public:
   PatchEntryPointMutate();
   PatchEntryPointMutate(const PatchEntryPointMutate &) = delete;
   PatchEntryPointMutate &operator=(const PatchEntryPointMutate &) = delete;
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineStateWrapper>();
-    analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
     // Does not preserve PipelineShaders because it replaces the entrypoints.
   }
 
@@ -226,7 +226,7 @@ ModulePass *lgc::createPatchEntryPointMutate() {
 }
 
 // =====================================================================================================================
-PatchEntryPointMutate::PatchEntryPointMutate() : Patch(ID), m_hasTs(false), m_hasGs(false) {
+PatchEntryPointMutate::PatchEntryPointMutate() : LegacyPatch(ID), m_hasTs(false), m_hasGs(false) {
 }
 
 // =====================================================================================================================
@@ -236,9 +236,9 @@ PatchEntryPointMutate::PatchEntryPointMutate() : Patch(ID), m_hasTs(false), m_ha
 bool PatchEntryPointMutate::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
 
-  Patch::init(&module);
+  LegacyPatch::init(&module);
 
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
 
   const unsigned stageMask = m_pipelineState->getShaderStageMask();
   m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0;
@@ -254,7 +254,7 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
 
   if (m_pipelineState->isGraphics()) {
     // Process each shader in turn, but not the copy shader.
-    auto pipelineShaders = &getAnalysis<PipelineShaders>();
+    auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
     for (unsigned shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
       m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
       if (m_entryPoint) {

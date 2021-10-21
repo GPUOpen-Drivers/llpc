@@ -94,7 +94,6 @@ public:
   void registerPass(StringRef passName, StringRef className) override;
   void run(Module &module) override;
   void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
-
 private:
   void registerCallbacks();
 
@@ -102,7 +101,6 @@ private:
 
   LoopAnalysisManager loopAnalysisManager;               // Loop analysis manager used when running the passes.
   CGSCCAnalysisManager cgsccAnalysisManager;             // CGSCC analysis manager used when running the passes.
-  ModuleAnalysisManager moduleAnalysisManager;           // Module analysis manager used when running the passes.
   PassInstrumentationCallbacks instrumentationCallbacks; // Instrumentation callbacks ran when running the passes.
   PrintIRInstrumentation instrumentationPrintIR; // Print IR instrumentation, to print IR before/after the passes.
   VerifyInstrumentation instrumentationVerify;   // Verify instrumentation, run module verifier after each pass.
@@ -197,15 +195,15 @@ void PassManagerImpl::run(Module &module) {
   // analyses are added beforehand.
   if (!initialized) {
     PassBuilder passBuilder(nullptr, PipelineTuningOptions(), None, &instrumentationCallbacks);
-    passBuilder.registerModuleAnalyses(moduleAnalysisManager);
+    passBuilder.registerModuleAnalyses(m_moduleAnalysisManager);
     passBuilder.registerCGSCCAnalyses(cgsccAnalysisManager);
-    passBuilder.registerFunctionAnalyses(functionAnalysisManager);
+    passBuilder.registerFunctionAnalyses(m_functionAnalysisManager);
     passBuilder.registerLoopAnalyses(loopAnalysisManager);
-    passBuilder.crossRegisterProxies(loopAnalysisManager, functionAnalysisManager, cgsccAnalysisManager,
-                                     moduleAnalysisManager);
+    passBuilder.crossRegisterProxies(loopAnalysisManager, m_functionAnalysisManager, cgsccAnalysisManager,
+                                     m_moduleAnalysisManager);
     initialized = true;
   }
-  ModulePassManager::run(module, moduleAnalysisManager);
+  ModulePassManager::run(module, m_moduleAnalysisManager);
 }
 
 // =====================================================================================================================

@@ -49,13 +49,13 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of setting up the value for workgroup global variables.
-class PatchInitializeWorkgroupMemory final : public Patch {
+class PatchInitializeWorkgroupMemory final : public LegacyPatch {
 public:
   PatchInitializeWorkgroupMemory();
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<PipelineShaders>();
-    analysisUsage.addRequired<PipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   }
 
   virtual bool runOnModule(Module &module) override;
@@ -84,7 +84,7 @@ ModulePass *createPatchInitializeWorkgroupMemory() {
 }
 
 // =====================================================================================================================
-PatchInitializeWorkgroupMemory::PatchInitializeWorkgroupMemory() : Patch(ID) {
+PatchInitializeWorkgroupMemory::PatchInitializeWorkgroupMemory() : LegacyPatch(ID) {
 }
 
 // =====================================================================================================================
@@ -94,7 +94,7 @@ PatchInitializeWorkgroupMemory::PatchInitializeWorkgroupMemory() : Patch(ID) {
 bool PatchInitializeWorkgroupMemory::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Initialize-Workgroup-Memory\n");
 
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   // This pass works on compute shader.
   if (!m_pipelineState->hasShaderStage(ShaderStageCompute))
     return false;
@@ -111,9 +111,9 @@ bool PatchInitializeWorkgroupMemory::runOnModule(Module &module) {
   if (workgroupGlobals.empty())
     return false;
 
-  Patch::init(&module);
+  LegacyPatch::init(&module);
   m_shaderStage = ShaderStageCompute;
-  m_entryPoint = (&getAnalysis<PipelineShaders>())->getEntryPoint(static_cast<ShaderStage>(m_shaderStage));
+  m_entryPoint = (&getAnalysis<LegacyPipelineShaders>())->getEntryPoint(static_cast<ShaderStage>(m_shaderStage));
   BuilderBase builder(*m_context);
   Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
   builder.SetInsertPoint(insertPos);

@@ -68,7 +68,7 @@ ModulePass *createPatchResourceCollect() {
 }
 
 // =====================================================================================================================
-PatchResourceCollect::PatchResourceCollect() : Patch(ID), m_resUsage(nullptr) {
+PatchResourceCollect::PatchResourceCollect() : LegacyPatch(ID), m_resUsage(nullptr) {
 }
 
 // =====================================================================================================================
@@ -78,9 +78,9 @@ PatchResourceCollect::PatchResourceCollect() : Patch(ID), m_resUsage(nullptr) {
 bool PatchResourceCollect::runOnModule(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 
-  Patch::init(&module);
-  m_pipelineShaders = &getAnalysis<PipelineShaders>();
-  m_pipelineState = getAnalysis<PipelineStateWrapper>().getPipelineState(&module);
+  LegacyPatch::init(&module);
+  m_pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
+  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
 
   // This pass processes a missing fragment shader using FS input packing information passed into LGC
   // from the separate compile of the FS.

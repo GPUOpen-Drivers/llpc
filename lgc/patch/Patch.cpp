@@ -30,7 +30,10 @@
  */
 #include "lgc/patch/Patch.h"
 #include "PatchCheckShaderCache.h"
+#include "PatchNullFragShader.h"
 #include "lgc/LgcContext.h"
+#include "lgc/PassManager.h"
+#include "lgc/builder/BuilderReplayer.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Debug.h"
@@ -77,11 +80,42 @@ namespace lgc {
 //
 // @param pipelineState : Pipeline state
 // @param [in/out] passMgr : Pass manager to add passes to
+// @param patchTimer : Timer to time patch passes with, nullptr if not timing
+// @param optTimer : Timer to time LLVM optimization passes with, nullptr if not timing
+// @param checkShaderCacheDunc : Callback function to check shader cache
+void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, bool addReplayerPass, Timer *patchTimer,
+                      Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc) {
+  // Start timer for patching passes.
+  if (patchTimer)
+    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
+
+  // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
+  if (addReplayerPass)
+    passMgr.addPass(BuilderReplayer(pipelineState));
+
+  if (raw_ostream *outs = getLgcOuts()) {
+    passMgr.addPass(PrintModulePass(*outs,
+                                    "===============================================================================\n"
+                                    "// LLPC pipeline before-patching results\n"));
+  }
+
+  // Build null fragment shader if necessary
+  passMgr.addPass(PatchNullFragShader());
+
+  // NOTE: The new pass manager is not fully implemented yet. We should add all
+  // the other patching passes here.
+}
+
+// =====================================================================================================================
+// Add whole-pipeline patch passes to pass manager
+//
+// @param pipelineState : Pipeline state
+// @param [in/out] passMgr : Pass manager to add passes to
 // @param replayerPass : BuilderReplayer pass, or nullptr if not needed
 // @param patchTimer : Timer to time patch passes with, nullptr if not timing
 // @param optTimer : Timer to time LLVM optimization passes with, nullptr if not timing
-void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr, ModulePass *replayerPass,
-                      Timer *patchTimer, Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc)
+void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr, ModulePass *replayerPass,
+                            Timer *patchTimer, Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc)
 // Callback function to check shader cache
 {
   // Start timer for patching passes.
@@ -99,7 +133,7 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
   }
 
   // Build null fragment shader if necessary
-  passMgr.add(createPatchNullFragShader());
+  passMgr.add(createLegacyPatchNullFragShader());
 
   // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
   passMgr.add(createPatchResourceCollect());
@@ -218,7 +252,7 @@ void Patch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr
 // Add optimization passes to pass manager
 //
 // @param [in/out] passMgr : Pass manager to add passes to
-void Patch::addOptimizationPasses(legacy::PassManager &passMgr) {
+void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr) {
   LLPC_OUTS("PassManager optimization level = " << cl::OptLevel << "\n");
 
   passMgr.add(createForceFunctionAttrsLegacyPass());

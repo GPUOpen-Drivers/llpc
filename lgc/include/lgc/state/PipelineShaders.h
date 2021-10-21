@@ -38,10 +38,10 @@ namespace lgc {
 
 // =====================================================================================================================
 // Simple analysis pass that finds the shaders in the pipeline module
-class PipelineShaders : public llvm::ModulePass {
+class LegacyPipelineShaders : public llvm::ModulePass {
 public:
   static char ID;
-  PipelineShaders() : llvm::ModulePass(ID) {}
+  LegacyPipelineShaders() : llvm::ModulePass(ID) {}
 
   bool runOnModule(llvm::Module &module) override;
 
@@ -52,13 +52,13 @@ public:
   ShaderStage getShaderStage(const llvm::Function *func) const;
 
 private:
-  PipelineShaders(const PipelineShaders &) = delete;
-  PipelineShaders &operator=(const PipelineShaders &) = delete;
+  LegacyPipelineShaders(const LegacyPipelineShaders &) = delete;
+  LegacyPipelineShaders &operator=(const LegacyPipelineShaders &) = delete;
 
   llvm::Function *m_entryPoints[ShaderStageCountInternal];       // The entry-point for each shader stage.
   std::map<const llvm::Function *, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
 };
 
-llvm::ModulePass *createPipelineShaders();
+llvm::ModulePass *createLegacyPipelineShaders();
 
 } // namespace lgc
