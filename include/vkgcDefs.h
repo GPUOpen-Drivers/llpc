@@ -35,7 +35,7 @@
 #include <tuple>
 
 // Confliction of Xlib and LLVM headers
-#if defined(__unix__)
+#if !_WIN32
 #undef True
 #undef False
 #undef DestroyAll
