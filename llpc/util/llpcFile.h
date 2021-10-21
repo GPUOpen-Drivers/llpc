@@ -36,9 +36,9 @@
 
 namespace Llpc {
 
-// On Linux, NAME_MAX is the maximum filename length, while PATH_MAX defines the maximum path length.
+// On Unix-like OSs, NAME_MAX is the maximum filename length, while PATH_MAX defines the maximum path length.
 // On Windows, maximum file and path lengths are defined by _MAX_FNAME and MAX_PATH, respectively.
-#if defined(__unix__)
+#if !_WIN32
 constexpr size_t MaxFilenameLen = NAME_MAX;
 constexpr size_t MaxPathLen = PATH_MAX;
 #else

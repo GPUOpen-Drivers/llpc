@@ -46,7 +46,7 @@ static cl::opt<std::string> ShaderCacheFilename("shader-cache-filename", cl::des
 
 namespace Llpc {
 
-#if defined(__unix__)
+#if !_WIN32
 static const char CacheFileSubPath[] = "/AMD/LlpcCache/";
 #else
 static const char CacheFileSubPath[] = "\\AMD\\LlpcCache\\";
