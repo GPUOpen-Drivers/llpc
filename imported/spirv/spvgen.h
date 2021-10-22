@@ -96,12 +96,20 @@ enum SpvSourceLanguage : uint32_t
 };
 enum SpvGenStage : uint32_t
 {
+    SpvGenStageTask,
     SpvGenStageVertex,
     SpvGenStageTessControl,
     SpvGenStageTessEvaluation,
     SpvGenStageGeometry,
+    SpvGenStageMesh,
     SpvGenStageFragment,
     SpvGenStageCompute,
+    SpvGenStageRayTracingRayGen,
+    SpvGenStageRayTracingIntersect,
+    SpvGenStageRayTracingAnyHit,
+    SpvGenStageRayTracingClosestHit,
+    SpvGenStageRayTracingMiss,
+    SpvGenStageRayTracingCallable,
     SpvGenStageCount,
     SpvGenStageInvalid = ~0u,
     SpvGenNativeStageCount = SpvGenStageCompute + 1,
