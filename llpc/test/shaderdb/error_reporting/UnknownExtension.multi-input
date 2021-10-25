@@ -4,7 +4,8 @@
 ; RUN: not amdllpc -validate-spirv=true -spvgen-dir=%spvgendir% -v %gfxip %s \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST %s
 ;
-; SHADERTEST-LABEL: {{^}}ERROR: {{.*}}: Bad file extension; try -help
+; SHADERTEST-LABEL: {{^}}ERROR: File {{.*}}.multi-input has an unknown extension;
+; SHADERTEST-SAME:  try -help to list supported input formats
 ; SHADERTEST-LABEL: {{^}}===== AMDLLPC FAILED =====
 ; END_SHADERTEST
 

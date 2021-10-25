@@ -143,6 +143,34 @@ TEST(InputUtilsTest, IsSpirvBinaryFile) {
   EXPECT_FALSE(isSpirvBinaryFile(""));
 }
 
+TEST(InputUtilsTest, IsGlslShaderFile) {
+  // Based on https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/.
+  for (StringRef extension : {".vert", ".tesc", ".tese", ".geom", ".frag", ".comp"}) {
+    const std::string basename = "file" + extension.str();
+
+    // Good inputs.
+    EXPECT_TRUE(isGlslShaderTextFile(basename));
+    EXPECT_TRUE(isGlslShaderTextFile("/some/long/path/./test_" + basename));
+
+    // Bad inputs.
+    EXPECT_FALSE(isGlslShaderTextFile(basename + ".x"));
+    EXPECT_FALSE(isGlslShaderTextFile(StringRef(basename).drop_back(1)));
+  }
+
+  // Bad inputs.
+  EXPECT_FALSE(isGlslShaderTextFile("file.glsl"));
+  EXPECT_FALSE(isGlslShaderTextFile("file.vs"));
+  EXPECT_FALSE(isGlslShaderTextFile("file.vshader"));
+  EXPECT_FALSE(isGlslShaderTextFile("file.fs"));
+  EXPECT_FALSE(isGlslShaderTextFile("file.fragment"));
+  EXPECT_FALSE(isGlslShaderTextFile("file.ps"));
+  EXPECT_FALSE(isGlslShaderTextFile("file.pixel"));
+  EXPECT_FALSE(isGlslShaderTextFile("file.spv"));
+  EXPECT_FALSE(isGlslShaderTextFile("file.spvasm"));
+  EXPECT_FALSE(isGlslShaderTextFile("file"));
+  EXPECT_FALSE(isGlslShaderTextFile(""));
+}
+
 TEST(InputUtilsTest, IsLlvmIrFile) {
   // Good inputs.
   EXPECT_TRUE(isLlvmIrFile("file.ll"));
