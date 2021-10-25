@@ -879,7 +879,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
 
   case BuiltInNumWorkgroups: {
     // NumWorkgroups is a v3i32 loaded from an address pointed to by a special user data item.
-    Value *numWorkgroupPtr = ShaderInputs::getSpecialUserData(UserDataMapping::Workgroup, *this);
+    Value *numWorkgroupPtr = ShaderInputs::getSpecialUserData(UserDataMapping::Workgroup, BuilderBase::get(*this));
     LoadInst *load = CreateLoad(FixedVectorType::get(getInt32Ty(), 3), numWorkgroupPtr);
     load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
     return load;
@@ -887,11 +887,12 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
 
   case BuiltInWorkgroupId:
     // WorkgroupId is a v3i32 shader input (three SGPRs set up by hardware).
-    return ShaderInputs::getInput(ShaderInput::WorkgroupId, *this, *getLgcContext());
+    return ShaderInputs::getInput(ShaderInput::WorkgroupId, BuilderBase::get(*this), *getLgcContext());
 
   case BuiltInLocalInvocationId: {
     // LocalInvocationId is a v3i32 shader input (three VGPRs set up in hardware).
-    Value *localInvocationId = ShaderInputs::getInput(ShaderInput::LocalInvocationId, *this, *getLgcContext());
+    Value *localInvocationId =
+        ShaderInputs::getInput(ShaderInput::LocalInvocationId, BuilderBase::get(*this), *getLgcContext());
 
     // Unused dimensions need zero-initializing.
     if (shaderMode.workgroupSizeZ <= 1) {
@@ -964,17 +965,18 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
 // @param instName : Name to give instruction(s)
 // @returns : Value of input; nullptr if not handled here
 Value *InOutBuilder::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
+  BuilderBase &builder = BuilderBase::get(*this);
   switch (builtIn) {
   case BuiltInBaseVertex:
-    return ShaderInputs::getSpecialUserData(UserDataMapping::BaseVertex, *this);
+    return ShaderInputs::getSpecialUserData(UserDataMapping::BaseVertex, builder);
   case BuiltInBaseInstance:
-    return ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, *this);
+    return ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder);
   case BuiltInDrawIndex:
-    return ShaderInputs::getSpecialUserData(UserDataMapping::DrawIndex, *this);
+    return ShaderInputs::getSpecialUserData(UserDataMapping::DrawIndex, builder);
   case BuiltInVertexIndex:
-    return ShaderInputs::getVertexIndex(*this, *getLgcContext());
+    return ShaderInputs::getVertexIndex(builder, *getLgcContext());
   case BuiltInInstanceIndex:
-    return ShaderInputs::getInstanceIndex(*this, *getLgcContext());
+    return ShaderInputs::getInstanceIndex(builder, *getLgcContext());
   default:
     // Not handled; caller will handle with lgc.input.import.builtin, which is then lowered in PatchInOutImportExport.
     return nullptr;

@@ -30,11 +30,11 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/ShaderInputs.h"
-#include "lgc/BuilderBase.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ResourceUsage.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/BuilderBase.h"
 
 using namespace lgc;
 using namespace llvm;

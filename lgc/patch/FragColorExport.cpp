@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/FragColorExport.h"
-#include "lgc/BuilderBase.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/IntrinsDefs.h"
@@ -38,6 +37,7 @@
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ResourceUsage.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"

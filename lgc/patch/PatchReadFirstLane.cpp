@@ -28,9 +28,9 @@
  * @brief LLPC source file: contains declaration and implementation of class lgc::PatchReadFirstLane.
  ***********************************************************************************************************************
  */
-#include "lgc/Builder.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
