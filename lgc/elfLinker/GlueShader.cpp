@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "GlueShader.h"
-#include "lgc/BuilderBase.h"
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/patch/VertexFetch.h"
@@ -38,6 +37,7 @@
 #include "lgc/state/ShaderStage.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/AddressExtender.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"

@@ -39,7 +39,7 @@
 #include <mach/mach_time.h>
 #endif
 
-#include "lgc/BuilderBase.h"
+#include "lgc/util/BuilderBase.h"
 #include "lgc/util/Internal.h"
 
 #define DEBUG_TYPE "lgc-internal"

@@ -53,7 +53,6 @@
  ***********************************************************************************************************************
  */
 
-#include "lgc/BuilderBase.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
@@ -64,6 +63,7 @@
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/AddressExtender.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"

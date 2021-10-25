@@ -30,9 +30,9 @@
  */
 #pragma once
 
-#include "lgc/BuilderBase.h"
 #include "lgc/Pipeline.h"
 #include "lgc/state/Defs.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include <map>

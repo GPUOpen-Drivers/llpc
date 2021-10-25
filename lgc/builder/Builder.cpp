@@ -71,7 +71,7 @@ Builder *Builder::createBuilderRecorder(LgcContext *context, Pipeline *pipeline,
 //
 // @param builderContext : Builder context
 Builder::Builder(LgcContext *builderContext)
-    : BuilderBase(builderContext->getContext()), m_builderContext(builderContext) {
+    : BuilderCommon(builderContext->getContext()), m_builderContext(builderContext) {
 }
 
 // =====================================================================================================================
@@ -136,104 +136,6 @@ Type *Builder::getConditionallyVectorizedTy(Type *elementTy, Type *maybeVecTy) {
   if (auto vecTy = dyn_cast<FixedVectorType>(maybeVecTy))
     return FixedVectorType::get(elementTy, vecTy->getNumElements());
   return elementTy;
-}
-
-// =====================================================================================================================
-// Create a map to i32 function. Many AMDGCN intrinsics only take i32's, so we need to massage input data into an i32
-// to allow us to call these intrinsics. This helper takes a function pointer, massage arguments, and passthrough
-// arguments and massages the mappedArgs into i32's before calling the function pointer. Note that all massage
-// arguments must have the same type.
-//
-// @param mapFunc : The function to call on each provided i32.
-// @param mappedArgs : The arguments to be massaged into i32's and passed to function.
-// @param passthroughArgs : The arguments to be passed through as is (no massaging).
-Value *Builder::CreateMapToInt32(PFN_MapToInt32Func mapFunc, ArrayRef<Value *> mappedArgs,
-                                 ArrayRef<Value *> passthroughArgs) {
-  // We must have at least one argument to massage.
-  assert(mappedArgs.size() > 0);
-
-  Type *const type = mappedArgs[0]->getType();
-
-  // Check the massage types all match.
-  for (unsigned i = 1; i < mappedArgs.size(); i++)
-    assert(mappedArgs[i]->getType() == type);
-
-  if (mappedArgs[0]->getType()->isVectorTy()) {
-    // For vectors we extract each vector component and map them individually.
-    const unsigned compCount = cast<FixedVectorType>(type)->getNumElements();
-
-    SmallVector<Value *, 4> results;
-
-    for (unsigned i = 0; i < compCount; i++) {
-      SmallVector<Value *, 4> newMappedArgs;
-
-      for (Value *const mappedArg : mappedArgs)
-        newMappedArgs.push_back(CreateExtractElement(mappedArg, i));
-
-      results.push_back(CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs));
-    }
-
-    Value *result = UndefValue::get(FixedVectorType::get(results[0]->getType(), compCount));
-
-    for (unsigned i = 0; i < compCount; i++)
-      result = CreateInsertElement(result, results[i], i);
-
-    return result;
-  } else if (type->isIntegerTy() && type->getIntegerBitWidth() == 1) {
-    SmallVector<Value *, 4> newMappedArgs;
-
-    for (Value *const mappedArg : mappedArgs)
-      newMappedArgs.push_back(CreateZExt(mappedArg, getInt32Ty()));
-
-    Value *const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
-    return CreateTrunc(result, getInt1Ty());
-  } else if (type->isIntegerTy() && type->getIntegerBitWidth() < 32) {
-    SmallVector<Value *, 4> newMappedArgs;
-
-    Type *const vectorType = FixedVectorType::get(type, type->getPrimitiveSizeInBits() == 16 ? 2 : 4);
-    Value *const undef = UndefValue::get(vectorType);
-
-    for (Value *const mappedArg : mappedArgs) {
-      Value *const newMappedArg = CreateInsertElement(undef, mappedArg, static_cast<uint64_t>(0));
-      newMappedArgs.push_back(CreateBitCast(newMappedArg, getInt32Ty()));
-    }
-
-    Value *const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
-    return CreateExtractElement(CreateBitCast(result, vectorType), static_cast<uint64_t>(0));
-  } else if (type->getPrimitiveSizeInBits() == 64) {
-    SmallVector<Value *, 4> castMappedArgs;
-
-    for (Value *const mappedArg : mappedArgs)
-      castMappedArgs.push_back(CreateBitCast(mappedArg, FixedVectorType::get(getInt32Ty(), 2)));
-
-    Value *result = UndefValue::get(castMappedArgs[0]->getType());
-
-    for (unsigned i = 0; i < 2; i++) {
-      SmallVector<Value *, 4> newMappedArgs;
-
-      for (Value *const castMappedArg : castMappedArgs)
-        newMappedArgs.push_back(CreateExtractElement(castMappedArg, i));
-
-      Value *const resultComp = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
-
-      result = CreateInsertElement(result, resultComp, i);
-    }
-
-    return CreateBitCast(result, type);
-  } else if (type->isFloatingPointTy()) {
-    SmallVector<Value *, 4> newMappedArgs;
-
-    for (Value *const mappedArg : mappedArgs)
-      newMappedArgs.push_back(CreateBitCast(mappedArg, getIntNTy(mappedArg->getType()->getPrimitiveSizeInBits())));
-
-    Value *const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
-    return CreateBitCast(result, type);
-  } else if (type->isIntegerTy(32))
-    return mapFunc(*this, mappedArgs, passthroughArgs);
-  else {
-    llvm_unreachable("Should never be called!");
-    return nullptr;
-  }
 }
 
 // =====================================================================================================================

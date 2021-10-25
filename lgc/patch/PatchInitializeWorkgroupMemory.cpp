@@ -29,11 +29,11 @@
  ***********************************************************************************************************************
  */
 
-#include "lgc/BuilderBase.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 #define DEBUG_TYPE "lgc-patch-initialize-workgroup-memory"
