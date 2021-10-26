@@ -4,11 +4,11 @@ LLPC can be built into a standalone offline compiler (amdllpc). It supports GLSL
 
 ## Build Instruction
 
-LLPC is normally built as part of the [AMD Open Source Driver for Vulkan](../AMDVLK/README.md). The build include standalone `lgc` and `amdllpc`. You can build `lgc amdllpc` only or build `check-lgc check-amdllpc` to trigger lit tests besides the build.
+LLPC is normally built as part of the [AMD Open Source Driver for Vulkan](../AMDVLK/README.md). The build include standalone `lgc` and `amdllpc`. You can build `lgc amdllpc` only or build `check-lgc check-lgc-units check-amdllpc check-amdllpc-units` to run local tests besides the build.
 ```
 cmake --build xgl/builds/Release64 --target lgc amdllpc
 or
-cmake --build xgl/builds/Release64 --target check-lgc check-amdllpc
+cmake --build xgl/builds/Release64 --target check-lgc check-lgc-units check-amdllpc check-amdllpc-units
 ```
 
 Building the `check-amdllpc` target also builds spvgen.so.
@@ -42,7 +42,7 @@ Once you have followed the driver build instructions for installing source, star
 ```
 cd llpc
 cmake -G Ninja -B build [-DPAL_CLIENT_INTERFACE_MAJOR_VERSION=<pal_interface_version>]
-cmake --build build --target check-lgc check-amdllpc
+cmake --build build --target check-lgc check-lgc-units check-amdllpc check-amdllpc-units
 ```
 
 See above if this gives an error due to not finding an include file from glslang or SPIRV-Tools.
