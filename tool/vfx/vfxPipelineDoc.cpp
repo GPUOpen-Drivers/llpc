@@ -31,13 +31,6 @@
 #include "vfx.h"
 #include "vfxSection.h"
 
-#ifndef VFX_DISABLE_SPVGEN
-#if VFX_INSIDE_SPVGEN
-#define SH_EXPORTING
-#endif
-#include "spvgen.h"
-#endif
-
 #if VFX_SUPPORT_VK_PIPELINE
 #include "vfxPipelineDoc.h"
 #include "vfxVkSection.h"

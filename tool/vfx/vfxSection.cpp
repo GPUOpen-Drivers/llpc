@@ -62,6 +62,30 @@ StrToMemberAddr SectionSpecEntryItem::m_addrTable[SectionSpecEntryItem::MemberCo
 StrToMemberAddr SectionSpecInfo::m_addrTable[SectionSpecInfo::MemberCount];
 
 // =====================================================================================================================
+// A helper method to convert ShaderStage enumerant to corresponding SpvGenStage enumerant.
+//
+// @param shaderStage : Input ShaderStage enumerant
+static SpvGenStage shaderStageToSpvGenStage(ShaderStage shaderStage) {
+  switch (shaderStage) {
+  case ShaderStage::ShaderStageVertex:
+    return SpvGenStageVertex;
+  case ShaderStage::ShaderStageTessControl:
+    return SpvGenStageTessControl;
+  case ShaderStage::ShaderStageTessEval:
+    return SpvGenStageTessEvaluation;
+  case ShaderStage::ShaderStageGeometry:
+    return SpvGenStageGeometry;
+  case ShaderStage::ShaderStageFragment:
+    return SpvGenStageFragment;
+  case ShaderStage::ShaderStageCompute:
+    return SpvGenStageCompute;
+  default:
+    VFX_NEVER_CALLED();
+    return SpvGenStageInvalid;
+  }
+}
+
+// =====================================================================================================================
 // Dummy class used to initialize all static variables
 class ParserInit {
 public:
@@ -527,7 +551,7 @@ bool SectionShader::compileGlsl(const char *entryPoint, std::string *errorMsg) {
 
   const char *glslText = m_shaderSource.c_str();
   const char *fileName = m_fileName.c_str();
-  SpvGenStage stage = static_cast<SpvGenStage>(m_shaderStage);
+  SpvGenStage stage = shaderStageToSpvGenStage(m_shaderStage);
   void *program = nullptr;
   const char *log = nullptr;
 
