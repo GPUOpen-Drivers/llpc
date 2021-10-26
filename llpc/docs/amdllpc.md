@@ -42,7 +42,7 @@ Once you have followed the driver build instructions for installing source, star
 ```
 cd llpc
 cmake -G Ninja -B build [-DPAL_CLIENT_INTERFACE_MAJOR_VERSION=<pal_interface_version>]
-cmake --build  build --target check-lgc check-amdllpc 
+cmake --build build --target check-lgc check-amdllpc
 ```
 
 See above if this gives an error due to not finding an include file from glslang or SPIRV-Tools.
@@ -59,27 +59,27 @@ amdllpc [<options>...] [<files>...]
 * Basic options
 
 | Option Name                      | Description                                                       | Default Value                 |
-| ------------------------------   | ----------------------------------------------------------------- | ------------------------------|
+| -------------------------------- | ----------------------------------------------------------------- | ------------------------------|
 | `-help`                          | Print detail help, include all LLVM options                       |                               |
-| `-gfxip=<major.minor.step>`      | Graphics IP version                                               | 8.0.0                         |                                                                                                |
+| `-gfxip=<major.minor.step>`      | Graphics IP version                                               | 8.0.0                         |
 | `-o=<filename>`                  | Output ELF binary file                                            |                               |
 | `-entry-target=<entryname>`      | Name string of entry target in SPIRV                              | main                          |
-| `-val`                          | Validate input SPIR-V binary or text                               |                               |
+| `-val`                           | Validate input SPIR-V binary or text                              |                               |
 | `-verify-ir`                     | Verify LLVM IR after each pass                                    | false                         |
 
 * Dump options
 
 | Option Name                      | Description                                                       | Default Value                 |
-| ------------------------------   | ----------------------------------------------------------------- | ------------------------------|
-| `-enable-errs`                   | Enable error message output (to stdout or external file)             |                               |
+| -------------------------------- | ----------------------------------------------------------------- | ------------------------------|
+| `-enable-errs`                   | Enable error message output (to stdout or external file)          |                               |
 | `-enable-outs`                   | Enable LLPC-specific debug dump output (to stdout or external     | false                         |
 |                                  | file)                                                             |                               |
 | `-v`                             | Alias for `-enable-outs`                                          | false                         |
-| `-enable-time-profiler`          | Enable time profiler for various compilation phases         |                               |
+| `-enable-time-profiler`          | Enable time profiler for various compilation phases               |                               |
 | `-log-file-dbgs=<filename>`      | Name of the file to log info from dbgs()                          | "" (meaning stderr)           |
 | `-log-file-outs=<filename>`      | Name of the file to log info from LLPC_OUTS() and LLPC_ERRS()     |                               |
-| `-enable-pipeline-dump`          | Enable pipeline info dump                                               |                               |
-| `-pipeline-dump-dir=<directory>` | Directory where pipeline shader info are dumped                      |                               |
+| `-enable-pipeline-dump`          | Enable pipeline info dump                                         |                               |
+| `-pipeline-dump-dir=<directory>` | Directory where pipeline shader info are dumped                   |                               |
 | `-emit-lgc`                      | Emit LLVM IR assembly just before LGC (middle-end)                | false                         |
 | `-emit-llvm`                     | Emit LLVM IR assembly just before LLVM back-end                   | false                         |
 | `-emit-llvm-bc`                  | Emit LLVM IR bitcode just before LLVM back-end                    | false                         |
@@ -88,25 +88,25 @@ amdllpc [<options>...] [<files>...]
 * Debug & Performance tunning options
 
 | Option Name                      | Description                                                       | Default Value                 |
-| ------------------------------   | ----------------------------------------------------------------- | ------------------------------|
-| `-enable-errs`                   | Enable error message output (to stdout or external file)             |                               |
-| `-enable-si-scheduler`           | Enable target option si-scheduler                    |                               |
-| `-disable-gs-onchip`             | Disable geometry shader on-chip mode           |                               |
-| `-enable-tess-offchip`           | Enable tessellation off-chip mode                    |                               |
-| `-disable-llvm-patch`              | Disable the patch for LLVM back-end issues                    |                               |
-| `-disable-lower-opt`             | Disable optimization for SPIR-V lowering         |                               |
-| `-disable-licm`                  | Disable LLVM LICM pass              |                               |
-| `-ignore-color-attachment-formats`| Ignore color attachment formats       |                               |
-| `-lower-dyn-index`                 | Lower SPIR-V dynamic (non-constant) index in access chain        |                               |
-| `-vgpr-limit=<uint>`                | Maximum VGPR limit for this shader       |0 |
-| `-sgpr-limit=<uint>`                | Maximum SGPR limit for this shader       |0 |
-| `-waves-per-eu=<minVal,maxVal>`  | The range of waves per EU for this shader  empty      |                               |
-| `-shader-cache-mode=<uint>`      | Shader cache mode <br/> 0 - disable <br/> 1 - runtime cache <br/> 2 - cache to disk   | 1 |
-| `-shader-replace-dir=<dir>`      | Directory to store the files used in shader replacement            |                               |.
+| -------------------------------- | ----------------------------------------------------------------- | ------------------------------|
+| `-enable-errs`                   | Enable error message output (to stdout or external file)          |                               |
+| `-enable-si-scheduler`           | Enable target option si-scheduler                                 |                               |
+| `-disable-gs-onchip`             | Disable geometry shader on-chip mode                              |                               |
+| `-enable-tess-offchip`           | Enable tessellation off-chip mode                                 |                               |
+| `-disable-llvm-patch`            | Disable the patch for LLVM back-end issues                        |                               |
+| `-disable-lower-opt`             | Disable optimization for SPIR-V lowering                          |                               |
+| `-disable-licm`                  | Disable LLVM LICM pass                                            |                               |
+| `-ignore-color-attachment-formats`| Ignore color attachment formats                                  |                               |
+| `-lower-dyn-index`               | Lower SPIR-V dynamic (non-constant) index in access chain         |                               |
+| `-vgpr-limit=<uint>`             | Maximum VGPR limit for this shader                                | 0                             |
+| `-sgpr-limit=<uint>`             | Maximum SGPR limit for this shader                                | 0                             |
+| `-waves-per-eu=<minVal,maxVal>`  | The range of waves per EU for this shader  empty                  |                               |
+| `-shader-cache-mode=<uint>`      | Shader cache mode <br/> 0 - disable <br/> 1 - runtime cache <br/> 2 - cache to disk | 1           |
+| `-shader-replace-dir=<dir>`      | Directory to store the files used in shader replacement           |                               |
 | `-shader-replace-mode=<uint>`    | Shader replacement mode <br/> 0 - disable <br/> 1 - replacement based on shader hash <br/> 2 - replacement based on both shader hash and pipeline hash | 0 |
-| `-shader-replace-pipeline-hashes=<hashes with comma as separator>`|A collection of pipeline hashes, specifying shader replacement is operated on which pipelines      |                               |
-| `-enable-shadow-desc`                        | Enable shadow descriptor table       |                               |
-| `-shadow-desc-table-ptr-high=<uint>`| High part of VA for shadow descriptor table pointer | 2|
+| `-shader-replace-pipeline-hashes=<hashes with comma as separator>`|A collection of pipeline hashes, specifying shader replacement is operated on which pipelines | |
+| `-enable-shadow-desc`            | Enable shadow descriptor table                                    |                               |
+| `-shadow-desc-table-ptr-high=<uint>`| High part of VA for shadow descriptor table pointer            | 2                             |
 
 > **Note:** amdllpc overwrites following native options in LLVM:
 >>>> -pragma-unroll-threshold=4096 -unroll-allow-partial -simplifycfg-sink-common=false -amdgpu-vgpr-index-mode -filetype=obj
