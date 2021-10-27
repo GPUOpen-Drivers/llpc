@@ -37,6 +37,7 @@
 #include "llpcShaderCacheManager.h"
 #include "vkgcMetroHash.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcContext.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -81,8 +82,7 @@ void Context::reset() {
 LgcContext *Context::getLgcContext() {
   if (!m_builderContext) {
     // First time: Create the LgcContext.
-    std::string gpuName;
-    PipelineContext::getGpuNameString(m_gfxIp, gpuName);
+    std::string gpuName = LgcContext::getGpuNameString(m_gfxIp.major, m_gfxIp.minor, m_gfxIp.stepping);
     m_builderContext.reset(LgcContext::Create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
     if (!m_builderContext)
       report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
