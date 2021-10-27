@@ -36,6 +36,7 @@
 #include "llpcAutoLayout.h"
 #include "llpcCompilationUtils.h"
 #include "llpcInputUtils.h"
+#include "lgc/LgcContext.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -353,6 +354,13 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
     assert(optIterator != cl::getRegisteredOptions().end());
     cl::Option *opt = optIterator->second;
     *static_cast<cl::opt<std::string> *>(opt) = ".";
+  }
+
+  // Check to see that the ParsedGfxIp is valid
+  std::string gfxIpName = lgc::LgcContext::getGpuNameString(ParsedGfxIp.major, ParsedGfxIp.minor, ParsedGfxIp.stepping);
+  if (!lgc::LgcContext::isGpuNameValid(gfxIpName)) {
+    LLPC_ERRS("Invalid gfxip: " << gfxIpName << "\n");
+    return Result::Unsupported;
   }
 
   Result result = ICompiler::Create(ParsedGfxIp, argc, argv, &compiler);
