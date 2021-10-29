@@ -1890,7 +1890,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher, false);
     hasher.Update(pipelineInfo->iaState.deviceIndex);
 
-    PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), &hasher, false);
+    PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), &hasher, false, stage);
 
     // Update input/output usage (provided by middle-end caller of this callback).
     hasher.Update(stageHashes[stage].data(), stageHashes[stage].size());

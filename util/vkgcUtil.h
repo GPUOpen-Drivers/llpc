@@ -96,4 +96,10 @@ inline const T *findVkStructInChain(VkStructureType type, const void *next) {
   return reinterpret_cast<const T *>(structHeader);
 }
 
+// Translates shader stage to corresponding stage mask.
+inline unsigned shaderStageToMask(ShaderStage stage) {
+  assert(stage < ShaderStageCount || stage == ShaderStageCopyShader);
+  return 1U << static_cast<unsigned>(stage);
+}
+
 } // namespace Vkgc

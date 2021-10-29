@@ -1192,20 +1192,24 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 // =====================================================================================================================
 // Updates hash code context for resource node and static descriptor value data.
 //
-// @param resourceMapping : Pipeline resource mapping data
-// @param [in,out] hasher : Haher to generate hash code
-// @param isRelocatableShader : TRUE if we are building relocatable shader
-void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData* pResourceMapping,
-                                                      MetroHash64 *hasher, bool isRelocatableShader) {
+// @param resourceMapping : Pipeline resource mapping data.
+// @param [in,out] hasher : Haher to generate hash code.
+// @param isRelocatableShader : TRUE if we are building relocatable shader.
+// @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
+void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData *pResourceMapping, MetroHash64 *hasher,
+                                                      bool isRelocatableShader, ShaderStage stage) {
   hasher->Update(pResourceMapping->staticDescriptorValueCount);
   if (pResourceMapping->staticDescriptorValueCount > 0) {
       for (unsigned i = 0; i < pResourceMapping->staticDescriptorValueCount; ++i) {
           auto staticDescriptorValue = &pResourceMapping->pStaticDescriptorValues[i];
-          hasher->Update(staticDescriptorValue->visibility);
-          hasher->Update(staticDescriptorValue->type);
-          hasher->Update(staticDescriptorValue->set);
-          hasher->Update(staticDescriptorValue->binding);
-          hasher->Update(staticDescriptorValue->arraySize);
+          if (stage == ShaderStageInvalid || (staticDescriptorValue->visibility & shaderStageToMask(stage))) {
+            if (stage == ShaderStageInvalid)
+              hasher->Update(staticDescriptorValue->visibility);
+            hasher->Update(staticDescriptorValue->type);
+            hasher->Update(staticDescriptorValue->set);
+            hasher->Update(staticDescriptorValue->binding);
+            hasher->Update(staticDescriptorValue->arraySize);
+          }
 
           // TODO: We should query descriptor size from patch
 
@@ -1227,8 +1231,11 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData*
     if (pResourceMapping->userDataNodeCount > 0) {
       for (unsigned i = 0; i < pResourceMapping->userDataNodeCount; ++i) {
         auto userDataNode = &pResourceMapping->pUserDataNodes[i];
-        hasher->Update(userDataNode->visibility);
-        updateHashForResourceMappingNode(&userDataNode->node, true, hasher);
+        if (stage == ShaderStageInvalid || (userDataNode->visibility & shaderStageToMask(stage))) {
+          if (stage == ShaderStageInvalid)
+            hasher->Update(userDataNode->visibility);
+          updateHashForResourceMappingNode(&userDataNode->node, true, hasher);
+        }
       }
     }
   }

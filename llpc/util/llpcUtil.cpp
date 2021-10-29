@@ -122,15 +122,6 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
 }
 
 // =====================================================================================================================
-// Translates shader stage to corresponding stage mask.
-//
-// @param stage : Shader stage
-unsigned shaderStageToMask(ShaderStage stage) {
-  assert(stage < ShaderStageCount || stage == ShaderStageCopyShader);
-  return (1 << stage);
-}
-
-// =====================================================================================================================
 // Returns true if shaderInfo has the information required to compile an unlinked shader of the given type.
 //
 // @param type : The unlinked shader type.
