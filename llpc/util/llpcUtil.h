@@ -54,9 +54,6 @@ static const unsigned DescSetMask = 0x000000FF;
 // Gets the name string of shader stage.
 const char *getShaderStageName(ShaderStage shaderStage);
 
-// Translates shader stage to corresponding stage mask.
-unsigned shaderStageToMask(ShaderStage stage);
-
 // Convert shader stage to the SPIR-V execution model
 spv::ExecutionModel convertToExecModel(ShaderStage shaderStage);
 

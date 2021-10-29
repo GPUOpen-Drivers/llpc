@@ -78,8 +78,8 @@ public:
   static void updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo, bool isCacheHash,
                                               MetroHash64 *hasher, bool isRelocatableShader);
 
-  static void updateHashForResourceMappingInfo(const ResourceMappingData* pResourceMapping,
-                                               MetroHash64 *hasher, bool isRelocatableShader);
+  static void updateHashForResourceMappingInfo(const ResourceMappingData *pResourceMapping, MetroHash64 *hasher,
+                                               bool isRelocatableShader, ShaderStage stage = ShaderStageInvalid);
 
   static void updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
                                             bool dynamicVertexStride, MetroHash64 *hasher);
