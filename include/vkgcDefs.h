@@ -71,7 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     51.1 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
+//  |     52.0 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
 //  |     50.2 | Add the member dsState to GraphicsPipelineBuildInfo                                                   |
 //  |     50.1 | Disclose ResourceMappingNodeType::InlineBuffer                                                        |
 //  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
