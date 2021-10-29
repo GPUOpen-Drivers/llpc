@@ -48,6 +48,7 @@ Value *YCbCrConverter::wrappedSample(YCbCrWrappedSampleInfo &wrapInfo) {
   Value *chromaWidth = nullptr;
   Value *chromaHeight = nullptr;
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 52
   if ((m_metaData.word5.lumaDepth > 1) && (m_metaData.word1.planes > 1)) {
     SqImgRsrcRegHandler proxySqRsrcRegHelper(m_builder, wrapInfo.imageDesc2, m_gfxIp);
     chromaWidth = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Width);
@@ -55,7 +56,9 @@ Value *YCbCrConverter::wrappedSample(YCbCrWrappedSampleInfo &wrapInfo) {
 
     chromaWidth = m_builder->CreateUIToFP(chromaWidth, m_builder->getFloatTy());
     chromaHeight = m_builder->CreateUIToFP(chromaHeight, m_builder->getFloatTy());
-  } else {
+  } else
+#endif
+  {
     chromaWidth = wrapInfo.chromaWidth;
     chromaHeight = wrapInfo.chromaHeight;
 
@@ -348,12 +351,15 @@ void YCbCrConverter::genImgDescChroma() {
   Value *width = nullptr;
   Value *height = nullptr;
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 52
   if ((m_metaData.word5.lumaDepth > 1) && (m_metaData.word1.planes > 1)) {
     width = ConstantInt::get(m_builder->getInt32Ty(), m_metaData.word4.lumaWidth);
     height = ConstantInt::get(m_builder->getInt32Ty(), m_metaData.word4.lumaHeight);
     m_width = ConstantFP::get(m_builder->getFloatTy(), m_metaData.word4.lumaWidth);
     m_height = ConstantFP::get(m_builder->getFloatTy(), m_metaData.word4.lumaHeight);
-  } else {
+  } else
+#endif
+  {
     width = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Width);
     height = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Height);
     m_width = m_builder->CreateUIToFP(width, m_builder->getFloatTy());
@@ -572,6 +578,7 @@ void YCbCrConverter::sampleYCbCrData() {
   SmallVector<Value *, 4> coordsLuma;
   SmallVector<Value *, 4> coordsChroma;
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 52
   if ((m_metaData.word5.lumaDepth > 1) && (m_metaData.word1.planes > 1)) {
     SqImgRsrcRegHandler proxySqRsrcRegHelper(m_builder, m_imgDescLuma, m_gfxIp);
 
@@ -587,6 +594,7 @@ void YCbCrConverter::sampleYCbCrData() {
     m_coordS = m_builder->CreateFMul(m_coordS, widthScaleFactor);
     m_coordT = m_builder->CreateFMul(m_coordT, heightScaleFactor);
   }
+#endif
 
   // coordI -> coordS
   coordsLuma.push_back(m_coordS);
