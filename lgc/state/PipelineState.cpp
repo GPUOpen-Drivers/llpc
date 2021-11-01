@@ -1121,7 +1121,63 @@ unsigned PipelineState::getShaderWaveSize(ShaderStage stage) {
   assert(stage <= ShaderStageCompute);
   if (!m_waveSize[stage])
     setShaderDefaultWaveSize(stage);
+
+  if (getTargetInfo().getGfxIpVersion().major >= 9) {
+    return getMergedShaderWaveSize(stage);
+  }
+
   return m_waveSize[stage];
+}
+
+// =====================================================================================================================
+// Gets wave size for the merged shader stage
+//
+// NOTE: For GFX9+, two shaders are merged as a shader pair. The wave size is determined by the larger one.
+//
+// @param stage : Shader stage
+unsigned PipelineState::getMergedShaderWaveSize(ShaderStage stage) {
+  assert(getTargetInfo().getGfxIpVersion().major >= 9);
+  unsigned waveSize = m_waveSize[stage];
+
+  // NOTE: For GFX9+, two shaders are merged as a shader pair. The wave size is determined by the larger one. That is
+  // to say:
+  // - VS + TCS -> HW HS
+  // - VS + GS -> HW GS (no tessellation)
+  // - TES + GS -> HW GS
+  // - VS/TES -> HW GS (NGG, no geometry)
+  switch (stage) {
+  case ShaderStageVertex:
+    if (hasShaderStage(ShaderStageTessControl)) {
+      waveSize = std::max(waveSize, m_waveSize[ShaderStageTessControl]);
+    } else if (hasShaderStage(ShaderStageGeometry)) {
+      waveSize = std::max(waveSize, m_waveSize[ShaderStageGeometry]);
+    }
+    break;
+
+  case ShaderStageTessControl:
+    waveSize = std::max(waveSize, m_waveSize[ShaderStageVertex]);
+    break;
+
+  case ShaderStageTessEval:
+    if (hasShaderStage(ShaderStageGeometry)) {
+      waveSize = std::max(waveSize, m_waveSize[ShaderStageGeometry]);
+    }
+    break;
+
+  case ShaderStageGeometry:
+    if (!hasShaderStage(ShaderStageGeometry)) {
+      // NGG, no geometry
+      waveSize =
+          std::max(waveSize, m_waveSize[hasShaderStage(ShaderStageTessEval) ? ShaderStageTessEval : ShaderStageVertex]);
+    } else if (hasShaderStage(ShaderStageTessEval)) {
+      waveSize = std::max(waveSize, m_waveSize[ShaderStageTessEval]);
+    } else {
+      waveSize = std::max(waveSize, m_waveSize[ShaderStageVertex]);
+    }
+    break;
+  }
+
+  return waveSize;
 }
 
 unsigned PipelineState::getShaderSubgroupSize(ShaderStage stage) {
