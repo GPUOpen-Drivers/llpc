@@ -278,6 +278,8 @@ public:
 
   // Gets wave size for the specified shader stage
   unsigned getShaderWaveSize(ShaderStage stage);
+  // Gets wave size for the merged shader stage
+  unsigned getMergedShaderWaveSize(ShaderStage stage);
   // Gets subgroup size for the specified shader stage
   unsigned getShaderSubgroupSize(ShaderStage stage);
 
