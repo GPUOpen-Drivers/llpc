@@ -365,7 +365,6 @@ void ShaderCache::resetCacheFile() {
   m_onDiskFile.close();
   Result fileResult = m_onDiskFile.open(m_fileFullPath, (FileAccessRead | FileAccessWrite | FileAccessBinary));
   assert(fileResult == Result::Success);
-  (void(fileResult)); // unused
 
   ShaderCacheSerializedHeader header = {};
   header.headerSize = sizeof(ShaderCacheSerializedHeader);
@@ -373,7 +372,9 @@ void ShaderCache::resetCacheFile() {
   header.shaderDataEnd = header.headerSize;
   getBuildTime(&header.buildId);
 
-  m_onDiskFile.write(&header, header.headerSize);
+  fileResult = m_onDiskFile.write(&header, header.headerSize);
+  assert(fileResult == Result::Success);
+  (void)fileResult; // unused
 }
 
 // =====================================================================================================================
@@ -567,7 +568,7 @@ void ShaderCache::insertShader(CacheEntryHandle hEntry, const void *blob, size_t
 
       // Finally, update the file if necessary.
       if (m_onDiskFile.isOpen())
-        addShaderToFile(index);
+        result = addShaderToFile(index);
     }
   }
 
@@ -628,7 +629,7 @@ Result ShaderCache::retrieveShader(CacheEntryHandle hEntry, const void **ppBlob,
 // Adds data for a new shader to the on-disk file
 //
 // @param index : A new shader
-void ShaderCache::addShaderToFile(const ShaderIndex *index) {
+Result ShaderCache::addShaderToFile(const ShaderIndex *index) {
   assert(m_onDiskFile.isOpen());
 
   // We only need to update the parts of the file that changed, which is the number of shaders, the new data section,
@@ -639,18 +640,24 @@ void ShaderCache::addShaderToFile(const ShaderIndex *index) {
   const unsigned dataEndOffset = offsetof(struct ShaderCacheSerializedHeader, shaderDataEnd);
 
   m_onDiskFile.seek(shaderCountOffset, true);
-  m_onDiskFile.write(&m_totalShaders, sizeof(size_t));
+  Result result = m_onDiskFile.write(&m_totalShaders, sizeof(size_t));
+  if (result != Result::Success)
+    return result;
 
   // Write the new shader data at the current end of the data section
   m_onDiskFile.seek(static_cast<unsigned>(m_shaderDataEnd), true);
-  m_onDiskFile.write(index->dataBlob, index->header.size);
+  result = m_onDiskFile.write(index->dataBlob, index->header.size);
+  if (result != Result::Success)
+    return result;
 
   // Then update the data end value and write it out to the file.
   m_shaderDataEnd += index->header.size;
   m_onDiskFile.seek(dataEndOffset, true);
-  m_onDiskFile.write(&m_shaderDataEnd, sizeof(size_t));
+  result = m_onDiskFile.write(&m_shaderDataEnd, sizeof(size_t));
+  if (result != Result::Success)
+    return result;
 
-  m_onDiskFile.flush();
+  return m_onDiskFile.flush();
 }
 
 // =====================================================================================================================
@@ -665,11 +672,13 @@ Result ShaderCache::loadCacheFromFile() {
   // Read the header from the file and validate it
   ShaderCacheSerializedHeader header = {};
   m_onDiskFile.rewind();
-  m_onDiskFile.read(&header, sizeof(ShaderCacheSerializedHeader), nullptr);
+  Result result = m_onDiskFile.read(&header, sizeof(ShaderCacheSerializedHeader), nullptr);
+  if (result != Result::Success)
+    return result;
 
   const size_t fileSize = File::getFileSize(m_fileFullPath);
   const size_t dataSize = fileSize - sizeof(ShaderCacheSerializedHeader);
-  Result result = validateAndLoadHeader(&header, fileSize);
+  result = validateAndLoadHeader(&header, fileSize);
 
   void *dataMem = nullptr;
   if (result == Result::Success) {

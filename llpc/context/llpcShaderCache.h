@@ -152,7 +152,7 @@ private:
 
   Result loadCacheFromFile();
   void resetCacheFile();
-  void addShaderToFile(const ShaderIndex *index);
+  Result addShaderToFile(const ShaderIndex *index);
 
   void *getCacheSpace(size_t numBytes);
 

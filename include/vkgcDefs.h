@@ -1142,8 +1142,11 @@ private:
   void Put() {
     if (!m_pCache)
       return;
-    if (m_mustPopulate)
-      m_pCache->SetValue(m_rawHandle, false, nullptr, 0);
+    if (m_mustPopulate) {
+      Result result = m_pCache->SetValue(m_rawHandle, false, nullptr, 0);
+      assert(result == Result::Success);
+      (void)result;
+    }
     m_pCache->ReleaseEntry(m_rawHandle);
     m_pCache = nullptr;
     m_rawHandle = nullptr;

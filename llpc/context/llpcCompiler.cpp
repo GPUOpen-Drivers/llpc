@@ -570,8 +570,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
       result = Result::Unsupported;
     }
     if (result == Result::Success) {
-      ShaderModuleHelper::collectInfoFromSpirvBinary(&shaderInfo->shaderBin, &moduleDataEx.common.usage, entryNames,
-                                                     &debugInfoSize);
+      result = ShaderModuleHelper::collectInfoFromSpirvBinary(&shaderInfo->shaderBin, &moduleDataEx.common.usage,
+                                                              entryNames, &debugInfoSize);
     }
     moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
     if (trimDebugInfo)
@@ -1768,7 +1768,7 @@ Result Compiler::CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, ISh
   if ((result == Result::Success) &&
       ((cl::ShaderCacheMode == ShaderCacheEnableRuntime) || (cl::ShaderCacheMode == ShaderCacheEnableOnDisk)) &&
       (pCreateInfo->initialDataSize > 0)) {
-    m_shaderCache->Merge(1, const_cast<const IShaderCache **>(ppShaderCache));
+    result = m_shaderCache->Merge(1, const_cast<const IShaderCache **>(ppShaderCache));
   }
 
   return result;
