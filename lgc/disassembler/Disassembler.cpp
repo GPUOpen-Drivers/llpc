@@ -45,13 +45,7 @@
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Support/AMDGPUMetadata.h"
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 401324
-// Old version
 #include "llvm/Support/TargetRegistry.h"
-#else
-// New version (and unknown version)
-#include "llvm/MC/TargetRegistry.h"
-#endif
 #include "llvm/Support/TargetSelect.h"
 
 using namespace llvm;

@@ -385,7 +385,7 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
   assert(posCall); // Position export must exist
 
   // Check position value, disable NGG culling if it is constant
-  auto posValue = posCall->getArgOperand(posCall->arg_size() - 1); // Last argument is position value
+  auto posValue = posCall->getArgOperand(posCall->getNumArgOperands() - 1); // Last argument is position value
   if (isa<Constant>(posValue))
     return false;
 
@@ -1084,7 +1084,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
     m_importedOutputBuiltIns.insert(builtInId);
   } else if (mangledName.startswith(lgcName::OutputExportGeneric)) {
-    auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
+    auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
     if (m_shaderStage != ShaderStageFragment && isa<UndefValue>(outputValue)) {
       // NOTE: If an output value of vertex processing stages is undefined, we can safely drop it and remove the output
       // export call.
@@ -1114,7 +1114,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     // NOTE: If an output value is undefined, we can safely drop it and remove the output export call.
     // Currently, do this for geometry shader.
     if (m_shaderStage == ShaderStageGeometry) {
-      auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
+      auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
       if (isa<UndefValue>(outputValue))
         m_deadCalls.push_back(&callInst);
       else {
@@ -1123,7 +1123,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       }
     }
   } else if (mangledName.startswith(lgcName::OutputExportXfb)) {
-    auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
+    auto outputValue = callInst.getArgOperand(callInst.getNumArgOperands() - 1);
     if (isa<UndefValue>(outputValue)) {
       // NOTE: If an output value is undefined, we can safely drop it and remove the transform feedback output export
       // call.
@@ -2485,7 +2485,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   // Fill inputLocInfoMap of {TCS, GS, FS} for the packable calls
   unsigned newLocIdx = 0;
   for (auto call : packableCalls) {
-    const bool isInterpolant = isFs && call->arg_size() == 5;
+    const bool isInterpolant = isFs && call->getNumArgOperands() == 5;
     unsigned locOffset = 0;
     unsigned compIdxArgIdx = 1;
     if (isInterpolant || isTcs) {
@@ -2762,7 +2762,7 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
         ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
         if (m_pipelineState->canPackOutput(shaderStage)) {
           // We have a use in VS/TES/GS. See if it needs scalarizing. The output value is always the final argument.
-          Type *valueTy = call->getArgOperand(call->arg_size() - 1)->getType();
+          Type *valueTy = call->getArgOperand(call->getNumArgOperands() - 1)->getType();
           if (isa<VectorType>(valueTy) || valueTy->getPrimitiveSizeInBits() == 64)
             outputCalls.push_back(call);
         }
@@ -2796,7 +2796,7 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
   //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
   SmallVector<Value *, 5> args;
-  for (unsigned i = 0, end = call->arg_size(); i != end; ++i)
+  for (unsigned i = 0, end = call->getNumArgOperands(); i != end; ++i)
     args.push_back(call->getArgOperand(i));
 
   const auto shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
@@ -2908,11 +2908,11 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
   // TES: @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
   // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
   SmallVector<Value *, 5> args;
-  for (unsigned i = 0, end = call->arg_size(); i != end; ++i)
+  for (unsigned i = 0, end = call->getNumArgOperands(); i != end; ++i)
     args.push_back(call->getArgOperand(i));
 
   static const unsigned ElemIdxArgIdx = 1;
-  unsigned valArgIdx = call->arg_size() - 1;
+  unsigned valArgIdx = call->getNumArgOperands() - 1;
   unsigned elemIdx = cast<ConstantInt>(args[ElemIdxArgIdx])->getZExtValue();
   Value *outputVal = call->getArgOperand(valArgIdx);
   Type *elementTy = outputVal->getType();
@@ -2985,7 +2985,7 @@ void InOutLocationInfoMapManager::deserializeMap(ArrayRef<std::pair<unsigned, un
 // @param resUsage : The resource usage reference
 void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStage, bool requireDword) {
   const bool isFs = shaderStage == ShaderStageFragment;
-  const bool isInterpolant = isFs && call->arg_size() == 5;
+  const bool isInterpolant = isFs && call->getNumArgOperands() == 5;
   unsigned locOffset = 0;
   unsigned compIdxArgIdx = 1;
   if (isInterpolant || shaderStage == ShaderStageTessControl) {

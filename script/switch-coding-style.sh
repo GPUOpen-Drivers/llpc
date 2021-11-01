@@ -123,6 +123,9 @@ do_clang_tidy() {
                 -DVULKAN_HEADER_PATH=../icd/api/include/khronos
                )
   fi
+#if VKI_IMAGE_BVH_INTERSECT_RAY
+  cmakedefs+=(-DVKI_IMAGE_BVH_INTERSECT_RAY=1)
+#endif
 
   # If this is the first check in this script run, do a cmake build of amdllpc,
   # asking for a compile_commands.json file.

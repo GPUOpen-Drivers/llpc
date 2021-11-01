@@ -451,7 +451,7 @@ void SpirvLowerMathFloatOp::visitCallInst(CallInst &callInst) {
     Value *valueWritten = nullptr;
     if (calleeName.startswith("lgc.output.export.builtin.")) {
       builtIn = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-      valueWritten = callInst.getOperand(callInst.arg_size() - 1);
+      valueWritten = callInst.getOperand(callInst.getNumArgOperands() - 1);
     } else if (calleeName.startswith("lgc.create.write.builtin")) {
       builtIn = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
       valueWritten = callInst.getOperand(0);

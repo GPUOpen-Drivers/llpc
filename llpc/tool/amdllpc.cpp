@@ -379,7 +379,6 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->relocatableShaderElf = EnableRelocatableShaderElf;
   compileInfo->autoLayoutDesc = AutoLayoutDesc;
   compileInfo->robustBufferAccess = RobustBufferAccess;
-  compileInfo->scalarBlockLayout = ScalarBlockLayout;
   compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
 
   // Set NGG control settings

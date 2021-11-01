@@ -332,7 +332,7 @@ Value *SpirvLowerResourceCollect::findCallAndGetIndexValue(Module &module, CallI
         CallInst *const call = dyn_cast<CallInst>(useIt->getUser());
 
         // Get the args.
-        auto args = ArrayRef<Use>(&call->getOperandList()[0], call->arg_size());
+        auto args = ArrayRef<Use>(&call->getOperandList()[0], call->getNumArgOperands());
 
         if (args[0] == targetCall)
           return args[1];
@@ -370,7 +370,7 @@ void SpirvLowerResourceCollect::visitCalls(Module &module) {
       CallInst *const call = dyn_cast<CallInst>(useIt->getUser());
 
       // Get the args.
-      auto args = ArrayRef<Use>(&call->getOperandList()[0], call->arg_size());
+      auto args = ArrayRef<Use>(&call->getOperandList()[0], call->getNumArgOperands());
 
       ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
       if (opcode == BuilderRecorder::Opcode::GetDescPtr)

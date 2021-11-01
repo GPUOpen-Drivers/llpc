@@ -2,7 +2,6 @@
  ***********************************************************************************************************************
  *
  *  Copyright (c) 2019-2021 Advanced Micro Devices, Inc. All Rights Reserved.
- *  Copyright (c) 2021 Google LLC. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -57,13 +56,12 @@ struct CompileInfo {
   Llpc::GraphicsPipelineBuildOut gfxPipelineOut;                       // Output of building graphics pipeline
   Llpc::ComputePipelineBuildInfo compPipelineInfo;                     // Info to build compute pipeline
   Llpc::ComputePipelineBuildOut compPipelineOut;                       // Output of building compute pipeline
-  void *pipelineBuf;                                                   // Allocation buffer of building pipeline
+  void *pipelineBuf;                                                   // Alllocation buffer of building pipeline
   void *pipelineInfoFile;                                              // VFX-style file containing pipeline info
   const char *fileNames;                                               // Names of input shader source files
   std::string entryTarget;                                             // Name of the entry target function.
   bool unlinked;                  // Whether to generate unlinked shader/part-pipeline ELF
   bool relocatableShaderElf;      // Whether to enable relocatable shader compilation
-  bool scalarBlockLayout;         // Whether to enable scalar block layout
   bool doAutoLayout;              // Whether to auto layout descriptors
   bool autoLayoutDesc;            // Whether to automatically create descriptor layout based on resource usages
   bool robustBufferAccess;        // Whether to enable robust buffer access

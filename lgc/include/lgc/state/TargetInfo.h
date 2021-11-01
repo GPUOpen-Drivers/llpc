@@ -70,13 +70,9 @@ struct GpuProperty {
   unsigned tessFactorBufferSizePerSe; // Size of the tessellation-factor buffer per SE, in dwords.
   bool supportShaderPowerProfiling;   // Hardware supports Shader Profiling for Power
   bool supportSpiPrefPriority;        // Hardware supports SPI shader preference priority
-  struct {
-    unsigned compBitwidth16 : 1; // Whether the vector is 16-bit component
-    unsigned compBitwidth8 : 1;  // Whether the vector is 8-bit component
-    unsigned compBitwidth4 : 1;  // Whether the vector is 4-bit component
-    unsigned sameSignedness : 1; // Whether the components of two vectors have the same signedness
-    unsigned diffSignedness : 1; // Whether the components of two vectors have the diff signedness
-  } supportIntegerDotFlag;       // The flag indicates the HW supports integer dot product
+  bool hasIntegerDot;                 // Hardware supports interger dot product where two vectors are same signedness
+  bool hasMixedIntegerDot; // Hardware supports interger dot product where first vector is signed and second vector is
+                           // unsigned
 };
 
 // Contains flags for all of the hardware workarounds which affect pipeline compilation.

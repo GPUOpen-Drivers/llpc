@@ -207,11 +207,8 @@ public:
   virtual llvm::Value *CreateDotProduct(llvm::Value *const vector1, llvm::Value *const vector2,
                                         const llvm::Twine &instName = "") = 0;
 
-  // Bit settings for integer dot product
-  enum : unsigned {
-    FirstVectorSigned = 1, // The components of the first vector are signed
-    SecondVectorSigned,    // The components of the second vector are signed
-  };
+  // Bit settings in flags argument for integer dot product
+  enum { FirstVectorSigned = 1, SecondVectorSigned = 2 };
 
   // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
   // where available.
@@ -965,7 +962,7 @@ public:
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
   // @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
-  // @param convertingSamplerDesc : Converting sampler descriptor (constant v10i32)
+  // @param convertingSamplerDesc : Converting sampler descriptor (constant v8i32)
   // @param address : Address and other arguments
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags,
