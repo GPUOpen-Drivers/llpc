@@ -547,7 +547,7 @@ static Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, 
         } else {
           char log[1024] = {};
           if (!spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log)) {
-            LLPC_ERRS("Fails to validate SPIR-V: \n" << log << "\n");
+            LLPC_ERRS("Failed to validate SPIR-V: \n" << log << "\n");
             return Result::ErrorInvalidShader;
           }
         }
@@ -573,7 +573,7 @@ static Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, 
           }
         }
       } else {
-        LLPC_ERRS(format("Fails to identify shader stages by entry-point \"%s\"\n", compileInfo.entryTarget.c_str()));
+        LLPC_ERRS(format("Failed to identify shader stages by entry-point \"%s\"\n", compileInfo.entryTarget.c_str()));
         return Result::ErrorUnavailable;
       }
     } else if (isLlvmIrFile(inFile)) {
@@ -586,6 +586,7 @@ static Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, 
         std::string errMsg;
         raw_string_ostream errStream(errMsg);
         errDiag.print(inFile.c_str(), errStream);
+        errStream.flush();
         LLPC_ERRS(errMsg);
         return Result::ErrorInvalidShader;
       }
@@ -594,14 +595,15 @@ static Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, 
       std::string errMsg;
       raw_string_ostream errStream(errMsg);
       if (verifyModule(*module.get(), &errStream)) {
-        LLPC_ERRS("File " << inFile << " parsed, but fail to verify the module: " << errMsg << "\n");
+        errStream.flush();
+        LLPC_ERRS("File " << inFile << " parsed, but failed to verify the module: " << errMsg << "\n");
         return Result::ErrorInvalidShader;
       }
 
       // Check the shader stage of input module.
       ShaderStage shaderStage = getShaderStageFromModule(module.get());
       if (shaderStage == ShaderStageInvalid) {
-        LLPC_ERRS("File " << inFile << ": Fail to determine shader stage\n");
+        LLPC_ERRS("File " << inFile << " parsed, but failed to determine shader stage\n");
         return Result::ErrorInvalidShader;
       }
 

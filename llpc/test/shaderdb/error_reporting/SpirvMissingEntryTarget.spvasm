@@ -4,7 +4,7 @@
 ; RUN: not amdllpc -entry-target=foo -spvgen-dir=%spvgendir% -v %gfxip %s \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST %s
 ;
-; SHADERTEST-LABEL: {{^}}ERROR: Fails to identify shader stages by entry-point "foo"
+; SHADERTEST-LABEL: {{^}}ERROR: Failed to identify shader stages by entry-point "foo"
 ; SHADERTEST-LABEL: {{^}}===== AMDLLPC FAILED =====
 ; END_SHADERTEST
 
