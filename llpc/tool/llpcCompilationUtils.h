@@ -119,5 +119,13 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, llvm::StringRef firstInFile);
 
+// Processes and compiles one pipeline input file.
+Result processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const std::string &inFile, bool unlinked,
+                            bool ignoreColorAttachmentFormats);
+
+// Processes and compiles multiple shader stage input files.
+Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, llvm::ArrayRef<std::string> inFiles,
+                          bool validateSpirv, std::string &fileNames);
+
 } // namespace StandaloneCompiler
 } // namespace Llpc
