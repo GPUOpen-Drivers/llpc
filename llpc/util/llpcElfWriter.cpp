@@ -1043,7 +1043,7 @@ void ElfWriter<Elf>::processRelocSection(const ElfReader<Elf> &reader, size_t no
   auto nonFragmentRelocSecIndex = GetSectionIndex(RelocName);
 
   reader.getSectionDataBySectionIndex(fragmentRelocSecIndex, &fragmentRelocSection);
-  getSectionDataBySectionIndex(nonFragmentRelocSecIndex, &nonFragmentRelocSection);
+  Result result = getSectionDataBySectionIndex(nonFragmentRelocSecIndex, &nonFragmentRelocSection);
 
   bool isFragmentRelocUsedInPs = false;
 
@@ -1066,7 +1066,9 @@ void ElfWriter<Elf>::processRelocSection(const ElfReader<Elf> &reader, size_t no
     m_relocSecIdx = m_sections.size() - 1;
     m_map[RelocName] = m_relocSecIdx;
     nonFragmentRelocSecIndex = m_relocSecIdx;
-    getSectionDataBySectionIndex(nonFragmentRelocSecIndex, &nonFragmentRelocSection);
+    result = getSectionDataBySectionIndex(nonFragmentRelocSecIndex, &nonFragmentRelocSection);
+    assert(result == Result::Success);
+    (void)result;
   }
 
   // Merge reloc section.
@@ -1200,7 +1202,6 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   auto fragmentCodesize = pFragmentElf->codeSize;
   auto result = reader.ReadFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
   assert(result == Result::Success);
-  (void(result)); // unused
 
   // Merge GPU ISA code
   const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentTextSection = nullptr;
@@ -1213,7 +1214,8 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   reader.getSectionDataBySectionIndex(fragmentTextSecIndex, &fragmentTextSection);
   reader.GetSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
 
-  getSectionDataBySectionIndex(nonFragmentSecIndex, &nonFragmentTextSection);
+  result = getSectionDataBySectionIndex(nonFragmentSecIndex, &nonFragmentTextSection);
+  assert(result == Result::Success);
   GetSymbolsBySectionIndex(nonFragmentSecIndex, nonFragmentSymbols);
   ElfSymbol *fragmentIsaSymbol = nullptr;
   ElfSymbol *nonFragmentIsaSymbol = nullptr;
@@ -1277,7 +1279,7 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   ElfSectionBuffer<Elf64::SectionHeader> *fragmentDisassemblySection = nullptr;
   const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentDisassemblySection = nullptr;
   reader.getSectionDataBySectionIndex(fragmentDisassemblySecIndex, &fragmentDisassemblySection);
-  getSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &nonFragmentDisassemblySection);
+  result = getSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &nonFragmentDisassemblySection);
   if (nonFragmentDisassemblySection) {
     assert(fragmentDisassemblySection);
     // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
@@ -1315,7 +1317,8 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(llvmIrSectionName.c_str());
   auto nonFragmentLlvmIrSecIndex = GetSectionIndex(llvmIrSectionName.c_str());
   reader.getSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &fragmentLlvmIrSection);
-  getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &nonFragmentLlvmIrSection);
+  result = getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &nonFragmentLlvmIrSection);
+  (void)result;
 
   if (nonFragmentLlvmIrSection) {
     assert(fragmentLlvmIrSection);
