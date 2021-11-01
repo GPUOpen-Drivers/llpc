@@ -71,7 +71,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     50.1 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
+//  |     50.1 | Disclose ResourceMappingNodeType::InlineBuffer                                                        |
 //  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
 //  |     49.1 | Added enableEarlyCompile to GraphicsPipelineBuildInfo                                                 |
 //  |     49.0 | Added DescriptorConstBuffer, DescriptorConstBufferCompact, DescriptorImage, DescriptorConstTexelBuffer|
@@ -187,12 +187,12 @@ enum class BasicType : unsigned {
 
 /// Enumerates LLPC shader stages.
 enum ShaderStage : unsigned {
-  ShaderStageVertex = 0,                                ///< Vertex shader
-  ShaderStageTessControl,                               ///< Tessellation control shader
-  ShaderStageTessEval,                                  ///< Tessellation evaluation shader
-  ShaderStageGeometry,                                  ///< Geometry shader
-  ShaderStageFragment,                                  ///< Fragment shader
-  ShaderStageCompute,                                   ///< Compute shader
+  ShaderStageVertex = 0,  ///< Vertex shader
+  ShaderStageTessControl, ///< Tessellation control shader
+  ShaderStageTessEval,    ///< Tessellation evaluation shader
+  ShaderStageGeometry,    ///< Geometry shader
+  ShaderStageFragment,    ///< Fragment shader
+  ShaderStageCompute,     ///< Compute shader
   ShaderStageCount,                                     ///< Count of shader stages
   ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
   ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
@@ -210,6 +210,8 @@ enum ShaderStageBit : unsigned {
   ShaderStageGeometryBit = (1 << ShaderStageGeometry),       ///< Geometry shader bit
   ShaderStageFragmentBit = (1 << ShaderStageFragment),       ///< Fragment shader bit
   ShaderStageComputeBit = (1 << ShaderStageCompute),         ///< Compute shader bit
+  ShaderStageAllGraphicsBit = ShaderStageVertexBit | ShaderStageTessControlBit | ShaderStageTessEvalBit |
+                              ShaderStageGeometryBit | ShaderStageFragmentBit, ///< All graphics bits
 };
 
 /// Enumerates LLPC types of unlinked shader elf.
@@ -247,6 +249,9 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including unifrom texel buffer
 #endif
 
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
+  InlineBuffer, ///< Push constant with binding
+#endif
   Count, ///< Count of resource mapping node types.
 };
 
@@ -689,22 +694,6 @@ struct SamplerYCbCrConversionMetaData {
     };
     unsigned u32All;
   } word3;
-
-  union {
-    struct {
-      unsigned lumaWidth : 16;  ///< Actual width of luma plane
-      unsigned lumaHeight : 16; ///< Actual height of luma plane
-    };
-    unsigned u32All;
-  } word4;
-
-  union {
-    struct {
-      unsigned lumaDepth : 16; ///< Actual array slices of luma plane
-      unsigned : 16;
-    };
-    unsigned u32All;
-  } word5;
 };
 
 /// Represents info of a shader attached to a to-be-built pipeline.

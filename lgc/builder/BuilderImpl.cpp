@@ -93,22 +93,14 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
   Value *scalar = nullptr;
   Type *outputTy = accumulator->getType();
 
-  // The component of Vector 2 can be signed or unsigned
-  const bool isSigned = (flags & FirstVectorSigned);
-  // The mixed signed/unsigned is that component of Vector 1 is treated as signed and component of Vector 2 is treated
-  // as unsigned.
-  const bool isMixed = (flags == FirstVectorSigned);
-
   const unsigned compBitWidth = inputTy->getScalarSizeInBits();
-  assert(compBitWidth >= 8 && compBitWidth <= 64);
-
-  auto &supportIntegerDotFlag = getPipelineState()->getTargetInfo().getGpuProperty().supportIntegerDotFlag;
-  // Check if the component bitwidth of vectors and the signedness of component of vecotrs are both supppored by HW.
-  const bool isSupportCompBitwidth = (supportIntegerDotFlag.compBitwidth16 && compBitWidth == 16) ||
-                                     (supportIntegerDotFlag.compBitwidth8 && compBitWidth == 8);
-  const bool isSupportSignedness =
-      isMixed ? supportIntegerDotFlag.diffSignedness : supportIntegerDotFlag.sameSignedness;
-  const bool hasHwNativeSupport = isSupportCompBitwidth && isSupportSignedness;
+  bool hasHwNativeSupport =
+      (getPipelineState()->getTargetInfo().getGpuProperty().hasIntegerDot && (compBitWidth == 8 || compBitWidth == 16));
+  const bool isSigned = (flags & lgc::Builder::FirstVectorSigned);
+  const bool isMixed = (flags == lgc::Builder::FirstVectorSigned);
+  // The mixed mode "First vector is signed and secont vector is unsigned" is not supported
+  if (hasHwNativeSupport && isMixed)
+    hasHwNativeSupport = false;
 
   // NOTE: For opcodes with an accumulator, the spec said "If any of the multiplications or additions, with the
   // exception of the final accumulation, overflow or underflow, the result of the instruction is undefined". For

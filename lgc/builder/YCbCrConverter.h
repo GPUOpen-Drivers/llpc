@@ -98,22 +98,6 @@ struct SamplerYCbCrConversionMetaData {
     };
     unsigned u32All;
   } word3;
-
-  union {
-    struct {
-      unsigned lumaWidth : 16;  ///< Actual width of luma plane
-      unsigned lumaHeight : 16; ///< Actual height of luma plane
-    };
-    unsigned u32All;
-  } word4;
-
-  union {
-    struct {
-      unsigned lumaDepth : 16; ///< Actual array slices of luma plane
-      unsigned : 16;
-    };
-    unsigned u32All;
-  } word5;
 };
 
 // Represents the type of sampler filter.

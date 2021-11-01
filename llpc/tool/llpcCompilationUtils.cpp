@@ -2,7 +2,6 @@
  ***********************************************************************************************************************
  *
  *  Copyright (c) 2016-2021 Advanced Micro Devices, Inc. All Rights Reserved.
- *  Copyright (c) 2021 Google LLC. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -333,7 +332,7 @@ Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
 }
 
 // =====================================================================================================================
-// Builds pipeline and does linking.
+// Builds pipeline and do linking.
 //
 // @param compiler : LLPC compiler object
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool
@@ -341,7 +340,7 @@ Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
 // @param timePasses : Whether to time compiler passes
 // @returns : Result::Success on success, other status codes on failure
 Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
-                     llvm::Optional<Vkgc::PipelineDumpOptions> pipelineDumpOptions, bool timePasses) {
+		     llvm::Optional<Vkgc::PipelineDumpOptions> pipelineDumpOptions, bool timePasses) {
   Result result = Result::Success;
 
   bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) - 1)) != 0;
@@ -393,7 +392,6 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
 
     pipelineInfo->options.robustBufferAccess = compileInfo->robustBufferAccess;
     pipelineInfo->options.enableRelocatableShaderElf = compileInfo->relocatableShaderElf;
-    pipelineInfo->options.scalarBlockLayout = compileInfo->scalarBlockLayout;
     pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo->scratchAccessBoundsChecks;
 
     void *pipelineDumpHandle = nullptr;
@@ -449,7 +447,7 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
       unsigned pushConstSize = 0;
       doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, shaderInfo, nodeSets,
                        pushConstSize, /*checkAutoLayoutCompatible = */ false,
-                       /*autoLayoutDesc =*/compileInfo->autoLayoutDesc);
+		       /*autoLayoutDesc =*/compileInfo->autoLayoutDesc);
 
       buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
                            compileInfo->autoLayoutDesc);
@@ -461,7 +459,6 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
     pipelineInfo->unlinked = compileInfo->unlinked;
     pipelineInfo->options.robustBufferAccess = compileInfo->robustBufferAccess;
     pipelineInfo->options.enableRelocatableShaderElf = compileInfo->relocatableShaderElf;
-    pipelineInfo->options.scalarBlockLayout = compileInfo->scalarBlockLayout;
     pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo->scratchAccessBoundsChecks;
 
     void *pipelineDumpHandle = nullptr;

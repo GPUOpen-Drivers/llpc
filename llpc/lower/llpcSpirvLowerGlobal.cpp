@@ -861,7 +861,7 @@ void SpirvLowerGlobal::lowerOutput() {
   // Replace the Emit(Stream)Vertex calls with builder code.
   for (auto emitCall : m_emitCalls) {
     unsigned emitStreamId =
-        emitCall->arg_size() != 0 ? cast<ConstantInt>(emitCall->getArgOperand(0))->getZExtValue() : 0;
+        emitCall->getNumArgOperands() != 0 ? cast<ConstantInt>(emitCall->getArgOperand(0))->getZExtValue() : 0;
     m_builder->SetInsertPoint(emitCall);
     m_builder->CreateEmitVertex(emitStreamId);
     emitCall->eraseFromParent();

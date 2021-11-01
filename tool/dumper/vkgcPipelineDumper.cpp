@@ -438,6 +438,9 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorFmask:
   case ResourceMappingNodeType::DescriptorBufferCompact:
   case ResourceMappingNodeType::PushConst:
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
+  case ResourceMappingNodeType::InlineBuffer:
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
   case ResourceMappingNodeType::DescriptorConstBuffer:
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
@@ -563,9 +566,7 @@ void PipelineDumper::dumpResourceMappingInfo(const ResourceMappingData* resource
             for (unsigned j = 0; j < staticDescriptorValue->arraySize; ++j) {
                 dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
                 const unsigned descriptorSizeInDw =
-                    4 + (staticDescriptorValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler
-                             ? (sizeof(SamplerYCbCrConversionMetaData) / 4)
-                             : 0);
+                    staticDescriptorValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler ? 8 : 4;
 
                 for (unsigned k = 0; k < descriptorSizeInDw - 1; ++k)
                     dumpFile << staticDescriptorValue->pValue[k] << ", ";
@@ -1210,9 +1211,7 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData*
           // The hasher should be updated when the content changes, this is because YCbCrMetaData
           // is engaged in pipeline compiling.
           const unsigned descriptorSize =
-              16 + (staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler
-                        ? 0
-                        : sizeof(SamplerYCbCrConversionMetaData));
+              staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler ? 16 : 32;
 
           hasher->Update(reinterpret_cast<const uint8_t *>(staticDescriptorValue->pValue),
                          staticDescriptorValue->arraySize * descriptorSize);
@@ -1276,6 +1275,9 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
     // Do nothing for the stream-out table
     break;
   }
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
+  case ResourceMappingNodeType::InlineBuffer:
+#endif
   case ResourceMappingNodeType::PushConst: {
     if (!isRootNode)
       hasher->Update(userDataNode->srdRange);

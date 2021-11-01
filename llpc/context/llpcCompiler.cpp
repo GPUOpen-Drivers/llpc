@@ -200,13 +200,7 @@ unsigned Compiler::m_outRedirectCount = 0;
 // @param userData : An argument which will be passed to the installed error handler
 // @param reason : Error reason
 // @param genCrashDiag : Whether diagnostic should be generated
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 400826
-// Old version of the code
 static void fatalErrorHandler(void *userData, const std::string &reason, bool genCrashDiag) {
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
-static void fatalErrorHandler(void *userData, const char *reason, bool genCrashDiag) {
-#endif
   LLPC_ERRS("LLVM FATAL ERROR: " << reason << "\n");
 #if LLPC_ENABLE_EXCEPTION
   throw("LLVM fatal error");
@@ -872,6 +866,10 @@ static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *no
 //
 // @param [in] resourceMapping : resource mapping data, containing user data nodes
 static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMapping) {
+  // The code to handle an immutable sampler cannot be easily patched.
+  if (resourceMapping->staticDescriptorValueCount != 0)
+    return true;
+
   for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
     if (isUnrelocatableResourceMappingRootNode(&resourceMapping->pUserDataNodes[i].node))
       return true;
@@ -1134,7 +1132,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         lowerPassMgr->setPassIndex(&passIndex);
         SpirvLower::registerPasses(*lowerPassMgr);
 
-        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
+        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
+        );
         // Run the passes.
         success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       } else {

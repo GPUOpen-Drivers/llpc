@@ -729,7 +729,7 @@ Value *ImageBuilder::CreateImageSample(Type *resultTy, unsigned dim, unsigned fl
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
 // @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
-// @param convertingSamplerDesc : Converting sampler descriptor (v10i32)
+// @param convertingSamplerDesc : Converting sampler descriptor (v8i32)
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescArray,
@@ -747,7 +747,7 @@ Value *ImageBuilder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsi
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
 // @param imageDescArray : Image descriptor, or array of up to three descriptors for multi-plane
-// @param convertingSamplerDesc : Converting sampler descriptor (v10i32)
+// @param convertingSamplerDesc : Converting sampler descriptor (v8i32)
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescArray,
@@ -768,8 +768,6 @@ Value *ImageBuilder::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim,
   yCbCrMetaData.word1.u32All = getYCbCrMetaElement(5);
   yCbCrMetaData.word2.u32All = getYCbCrMetaElement(6);
   yCbCrMetaData.word3.u32All = getYCbCrMetaElement(7);
-  yCbCrMetaData.word4.u32All = getYCbCrMetaElement(8);
-  yCbCrMetaData.word5.u32All = getYCbCrMetaElement(9);
 
   // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
   // Init sample descriptor for luma channel

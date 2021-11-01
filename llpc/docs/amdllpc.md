@@ -42,7 +42,7 @@ Once you have followed the driver build instructions for installing source, star
 ```
 cd llpc
 cmake -G Ninja -B build [-DPAL_CLIENT_INTERFACE_MAJOR_VERSION=<pal_interface_version>]
-cmake --build  build --target check-lgc check-amdllpc 
+cmake --build  build --target check-lgc check-amdllpc
 ```
 
 See above if this gives an error due to not finding an include file from glslang or SPIRV-Tools.
@@ -84,7 +84,6 @@ amdllpc [<options>...] [<files>...]
 | `-emit-llvm`                     | Emit LLVM IR assembly just before LLVM back-end                   | false                         |
 | `-emit-llvm-bc`                  | Emit LLVM IR bitcode just before LLVM back-end                    | false                         |
 
-
 * Debug & Performance tunning options
 
 | Option Name                      | Description                                                       | Default Value                 |
@@ -110,7 +109,6 @@ amdllpc [<options>...] [<files>...]
 
 > **Note:** amdllpc overwrites following native options in LLVM:
 >>>> -pragma-unroll-threshold=4096 -unroll-allow-partial -simplifycfg-sink-common=false -amdgpu-vgpr-index-mode -filetype=obj
-
 
 ### File formats
 
@@ -138,7 +136,6 @@ or a Pipeline info file that contains or points to either of those, amdllpc need
 call [spvgen](https://github.com/GPUOpen-Drivers/spvgen). The directory of the spvgen library
 needs to be added to the environment variable LD_LIBRARY_PATH. Compiling SPIR-V binary
 or a Pipeline info file that contains or points to SPIR-V binary does not require spvgen.
-
 
 ### Examples
 
