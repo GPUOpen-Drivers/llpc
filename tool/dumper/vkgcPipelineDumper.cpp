@@ -895,7 +895,8 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
     break;
   }
 
-  updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isRelocatableShader);
+  if (!isRelocatableShader)
+    updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher);
 
   hasher.Update(pipeline->iaState.deviceIndex);
 
@@ -930,7 +931,8 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
 
   updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher, isRelocatableShader);
 
-  updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isRelocatableShader);
+  if (!isRelocatableShader)
+    updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher);
 
   hasher.Update(pipeline->deviceIndex);
 
@@ -1197,10 +1199,9 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 //
 // @param resourceMapping : Pipeline resource mapping data.
 // @param [in,out] hasher : Haher to generate hash code.
-// @param isRelocatableShader : TRUE if we are building relocatable shader.
 // @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
 void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData *pResourceMapping, MetroHash64 *hasher,
-                                                      bool isRelocatableShader, ShaderStage stage) {
+                                                      ShaderStage stage) {
   hasher->Update(pResourceMapping->staticDescriptorValueCount);
   if (pResourceMapping->staticDescriptorValueCount > 0) {
       for (unsigned i = 0; i < pResourceMapping->staticDescriptorValueCount; ++i) {
@@ -1229,7 +1230,6 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
       }
   }
 
-  if (!isRelocatableShader) {
     hasher->Update(pResourceMapping->userDataNodeCount);
     if (pResourceMapping->userDataNodeCount > 0) {
       for (unsigned i = 0; i < pResourceMapping->userDataNodeCount; ++i) {
@@ -1241,7 +1241,6 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
         }
       }
     }
-  }
 }
 
 // =====================================================================================================================
