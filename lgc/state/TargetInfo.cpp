@@ -341,6 +341,7 @@ static void setGfx1011Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waWarFpAtomicDenormHazard = 1;
   targetInfo->getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups = 1;
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
+
   targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth16 = true;
   targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth8 = true;
   targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;

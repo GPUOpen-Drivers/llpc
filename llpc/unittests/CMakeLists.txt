@@ -23,12 +23,12 @@
  #
  #######################################################################################################################
 
-# LLPC Unit tests.
-# To execute all LLPC unit tests, run:
-#   cmake --build . --target check-amdllpc-units
-
+ # LLPC Unit tests.
 add_custom_target(LlpcUnitTests)
 set_target_properties(LlpcUnitTests PROPERTIES FOLDER "LLPC Tests")
+
+# To execute all LLPC unit tests, run:
+#   cmake --build . --target check-amdllpc-units
 
 list(APPEND CMAKE_MODULE_PATH "${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm")
 include(LLVMConfig)

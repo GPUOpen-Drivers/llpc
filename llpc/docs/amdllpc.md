@@ -89,7 +89,6 @@ amdllpc [<options>...] [<files>...]
 | `-emit-llvm`                     | Emit LLVM IR assembly just before LLVM back-end                   | false                         |
 | `-emit-llvm-bc`                  | Emit LLVM IR bitcode just before LLVM back-end                    | false                         |
 
-
 * Debug & Performance tunning options
 
 | Option Name                      | Description                                                       | Default Value                 |
@@ -115,7 +114,6 @@ amdllpc [<options>...] [<files>...]
 
 > **Note:** amdllpc overwrites following native options in LLVM:
 >>>> -pragma-unroll-threshold=4096 -unroll-allow-partial -simplifycfg-sink-common=false -amdgpu-vgpr-index-mode -filetype=obj
-
 
 ### File formats
 
@@ -143,7 +141,6 @@ or a Pipeline info file that contains or points to either of those, amdllpc need
 call [spvgen](https://github.com/GPUOpen-Drivers/spvgen). The directory of the spvgen library
 needs to be added to the environment variable LD_LIBRARY_PATH. Compiling SPIR-V binary
 or a Pipeline info file that contains or points to SPIR-V binary does not require spvgen.
-
 
 ### Examples
 

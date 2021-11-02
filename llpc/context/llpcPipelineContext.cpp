@@ -529,8 +529,12 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       static_assert(ResourceNodeType::DescriptorBufferCompact ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBufferCompact),
                     "Mismatch");
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50
+      if (node.type == ResourceMappingNodeType::InlineBuffer)
+#else
       // A "PushConst" is in fact an InlineBuffer when it appears in a non-root table.
       if (node.type == ResourceMappingNodeType::PushConst && !isRoot)
+#endif
         destNode.type = ResourceNodeType::InlineBuffer;
       else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
         destNode.type = ResourceNodeType::DescriptorResource;

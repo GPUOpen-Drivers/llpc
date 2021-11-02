@@ -105,7 +105,8 @@ public:
     : m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid), m_entryPoint(nullptr) {}
 
   // Add per-shader lowering passes to pass manager
-  static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer);
+  static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer
+  );
   // Register all the lowering passes into the given pass manager
   static void registerPasses(lgc::PassManager &passMgr);
 

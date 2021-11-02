@@ -44,7 +44,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 50
+#define LLPC_INTERFACE_MAJOR_VERSION 51
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 2
@@ -72,7 +72,8 @@
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
 //  |     50.2 | Add the member dsState to GraphicsPipelineBuildInfo                                                   |
-//  |     50.1 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
+//  |     51.1 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
+//  |     50.1 | Disclose ResourceMappingNodeType::InlineBuffer                                                        |
 //  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
 //  |     49.1 | Added enableEarlyCompile to GraphicsPipelineBuildInfo                                                 |
 //  |     49.0 | Added DescriptorConstBuffer, DescriptorConstBufferCompact, DescriptorImage, DescriptorConstTexelBuffer|
@@ -136,7 +137,7 @@ static const unsigned Version = LLPC_INTERFACE_MAJOR_VERSION;
 static const unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
 static const unsigned MaxVertexAttribs = 64;
 static const unsigned MaxColorTargets = 8;
-static const unsigned FetchShaderInternalBufferBinding = 4;
+static const unsigned FetchShaderInternalBufferBinding = 5;
 static const unsigned MaxFetchShaderInternalBufferSize = 16 * MaxVertexAttribs;
 
 // Forward declarations
@@ -188,12 +189,12 @@ enum class BasicType : unsigned {
 
 /// Enumerates LLPC shader stages.
 enum ShaderStage : unsigned {
-  ShaderStageVertex = 0,                                ///< Vertex shader
-  ShaderStageTessControl,                               ///< Tessellation control shader
-  ShaderStageTessEval,                                  ///< Tessellation evaluation shader
-  ShaderStageGeometry,                                  ///< Geometry shader
-  ShaderStageFragment,                                  ///< Fragment shader
-  ShaderStageCompute,                                   ///< Compute shader
+  ShaderStageVertex = 0, ///< Vertex shader
+  ShaderStageTessControl, ///< Tessellation control shader
+  ShaderStageTessEval,    ///< Tessellation evaluation shader
+  ShaderStageGeometry,    ///< Geometry shader
+  ShaderStageFragment, ///< Fragment shader
+  ShaderStageCompute,  ///< Compute shader
   ShaderStageCount,                                     ///< Count of shader stages
   ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
   ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
@@ -250,6 +251,9 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including unifrom texel buffer
 #endif
 
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
+  InlineBuffer, ///< Push constant with binding
+#endif
   Count, ///< Count of resource mapping node types.
 };
 
@@ -741,7 +745,7 @@ struct GraphicsPipelineBuildInfo {
   PipelineShaderInfo tcs; ///< Tessellation control shader
   PipelineShaderInfo tes; ///< Tessellation evaluation shader
   PipelineShaderInfo gs;  ///< Geometry shader
-  PipelineShaderInfo fs;  ///< Fragment shader
+  PipelineShaderInfo fs; ///< Fragment shader
 
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
 
@@ -925,6 +929,7 @@ public:
   /// @param hashCode64           Precalculated Hash code of pipeline
   static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo *pPipelineInfo, char *pPipeName,
                                          const size_t nameBufSize, uint64_t hashCode64);
+
 };
 
 // =====================================================================================================================

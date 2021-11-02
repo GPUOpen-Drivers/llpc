@@ -1,0 +1,3 @@
+; Test requires at least a RUN line - this one does nothing
+; RUN: echo "Empty test"
+
