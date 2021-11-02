@@ -174,4 +174,7 @@ private:
 // Convert front-end LLPC shader stage to middle-end LGC shader stage
 lgc::ShaderStage getLgcShaderStage(ShaderStage stage);
 
+// Convert front-end LLPC shader stage to middle-end LGC shader stage mask
+unsigned getLgcShaderStageMask(ShaderStage stage);
+
 } // namespace Llpc
