@@ -1120,7 +1120,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         }
       }
     }
-    SmallVector<Module *, 5> modulesToLink;
+    SmallVector<Module *, ShaderStageGfxCount> modulesToLink;
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
       // Per-shader SPIR-V lowering passes.
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
@@ -1239,7 +1239,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 // shader stages that we don't want because there was a shader cache hit.
 //
 // @param module : Module
-// @param stageMask : Shader stage mask
+// @param stageMask : Shader stage mask (NOTE: This is a LGC shader stage mask passed by middle-end)
 // @param stageHashes : Per-stage hash of in/out usage
 // @param [out] stageCacheAccesses : Stage cache access info to fill out
 // @returns : Stage mask of the stages left to compile.
@@ -1252,11 +1252,11 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned 
   Compiler::buildShaderCacheHash(m_context, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
   unsigned stagesLeftToCompile = stageMask;
 
-  if (stageMask & shaderStageToMask(ShaderStageFragment)) {
+  if (stageMask & getLgcShaderStageMask(ShaderStageFragment)) {
     m_fragmentCacheAccessor.emplace(m_context, fragmentHash, m_compiler->getInternalCaches());
     if (m_fragmentCacheAccessor->isInCache()) {
       // Remove fragment shader stages.
-      stagesLeftToCompile &= ~shaderStageToMask(ShaderStageFragment);
+      stagesLeftToCompile &= ~getLgcShaderStageMask(ShaderStageFragment);
       stageCacheAccesses[ShaderStageFragment] =
           m_fragmentCacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
     } else {
@@ -1264,12 +1264,12 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned 
     }
   }
 
-  if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
+  if (stageMask & ~getLgcShaderStageMask(ShaderStageFragment)) {
     auto accessInfo = CacheAccessInfo::CacheNotChecked;
     m_nonFragmentCacheAccessor.emplace(m_context, nonFragmentHash, m_compiler->getInternalCaches());
     if (m_nonFragmentCacheAccessor->isInCache()) {
       // Remove non-fragment shader stages.
-      stagesLeftToCompile &= shaderStageToMask(ShaderStageFragment);
+      stagesLeftToCompile &= getLgcShaderStageMask(ShaderStageFragment);
       accessInfo = m_nonFragmentCacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit
                                                                   : CacheAccessInfo::CacheHit;
     } else {
@@ -1277,7 +1277,7 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned 
     }
 
     for (ShaderStage stage : gfxShaderStages())
-      if (stage != ShaderStageFragment && (shaderStageToMask(stage) & stageMask))
+      if (stage != ShaderStageFragment && (getLgcShaderStageMask(stage) & stageMask))
         stageCacheAccesses[stage] = accessInfo;
   }
   return stagesLeftToCompile;
@@ -1426,7 +1426,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   Result result = Result::Success;
   BinaryData elfBin = {};
 
-  SmallVector<const PipelineShaderInfo *, 6> shaderInfo = {
+  SmallVector<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfo = {
       &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
   };
 
@@ -1868,7 +1868,7 @@ void Compiler::releaseContext(Context *context) const {
 // Builds hash code from input context for per shader stage cache
 //
 // @param context : Acquired context
-// @param stageMask : Shader stage mask
+// @param stageMask : Shader stage mask (NOTE: This is a LGC shader stage mask passed by middle-end)
 // @param stageHashes : Per-stage hash of in/out usage
 // @param [out] fragmentHash : Hash code of fragment shader
 // @param [out] nonFragmentHash : Hash code of all non-fragment shader
@@ -1881,7 +1881,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
 
   // Build hash per shader stage
   for (ShaderStage stage : gfxShaderStages()) {
-    if ((stageMask & shaderStageToMask(stage)) == 0)
+    if ((stageMask & getLgcShaderStageMask(stage)) == 0)
       continue;
 
     auto shaderInfo = context->getPipelineShaderInfo(stage);
@@ -1894,7 +1894,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), &hasher, false);
 
     // Update input/output usage (provided by middle-end caller of this callback).
-    hasher.Update(stageHashes[stage].data(), stageHashes[stage].size());
+    hasher.Update(stageHashes[getLgcShaderStage(stage)].data(), stageHashes[getLgcShaderStage(stage)].size());
 
     // Update vertex input state
     if (stage == ShaderStageVertex)
@@ -1913,7 +1913,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
   }
 
   // Add addtional pipeline state to final hasher
-  if (stageMask & shaderStageToMask(ShaderStageFragment)) {
+  if (stageMask & getLgcShaderStageMask(ShaderStageFragment)) {
     // Add pipeline options to fragment hash
     fragmentHasher.Update(pipelineOptions->includeDisassembly);
     fragmentHasher.Update(pipelineOptions->scalarBlockLayout);
@@ -1927,7 +1927,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     fragmentHasher.Finalize(fragmentHash->bytes);
   }
 
-  if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
+  if (stageMask & ~getLgcShaderStageMask(ShaderStageFragment)) {
     PipelineDumper::updateHashForNonFragmentState(pipelineInfo, true, &nonFragmentHasher, false);
     nonFragmentHasher.Finalize(nonFragmentHash->bytes);
   }
@@ -1974,6 +1974,8 @@ bool Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
 
 // =====================================================================================================================
 // Convert front-end LLPC shader stage to middle-end LGC shader type
+//
+// @param stage : Front-end LLPC shader stage
 lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
   switch (stage) {
   case ShaderStageCompute:
@@ -1992,6 +1994,14 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
     llvm_unreachable("");
     return lgc::ShaderStageInvalid;
   }
+}
+
+// =====================================================================================================================
+// Convert front-end LLPC shader stage to middle-end LGC shader stage mask
+//
+// @param stage : Front-end LLPC shader stage
+unsigned getLgcShaderStageMask(ShaderStage stage) {
+  return (1 << getLgcShaderStage(stage));
 }
 
 } // namespace Llpc
