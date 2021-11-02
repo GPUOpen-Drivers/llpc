@@ -86,6 +86,12 @@ public:
 
   ~LgcContext();
 
+  // Given major.minor.steppings - generate the gpuName string
+  static std::string getGpuNameString(unsigned major, unsigned minor, unsigned stepping);
+
+  // Verify that gpuName is valid
+  static bool isGpuNameValid(llvm::StringRef gpuName);
+
   // Get LLVM context
   llvm::LLVMContext &getContext() const { return m_context; }
 

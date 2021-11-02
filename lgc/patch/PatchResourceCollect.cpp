@@ -39,6 +39,7 @@
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/BuilderBase.h"
 #include "lgc/util/Debug.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"

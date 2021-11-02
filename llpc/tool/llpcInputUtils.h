@@ -56,6 +56,8 @@ constexpr llvm::StringLiteral LlvmIr = ".ll";
 constexpr llvm::StringLiteral IsaText = ".s";
 constexpr llvm::StringLiteral IsaBin = ".elf";
 
+constexpr llvm::StringLiteral GlslShaders[] = {".vert", ".tesc", ".tese", ".geom", ".frag", ".comp"};
+
 } // namespace Ext
 
 // Returns true when the buffer is an ELF binary.
@@ -72,6 +74,9 @@ bool isSpirvTextFile(llvm::StringRef fileName);
 
 // Checks whether the specified file name represents a SPIR-V binary file (.spv).
 bool isSpirvBinaryFile(llvm::StringRef fileName);
+
+// Checks whether the specified file name represents a GLSL shader file (.vert, .frag, etc.).
+bool isGlslShaderTextFile(llvm::StringRef fileName);
 
 // Checks whether the specified file name represents an LLVM IR file (.ll).
 bool isLlvmIrFile(llvm::StringRef fileName);

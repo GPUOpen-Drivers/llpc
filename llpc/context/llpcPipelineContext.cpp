@@ -142,28 +142,6 @@ PipelineContext::~PipelineContext() {
 }
 
 // =====================================================================================================================
-// Gets the name string of GPU target according to graphics IP version info.
-//
-// @param gfxIp : Graphics IP version info
-// @param [out] gpuName : LLVM GPU name
-void PipelineContext::getGpuNameString(GfxIpVersion gfxIp, std::string &gpuName) {
-  // A GfxIpVersion from PAL is three decimal numbers for major, minor and stepping. This function
-  // converts that to an LLVM target name, whith is "gfx" followed by the three decimal numbers with
-  // no separators, e.g. "gfx1010" for 10.1.0. A high stepping number 0xFFFA..0xFFFF denotes an
-  // experimental target, and that is represented by the final hexadecimal digit, e.g. "gfx101A"
-  // for 10.1.0xFFFA. In gfx9, stepping numbers 10..35 are represented by lower case letter 'a'..'z'.
-  gpuName.clear();
-  raw_string_ostream gpuNameStream(gpuName);
-  gpuNameStream << "gfx" << gfxIp.major << gfxIp.minor;
-  if (gfxIp.stepping >= 0xFFFA)
-    gpuNameStream << char(gfxIp.stepping - 0xFFFA + 'A');
-  else if (gfxIp.major == 9 && gfxIp.stepping >= 10)
-    gpuNameStream << char(gfxIp.stepping - 10 + 'a');
-  else
-    gpuNameStream << gfxIp.stepping;
-}
-
-// =====================================================================================================================
 // Gets the name string of the abbreviation for GPU target according to graphics IP version info.
 //
 // @param gfxIp : Graphics IP version info

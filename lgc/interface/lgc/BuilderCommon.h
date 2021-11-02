@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuilderBase.h
- * @brief LLPC header file: declaration of BuilderBase
+ * @file  BuilderCommon.h
+ * @brief LLPC header file: declaration of BuilderCommon
  ***********************************************************************************************************************
  */
 #pragma once
@@ -35,16 +35,15 @@
 namespace lgc {
 
 // =====================================================================================================================
-// BuilderBase extends IRBuilder<>, and provides a few utility methods used in both the LLPC front-end and in LGC (the
-// LLPC middle-end). LGC code outside of Builder subclasses would use BuilderBase directly; LLPC front-end code gets
-// to use BuilderBase methods because it uses Builder, which inherits from BuilderBase.
-//
-class BuilderBase : public llvm::IRBuilder<> {
+// BuilderCommon extends IRBuilder<>, and provides a few utility methods used in both the LLPC front-end and in LGC
+// (the LLPC middle-end).
+// This class is used directly by passes in LGC.
+class BuilderCommon : public llvm::IRBuilder<> {
 public:
   // Constructors
-  BuilderBase(llvm::LLVMContext &context) : IRBuilder(context) {}
-  BuilderBase(llvm::BasicBlock *block) : IRBuilder(block) {}
-  BuilderBase(llvm::Instruction *inst) : IRBuilder(inst) {}
+  BuilderCommon(llvm::LLVMContext &context) : IRBuilder(context) {}
+  BuilderCommon(llvm::BasicBlock *block) : IRBuilder(block) {}
+  BuilderCommon(llvm::Instruction *inst) : IRBuilder(inst) {}
 
   // Create an LLVM function call to the named function. The callee is built automically based on return
   // type and its parameters.
@@ -56,20 +55,6 @@ public:
   // @param instName : Name to give instruction
   llvm::CallInst *CreateNamedCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
                                   llvm::ArrayRef<llvm::Attribute::AttrKind> attribs, const llvm::Twine &instName = "");
-
-  // Emits a amdgcn.reloc.constant intrinsic that represents an i32 relocatable value with the given symbol name
-  //
-  // @param symbolName : Name of the relocation symbol associated with this relocation
-  llvm::Value *CreateRelocationConstant(const llvm::Twine &symbolName);
-
-  // Generate an add of an offset to a byte pointer. This is provided to use in the case that the offset is,
-  // or might be, a relocatable value, as it implements a workaround to get more efficient code for the load
-  // that uses the offset pointer.
-  //
-  // @param pointer : Pointer to add to
-  // @param byteOffset : Byte offset to add
-  // @param instName : Name to give instruction
-  llvm::Value *CreateAddByteOffset(llvm::Value *pointer, llvm::Value *byteOffset, const llvm::Twine &instName = "");
 };
 
 } // namespace lgc

@@ -4,7 +4,7 @@
 ; RUN: not amdllpc -validate-spirv=true -spvgen-dir=%spvgendir% -v %gfxip %s \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST %s
 ;
-; SHADERTEST-LABEL: {{^}}ERROR: Fails to validate SPIR-V:
+; SHADERTEST-LABEL: {{^}}ERROR: Failed to validate SPIR-V:
 ; SHADERTEST-LABEL: {{^}}error: {{[0-9]+}}: 2 Entry points cannot share the same name and ExecutionMode.
 ; SHADERTEST-LABEL: {{^}}===== AMDLLPC FAILED =====
 ; END_SHADERTEST

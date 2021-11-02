@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "lgc/BuilderBase.h"
+#include "lgc/BuilderCommon.h"
 #include "lgc/BuiltIns.h"
 #include "lgc/CommonDefs.h"
 #include "llvm/Support/AtomicOrdering.h"
@@ -125,7 +125,7 @@ private:
 // of IRBuilder<>, so the front-end can use its methods to create IR instructions at the set insertion
 // point. In addition it has its own Create* methods to create graphics-specific IR constructs.
 //
-class Builder : public BuilderBase {
+class Builder : public BuilderCommon {
 public:
   // The group arithmetic operations the builder can consume.
   // NOTE: We rely on casting this implicitly to an integer, so we cannot use an enum class.
@@ -1621,18 +1621,6 @@ protected:
   //
   // @param matrixType : The matrix type to tranpose
   llvm::Type *getTransposedMatrixTy(llvm::Type *const matrixType) const;
-
-  typedef std::function<llvm::Value *(Builder &builder, llvm::ArrayRef<llvm::Value *> mappedArgs,
-                                      llvm::ArrayRef<llvm::Value *> passthroughArgs)>
-      PFN_MapToInt32Func;
-
-  // Create a call that'll map the massage arguments to an i32 type (for functions that only take i32).
-  //
-  // @param mapFunc : Pointer to the function to call on each i32.
-  // @param mappedArgs : The arguments to massage into an i32 type.
-  // @param passthroughArgs : The arguments to pass-through without massaging.
-  llvm::Value *CreateMapToInt32(PFN_MapToInt32Func mapFunc, llvm::ArrayRef<llvm::Value *> mappedArgs,
-                                llvm::ArrayRef<llvm::Value *> passthroughArgs);
 
 private:
   Builder() = delete;

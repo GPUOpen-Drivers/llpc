@@ -115,7 +115,6 @@ public:
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const = 0;
 
-  static void getGpuNameString(GfxIpVersion gfxIp, std::string &gpuName);
   static const char *getGpuNameAbbreviation(GfxIpVersion gfxIp);
 
   // Gets graphics IP version info

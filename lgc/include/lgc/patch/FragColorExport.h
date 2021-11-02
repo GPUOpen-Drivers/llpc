@@ -30,10 +30,10 @@
  */
 #pragma once
 
-#include "lgc/BuilderBase.h"
 #include "lgc/Pipeline.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
+#include "lgc/util/BuilderBase.h"
 #include "lgc/util/Internal.h"
 
 namespace lgc {

@@ -170,6 +170,43 @@ void LgcContext::initialize() {
 }
 
 // =====================================================================================================================
+// Gets the name string of GPU target according to graphics IP version info.
+//
+// @param major : major version
+// @param minor : minor version
+// @param stepping : stepping info
+// @returns : LLVM GPU name as a std::string
+std::string LgcContext::getGpuNameString(unsigned major, unsigned minor, unsigned stepping) {
+  // A GfxIpVersion from PAL is three decimal numbers for major, minor and stepping. This function
+  // converts that to an LLVM target name, whith is "gfx" followed by the three decimal numbers with
+  // no separators, e.g. "gfx1010" for 10.1.0. A high stepping number 0xFFFA..0xFFFF denotes an
+  // experimental target, and that is represented by the final hexadecimal digit, e.g. "gfx101A"
+  // for 10.1.0xFFFA. In gfx9, stepping numbers 10..35 are represented by lower case letter 'a'..'z'.
+  std::string gpuName;
+  raw_string_ostream gpuNameStream(gpuName);
+  gpuNameStream << "gfx" << major << minor;
+  if (stepping >= 0xFFFA)
+    gpuNameStream << char(stepping - 0xFFFA + 'A');
+  else if (major == 9 && stepping >= 10)
+    gpuNameStream << char(stepping - 10 + 'a');
+  else
+    gpuNameStream << stepping;
+
+  return gpuNameStream.str();
+}
+
+// =====================================================================================================================
+// Validate gpuName as a valid gpu
+//
+// @param gpuName : LLVM GPU name (e.g. "gfx900")
+// @returns : true if gpu name is valid, false otherwise
+bool LgcContext::isGpuNameValid(llvm::StringRef gpuName) {
+  TargetInfo targetInfo;
+
+  return targetInfo.setTargetInfo(gpuName);
+}
+
+// =====================================================================================================================
 // Create the LgcContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
 //
 // @param context : LLVM context to give each Builder
@@ -185,6 +222,7 @@ LgcContext *LgcContext::Create(LLVMContext &context, StringRef gpuName, unsigned
     gpuName = mcpuName;
 
   builderContext->m_targetInfo = new TargetInfo;
+  // If we can't set the target info it means the gpuName isn't valid
   if (!builderContext->m_targetInfo->setTargetInfo(gpuName)) {
     delete builderContext;
     return nullptr;

@@ -156,6 +156,15 @@ bool isSpirvBinaryFile(StringRef fileName) {
 }
 
 // =====================================================================================================================
+// Checks whether the specified file name represents a GLSL shader file (.vert, .frag, etc.).
+//
+// @param fileName : File path to check
+// @returns : true when fileName is an LLVM IR file
+bool isGlslShaderTextFile(llvm::StringRef fileName) {
+  return any_of(Ext::GlslShaders, [fileName](StringLiteral extension) { return fileName.endswith(extension); });
+}
+
+// =====================================================================================================================
 // Checks whether the specified file name represents an LLVM IR file (.ll).
 //
 // @param fileName : File path to check

@@ -3,7 +3,8 @@
 ; BEGIN_SHADERTEST
 ; RUN: not amdllpc -v %gfxip %s | FileCheck --check-prefix=SHADERTEST %s
 ;
-; SHADERTEST-LABEL: {{^}}ERROR: File {{.*}} parsed, but fail to verify the module: Instruction does not dominate all uses!
+; SHADERTEST-LABEL: {{^}}ERROR: File {{.*}} parsed, but failed to verify the module:
+; SHADERTEST-SAME:  Instruction does not dominate all uses!
 ; SHADERTEST-LABEL: {{^}}===== AMDLLPC FAILED =====
 ; END_SHADERTEST
 

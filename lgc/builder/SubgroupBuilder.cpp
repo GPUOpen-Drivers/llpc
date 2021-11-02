@@ -148,7 +148,7 @@ Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, bool wqm, con
 // @param index : The index to broadcast from. Must be an i32.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupBroadcast(Value *const value, Value *const index, const Twine &instName) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
   };
 
@@ -163,7 +163,8 @@ Value *SubgroupBuilder::CreateSubgroupBroadcast(Value *const value, Value *const
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupBroadcastWaterfall(Value *const value, Value *const index,
                                                          const Twine &instName) {
-  auto mapFunc = [this](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                        ArrayRef<Value *> passthroughArgs) -> Value * {
     Value *const readlane =
         builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
     return createWaterfallLoop(cast<Instruction>(readlane), 1);
@@ -177,7 +178,7 @@ Value *SubgroupBuilder::CreateSubgroupBroadcastWaterfall(Value *const value, Val
 // @param value : The value to read from the first active lane into all other active lanes.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupBroadcastFirst(Value *const value, const Twine &instName) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, mappedArgs[0]);
   };
 
@@ -320,14 +321,15 @@ Value *SubgroupBuilder::CreateSubgroupBallotFindMsb(Value *const value, const Tw
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const index, const Twine &instName) {
   if (supportBPermute()) {
-    auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                      ArrayRef<Value *> passthroughArgs) -> Value * {
       return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
     };
 
     // The ds_bpermute intrinsic requires the index be multiplied by 4.
     return CreateMapToInt32(mapFunc, value, CreateMul(index, getInt32(4)));
   } else {
-    auto mapFunc = [this](Builder &builder, ArrayRef<Value *> mappedArgs,
+    auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                           ArrayRef<Value *> passthroughArgs) -> Value * {
       Value *const readlane =
           builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
@@ -1075,7 +1077,7 @@ Value *SubgroupBuilder::CreateSubgroupSwizzleMask(Value *const value, Value *con
 // @param instName : Name to give instruction(s)
 Value *SubgroupBuilder::CreateSubgroupWriteInvocation(Value *const inputValue, Value *const writeValue,
                                                       Value *const invocationIndex, const Twine &instName) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_writelane, {},
                                    {
                                        mappedArgs[1],
@@ -1213,7 +1215,7 @@ Value *SubgroupBuilder::createGroupArithmeticOperation(GroupArithOp groupArithOp
 //
 // @param value : The value to ensure doesn't move in control flow.
 Value *SubgroupBuilder::createInlineAsmSideEffect(Value *const value) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
     Value *const value = mappedArgs[0];
     Type *const type = value->getType();
     FunctionType *const funcType = FunctionType::get(type, type, false);
@@ -1234,7 +1236,7 @@ Value *SubgroupBuilder::createInlineAsmSideEffect(Value *const value) {
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *SubgroupBuilder::createDppMov(Value *const value, DppCtrl dppCtrl, unsigned rowMask, unsigned bankMask,
                                      bool boundCtrl) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
         Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
         {mappedArgs[0], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
@@ -1256,7 +1258,7 @@ Value *SubgroupBuilder::createDppMov(Value *const value, DppCtrl dppCtrl, unsign
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *SubgroupBuilder::createDppUpdate(Value *const origValue, Value *const updateValue, DppCtrl dppCtrl,
                                         unsigned rowMask, unsigned bankMask, bool boundCtrl) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
         Intrinsic::amdgcn_update_dpp, builder.getInt32Ty(),
         {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
@@ -1282,7 +1284,7 @@ Value *SubgroupBuilder::createDppUpdate(Value *const origValue, Value *const upd
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
                                          unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     Module *const module = builder.GetInsertBlock()->getModule();
 
     Type *const int1Ty = builder.getInt1Ty();
@@ -1316,7 +1318,7 @@ Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const up
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *SubgroupBuilder::createPermLaneX16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
                                           unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     Module *const module = builder.GetInsertBlock()->getModule();
 
     Type *const int1Ty = builder.getInt1Ty();
@@ -1345,7 +1347,7 @@ Value *SubgroupBuilder::createPermLaneX16(Value *const origValue, Value *const u
 // @param value : The value to swizzle.
 // @param dsPattern : The pattern to swizzle with.
 Value *SubgroupBuilder::createDsSwizzle(Value *const value, uint16_t dsPattern) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle, {}, {mappedArgs[0], passthroughArgs[0]});
   };
 
@@ -1357,7 +1359,7 @@ Value *SubgroupBuilder::createDsSwizzle(Value *const value, uint16_t dsPattern) 
 //
 // @param value : The value to pass to the WWM call.
 Value *SubgroupBuilder::createWwm(Value *const value) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
     return builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wwm, mappedArgs[0]);
   };
 
@@ -1370,7 +1372,7 @@ Value *SubgroupBuilder::createWwm(Value *const value) {
 // @param active : The value active invocations should take.
 // @param inactive : The value inactive invocations should take.
 Value *SubgroupBuilder::createSetInactive(Value *active, Value *inactive) {
-  auto mapFunc = [](Builder &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
     Value *const active = mappedArgs[0];
     Value *const inactive = mappedArgs[1];
     return builder.CreateIntrinsic(Intrinsic::amdgcn_set_inactive, active->getType(), {active, inactive});
