@@ -13,11 +13,11 @@
 ; RUN:      %S/pipelines/PipelineVsFs_ConstantData_Vs1Fs2.pipe   \
 ; RUN:      %S/pipelines/PipelineVsFs_ConstantData_Vs2Fs1.pipe   \
 ; RUN: | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST:       Non fragment shader cache miss. 
+; SHADERTEST:       Non fragment shader cache miss.
 ; SHADERTEST-NEXT:  Fragment shader cache miss.
-; SHADERTEST:       Non fragment shader cache hit. 
+; SHADERTEST:       Non fragment shader cache hit.
 ; SHADERTEST-NEXT:  Fragment shader cache miss.
-; SHADERTEST:       Non fragment shader cache miss. 
+; SHADERTEST:       Non fragment shader cache miss.
 ; SHADERTEST-NEXT:  Fragment shader cache hit.
 ; SHADERTEST-NOT:   shader cache {{miss|hit}}.
 ; SHADERTEST-LABEL: .rodata.cached

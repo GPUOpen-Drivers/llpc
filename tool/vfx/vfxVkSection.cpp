@@ -69,7 +69,9 @@ public:
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorImage)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstTexelBuffer)
 #endif
-
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, InlineBuffer)
+#endif
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Auto)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, MaximumSize)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, HalfSize)

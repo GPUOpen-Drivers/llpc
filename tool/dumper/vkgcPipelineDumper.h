@@ -99,6 +99,9 @@ public:
   static void updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher,
                                          bool isRelocatableShader);
 
+  static void updateHashForPipelineOptions(const PipelineOptions *options, MetroHash64 *hasher,
+                                           bool isRelocatableShader);
+
   // Get name of register, or "" if not known
   static const char *getRegisterNameString(unsigned regNumber);
 

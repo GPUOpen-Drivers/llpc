@@ -438,6 +438,9 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorFmask:
   case ResourceMappingNodeType::DescriptorBufferCompact:
   case ResourceMappingNodeType::PushConst:
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
+  case ResourceMappingNodeType::InlineBuffer:
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
   case ResourceMappingNodeType::DescriptorConstBuffer:
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
@@ -930,19 +933,8 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
   updateHashForResourceMappingInfo(&pipeline->resourceMapping, &hasher, isRelocatableShader);
 
   hasher.Update(pipeline->deviceIndex);
-  hasher.Update(pipeline->options.includeDisassembly);
-  hasher.Update(pipeline->options.scalarBlockLayout);
-  hasher.Update(pipeline->options.includeIr);
-  hasher.Update(pipeline->options.robustBufferAccess);
 
-  if (!isRelocatableShader) {
-    hasher.Update(pipeline->options.shadowDescriptorTableUsage);
-    hasher.Update(pipeline->options.shadowDescriptorTablePtrHigh);
-  }
-
-  hasher.Update(pipeline->options.extendedRobustness.robustBufferAccess);
-  hasher.Update(pipeline->options.extendedRobustness.robustImageAccess);
-  hasher.Update(pipeline->options.extendedRobustness.nullDescriptor);
+  updateHashForPipelineOptions(&pipeline->options, &hasher, isRelocatableShader);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1069,20 +1061,8 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
       hasher->Update(nggState->primsPerSubgroup);
       hasher->Update(nggState->vertsPerSubgroup);
     }
-    hasher->Update(pipeline->options.includeDisassembly);
-    hasher->Update(pipeline->options.scalarBlockLayout);
-    hasher->Update(pipeline->options.includeIr);
-    hasher->Update(pipeline->options.robustBufferAccess);
-    hasher->Update(pipeline->options.reconfigWorkgroupLayout);
 
-    if (!isRelocatableShader) {
-      hasher->Update(pipeline->options.shadowDescriptorTableUsage);
-      hasher->Update(pipeline->options.shadowDescriptorTablePtrHigh);
-    }
-
-    hasher->Update(pipeline->options.extendedRobustness.robustBufferAccess);
-    hasher->Update(pipeline->options.extendedRobustness.robustImageAccess);
-    hasher->Update(pipeline->options.extendedRobustness.nullDescriptor);
+    updateHashForPipelineOptions(&pipeline->options, hasher, isRelocatableShader);
   }
 }
 
@@ -1114,6 +1094,29 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
       }
     }
   }
+}
+
+// =====================================================================================================================
+// Update hash code from pipeline options
+//
+// @param options: Pipeline options
+// @param [in/out] hasher : Hasher to generate hash code
+void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options, MetroHash64 *hasher,
+                                                  bool isRelocatableShader) {
+  hasher->Update(options->includeDisassembly);
+  hasher->Update(options->scalarBlockLayout);
+  hasher->Update(options->includeIr);
+  hasher->Update(options->robustBufferAccess);
+  hasher->Update(options->reconfigWorkgroupLayout);
+
+  if (!isRelocatableShader) {
+    hasher->Update(options->shadowDescriptorTableUsage);
+    hasher->Update(options->shadowDescriptorTablePtrHigh);
+  }
+
+  hasher->Update(options->extendedRobustness.robustBufferAccess);
+  hasher->Update(options->extendedRobustness.robustImageAccess);
+  hasher->Update(options->extendedRobustness.nullDescriptor);
 }
 
 // =====================================================================================================================
@@ -1276,6 +1279,9 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
     // Do nothing for the stream-out table
     break;
   }
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
+  case ResourceMappingNodeType::InlineBuffer:
+#endif
   case ResourceMappingNodeType::PushConst: {
     if (!isRootNode)
       hasher->Update(userDataNode->srdRange);

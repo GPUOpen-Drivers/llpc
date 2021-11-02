@@ -23,4 +23,7 @@
  #
  #######################################################################################################################
 
+# This CMakeLists.txt simply forwards to the real one in llpc/test, and is present only
+# to cater for an old build script that still looks for it in the old location.
+
 add_subdirectory(../llpc/test ${CMAKE_CURRENT_BINARY_DIR})
