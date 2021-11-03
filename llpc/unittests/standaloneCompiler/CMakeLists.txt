@@ -25,6 +25,7 @@
 
 add_llpc_unittest(LlpcStandaloneCompilerTests
   testInputUtils.cpp
+  testShaderCache.cpp
 )
 
 target_link_libraries(LlpcStandaloneCompilerTests PRIVATE

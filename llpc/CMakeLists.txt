@@ -365,6 +365,7 @@ target_link_libraries(llpc_standalone_compiler PUBLIC
     cwpack
     llpc
     ${llvm_libs}
+    metrohash
     vfx
 )
 if(UNIX)
