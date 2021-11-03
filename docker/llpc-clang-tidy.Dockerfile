@@ -52,7 +52,7 @@ RUN ln -s /vulkandriver/builds/ci-build/compile_commands.json \
         echo "Please run clang-tidy-diff on your changes and push again:"; \
         echo "    git diff origin/$LLPC_BASE_REF -U0 --no-color | ../llvm-project/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py -p1 -fix"; \
         echo ""; \
-        echo "To disable a lint, add `// NOLINT` at the end of the line."; \
+        echo "To disable a lint, add \`// NOLINT\` at the end of the line."; \
         echo ""; \
         echo "Diff:"; \
         cat not-tidy.diff; \
