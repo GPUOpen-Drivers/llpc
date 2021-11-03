@@ -162,6 +162,23 @@ private:
   // Unlock cache map
   void unlockCacheMap(bool readOnly) { m_lock.unlock(); }
 
+  // Satisfies `BasicLockable`, so that we can pass it to `std::condition_variable_any::wait`.
+  // Does *not* automatically lock/unlock on construction/destruction.
+  class CacheMapLock {
+  public:
+    CacheMapLock(ShaderCache &sc, bool readOnlyLock) : m_sc(sc), ReadOnlyLock(readOnlyLock) {}
+
+    void lock() { m_sc.lockCacheMap(ReadOnlyLock); }
+    void unlock() { m_sc.unlockCacheMap(ReadOnlyLock); }
+
+  private:
+    ShaderCache &m_sc;
+    const bool ReadOnlyLock;
+  };
+
+  // Returns a new lock object that satisfies `BasicLockable`. It can be used with `std::condition_variable_any`.
+  CacheMapLock makeCacheLock(bool readOnlyLock) { return {*this, readOnlyLock}; }
+
   bool useExternalCache() { return m_getValueFunc && m_storeValueFunc; }
 
   void resetRuntimeCache();
@@ -184,13 +201,12 @@ private:
 
   std::list<std::pair<uint8_t *, size_t>> m_allocationList; // Memory allcoated by GetCacheSpace
   unsigned m_serializedSize;                                // Serialized byte size of whole shader cache
-  std::mutex m_conditionMutex;                              // Mutex that will be used with the condition variable
-  std::condition_variable m_conditionVariable; // Condition variable that will be used to wait compile finish
-  const void *m_clientData;                    // Client data that will be used by function GetValue and StoreValue
-  ShaderCacheGetValue m_getValueFunc;          // GetValue function used to query an external cache for shader data
-  ShaderCacheStoreValue m_storeValueFunc;      // StoreValue function used to store shader data in an external cache
-  GfxIpVersion m_gfxIp;                        // Graphics IP version info
-  MetroHash::Hash m_hash;                      // Hash code of compilation options
+  std::condition_variable_any m_conditionVariable; // Condition variable used to wait for compililation to finish
+  const void *m_clientData;                        // Client data that will be used by function GetValue and StoreValue
+  ShaderCacheGetValue m_getValueFunc;              // GetValue function used to query an external cache for shader data
+  ShaderCacheStoreValue m_storeValueFunc;          // StoreValue function used to store shader data in an external cache
+  GfxIpVersion m_gfxIp;                            // Graphics IP version info
+  MetroHash::Hash m_hash;                          // Hash code of compilation options
 };
 
 } // namespace Llpc

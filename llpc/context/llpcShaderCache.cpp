@@ -475,19 +475,17 @@ ShaderEntryState ShaderCache::findShader(MetroHash::Hash hash, bool allocateOnMi
     } // End if (existed == false)
 
     if (index->state == ShaderEntryState::Compiling) {
-      // The shader is being compiled by another thread, we should release the lock and wait for it to complete
-      while (index->state == ShaderEntryState::Compiling) {
-        unlockCacheMap(readOnlyLock);
-        {
-          std::unique_lock<std::mutex> lock(m_conditionMutex);
-
-          m_conditionVariable.wait_for(lock, std::chrono::seconds(1));
-        }
-        lockCacheMap(readOnlyLock);
-      }
+      // The shader is being compiled by another thread, we should release the lock and wait for it to complete.
+      // This uses the same lock as lock/unlockCacheMap.
+      CacheMapLock lock = makeCacheLock(readOnlyLock);
+      m_conditionVariable.wait(lock, [index] {
+        // The lock must have been acquired by the time we enter this lambda.
+        return index->state != ShaderEntryState::Compiling;
+      });
       // At this point the shader entry is either Ready, New or something failed. We've already
       // initialized our result code to an error code above, the Ready and New cases are handled below so
-      // nothing else to do here.
+      // nothing else to do here. The cache lock is in the locked state after waiting.
+      assert(index->state != ShaderEntryState::Compiling);
     }
 
     if (index->state == ShaderEntryState::Ready) {
