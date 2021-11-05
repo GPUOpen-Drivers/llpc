@@ -1409,6 +1409,8 @@ void PipelineState::initializeInOutPackState() {
     for (ShaderStage stage : lgc::enumRange(ShaderStage::ShaderStageGfxCount)) {
       if ((m_stageMask & shaderStageToMask(stage)) == 0)
         continue;
+      if (stage == ShaderStageTessEval)
+        continue;
       ShaderStage preStage = getPrevShaderStage(stage);
       if (preStage == ShaderStageInvalid)
         continue;
