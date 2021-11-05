@@ -124,7 +124,7 @@ set_compiler_options(llpc ${LLPC_ENABLE_WERROR})
 if(ICD_BUILD_LLPC)
     set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm)
     include(LLVMConfig)
-    message(STATUS "LLVM execuables: " ${LLVM_TOOLS_BINARY_DIR})
+    message(STATUS "LLVM executables: " ${LLVM_TOOLS_BINARY_DIR})
     message(STATUS "LLVM libraries: " ${LLVM_BUILD_LIBRARY_DIR})
     execute_process(
         COMMAND ${LLVM_TOOLS_BINARY_DIR}/llvm-config --libs amdgpu analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils
