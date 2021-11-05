@@ -1,0 +1,80 @@
+; Test that the TCS output at location 0 is removed, and that the mapping of the TES inputs and TCS outputs match.
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% \
+; RUN:         -enable-relocatable-shader-elf \
+; RUN:         -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: // LLPC location input/output mapping results (TES shader)
+; SHADERTEST: (TES) Input:  loc = 2, comp = 0 =>  Mapped = 0, 0
+; SHADERTEST-LABEL: // LLPC location input/output mapping results (TCS shader)
+; SHADERTEST: (TCS) Output: loc = 2, comp = 0  =>  Mapped = 0, 0
+; END_SHADERTEST
+
+[Version]
+version = 50
+
+[VsGlsl]
+#version 450
+
+void main()
+{
+    gl_Position = vec4(0.0);
+}
+
+[VsInfo]
+entryPoint = main
+
+[TcsGlsl]
+#version 450
+layout(vertices = 3) out;
+
+layout(location = 0) out vec2 _6[3];
+layout(location = 2) out float _7[3];
+
+void main()
+{
+    gl_out[gl_InvocationID].gl_Position = vec4(0.0);
+    _6[gl_InvocationID] = vec2(0.0);
+    _7[gl_InvocationID] = 0.0;
+}
+
+[TcsInfo]
+entryPoint = main
+
+[TesGlsl]
+#version 450
+layout(triangles) in;
+
+layout(location = 2) in float _7[];
+
+void main()
+{
+    float _30_unrolled[3];
+    for (int i = 0; i < int(3); i++)
+    {
+        _30_unrolled[i] = _7[i];
+    }
+    gl_Position = vec4(_30_unrolled[0], _30_unrolled[1], _30_unrolled[2], 1.0);
+}
+
+[TesInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+layout(early_fragment_tests) in;
+
+layout(location = 0) out vec4 _4;
+
+void main()
+{
+    _4 = vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_SRGB
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0

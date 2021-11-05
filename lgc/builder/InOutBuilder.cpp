@@ -313,7 +313,7 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
   if (!isOutput || m_shaderStage != ShaderStageGeometry) {
     bool keepAllLocations = false;
     if (getPipelineState()->isUnlinked()) {
-      if (m_shaderStage == ShaderStageVertex && isOutput)
+      if (isOutput && m_pipelineState->getNextShaderStage(m_shaderStage, true) == ShaderStageFragment)
         keepAllLocations = true;
       if (m_shaderStage == ShaderStageFragment && !isOutput)
         keepAllLocations = true;

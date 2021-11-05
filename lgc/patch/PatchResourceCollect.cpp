@@ -2270,7 +2270,7 @@ void PatchResourceCollect::clearUnusedOutput() {
   ShaderStage nextStage = m_pipelineState->getNextShaderStage(m_shaderStage, m_processMissingFs);
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
-  if (!m_pipelineState->isUnlinked() && nextStage != ShaderStageInvalid) {
+  if (nextStage != ShaderStageInvalid) {
     // Collect the locations of TCS with dynamic indexing or as imported output
     DenseSet<unsigned> dynIndexedOrImportOutputLocs;
     if (m_shaderStage == ShaderStageTessControl) {
