@@ -13,15 +13,14 @@ define spir_func <10 x i32> @func(<10 x i32> %arg) local_unnamed_addr #0 !spirv.
 ; CHECK-LABEL: func:
 ; CHECK: s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; CHECK-NEXT: s_waitcnt_vscnt null, 0x0
-; CHECK-NEXT: s_getpc_b64 s[4:5]
-; CHECK-NEXT: v_mov_b32_e32 v10, s20
-; CHECK-NEXT: s_mov_b32 s9, s5
-; CHECK-NEXT: v_mov_b32_e32 v11, s21
-; CHECK-NEXT: s_load_dwordx4 s[4:7], s[8:9], 0x0
-; CHECK-NEXT: v_mov_b32_e32 v12, s22
-; CHECK-NEXT: s_waitcnt lgkmcnt(0)
-; CHECK-NEXT: buffer_store_dwordx3 v[10:12], off, s[4:7], 0
-; CHECK-NEXT: s_waitcnt_vscnt null, 0x0
+; CHECK: s_getpc_b64 s[{{[0-9]+:[0-9]+}}]
+; CHECK: s_mov_b32 s9, s{{[0-9]+}}
+; CHECK-NEXT: v_mov_b32_e32 v{{[0-9]+}}, s{{[0-9]+}}
+; CHECK-NEXT: s_load_dwordx4 s[{{[0-9]+:[0-9]+}}], s[8:9], 0x0
+; CHECK: v_mov_b32_e32 v12, s{{[0-9]+}}
+; CHECK: s_waitcnt lgkmcnt(0)
+; CHECK-NEXT: buffer_store_dwordx3 v[{{[0-9]+:[0-9]+}}], off, s[{{[0-9]+:[0-9]+}}], 0
+; CHECK: s_waitcnt_vscnt null, 0x0
 ; CHECK-NEXT: s_setpc_b64 s[30:31]
 .entry:
   %id = call <3 x i32> @lgc.shader.input.LocalInvocationId(i32 0)
