@@ -1148,36 +1148,36 @@ unsigned PipelineState::getMergedShaderWaveSize(ShaderStage stage) {
   switch (stage) {
   case ShaderStageVertex:
     if (hasShaderStage(ShaderStageTessControl)) {
-      waveSize = std::max(waveSize, m_waveSize[ShaderStageTessControl]);
-    } else if (hasShaderStage(ShaderStageGeometry)) {
-      waveSize = std::max(waveSize, m_waveSize[ShaderStageGeometry]);
+      return std::max(waveSize, m_waveSize[ShaderStageTessControl]);
     }
-    break;
+    if (hasShaderStage(ShaderStageGeometry)) {
+      return std::max(waveSize, m_waveSize[ShaderStageGeometry]);
+    }
+    return waveSize;
 
   case ShaderStageTessControl:
-    waveSize = std::max(waveSize, m_waveSize[ShaderStageVertex]);
-    break;
+    return std::max(waveSize, m_waveSize[ShaderStageVertex]);
 
   case ShaderStageTessEval:
     if (hasShaderStage(ShaderStageGeometry)) {
-      waveSize = std::max(waveSize, m_waveSize[ShaderStageGeometry]);
+      return std::max(waveSize, m_waveSize[ShaderStageGeometry]);
     }
-    break;
+    return waveSize;
 
   case ShaderStageGeometry:
     if (!hasShaderStage(ShaderStageGeometry)) {
       // NGG, no geometry
-      waveSize =
-          std::max(waveSize, m_waveSize[hasShaderStage(ShaderStageTessEval) ? ShaderStageTessEval : ShaderStageVertex]);
-    } else if (hasShaderStage(ShaderStageTessEval)) {
-      waveSize = std::max(waveSize, m_waveSize[ShaderStageTessEval]);
-    } else {
-      waveSize = std::max(waveSize, m_waveSize[ShaderStageVertex]);
+      return std::max(waveSize,
+                      m_waveSize[hasShaderStage(ShaderStageTessEval) ? ShaderStageTessEval : ShaderStageVertex]);
     }
-    break;
-  }
+    if (hasShaderStage(ShaderStageTessEval)) {
+      return std::max(waveSize, m_waveSize[ShaderStageTessEval]);
+    }
+    return std::max(waveSize, m_waveSize[ShaderStageVertex]);
 
-  return waveSize;
+  default:
+    return waveSize;
+  }
 }
 
 unsigned PipelineState::getShaderSubgroupSize(ShaderStage stage) {

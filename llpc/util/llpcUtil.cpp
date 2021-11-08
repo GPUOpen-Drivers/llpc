@@ -89,10 +89,10 @@ ShaderStage convertToShaderStage(unsigned execModel) {
     return ShaderStageCompute;
   case spv::ExecutionModelCopyShader:
     return ShaderStageCopyShader;
+  default:
+    llvm_unreachable("Unknown execution model");
+    return ShaderStageInvalid;
   }
-
-  llvm_unreachable("Should never be called!");
-  return ShaderStageInvalid;
 }
 
 // =====================================================================================================================
@@ -115,10 +115,10 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
     return spv::ExecutionModelGLCompute;
   case ShaderStageCopyShader:
     return spv::ExecutionModelCopyShader;
+  default:
+    llvm_unreachable("Unknown shader stage");
+    return spv::ExecutionModelMax;
   }
-
-  llvm_unreachable("Should never be called!");
-  return spv::ExecutionModelMax;
 }
 
 // =====================================================================================================================
