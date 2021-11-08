@@ -14,6 +14,10 @@ from lit.llvm import llvm_config
 from lit.llvm.subst import FindTool
 from lit.llvm.subst import ToolSubst
 
+sys.path.append(os.path.dirname(__file__))
+
+from query_gfxip import query_gfxips
+
 # name: The name of this test suite.
 config.name = 'LLPC-AMBER'
 
@@ -35,8 +39,9 @@ config.test_source_root = os.path.dirname(__file__)
 # test_exec_root: The root path where tests should be run.
 config.test_exec_root = os.path.join(config.llvm_obj_root, 'test')
 
-# TODO Set features for available gpu hardware. They can be queried with REQUIRES, etc.
-config.available_features.add('gfx10+')
+# Set features for available gpu hardware. They can be queried with REQUIRES, etc.
+for gfxip in query_gfxips():
+    config.available_features.add(gfxip)
 
 # Tweak the PATH to include the tools dir.
 llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
