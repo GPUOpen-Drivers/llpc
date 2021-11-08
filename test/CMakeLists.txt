@@ -23,28 +23,31 @@
  #
  #######################################################################################################################
 
-find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
-  COMPONENTS Interpreter)
+# Only build if llpc is built as part of xgl
+if(NOT LLPC_IS_STANDALONE)
+  find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
+    COMPONENTS Interpreter)
 
-list(APPEND CMAKE_MODULE_PATH "${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm")
-include(LLVMConfig)
+  list(APPEND CMAKE_MODULE_PATH "${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm")
+  include(LLVMConfig)
 
-# required by lit.site.cfg.py.in.
-set(LLPC_AMBER_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(LLPC_AMBER_TEST_ICD_NAME ${CMAKE_BINARY_DIR}/icd/amdvlk${TARGET_ARCHITECTURE_BITS}${CMAKE_SHARED_LIBRARY_SUFFIX})
-# required by configure_lit_site_cfg.
-set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
-# Main config for shaderdb tests.
-configure_lit_site_cfg(
-  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
-  ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
-  MAIN_CONFIG
-    ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
-)
+  # required by lit.site.cfg.py.in.
+  set(LLPC_AMBER_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+  set(LLPC_AMBER_TEST_ICD_NAME ${CMAKE_BINARY_DIR}/icd/amdvlk${TARGET_ARCHITECTURE_BITS}${CMAKE_SHARED_LIBRARY_SUFFIX})
+  # required by configure_lit_site_cfg.
+  set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
+  # Main config for shaderdb tests.
+  configure_lit_site_cfg(
+    ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
+    ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
+    MAIN_CONFIG
+      ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
+  )
 
-add_lit_testsuite(check-amber "Running the llpc amber regression tests"
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${exclude_from_check_all}
-  DEPENDS
-    FileCheck count not xgl
-)
+  add_lit_testsuite(check-amber "Running the llpc amber regression tests"
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${exclude_from_check_all}
+    DEPENDS
+      FileCheck count not xgl
+  )
+endif()

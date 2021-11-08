@@ -30,6 +30,7 @@ project(VKGC LANGUAGES C CXX)
 ### Standalone LLPC build handling
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     include(cmake/CompilerStandalone.cmake)
+    set(LLPC_IS_STANDALONE ON)
 endif()
 
 ### Top-level VKGC Interface ###
