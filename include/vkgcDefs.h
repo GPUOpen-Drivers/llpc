@@ -65,6 +65,21 @@
 #define LLPC_ENABLE_SHADER_CACHE 0
 #endif
 
+/// LLPC_NODISCARD - Warns when function return value is discarded.
+//
+// We cannot use the 'nodiscard' attribute until we upgrade to C++17 or newer mode.
+#if defined(__has_cpp_attribute)
+#if __has_cpp_attribute(clang::warn_unused_result)
+#define LLPC_NODISCARD [[clang::warn_unused_result]]
+#elif defined(__GNUC__) && __has_cpp_attribute(nodiscard)
+#define LLPC_NODISCARD [[nodiscard]]
+#else
+#define LLPC_NODISCARD
+#endif
+#else
+#define LLPC_NODISCARD
+#endif
+
 //
 // -------------------------------------------------------------------------------------------------------------------
 //  @page VersionHistory
@@ -959,7 +974,7 @@ public:
   ///   * NotFound: no existing entry was found. If \p allocateOnMiss is set, a new entry was
   ///               allocated and the caller must populate it via SetValue
   ///   * ErrorXxx: some internal error has occurred, no handle is returned
-  virtual Result GetEntry(HashId hash, bool allocateOnMiss, EntryHandle *pHandle) = 0;
+  LLPC_NODISCARD virtual Result GetEntry(HashId hash, bool allocateOnMiss, EntryHandle *pHandle) = 0;
 
   /// \brief Release ownership of a handle to a cache entry.
   ///
@@ -980,7 +995,7 @@ public:
   ///   * ErrorXxx: some internal error has occurred, or populating the cache was not successful
   ///               (e.g. due to a compiler error). The operation was semantically a no-op:
   ///               the entry is still not ready, and the caller must still release it via \ref PutEntry
-  virtual Result WaitForEntry(RawEntryHandle rawHandle) = 0;
+  LLPC_NODISCARD virtual Result WaitForEntry(RawEntryHandle rawHandle) = 0;
 
   /// \brief Retrieve the value contents of a cache entry.
   ///
@@ -994,7 +1009,7 @@ public:
   ///   * Success: operation completed successfully
   ///   * NotReady: the entry is not ready yet (waiting to be populated by another thread)
   ///   * ErrorXxx: some internal error has occurred. The operation was semantically a no-op.
-  virtual Result GetValue(RawEntryHandle rawHandle, void *pData, size_t *pDataLen) = 0;
+  LLPC_NODISCARD virtual Result GetValue(RawEntryHandle rawHandle, void *pData, size_t *pDataLen) = 0;
 
   /// \brief Zero-copy retrieval of the value contents of a cache entry.
   ///
@@ -1008,7 +1023,7 @@ public:
   ///                  \ref GetValue instead
   ///   * NotReady: the entry is not ready yet (waiting to be populated by another thread)
   ///   * ErrorXxx: some internal error has occurred. The operation was semantically a no-op.
-  virtual Result GetValueZeroCopy(RawEntryHandle rawHandle, const void **ppData, size_t *pDataLen) = 0;
+  LLPC_NODISCARD virtual Result GetValueZeroCopy(RawEntryHandle rawHandle, const void **ppData, size_t *pDataLen) = 0;
 
   /// \brief Populate the value contents of a cache entry.
   ///
@@ -1025,14 +1040,15 @@ public:
   ///   * Success: operation completed successfully
   ///   * ErrorXxx: some internal error has occurred. The caller must not call SetValue again,
   ///               but it must still release the handle via \ref PutEntry.
-  virtual Result SetValue(RawEntryHandle rawHandle, bool success, const void *pData, size_t dataLen) = 0;
+  LLPC_NODISCARD virtual Result SetValue(RawEntryHandle rawHandle, bool success, const void *pData, size_t dataLen) = 0;
 
   /// \brief Populate the value contents of a cache entry and release the handle.
   ///
   /// Semantics are identical to SetValue, except that the handle is guaranteed to be released.
   /// Doing this atomically can sometimes allow a more efficient implementation; the default
   /// implementation is trivial.
-  virtual Result ReleaseWithValue(RawEntryHandle rawHandle, bool success, const void *pData, size_t dataLen) {
+  LLPC_NODISCARD virtual Result ReleaseWithValue(RawEntryHandle rawHandle, bool success, const void *pData,
+                                                 size_t dataLen) {
     Result result = Result::ErrorUnknown;
     if (!rawHandle)
       return result;
@@ -1098,22 +1114,22 @@ public:
 
   // semantics of these methods are largely analogous to the above in ICache,
   // their implementation simply forwards to the m_pCache.
-  Result WaitForEntry() const {
+  LLPC_NODISCARD Result WaitForEntry() const {
     assert(m_pCache);
     return m_pCache->WaitForEntry(m_rawHandle);
   }
 
-  Result GetValue(void *pData, size_t *pDataLen) const {
+  LLPC_NODISCARD Result GetValue(void *pData, size_t *pDataLen) const {
     assert(m_pCache);
     return m_pCache->GetValue(m_rawHandle, pData, pDataLen);
   }
 
-  Result GetValueZeroCopy(const void **ppData, size_t *pDataLen) const {
+  LLPC_NODISCARD Result GetValueZeroCopy(const void **ppData, size_t *pDataLen) const {
     assert(m_pCache);
     return m_pCache->GetValueZeroCopy(m_rawHandle, ppData, pDataLen);
   }
 
-  Result SetValue(bool success, const void *pData, size_t dataLen) {
+  LLPC_NODISCARD Result SetValue(bool success, const void *pData, size_t dataLen) {
     assert(m_pCache);
     assert(m_mustPopulate);
     m_mustPopulate = false;

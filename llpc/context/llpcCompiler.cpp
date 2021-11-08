@@ -686,8 +686,10 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
       moduleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
       if (fsOutInfos.size() > 0)
         memcpy(fsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
-      if (m_cache && allocateOnMiss && cacheResult == Result::NotFound)
-        cacheEntry.SetValue(true, moduleDataExCopy, allocSize);
+      if (m_cache && allocateOnMiss && cacheResult == Result::NotFound) {
+        mustSucceed(cacheEntry.SetValue(true, moduleDataExCopy, allocSize),
+                    "Failed to insert shader module into cache");
+      }
       if (cacheEntryState == ShaderEntryState::Compiling) {
         if (hEntry)
           m_shaderCache->insertShader(hEntry, moduleDataExCopy, allocSize);

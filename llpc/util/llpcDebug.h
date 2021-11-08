@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include <cstdint>
+#include "llvm/Support/raw_ostream.h"
 
 // Output error message
 #define LLPC_ERRS(_msg)                                                                                                \
@@ -50,8 +50,6 @@
   while (false)
 
 namespace llvm {
-class raw_fd_ostream;
-class raw_ostream;
 class Error;
 } // namespace llvm
 

@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "llpcUtil.h"
 #include "vkgcElfReader.h"
 
 // Forward declaration
@@ -75,9 +76,9 @@ public:
 
   static void updateMetaNote(Context *context, const ElfNote *note, ElfNote *newNote);
 
-  static size_t numRelocs(const SectionBuffer *relocSection);
+  LLPC_NODISCARD static size_t numRelocs(const SectionBuffer *relocSection);
 
-  static size_t getRelocPsStartPos(const SectionBuffer *relocSection, size_t psIsaOffset);
+  LLPC_NODISCARD static size_t getRelocPsStartPos(const SectionBuffer *relocSection, size_t psIsaOffset);
 
   SectionBuffer createNewSection(const char *sectionName, SectionBuffer *inputSection);
 
@@ -87,38 +88,38 @@ public:
 
   void addRelocSymbols(const ElfReader<Elf> &reader, ElfReloc inputRelocs);
 
-  uint32_t getRelocSymbolIndex(const char *inputSymbolName);
+  LLPC_NODISCARD uint32_t getRelocSymbolIndex(const char *inputSymbolName);
 
   void processRelocSection(const ElfReader<Elf> &reader, size_t nonFragmentPsIsaOffset, size_t fragmentPsIsaOffset);
 
-  Result ReadFromBuffer(const void *buffer, size_t bufSize);
-  Result copyFromReader(const ElfReader<Elf> &reader);
+  LLPC_NODISCARD Result ReadFromBuffer(const void *buffer, size_t bufSize);
+  LLPC_NODISCARD Result copyFromReader(const ElfReader<Elf> &reader);
 
   void updateElfBinary(Context *context, ElfPackage *pipelineElf);
 
   void mergeElfBinary(Context *context, const BinaryData *fragmentElf, ElfPackage *pipelineElf);
 
   // Gets the section index for the specified section name.
-  int GetSectionIndex(const char *name) const {
+  LLPC_NODISCARD int GetSectionIndex(const char *name) const {
     auto entry = m_map.find(name);
     return entry != m_map.end() ? entry->second : InvalidValue;
   }
 
   void setSection(unsigned secIndex, SectionBuffer *section);
 
-  ElfSymbol *getSymbol(const char *symbolName);
+  LLPC_NODISCARD ElfSymbol *getSymbol(const char *symbolName);
 
-  ElfNote getNote(uint32_t noteType);
+  LLPC_NODISCARD ElfNote getNote(uint32_t noteType);
 
   void setNote(ElfNote *note);
 
-  Result getSectionDataBySectionIndex(unsigned secIdx, const SectionBuffer **ppSectionData) const;
+  LLPC_NODISCARD Result getSectionDataBySectionIndex(unsigned secIdx, const SectionBuffer **ppSectionData) const;
 
-  Result getSectionData(const char *name, const void **ppData, size_t *dataLength) const;
+  LLPC_NODISCARD Result getSectionData(const char *name, const void **ppData, size_t *dataLength) const;
 
   void GetSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol *> &secSymbols);
 
-  Result getSectionTextShader(const char *name, const void **ppData, size_t *dataLength);
+  LLPC_NODISCARD Result getSectionTextShader(const char *name, const void **ppData, size_t *dataLength);
 
   void updateSymbolsBySectionIndex(unsigned secIdx, std::vector<ElfSymbol> &secSymbols);
 
@@ -130,7 +131,7 @@ private:
 
   static void mergeMapItem(llvm::msgpack::MapDocNode &destMap, llvm::msgpack::MapDocNode &srcMap, unsigned key);
 
-  size_t getRequiredBufferSizeBytes();
+  LLPC_NODISCARD size_t getRequiredBufferSizeBytes();
 
   void calcSectionHeaderOffset();
 
