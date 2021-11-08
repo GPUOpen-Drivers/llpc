@@ -363,8 +363,9 @@ Result ShaderCache::buildFileName(const char *executableName, const char *cacheF
 // Resets the contents of the cache file, assumes the shader cache has been locked for writes.
 void ShaderCache::resetCacheFile() {
   m_onDiskFile.close();
-  Result fileResult = m_onDiskFile.open(m_fileFullPath, (FileAccessRead | FileAccessWrite | FileAccessBinary));
-  assert(fileResult == Result::Success);
+  const unsigned accessFlags = FileAccessRead | FileAccessWrite | FileAccessBinary;
+  mustSucceed(m_onDiskFile.open(m_fileFullPath, accessFlags),
+              Twine("Failed to open shader cache file: ") + m_fileFullPath);
 
   ShaderCacheSerializedHeader header = {};
   header.headerSize = sizeof(ShaderCacheSerializedHeader);
@@ -372,9 +373,8 @@ void ShaderCache::resetCacheFile() {
   header.shaderDataEnd = header.headerSize;
   getBuildTime(&header.buildId);
 
-  fileResult = m_onDiskFile.write(&header, header.headerSize);
-  assert(fileResult == Result::Success);
-  (void)fileResult; // unused
+  mustSucceed(m_onDiskFile.write(&header, header.headerSize),
+              Twine("Failed to write shader cache file: ") + m_fileFullPath);
 }
 
 // =====================================================================================================================

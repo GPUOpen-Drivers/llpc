@@ -35,6 +35,7 @@
 #include "palPipelineAbi.h"
 #include "spirvExt.h"
 #include "vkgcElfReader.h"
+#include <cassert>
 
 using namespace llvm;
 using namespace Vkgc;
@@ -42,6 +43,23 @@ using namespace Vkgc;
 #define DEBUG_TYPE "llpc-util"
 
 namespace Llpc {
+
+// =====================================================================================================================
+// Handles passed `result` and checks if it is a Success. Prints `errorMessage` if not.
+//
+// @param result : Result to check
+// @param errorMessage : Optional error message to print on failure
+void mustSucceed(Result result, const Twine &errorMessage) {
+  if (result == Result::Success)
+    return;
+
+  if (errorMessage.isTriviallyEmpty())
+    LLPC_ERRS("Unhandled error result\n");
+  else
+    LLPC_ERRS("Unhandled error result: " << errorMessage << "\n");
+
+  assert(false && "Result is not Success");
+}
 
 // =====================================================================================================================
 // Gets the name string of shader stage.

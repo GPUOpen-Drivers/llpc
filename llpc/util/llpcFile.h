@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llpc.h"
+#include "llpcUtil.h"
 #include <climits>
 #include <cstdio>
 
@@ -71,24 +72,24 @@ public:
   // Closes the file if it is still open.
   ~File() { close(); }
 
-  static size_t getFileSize(const char *filename);
-  static bool exists(const char *filename);
+  LLPC_NODISCARD static size_t getFileSize(const char *filename);
+  LLPC_NODISCARD static bool exists(const char *filename);
 
-  Result open(const char *filename, unsigned accessFlags);
+  LLPC_NODISCARD Result open(const char *filename, unsigned accessFlags);
   void close();
-  Result write(const void *buffer, size_t bufferSize);
-  Result read(void *buffer, size_t bufferSize, size_t *bytesRead);
-  Result readLine(void *buffer, size_t bufferSize, size_t *bytesRead);
-  Result printf(const char *formatStr, ...) const;
-  Result vPrintf(const char *formatStr, va_list argList);
-  Result flush() const;
+  LLPC_NODISCARD Result write(const void *buffer, size_t bufferSize);
+  LLPC_NODISCARD Result read(void *buffer, size_t bufferSize, size_t *bytesRead);
+  LLPC_NODISCARD Result readLine(void *buffer, size_t bufferSize, size_t *bytesRead);
+  LLPC_NODISCARD Result printf(const char *formatStr, ...) const;
+  LLPC_NODISCARD Result vPrintf(const char *formatStr, va_list argList);
+  LLPC_NODISCARD Result flush() const;
   void rewind();
   void seek(int offset, bool fromOrigin);
 
   // Returns true if the file is presently open.
-  bool isOpen() const { return (m_fileHandle); }
+  LLPC_NODISCARD bool isOpen() const { return (m_fileHandle); }
   // Gets handle of the file
-  const std::FILE *getHandle() const { return m_fileHandle; }
+  LLPC_NODISCARD const std::FILE *getHandle() const { return m_fileHandle; }
 
 private:
   std::FILE *m_fileHandle; // File handle

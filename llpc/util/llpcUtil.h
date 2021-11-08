@@ -39,6 +39,7 @@
 #include "lgc/EnumIterator.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/Twine.h"
 
 namespace Llpc {
 
@@ -61,6 +62,9 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage);
 
 // Convert SPIR-V execution model to the shader stage
 ShaderStage convertToShaderStage(unsigned execModel);
+
+// Handles passed `result` and checks if it is a Success. Prints `errorMessage` if not.
+void mustSucceed(Vkgc::Result result, const llvm::Twine &errorMessage = "");
 
 // =====================================================================================================================
 // Gets module ID according to the index

@@ -73,9 +73,7 @@ ShaderCachePtr ShaderCacheManager::getShaderCacheObject(const ShaderCacheCreateI
   if (cacheIt == endIt) {
     shaderCache = std::make_shared<ShaderCache>();
     m_shaderCaches.push_back(shaderCache);
-    Result result = shaderCache->init(createInfo, auxCreateInfo);
-    assert(result == Result::Success);
-    (void)result;
+    mustSucceed(shaderCache->init(createInfo, auxCreateInfo), "Failed to initialize shader cache");
   }
 
   return shaderCache;
