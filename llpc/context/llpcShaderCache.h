@@ -166,14 +166,14 @@ private:
   // Does *not* automatically lock/unlock on construction/destruction.
   class CacheMapLock {
   public:
-    CacheMapLock(ShaderCache &sc, bool readOnlyLock) : m_sc(sc), ReadOnlyLock(readOnlyLock) {}
+    CacheMapLock(ShaderCache &sc, bool readOnlyLock) : m_sc(sc), m_readOnlyLock(readOnlyLock) {}
 
-    void lock() { m_sc.lockCacheMap(ReadOnlyLock); }
-    void unlock() { m_sc.unlockCacheMap(ReadOnlyLock); }
+    void lock() { m_sc.lockCacheMap(m_readOnlyLock); }
+    void unlock() { m_sc.unlockCacheMap(m_readOnlyLock); }
 
   private:
     ShaderCache &m_sc;
-    const bool ReadOnlyLock;
+    const bool m_readOnlyLock;
   };
 
   // Returns a new lock object that satisfies `BasicLockable`. It can be used with `std::condition_variable_any`.
