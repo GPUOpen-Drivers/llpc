@@ -171,8 +171,7 @@ TEST_F(ShaderCacheTest, InsertsShaders) {
 // This test tries to insert the same shader with N threads. We expect to see one insertion
 // and N - 1 hits, for each shader.
 // Disable it can fail or hang with the wait time in `ShaderCache::findShader` changed.
-// TODO: Reenable when ShaderCache is fixed.
-TEST_F(ShaderCacheTest, DISABLED_InsertsShadersMultithreaded) {
+TEST_F(ShaderCacheTest, InsertsShadersMultithreaded) {
   ShaderCache &cache = getCache();
   SmallVector<char> cacheEntry(64);
   constexpr size_t numShaders = 128;
