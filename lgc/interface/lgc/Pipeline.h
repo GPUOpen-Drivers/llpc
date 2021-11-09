@@ -126,6 +126,7 @@ struct Options {
   unsigned reserved10;                 // Reserved for future functionality
   unsigned reserved1f; // Reserved for funture functionality
   unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
+  unsigned pageMigrationEnabled;  // Enable page migration
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

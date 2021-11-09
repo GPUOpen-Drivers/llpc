@@ -318,6 +318,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
   options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
+  options.pageMigrationEnabled = getPipelineOptions()->pageMigrationEnabled;
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;
   pipeline->setOptions(options);
