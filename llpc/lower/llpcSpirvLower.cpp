@@ -195,7 +195,11 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 
   // Remove redundant load/store operations and do minimal optimization
   // It is required by SpirvLowerImageOp.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 404149
   passMgr.addPass(createModuleToFunctionPassAdaptor(SROA()));
+#else
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass()));
+#endif
   passMgr.addPass(GlobalOptPass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(ADCEPass()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(2)));
