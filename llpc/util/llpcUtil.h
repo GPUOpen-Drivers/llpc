@@ -34,9 +34,11 @@
 #include "llpc.h"
 #include "spirv.hpp"
 #include "vkgcDefs.h"
+#include "vkgcMetroHash.h"
 #include "vkgcUtil.h"
 #include "lgc/EnumIterator.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMapInfo.h"
 
 namespace Llpc {
 
@@ -153,3 +155,23 @@ inline auto internalShaderStages() {
   return lgc::enumRange(Vkgc::ShaderStage::ShaderStageCopyShader, Vkgc::ShaderStage::ShaderStageCountInternal);
 }
 } // namespace Llpc
+
+// Make MetroHash::Hash compatible with LLVM's unordered contrainers.
+namespace llvm {
+template <> struct DenseMapInfo<MetroHash::Hash> {
+  static MetroHash::Hash getEmptyKey() {
+    MetroHash::Hash hash = {};
+    hash.qwords[0] = static_cast<uint64_t>(-1);
+    hash.qwords[1] = static_cast<uint64_t>(-1);
+    return hash;
+  }
+  static MetroHash::Hash getTombstoneKey() {
+    MetroHash::Hash hash = {};
+    hash.qwords[0] = static_cast<uint64_t>(-2);
+    hash.qwords[1] = static_cast<uint64_t>(-2);
+    return hash;
+  }
+  static unsigned getHashValue(MetroHash::Hash hash) { return MetroHash::compact32(&hash); }
+  static bool isEqual(MetroHash::Hash lhs, MetroHash::Hash rhs) { return lhs == rhs; }
+};
+} // namespace llvm

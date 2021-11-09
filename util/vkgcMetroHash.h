@@ -31,6 +31,8 @@
 #pragma once
 
 #include "metrohash.h"
+#include <functional>
+#include <utility>
 
 // Namespace containing functions that provide support for MetroHash.
 namespace MetroHash {
@@ -38,7 +40,8 @@ namespace MetroHash {
 // 128-bit hash structure
 struct Hash {
   union {
-    unsigned dwords[4]; // Output hash in dwords.
+    uint64_t qwords[2]; // Output hash in qwords.
+    uint32_t dwords[4]; // Output hash in dwords.
     uint8_t bytes[16];  // Output hash in bytes.
   };
 };
@@ -62,14 +65,27 @@ inline unsigned compact32(const Hash *hash) {
   return hash->dwords[3] ^ hash->dwords[2] ^ hash->dwords[1] ^ hash->dwords[0];
 }
 
-// Compacts a 128-bit hash into a 32-bit one by XOR'ing each 32-bit chunk together.
-//
-// Takes input parameter ShaderHash, which is a struct consisting of 2 quad words to be compacted.
-//
-// Returns 32-bit hash value based on the input 128-bit hash.
-inline unsigned compact32(Vkgc::ShaderHash hash) {
-  return (static_cast<unsigned>(hash.lower) ^ static_cast<unsigned>(hash.lower >> 32) ^
-          static_cast<unsigned>(hash.upper) ^ static_cast<unsigned>(hash.upper >> 32));
+// Compares two hashes. Returns true iff `lhs` is less than `rhs`.
+inline bool operator<(const Hash &lhs, const Hash &rhs) {
+  return std::make_pair(lhs.qwords[0], lhs.qwords[1]) < std::make_pair(rhs.qwords[0], rhs.qwords[1]);
+}
+
+// Compares two hashes for equality. Returns true iff both hashes are bit-identical.
+inline bool operator==(const Hash &lhs, const Hash &rhs) {
+  return lhs.qwords[0] == rhs.qwords[0] && lhs.qwords[1] == rhs.qwords[1];
+}
+
+// Compares two hashes for inequality. Returns true iff both hashes differ.
+inline bool operator!=(const Hash &lhs, const Hash &rhs) {
+  return !(lhs == rhs);
 }
 
 } // namespace MetroHash
+
+// Make MetroHash::Hash compatible with std::hash, so that it can be used as a key type in unordered data structures.
+namespace std {
+template <> struct hash<MetroHash::Hash> {
+  // Returns `hash` compacted to `size_t`. Returns zero for value-initialized hashes.
+  size_t operator()(const MetroHash::Hash &hash) const { return static_cast<size_t>(MetroHash::compact64(&hash)); }
+};
+} // namespace std
