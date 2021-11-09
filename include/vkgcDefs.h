@@ -551,6 +551,16 @@ struct ShaderHash {
   uint64_t upper; ///< Upper 64 bits of hash key.
 };
 
+/// Compacts a 128-bit hash into a 32-bit one by XOR'ing each 32-bit chunk together.
+///
+/// Takes input parameter ShaderHash, which is a struct consisting of 2 quad words to be compacted.
+//
+/// Returns 32-bit hash value based on the input 128-bit hash.
+inline unsigned compact32(ShaderHash hash) {
+  return (static_cast<unsigned>(hash.lower) ^ static_cast<unsigned>(hash.lower >> 32) ^
+          static_cast<unsigned>(hash.upper) ^ static_cast<unsigned>(hash.upper >> 32));
+}
+
 /// Represents per shader stage options.
 struct PipelineShaderOptions {
   ShaderHash clientHash; ///< Client-supplied unique shader hash. A value of zero indicates that LLPC should
