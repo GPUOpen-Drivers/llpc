@@ -156,6 +156,13 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       targetFeatures += ",+cumode";
     }
 
+    if (m_pipelineState->getOptions().pageMigrationEnabled) {
+      // Enable xnack when page migration is enabled
+      targetFeatures += ",+xnack";
+    } else {
+      targetFeatures += ",-xnack";
+    }
+
     // Set up denormal mode attributes.
 
     // In the backend, f32 denormals are handled by default, so request denormal flushing behavior.
