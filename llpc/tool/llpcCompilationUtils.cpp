@@ -141,10 +141,10 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
     return ShaderStage::ShaderStageFragment;
   case SpvGenStageCompute:
     return ShaderStage::ShaderStageCompute;
+  default:
+    llvm_unreachable("Unexpected shading language type!");
+    return ShaderStage::ShaderStageInvalid;
   }
-
-  llvm_unreachable("Unexpected shading language type!");
-  return ShaderStage::ShaderStageInvalid;
 }
 
 // =====================================================================================================================
