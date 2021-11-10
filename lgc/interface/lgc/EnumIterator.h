@@ -30,61 +30,48 @@
  */
 #pragma once
 
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/iterator.h"
-#include "llvm/ADT/iterator_range.h"
-#include <array>
+#include "llvm/ADT/Sequence.h"
 #include <cassert>
-#include <iterator>
 #include <type_traits>
 
 namespace lgc {
 
-// Traits providing information about how to iterate C++ enum types. By default, enums are not considered iterable.
-// To make an enum type iterable, provide a specialization of this struct for you enum. This will allow you to use
-// `lgc::enum_iterator` and `lgc::enum_range()`.
-// For now, only continuous enums are supported.
-template <typename EnumT> struct iterable_enum_traits {
+// Common LGC traits for enums with continuous values, i.e., `first, first + 1, ..., end - 1`.
+// This is intended to extend `llvm::enum_iteration_traits`, so that we can use it both with `lgc::enumRange`,
+// and, internally, with `llvm::enum_seq`.
+template <typename EnumT, EnumT first, EnumT end> struct continuous_enum_iteration_traits {
+  // LLVM traits for `llvm::enum_iteration_traits`.
   static_assert(std::is_enum<EnumT>::value, "enum_traits can only be used with enums");
-  using underlying_type = std::underlying_type_t<EnumT>;
-  static constexpr bool is_iteratable = false;
+  static constexpr bool is_iterable = true; // NOLINT
 
-  /*
-  Specializations must provide the following:
-  static constexpr EnumT first_value = ...;
-  static constexpr underlying_type first_underlying_value = ...;
-  static constexpr EnumT end_value = ...;
-  static constexpr underlying_type end_underlying_value = ...;
-  */
+  // Custom LGC traits not present in LLVM. We put them in a nested struct to avoid potential clashes with future
+  // members added to `llvm::enum_iteration_traits`.
+  struct lgc_traits {
+    using underlying_type = std::underlying_type_t<EnumT>;
+
+    static constexpr EnumT first_value = first;                                                    // NOLINT
+    static constexpr underlying_type first_underlying_value = static_cast<underlying_type>(first); // NOLINT
+    static constexpr EnumT end_value = end;                                                        // NOLINT
+    static constexpr underlying_type end_underlying_value = static_cast<underlying_type>(end);     // NOLINT
+  };
 };
 
-// Common iterable_enum_traits for enums with continuous values, i.e., `first, first + 1, ..., end - 1`.
-template <typename EnumT, EnumT first, EnumT end> struct continuous_iterable_enum_traits {
-  static_assert(std::is_enum<EnumT>::value, "enum_traits can only be used with enums");
-  using underlying_type = std::underlying_type_t<EnumT>;
-  static constexpr bool is_iterable = true;
-
-  static constexpr EnumT first_value = first;
-  static constexpr underlying_type first_underlying_value = static_cast<underlying_type>(first);
-  static constexpr EnumT end_value = end;
-  static constexpr underlying_type end_underlying_value = static_cast<underlying_type>(end);
-};
-
-// Common iterable_enum_traits for continuous enums that start at 0 and have a `::Count` value indicating the number of
+// Common enum_iteration_traits for continuous enums that start at 0 and have a `::Count` value indicating the number of
 // values.
 template <typename EnumT>
-struct default_continuous_iterable_enum_traits : continuous_iterable_enum_traits<EnumT, EnumT{}, EnumT::Count> {};
+struct default_continuous_enum_iteration_traits : continuous_enum_iteration_traits<EnumT, EnumT{}, EnumT::Count> {};
 
 // Convenience macro to make an enum iterable. Requires the enum type to start at 0 and have a `::Count` value
-// indicating the number of values. Must be used in the `lgc` namespace.
+// indicating the number of values. Must be used in the `llvm` namespace.
 #define LGC_DEFINE_DEFAULT_ITERABLE_ENUM(ENUM_TYPE)                                                                    \
-  template <> struct iterable_enum_traits<ENUM_TYPE> : default_continuous_iterable_enum_traits<ENUM_TYPE> {}
+  template <> struct enum_iteration_traits<ENUM_TYPE> : lgc::default_continuous_enum_iteration_traits<ENUM_TYPE> {}
 
 // Convenience macro to make an enum iterable. Requires the enum type to start at zero and have a COUNT_VALUE value
-// indicating the number of values. Must be used in the `lgc` namespace.
+// indicating the number of values. Must be used in the `llvm` namespace.
 #define LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(ENUM_TYPE, COUNT_VALUE)                                                    \
   template <>                                                                                                          \
-  struct iterable_enum_traits<ENUM_TYPE> : continuous_iterable_enum_traits<ENUM_TYPE, ENUM_TYPE{}, COUNT_VALUE> {}
+  struct enum_iteration_traits<ENUM_TYPE>                                                                              \
+      : lgc::continuous_enum_iteration_traits<ENUM_TYPE, ENUM_TYPE{}, COUNT_VALUE> {}
 
 // =====================================================================================================================
 // Converts enum to its underlying integer value.
@@ -100,75 +87,29 @@ template <typename EnumT> constexpr std::underlying_type_t<EnumT> toUnderlying(E
 //
 // @returns : The number of enum values in `EnumT`.
 template <typename EnumT> constexpr size_t enumCount() {
-  return static_cast<size_t>(iterable_enum_traits<EnumT>::end_underlying_value -
-                             iterable_enum_traits<EnumT>::first_underlying_value);
+  return static_cast<size_t>(llvm::enum_iteration_traits<EnumT>::lgc_traits::end_underlying_value -
+                             llvm::enum_iteration_traits<EnumT>::lgc_traits::first_underlying_value);
 }
-
-// Random access iterator for iterating over enums. Enum types must implement the `iterable_enum_traits` by providing
-// its specialization.
-// Implementation inspired by `value_sequence_iterator` from `llvm/ADT/Sequence.h`.
-template <typename EnumT>
-class enum_iterator
-    : public llvm::iterator_facade_base<enum_iterator<EnumT>, std::random_access_iterator_tag, const EnumT> {
-  using BaseT = typename enum_iterator::iterator_facade_base;
-  using TraitsT = iterable_enum_traits<EnumT>;
-  static_assert(TraitsT::is_iterable, "enum not iterable or iterable_enum_traits missing");
-
-public:
-  using UnderlyingT = typename TraitsT::underlying_type;
-  using DifferenceT = typename BaseT::difference_type;
-  using ReferenceT = typename BaseT::reference;
-
-  // Default constructor creates an end iterator.
-  enum_iterator() = default;
-
-  enum_iterator(EnumT value) : m_value(value) {
-    assert(toUnderlying(m_value) >= TraitsT::first_underlying_value && "Invalid enum value");
-    assert(toUnderlying(m_value) <= TraitsT::end_underlying_value && "Invalid enum value");
-  }
-
-  // Copyable and moveable.
-  enum_iterator(const enum_iterator &) = default;
-  enum_iterator &operator=(const enum_iterator &) = default;
-  enum_iterator(enum_iterator &&) = default;
-  enum_iterator &operator=(enum_iterator &&) = default;
-
-  enum_iterator &operator+=(DifferenceT n) {
-    m_value = toEnum(toUnderlying(m_value) + n);
-    assert(toUnderlying(m_value) <= TraitsT::end_underlying_value && "Invalid enum value");
-    return *this;
-  }
-  enum_iterator &operator-=(DifferenceT n) {
-    m_value = toEnum(toUnderlying(m_value) - n);
-    assert(toUnderlying(m_value) >= TraitsT::first_underlying_value && "Invalid enum value");
-    return *this;
-  }
-  using BaseT::operator-;
-  DifferenceT operator-(const enum_iterator &rhs) const { return toUnderlying(m_value) - toUnderlying(rhs.m_value); }
-
-  bool operator==(const enum_iterator &rhs) const { return m_value == rhs.m_value; }
-  bool operator<(const enum_iterator &rhs) const { return toUnderlying(m_value) < toUnderlying(rhs.m_value); }
-  ReferenceT operator*() const { return m_value; }
-
-private:
-  static EnumT toEnum(UnderlyingT value) { return static_cast<EnumT>(value); }
-
-  EnumT m_value = TraitsT::end_value;
-};
 
 // =====================================================================================================================
 // Creates the range of enum values: `[begin, end)`. By default, this will range over all enum values (except
-// `::Count`). EnumT must provide the `iterable_enum_traits` trait. E.g.:
-// - for (MyEnum value : enumRange<MyEnum>())  // Iterates over all values of `MyEnum`.
-// - for (MyEnum value : enumRange(MyEnum::C))  // Iterates over values of `MyEnum` until (but excluding `C`).
-// - llvm::is_contained(enumRange(MyEnum::A, MyEnum::C), value)  // Checks if `value` is in `[A, C)` (without `C`).
-// - llvm::is_contained(enumRange(MyEnum::A, enumInc(MyEnum::C)), value)  // Checks if `value` is in `[A, C]`.
+// `::Count`). EnumT must provide the `enum_iteration_traits::lgc_traits` traits.
+// Has the same semantics as `llvm::enum_seq` but performs extra safety checks.
+// See https://llvm.org/doxygen/Sequence_8h.html for usage details and examples.
 //
 // @param begin : The first value in the range. By default, this is the enum value `0`.
 // @param end : The one-past the last value in the range. By default, this is the enum value `::Count`.
 // @returns : The enum range: `begin, begin + 1, ..., end - 1`.
-template <typename EnumT> llvm::iterator_range<enum_iterator<EnumT>> enumRange(EnumT begin, EnumT end) {
-  return {enum_iterator<EnumT>(begin), enum_iterator<EnumT>(end)};
+template <typename EnumT> llvm::iota_range<EnumT> enumRange(EnumT begin, EnumT end) {
+  using LgcTraitsT = typename llvm::enum_iteration_traits<EnumT>::lgc_traits;
+  constexpr auto firstValue = LgcTraitsT::first_underlying_value;
+  constexpr auto endValue = LgcTraitsT::end_underlying_value;
+  (void)firstValue;
+  (void)endValue;
+  assert(toUnderlying(begin) <= toUnderlying(end) && "Invalid enum range");
+  assert(toUnderlying(begin) >= firstValue && "Invalid enum value");
+  assert(toUnderlying(end) <= endValue && "Invalid enum value");
+  return llvm::enum_seq(begin, end);
 }
 
 // =====================================================================================================================
@@ -176,16 +117,17 @@ template <typename EnumT> llvm::iterator_range<enum_iterator<EnumT>> enumRange(E
 //
 // @param end : The one-past the last value in the range. By default, this is the enum value `::Count`.
 // @returns : The enum range: `first_value, first_value + 1, ..., end - 1`.
-template <typename EnumT> llvm::iterator_range<enum_iterator<EnumT>> enumRange(EnumT end) {
-  return enumRange<EnumT>(iterable_enum_traits<EnumT>::first_value, end);
+template <typename EnumT> llvm::iota_range<EnumT> enumRange(EnumT end) {
+  return enumRange(llvm::enum_iteration_traits<EnumT>::lgc_traits::first_value, end);
 }
 
 // =====================================================================================================================
 // Creates the range of all enum values of `EnumT`. See `enumRange(EnumT begin, EnumT end)` above.
 //
 // @returns : The enum range: `first_value, first_value + 1, ..., end_value - 1`.
-template <typename EnumT> llvm::iterator_range<enum_iterator<EnumT>> enumRange() {
-  return enumRange<EnumT>(iterable_enum_traits<EnumT>::first_value, iterable_enum_traits<EnumT>::end_value);
+template <typename EnumT> llvm::iota_range<EnumT> enumRange() {
+  return enumRange(llvm::enum_iteration_traits<EnumT>::lgc_traits::first_value,
+                   llvm::enum_iteration_traits<EnumT>::lgc_traits::end_value);
 }
 
 } // namespace lgc

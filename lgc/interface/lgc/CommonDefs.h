@@ -56,9 +56,13 @@ enum ShaderStage : unsigned {
   ShaderStageCountInternal,                 ///< Count of shader stages (internal-use)
 };
 
+} // namespace lgc
+namespace llvm {
 // Enable iteration over shader stages with `lgc::enumRange<lgc::ShaderStage>()`.
-LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(ShaderStage, ShaderStage::ShaderStageCountInternal);
+LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(lgc::ShaderStage, lgc::ShaderStage::ShaderStageCountInternal);
+} // namespace llvm
 
+namespace lgc {
 // Enumerates the function of a particular node in a shader's resource mapping graph. Also used as descriptor
 // type in Builder descriptor functions.
 enum class ResourceNodeType : unsigned {
@@ -83,8 +87,10 @@ enum class ResourceNodeType : unsigned {
   DescriptorReserved16,
   Count, ///< Count of resource mapping node types.
 };
-
-// Enable iteration over resource node type with `lgc::enumRange<ResourceNodeType>()`.
-LGC_DEFINE_DEFAULT_ITERABLE_ENUM(ResourceNodeType);
-
 } // namespace lgc
+
+namespace llvm {
+// Enable iteration over resource node type with `lgc::enumRange<ResourceNodeType>()`.
+LGC_DEFINE_DEFAULT_ITERABLE_ENUM(lgc::ResourceNodeType);
+
+} // namespace llvm

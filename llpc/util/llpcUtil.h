@@ -131,13 +131,13 @@ inline bool doesShaderStageExist(llvm::ArrayRef<const PipelineShaderInfo *> shad
 }
 } // namespace Llpc
 
-namespace lgc {
+namespace llvm {
 // Make Vkgc::UnlinkedShaderStage iterable using `lgc::enumRange<Vkgc::ShaderStage>()`.
 LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(Vkgc::ShaderStage, Vkgc::ShaderStageCountInternal);
 
 // Make Vkgc::UnlinkedShaderStage iterable using `lgc::enumRange<Vkgc::UnlinedShaderStage>()`.
 LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(Vkgc::UnlinkedShaderStage, Vkgc::UnlinkedStageCount);
-} // namespace lgc
+} // namespace llvm
 
 namespace Llpc {
 // Returns the range of all native ShaderStages.
