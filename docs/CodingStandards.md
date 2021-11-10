@@ -139,7 +139,7 @@ line `// ======` (117 equals signs for a total width of 120).
 Parameters should be commented in the main comment at
 the top of the function like this:
 
-```
+```c++
 // @param [in/out] hatstand : The Hatstand object to modify
 ```
 
@@ -151,7 +151,7 @@ Parameter comments should not be placed on the parameter line itself and aligned
 of one parameter means all the others need realigning.
 
 Return values have to be documented in a similar way:
-```
+```c++
 // @returns : The return value description.
 ```
 
@@ -181,7 +181,7 @@ is purely reformatting.
 You can mark a section of source that you do not want clang-format to touch by surrounding
 it with
 
-```
+```c++
 // clang-format off
 
 // clang-format on
@@ -199,3 +199,9 @@ where `clang-format-diff` can be found in `llvm-project/clang/tools/clang-format
 where `/path/to/build/compile_commands.json` exists. CMake generates a
 `compile_commands.json` file when `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` is
 enabled.
+
+You can mark a line of source that you do not want clang-tidy to warn about by appending `// NOLINT`, e.g.:
+
+```c++
+static constexpr bool wrong_member_name_style = true; // NOLINT
+```
