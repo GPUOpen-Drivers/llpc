@@ -112,6 +112,74 @@ it is a single line, including comments. Otherwise the body should be braced. Fo
 an "if..else", if one of the two bodies is braced, the other one should be too. For
 an "if..else if..else if..else", if any body is braced, the others should be too.
 
+## Result handling
+
+LLPC uses the `Vkgc::Result` enum for return type of functions that may succeed
+(`Result::Success`) or fail (other enum values). We follow the LLVM convention and
+[prefer early exits](https://llvm.org/docs/CodingStandards.html#use-early-exits-and-continue-to-simplify-code)
+over branching on result. Example:
+
+**Good:**
+```c++
+Result result = foo(...);
+if (result != Result::Success)
+  return result;
+
+result = bar(...);
+if (result != Result::Success)
+  return result;
+
+if (error_condition)
+  return Result::ErrorValue;
+
+baz(...);
+...
+return Result::Success;
+```
+
+**Bad:**
+```c++
+Result result = Result::Success;
+
+result = foo(...);
+if (result == Result::Success) {
+  result = bar(...);
+  if (result == Result::Success) {
+    if (error_condition) {
+      result = Result::ErrorValue;
+    }
+    if (result == Result::Success) {
+      baz(...);
+    }
+  }
+}
+...
+
+return result;
+```
+
+In situations when it is not possible to meaningfully handle an error condition, you can
+wrap the operation with `llpc::mustSucceed`, e.g.:
+```c++
+mustSucceed(openFile(path), Twine("Failed to open: ") + path);
+```
+
+This will print an error message and abort execution (in debug builds) if `openFile(path)`
+returns a non-success value. The error message parameter is optional.
+
+In order to ensure that all `Result` return values are checked and handled, you must
+annotate all function declarations that do return a `Result` with `LLPC_NODISCARD`,
+e.g.:
+```c++
+LLPC_NODISCARD Result openFile(const std::string& path, int &handle);
+```
+
+Note that you can also use `LLPC_NODISCARD` with functions whose return value cannot
+be meaningfully ignored, e.g.:
+```c++
+LLPC_NODISCARD size_t getFileSize(const std::string& path);
+```
+
 ## Redundant comparisons
 
 Comparison of a bool with `false` or a pointer with `nullptr` is redundant and should
