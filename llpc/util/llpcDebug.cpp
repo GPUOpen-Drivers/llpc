@@ -126,7 +126,7 @@ void redirectLogOutput(bool restoreToDefault, unsigned optionCount, const char *
   } else {
     // Redirect errs() for dbgs()
     if (!cl::LogFileDbgs.empty()) {
-      // NOTE: Checks whether errs() is needed in compiliation
+      // NOTE: Checks whether errs() is needed in compilation
       // Until now, option -debug, -debug-only and -print-* need use debug output
       bool needDebugOut = ::llvm::DebugFlag;
       for (unsigned i = 1; !needDebugOut && i < optionCount; ++i) {

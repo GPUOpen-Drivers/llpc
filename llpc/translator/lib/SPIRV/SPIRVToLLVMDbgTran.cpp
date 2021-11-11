@@ -460,7 +460,7 @@ DINode *SPIRVToLLVMDbgTran::transFunction(const SPIRVExtInst *DebugInst) {
   // Here we create fake array of template parameters. If it was plain nullptr,
   // the template parameter operand would be removed in DISubprogram::getImpl.
   // But we want it to be there, because if there is DebugTemplate instruction
-  // refering to this function, TransTemplate method must be able to replace the
+  // referring to this function, TransTemplate method must be able to replace the
   // template parameter operand, thus it must be in the operands list.
   SmallVector<llvm::Metadata *, 8> Elts;
   DINodeArray TParams = Builder.getOrCreateArray(Elts);
@@ -535,7 +535,7 @@ DINode *SPIRVToLLVMDbgTran::transFunctionDecl(const SPIRVExtInst *DebugInst) {
   // Here we create fake array of template parameters. If it was plain nullptr,
   // the template parameter operand would be removed in DISubprogram::getImpl.
   // But we want it to be there, because if there is DebugTemplate instruction
-  // refering to this function, TransTemplate method must be able to replace the
+  // referring to this function, TransTemplate method must be able to replace the
   // template parameter operand, thus it must be in the operands list.
   SmallVector<llvm::Metadata *, 8> Elts;
   DINodeArray TParams = Builder.getOrCreateArray(Elts);
@@ -929,7 +929,7 @@ DebugLoc SPIRVToLLVMDbgTran::transDebugScope(const SPIRVInstruction *SpirvInst, 
   DISubprogram *Sub = getDISubprogram(SF);
   if (!Sub) {
     // There's no debug scope present, so we'll assume the scope is a basic
-    // function. Note that a debug scope will be availbale if full SPIR-V debug
+    // function. Note that a debug scope will be available if full SPIR-V debug
     // info is present.
     std::string Filename;
     unsigned LN = 0;

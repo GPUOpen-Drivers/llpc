@@ -355,7 +355,7 @@ TEST_F(GroupInputFilesTest, MixShaderPipe) {
   auto groupsOrErr1 = groupInputFiles({shaderPath, pipePath});
   EXPECT_TRUE(expectedToBool(groupsOrErr1));
 
-  // The other order should also resul in an error.
+  // The other order should also result in an error.
   auto groupsOrErr2 = groupInputFiles({pipePath, shaderPath});
   EXPECT_TRUE(expectedToBool(groupsOrErr2));
 }

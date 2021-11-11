@@ -87,7 +87,7 @@ public:
 
   void addRelocSymbols(const ElfReader<Elf> &reader, ElfReloc inputRelocs);
 
-  uint32_t getRelocSymbolIndex(const char *inputSymolName);
+  uint32_t getRelocSymbolIndex(const char *inputSymbolName);
 
   void processRelocSection(const ElfReader<Elf> &reader, size_t nonFragmentPsIsaOffset, size_t fragmentPsIsaOffset);
 

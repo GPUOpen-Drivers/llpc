@@ -96,7 +96,7 @@ class TestRunner:
     # Amber and SwiftShader both use the VK_DEBUGGER_PORT environment variable
     # for specifying the Debug Adapter Protocol port number.
     # This needs to be set before creating the Vulkan device.
-    # We remove this key from the enviroment if the test is not a debugger test
+    # We remove this key from the environment if the test is not a debugger test
     # so that full SPIR-V optimizations are preserved.
     is_debugger_test = os.path.basename(tc.GetInputPath()) in DEBUGGER_CASES
     if is_debugger_test:

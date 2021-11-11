@@ -655,7 +655,7 @@ Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBas
 
   ReturnInst *retInst = cast<ReturnInst>(builder.GetInsertPoint()->getParent()->getTerminator());
 
-  // Fisrt build the return type for the fragment shader.
+  // First build the return type for the fragment shader.
   SmallVector<Type *, 8> outputTypes;
   for (const ColorExportInfo &info : m_info) {
     outputTypes.push_back(getVgprTy(info.ty));

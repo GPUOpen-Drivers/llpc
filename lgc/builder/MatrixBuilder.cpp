@@ -362,7 +362,7 @@ Value *MatrixBuilder::CreateCooperativeMatrixLoad(Value *pointer, Value *stride,
   CooperativeMatrixInfo coopMatInfo = {};
   calcCooperativeMatrixInfo(coopMatInfo, pointer);
 
-  // Load data from a contigous memroy location into a vector
+  // Load data from a contiguous memory location into a vector
   Value *loadVal = nullptr;
   doMemoryAccess(pointer, stride, alignment, loadVal);
 
@@ -392,8 +392,8 @@ Value *MatrixBuilder::CreateCooperativeMatrixLoad(Value *pointer, Value *stride,
 // We only allow the size 16x16 size for a cooperative matrix. So 16 lanes are responsible for writing matrix elements
 // to memory. The layout of a cooperative matrix A in the VGPR under wave32 mode is that each lane writes a row (or
 // column) of matrix A from the VGPRs (implemented as a vector) to the memory, where the value of one VGPR is written
-// into a memory location if the data format is f32/i32, the value of one VGPR is splitted into two values to store if
-// the data format is f16, the value of one VGPR is splitted into four values to store if the data format is i8.
+// into a memory location if the data format is f32/i32, the value of one VGPR is split into two values to store if
+// the data format is f16, the value of one VGPR is split into four values to store if the data format is i8.
 //
 // @param pointer : The pointer to a data array.
 // @param object : The row of cooperative matrix to store.
@@ -411,7 +411,7 @@ Value *MatrixBuilder::CreateCooperativeMatrixStore(Value *pointer, Value *object
   calcCooperativeMatrixInfo(coopMatInfo, pointer);
 
   Value *storeVal = object;
-  // The sub-elements of a row are stored in contigous locations as a vector.
+  // The sub-elements of a row are stored in contiguous locations as a vector.
   if (coopMatInfo.subElemCount > 1) {
     constexpr unsigned numOfData = 16;
     Type *storeTy = FixedVectorType::get(coopMatInfo.subElemType, numOfData);
@@ -438,7 +438,7 @@ Value *MatrixBuilder::CreateCooperativeMatrixStore(Value *pointer, Value *object
 // Create cooperative matrix conversion.
 //
 // @param source : The source cooperative matrix.
-// @param target : The convertion target.
+// @param target : The conversion target.
 // @param instName : Name to give instruction(s).
 Value *MatrixBuilder::CreateCooperativeMatrixConvert(Value *source, Value *target, const Twine &instName) {
   assert((source->getType()->getScalarType()->isIntegerTy() && target->getType()->getScalarType()->isIntegerTy()) ||
@@ -456,7 +456,7 @@ Value *MatrixBuilder::CreateCooperativeMatrixConvert(Value *source, Value *targe
   Value *result = target;
 
   if (coopMatInfoSrc.elemCount > coopMatInfoTgt.elemCount) {
-    // The element of the target row vector is packed by contigous elements of the source row vector.
+    // The element of the target row vector is packed by contiguous elements of the source row vector.
     // E.g., tgt[0] is made up of src[0] and src[1]
     Type *vecTy = FixedVectorType::get(coopMatInfoTgt.subElemType, coopMatInfoTgt.subElemCount);
     Value *tgtElemVec = UndefValue::get(vecTy);
@@ -494,7 +494,7 @@ Value *MatrixBuilder::CreateCooperativeMatrixConvert(Value *source, Value *targe
 // =====================================================================================================================
 // Create cooparetive matrix binary operation
 //
-// @param coopMatArithOp : The cooperative matrix arithemtic operation to perform.
+// @param coopMatArithOp : The cooperative matrix arithmetic operation to perform.
 // @param operand1 : The first operand and it can be a scalar or a cooperative matrix.
 // @param operand2 : The second operand and it should be a cooperative matrix.
 // @param instName : Name to give instruction(s).
@@ -681,13 +681,13 @@ void MatrixBuilder::calcCooperativeMatrixInfo(CooperativeMatrixInfo &coopMatInfo
 }
 
 // =====================================================================================================================
-// Load or store a contigous elements from the specified location of the memory.
+// Load or store a contiguous elements from the specified location of the memory.
 //
 // @param dataPtr : The pointer to a data array.
 // @param stride : The number of elements in the array in memory between the first component of consecutive rows (or
 // columns) in the result.
 // @param alignment : The alignment for physical buffer storage operation.
-// @param vecVal : The contigous elements made up of a vector to be loaded or stored.
+// @param vecVal : The contiguous elements made up of a vector to be loaded or stored.
 void MatrixBuilder::doMemoryAccess(Value *dataPtr, Value *stride, Value *alignment, Value *&vecVal) {
   assert(isa<GetElementPtrInst>(dataPtr));
   auto getElemPtrInst = dyn_cast<GetElementPtrInst>(dataPtr);
@@ -709,7 +709,7 @@ void MatrixBuilder::doMemoryAccess(Value *dataPtr, Value *stride, Value *alignme
   elemOffset = CreateTrunc(elemOffset, getInt32Ty());
   startLoc = CreateAdd(startLoc, elemOffset);
 
-  // Calculate the alignement for the store or load operation.
+  // Calculate the alignment for the store or load operation.
   assert(isa<ConstantInt>(alignment));
   unsigned align = 0;
   if (!cast<ConstantInt>(alignment)->isNullValue()) {
@@ -719,7 +719,7 @@ void MatrixBuilder::doMemoryAccess(Value *dataPtr, Value *stride, Value *alignme
     align = dataBitwidth / 8;
   }
 
-  // Calculate the pointer to store/load the contigous elements as a vector
+  // Calculate the pointer to store/load the contiguous elements as a vector
   Value *basePtr = getElemPtrInst->getPointerOperand();
   Value *vecPtr = CreateGEP(basePtr->getType()->getPointerElementType(), basePtr,
                             ArrayRef<Value *>{getInt32(0), getInt32(0), startLoc});

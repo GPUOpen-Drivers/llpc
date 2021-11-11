@@ -20,7 +20,7 @@ StrToMemberAddr SectionNggState::m_addrTable[SectionNggState::MemberCount];
 StrToMemberAddr SectionExtendedRobustness::m_addrTable[SectionExtendedRobustness::MemberCount];
 
 // =====================================================================================================================
-// Dummy class used to initialize all VK sepcial sections
+// Dummy class used to initialize all VK special sections
 class VkSectionParserInit {
 public:
   VkSectionParserInit() {
@@ -101,7 +101,7 @@ public:
 };
 
 // =====================================================================================================================
-// Initialize VK pipleine special sections.
+// Initialize VK pipeline special sections.
 void initVkSections() {
   static VkSectionParserInit init;
 }

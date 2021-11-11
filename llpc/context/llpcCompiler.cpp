@@ -1000,7 +1000,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   if (shaderInfoEntry) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
     if (moduleData && moduleData->binType == BinaryType::LlvmBc)
-      pipelineModule.reset(context->loadLibary(&moduleData->binCode).release());
+      pipelineModule.reset(context->loadLibrary(&moduleData->binCode).release());
   }
 
   // If not IR input, run the per-shader passes, including SPIR-V translation, and then link the modules
@@ -1041,7 +1041,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         }
 
         if (binCode.codeSize > 0) {
-          module = context->loadLibary(&binCode).release();
+          module = context->loadLibrary(&binCode).release();
           stageSkipMask |= (1 << shaderIndex);
         } else
           result = Result::ErrorInvalidShader;

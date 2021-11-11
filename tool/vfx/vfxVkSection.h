@@ -107,7 +107,7 @@ private:
   static const unsigned MemberCount = 8;
   static StrToMemberAddr m_addrTable[MemberCount];
 
-  std::vector<SectionResourceMappingNode> m_next; // Next rsource mapping node
+  std::vector<SectionResourceMappingNode> m_next; // Next resource mapping node
   uint32_t m_visibility;
   SubState m_state;
   std::vector<Vkgc::ResourceMappingNode> m_nextNodeBuf; // Contains next nodes

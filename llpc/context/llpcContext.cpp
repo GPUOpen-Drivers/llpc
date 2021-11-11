@@ -94,7 +94,7 @@ LgcContext *Context::getLgcContext() {
 // Loads library from external LLVM library.
 //
 // @param lib : Bitcodes of external LLVM library
-std::unique_ptr<Module> Context::loadLibary(const BinaryData *lib) {
+std::unique_ptr<Module> Context::loadLibrary(const BinaryData *lib) {
   auto memBuffer =
       MemoryBuffer::getMemBuffer(StringRef(static_cast<const char *>(lib->pCode), lib->codeSize), "", false);
 

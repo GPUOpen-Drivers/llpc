@@ -37,7 +37,7 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for access chain.
+// Represents the pass of SPIR-V lowering operations for access chain.
 class SpirvLowerAccessChain : public SpirvLower,
                               public llvm::InstVisitor<SpirvLowerAccessChain>,
                               public llvm::PassInfoMixin<SpirvLowerAccessChain> {
@@ -54,7 +54,7 @@ private:
 };
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for access chain.
+// Represents the pass of SPIR-V lowering operations for access chain.
 class LegacySpirvLowerAccessChain : public llvm::ModulePass {
 public:
   LegacySpirvLowerAccessChain();

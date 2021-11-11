@@ -1,4 +1,4 @@
-; This test checks that the PS_INPUT_CNTL entries are contineous.  Tests fail
+; This test checks that the PS_INPUT_CNTL entries are continuous.  Tests fail
 ; when there is they not not start at 0 or there is a gap.
 
 ; BEGIN_SHADERTEST

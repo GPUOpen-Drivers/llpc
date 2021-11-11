@@ -220,7 +220,7 @@ private:
 char PatchEntryPointMutate::ID = 0;
 
 // =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching opertions for entry-point mutation
+// Pass creator, creates the pass of LLVM patching operations for entry-point mutation
 ModulePass *lgc::createPatchEntryPointMutate() {
   return new PatchEntryPointMutate();
 }

@@ -192,7 +192,7 @@ bool RenderDocument::getPtrOfSubSection(Section *section, unsigned lineNum, cons
 // =====================================================================================================================
 // Gets render document from document handle
 //
-// NOTE: The document contents are not accessable after call vfxCloseDoc
+// NOTE: The document contents are not accessible after call vfxCloseDoc
 //
 // @param doc : Document handle
 // @param [out] renderState : Pointer of struct VfxRenderState

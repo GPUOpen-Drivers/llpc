@@ -33,7 +33,7 @@ if(ICD_BUILD_LLPC)
 endif()
 
 ### Cached Project Options #############################################################################################
-# LLPC_BUIL_TESTS should be the only option once XGL and all scripts get updated.
+# LLPC_BUILD_TESTS should be the only option once XGL and all scripts get updated.
 option(LLPC_BUILD_TESTS      "LLPC build all tests"        OFF)
 # Deprecated, use LLPC_BUILD_TESTS instead.
 option(LLPC_BUILD_LIT        "LLPC build lit tests"        OFF)

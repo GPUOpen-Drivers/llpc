@@ -1902,7 +1902,7 @@ Value *BuilderRecorder::CreateCooperativeMatrixStore(Value *pointer, Value *obje
 // Create cooperative matrix conversion.
 //
 // @param source : The source cooperative matrix.
-// @param dest : The convertion target.
+// @param dest : The conversion target.
 // @param instName : Name to give instruction(s).
 Value *BuilderRecorder::CreateCooperativeMatrixConvert(Value *source, Value *dest, const Twine &instName) {
   return record(Opcode::CooperativeMatrixConvert, dest->getType(), {source, dest}, instName);
@@ -1911,7 +1911,7 @@ Value *BuilderRecorder::CreateCooperativeMatrixConvert(Value *source, Value *des
 // =====================================================================================================================
 // Create cooparetive matrix binary operation
 //
-// @param coopMatArithOp : The cooperative matrix arithemtic operation to perform.
+// @param coopMatArithOp : The cooperative matrix arithmetic operation to perform.
 // @param operand1 : The first operand.
 // @param operand2 : The second operand.
 // @param instName : Name to give instruction(s).

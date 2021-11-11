@@ -591,7 +591,7 @@ union ShaderImageCallMetadata {
     unsigned Multisampled : 1;       // Whether image is multisampled
     unsigned NonUniformSampler : 1;  // Whether sampler is non-uniform
     unsigned NonUniformResource : 1; // Whether resource is non-uniform
-    unsigned WriteOnly : 1;          // Whetehr it is a write-only operation
+    unsigned WriteOnly : 1;          // Whether it is a write-only operation
     unsigned Unused : 18;
   };
   unsigned U32All;

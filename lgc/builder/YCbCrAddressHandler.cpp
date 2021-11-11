@@ -41,7 +41,7 @@ using namespace llvm;
 // =====================================================================================================================
 // Generate base address for image planes
 // Note: If input planeCount == 1, it'll generate the base address for plane 0. This function accepts the concept of
-// planeCount rather a specific plane for that the calulation of plane[n+1] is always based on plane[n].
+// planeCount rather a specific plane for that the calculation of plane[n+1] is always based on plane[n].
 //
 // @param planeCount : The plane counts
 void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {

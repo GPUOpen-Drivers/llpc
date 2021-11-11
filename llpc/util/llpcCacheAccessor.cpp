@@ -151,7 +151,7 @@ void CacheAccessor::resetShaderCacheTrackingData() {
 //
 // @param hash : The hash to look up.
 // @param allocateOnMiss : Will add an entry to the cache on a miss if true.
-// @param cache : The cache in whith to look.
+// @param cache : The cache in with to look.
 bool CacheAccessor::lookUpInShaderCache(const MetroHash::Hash &hash, bool allocateOnMiss, ShaderCache *cache) {
   CacheEntryHandle currentEntry;
   ShaderEntryState cacheEntryState = cache->findShader(hash, allocateOnMiss, &currentEntry);

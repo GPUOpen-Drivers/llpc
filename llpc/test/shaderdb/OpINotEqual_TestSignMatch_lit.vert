@@ -17,7 +17,7 @@ bool out0;
 void main()
 
 {
-    // OpINotEqual is used when convert int to bool, and sign flag mismatch in the comparation
+    // OpINotEqual is used when convert int to bool, and sign flag mismatch in the comparison
     out0 = bool(in0);
     gl_Position = dEQP_Position;
 

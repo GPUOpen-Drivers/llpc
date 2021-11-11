@@ -242,7 +242,7 @@ public:
   llvm::Value *GetImgDescChroma(unsigned planeIndex);
 
 private:
-  // Set YCbCr sample infomation
+  // Set YCbCr sample information
   void setYCbCrSampleInfo(YCbCrSampleInfo *ycbcrSampleInfo);
 
   // Generate sampler descriptor for chroma channel
@@ -254,10 +254,10 @@ private:
   // Prepare the sample coords
   void prepareCoord();
 
-  // Implement transfer from ST coordinates to UV coordiantes operation
+  // Implement transfer from ST coordinates to UV coordinates operation
   llvm::Value *transferSTtoUVCoords(llvm::Value *coordST, llvm::Value *scale);
 
-  // Implement the adjustment of UV coordiantes when the sample location associated with
+  // Implement the adjustment of UV coordinates when the sample location associated with
   // downsampled chroma channels in the X/XY dimension occurs
   llvm::Value *calculateImplicitChromaUV(ChromaLocation offset, llvm::Value *coordUV);
 
@@ -280,7 +280,7 @@ private:
   // Implement reconstructed YCbCr sample operation for downsampled chroma channels in both X and Y dimension
   llvm::Value *reconstructLinearXYChromaSample(XYChromaSampleInfo &xyChromaInfo);
 
-  // Implement interanl image sample for YCbCr conversion
+  // Implement internal image sample for YCbCr conversion
   llvm::Value *createImageSampleInternal(llvm::SmallVectorImpl<llvm::Value *> &coords, YCbCrSampleInfo *ycbcrInfo);
 
   // Generate sampler descriptor for YCbCr conversion
@@ -333,7 +333,7 @@ private:
   // Sample result type
   llvm::Value *m_ycbcrData = nullptr;
 
-  // YCbCr sample reuslt
+  // YCbCr sample result
   llvm::Type *m_resultType = nullptr;
 };
 

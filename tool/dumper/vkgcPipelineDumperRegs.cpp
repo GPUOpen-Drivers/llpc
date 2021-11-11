@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  vkgcPipelineDumperRegs.cpp
-* @breif VKGC source file: register names for VKGC pipline dump utility.
+* @brief VKGC source file: register names for VKGC pipline dump utility.
 ***********************************************************************************************************************
 */
 #include "vkgcPipelineDumper.h"

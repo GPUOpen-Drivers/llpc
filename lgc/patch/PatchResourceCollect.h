@@ -42,7 +42,7 @@ class InOutLocationInfoMapManager;
 typedef std::map<InOutLocationInfo, InOutLocationInfo> InOutLocationInfoMap;
 
 // =====================================================================================================================
-// Represents the pass of LLVM patching opertions for resource collecting
+// Represents the pass of LLVM patching operations for resource collecting
 class PatchResourceCollect : public LegacyPatch, public llvm::InstVisitor<PatchResourceCollect> {
 public:
   PatchResourceCollect();

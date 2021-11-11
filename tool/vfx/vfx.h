@@ -78,7 +78,7 @@ static const unsigned MaxVertexAttributeCount = 32;      // Max vertex attribute
 static const unsigned MaxSpecConstantCount = 32;         // Max spec constant count
 static const unsigned VfxSizeOfVec4 = 16;                // Ehe size of vec4
 static const unsigned VfxInvalidValue = 0xFFFFFFFF;      // Invalid value
-static const unsigned VfxVertexBufferSetId = 0xFFFFFFFE; // Vertex bufer set id
+static const unsigned VfxVertexBufferSetId = 0xFFFFFFFE; // Vertex buffer set id
 static const unsigned VfxIndexBufferSetId = 0xFFFFFFFD;  // Index buffer set id
 static const unsigned VfxDynamicArrayId = 0xFFFFFFFC;    // Dynamic array id
 static const size_t MaxKeyBufSize = 256;                 // Buffer size to parse a key-value pair key in VFX file.
@@ -379,7 +379,7 @@ struct SpecConstItem {
 };
 
 // =====================================================================================================================
-// Represents specializaton constants for one shader stage.
+// Represents specialization constants for one shader stage.
 struct SpecConst {
   unsigned numSpecConst;                         // Number of specialization constants
   SpecConstItem specConst[MaxSpecConstantCount]; // All specialization constants
@@ -436,7 +436,7 @@ struct ImageView {
   IUFValue size;                   // Size of this image
   VkImageViewType viewType;        // Image view type, enum type is VkImageViewType
   ImagePattern dataPattern;        // Image data pattern
-  unsigned samples;                // Number of image samples, only 1 is supportted now
+  unsigned samples;                // Number of image samples, only 1 is supported now
   unsigned mipmap;                 // Whether this image has mipmap
 };
 
@@ -583,7 +583,7 @@ enum VfxPipelineType {
 };
 
 // =====================================================================================================================
-// Represents the content of PipelineDoucment.
+// Represents the content of PipelineDocument.
 struct VfxPipelineState {
   unsigned version;                                // Pipeline state version
   VfxPipelineType pipelineType;                    // Pipeline type

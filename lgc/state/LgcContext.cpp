@@ -184,7 +184,7 @@ void LgcContext::initialize() {
 // @returns : LLVM GPU name as a std::string
 std::string LgcContext::getGpuNameString(unsigned major, unsigned minor, unsigned stepping) {
   // A GfxIpVersion from PAL is three decimal numbers for major, minor and stepping. This function
-  // converts that to an LLVM target name, whith is "gfx" followed by the three decimal numbers with
+  // converts that to an LLVM target name, with is "gfx" followed by the three decimal numbers with
   // no separators, e.g. "gfx1010" for 10.1.0. A high stepping number 0xFFFA..0xFFFF denotes an
   // experimental target, and that is represented by the final hexadecimal digit, e.g. "gfx101A"
   // for 10.1.0xFFFA. In gfx9, stepping numbers 10..35 are represented by lower case letter 'a'..'z'.

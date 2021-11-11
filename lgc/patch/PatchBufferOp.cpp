@@ -796,7 +796,7 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
   SmallVector<Value *, 8> incomings;
 
   for (unsigned i = 0, incomingValueCount = phiNode.getNumIncomingValues(); i < incomingValueCount; i++) {
-    // PHIs require us to insert new incomings in the preceeding basic blocks.
+    // PHIs require us to insert new incomings in the preceding basic blocks.
     m_builder->SetInsertPoint(phiNode.getIncomingBlock(i)->getTerminator());
 
     incomings.push_back(getPointerOperandAsInst(phiNode.getIncomingValue(i)));
@@ -833,7 +833,7 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
       Value *incomingBufferDesc = m_replacementMap[incomings[blockIndex]].first;
 
       if (!incomingBufferDesc) {
-        // If we cannot get an incoming buffer decriptor from the replacement map, it is unvisited yet. Generate an
+        // If we cannot get an incoming buffer descriptor from the replacement map, it is unvisited yet. Generate an
         // incomplete phi and fix it later.
         incomingBufferDesc = UndefValue::get(newPhiNode->getType());
         m_incompletePhis[{newPhiNode, block}] = incomings[blockIndex];
@@ -957,7 +957,7 @@ void PatchBufferOp::visitStoreInst(StoreInst &storeInst) {
 // =====================================================================================================================
 // Visits "icmp" instruction.
 //
-// @param icmpInst : The instuction
+// @param icmpInst : The instruction
 void PatchBufferOp::visitICmpInst(ICmpInst &icmpInst) {
   Type *const type = icmpInst.getOperand(0)->getType();
 

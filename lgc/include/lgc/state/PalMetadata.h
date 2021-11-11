@@ -218,7 +218,7 @@ private:
   // Finalize PAL metadata user data limit for any compilation (shader, part-pipeline, whole pipeline)
   void finalizeUserDataLimit();
 
-  // The maximum possible value for the spill threshold entry in the PAL meatadata.
+  // The maximum possible value for the spill threshold entry in the PAL metadata.
   static constexpr uint64_t MAX_SPILL_THRESHOLD = UINT_MAX;
 
   unsigned getUserDataCount(unsigned callingConv);

@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  vkgcPipelineDumper.cpp
-* @breif VKGC source file: contains implementation of VKGC pipline dump utility.
+* @brief VKGC source file: contains implementation of VKGC pipline dump utility.
 ***********************************************************************************************************************
 */
 #include "llvm/Support/Mutex.h"

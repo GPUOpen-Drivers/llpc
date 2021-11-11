@@ -195,7 +195,7 @@ can only ever be top-level nodes.
 ## Immutable Samplers
 
 An unlinked shader compilation where the user data nodes are not available
-cannot tell if a descriptor for a sampler is actaully an "immutable value", so
+cannot tell if a descriptor for a sampler is actually an "immutable value", so
 the code will be generated the same way it is for any other descriptor. This
 means that pipelines with immutable samplers cannot be compiled using
 relocatable shader.

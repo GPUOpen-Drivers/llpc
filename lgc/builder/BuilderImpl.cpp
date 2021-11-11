@@ -103,7 +103,7 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
   assert(compBitWidth >= 8 && compBitWidth <= 64);
 
   auto &supportIntegerDotFlag = getPipelineState()->getTargetInfo().getGpuProperty().supportIntegerDotFlag;
-  // Check if the component bitwidth of vectors and the signedness of component of vecotrs are both supppored by HW.
+  // Check if the component bitwidth of vectors and the signedness of component of vectors are both supppored by HW.
   const bool isSupportCompBitwidth = (supportIntegerDotFlag.compBitwidth16 && compBitWidth == 16) ||
                                      (supportIntegerDotFlag.compBitwidth8 && compBitWidth == 8);
   const bool isSupportSignedness =
@@ -142,7 +142,7 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
   } else {
     // <4xi8>, <3xi8>, <2xi8> are native supported by using v_dot4_i32_i8 or v_dot4_u32_u8
     // <2xi16> is native supported by using v_dot2_i32_i16 and v_dot2_u32_u16
-    // <3xi16>, <4xi16> will be splitted up with two sequences of v_dot2 and a final saturation add
+    // <3xi16>, <4xi16> will be split up with two sequences of v_dot2 and a final saturation add
     Value *input1 = vector1;
     Value *input2 = vector2;
 

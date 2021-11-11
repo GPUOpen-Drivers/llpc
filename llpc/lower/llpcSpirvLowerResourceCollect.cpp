@@ -54,7 +54,7 @@ namespace Llpc {
 char SpirvLowerResourceCollect::ID = 0;
 
 // =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering opertions for resource collecting
+// Pass creator, creates the pass of SPIR-V lowering operations for resource collecting
 //
 // @param collectDetailUsage : Whether to collect detailed usages of resource node datas and FS output infos
 ModulePass *createSpirvLowerResourceCollect(bool collectDetailUsage) {
@@ -411,5 +411,5 @@ void SpirvLowerResourceCollect::visitCalls(Module &module) {
 } // namespace Llpc
 
 // =====================================================================================================================
-// Initializes the pass of SPIR-V lowering opertions for resource collecting.
+// Initializes the pass of SPIR-V lowering operations for resource collecting.
 INITIALIZE_PASS(SpirvLowerResourceCollect, DEBUG_TYPE, "Lower SPIR-V resource collecting", false, false)
