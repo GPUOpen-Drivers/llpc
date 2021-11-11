@@ -113,16 +113,6 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->rsState.numSamples = graphicState.numSamples;
     gfxPipelineInfo->rsState.samplePatternIdx = graphicState.samplePatternIdx;
     gfxPipelineInfo->rsState.usrClipPlaneMask = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-    gfxPipelineInfo->rsState.polygonMode = graphicState.polygonMode;
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-    gfxPipelineInfo->rsState.cullMode = graphicState.cullMode;
-    gfxPipelineInfo->rsState.frontFace = graphicState.frontFace;
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-    gfxPipelineInfo->rsState.depthBiasEnable = graphicState.depthBiasEnable != 0;
-#endif
 
     gfxPipelineInfo->cbState.alphaToCoverageEnable = graphicState.alphaToCoverageEnable != 0;
     gfxPipelineInfo->cbState.dualSourceBlendEnable = graphicState.dualSourceBlendEnable != 0;

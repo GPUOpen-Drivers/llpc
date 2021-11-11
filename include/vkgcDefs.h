@@ -57,7 +57,7 @@
 #endif
 #endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 41
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 50
 #error LLPC client version is too old
 #endif
 
@@ -244,18 +244,13 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorBufferCompact,   ///< Compact buffer descriptor, only contains the buffer address
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
-  DescriptorYCbCrSampler, ///< Generic descriptor: YCbCr sampler
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
+  DescriptorYCbCrSampler,       ///< Generic descriptor: YCbCr sampler
   DescriptorConstBuffer,        ///< Generic descriptor: constBuffer,including uniform buffer
   DescriptorConstBufferCompact, ///< Generic descriptor: constBuffer,including dynamic storage buffer
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
-#endif
-
-#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
-  InlineBuffer, ///< Push constant with binding
-#endif
-  Count, ///< Count of resource mapping node types.
+  InlineBuffer,                 ///< Push constant with binding
+  Count,                        ///< Count of resource mapping node types.
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
@@ -484,9 +479,6 @@ enum class WaveBreakSize : unsigned {
   _8x8 = 0x1,   ///< Outside a 8x8 pixel region
   _16x16 = 0x2, ///< Outside a 16x16 pixel region
   _32x32 = 0x3, ///< Outside a 32x32 pixel region
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 43
-  DrawTime = 0xF, ///< Choose wave break size per draw
-#endif
 };
 
 /// Enumerates various sizing options of sub-group size for NGG primitive shader.
@@ -509,21 +501,11 @@ enum NggCompactMode : unsigned {
 
 /// Represents NGG tuning options
 struct NggState {
-  bool enableNgg;   ///< Enable NGG mode, use an implicit primitive shader
-  bool enableGsUse; ///< Enable NGG use on geometry shader
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
-  bool forceNonPassthrough; ///< Force NGG to run in non pass-through mode
-#else
-  bool forceCullingMode;          ///< Force NGG to run in culling mode
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-  bool alwaysUsePrimShaderTable; ///< Always use primitive shader table to fetch culling-control registers
-#endif
+  bool enableNgg;             ///< Enable NGG mode, use an implicit primitive shader
+  bool enableGsUse;           ///< Enable NGG use on geometry shader
+  bool forceCullingMode;      ///< Force NGG to run in culling mode
   NggCompactMode compactMode; ///< Compaction mode after culling operations
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
-  bool enableFastLaunch; ///< Enable the hardware to launch subgroups of work at a faster rate
-#endif
   bool enableVertexReuse;         ///< Enable optimization to cull duplicate vertices
   bool enableBackfaceCulling;     ///< Enable culling of primitives that don't meet facing criteria
   bool enableFrustumCulling;      ///< Enable discarding of primitives outside of view frustum
@@ -678,11 +660,7 @@ struct SamplerYCbCrConversionMetaData {
       unsigned xChromaOffset : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
       unsigned yChromaOffset : 1; ///< COSITED_EVEN(0) or MIDPOINT(1)
       unsigned xSubSampled : 1;   ///< true(1) or false(0)
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 42
-      unsigned : 1; ///< Unused
-#else
-      unsigned tileOptimal : 1;   ///< true(1) or false(0)
-#endif
+      unsigned : 1;               ///< Unused
       unsigned ySubSampled : 1;   ///< true(1) or false(0)
       unsigned dstSelXYZW : 12;   ///< dst selection Swizzle
       unsigned undefined : 11;
@@ -792,16 +770,6 @@ struct GraphicsPipelineBuildInfo {
                                   ///  matches the sample pattern used by the rasterizer when rendering
                                   ///  with this pipeline.
     uint8_t usrClipPlaneMask;     ///< Mask to indicate the enabled user defined clip planes
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-    VkPolygonMode polygonMode; ///< Triangle rendering mode
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-    VkCullModeFlags cullMode; ///< Fragment culling mode
-    VkFrontFace frontFace;    ///< Front-facing triangle orientation
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-    bool depthBiasEnable; ///< Whether to bias fragment depth values
-#endif
   } rsState; ///< Rasterizer State
   struct {
     bool alphaToCoverageEnable; ///< Enable alpha to coverage

@@ -460,24 +460,14 @@ struct PushConstRange {
 // =====================================================================================================================
 // Represents DrawState section
 struct DrawState {
-  unsigned instance;            // Instance count for draw array
-  unsigned vertex;              // Vertex count for draw array
-  unsigned firstInstance;       // First instance in draw array
-  unsigned firstVertex;         // First vertex in draw array
-  unsigned index;               // Index count for draw index
-  unsigned firstIndex;          // First index in draw index
-  unsigned vertexOffset;        // Vertex offset in draw index
-  VkPrimitiveTopology topology; // Primitive topology
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-  VkPolygonMode polygonMode; // Triangle rendering mode
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-  VkCullModeFlags cullMode; // Fragment culling mode
-  VkFrontFace frontFace;    // Front-facing triangle orientation
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-  unsigned depthBiasEnable; // Whether to bias fragment depth values
-#endif
+  unsigned instance;                                    // Instance count for draw array
+  unsigned vertex;                                      // Vertex count for draw array
+  unsigned firstInstance;                               // First instance in draw array
+  unsigned firstVertex;                                 // First vertex in draw array
+  unsigned index;                                       // Index count for draw index
+  unsigned firstIndex;                                  // First index in draw index
+  unsigned vertexOffset;                                // Vertex offset in draw index
+  VkPrimitiveTopology topology;                         // Primitive topology
   unsigned patchControlPoints;                          // Patch control points
   IUFValue dispatch;                                    // Dispatch dimension
   unsigned width;                                       // Window width
@@ -508,17 +498,7 @@ struct ColorBuffer {
 // =====================================================================================================================
 // Represents GraphicsPipelineState section.
 struct GraphicsPipelineState {
-  VkPrimitiveTopology topology; // Primitive type
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-  VkPolygonMode polygonMode; // Triangle rendering mode
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-  VkCullModeFlags cullMode; // Fragment culling mode
-  VkFrontFace frontFace;    // Front-facing triangle orientation
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-  unsigned depthBiasEnable; // Whether to bias fragment depth values
-#endif
+  VkPrimitiveTopology topology;     // Primitive type
   unsigned patchControlPoints;      // Patch control points
   unsigned deviceIndex;             // Device index for device group
   unsigned disableVertexReuse;      // Disable reusing vertex shader output for indexed draws

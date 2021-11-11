@@ -63,15 +63,11 @@ public:
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, PushConst)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorBufferCompact)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, StreamOutTableVaPtr)
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstBuffer)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstBufferCompact)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorImage)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstTexelBuffer)
-#endif
-#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, InlineBuffer)
-#endif
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Auto)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, MaximumSize)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, HalfSize)
@@ -86,9 +82,6 @@ public:
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _8x8)
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _16x16)
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _32x32)
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 43
-    ADD_CLASS_ENUM_MAP(WaveBreakSize, DrawTime)
-#endif
 
     ADD_CLASS_ENUM_MAP(ShadowDescriptorTableUsage, Auto)
     ADD_CLASS_ENUM_MAP(ShadowDescriptorTableUsage, Enable)

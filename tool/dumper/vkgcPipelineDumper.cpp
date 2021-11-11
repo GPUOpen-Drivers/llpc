@@ -57,13 +57,6 @@ namespace Vkgc {
 std::ostream &operator<<(std::ostream &out, VkVertexInputRate inputRate);
 std::ostream &operator<<(std::ostream &out, VkFormat format);
 std::ostream &operator<<(std::ostream &out, VkPrimitiveTopology topology);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-std::ostream &operator<<(std::ostream &out, VkPolygonMode polygonMode);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-std::ostream &operator<<(std::ostream &out, VkCullModeFlagBits cullMode);
-std::ostream &operator<<(std::ostream &out, VkFrontFace frontFace);
-#endif
 std::ostream &operator<<(std::ostream &out, ResourceMappingNodeType type);
 std::ostream &operator<<(std::ostream &out, NggSubgroupSizingType subgroupSizing);
 std::ostream &operator<<(std::ostream &out, NggCompactMode compactMode);
@@ -438,15 +431,11 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorFmask:
   case ResourceMappingNodeType::DescriptorBufferCompact:
   case ResourceMappingNodeType::PushConst:
-#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
   case ResourceMappingNodeType::InlineBuffer:
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
   case ResourceMappingNodeType::DescriptorConstBuffer:
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
   case ResourceMappingNodeType::DescriptorConstTexelBuffer:
-#endif
   {
     char setHexvalue[64] = {};
     snprintf(setHexvalue, 64, "0x%08" PRIX32, userDataNode->srdRange.set);
@@ -746,16 +735,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "numSamples = " << pipelineInfo->rsState.numSamples << "\n";
   dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-  dumpFile << "polygonMode = " << pipelineInfo->rsState.polygonMode << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-  dumpFile << "cullMode = " << static_cast<VkCullModeFlagBits>(pipelineInfo->rsState.cullMode) << "\n";
-  dumpFile << "frontFace = " << pipelineInfo->rsState.frontFace << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-  dumpFile << "depthBiasEnable = " << pipelineInfo->rsState.depthBiasEnable << "\n";
-#endif
   dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
   dumpFile << "dualSourceBlendEnable = " << pipelineInfo->cbState.dualSourceBlendEnable << "\n";
 
@@ -772,18 +751,8 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
 
   dumpFile << "nggState.enableNgg = " << pipelineInfo->nggState.enableNgg << "\n";
   dumpFile << "nggState.enableGsUse = " << pipelineInfo->nggState.enableGsUse << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
-  dumpFile << "nggState.forceNonPassthrough = " << pipelineInfo->nggState.forceNonPassthrough << "\n";
-#else
   dumpFile << "nggState.forceCullingMode = " << pipelineInfo->nggState.forceCullingMode << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-  dumpFile << "nggState.alwaysUsePrimShaderTable = " << pipelineInfo->nggState.alwaysUsePrimShaderTable << "\n";
-#endif
   dumpFile << "nggState.compactMode = " << pipelineInfo->nggState.compactMode << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
-  dumpFile << "nggState.enableFastLaunch = " << pipelineInfo->nggState.enableFastLaunch << "\n";
-#endif
   dumpFile << "nggState.enableVertexReuse = " << pipelineInfo->nggState.enableVertexReuse << "\n";
   dumpFile << "nggState.enableBackfaceCulling = " << pipelineInfo->nggState.enableBackfaceCulling << "\n";
   dumpFile << "nggState.enableFrustumCulling = " << pipelineInfo->nggState.enableFrustumCulling << "\n";
@@ -1026,34 +995,14 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   if (updateHashFromRs) {
     auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-    hasher->Update(rsState->polygonMode);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-    hasher->Update(rsState->cullMode);
-    hasher->Update(rsState->frontFace);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-    hasher->Update(rsState->depthBiasEnable);
-#endif
   }
 
   if (isCacheHash) {
     hasher->Update(nggState->enableNgg);
     if (nggState->enableNgg) {
       hasher->Update(nggState->enableGsUse);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
-      hasher->Update(nggState->forceNonPassthrough);
-#else
       hasher->Update(nggState->forceCullingMode);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-      hasher->Update(nggState->alwaysUsePrimShaderTable);
-#endif
       hasher->Update(nggState->compactMode);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
-      hasher->Update(nggState->enableFastLaunch);
-#endif
       hasher->Update(nggState->enableVertexReuse);
       hasher->Update(nggState->enableBackfaceCulling);
       hasher->Update(nggState->enableFrustumCulling);
@@ -1265,12 +1214,10 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   case ResourceMappingNodeType::DescriptorBuffer:
   case ResourceMappingNodeType::DescriptorFmask:
   case ResourceMappingNodeType::DescriptorBufferCompact:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
   case ResourceMappingNodeType::DescriptorConstBuffer:
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
   case ResourceMappingNodeType::DescriptorConstTexelBuffer:
-#endif
   {
     hasher->Update(userDataNode->srdRange);
     break;
@@ -1288,9 +1235,7 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
     // Do nothing for the stream-out table
     break;
   }
-#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
   case ResourceMappingNodeType::InlineBuffer:
-#endif
   case ResourceMappingNodeType::PushConst: {
     if (!isRootNode)
       hasher->Update(userDataNode->srdRange);
@@ -1754,9 +1699,6 @@ std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize) {
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _8x8)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _16x16)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _32x32)
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 43
-    CASE_CLASSENUM_TO_STRING(WaveBreakSize, DrawTime)
-#endif
     break;
   default:
     llvm_unreachable("Should never be called!");
@@ -1814,74 +1756,6 @@ std::ostream &operator<<(std::ostream &out, VkPrimitiveTopology topology) {
 
   return out << string;
 }
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-// =====================================================================================================================
-// Translates enum "VkPolygonMode" to string and output to ostream.
-//
-// @param [out] out : Output stream
-// @param polygonMode : Rendering mode
-std::ostream &operator<<(std::ostream &out, VkPolygonMode polygonMode) {
-  const char *string = nullptr;
-  switch (polygonMode) {
-    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_FILL)
-    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_LINE)
-    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_POINT)
-    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_FILL_RECTANGLE_NV)
-    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_MAX_ENUM)
-    break;
-  default:
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-
-  return out << string;
-}
-#endif
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-// =====================================================================================================================
-// Translates enum "VkCullModeFlagBits" to string and output to ostream.
-//
-// @param [out] out : Output stream
-// @param cullMode : Culling mode
-std::ostream &operator<<(std::ostream &out, VkCullModeFlagBits cullMode) {
-  const char *string = nullptr;
-  switch (cullMode) {
-    CASE_ENUM_TO_STRING(VK_CULL_MODE_NONE)
-    CASE_ENUM_TO_STRING(VK_CULL_MODE_FRONT_BIT)
-    CASE_ENUM_TO_STRING(VK_CULL_MODE_BACK_BIT)
-    CASE_ENUM_TO_STRING(VK_CULL_MODE_FRONT_AND_BACK)
-    CASE_ENUM_TO_STRING(VK_CULL_MODE_FLAG_BITS_MAX_ENUM)
-    break;
-  default:
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-
-  return out << string;
-}
-
-// =====================================================================================================================
-// Translates enum "VkFrontFace" to string and output to ostream.
-//
-// @param [out] out : Output stream
-// @param frontFace : Front facing orientation
-std::ostream &operator<<(std::ostream &out, VkFrontFace frontFace) {
-  const char *string = nullptr;
-  switch (frontFace) {
-    CASE_ENUM_TO_STRING(VK_FRONT_FACE_COUNTER_CLOCKWISE)
-    CASE_ENUM_TO_STRING(VK_FRONT_FACE_CLOCKWISE)
-    CASE_ENUM_TO_STRING(VK_FRONT_FACE_MAX_ENUM)
-    break;
-  default:
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-
-  return out << string;
-}
-#endif
 
 // =====================================================================================================================
 // Translates enum "VkFormat" to string and output to ostream.
