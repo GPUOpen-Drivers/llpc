@@ -1,6 +1,6 @@
  # Do not modify llpc.h, vkgcDefs.h, anything in the SPIRV library, or vfx.h, or anything in lgc/imported.
 HeaderFilterRegex: '.*/vfx/vfx..*\\.h|.*/dumper/vkgc.*\\.h|.*/util/vkgc.*\\.h|.*/lgc/include/.*\\.h|.*/context/llpc[^/]*\\.h|.*/util/llpc[^/]*\\.h|.*/lower/llpc[^/]*\\.h|.*/builder/llpc[^/]*\\.h|.*/patch.*/llpc[^/]*\\.h|.*/tool/[^/]*\\.h'
-Checks: '-*,clang-diagnostic-*,llvm-*,-llvm-include-order,-llvm-qualified-auto,misc-*,-misc-no-recursion,-misc-unused-parameters,-misc-non-private-member-variables-in-classes,readability-identifier-naming,readability-simplify-boolean-expr,readability-redundant-nullptr-comparison,readability-redundant-parentheses,readability-declaration-inline-comment'
+Checks: '-*,clang-diagnostic-*,llvm-*,-llvm-include-order,-llvm-qualified-auto,-llvm-header-guard,misc-*,-misc-no-recursion,-misc-unused-parameters,-misc-non-private-member-variables-in-classes,readability-identifier-naming,readability-simplify-boolean-expr,readability-redundant-nullptr-comparison,readability-redundant-parentheses,readability-declaration-inline-comment'
 CheckOptions:
   - { key: readability-identifier-naming.ParameterCase, value: camelBack }
   - { key: readability-identifier-naming.ParameterRemovePrefixes, value: 'p,b,pfn' }
