@@ -277,11 +277,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
       options.nggFlags |= NggFlagDisable;
     else {
       options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
-                         (nggState.forceNonPassthrough ? NggFlagForceCullingMode : 0) |
-#else
                          (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
-#endif
                          (nggState.compactMode == NggCompactDisable ? NggFlagCompactDisable : 0) |
                          (nggState.enableVertexReuse ? NggFlagEnableVertexReuse : 0) |
                          (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
@@ -530,16 +526,10 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       static_assert(ResourceNodeType::DescriptorBufferCompact ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBufferCompact),
                     "Mismatch");
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50
       if (node.type == ResourceMappingNodeType::InlineBuffer)
-#else
-      // A "PushConst" is in fact an InlineBuffer when it appears in a non-root table.
-      if (node.type == ResourceMappingNodeType::PushConst && !isRoot)
-#endif
         destNode.type = ResourceNodeType::InlineBuffer;
       else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
         destNode.type = ResourceNodeType::DescriptorResource;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
       else if (node.type == ResourceMappingNodeType::DescriptorImage)
         destNode.type = ResourceNodeType::DescriptorResource;
       else if (node.type == ResourceMappingNodeType::DescriptorConstTexelBuffer)
@@ -548,7 +538,6 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.type = ResourceNodeType::DescriptorBufferCompact;
       else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
         destNode.type = ResourceNodeType::DescriptorBuffer;
-#endif
       else
         destNode.type = static_cast<ResourceNodeType>(node.type);
 
@@ -557,9 +546,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
       switch (node.type) {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
       case ResourceMappingNodeType::DescriptorImage:
-#endif
       case ResourceMappingNodeType::DescriptorResource:
       case ResourceMappingNodeType::DescriptorFmask:
         destNode.stride = DescriptorSizeResource / sizeof(uint32_t);
@@ -581,9 +568,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.stride = node.sizeInDwords;
         break;
       case ResourceMappingNodeType::DescriptorBufferCompact:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 49
       case ResourceMappingNodeType::DescriptorConstBufferCompact:
-#endif
         destNode.stride = 2;
         break;
       default:

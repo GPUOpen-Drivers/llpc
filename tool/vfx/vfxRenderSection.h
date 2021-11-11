@@ -364,16 +364,6 @@ public:
     state.firstIndex = 0;
     state.vertexOffset = 0;
     state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-    state.polygonMode = VK_POLYGON_MODE_FILL;
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-    state.cullMode = VK_CULL_MODE_NONE;
-    state.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-    state.depthBiasEnable = false;
-#endif
     state.width = 0;
     state.height = 0;
     state.lineWidth = 1.0f;
@@ -389,16 +379,6 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, firstIndex, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, vertexOffset, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, topology, MemberTypeEnum, false);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 48
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, polygonMode, MemberTypeEnum, false);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 47
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, cullMode, MemberTypeEnum, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, frontFace, MemberTypeEnum, false);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 46
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, depthBiasEnable, MemberTypeInt, false);
-#endif
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, patchControlPoints, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, dispatch, MemberTypeIVec4, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDrawState, width, MemberTypeInt, false);

@@ -386,15 +386,8 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 
     nggState.enableNgg = EnableNgg;
     nggState.enableGsUse = NggEnableGsUse;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 44
-    nggState.forceNonPassthrough = NggForceCullingMode;
-#else
     nggState.forceCullingMode = NggForceCullingMode;
-#endif
     nggState.compactMode = static_cast<NggCompactMode>(NggCompactionMode.getValue());
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 45
-    nggState.enableFastLaunch = false;
-#endif
     nggState.enableVertexReuse = NggEnableVertexReuse;
     nggState.enableBackfaceCulling = NggEnableBackfaceCulling;
     nggState.enableFrustumCulling = NggEnableFrustumCulling;
