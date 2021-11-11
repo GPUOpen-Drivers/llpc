@@ -308,7 +308,7 @@ bool PatchCopyShader::runOnModule(Module &module) {
       }
     } else {
       // NOTE: If NGG, the copy shader with stream-out is not a real HW VS and will be incorporated into NGG
-      // primitive shader later. Therefore, there is no mutiple HW executions.
+      // primitive shader later. Therefore, there is no multiple HW executions.
 
       //
       // copyShader() {

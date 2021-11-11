@@ -91,7 +91,7 @@ void PatchWorkarounds::applyImageDescWorkaround(void) {
 
     // We have to consider waterfall.last.use as this may be used on a resource
     // descriptor that is then used by an image instruction.
-    // waterfall.last.use needs to then be proceesed first due to the nature of
+    // waterfall.last.use needs to then be processed first due to the nature of
     // the intrinsic (dst needs to go into the processed list to prevent it
     // being processed twice, plus the workaround breaks the last.use if not
     // handled like this)
@@ -230,5 +230,5 @@ void PatchWorkarounds::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
 } // namespace lgc
 
 // =====================================================================================================================
-// Initializes the pass of LLVM patching opertions for workarounds
+// Initializes the pass of LLVM patching operations for workarounds
 INITIALIZE_PASS(PatchWorkarounds, DEBUG_TYPE, "Patch LLVM for workarounds", false, false)

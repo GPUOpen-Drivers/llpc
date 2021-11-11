@@ -39,7 +39,7 @@ using namespace llvm;
 // =====================================================================================================================
 // Implement wrapped YCbCr sample
 //
-// @param wrapInfo : Wrapped YCbCr sample infomation
+// @param wrapInfo : Wrapped YCbCr sample information
 Value *YCbCrConverter::wrappedSample(YCbCrWrappedSampleInfo &wrapInfo) {
   SmallVector<Value *, 4> coordsChroma;
   YCbCrSampleInfo *sampleInfo = wrapInfo.ycbcrInfo;
@@ -100,7 +100,7 @@ Value *YCbCrConverter::wrappedSample(YCbCrWrappedSampleInfo &wrapInfo) {
 // =====================================================================================================================
 // Create YCbCr reconstruct linear X chroma sample
 //
-// @param xChromeInfo : Infomation for downsampled chroma channels in X dimension
+// @param xChromeInfo : Information for downsampled chroma channels in X dimension
 Value *YCbCrConverter::reconstructLinearXChromaSample(XChromaSampleInfo &xChromaInfo) {
   YCbCrSampleInfo *sampleInfo = xChromaInfo.ycbcrInfo;
   Value *isEvenI = m_builder->CreateICmpEQ(
@@ -285,7 +285,7 @@ Value *YCbCrConverter::reconstructLinearXYChromaSample(XYChromaSampleInfo &xyChr
 // Create YCbCr image sample internal
 //
 // @param coords : The ST coordinates
-// @param ycbcrInfo : YCbCr smaple information
+// @param ycbcrInfo : YCbCr sample information
 Value *YCbCrConverter::createImageSampleInternal(SmallVectorImpl<Value *> &coordsIn, YCbCrSampleInfo *ycbcrInfo) {
 
   unsigned imageDim = ycbcrInfo->dim;
@@ -320,7 +320,7 @@ YCbCrConverter::YCbCrConverter(ImageBuilder *builder, const SamplerYCbCrConversi
 }
 
 // =====================================================================================================================
-// Set YCbCr sample infomation
+// Set YCbCr sample information
 //
 // @param ycbcrSampleInfo : YCbCr sampler information
 void YCbCrConverter::setYCbCrSampleInfo(YCbCrSampleInfo *ycbcrSampleInfo) {
@@ -474,7 +474,7 @@ void YCbCrConverter::prepareCoord() {
 //
 // @param samplerDesc : Sampler descriptor
 // @param filter : The type of sampler filter
-// @param forceExplicitReconstruction : Enable/Disable force explict chroma reconstruction
+// @param forceExplicitReconstruction : Enable/Disable force explicit chroma reconstruction
 Value *YCbCrConverter::generateSamplerDesc(Value *samplerDesc, SamplerFilter filter, bool forceExplicitReconstruction) {
   SqImgSampRegHandler imgRegHelper(m_builder, samplerDesc, m_gfxIp);
 
@@ -612,7 +612,7 @@ void YCbCrConverter::sampleYCbCrData() {
   Value *chromaWidth = m_builder->CreateFMul(m_width, ConstantFP::get(m_builder->getFloatTy(), 0.5f));
   Value *chromaHeight = m_builder->CreateFMul(m_height, ConstantFP::get(m_builder->getFloatTy(), 0.5f));
 
-  // Init smaple chroma info for downsampled chroma channels in the x dimension
+  // Init sample chroma info for downsampled chroma channels in the x dimension
   XChromaSampleInfo xChromaInfo = {};
   xChromaInfo.ycbcrInfo = m_ycbcrSampleInfo;
   xChromaInfo.imageDesc1 = m_imgDescsChroma[1];
@@ -622,7 +622,7 @@ void YCbCrConverter::sampleYCbCrData() {
   xChromaInfo.chromaHeight = m_height;
   xChromaInfo.chromaOffsetX = static_cast<ChromaLocation>(m_metaData.word1.xChromaOffset);
 
-  // Init smaple chroma info for downsampled chroma channels in xy dimension
+  // Init sample chroma info for downsampled chroma channels in xy dimension
   XYChromaSampleInfo xyChromaInfo = {};
   xyChromaInfo.ycbcrInfo = m_ycbcrSampleInfo;
   xyChromaInfo.imageDesc1 = m_imgDescsChroma[1];
@@ -635,7 +635,7 @@ void YCbCrConverter::sampleYCbCrData() {
   xyChromaInfo.chromaOffsetX = static_cast<ChromaLocation>(m_metaData.word1.xChromaOffset);
   xyChromaInfo.chromaOffsetY = static_cast<ChromaLocation>(m_metaData.word1.yChromaOffset);
 
-  // Init wrapped smaple chroma info
+  // Init wrapped sample chroma info
   YCbCrWrappedSampleInfo wrappedSampleInfo = {};
   wrappedSampleInfo.ycbcrInfo = m_ycbcrSampleInfo;
   wrappedSampleInfo.chromaWidth = m_width;
@@ -889,7 +889,7 @@ Value *YCbCrConverter::convertColor(Type *resultTy, SamplerYCbCrModelConversion 
 }
 
 // =====================================================================================================================
-// Implement transfer form  ST coordinates to UV coordiantes operation
+// Implement transfer form  ST coordinates to UV coordinates operation
 //
 // @param coordST : ST coords
 // @param scale : With/height
@@ -929,9 +929,9 @@ Value *YCbCrConverter::transferUVtoIJCoords(SamplerFilter filter, Value *coordUV
 //
 // @param coordUV : UV coordinates
 Value *YCbCrConverter::calculateUVoffset(Value *coordUV) {
-  Value *coordUVBaised = m_builder->CreateFSub(coordUV, ConstantFP::get(m_builder->getFloatTy(), 0.5f));
-  Value *coordIJ = m_builder->CreateUnaryIntrinsic(Intrinsic::floor, coordUVBaised);
-  return m_builder->CreateFSub(coordUVBaised, coordIJ);
+  Value *coordUVBiased = m_builder->CreateFSub(coordUV, ConstantFP::get(m_builder->getFloatTy(), 0.5f));
+  Value *coordIJ = m_builder->CreateUnaryIntrinsic(Intrinsic::floor, coordUVBiased);
+  return m_builder->CreateFSub(coordUVBiased, coordIJ);
 }
 
 // =====================================================================================================================

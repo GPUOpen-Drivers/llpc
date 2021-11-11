@@ -63,7 +63,7 @@ Value *GfxRegHandler::getRegCommon(unsigned regId) {
 }
 
 // =====================================================================================================================
-// Get combined data from two seperate dwords
+// Get combined data from two separate dwords
 // Note: The return type is one dword, it doesn't support two dwords for now.
 // TODO: Expand to support 2-dwords combination result.
 //
@@ -76,7 +76,7 @@ Value *GfxRegHandler::getRegCombine(unsigned regIdLo, unsigned regIdHi) {
 }
 
 // =====================================================================================================================
-// Set register value into two seperate dwords
+// Set register value into two separate dwords
 // Note: The input pRegValue only supports one dword
 //
 // @param regIdLo : The ID of low part register
@@ -94,7 +94,7 @@ void GfxRegHandler::setRegCombine(unsigned regIdLo, unsigned regIdHi, Value *reg
 }
 
 // =====================================================================================================================
-// SqImgSampReg Bits infomation look up table (Gfx9-10)
+// SqImgSampReg Bits information look up table (Gfx9-10)
 // Refer to imported/chip/gfx9/gfx9_plus_merged_registers.h : SQ_IMG_SAMP_WORD
 static constexpr BitsInfo SqImgSampRegBitsGfx9[static_cast<unsigned>(SqSampRegs::Count)] = {
     {0, 30, 2}, // FilterMode

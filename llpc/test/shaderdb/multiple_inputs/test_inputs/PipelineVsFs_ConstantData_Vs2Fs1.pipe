@@ -1,4 +1,4 @@
-; Test that constant data in the fragement shader is handled correctly.
+; Test that constant data in the fragment shader is handled correctly.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t_0.elf %gfxip %s
 ; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -D -r %t_0.elf | FileCheck -check-prefix=SHADERTEST %s

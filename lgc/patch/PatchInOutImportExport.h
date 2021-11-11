@@ -42,7 +42,7 @@
 namespace lgc {
 
 // =====================================================================================================================
-// Represents the pass of LLVM patching opertions for input import and output export.
+// Represents the pass of LLVM patching operations for input import and output export.
 class PatchInOutImportExport : public LegacyPatch {
 public:
   PatchInOutImportExport();

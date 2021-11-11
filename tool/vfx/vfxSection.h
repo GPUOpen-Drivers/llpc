@@ -129,7 +129,7 @@ enum ShaderType {
   Glsl,         // GLSL source
   Hlsl,         // HLSL source
   SpirvAsm,     // SPIRV assemble code
-  GlslFile,     // GLSL source in extenal file
+  GlslFile,     // GLSL source in external file
   HlslFile,     // HLSL source in external file
   SpirvFile,    // SPIRV binary code in external file
   SpirvAsmFile, // SPIRV assemble code in external file
@@ -268,7 +268,7 @@ struct StrToMemberAddr {
 };
 
 // =====================================================================================================================
-// Represents an object whose member can be set throught it's string form name.
+// Represents an object whose member can be set through it's string form name.
 class Section {
 public:
   Section(StrToMemberAddr *addrTable, unsigned tableSize, SectionType type, const char *sectionName);
@@ -712,11 +712,11 @@ private:
   static const unsigned MemberCount = 3;
   static StrToMemberAddr m_addrTable[MemberCount];
 
-  std::vector<SectionVertexInputAttribute> m_attribute;                // Vertex input atribute
+  std::vector<SectionVertexInputAttribute> m_attribute;                // Vertex input attribute
   std::vector<SectionVertexInputBinding> m_binding;                    // Vertex input binding
   std::vector<SectionVertexInputDivisor> m_divisor;                    // Vertex input divisor
   std::vector<VkVertexInputBindingDescription> m_vkBindings;           // Vulkan input binding
-  std::vector<VkVertexInputAttributeDescription> m_vkAttributes;       // Vulkan vertex input atribute
+  std::vector<VkVertexInputAttributeDescription> m_vkAttributes;       // Vulkan vertex input attribute
   std::vector<VkVertexInputBindingDivisorDescriptionEXT> m_vkDivisors; // Vulkan vertex input divisor
   VkPipelineVertexInputDivisorStateCreateInfoEXT m_vkDivisorState;     // Vulkan vertex input divisor state
 };

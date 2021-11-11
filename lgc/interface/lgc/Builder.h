@@ -640,7 +640,7 @@ public:
   virtual llvm::Value *CreateExtractBitField(llvm::Value *base, llvm::Value *offset, llvm::Value *count, bool isSigned,
                                              const llvm::Twine &instName = "") = 0;
 
-  // Create "find MSB" operation for a (vector of) signed i32. For a postive number, the result is the bit number of
+  // Create "find MSB" operation for a (vector of) signed i32. For a positive number, the result is the bit number of
   // the most significant 1-bit. For a negative number, the result is the bit number of the most significant 0-bit.
   // For a value of 0 or -1, the result is -1.
   //
@@ -845,7 +845,7 @@ public:
     ImageFlagCheckMultiView = 0x40,              // If pipeline state enables multiview, use ViewIndex as coordinate z.
                                                  // Otherwise, acts the same as ImageFlagAddFragCoord
     ImageFlagEnforceReadFirstLaneImage = 0x80,   // Whether enabling readfirstlane on the image descriptor
-    ImageFlagEnforceReadFirstLaneSampler = 0x100 // Whether enabling readfirstlane on the sampler desriptor
+    ImageFlagEnforceReadFirstLaneSampler = 0x100 // Whether enabling readfirstlane on the sampler descriptor
   };
 
   // Address array indices for image sample and gather methods. Where an optional entry is missing (either
@@ -1097,7 +1097,7 @@ public:
   // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
   // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
   // This operation is only supported for TCS; other shader stages do not have per-vertex outputs, and
-  // the frontend is expected to do its own cacheing of a written output if the shader wants to read it back again.
+  // the frontend is expected to do its own caching of a written output if the shader wants to read it back again.
   //
   // @param resultTy : Type of value to read
   // @param location : Base location (row) of output
@@ -1181,7 +1181,7 @@ public:
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
   // or the element type if pIndex is not nullptr.
   // This operation is only supported for TCS; other shader stages do not have per-vertex outputs, and
-  // the frontend is expected to do its own cacheing of a written output if the shader wants to read it back again.
+  // the frontend is expected to do its own caching of a written output if the shader wants to read it back again.
   //
   // @param builtIn : Built-in kind, one of the BuiltIn* constants
   // @param outputInfo : Extra output info (shader-defined array length)
@@ -1295,14 +1295,14 @@ public:
   // Create cooperative matrix conversion.
   //
   // @param source : The source cooperative matrix.
-  // @param dest : The convertion target.
+  // @param dest : The conversion target.
   // @param instName : Name to give instruction(s).
   virtual llvm::Value *CreateCooperativeMatrixConvert(llvm::Value *source, llvm::Value *dest,
                                                       const llvm::Twine &instName = "") = 0;
 
   // Create cooparetive matrix binary operation
   //
-  // @param coopMatArithOp : The cooperative matrix arithemtic operation to perform.
+  // @param coopMatArithOp : The cooperative matrix arithmetic operation to perform.
   // @param operand1 : The first operand.
   // @param operand2 : The second operand.
   // @param instName : Name to give instruction(s).

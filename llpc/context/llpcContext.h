@@ -101,7 +101,7 @@ public:
   // TODO: This is not correct behavior. The front-end should not be using pipeline options.
   bool getRobustBufferAccess() const { return m_robustBufferAccess; }
 
-  std::unique_ptr<llvm::Module> loadLibary(const BinaryData *lib);
+  std::unique_ptr<llvm::Module> loadLibrary(const BinaryData *lib);
 
   // Wrappers of interfaces of pipeline context
   bool isGraphics() const { return m_pipelineContext->isGraphics(); }

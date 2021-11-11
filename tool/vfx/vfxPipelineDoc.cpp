@@ -74,7 +74,7 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
 };
 
 // =====================================================================================================================
-// Checks whether the input version is supportted.
+// Checks whether the input version is supported.
 //
 // @param ver : Version
 bool PipelineDocument::checkVersion(unsigned ver) {
@@ -343,7 +343,7 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
 // =====================================================================================================================
 // Gets pipeline document from document handle
 //
-// NOTE: The document contents are not accessable after call vfxCloseDoc
+// NOTE: The document contents are not accessible after call vfxCloseDoc
 //
 // @param doc : Document handle
 // @param [out] pipelineState : Pointer of struct VfxPipelineState

@@ -158,7 +158,7 @@ llvm::ModulePass *createLLVMInput();
 /// Create a pass for translating input function call to real access output instruction
 llvm::ModulePass *createLLVMOutput();
 
-/// Create a pass for translating descriptor function call to real descritpor setup instruction
+/// Create a pass for translating descriptor function call to real descriptor setup instruction
 llvm::ModulePass *createLLVMDescriptor();
 
 /// Create a pass for removing unused built-in functions

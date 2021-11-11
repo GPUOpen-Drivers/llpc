@@ -437,7 +437,7 @@ inline void SPIRVMap<std::string, SPIRVTypeImageDescriptor>::init() {
 #undef _SPIRV_OP
 }
 
-// Comparision function required to use the struct as map key.
+// Comparison function required to use the struct as map key.
 inline bool operator<(const SPIRVTypeImageDescriptor &A,
                       const SPIRVTypeImageDescriptor &B) {
   return SPIRVTypeImageDescriptor::getAsTuple(A) <

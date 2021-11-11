@@ -93,7 +93,7 @@ struct BitsState
     bool isModified = false;
 };
 ```
-SQ_IMG_SAMP register bits infomation look up table (Gfx9-10)
+SQ_IMG_SAMP register bits information look up table (Gfx9-10)
 ```
 static constexpr BitsInfo g_sqImgSampRegBitsGfx9[SqSampRegsCount] =
 {       // Which DWORD      Start bit        Count

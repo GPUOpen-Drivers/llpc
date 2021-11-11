@@ -1059,7 +1059,7 @@ void PipelineState::setDepthStencilState(const DepthStencilState &dsState) {
 // Set the finalized 128-bit cache hash that is used to find this pipeline in the cache.
 //
 // @param finalizedCacheHash: The 128-bit hash value.
-// @param version: The version of LLPC used to compute the hash.  This will let other tools know if the hashs are
+// @param version: The version of LLPC used to compute the hash.  This will let other tools know if the hashes are
 //                 comparable.
 void PipelineState::set128BitCacheHash(const Hash128 &finalizedCacheHash, const VersionTuple &version) {
   getPalMetadata()->setFinalized128BitCacheHash(finalizedCacheHash, version);

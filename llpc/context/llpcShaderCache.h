@@ -199,7 +199,7 @@ private:
 
   char m_fileFullPath[PathBufferLen]; // Full path/filename of the shader cache on-disk file
 
-  std::list<std::pair<uint8_t *, size_t>> m_allocationList; // Memory allcoated by GetCacheSpace
+  std::list<std::pair<uint8_t *, size_t>> m_allocationList; // Memory allocated by GetCacheSpace
   unsigned m_serializedSize;                                // Serialized byte size of whole shader cache
   std::condition_variable_any m_conditionVariable; // Condition variable used to wait for compililation to finish
   const void *m_clientData;                        // Client data that will be used by function GetValue and StoreValue

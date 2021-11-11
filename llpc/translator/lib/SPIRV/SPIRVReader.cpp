@@ -5333,7 +5333,7 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
   // different function types. This is OK if the function name
   // is used internally and finally translated to unique function
   // names. However it is better to have a way to differentiate
-  // between intermidiate functions and final functions and make
+  // between intermediate functions and final functions and make
   // sure final functions have unique names.
   if (!func || func->getFunctionType() != ft) {
     func = Function::Create(ft, GlobalValue::ExternalLinkage, mangledName, m_m);
@@ -5863,7 +5863,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
       ordering = AtomicOrdering::Release;
 
     if (ordering != AtomicOrdering::NotAtomic) {
-      // Upgrade the ordering if we need to make it avaiable or visible
+      // Upgrade the ordering if we need to make it available or visible
       if (semantics & (MemorySemanticsMakeAvailableKHRMask | MemorySemanticsMakeVisibleKHRMask))
         ordering = AtomicOrdering::SequentiallyConsistent;
     }
@@ -7210,7 +7210,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     inOutDec.XfbStride = xfbStride;
 
   if (bt->isTypeScalar() || bt->isTypeVector() || bt->isTypePointer()) {
-    // Hanlde scalar or vector type or pointer type
+    // Handle scalar or vector type or pointer type
     assert(inOutDec.Value.U32All != SPIRVID_INVALID);
 
     // Build metadata for the scala/vector

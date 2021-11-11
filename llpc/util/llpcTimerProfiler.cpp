@@ -165,7 +165,7 @@ const StringMap<TimeRecord> &TimerProfiler::getDummyTimeRecords() {
     // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
     // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
     // compile multiple pipelines. so we add a dummy record to force all fields is shown.
-    // But LLVM TimeRecord can't be initialized explicitly. We have to use HackedTimeRecord to force update the vaule
+    // But LLVM TimeRecord can't be initialized explicitly. We have to use HackedTimeRecord to force update the value
     // in TimeRecord.
     TimeRecord timeRecord;
     struct HackedTimeRecord {

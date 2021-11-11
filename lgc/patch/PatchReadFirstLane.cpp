@@ -73,7 +73,7 @@ private:
   bool isSupportedType(Instruction *inst) { return inst->getType()->isFloatTy() || inst->getType()->isIntegerTy(32); }
 
   LegacyDivergenceAnalysis *m_divergenceAnalysis; // The divergence analysis
-  TargetTransformInfo *m_targetTransformInfo;     // The target tranform info to determine stop propagation
+  TargetTransformInfo *m_targetTransformInfo;     // The target transform info to determine stop propagation
   DenseMap<Instruction *, SmallVector<Instruction *, 2>>
       m_uniformDivergentUsesMap; // The map key is an instruction `I` that can be assumed uniform.
                                  // That is, we can apply readfirstlane to the result of `I` and remain
@@ -242,7 +242,7 @@ bool PatchReadFirstLane::promoteEqualUniformOps(Function &function) {
 // @param [in,out] function : LLVM function to be run for readfirstlane optimization.
 bool PatchReadFirstLane::liftReadFirstLane(Function &function) {
   // Collect the basic blocks with amdgcn_readfirstlane
-  // Build the map between initial readfirstlanes and their corrensponding blocks
+  // Build the map between initial readfirstlanes and their corresponding blocks
   DenseMap<BasicBlock *, SmallVector<Instruction *, 2>> blockInitialReadFirstLanesMap;
   Module *module = function.getParent();
   for (auto &func : *module) {
@@ -392,7 +392,7 @@ void PatchReadFirstLane::findBestInsertLocation(const SmallVectorImpl<Instructio
     for (;;) {
       const auto &mapIt = m_uniformDivergentUsesMap.find(current);
       if (mapIt == m_uniformDivergentUsesMap.end())
-        break; // no futher propagation possible
+        break; // no further propagation possible
 
       const auto &divergentOperands = mapIt->second;
       if (divergentOperands.empty())

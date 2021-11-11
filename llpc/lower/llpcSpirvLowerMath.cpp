@@ -144,7 +144,7 @@ void SpirvLowerMath::flushDenormIfNeeded(Instruction *inst) {
 }
 
 // =====================================================================================================================
-// Recursively finds backward if the FPMathOperator operand does not specifiy "contract" flag.
+// Recursively finds backward if the FPMathOperator operand does not specify "contract" flag.
 //
 // @param operand : Operand to check
 bool SpirvLowerMath::isOperandNoContract(Value *operand) {
@@ -472,7 +472,7 @@ void SpirvLowerMathFloatOp::visitFPTruncInst(FPTruncInst &fptruncInst) {
     auto destTy = fptruncInst.getDestTy();
 
     if (srcTy->getScalarType()->isDoubleTy() && destTy->getScalarType()->isHalfTy()) {
-      // NOTE: doubel -> float16 conversion is done in backend compiler with RTE rounding. Thus, we have to split
+      // NOTE: double -> float16 conversion is done in backend compiler with RTE rounding. Thus, we have to split
       // it with two phases to disable such lowering if we need RTZ rounding.
       auto floatTy = srcTy->isVectorTy() ? FixedVectorType::get(Type::getFloatTy(*m_context),
                                                                 cast<FixedVectorType>(srcTy)->getNumElements())

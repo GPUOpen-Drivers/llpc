@@ -60,7 +60,7 @@ public:
 private:
   void DeduplicateResourceMappingData(Vkgc::ResourceMappingData *resourceMapping);
 
-  VfxPipelineState m_pipelineState; // Contants the render state
+  VfxPipelineState m_pipelineState; // Contains the render state
   VkPipelineVertexInputStateCreateInfo m_vertexInputState;
   std::vector<Vfx::ShaderSource> m_shaderSources;
   std::vector<Vkgc::PipelineShaderInfo> m_shaderInfos;

@@ -1,7 +1,7 @@
 # Partial Pipeline Compile
 
 # INTRODUCTION
-Per pervious profile result, many Vulkan APPs loading SPIR-V binary is much ahead of create pipeline. And APPs hate the long pipeline creation time, since it will cause the lag in app.
+Per previous profile result, many Vulkan APPs loading SPIR-V binary is much ahead of create pipeline. And APPs hate the long pipeline creation time, since it will cause the lag in app.
 To reduce the pipeline creation time, one possible idea is shifting the workload from create pipeline to create shader module. But we lack the pipeline states when create shader module, especially, we don’t have the pipeline layout, it is the major interface between shader and driver.
 This DDN proposes a method to build pipeline layout from SPIR-V binary and make it compatible with APP’s pipeline layout without recompile.
 
@@ -58,7 +58,7 @@ struct ShaderModuleUsage
     bool                  enableVarPtr;            ///< Whether to enable "VariablePointer" capability
     bool                  useSubgroupSize;         ///< Whether gl_SubgroupSize is used
     bool                  useHelpInvocation;       ///< Whether fragment shader has helper-invocation for subgroup
-    bool                  useSpecConstant;         ///< Whether specializaton constant is used
+    bool                  useSpecConstant;         ///< Whether specialization constant is used
     bool                  keepUnusedFunctions;     ///< Whether to keep unused function
 };
 
@@ -117,12 +117,12 @@ Beside this, we need extend user data remapping in PAL, until now,
 *   Spill table doesn’t support user data remapping.
 
 ## Compile SPIR-V shader with Auto-Layout Pipeline Layout
-When build partial pipleine is enabled, we will try to build partial pipeline with auto layout pieline layout in vkCreateShaderModule.
+When build partial pipeline is enabled, we will try to build partial pipeline with auto layout pieline layout in vkCreateShaderModule.
 To check whether shader hash is compatible with auto-layout pipeline, we need modify exist hash algorithm for descriptor layout, only active resource nodes are included, and the offset of root node should be ignored.
  Beside this, color buffer format should be mapped to export format during hash calculation and apply to common path.
 The compile result of auto-layout pipeline isn’t stored in any Vulkan API object, it only affects the content of internal shader cache.
 
-To avoid increase the time in vkCreateShaderModule, build partial pipeline will be dispatch to a worker thread. Which is similar with async shader module, we create a PartialPipline class, in its Execute() method, we constract pipeline info by using previous exposed resource info, and then compile it.
+To avoid increase the time in vkCreateShaderModule, build partial pipeline will be dispatch to a worker thread. Which is similar with async shader module, we create a PartialPipline class, in its Execute() method, we construct pipeline info by using previous exposed resource info, and then compile it.
 ```
 // =====================================================================================================================
 // Implementation of a async partial pipeline

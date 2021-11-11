@@ -41,7 +41,7 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for globals (global variables, inputs, and outputs).
+// Represents the pass of SPIR-V lowering operations for globals (global variables, inputs, and outputs).
 class SpirvLowerGlobal : public SpirvLower,
                          public llvm::PassInfoMixin<SpirvLowerGlobal>,
                          public llvm::InstVisitor<SpirvLowerGlobal> {
@@ -110,7 +110,7 @@ private:
   bool m_lowerInputInPlace;  // Whether to lower input inplace
   bool m_lowerOutputInPlace; // Whether to lower output inplace
 
-  // Flags controlling how to behave when visting the instructions
+  // Flags controlling how to behave when visiting the instructions
   union {
     struct {
       unsigned checkEmitCall : 1;   // Whether to check "emit" calls

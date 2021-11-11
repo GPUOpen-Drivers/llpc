@@ -179,7 +179,7 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
 // =====================================================================================================================
 // Removes all debug instructions for SPIR-V binary.
 //
-// @param spvBin : SPIR-V binay code
+// @param spvBin : SPIR-V binary code
 // @param bufferSize : Output buffer size in bytes
 // @param [out] trimSpvBin : Trimmed SPIR-V binary code
 void ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin) {

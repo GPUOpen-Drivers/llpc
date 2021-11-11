@@ -177,7 +177,7 @@ class SPIRVExtInst;
 ///    type as a value, set them in the constructors.
 /// 6. If the class may represent SPIRV entity which has been added in version
 ///    later than 1.0, implement virtual function getRequiredSPIRVVersion().
-///    To automaticly update module's version you can also call protected
+///    To automatically update module's version you can also call protected
 ///    function updateModuleVersion() in the constructor.
 /// 7. Add the class to the Table of SPIRVEntry::create().
 /// 8. Add the class to SPIRVToLLVM.

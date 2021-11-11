@@ -36,7 +36,7 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for removing the instruction metadata.
+// Represents the pass of SPIR-V lowering operations for removing the instruction metadata.
 class SpirvLowerInstMetaRemove : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerInstMetaRemove> {
 public:
   SpirvLowerInstMetaRemove();

@@ -692,7 +692,7 @@ void PalMetadata::addColorExportInfo(ArrayRef<ColorExportInfo> exports) {
 }
 
 // =====================================================================================================================
-// Get the count of color exports needed by the fragement shader.
+// Get the count of color exports needed by the fragment shader.
 unsigned PalMetadata::getColorExportCount() {
   if (m_colorExports.isEmpty())
     return 0;
@@ -1010,8 +1010,8 @@ unsigned PalMetadata::getNumberOfSgprsBeforeUserData(unsigned callingConv) {
 // =====================================================================================================================
 // Returns the offset of the userDataMapping from firstUserDataNode.  Returns UINT_MAX if it cannot be found.
 //
-// @param firstUserDataNode : An iterator identifing the starting point for the search.  It is assumed that it points to
-//                            the first user data node for some shader stage.
+// @param firstUserDataNode : An iterator identifying the starting point for the search.  It is assumed that it points
+//                            to the first user data node for some shader stage.
 // @param userDataMapping : The user data mapping that is being search for.
 //
 unsigned PalMetadata::getOffsetOfUserDataReg(std::map<msgpack::DocNode, msgpack::DocNode>::iterator firstUserDataNode,

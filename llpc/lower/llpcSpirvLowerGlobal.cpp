@@ -221,7 +221,7 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
       mapOutputToProxy(&*global);
   }
 
-  // NOTE: Global variable, inlcude general global variable, input and output is a special constant variable, so if
+  // NOTE: Global variable, include general global variable, input and output is a special constant variable, so if
   // it is referenced by constant expression, we need translate constant expression to normal instruction first,
   // Otherwise, we will hit assert in replaceAllUsesWith() when we replace global variable with proxy variable.
   for (GlobalVariable &global : m_module->globals()) {
@@ -619,7 +619,7 @@ void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
 }
 
 // =====================================================================================================================
-// Does lowering opertions for SPIR-V global variables, replaces global variables with proxy variables.
+// Does lowering operations for SPIR-V global variables, replaces global variables with proxy variables.
 void SpirvLowerGlobal::lowerGlobalVar() {
   if (m_globalVarProxyMap.empty()) {
     // Skip lowering if there is no global variable
@@ -638,7 +638,7 @@ void SpirvLowerGlobal::lowerGlobalVar() {
 }
 
 // =====================================================================================================================
-// Does lowering opertions for SPIR-V inputs, replaces inputs with proxy variables.
+// Does lowering operations for SPIR-V inputs, replaces inputs with proxy variables.
 void SpirvLowerGlobal::lowerInput() {
   if (m_inputProxyMap.empty()) {
     // Skip lowering if there is no input
@@ -681,7 +681,7 @@ void SpirvLowerGlobal::lowerInput() {
     auto input = cast<GlobalVariable>(inputMap.first);
 
     for (auto user = input->user_begin(), end = input->user_end(); user != end; ++user) {
-      // NOTE: "Getelementptr" and "bitcast" will propogate the address space of pointer value (input variable)
+      // NOTE: "Getelementptr" and "bitcast" will propagate the address space of pointer value (input variable)
       // to the element pointer value (destination). We have to clear the address space of this element pointer
       // value. The original pointer value has been lowered and therefore the address space is invalid now.
       Instruction *inst = dyn_cast<Instruction>(*user);
@@ -703,7 +703,7 @@ void SpirvLowerGlobal::lowerInput() {
 }
 
 // =====================================================================================================================
-// Does lowering opertions for SPIR-V outputs, replaces outputs with proxy variables.
+// Does lowering operations for SPIR-V outputs, replaces outputs with proxy variables.
 void SpirvLowerGlobal::lowerOutput() {
 
   m_retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
@@ -778,7 +778,7 @@ void SpirvLowerGlobal::lowerOutput() {
     auto output = cast<GlobalVariable>(outputMap.first);
 
     for (auto user = output->user_begin(), end = output->user_end(); user != end; ++user) {
-      // NOTE: "Getelementptr" and "bitCast" will propogate the address space of pointer value (output variable)
+      // NOTE: "Getelementptr" and "bitCast" will propagate the address space of pointer value (output variable)
       // to the element pointer value (destination). We have to clear the address space of this element pointer
       // value. The original pointer value has been lowered and therefore the address space is invalid now.
       Instruction *inst = dyn_cast<Instruction>(*user);
@@ -800,7 +800,7 @@ void SpirvLowerGlobal::lowerOutput() {
 }
 
 // =====================================================================================================================
-// Does inplace lowering opertions for SPIR-V inputs/outputs, replaces "load" instructions with import calls and
+// Does inplace lowering operations for SPIR-V inputs/outputs, replaces "load" instructions with import calls and
 // "store" instructions with export calls.
 void SpirvLowerGlobal::lowerInOutInPlace() {
   assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval);

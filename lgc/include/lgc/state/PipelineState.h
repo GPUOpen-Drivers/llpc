@@ -207,7 +207,7 @@ public:
   // Return whether we're generating a part-pipeline.
   bool isPartPipeline() const { return m_pipelineLink == PipelineLink::PartPipeline; }
 
-  // Return whether we're generating an indepedent unlinked shader (not in the part-pipeline scheme).
+  // Return whether we're generating an independent unlinked shader (not in the part-pipeline scheme).
   bool isUnlinked() const { return m_pipelineLink == PipelineLink::Unlinked; }
 
   // Clear the pipeline state IR metadata.

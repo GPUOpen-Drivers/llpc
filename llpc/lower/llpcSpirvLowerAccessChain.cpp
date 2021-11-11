@@ -121,7 +121,7 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
   GetElementPtrInst *coalescedGetElemPtr = getElemPtr;
 
   std::stack<User *> chainedInsts;              // Order: from top to bottom
-  std::stack<GetElementPtrInst *> removedInsts; // Order: from botton to top
+  std::stack<GetElementPtrInst *> removedInsts; // Order: from bottom to top
 
   // Collect chained "getelementptr" instructions and constants from bottom to top.
   auto ptrVal = cast<User>(getElemPtr);
@@ -188,5 +188,5 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
 } // namespace Llpc
 
 // =====================================================================================================================
-// Initializes the pass of SPIR-V lowering opertions for access chain.
+// Initializes the pass of SPIR-V lowering operations for access chain.
 INITIALIZE_PASS(LegacySpirvLowerAccessChain, DEBUG_TYPE, "Lower SPIR-V access chain", false, false)

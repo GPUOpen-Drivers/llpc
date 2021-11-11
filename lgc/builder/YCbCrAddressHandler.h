@@ -35,7 +35,7 @@
 namespace lgc {
 
 // =====================================================================================================================
-// The class is used for calculating and mantain the base address of each plane in YCbCr image.
+// The class is used for calculating and maintain the base address of each plane in YCbCr image.
 // Note: There are at most 3 planes, and the index for plane is start from zero
 class YCbCrAddressHandler {
 public:

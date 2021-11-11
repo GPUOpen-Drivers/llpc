@@ -124,7 +124,7 @@ public:
 private:
   union {
     struct {
-      uint16_t isHighHalf : 1; // High half in case of 16-bit attriburtes
+      uint16_t isHighHalf : 1; // High half in case of 16-bit attributes
       uint16_t component : 2;  // The component index
       uint16_t location : 10;  // The location
       uint16_t isBuiltIn : 1;  // Whether location is actually built-in ID
@@ -339,7 +339,7 @@ struct ResourceUsage {
                                            // "hsCpStride")
         unsigned patchCountPerThreadGroup; // Count of patches per thread group (in dword, correspond to
                                            // "hsNumPatch")
-        // On-chip caculation factors
+        // On-chip calculation factors
         struct {
           unsigned outPatchStart;   // Offset into LDS where vertices of output patches start
                                     // (in dword, correspond to "hsOutputBase")
@@ -347,7 +347,7 @@ struct ResourceUsage {
                                     // correspond to "patchConstBase")
         } onChip;
 
-        // Off-chip caculation factors
+        // Off-chip calculation factors
         struct {
           unsigned outPatchStart;   // Offset into LDS where vertices of output patches start
                                     // (in dword, correspond to "hsOutputBase")

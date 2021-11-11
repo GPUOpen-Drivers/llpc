@@ -96,7 +96,7 @@ const static char Pushconst[] = "pushconst";
 //  * 1: the shadow descriptor table is enabled.
 const static char ShadowDescriptorTableEnabled[] = "$shadowenabled";
 
-// The high 32-bits of the addess of the shadow descriptor table.
+// The high 32-bits of the address of the shadow descriptor table.
 const static char ShadowDescriptorTable[] = "$shadowdesctable";
 
 } // namespace reloc

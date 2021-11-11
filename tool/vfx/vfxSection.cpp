@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  vfxSection.cpp
-* @brief Contains implmentation of class Section and derived classes
+* @brief Contains implementation of class Section and derived classes
 ***********************************************************************************************************************
 */
 
@@ -226,7 +226,7 @@ bool Section::getMemberType(unsigned lineNum, const char *memberName, MemberType
 //
 // @param lineNum : Line number
 // @param memberName : Member name
-// @param [out] output : Is this memeber a section object
+// @param [out] output : Is this member a section object
 // @param [out] type : Object type
 // @param [out] errorMsg : Error message
 bool Section::isSection(unsigned lineNum, const char *memberName, bool *output, MemberType *type,

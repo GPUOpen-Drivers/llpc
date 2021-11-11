@@ -197,7 +197,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
   const unsigned requiredNumThreads = lds->getType()->getPointerElementType()->getArrayNumElements();
   Value *loopCount = builder.getInt32((requiredNumThreads + actualNumThreads - 1) / actualNumThreads);
 
-  // Contruct ".for.Header" block
+  // Construct ".for.Header" block
   {
     builder.SetInsertPoint(forHeaderBlock);
 
@@ -244,7 +244,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
 // =====================================================================================================================
 // Return the size in dwords of a variable type
 //
-// @param inputTy : The type to be caculated
+// @param inputTy : The type to be calculated
 unsigned PatchInitializeWorkgroupMemory::getTypeSizeInDwords(Type *inputTy) {
   if (inputTy->isSingleValueType()) {
     // Variabl in LDS is stored in dwords and padded as 4 dowrds

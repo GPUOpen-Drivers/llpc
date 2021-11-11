@@ -168,7 +168,7 @@ enum class Result : int {
   ErrorInvalidValue = -(0x00000004),
   /// A required input pointer passed to the call was invalid (probably null)
   ErrorInvalidPointer = -(0x00000005),
-  /// The operaton encountered an unknown error
+  /// The operation encountered an unknown error
   ErrorUnknown = -(0x00000006),
 };
 
@@ -249,7 +249,7 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorConstBuffer,        ///< Generic descriptor: constBuffer,including uniform buffer
   DescriptorConstBufferCompact, ///< Generic descriptor: constBuffer,including dynamic storage buffer
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
-  DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including unifrom texel buffer
+  DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
 #endif
 
 #if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
@@ -423,7 +423,7 @@ struct ShaderModuleUsage {
   bool enableVarPtr;           ///< Whether to enable "VariablePointer" capability
   bool useSubgroupSize;        ///< Whether gl_SubgroupSize is used
   bool useHelpInvocation;      ///< Whether fragment shader has helper-invocation for subgroup
-  bool useSpecConstant;        ///< Whether specializaton constant is used
+  bool useSpecConstant;        ///< Whether specialization constant is used
   bool keepUnusedFunctions;    ///< Whether to keep unused function
   bool useIsNan;               ///< Whether IsNan is used
   bool useInvariant;           ///< Whether invariant variable is used
@@ -845,7 +845,7 @@ struct PipelineBuildInfo {
 /// Represents the interfaces of a pipeline dumper.
 class IPipelineDumper {
 public:
-  /// Dumps SPIR-V shader binary to extenal file.
+  /// Dumps SPIR-V shader binary to external file.
   ///
   /// @param [in]  pDumpDir     Directory of pipeline dump
   /// @param [in]  pSpirvBin    SPIR-V binary

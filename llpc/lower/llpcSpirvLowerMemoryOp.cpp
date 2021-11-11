@@ -343,7 +343,7 @@ void SpirvLowerMemoryOp::expandStoreInst(StoreInst *storeInst, ArrayRef<GetEleme
   Value *firstStoreDest = getElemPtrs[0];
 
   if (robustBufferAccess) {
-    // The .entry will be splitted into three blocks, .entry, .store and .endStore
+    // The .entry will be split into three blocks, .entry, .store and .endStore
     //
     // Expand is something like this:
     //

@@ -47,7 +47,7 @@ namespace Llpc {
 char LegacySpirvLowerInstMetaRemove::ID = 0;
 
 // =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering opertions for removing the instruction metadata
+// Pass creator, creates the pass of SPIR-V lowering operations for removing the instruction metadata
 ModulePass *createLegacySpirvLowerInstMetaRemove() {
   return new LegacySpirvLowerInstMetaRemove();
 }
@@ -124,6 +124,6 @@ bool LegacySpirvLowerInstMetaRemove::runOnModule(Module &module) {
 } // namespace Llpc
 
 // =====================================================================================================================
-// Initializes the pass of SPIR-V lowering opertions for removing instruction metadata.
+// Initializes the pass of SPIR-V lowering operations for removing instruction metadata.
 INITIALIZE_PASS(LegacySpirvLowerInstMetaRemove, DEBUG_TYPE,
                 "Lower SPIR-V instruction metadata by removing those targeted", false, false)

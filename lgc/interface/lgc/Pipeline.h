@@ -51,7 +51,7 @@ class LgcContext;
 // Per-pipeline and per-shader options for setting in pipeline state
 
 // Bit values of NGG flags. This is done as bit values rather than bitfields so the flags word appears
-// in a platform-independent way in IR metdata.
+// in a platform-independent way in IR metadata.
 enum NggFlag : unsigned {
   NggFlagDisable = 0x0001,                   // Disable NGG
   NggFlagEnableGsUse = 0x0002,               // Enable NGG when pipeline has GS

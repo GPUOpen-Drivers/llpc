@@ -170,7 +170,7 @@ void PatchPreparePipelineAbi::setCallingConvs(Module &module) {
     setCallingConv(ShaderStageGeometry, CallingConv::AMDGPU_GS);
     setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
   } else if (m_hasVs) {
-    // VS-FS pipeine
+    // VS-FS pipeline
     setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
   }
 }

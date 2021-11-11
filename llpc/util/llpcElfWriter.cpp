@@ -233,7 +233,7 @@ static void updateRootDescriptorRegisters(Context *context, msgpack::Document &d
               // If it's descriptor user data, then update its offset to it.
               unsigned value = userDataNode->offsetInDwords;
               keyIt->second = registers.getDocument()->getNode(value);
-              // Update userDataLimit if neccessary
+              // Update userDataLimit if necessary
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 676
               unsigned userDataLimit = pipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit].getUInt();
               pipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit] =

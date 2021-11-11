@@ -52,7 +52,7 @@ public:
   Section *createSection(const char *sectionName);
 
 private:
-  VfxRenderState m_renderState; // Contants the render state
+  VfxRenderState m_renderState; // Contains the render state
 };
 
 } // namespace Vfx

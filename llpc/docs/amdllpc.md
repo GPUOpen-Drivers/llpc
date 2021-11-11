@@ -89,7 +89,7 @@ amdllpc [<options>...] [<files>...]
 | `-emit-llvm`                     | Emit LLVM IR assembly just before LLVM back-end                   | false                         |
 | `-emit-llvm-bc`                  | Emit LLVM IR bitcode just before LLVM back-end                    | false                         |
 
-* Debug & Performance tunning options
+* Debug & Performance tuning options
 
 | Option Name                      | Description                                                       | Default Value                 |
 | -------------------------------- | ----------------------------------------------------------------- | ------------------------------|
