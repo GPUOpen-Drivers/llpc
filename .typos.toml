@@ -1,0 +1,24 @@
+# For information about the config format, see https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = ["imported/"]
+
+[default.extend-identifiers]
+# Needs to be fixed in xgl first
+TARGET_ARCHITECTURE_ENDIANESS = "TARGET_ARCHITECTURE_ENDIANESS"
+tese = "tese"
+fo = "fo"
+ANDed = "ANDed"
+ba = "ba"
+UE = "UE"
+OpBuildNDRange = "OpBuildNDRange"
+
+[default.extend-words]
+lod = "lod"
+LOD = "LOD"
+Lod = "Lod"
+OLT = "OLT"
+inout = "inout"
+RELA = "RELA"
+USCALED = "USCALED"
+Datas = "Datas"

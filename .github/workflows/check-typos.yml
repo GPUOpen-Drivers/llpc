@@ -1,0 +1,21 @@
+name: Spell Check
+on: [pull_request]
+
+jobs:
+  run:
+    name: typos
+    runs-on: "ubuntu-20.04"
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+
+    - name: Check spelling
+      uses: crate-ci/typos@v1.2.1
+
+    - name: Help
+      if: always()
+      run: |
+        echo 'To run the check locally, install typos from https://github.com/crate-ci/typos and run `typos` in the repository.'
+        echo 'Run `typos -w` to automatically correct spelling mistakes.'
+        echo
+        echo 'Please add false positives to .typos.toml'
