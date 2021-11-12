@@ -1611,7 +1611,7 @@ bool LegacyPipelineStateClearer::runOnModule(Module &module) {
 //
 // @param [in/out] module : IR module
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
-// @returns : The preverved analyses (The Analyses that are still valid after this pass)
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
 PreservedAnalyses PipelineStateClearer::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   runImpl(module, pipelineState);
