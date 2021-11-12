@@ -137,7 +137,7 @@ void ElfWriter<Elf>::mergeSection(const SectionBuffer *pSection1, size_t section
 
   // Fill alignment data with NOP instruction to match backend's behavior
   if (baseCopySize < section1Size) {
-    // NOTE: All disassemble section don't have any alignmeent requirement, so it happen only if we merge
+    // NOTE: All disassemble section don't have any alignment requirement, so it happen only if we merge
     // .text section.
     constexpr unsigned nop = 0xBF800000;
     unsigned *dataDw = reinterpret_cast<unsigned *>(data);
@@ -157,7 +157,7 @@ void ElfWriter<Elf>::mergeSection(const SectionBuffer *pSection1, size_t section
 }
 
 // =====================================================================================================================
-// A woarkaround to support erase in llvm::msgpack::MapDocNode.
+// A workaround to support erase in llvm::msgpack::MapDocNode.
 class MapDocNode : public msgpack::MapDocNode {
 public:
   MapTy::iterator erase(MapTy::iterator where) { return Map->erase(where); }

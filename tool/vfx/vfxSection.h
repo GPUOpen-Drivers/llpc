@@ -243,7 +243,7 @@ inline SectionInfo initSectionItemInfo(SectionType type, uint16_t propertyLo, ui
   ++tableItem;
 
 // =====================================================================================================================
-// Csses a section to sub section
+// Cases a section to sub section
 #define CASE_SUBSECTION(ENUM, TYPE)                                                                                    \
   case ENUM: {                                                                                                         \
     TYPE *subSectionObj = nullptr;                                                                                     \
@@ -331,7 +331,7 @@ protected:
 private:
   StrToMemberAddr *m_memberTable; // Member address table
   unsigned m_tableSize;           // Address table size
-  bool m_isActive;                // If the scestion is active
+  bool m_isActive;                // If the section is active
 };
 
 // =====================================================================================================================

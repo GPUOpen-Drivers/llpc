@@ -461,7 +461,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
           xfbOutValue = elements[0];
         }
 
-        // Get the XFB out info at the origial location info
+        // Get the XFB out info at the original location info
         InOutLocationInfo origLocInfo;
         origLocInfo.setLocation(locElemsPair.first);
         origLocInfo.setStreamId(streamId);
@@ -521,7 +521,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
 
   const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
   if (builtInUsage.layer || enableMultiView) {
-    // NOTE: If mult-view is enabled, always export gl_ViewIndex rather than gl_Layer.
+    // NOTE: If multi-view is enabled, always export gl_ViewIndex rather than gl_Layer.
     builtInPairs.push_back(std::make_pair(enableMultiView ? BuiltInViewIndex : BuiltInLayer, builder.getInt32Ty()));
   }
 
@@ -575,7 +575,7 @@ Value *PatchCopyShader::calcGsVsRingOffsetForInput(unsigned location, unsigned c
 }
 
 // =====================================================================================================================
-// Loads value from GS-VS ring (only accept 32-bit scalar, vector, or arry).
+// Loads value from GS-VS ring (only accept 32-bit scalar, vector, or array).
 //
 // @param loadTy : Type of the load value
 // @param location : Output location

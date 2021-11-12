@@ -596,7 +596,7 @@ struct PipelineShaderOptions {
   // Whether update descriptor root offset in ELF
   bool updateDescInElf;
 
-  /// Disable the the LLVM backend's LICM pass (equivalent to disableLicmThreshold=1).
+  /// Disable the LLVM backend's LICM pass (equivalent to disableLicmThreshold=1).
   bool disableLicm;
 
   /// Default unroll threshold for LLVM.

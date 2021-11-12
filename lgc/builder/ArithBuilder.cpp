@@ -1226,7 +1226,7 @@ Value *ArithBuilder::CreateExtractBitField(Value *base, Value *offset, Value *co
 }
 
 // =====================================================================================================================
-// Create "find MSB" operation for a (vector of) signed i32. For a postive number, the result is the bit number of
+// Create "find MSB" operation for a (vector of) signed i32. For a positive number, the result is the bit number of
 // the most significant 1-bit. For a negative number, the result is the bit number of the most significant 0-bit.
 // For a value of 0 or -1, the result is -1.
 //

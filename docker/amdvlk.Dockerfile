@@ -14,7 +14,7 @@
 # - BRANCH: The base AMDVLK branch to use (e.g., master, dev, releases/<name>)
 # - CONFIG: Debug or Release
 # - ASSERTIONS: OFF or ON
-# - FEATURES: A '+'-spearated set of features to enable
+# - FEATURES: A '+'-separated set of features to enable
 # - GENERATOR: CMake generator to use (e.g., "Unix Makefiles", Ninja)
 #
 

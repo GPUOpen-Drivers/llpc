@@ -148,7 +148,7 @@ enum class WorkgroupLayout : unsigned {
 struct ResourceUsage {
   std::unordered_set<uint64_t> descPairs;  // Pairs of descriptor set/binding
   bool resourceWrite = false;              // Whether shader does resource-write operations (UAV)
-  bool resourceRead = false;               // Whether shader does resource-read operrations (UAV)
+  bool resourceRead = false;               // Whether shader does resource-read operations (UAV)
   bool perShaderTable = false;             // Whether per shader stage table is used
   unsigned numSgprsAvailable = UINT32_MAX; // Number of available SGPRs
   unsigned numVgprsAvailable = UINT32_MAX; // Number of available VGPRs
@@ -379,7 +379,7 @@ struct ResourceUsage {
       // Map from output location info to the transform feedback info
       std::map<InOutLocationInfo, XfbOutInfo> locInfoXfbOutInfoMap;
 
-      // ID of the vertex stream sent to rasterizor
+      // ID of the vertex stream sent to rasterizer
       unsigned rasterStream = 0;
 
       struct {

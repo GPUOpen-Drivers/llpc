@@ -86,7 +86,7 @@ const static char SamplePatternIdx[] = "$samplePatternIdx";
 const static char DeviceIdx[] = "$deviceIdx";
 
 // Pushconst offset is "pushconst"
-// The value of the relocation is the offset of the pushconst reource node in the pipeline state.
+// The value of the relocation is the offset of the pushconst resource node in the pipeline state.
 const static char Pushconst[] = "pushconst";
 
 // Whether the shadow descriptor is enabled or not.

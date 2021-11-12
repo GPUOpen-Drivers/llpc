@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  vkgcPipelineDumper.h
- * @brief VKGC header file: contains definitions of VKGC pipline dump utility
+ * @brief VKGC header file: contains definitions of VKGC pipeline dump utility
  ***********************************************************************************************************************
  */
 #pragma once

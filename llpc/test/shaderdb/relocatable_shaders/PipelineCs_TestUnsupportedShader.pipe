@@ -8,7 +8,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} calculated hash results (compute pipeline)
 ; SHADERTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: {{^=====}} AMDLLPC SUCCES
+; SHADERTEST: {{^=====}} AMDLLPC SUCCESS
 ; END_SHADERTEST
 
 

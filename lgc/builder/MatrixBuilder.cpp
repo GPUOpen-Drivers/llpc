@@ -492,7 +492,7 @@ Value *MatrixBuilder::CreateCooperativeMatrixConvert(Value *source, Value *targe
 }
 
 // =====================================================================================================================
-// Create cooparetive matrix binary operation
+// Create cooperative matrix binary operation
 //
 // @param coopMatArithOp : The cooperative matrix arithmetic operation to perform.
 // @param operand1 : The first operand and it can be a scalar or a cooperative matrix.

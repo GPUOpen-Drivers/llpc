@@ -376,7 +376,7 @@ private:
   SPIRVAccessChainBase *deriveAccessChain(SPIRVValue *memOp, SPIRVToLLVM::LlvmMemOpType instructionType) const;
 
   // ========================================================================================================================
-  // Checks if a given memOp is eligble for inserting the bounds check, e. g. if the access chain is of storage class
+  // Checks if a given memOp is eligible for inserting the bounds check, e. g. if the access chain is of storage class
   // "private" or "function".
   // @param [in] memOp: either a SPVLoad or a SPVStore.
   // @param [in] instructionType: an enum value describing the kind of memOp.

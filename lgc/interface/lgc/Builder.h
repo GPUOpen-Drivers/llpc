@@ -1300,7 +1300,7 @@ public:
   virtual llvm::Value *CreateCooperativeMatrixConvert(llvm::Value *source, llvm::Value *dest,
                                                       const llvm::Twine &instName = "") = 0;
 
-  // Create cooparetive matrix binary operation
+  // Create cooperative matrix binary operation
   //
   // @param coopMatArithOp : The cooperative matrix arithmetic operation to perform.
   // @param operand1 : The first operand.
@@ -1622,7 +1622,7 @@ protected:
   ShaderStage m_shaderStage = ShaderStageInvalid; // Current shader stage being built.
 
   //
-  // @param matrixType : The matrix type to tranpose
+  // @param matrixType : The matrix type to transpose
   llvm::Type *getTransposedMatrixTy(llvm::Type *const matrixType) const;
 
 private:

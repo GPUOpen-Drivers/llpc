@@ -411,7 +411,7 @@ Value *FragColorExport::convertToInt(Value *value, bool signedness, BuilderBase 
   }
   if (bitWidth <= 16) {
     if (valueTy->isFloatingPointTy()) {
-      // %value = bicast half %value to i16
+      // %value = bitcast half %value to i16
       value = builder.CreateBitCast(value, int16Ty);
     }
 

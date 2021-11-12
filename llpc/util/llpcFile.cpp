@@ -65,7 +65,7 @@ Result File::open(const char *filename, unsigned accessFlags) {
     case (FileAccessRead | FileAccessWrite):
       // NOTE: Both r+ and w+ modes might apply here: r+ requires that the file exists beforehand, while w+ does
       // not. w+ will create the file if it doesn't exist, like w,a,a+. w+, like w, will discard existing
-      // contents of thefile. If we need to expose r+ mode, adding another flag to indicate 'don't overwrite the
+      // contents of the file. If we need to expose r+ mode, adding another flag to indicate 'don't overwrite the
       // file'.
       fileMode[0] = 'w';
       fileMode[1] = '+';

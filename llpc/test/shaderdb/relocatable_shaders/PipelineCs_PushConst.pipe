@@ -1,11 +1,11 @@
 ; Test that the offset to the push constant area is correct when the push constants are spilled.
-; This may be a fragile test because the conditions in which the push constatns are spilled might change.
+; This may be a fragile test because the conditions in which the push constants are spilled might change.
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s
 ; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
-; This tries to match the sequece that loads the vector from the puch constant.  This is the only 2 element load in the
+; This tries to match the sequence that loads the vector from the push constant.  This is the only 2 element load in the
 ; code.  The "4" is the offset of the push constant area in the root table.
 ; SHADERTEST: s_mov_b32 [[r1:s[0-9]+]], 4 //
 ; SHADERTEST: s_ashr_i32 s[[r2:[0-9]+]], [[r1]], 31
@@ -91,4 +91,3 @@ userDataNode[2].next[5].offsetInDwords = 28
 userDataNode[2].next[5].sizeInDwords = 4
 userDataNode[2].next[5].set = 0x00000000
 userDataNode[2].next[5].binding = 6
-

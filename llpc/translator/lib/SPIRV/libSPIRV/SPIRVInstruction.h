@@ -2619,7 +2619,7 @@ protected:
 };
 
 #define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVIntegerDotProductInstBase, Op##x, __VA_ARGS__> SPIRV##x;
-// Integer dot product instrction
+// Integer dot product instruction
 _SPIRV_OP(SDotKHR, true, 5, true, 2)
 _SPIRV_OP(UDotKHR, true, 5, true, 2)
 _SPIRV_OP(SUDotKHR, true, 5, true, 2)

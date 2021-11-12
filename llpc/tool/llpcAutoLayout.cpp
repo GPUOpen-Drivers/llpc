@@ -89,7 +89,7 @@ static unsigned getTypeDataSize(const SPIRVType *ty) {
 // @param [in] shaderInfo : Shader info, used to check entry point name
 // @param [in/out] resNodeSets : Resource map, will have user data nodes added to it
 // @param [in/out] pushConstSize : Cumulative push constant node size
-// @param autoLayourDesc : Whether to automatically create descriptor layout based on resource usages
+// @param autoLayoutDesc : Whether to automatically create descriptor layout based on resource usages
 void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipelineBuildInfo *pipelineInfo,
                       PipelineShaderInfo *shaderInfo, ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
                       bool autoLayoutDesc) {
@@ -488,7 +488,7 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
 // @param resNodeSets : User-data nodes to be pointed to by top level nodes
 // @param pushConstSize : Push constant node size
 // @param [in/out] resourceMapping : Resource map, will have user data nodes added to it
-// @param autoLayourDesc : Whether to automatically create descriptor layout based on resource usages
+// @param autoLayoutDesc : Whether to automatically create descriptor layout based on resource usages
 void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
                           ResourceMappingData *resourceMapping, bool autoLayoutDesc) {
   // Only auto-layout descriptors if -auto-layout-desc is on.

@@ -937,12 +937,12 @@ Value *YCbCrConverter::calculateUVoffset(Value *coordUV) {
 // =====================================================================================================================
 // Implement bilinear blend
 //
-// @param alpha : Horizen weight
+// @param alpha : Horizontal weight
 // @param beta : Vertical weight
 // @param coordTL: Top-left pixel
 // @param coordTR : Top-right pixel
 // @param coordBL : Bottom-left pixel
-// @param coordBR : Bottm-right pixel
+// @param coordBR : Bottom-right pixel
 Value *YCbCrConverter::bilinearBlend(Value *alpha, Value *beta, Value *coordTL, Value *coordTR, Value *coordBL,
                                      Value *coordBR) {
   Value *coordTop = m_builder->createFMix(coordTL, coordTR, alpha);

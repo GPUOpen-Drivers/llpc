@@ -188,7 +188,7 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet
     descPtr = module->getGlobalVariable(globalName, /*AllowInternal=*/true);
     if (!descPtr) {
       // We need to create the global variable as it does not already exist.
-      // First construct the immutable value as an array of <4 x i32>, for use as the initialzier of the
+      // First construct the immutable value as an array of <4 x i32>, for use as the initializer of the
       // global variable.
       SmallVector<Constant *> immutableArray;
       for (unsigned idx = 0; idx != node->immutableSize; ++idx) {

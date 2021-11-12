@@ -156,7 +156,7 @@ inline auto internalShaderStages() {
 }
 } // namespace Llpc
 
-// Make MetroHash::Hash compatible with LLVM's unordered contrainers.
+// Make MetroHash::Hash compatible with LLVM's unordered containers.
 namespace llvm {
 template <> struct DenseMapInfo<MetroHash::Hash> {
   static MetroHash::Hash getEmptyKey() {

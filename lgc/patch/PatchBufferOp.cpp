@@ -1033,7 +1033,7 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
   // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
   if (!lengthConstant || constantLength > MinMemOpLoopBytes) {
     // NOTE: We want to perform our memcpy operation on the greatest stride of bytes possible (load/storing up to
-    // dwordx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
+    // dwordx4 or 16 bytes per loop iteration). If we have a constant length, we check if the alignment and
     // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
     // 2. Worst case we have to load/store a single byte per loop.
     unsigned stride = !lengthConstant ? 1 : 16;
@@ -1162,7 +1162,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
   // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
   if (!lengthConstant || constantLength > MinMemOpLoopBytes) {
     // NOTE: We want to perform our memset operation on the greatest stride of bytes possible (load/storing up to
-    // dwordx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
+    // dwordx4 or 16 bytes per loop iteration). If we have a constant length, we check if the alignment and
     // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
     // 2. Worst case we have to load/store a single byte per loop.
     unsigned stride = !lengthConstant ? 1 : 16;
@@ -1721,7 +1721,7 @@ Value *PatchBufferOp::replaceICmp(ICmpInst *const iCmpInst) {
 }
 
 // =====================================================================================================================
-// Make a loop, returning the the value of the loop counter. This modifies the insertion point of the builder.
+// Make a loop, returning the value of the loop counter. This modifies the insertion point of the builder.
 //
 // @param loopStart : The start index of the loop.
 // @param loopEnd : The end index of the loop.

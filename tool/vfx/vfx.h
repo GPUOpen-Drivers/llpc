@@ -62,7 +62,7 @@ namespace Vfx {
 #if VFX_SUPPORT_VK_PIPELINE
 typedef Vkgc::ShaderStage ShaderStage;
 #else
-#error Not implemetend!
+#error Not implemented!
 #endif
 
 // =====================================================================================================================
@@ -519,7 +519,7 @@ struct GraphicsPipelineState {
   ColorBuffer colorBuffer[Vkgc::MaxColorTargets]; // Color target state.
   bool dynamicVertexStride; // Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader; // Use uber fetch shader
-  bool enableEarlyCompile; // Enaable early compile
+  bool enableEarlyCompile;    // Enable early compile
 };
 
 // =====================================================================================================================

@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  IntrinsDefs.h
- * @brief LLPC header file: contains various definitions used by LLPC AMDGPU-backend instrinics.
+ * @brief LLPC header file: contains various definitions used by LLPC AMDGPU-backend intrinsics.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -143,7 +143,7 @@ enum ColorNumFormat {
   COLOR_NUM_FORMAT_FLOAT = 7,   // FLOAT
 };
 
-// Enumrates CB component swap mode.
+// Enumerates CB component swap mode.
 enum ColorSwap {
   COLOR_SWAP_STD = 0,     // STD
   COLOR_SWAP_ALT = 1,     // ALT

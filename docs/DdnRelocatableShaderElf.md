@@ -170,7 +170,7 @@ a descriptor in a descriptor table. An example can be found in the
 Note that for the top-level case, it is assumed that the descriptor has been
 spilled. The code is generated this way in
 [`DescBuilder::CreateLoadBufferDesc`](../lgc/builder/DescBuilder.cpp). The case
-where `node == topeNode` cannot be reached for unlinked shaders with missing
+where `node == topNode` cannot be reached for unlinked shaders with missing
 user data nodes. Then when replacing the `reloc::DescriptorUseSpillTable`
 relocation in [`RelocHandler::getValue`](../lgc/elfLinker/RelocHandler.cpp), the
 descriptor is spilled if it is a top-level node.

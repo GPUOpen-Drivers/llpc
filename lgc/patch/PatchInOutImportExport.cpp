@@ -1061,7 +1061,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       // }
       //
       // If NGG, the copy shader with stream-out is not a real HW VS and will be incorporated into NGG
-      // primitive shader later. There is no mutiple HW executions. And it has the following structure similar to
+      // primitive shader later. There is no multiple HW executions. And it has the following structure similar to
       // single stream processing:
       //
       //   copyShader() {
@@ -1079,7 +1079,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
       bool updated = false;
       for (auto &block : *m_entryPoint) {
-        // Seach blocks to find the switch-case instruction
+        // Search blocks to find the switch-case instruction
         auto switchInst = dyn_cast<SwitchInst>(block.getTerminator());
         if (switchInst) {
           for (auto &caseBranch : switchInst->cases()) {
@@ -1533,7 +1533,7 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
   Value *input = loadValueFromEsGsRing(inputTy, location, compIdx, vertexIdx, insertPos);
 
   if (inputTy != origInputTy) {
-    // Cast back to oringinal input type
+    // Cast back to original input type
     assert(canBitCast(inputTy, origInputTy));
     assert(inputTy->isVectorTy());
 
@@ -1546,7 +1546,7 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
 // =====================================================================================================================
 // Translate float type interpolation into corresponding LLVM intrinsics
 //
-// @param builder : The IR builder to to create and insert IR instruction
+// @param builder : The IR builder to create and insert IR instruction
 // @param attr : The attribute location to access
 // @param channel: The specific attribute channel to access
 // @param coordI: Value of I coordinate
@@ -1571,7 +1571,7 @@ Value *PatchInOutImportExport::performFsFloatInterpolation(BuilderBase &builder,
 // =====================================================================================================================
 // Translate half type interpolation into corresponding LLVM intrinsics
 //
-// @param builder : The IR builder to to create and insert IR instruction
+// @param builder : The IR builder to create and insert IR instruction
 // @param attr : The attribute location to access
 // @param channel: The specific attribute channel to access
 // @param coordI: Value of I coordinate
@@ -1671,7 +1671,7 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
     interpInfoAtLoc.is16bit = inputTy->getScalarSizeInBits() == 16;
     interpInfoAtLoc.attr0Valid = true;
   } else {
-    // attr1Valid is false by default and set it true when it is realy a high half
+    // attr1Valid is false by default and set it true when it is really a high half
     interpInfo[location].attr1Valid = true;
   }
 
@@ -3384,7 +3384,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
 }
 
 // =====================================================================================================================
-// Creates the LLPC intrinsic "llpc.streamoutbuffer.store.f32" to store value to to stream-out buffer.
+// Creates the LLPC intrinsic "llpc.streamoutbuffer.store.f32" to store value to stream-out buffer.
 //
 // @param storeValue : Value to store
 // @param xfbStride : Transform feedback stride
@@ -4404,7 +4404,7 @@ Value *PatchInOutImportExport::calcTessFactorOffset(bool isOuter, Value *elemIdx
   Value *tessFactorOffset = ConstantInt::get(Type::getInt32Ty(*m_context), tessFactorStart);
   if (elemIdxVal) {
     if (primitiveMode == PrimitiveMode::Isolines && isOuter) {
-      // NOTE: In case of the isoline,  hardware wants two tessellation factor: the first is detail
+      // NOTE: In case of the isoline, hardware wants two tessellation factor: the first is detail
       // TF, the second is density TF. The order is reversed, different from GLSL spec.
       assert(tessFactorCount == 2);
 
@@ -5709,7 +5709,7 @@ void PatchInOutImportExport::storeTessFactors() {
 //
 // @param outerTessFactors : The collected tessellation factors of Outer
 // @param innerTessFactors : The collected tessellation factors of Inner
-// @param inserPos : Where to insert instructions
+// @param insertPos : Where to insert instructions
 void PatchInOutImportExport::doTessFactorBufferStore(ArrayRef<Value *> outerTessFactors,
                                                      ArrayRef<Value *> innerTessFactors, Instruction *insertPos) {
   ArrayRef<Instruction *> tessLevelInsts = m_tessLevelOuterInsts;

@@ -1311,7 +1311,7 @@ char *getWordFromString(char *str, char *wordBuffer) {
 }
 
 // =====================================================================================================================
-// Substitutes marcros for 1 line.
+// Substitutes macros for 1 line.
 // Returns false if line length after substitution exceeds MaxLineBufSize
 //
 // @param line : Line string
@@ -1363,7 +1363,7 @@ namespace Vfx {
 // Parses input file
 //
 // @param filename : Input file name
-// @param numMacro : Number of marcos
+// @param numMacro : Number of macros
 // @param macros : Marco list, Two strings are a macro, and macro will be extract before parse
 // @param type : Document type
 // @param [out] ppDoc : Document handle

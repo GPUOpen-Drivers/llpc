@@ -77,7 +77,7 @@ void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {
     static_assert((sizeof(XorBankRot3b) / sizeof(unsigned)) == xorPatternLen,
                   "The length of XorBankRot3b is different from xorPatternLen");
 
-    // GFX10 hardware calculate pipe banck xor
+    // GFX10 hardware calculate pipe bank xor
     // SEE: Gfx10Lib::HwlComputePipeBankXor in pal\src\core\imported\addrlib\src\gfx10\gfx10addrlib.cpp
     auto gfx10HwlComputePipeBankXor = [&](unsigned surfIdx) -> Value * {
       return m_builder->getInt32(XorBankRot3b[surfIdx % xorPatternLen] << (pipesLog2 + columnBits));
