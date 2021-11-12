@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,61 +24,61 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  VertexFetch.h
- * @brief LLPC header file: contains declaration of class lgc::VertexFetch.
+ * @file  PatchLoopMetadata.h
+ * @brief LLPC header file: contains declaration of class lgc::PatchLoopMetadata.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/Pipeline.h"
+#include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
+//#include "llvm/Analysis/LoopAnalysisManager.h"
+#include "llvm/Transforms/Scalar/LoopPassManager.h"
 
 namespace lgc {
 
-class BuilderBase;
-
 // =====================================================================================================================
-// Public interface to vertex fetch manager.
-class VertexFetch {
+// Represents the LLVM pass for patching loop metadata.
+class PatchLoopMetadata : public llvm::PassInfoMixin<PatchLoopMetadata> {
 public:
-  virtual ~VertexFetch() {}
+  PatchLoopMetadata();
+  llvm::PreservedAnalyses run(llvm::Loop &loop, llvm::LoopAnalysisManager &analysisManager,
+                              llvm::LoopStandardAnalysisResults &loopAnalysisResults, llvm::LPMUpdater &);
 
-  // Create a VertexFetch
-  static VertexFetch *create(LgcContext *lgcContext);
+  bool runImpl(llvm::Loop &loop, PipelineState *pipelineState);
 
-  // Generate code to fetch a vertex value
-  virtual llvm::Value *fetchVertex(llvm::Type *inputTy, const VertexInputDescription *description, unsigned location,
-                                   unsigned compIdx, BuilderBase &builder) = 0;
+  static llvm::StringRef name() { return "Set or amend metadata to control loop unrolling"; }
+
+  llvm::MDNode *updateMetadata(llvm::MDNode *loopId, llvm::ArrayRef<llvm::StringRef> prefixesToRemove,
+                               llvm::Metadata *addMetadata, bool conditional);
+
+private:
+  llvm::LLVMContext *m_context;       // Associated LLVM context of the LLVM module that passes run on
+  unsigned m_forceLoopUnrollCount;    // Force loop unroll count
+  bool m_disableLoopUnroll;           // Forcibly disable loop unroll
+  unsigned m_disableLicmThreshold;    // Disable LLVM LICM pass loop block count threshold
+  unsigned m_unrollHintThreshold;     // Unroll hint threshold
+  unsigned m_dontUnrollHintThreshold; // DontUnroll hint threshold
+  GfxIpVersion m_gfxIp;
 };
 
 // =====================================================================================================================
-// Pass to lower vertex fetch calls
-class LowerVertexFetch : public llvm::PassInfoMixin<LowerVertexFetch> {
+// Represents the LLVM pass for patching loop metadata.
+class LegacyPatchLoopMetadata : public llvm::LoopPass {
 public:
-  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  LegacyPatchLoopMetadata();
 
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
+  bool runOnLoop(llvm::Loop *loop, llvm::LPPassManager &loopPassMgr) override;
 
-  static llvm::StringRef name() { return "Lower vertex fetch calls"; }
-};
-
-// =====================================================================================================================
-// Pass to lower vertex fetch calls
-class LegacyLowerVertexFetch : public llvm::ModulePass {
-public:
-  LegacyLowerVertexFetch();
-  LegacyLowerVertexFetch(const LegacyLowerVertexFetch &) = delete;
-  LegacyLowerVertexFetch &operator=(const LegacyLowerVertexFetch &) = delete;
+  static char ID; // ID of this pass
 
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
     analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   }
 
-  virtual bool runOnModule(llvm::Module &module) override;
-
-  static char ID; // ID of this pass
 private:
-  LowerVertexFetch m_impl;
+  PatchLoopMetadata m_impl;
 };
 
 } // namespace lgc

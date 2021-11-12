@@ -26,9 +26,10 @@
  ***********************************************************************************************************************
  * @file  PatchInOutImportExport.cpp
  * @brief LLPC source file: contains implementation of class lgc::PatchInOutImportExport.
+ *
  ***********************************************************************************************************************
  */
-#include "PatchInOutImportExport.h"
+#include "lgc/patch/PatchInOutImportExport.h"
 #include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
 #include "lgc/state/AbiUnlinked.h"
@@ -49,22 +50,26 @@ namespace lgc {
 
 // =====================================================================================================================
 // Initializes static members.
-char PatchInOutImportExport::ID = 0;
+char LegacyPatchInOutImportExport::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for input import and output export
-ModulePass *createPatchInOutImportExport() {
-  return new PatchInOutImportExport();
+ModulePass *createLegacyPatchInOutImportExport() {
+  return new LegacyPatchInOutImportExport();
 }
 
 // =====================================================================================================================
-PatchInOutImportExport::PatchInOutImportExport() : LegacyPatch(ID), m_lds(nullptr) {
+PatchInOutImportExport::PatchInOutImportExport() : m_lds(nullptr) {
   memset(&m_gfxIp, 0, sizeof(m_gfxIp));
   initPerShader();
 }
 
 // =====================================================================================================================
-PatchInOutImportExport::~PatchInOutImportExport() {
+LegacyPatchInOutImportExport::LegacyPatchInOutImportExport() : ModulePass(ID) {
+}
+
+// =====================================================================================================================
+LegacyPatchInOutImportExport::~LegacyPatchInOutImportExport() {
 }
 
 // =====================================================================================================================
@@ -87,12 +92,50 @@ void PatchInOutImportExport::initPerShader() {
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchInOutImportExport::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchInOutImportExport::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
+  auto getPDT = [&](Function &f) -> PostDominatorTree & {
+    return getAnalysis<PostDominatorTreeWrapperPass>(f).getPostDomTree();
+  };
+  return m_impl.runImpl(module, pipelineShaders, pipelineState, getPDT);
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PatchInOutImportExport::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
+  auto getPDT = [&](Function &f) -> PostDominatorTree & {
+    auto &fam = analysisManager.getResult<FunctionAnalysisManagerModuleProxy>(module).getManager();
+    return fam.getResult<PostDominatorTreeAnalysis>(f);
+  };
+  if (runImpl(module, pipelineShaders, pipelineState, getPDT))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param pipelineShaders : Pipeline shaders analysis result
+// @param pipelineState : Pipeline state
+// @param getPostDominatorTree : Function to get the PostDominatorTree of the given Function object
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
+                                     PipelineState *pipelineState,
+                                     std::function<PostDominatorTree &(Function &)> getPostDominatorTree) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-In-Out-Import-Export\n");
 
-  LegacyPatch::init(&module);
+  Patch::init(&module);
 
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = pipelineState;
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   m_pipelineSysValues.initialize(m_pipelineState);
 
@@ -139,11 +182,11 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
 
   // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
   // set by TCS).
-  auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
   for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage) {
-    auto entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
+    auto entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(shaderStage));
     if (entryPoint) {
-      processFunction(*entryPoint, static_cast<ShaderStage>(shaderStage), inputCallees, otherCallees);
+      processFunction(*entryPoint, static_cast<ShaderStage>(shaderStage), inputCallees, otherCallees,
+                      getPostDominatorTree);
       if (shaderStage == ShaderStageTessControl)
         storeTessFactors();
     }
@@ -154,9 +197,9 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
     if (func.isDeclaration())
       continue;
     auto shaderStage = getShaderStage(&func);
-    if (shaderStage == ShaderStage::ShaderStageInvalid || &func == pipelineShaders->getEntryPoint(shaderStage))
+    if (shaderStage == ShaderStage::ShaderStageInvalid || &func == pipelineShaders.getEntryPoint(shaderStage))
       continue;
-    processFunction(func, shaderStage, inputCallees, otherCallees);
+    processFunction(func, shaderStage, inputCallees, otherCallees, getPostDominatorTree);
   }
 
   for (auto callInst : m_importCalls) {
@@ -178,8 +221,9 @@ bool PatchInOutImportExport::runOnModule(Module &module) {
 
 void PatchInOutImportExport::processFunction(Function &func, ShaderStage shaderStage,
                                              SmallVectorImpl<Function *> &inputCallees,
-                                             SmallVectorImpl<Function *> &otherCallees) {
-  PostDominatorTree &postDomTree = getAnalysis<PostDominatorTreeWrapperPass>(func).getPostDomTree();
+                                             SmallVectorImpl<Function *> &otherCallees,
+                                             std::function<PostDominatorTree &(Function &)> getPostDominatorTree) {
+  PostDominatorTree &postDomTree = getPostDominatorTree(func);
 
   initPerShader();
   m_entryPoint = &func;
@@ -5745,6 +5789,6 @@ void PatchInOutImportExport::doTessFactorBufferStore(ArrayRef<Value *> outerTess
 } // namespace lgc
 
 // =====================================================================================================================
-// Initializes the pass of LLVM patching opertions for input import and output export.
-INITIALIZE_PASS(PatchInOutImportExport, DEBUG_TYPE, "Patch LLVM for input import and output export operations", false,
-                false)
+// Initializes the pass of LLVM patching operations for input import and output export.
+INITIALIZE_PASS(LegacyPatchInOutImportExport, DEBUG_TYPE, "Patch LLVM for input import and output export operations",
+                false, false)

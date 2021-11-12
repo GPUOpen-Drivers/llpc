@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/PatchInitializeWorkgroupMemory.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
@@ -48,53 +48,56 @@ static cl::opt<bool>
 namespace lgc {
 
 // =====================================================================================================================
-// Represents the pass of setting up the value for workgroup global variables.
-class PatchInitializeWorkgroupMemory final : public LegacyPatch {
-public:
-  PatchInitializeWorkgroupMemory();
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
-
-  virtual bool runOnModule(Module &module) override;
-
-  static char ID; // ID of this pass
-
-private:
-  PatchInitializeWorkgroupMemory(const PatchInitializeWorkgroupMemory &) = delete;
-  PatchInitializeWorkgroupMemory &operator=(const PatchInitializeWorkgroupMemory &) = delete;
-
-  void initializeWithZero(GlobalVariable *lds, BuilderBase &builder);
-  unsigned getTypeSizeInDwords(Type *inputTy);
-
-  DenseMap<GlobalVariable *, Value *> m_globalLdsOffsetMap;
-  PipelineState *m_pipelineState = nullptr;
-};
-
-// =====================================================================================================================
 // Initializes static members.
-char PatchInitializeWorkgroupMemory::ID = 0;
+char LegacyPatchInitializeWorkgroupMemory::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of setting up the value for workgroup global variables.
-ModulePass *createPatchInitializeWorkgroupMemory() {
-  return new PatchInitializeWorkgroupMemory();
+ModulePass *createLegacyPatchInitializeWorkgroupMemory() {
+  return new LegacyPatchInitializeWorkgroupMemory();
 }
 
 // =====================================================================================================================
-PatchInitializeWorkgroupMemory::PatchInitializeWorkgroupMemory() : LegacyPatch(ID) {
+LegacyPatchInitializeWorkgroupMemory::LegacyPatchInitializeWorkgroupMemory() : ModulePass(ID) {
 }
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchInitializeWorkgroupMemory::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchInitializeWorkgroupMemory::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
+  return m_impl.runImpl(module, pipelineShaders, pipelineState);
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PatchInitializeWorkgroupMemory::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
+  if (runImpl(module, pipelineShaders, pipelineState))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param pipelineShaders : Pipeline shaders analysis result
+// @param pipelineState : Pipeline state
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
+                                             PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Initialize-Workgroup-Memory\n");
 
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = pipelineState;
   // This pass works on compute shader.
   if (!m_pipelineState->hasShaderStage(ShaderStageCompute))
     return false;
@@ -111,9 +114,9 @@ bool PatchInitializeWorkgroupMemory::runOnModule(Module &module) {
   if (workgroupGlobals.empty())
     return false;
 
-  LegacyPatch::init(&module);
+  Patch::init(&module);
   m_shaderStage = ShaderStageCompute;
-  m_entryPoint = (&getAnalysis<LegacyPipelineShaders>())->getEntryPoint(static_cast<ShaderStage>(m_shaderStage));
+  m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(m_shaderStage));
   BuilderBase builder(*m_context);
   Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
   builder.SetInsertPoint(insertPos);
@@ -271,4 +274,4 @@ unsigned PatchInitializeWorkgroupMemory::getTypeSizeInDwords(Type *inputTy) {
 
 // =====================================================================================================================
 // Initializes the pass of initialize workgroup memory with zero.
-INITIALIZE_PASS(PatchInitializeWorkgroupMemory, DEBUG_TYPE, "Patch for initialize workgroup memory", false, false)
+INITIALIZE_PASS(LegacyPatchInitializeWorkgroupMemory, DEBUG_TYPE, "Patch for initialize workgroup memory", false, false)

@@ -28,7 +28,7 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchResourceCollect.
  ***********************************************************************************************************************
  */
-#include "PatchResourceCollect.h"
+#include "lgc/patch/PatchResourceCollect.h"
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
 #include "NggLdsManager.h"
@@ -59,38 +59,70 @@ namespace lgc {
 
 // =====================================================================================================================
 // Initializes static members.
-char PatchResourceCollect::ID = 0;
+char LegacyPatchResourceCollect::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for resource collecting
-ModulePass *createPatchResourceCollect() {
-  return new PatchResourceCollect();
+ModulePass *createLegacyPatchResourceCollect() {
+  return new LegacyPatchResourceCollect();
 }
 
 // =====================================================================================================================
-PatchResourceCollect::PatchResourceCollect() : LegacyPatch(ID), m_resUsage(nullptr) {
+PatchResourceCollect::PatchResourceCollect() : m_resUsage(nullptr) {
+}
+
+// =====================================================================================================================
+LegacyPatchResourceCollect::LegacyPatchResourceCollect() : ModulePass(ID) {
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchResourceCollect::runOnModule(Module &module) {
+  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  return m_impl.runImpl(module, pipelineShaders, pipelineState);
 }
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchResourceCollect::runOnModule(Module &module) {
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PatchResourceCollect::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  runImpl(module, pipelineShaders, pipelineState);
+  return PreservedAnalyses::none();
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param pipelineShaders : Pipeline shaders analysis result
+// @param pipelineState : Pipeline state
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchResourceCollect::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
+                                   PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 
-  LegacyPatch::init(&module);
-  m_pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  Patch::init(&module);
+  m_pipelineShaders = &pipelineShaders;
+  m_pipelineState = pipelineState;
 
   // This pass processes a missing fragment shader using FS input packing information passed into LGC
   // from the separate compile of the FS.
-  m_processMissingFs = m_pipelineState->isPartPipeline();
+  m_processMissingFs = pipelineState->isPartPipeline();
 
   bool needPack = false;
   for (int shaderStage = 0; shaderStage < ShaderStageGfxCount; ++shaderStage) {
     ShaderStage stage = static_cast<ShaderStage>(shaderStage);
-    if (m_pipelineState->hasShaderStage(stage) &&
-        (m_pipelineState->canPackInput(stage) || m_pipelineState->canPackOutput(stage))) {
+    if (pipelineState->hasShaderStage(stage) &&
+        (pipelineState->canPackInput(stage) || pipelineState->canPackOutput(stage))) {
       needPack = true;
       break;
     }
@@ -103,7 +135,7 @@ bool PatchResourceCollect::runOnModule(Module &module) {
 
   // Process each shader stage, in reverse order. We process FS even if it does not exist (part-pipeline compile).
   for (int shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage) {
-    m_entryPoint = m_pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
+    m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(shaderStage));
     m_shaderStage = static_cast<ShaderStage>(shaderStage);
     if (m_entryPoint)
       processShader();
@@ -116,23 +148,23 @@ bool PatchResourceCollect::runOnModule(Module &module) {
     if (func.isDeclaration())
       continue;
     m_shaderStage = getShaderStage(&func);
-    if (m_shaderStage == ShaderStage::ShaderStageInvalid || &func == m_pipelineShaders->getEntryPoint(m_shaderStage))
+    if (m_shaderStage == ShaderStage::ShaderStageInvalid || &func == pipelineShaders.getEntryPoint(m_shaderStage))
       continue;
     m_entryPoint = &func;
     processShader();
   }
 
-  if (m_pipelineState->isGraphics()) {
+  if (pipelineState->isGraphics()) {
     // Set NGG control settings
     setNggControl(&module);
 
     // Determine whether or not GS on-chip mode is valid for this pipeline
-    bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
-    bool checkGsOnChip = hasGs || m_pipelineState->getNggControl()->enableNgg;
+    bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
+    bool checkGsOnChip = hasGs || pipelineState->getNggControl()->enableNgg;
 
     if (checkGsOnChip) {
       bool gsOnChip = checkGsOnChipValidity();
-      m_pipelineState->setGsOnChip(gsOnChip);
+      pipelineState->setGsOnChip(gsOnChip);
     }
   }
 
@@ -3109,4 +3141,4 @@ bool InOutLocationInfoMapManager::findMap(const InOutLocationInfo &origLocInfo,
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for resource collecting.
-INITIALIZE_PASS(PatchResourceCollect, DEBUG_TYPE, "Patch LLVM for resource collecting", false, false)
+INITIALIZE_PASS(LegacyPatchResourceCollect, DEBUG_TYPE, "Patch LLVM for resource collecting", false, false)

@@ -28,7 +28,7 @@
  * @brief LLPC source file: per-shader per-pass generating and cache of shader system pointers
  ***********************************************************************************************************************
  */
-#include "SystemValues.h"
+#include "lgc/patch/SystemValues.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Constants.h"

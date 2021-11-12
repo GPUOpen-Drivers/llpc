@@ -34,6 +34,16 @@
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/builder/BuilderReplayer.h"
+#include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/PatchCopyShader.h"
+#include "lgc/patch/PatchEntryPointMutate.h"
+#include "lgc/patch/PatchInOutImportExport.h"
+#include "lgc/patch/PatchInitializeWorkgroupMemory.h"
+#include "lgc/patch/PatchLoopMetadata.h"
+#include "lgc/patch/PatchResourceCollect.h"
+#include "lgc/patch/PatchWaveSizeAdjust.h"
+#include "lgc/patch/PatchWorkarounds.h"
+#include "lgc/patch/VertexFetch.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Debug.h"
@@ -45,11 +55,13 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/ForceFunctionAttrs.h"
+#include "llvm/Transforms/IPO/GlobalDCE.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
+#include "llvm/Transforms/Scalar/LoopPassManager.h"
 #include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
@@ -102,6 +114,40 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   // Build null fragment shader if necessary
   passMgr.addPass(PatchNullFragShader());
 
+  // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
+  passMgr.addPass(PatchResourceCollect());
+
+  // Patch wave size adjusting heuristic
+  passMgr.addPass(PatchWaveSizeAdjust());
+
+  // Patch workarounds
+  passMgr.addPass(PatchWorkarounds());
+
+  // Generate copy shader if necessary.
+  passMgr.addPass(PatchCopyShader());
+
+  // Lower vertex fetch operations.
+  passMgr.addPass(LowerVertexFetch());
+
+  // Lower fragment export operations.
+  passMgr.addPass(LowerFragColorExport());
+
+  // Patch entry-point mutation (should be done before external library link)
+  passMgr.addPass(PatchEntryPointMutate());
+
+  // Patch workgroup memory initializaion.
+  passMgr.addPass(PatchInitializeWorkgroupMemory());
+
+  // Patch input import and output export operations
+  passMgr.addPass(PatchInOutImportExport());
+
+  // Prior to general optimization, do function inlining and dead function removal
+  passMgr.addPass(AlwaysInlinerPass());
+  passMgr.addPass(GlobalDCEPass());
+
+  // Patch loop metadata
+  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
+
   // NOTE: The new pass manager is not fully implemented yet. We should add all
   // the other patching passes here.
 }
@@ -136,41 +182,41 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   passMgr.add(createLegacyPatchNullFragShader());
 
   // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
-  passMgr.add(createPatchResourceCollect());
+  passMgr.add(createLegacyPatchResourceCollect());
 
   // Patch wave size adjusting heuristic
-  passMgr.add(createPatchWaveSizeAdjust());
+  passMgr.add(createLegacyPatchWaveSizeAdjust());
 
   // Patch workarounds
-  passMgr.add(createPatchWorkarounds());
+  passMgr.add(createLegacyPatchWorkarounds());
 
   // Generate copy shader if necessary.
-  passMgr.add(createPatchCopyShader());
+  passMgr.add(createLegacyPatchCopyShader());
 
   // Lower vertex fetch operations.
-  passMgr.add(createLowerVertexFetch());
+  passMgr.add(createLegacyLowerVertexFetch());
 
   // Lower fragment export operations.
-  passMgr.add(createLowerFragColorExport());
+  passMgr.add(createLegacyLowerFragColorExport());
 
   // Run IPSCCP before EntryPointMutate to avoid adding unnecessary arguments to an entry point.
   passMgr.add(createIPSCCPPass());
 
   // Patch entry-point mutation (should be done before external library link)
-  passMgr.add(createPatchEntryPointMutate());
+  passMgr.add(createLegacyPatchEntryPointMutate());
 
   // Patch workgroup memory initializaion.
-  passMgr.add(createPatchInitializeWorkgroupMemory());
+  passMgr.add(createLegacyPatchInitializeWorkgroupMemory());
 
   // Patch input import and output export operations
-  passMgr.add(createPatchInOutImportExport());
+  passMgr.add(createLegacyPatchInOutImportExport());
 
   // Prior to general optimization, do function inlining and dead function removal
   passMgr.add(createAlwaysInlinerLegacyPass());
   passMgr.add(createGlobalDCEPass());
 
   // Patch loop metadata
-  passMgr.add(createPatchLoopMetadata());
+  passMgr.add(createLegacyPatchLoopMetadata());
 
   // Check shader cache
   auto checkShaderCachePass = createPatchCheckShaderCache();

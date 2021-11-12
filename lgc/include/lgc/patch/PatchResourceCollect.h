@@ -43,25 +43,20 @@ typedef std::map<InOutLocationInfo, InOutLocationInfo> InOutLocationInfoMap;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for resource collecting
-class PatchResourceCollect : public LegacyPatch, public llvm::InstVisitor<PatchResourceCollect> {
+class PatchResourceCollect : public Patch,
+                             public llvm::InstVisitor<PatchResourceCollect>,
+                             public llvm::PassInfoMixin<PatchResourceCollect> {
 public:
   PatchResourceCollect();
 
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    analysisUsage.addPreserved<LegacyPipelineShaders>();
-  }
-
-  virtual bool runOnModule(llvm::Module &module) override;
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
   virtual void visitCallInst(llvm::CallInst &callInst);
 
-  static char ID; // ID of this pass
+  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState);
+
+  static llvm::StringRef name() { return "Patch LLVM for resource collecting"; }
 
 private:
-  PatchResourceCollect(const PatchResourceCollect &) = delete;
-  PatchResourceCollect &operator=(const PatchResourceCollect &) = delete;
-
   // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
   bool checkGsOnChipValidity();
 
@@ -96,7 +91,7 @@ private:
   void scalarizeGenericInput(llvm::CallInst *call);
   void scalarizeGenericOutput(llvm::CallInst *call);
 
-  LegacyPipelineShaders *m_pipelineShaders; // Pipeline shaders
+  PipelineShadersResult *m_pipelineShaders; // Pipeline shaders
   PipelineState *m_pipelineState;     // Pipeline state
 
   std::vector<llvm::CallInst *> m_deadCalls; // Dead calls
@@ -115,6 +110,29 @@ private:
       m_locationInfoMapManager; // Pointer to InOutLocationInfoMapManager instance
 
   bool m_processMissingFs = false; // Whether to process a missing FS (part-pipeline compilation).
+};
+
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations for resource collecting
+class LegacyPatchResourceCollect : public llvm::ModulePass {
+public:
+  LegacyPatchResourceCollect();
+
+  virtual bool runOnModule(llvm::Module &module) override;
+
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
+    analysisUsage.addPreserved<LegacyPipelineShaders>();
+  }
+
+  static char ID; // ID of this pass
+
+private:
+  LegacyPatchResourceCollect(const LegacyPatchResourceCollect &) = delete;
+  LegacyPatchResourceCollect &operator=(const LegacyPatchResourceCollect &) = delete;
+
+  PatchResourceCollect m_impl;
 };
 
 // Represents the compatibility info of input/output

@@ -28,13 +28,11 @@
  * @brief LLPC source file: PatchWaveSizeAdjust pass
  ***********************************************************************************************************************
  */
+#include "lgc/patch/PatchWaveSizeAdjust.h"
 #include "lgc/patch/Patch.h"
-#include "lgc/state/PipelineShaders.h"
-#include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
-#include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "lgc-patch-wave-size-adjust"
@@ -42,57 +40,54 @@
 using namespace lgc;
 using namespace llvm;
 
-namespace {
-
-// =====================================================================================================================
-// Pass to adjust wave size per shader stage heuristically.
-class PatchWaveSizeAdjust final : public ModulePass {
-public:
-  PatchWaveSizeAdjust();
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.setPreservesAll();
-  }
-
-  bool runOnModule(Module &module) override;
-
-  static char ID;
-
-private:
-  PatchWaveSizeAdjust(const PatchWaveSizeAdjust &) = delete;
-  PatchWaveSizeAdjust &operator=(const PatchWaveSizeAdjust &) = delete;
-
-};
-
-} // namespace
-
-char PatchWaveSizeAdjust::ID = 0;
+char LegacyPatchWaveSizeAdjust::ID = 0;
 
 // =====================================================================================================================
 // Create PatchWaveSizeAdjust pass
 //
 // @param pipeline : Pipeline object
-ModulePass *lgc::createPatchWaveSizeAdjust() {
-  return new PatchWaveSizeAdjust();
+ModulePass *lgc::createLegacyPatchWaveSizeAdjust() {
+  return new LegacyPatchWaveSizeAdjust();
 }
 
 // =====================================================================================================================
 // Constructor
 //
 // @param pipeline : Pipeline object
-PatchWaveSizeAdjust::PatchWaveSizeAdjust() : ModulePass(ID) {
+LegacyPatchWaveSizeAdjust::LegacyPatchWaveSizeAdjust() : ModulePass(ID) {
+}
+
+// =====================================================================================================================
+// Run the PatchWaveSizeAdjust pass on a module
+//
+// @param [in/out] module : LLVM module to be run on
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchWaveSizeAdjust::runOnModule(Module &module) {
+  auto pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  return m_impl.runImpl(module, pipelineState);
+}
+
+// =====================================================================================================================
+// Run the PatchWaveSizeAdjust pass on a module
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PatchWaveSizeAdjust::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  runImpl(module, pipelineState);
+  return PreservedAnalyses::all();
 }
 
 // =====================================================================================================================
 // Run the PatchWaveSizeAdjust pass on a module
 //
 // @param module : Module to run this pass on
-bool PatchWaveSizeAdjust::runOnModule(Module &module) {
+// @param pipelineState : Pipeline state
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchWaveSizeAdjust::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Running the pass of adjusting wave size heuristic\n");
 
-  auto pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   for (int stageIdx = 0; stageIdx < ShaderStageCount; ++stageIdx) {
     ShaderStage shaderStage = static_cast<ShaderStage>(stageIdx);
     if (pipelineState->hasShaderStage(shaderStage)) {
@@ -107,4 +102,4 @@ bool PatchWaveSizeAdjust::runOnModule(Module &module) {
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(PatchWaveSizeAdjust, DEBUG_TYPE, "Patch LLVM for per-shader wave size adjustment", false, false)
+INITIALIZE_PASS(LegacyPatchWaveSizeAdjust, DEBUG_TYPE, "Patch LLVM for per-shader wave size adjustment", false, false)

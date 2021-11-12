@@ -24,61 +24,67 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  VertexFetch.h
- * @brief LLPC header file: contains declaration of class lgc::VertexFetch.
+ * @file  PatchWorkarounds.h
+ * @brief LLPC header file: contains declaration of class lgc::PatchWorkarounds.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/Pipeline.h"
-#include "lgc/state/PipelineState.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/util/Internal.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Value.h"
+#include "llvm/Pass.h"
 
 namespace lgc {
 
-class BuilderBase;
-
 // =====================================================================================================================
-// Public interface to vertex fetch manager.
-class VertexFetch {
-public:
-  virtual ~VertexFetch() {}
-
-  // Create a VertexFetch
-  static VertexFetch *create(LgcContext *lgcContext);
-
-  // Generate code to fetch a vertex value
-  virtual llvm::Value *fetchVertex(llvm::Type *inputTy, const VertexInputDescription *description, unsigned location,
-                                   unsigned compIdx, BuilderBase &builder) = 0;
-};
-
-// =====================================================================================================================
-// Pass to lower vertex fetch calls
-class LowerVertexFetch : public llvm::PassInfoMixin<LowerVertexFetch> {
+// Represents the pass of LLVM patching operations for applying workarounds:
+//
+// - fix up issues when buffer descriptor is incorrectly given when it should be an image descriptor. Some architectures
+//   require a fix so the hardware will ignore this difference (actually an app error, but common enough to require
+//   handling)
+//
+class PatchWorkarounds final : public Patch, public llvm::PassInfoMixin<PatchWorkarounds> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
   bool runImpl(llvm::Module &module, PipelineState *pipelineState);
 
-  static llvm::StringRef name() { return "Lower vertex fetch calls"; }
+  static llvm::StringRef name() { return "Patch LLVM for workarounds"; }
+
+private:
+  std::unique_ptr<llvm::IRBuilder<>> m_builder; // The IRBuilder.
+  PipelineState *m_pipelineState;               // The pipeline state
+
+  llvm::SmallPtrSet<llvm::Value *, 8> m_processed; // Track rsrc-desc args already processed
+
+  bool m_changed;
+
+  void applyImageDescWorkaround(void);
+  void processImageDescWorkaround(llvm::CallInst &callInst, bool isLastUse);
 };
 
 // =====================================================================================================================
-// Pass to lower vertex fetch calls
-class LegacyLowerVertexFetch : public llvm::ModulePass {
+// Represents the pass of LLVM patching operations for applying workarounds:
+//
+// - fix up issues when buffer descriptor is incorrectly given when it should be an image descriptor. Some architectures
+//   require a fix so the hardware will ignore this difference (actually an app error, but common enough to require
+//   handling)
+//
+class LegacyPatchWorkarounds final : public llvm::ModulePass {
 public:
-  LegacyLowerVertexFetch();
-  LegacyLowerVertexFetch(const LegacyLowerVertexFetch &) = delete;
-  LegacyLowerVertexFetch &operator=(const LegacyLowerVertexFetch &) = delete;
+  LegacyPatchWorkarounds();
 
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
+  bool runOnModule(llvm::Module &module) override;
 
-  virtual bool runOnModule(llvm::Module &module) override;
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
 
   static char ID; // ID of this pass
+
 private:
-  LowerVertexFetch m_impl;
+  PatchWorkarounds m_impl;
 };
 
 } // namespace lgc

@@ -2012,6 +2012,6 @@ Value *SpirvLowerGlobal::toInt32Value(Value *value, Instruction *insertPos) {
 } // namespace Llpc
 
 // =====================================================================================================================
-// Initializes the pass of SPIR-V lowering opertions for globals.
+// Initializes the pass of SPIR-V lowering operations for globals.
 INITIALIZE_PASS(LegacySpirvLowerGlobal, DEBUG_TYPE, "Lower SPIR-V globals (global variables, inputs, and outputs)",
                 false, false)

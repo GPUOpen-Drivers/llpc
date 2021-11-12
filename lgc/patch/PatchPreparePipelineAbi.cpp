@@ -210,8 +210,8 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
     if (hasTs && m_hasGs) {
       // TS-GS pipeline
       if (m_hasTcs) {
-        auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
-        auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
+        auto lsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageVertex);
+        auto hsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageTessControl);
 
         if (hsEntryPoint) {
           if (lsEntryPoint)
@@ -222,14 +222,14 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
         }
       }
 
-      auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
-      auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageGeometry);
+      auto esEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageTessEval);
+      auto gsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageGeometry);
 
       if (enableNgg) {
         if (gsEntryPoint) {
           if (esEntryPoint)
             lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
-          auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
+          auto copyShaderEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageCopyShader);
           if (copyShaderEntryPoint)
             lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
@@ -250,8 +250,8 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
     } else if (hasTs) {
       // TS-only pipeline
       if (m_hasTcs) {
-        auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
-        auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
+        auto lsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageVertex);
+        auto hsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageTessControl);
 
         if (hsEntryPoint) {
           if (lsEntryPoint)
@@ -264,7 +264,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
 
       if (enableNgg) {
         // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
-        auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
+        auto esEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageTessEval);
 
         if (esEntryPoint) {
           lgc::setShaderStage(esEntryPoint, ShaderStageTessEval);
@@ -277,14 +277,14 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
       }
     } else if (m_hasGs) {
       // GS-only pipeline
-      auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
-      auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageGeometry);
+      auto esEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageVertex);
+      auto gsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageGeometry);
 
       if (enableNgg) {
         if (gsEntryPoint) {
           if (esEntryPoint)
             lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
-          auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
+          auto copyShaderEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageCopyShader);
           if (copyShaderEntryPoint)
             lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
@@ -306,7 +306,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
       // VS_FS pipeline
       if (enableNgg) {
         // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
-        auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
+        auto esEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageVertex);
         if (esEntryPoint) {
           if (esEntryPoint)
             lgc::setShaderStage(esEntryPoint, ShaderStageVertex);
@@ -326,7 +326,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
 // @param shaderStage : Shader stage
 // @param callingConv : Calling convention to set it to
 void PatchPreparePipelineAbi::setCallingConv(ShaderStage shaderStage, CallingConv::ID callingConv) {
-  auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
+  auto entryPoint = m_pipelineShaders->getResult().getEntryPoint(shaderStage);
   if (entryPoint)
     entryPoint->setCallingConv(callingConv);
 }

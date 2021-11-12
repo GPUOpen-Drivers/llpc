@@ -74,23 +74,6 @@ struct VertexCompFormatInfo {
 };
 
 // =====================================================================================================================
-// Pass to lower vertex fetch calls
-class LowerVertexFetch : public ModulePass {
-public:
-  LowerVertexFetch() : ModulePass(ID) {}
-  LowerVertexFetch(const LowerVertexFetch &) = delete;
-  LowerVertexFetch &operator=(const LowerVertexFetch &) = delete;
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
-
-  virtual bool runOnModule(Module &module) override;
-
-  static char ID; // ID of this pass
-};
-
-// =====================================================================================================================
 // Vertex fetch manager
 class VertexFetchImpl : public VertexFetch {
 public:
@@ -350,20 +333,48 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
 };
 // clang-format on
 
-char LowerVertexFetch::ID = 0;
+char LegacyLowerVertexFetch::ID = 0;
 
 // =====================================================================================================================
 // Create the vertex fetch pass
-ModulePass *lgc::createLowerVertexFetch() {
-  return new LowerVertexFetch();
+ModulePass *lgc::createLegacyLowerVertexFetch() {
+  return new LegacyLowerVertexFetch();
+}
+
+// =====================================================================================================================
+LegacyLowerVertexFetch::LegacyLowerVertexFetch() : ModulePass(ID) {
 }
 
 // =====================================================================================================================
 // Run the lower vertex fetch pass on a module
 //
 // @param [in/out] module : Module
-bool LowerVertexFetch::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyLowerVertexFetch::runOnModule(Module &module) {
   PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  return m_impl.runImpl(module, pipelineState);
+}
+
+// =====================================================================================================================
+// Run the lower vertex fetch pass on a module
+//
+// @param [in/out] module : Module
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  if (runImpl(module, pipelineState))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Run the lower vertex fetch pass on a module
+//
+// @param [in/out] module : Module
+// @param pipelineState : Pipeline state
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
   std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(pipelineState->getLgcContext()));
 
   // Gather vertex fetch calls. We can assume they're all in one function, the vertex shader.
@@ -1150,4 +1161,4 @@ bool VertexFetchImpl::needSecondVertexFetch(const VertexInputDescription *inputD
 
 // =====================================================================================================================
 // Initialize the lower vertex fetch pass
-INITIALIZE_PASS(LowerVertexFetch, DEBUG_TYPE, "Lower vertex fetch calls", false, false)
+INITIALIZE_PASS(LegacyLowerVertexFetch, DEBUG_TYPE, "Lower vertex fetch calls", false, false)

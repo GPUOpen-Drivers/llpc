@@ -28,7 +28,7 @@
  * @brief LLPC source file: contains declaration and implementation of class lgc::PatchCopyShader.
  ***********************************************************************************************************************
  */
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/PatchCopyShader.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
@@ -56,71 +56,56 @@ extern opt<bool> InRegEsGsLdsSize;
 using namespace lgc;
 using namespace llvm;
 
-namespace lgc {
-
-// =====================================================================================================================
-// Pass to generate copy shader if required
-class PatchCopyShader : public LegacyPatch {
-public:
-  static char ID;
-  PatchCopyShader() : LegacyPatch(ID) {}
-
-  bool runOnModule(Module &module) override;
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    // Pass does not preserve PipelineShaders as it adds a new shader.
-  }
-
-private:
-  PatchCopyShader(const PatchCopyShader &) = delete;
-  PatchCopyShader &operator=(const PatchCopyShader &) = delete;
-
-  void exportOutput(unsigned streamId, BuilderBase &builder);
-  void collectGsGenericOutputInfo(Function *gsEntryPoint);
-
-  Value *calcGsVsRingOffsetForInput(unsigned location, unsigned compIdx, unsigned streamId, BuilderBase &builder);
-
-  Value *loadValueFromGsVsRing(Type *loadTy, unsigned location, unsigned streamId, BuilderBase &builder);
-
-  Value *loadGsVsRingBufferDescriptor(BuilderBase &builder);
-
-  void exportGenericOutput(Value *outputValue, unsigned location, BuilderBase &builder);
-  void exportXfbOutput(Value *outputValue, const XfbOutInfo &XfbOutInfo, BuilderBase &builder);
-  void exportBuiltInOutput(Value *outputValue, BuiltInKind builtInId, unsigned streamId, BuilderBase &builder);
-
-  // Low part of global internal table pointer
-  static const unsigned EntryArgIdxInternalTablePtrLow = 0;
-
-  PipelineState *m_pipelineState;                                       // Pipeline state
-  GlobalVariable *m_lds = nullptr;                                      // Global variable representing LDS
-  Value *m_gsVsRingBufDesc = nullptr;                                   // Descriptor for GS-VS ring
-  DenseMap<unsigned, unsigned> m_newLocByteSizesMapArray[MaxGsStreams]; // The byte sizes of the output value at the
-                                                                        // mapped location for each stream
-};
-
-char PatchCopyShader::ID = 0;
-
-} // namespace lgc
+char LegacyPatchCopyShader::ID = 0;
 
 // =====================================================================================================================
 // Create pass to generate copy shader if required.
-ModulePass *lgc::createPatchCopyShader() {
-  return new PatchCopyShader();
+ModulePass *lgc::createLegacyPatchCopyShader() {
+  return new LegacyPatchCopyShader();
+}
+
+// =====================================================================================================================
+LegacyPatchCopyShader::LegacyPatchCopyShader() : llvm::ModulePass(ID) {
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchCopyShader::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchCopyShader::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
+  return m_impl.runImpl(module, pipelineShaders, pipelineState);
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PatchCopyShader::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
+  if (runImpl(module, pipelineShaders, pipelineState))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param pipelineShaders : Pipeline shaders analysis result
+// @param pipelineState : Pipeline state
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Copy-Shader\n");
 
-  LegacyPatch::init(&module);
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
-  auto gsEntryPoint = pipelineShaders->getEntryPoint(ShaderStageGeometry);
+  Patch::init(&module);
+  m_pipelineState = pipelineState;
+  auto gsEntryPoint = pipelineShaders.getEntryPoint(ShaderStageGeometry);
   if (!gsEntryPoint) {
     // No geometry shader -- copy shader not required.
     return false;
@@ -189,7 +174,7 @@ bool PatchCopyShader::runOnModule(Module &module) {
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
 
   auto insertPos = module.getFunctionList().end();
-  auto fsEntryPoint = pipelineShaders->getEntryPoint(ShaderStageFragment);
+  auto fsEntryPoint = pipelineShaders.getEntryPoint(ShaderStageFragment);
   if (fsEntryPoint)
     insertPos = fsEntryPoint->getIterator();
   module.getFunctionList().insert(insertPos, entryPoint);
@@ -765,4 +750,4 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(PatchCopyShader, DEBUG_TYPE, "Patch LLVM for copy shader generation", false, false)
+INITIALIZE_PASS(LegacyPatchCopyShader, DEBUG_TYPE, "Patch LLVM for copy shader generation", false, false)

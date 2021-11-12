@@ -53,8 +53,8 @@
  ***********************************************************************************************************************
  */
 
+#include "lgc/patch/PatchEntryPointMutate.h"
 #include "lgc/LgcContext.h"
-#include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/IntrinsDefs.h"
@@ -65,7 +65,6 @@
 #include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -85,160 +84,78 @@ opt<bool> InRegEsGsLdsSize("inreg-esgs-lds-size", desc("For GS on-chip, add esGs
 } // namespace cl
 } // namespace llvm
 
-namespace {
-
-// =====================================================================================================================
-// The entry-point mutation pass
-class PatchEntryPointMutate : public LegacyPatch {
-public:
-  PatchEntryPointMutate();
-  PatchEntryPointMutate(const PatchEntryPointMutate &) = delete;
-  PatchEntryPointMutate &operator=(const PatchEntryPointMutate &) = delete;
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    // Does not preserve PipelineShaders because it replaces the entrypoints.
-  }
-
-  virtual bool runOnModule(Module &module) override;
-
-  static char ID; // ID of this pass
-
-private:
-  // A shader entry-point user data argument
-  struct UserDataArg {
-    UserDataArg(Type *argTy, const Twine &name,
-                unsigned userDataValue = static_cast<unsigned>(UserDataMapping::Invalid), unsigned *argIndex = nullptr)
-        : argTy(argTy), name(name.str()), userDataValue(userDataValue), argIndex(argIndex) {
-      if (isa<PointerType>(argTy))
-        argDwordSize = argTy->getPointerAddressSpace() == ADDR_SPACE_CONST_32BIT ? 1 : 2;
-      else
-        argDwordSize = argTy->getPrimitiveSizeInBits() / 32;
-    }
-
-    UserDataArg(Type *argTy, const Twine &name, UserDataMapping userDataValue, unsigned *argIndex = nullptr)
-        : UserDataArg(argTy, name, static_cast<unsigned>(userDataValue), argIndex) {}
-
-    Type *argTy;            // IR type of the argument
-    std::string name;       // Name of the argument
-    unsigned argDwordSize;  // Size of argument in dwords
-    unsigned userDataValue; // PAL metadata user data value, ~0U (UserDataMapping::Invalid) for none
-    unsigned *argIndex;     // Where to store arg index once it is allocated, nullptr for none
-  };
-
-  // User data usage for one user data node
-  struct UserDataNodeUsage {
-    unsigned entryArgIdx = 0;
-    unsigned dwordSize = 0; // Only used in pushConstOffsets
-    SmallVector<Instruction *, 4> users;
-  };
-
-  // Per-merged-shader-stage gathered user data usage information.
-  struct UserDataUsage {
-    // Check if special user data value is used by lgc.special.user.data call generated before PatchEntryPointMutate
-    bool isSpecialUserDataUsed(UserDataMapping kind) {
-      unsigned index = static_cast<unsigned>(kind) - static_cast<unsigned>(UserDataMapping::GlobalTable);
-      return specialUserData.size() > index && !specialUserData[index].users.empty();
-    }
-
-    // List of lgc.spill.table calls
-    UserDataNodeUsage spillTable;
-    // List of lgc.push.const calls. There is no direct attempt to unspill these; instead we attempt to
-    // unspill the pushConstOffsets loads.
-    UserDataNodeUsage pushConst;
-    // True means that we did not succeed in putting all loads into pushConstOffsets, so lgc.push.const
-    // calls must be kept.
-    bool pushConstSpill = false;
-    // Per-push-const-offset lists of loads from push const. We attempt to unspill these.
-    SmallVector<UserDataNodeUsage, 8> pushConstOffsets;
-    // Per-user-data-offset lists of lgc.root.descriptor calls
-    SmallVector<UserDataNodeUsage, 8> rootDescriptors;
-    // Per-table lists of lgc.descriptor.table.addr calls
-    // When the user data nodes are available, a table is identifed by its
-    // index in the user data nodes.  Using this index allows for the possibility that a descriptor
-    // set is split over multiple tables.  When it is not available, a table is identified by the
-    // descriptor set it contains, which is consistent with the Vulkan binding model.
-    SmallVector<UserDataNodeUsage, 8> descriptorTables;
-    // Per-UserDataMapping lists of lgc.special.user.data calls
-    SmallVector<UserDataNodeUsage, 18> specialUserData;
-    // Minimum offset at which spill table is used.
-    unsigned spillUsage = UINT_MAX;
-    // Usage of streamout table
-    bool usesStreamOutTable = false;
-  };
-
-  // Set up compute-with-calls flag.
-  void setupComputeWithCalls(Module *module);
-
-  // Gather user data usage in all shaders.
-  void gatherUserDataUsage(Module *module);
-
-  // Fix up user data uses.
-  void fixupUserDataUses(Module &module);
-
-  void processShader(ShaderInputs *shaderInputs);
-  void processComputeFuncs(ShaderInputs *shaderInputs, Module &module);
-  void processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys,
-                    SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask, unsigned argOffset);
-  void setFuncAttrs(Function *entryPoint);
-
-  uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys,
-                                    SmallVectorImpl<std::string> &argNames, unsigned argOffset);
-
-  void addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs,
-                              SmallVectorImpl<UserDataArg> &specialUserDataArgs, IRBuilder<> &builder);
-  void addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder);
-  void addUserDataArg(SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue, unsigned sizeInDwords,
-                      const Twine &name, unsigned *argIndex, IRBuilder<> &builder);
-
-  void determineUnspilledUserDataArgs(ArrayRef<UserDataArg> userDataArgs, ArrayRef<UserDataArg> specialUserDataArgs,
-                                      IRBuilder<> &builder, SmallVectorImpl<UserDataArg> &unspilledArgs);
-
-  uint64_t pushFixedShaderArgTys(SmallVectorImpl<Type *> &argTys) const;
-
-  // Get UserDataUsage struct for the merged shader stage that contains the given shader stage
-  UserDataUsage *getUserDataUsage(ShaderStage stage);
-
-  // Get the shader stage that the given shader stage is merged into.
-  ShaderStage getMergedShaderStage(ShaderStage stage) const;
-
-  bool isComputeWithCalls() const { return m_computeWithCalls; }
-
-  bool m_hasTs;                             // Whether the pipeline has tessllation shader
-  bool m_hasGs;                             // Whether the pipeline has geometry shader
-  PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
-  bool m_computeWithCalls = false;          // Whether this is compute pipeline with calls or compute library
-  // Per-HW-shader-stage gathered user data usage information.
-  SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
-};
-
-} // anonymous namespace
-
 // =====================================================================================================================
 // Initializes static members.
-char PatchEntryPointMutate::ID = 0;
+char LegacyPatchEntryPointMutate::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for entry-point mutation
-ModulePass *lgc::createPatchEntryPointMutate() {
-  return new PatchEntryPointMutate();
+ModulePass *lgc::createLegacyPatchEntryPointMutate() {
+  return new LegacyPatchEntryPointMutate();
 }
 
 // =====================================================================================================================
-PatchEntryPointMutate::PatchEntryPointMutate() : LegacyPatch(ID), m_hasTs(false), m_hasGs(false) {
+PatchEntryPointMutate::PatchEntryPointMutate() : m_hasTs(false), m_hasGs(false) {
+}
+
+// =====================================================================================================================
+PatchEntryPointMutate::UserDataArg::UserDataArg(llvm::Type *argTy, const llvm::Twine &name, unsigned userDataValue,
+                                                unsigned *argIndex)
+    : argTy(argTy), name(name.str()), userDataValue(userDataValue), argIndex(argIndex) {
+  if (llvm::isa<llvm::PointerType>(argTy))
+    argDwordSize = argTy->getPointerAddressSpace() == ADDR_SPACE_CONST_32BIT ? 1 : 2;
+  else
+    argDwordSize = argTy->getPrimitiveSizeInBits() / 32;
+}
+
+// =====================================================================================================================
+PatchEntryPointMutate::UserDataArg::UserDataArg(llvm::Type *argTy, const llvm::Twine &name,
+                                                UserDataMapping userDataValue, unsigned *argIndex)
+    : UserDataArg(argTy, name, static_cast<unsigned>(userDataValue), argIndex) {
+}
+
+// =====================================================================================================================
+LegacyPatchEntryPointMutate::LegacyPatchEntryPointMutate() : ModulePass(ID) {
 }
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchEntryPointMutate::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchEntryPointMutate::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
+  return m_impl.runImpl(module, pipelineShaders, pipelineState);
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PatchEntryPointMutate::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
+  runImpl(module, pipelineShaders, pipelineState);
+  return PreservedAnalyses::none();
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param pipelineShaders : Pipeline shaders analysis result
+// @param pipelineState : Pipeline state
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
+                                    PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
 
-  LegacyPatch::init(&module);
+  Patch::init(&module);
 
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = pipelineState;
 
   const unsigned stageMask = m_pipelineState->getShaderStageMask();
   m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0;
@@ -254,9 +171,8 @@ bool PatchEntryPointMutate::runOnModule(Module &module) {
 
   if (m_pipelineState->isGraphics()) {
     // Process each shader in turn, but not the copy shader.
-    auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
     for (unsigned shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
-      m_entryPoint = pipelineShaders->getEntryPoint(static_cast<ShaderStage>(shaderStage));
+      m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(shaderStage));
       if (m_entryPoint) {
         m_shaderStage = static_cast<ShaderStage>(shaderStage);
         processShader(&shaderInputs);
@@ -1585,5 +1501,16 @@ ShaderStage PatchEntryPointMutate::getMergedShaderStage(ShaderStage stage) const
 }
 
 // =====================================================================================================================
-// Initializes the pass of LLVM patching opertions for entry-point mutation.
-INITIALIZE_PASS(PatchEntryPointMutate, DEBUG_TYPE, "Patch LLVM for entry-point mutation", false, false)
+bool PatchEntryPointMutate::isComputeWithCalls() const {
+  return m_computeWithCalls;
+}
+
+// =====================================================================================================================
+bool PatchEntryPointMutate::UserDataUsage::isSpecialUserDataUsed(UserDataMapping kind) {
+  unsigned index = static_cast<unsigned>(kind) - static_cast<unsigned>(UserDataMapping::GlobalTable);
+  return specialUserData.size() > index && !specialUserData[index].users.empty();
+}
+
+// =====================================================================================================================
+// Initializes the pass of LLVM patching operations for entry-point mutation.
+INITIALIZE_PASS(LegacyPatchEntryPointMutate, DEBUG_TYPE, "Patch LLVM for entry-point mutation", false, false)
