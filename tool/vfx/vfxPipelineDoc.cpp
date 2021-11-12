@@ -89,7 +89,7 @@ bool PipelineDocument::checkVersion(unsigned ver) {
 }
 
 // =====================================================================================================================
-// Gets PiplineDocument content
+// Gets PipelineDocument content
 VfxPipelineStatePtr PipelineDocument::getDocument() {
   // Section "Version"
   m_pipelineState.version = Version;

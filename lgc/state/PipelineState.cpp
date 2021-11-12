@@ -256,7 +256,7 @@ void PipelineState::clearPalMetadata() {
 // Merge blob of MsgPack data into existing PAL metadata
 //
 // @param blob : MsgPack PAL metadata to merge
-// @param isGlueCode : True if the blob is was generated for glue code.
+// @param isGlueCode : True if the blob was generated for glue code.
 void PipelineState::mergePalMetadataFromBlob(llvm::StringRef blob, bool isGlueCode) {
   if (!m_palMetadata)
     m_palMetadata = new PalMetadata(this, blob);
@@ -283,7 +283,7 @@ void PipelineState::setOtherPartPipeline(Pipeline &otherPartPipeline, Module *li
 
 // =====================================================================================================================
 // Clear the pipeline state IR metadata.
-// This does not clear PalMetadta, because we want that to persist into the back-end.
+// This does not clear PalMetadata, because we want that to persist into the back-end.
 //
 // @param [in/out] module : IR module
 void PipelineState::clear(Module *module) {
@@ -1611,7 +1611,7 @@ bool LegacyPipelineStateClearer::runOnModule(Module &module) {
 //
 // @param [in/out] module : IR module
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
-// @returns : The preverved analyses (The Analyses that are still valid after this pass)
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
 PreservedAnalyses PipelineStateClearer::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   runImpl(module, pipelineState);

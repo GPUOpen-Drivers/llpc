@@ -3054,7 +3054,7 @@ void NggPrimShader::runGs(Module *module, Argument *sysValueStart) {
 
   // NOTE: This argument is expected to be GS wave ID, not wave ID in sub-group, for normal ES-GS merged shader.
   // However, in NGG mode, GS wave ID, sent to GS_EMIT and GS_CUT messages, is no longer required because of NGG
-  // handling of such messages. Instead, wave ID in sub-group is required as the substitue.
+  // handling of such messages. Instead, wave ID in sub-group is required as the substitute.
   auto waveId = m_nggFactor.waveIdInSubgroup;
 
   arg += EsGsSpecialSysValueCount;
@@ -3170,7 +3170,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {m_builder->getInt32(-1), threadIdInWave});
   }
 
-  // Initialzie thread ID in subgroup
+  // Initialize thread ID in subgroup
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
   auto waveId = getFunctionArgument(gsEntryPoint, entryArgIdxs.waveId);
 
@@ -4178,7 +4178,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     absW0W1W2 = m_builder->CreateFMul(absW0W1W2, w2);
     absW0W1W2 = m_builder->CreateIntrinsic(Intrinsic::fabs, m_builder->getFloatTy(), absW0W1W2);
 
-    // threeshold = (10 ^ (-backfaceExponent)) / |w0 * w1 * w2|
+    // threshold = (10 ^ (-backfaceExponent)) / |w0 * w1 * w2|
     auto threshold = m_builder->CreateNeg(backfaceExponent);
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 391319
     threshold = m_builder->CreateIntrinsic(Intrinsic::powi, m_builder->getFloatTy(),
@@ -5635,7 +5635,7 @@ BasicBlock *NggPrimShader::createBlock(Function *parent, const Twine &blockName)
 // @param value : Source value to extract
 // @param offset : Bit number of least-significant end of bitfield
 // @param count : Count of bits in bitfield
-// @returns : The extracted bitfied
+// @returns : The extracted bitfield
 Value *NggPrimShader::CreateUBfe(Value *value, unsigned offset, unsigned count) {
   assert(value->getType()->isIntegerTy(32));
   assert(offset <= 31 && count >= 1 && offset + count - 1 <= 31);

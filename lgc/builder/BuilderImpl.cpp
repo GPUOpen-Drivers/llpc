@@ -103,7 +103,7 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
   assert(compBitWidth >= 8 && compBitWidth <= 64);
 
   auto &supportIntegerDotFlag = getPipelineState()->getTargetInfo().getGpuProperty().supportIntegerDotFlag;
-  // Check if the component bitwidth of vectors and the signedness of component of vectors are both supppored by HW.
+  // Check if the component bitwidth of vectors and the signedness of component of vectors are both supported by HW.
   const bool isSupportCompBitwidth = (supportIntegerDotFlag.compBitwidth16 && compBitWidth == 16) ||
                                      (supportIntegerDotFlag.compBitwidth8 && compBitWidth == 8);
   const bool isSupportSignedness =
@@ -192,7 +192,7 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
           scalar =
               CreateIntrinsic(intrinsicDot2, {}, {input1, input2, intermediateRes, getInt1(false)}, nullptr, instName);
         }
-        // Add a satruation add if required.
+        // Add a saturation add if required.
         if (hasAccumulator)
           scalar = CreateNamedCall("llvm.sadd.sat.i32", getInt32Ty(), {scalar, accumulator}, {}, instName);
       }

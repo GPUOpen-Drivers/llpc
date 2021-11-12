@@ -517,12 +517,12 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     // The issue is because we only remove unused builtin output till final GS output store generation, when
     // determining onchip/offchip mode, unused builtin output like PointSize and Clip/CullDistance is factored in
     // LDS usage and deactivates onchip GS when GsOffChipDefaultThreshold  is 64. To fix this we will probably
-    // need to clear unused builtin ouput before determining onchip/offchip GS mode.
+    // need to clear unused builtin output before determining onchip/offchip GS mode.
     constexpr unsigned gsOffChipDefaultThreshold = 32;
 
     bool disableGsOnChip = DisableGsOnChip;
     if (hasTs || m_pipelineState->getTargetInfo().getGfxIpVersion().major == 6) {
-      // GS on-chip is not supportd with tessellation, and is not supportd on GFX6
+      // GS on-chip is not supported with tessellation, and is not supported on GFX6
       disableGsOnChip = true;
     }
 
@@ -610,7 +610,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         // User-GS NGG only supports triangles.
         constexpr unsigned vertsPerPrimitive = 3;
 
-        // NOTE: If primitive amplification is active and the currently calculated gsPrimsPerSubgroup multipled
+        // NOTE: If primitive amplification is active and the currently calculated gsPrimsPerSubgroup multiplied
         // by the amplification factor is larger than the supported number of primitives within a subgroup, we
         // need to shrimp the number of gsPrimsPerSubgroup down to a reasonable level to prevent
         // over-allocating LDS.
@@ -846,7 +846,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
       assert(esVertsPerSubgroup >= esMinVertsPerSubgroup);
 
-      // Vertices for adjacency primitives are not always reused (e.g. in the case of shadow volumes). Acording
+      // Vertices for adjacency primitives are not always reused (e.g. in the case of shadow volumes). According
       // to hardware engineers, we must restore esMinVertsPerSubgroup for ES_VERTS_PER_SUBGRP.
       if (useAdjacency)
         esMinVertsPerSubgroup = inVertsPerPrim;
@@ -1677,7 +1677,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       const auto &nextBuiltInUsage = nextResUsage->builtInUsage.tes;
       auto &nextInOutUsage = nextResUsage->inOutUsage;
 
-      // NOTE: For tessellation control shadder, those built-in outputs that involve in output import have to
+      // NOTE: For tessellation control shader, those built-in outputs that involve in output import have to
       // be mapped to generic ones even if they do not have corresponding built-in inputs used in next shader
       // stage.
       if (nextBuiltInUsage.positionIn) {
@@ -2242,10 +2242,10 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
     for (auto &locInfoPair : inputLocInfoMap) {
       auto &newLocationInfo = locInfoPair.second;
       if (m_shaderStage == ShaderStageVertex) {
-        // NOTE: For vertex shader, use the orignal location as the remapped location
+        // NOTE: For vertex shader, use the original location as the remapped location
         newLocationInfo.setData(locInfoPair.first.getData());
       } else {
-        // For other shaders, map the location to continous locations
+        // For other shaders, map the location to continuous locations
         newLocationInfo.setData(0);
         newLocationInfo.setLocation(nextMapLoc++);
       }
@@ -2668,7 +2668,7 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
       ++elementsInfo.elemCountOf32bit;
   }
 
-  // Re-assamble XX' output export calls for each packed location
+  // Re-assemble XX' output export calls for each packed location
   for (auto &elementsInfo : elementsInfoArray) {
     if (elementsInfo.elemCountOf16bit + elementsInfo.elemCountOf32bit == 0) {
       // It's the end of the packed location
@@ -3027,7 +3027,7 @@ void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStag
 }
 
 // =====================================================================================================================
-// Build the map between orignal InOutLocationInfo and packed InOutLocationInfo based on sorted locaiton spans
+// Build the map between orignal InOutLocationInfo and packed InOutLocationInfo based on sorted location spans
 //
 // @param shaderStage : The shader stage to determine whether to check compatibility
 void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
@@ -3043,12 +3043,12 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
   unsigned compIdx = 0;
   bool isHighHalf = false;
   const bool isGs = shaderStage == ShaderStageGeometry;
-  // For GS, the locatioSpans in the same stream is compatible.
-  // No need to check compatibility means all locationSpans are comatible.
+  // For GS, the locationSpans in the same stream is compatible.
+  // No need to check compatibility means all locationSpans are compatible.
   const bool checkCompatibility = shaderStage == ShaderStageFragment || isGs;
   for (auto spanIt = m_locationSpans.begin(); spanIt != m_locationSpans.end(); ++spanIt) {
     if (spanIt != m_locationSpans.begin()) {
-      // Check the current span with previous span to determine wether it is put in the same location or the next
+      // Check the current span with previous span to determine whether it is put in the same location or the next
       // location.
       const auto &prevSpan = *(--spanIt);
       ++spanIt;

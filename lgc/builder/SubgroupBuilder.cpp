@@ -1442,7 +1442,7 @@ Value *SubgroupBuilder::createGroupBallot(Value *const value) {
   // Turn value into an i32.
   Value *valueAsInt32 = CreateSelect(value, getInt32(1), getInt32(0));
 
-  // TODO: There is a longstanding bug with LLVM's convergent that forces us to use inline assembly with sideffects to
+  // TODO: There is a longstanding bug with LLVM's convergent that forces us to use inline assembly with side effects to
   // stop any hoisting out of control flow.
   valueAsInt32 = createInlineAsmSideEffect(valueAsInt32);
 

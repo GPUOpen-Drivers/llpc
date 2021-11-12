@@ -227,7 +227,7 @@ PreservedAnalyses SpirvLowerMathConstFolding::run(Module &module, ModuleAnalysis
 }
 
 // =====================================================================================================================
-// Executes constand folding SPIR-V lowering pass on the specified LLVM module.
+// Executes constant folding SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
 bool SpirvLowerMathConstFolding::runImpl(Module &module, std::function<TargetLibraryInfo &()> getTargetLibraryInfo) {
@@ -246,7 +246,7 @@ bool SpirvLowerMathConstFolding::runImpl(Module &module, std::function<TargetLib
 
         // DCE instruction if trivially dead.
         if (isInstructionTriviallyDead(inst, &targetLibInfo)) {
-          LLVM_DEBUG(dbgs() << "Algebriac transform: DCE: " << *inst << '\n');
+          LLVM_DEBUG(dbgs() << "Algebraic transform: DCE: " << *inst << '\n');
           inst->eraseFromParent();
           m_changed = true;
           continue;
@@ -260,7 +260,7 @@ bool SpirvLowerMathConstFolding::runImpl(Module &module, std::function<TargetLib
 
         // ConstantProp instruction if trivially constant.
         if (Constant *constVal = ConstantFoldInstruction(inst, dataLayout, &targetLibInfo)) {
-          LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *constVal << " from: " << *inst << '\n');
+          LLVM_DEBUG(dbgs() << "Algebraic transform: constant folding: " << *constVal << " from: " << *inst << '\n');
           if ((destType->isHalfTy() && m_fp16DenormFlush) || (destType->isFloatTy() && m_fp32DenormFlush) ||
               (destType->isDoubleTy() && m_fp64DenormFlush)) {
             // Replace denorm value with zero
@@ -353,7 +353,7 @@ void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
       bool hasNoContract = isOperandNoContract(src1) || isOperandNoContract(src2);
       bool allowContract = !hasNoContract;
 
-      // Reassocation and contract should be same
+      // Reassociation and contract should be same
       fastMathFlags.setAllowReassoc(allowContract);
       fastMathFlags.setAllowContract(allowContract);
       binaryOp.copyFastMathFlags(fastMathFlags);

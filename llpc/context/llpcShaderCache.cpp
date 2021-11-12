@@ -160,7 +160,7 @@ Result ShaderCache::Serialize(void *blob, size_t *size) {
   Result result = Result::Success;
 
   if (*size == 0) {
-    // Query shader cache serailzied size
+    // Query shader cache serialized size
     (*size) = m_serializedSize;
   } else {
     // Do serialize

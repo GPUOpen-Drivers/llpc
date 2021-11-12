@@ -445,7 +445,7 @@ private:
   // Fix image descriptor before an operation that reads the image
   llvm::Value *fixImageDescForRead(llvm::Value *imageDesc);
 
-  // Enforce readfirstlane on the image or sampler descripotrs
+  // Enforce readfirstlane on the image or sampler descriptors
   void enforceReadFirstLane(llvm::Instruction *imageInst, unsigned descIdx);
 
   enum ImgDataFormat {

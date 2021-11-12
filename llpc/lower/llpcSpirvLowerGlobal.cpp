@@ -285,7 +285,7 @@ void SpirvLowerGlobal::visitReturnInst(ReturnInst &retInst) {
 //
 // @param callInst : "Call" instruction
 void SpirvLowerGlobal::visitCallInst(CallInst &callInst) {
-  // Skip if "emit" and interpolaton calls are not expected to be handled
+  // Skip if "emit" and interpolation calls are not expected to be handled
   if (!static_cast<bool>(m_instVisitFlags.checkEmitCall) && !static_cast<bool>(m_instVisitFlags.checkInterpCall))
     return;
 
@@ -1056,7 +1056,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
       if (addrSpace == SPIRAS_Input) {
         if (m_shaderStage == ShaderStageFragment) {
           if (interpLoc != InterpLocUnknown) {
-            // Use auxiliary value of interpolation (calcuated I/J or vertex no.) for
+            // Use auxiliary value of interpolation (calculated I/J or vertex no.) for
             // interpolant inputs of fragment shader.
             vertexIdx = auxInterpValue;
             inOutInfo.setHasInterpAux();
@@ -1579,7 +1579,7 @@ void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, cons
 void SpirvLowerGlobal::lowerBufferBlock() {
   SmallVector<GlobalVariable *, 8> globalsToRemove;
 
-  // Represent the users of the global varibales, expect a bitCast, a GEP or a select used by GEPs
+  // Represent the users of the global variables, expect a bitCast, a GEP or a select used by GEPs
   struct ReplaceInstsInfo {
     BitCastInst *bitCastInst;                         // The user is a bitCast
     SelectInst *selectInst;                           // The user is a select

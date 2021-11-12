@@ -74,7 +74,7 @@ layout(location = 7) in float16_t v8;
                        |                            (3,1,false) <-> (2,2,true)
                        |                                      |
                        |``````````````````````````````````````|
-            (Ressemble output export)               (Fill InOutLocMap with AsIndex() of origin and new)
+            (Resemble output export)               (Fill InOutLocMap with AsIndex() of origin and new)
                        |                                      |
             export.generic.*.v4f32                            |
             export.generic.*.v4f32                            |
@@ -107,7 +107,7 @@ union InOutLocationInfo {
 };
 
 // In llpcPatchResourceCollect.h
-// Represents the wrapper of input/output locatoin info, along with handlers
+// Represents the wrapper of input/output location info, along with handlers
 struct InOutLocation {
   uint16_t asIndex() const { return locationInfo.u16All; }
 
@@ -192,7 +192,7 @@ InOutLocation firstLocation;
 InOutCompatibilityInfo compatibilityInfo;
 };
 ```
-### 4.4 Scalarizaiton
+### 4.4 Scalarization
 Scalarization is done before processShader() in the resource collect pass. Hence, we need find unused elements by traversing each call users. In the future, we can fix this properly by doing the whole of generic input/output assignment later on in the middle-end, somewhere in the LLVM middle-end optimization pass flow.
 ### 4.5 Re-vectorization
 Fragment shader input instructions do not benefit from re-vectorization.

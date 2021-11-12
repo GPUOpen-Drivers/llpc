@@ -17,7 +17,7 @@
 ; file.
 ; RUN: grep -v "descriptorRangeValue" %s > %t.pipe
 
-; Run amdllpc on the the two versions of the file an make sure the hashes for
+; Run amdllpc on the two versions of the file an make sure the hashes for
 ; vertex and fragment shader stages are the same for both.
 ; RUN: amdllpc -spvgen-dir=%spvgendir% \
 ; RUN:         -enable-relocatable-shader-elf \

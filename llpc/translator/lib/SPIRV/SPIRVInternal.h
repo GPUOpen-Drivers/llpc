@@ -554,7 +554,7 @@ struct ShaderInOutDecorate {
 union ShaderBlockMetadata {
   struct {
     unsigned offset : 32;      // Offset (bytes) in block
-    unsigned IsMatrix : 1;     // Whether it it is a matrix
+    unsigned IsMatrix : 1;     // Whether it is a matrix
     unsigned IsRowMajor : 1;   // Whether it is a "row_major" qualified matrix
     unsigned MatrixStride : 6; // Matrix stride, valid for matrix
     unsigned Restrict : 1;     // Whether "restrict" qualifier is present

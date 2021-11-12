@@ -18,7 +18,7 @@
 ; END_SHADERTEST_2
 
 ; BEGIN_SHADERTEST_3
-; In this test, produce produce a .spv file which should only require SPVGEN for disassembly/validation.
+; In this test, produce a .spv file which should only require SPVGEN for disassembly/validation.
 
 ; Create a fresh directory for pipeline dump files.
 ; RUN: mkdir -p %t/dump

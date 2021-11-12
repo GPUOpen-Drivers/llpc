@@ -675,7 +675,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
       // Copy binary code
       memcpy(code, moduleDataEx.common.binCode.pCode, moduleDataEx.common.binCode.codeSize);
-      // Destory the temporary module code
+      // Destroy the temporary module code
       if (trimmedCode) {
         delete[] trimmedCode;
         trimmedCode = nullptr;
@@ -968,7 +968,7 @@ bool Compiler::canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo 
 // @param shaderInfo : Shader info of this pipeline
 // @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs
 // @param [out] pipelineElf : Output Elf package
-// @param [out] pipelineElf : Stage cache acccess info.
+// @param [out] pipelineElf : Stage cache access info.
 Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
                                        ElfPackage *pipelineElf,
                                        llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
@@ -1741,7 +1741,7 @@ Result Compiler::validatePipelineShaderInfo(const PipelineShaderInfo *shaderInfo
 // Creates shader cache object with the requested properties.
 // @param : Shader cache create info.
 // @param [out] : Shader cache object
-// @returns : Result::Success if creation succeeedds, error status otherwise.
+// @returns : Result::Success if creation succeeds, error status otherwise.
 Result Compiler::CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache) {
   Result result = Result::Success;
 
@@ -1912,7 +1912,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
       nonFragmentHasher.Update(shaderHashCode);
   }
 
-  // Add addtional pipeline state to final hasher
+  // Add additional pipeline state to final hasher
   if (stageMask & getLgcShaderStageMask(ShaderStageFragment)) {
     // Add pipeline options to fragment hash
     fragmentHasher.Update(pipelineOptions->includeDisassembly);

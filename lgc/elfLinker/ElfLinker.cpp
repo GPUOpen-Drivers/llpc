@@ -764,8 +764,8 @@ bool ElfLinkerImpl::insertGlueShaders() {
               return false;
             }
 
-            // You cannot reduce the aligment if the elfInput has more than one
-            // shader.  Otherwise the other shaders could be misalligned.
+            // You cannot reduce the alignment if the elfInput has more than one
+            // shader.  Otherwise the other shaders could be misaligned.
             if (containsASingleShader(elfInput))
               elfInput.reduceAlign = cantFail(section->getName());
             insertPos = idx;

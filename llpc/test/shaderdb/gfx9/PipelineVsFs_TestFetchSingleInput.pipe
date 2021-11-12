@@ -9,7 +9,7 @@
 ; SHADERTEST-LABEL: LGC glue shader results
 ; Check the inputs to the fetch shader.  This should match the vertex shader except:
 ; - there are extra inreg inputs because its determination of how many SGPR inputs
-;   there are is conservative;
+;   are conservative;
 ; - there is no VGPR input for the vertex input that the fetch shader generates.
 ; SHADERTEST: define amdgpu_vs { i32,{{.*}}, i32, float, float, float, float, <4 x float> } @_amdgpu_vs_main(i32 inreg %0, i32 inreg %1, i32 inreg %2, i32 inreg %VertexBufferTable, i32 inreg %BaseVertex, i32 inreg %BaseInstance,{{.*}}, i32 inreg %{{.*}}, float %VertexId, float %{{.*}}, float %{{.*}}, float %InstanceId)
 ; Check that the attribute is loaded.

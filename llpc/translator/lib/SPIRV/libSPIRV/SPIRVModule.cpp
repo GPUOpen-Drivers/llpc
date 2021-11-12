@@ -474,7 +474,7 @@ void SPIRVModuleImpl::optimizeDecorates() {
       Targets.push_back(E->getTargetId());
     }
 
-    // WordCount is only 16 bits.  We can only have 65535 - FixedWC targtets per
+    // WordCount is only 16 bits.  We can only have 65535 - FixedWC targets per
     // group.
     // For now, just skip using a group if the number of targets to too big
     if (Targets.size() < 65530) {

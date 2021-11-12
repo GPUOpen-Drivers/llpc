@@ -226,7 +226,7 @@ private:
   llvm::Value *m_fragDepth;      // Correspond to "out float gl_FragDepth"
   llvm::Value *m_fragStencilRef; // Correspond to "out int gl_FragStencilRef"
   llvm::Value *m_sampleMask;     // Correspond to "out int gl_SampleMask[]"
-  // NOTE: For GFX9, gl_ViewportIndex and gl_Layer are packed with one channel (gl_ViewpoertInex is 16-bit high part
+  // NOTE: For GFX9, gl_ViewportIndex and gl_Layer are packed with one channel (gl_ViewportIndex is 16-bit high part
   // and gl_Layer is 16-bit low part). Thus, the export is delayed with them merged together.
   llvm::Value *m_viewportIndex; // Correspond to "out int gl_ViewportIndex"
   llvm::Value *m_layer;         // Correspond to "out int gl_Layer"

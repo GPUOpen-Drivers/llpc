@@ -265,7 +265,7 @@ DICompositeType *SPIRVToLLVMDbgTran::transTypeComposite(const SPIRVExtInst *Debu
                                   DINodeArray() /*elements*/, 0 /*RunTimeLang*/, nullptr /*VTableHolder*/, Identifier);
     break;
   case SPIRVDebug::Union:
-    CT = Builder.createUnionType(ParentScope, Name, File, LineNo, Size, Align, Flags, DINodeArray(), 0 /*RuntimrLang*/,
+    CT = Builder.createUnionType(ParentScope, Name, File, LineNo, Size, Align, Flags, DINodeArray(), 0 /*RuntimeLang*/,
                                  Identifier);
     break;
   default:

@@ -201,7 +201,7 @@ bool isLlvmIrFile(StringRef fileName) {
 // Checks whether the specified file name represents an LLPC pipeline info file (.pipe).
 //
 // @param fileName : File path to check
-// @returns : true when `fileName` is a pipelien info file
+// @returns : true when `fileName` is a pipeline info file
 bool isPipelineInfoFile(StringRef fileName) {
   return fileName.endswith(Ext::PipelineInfo);
 }

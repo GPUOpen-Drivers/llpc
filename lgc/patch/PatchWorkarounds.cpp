@@ -180,7 +180,7 @@ void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLas
         m_builder->SetInsertPoint(rsrcInstr->getNextNode());
         m_builder->SetCurrentDebugLocation(rsrcInstr->getNextNode()->getDebugLoc());
 
-        // Create a new rsrc load instruction - we apply the workaround the the new instruction and then replace
+        // Create a new rsrc load instruction - we apply the workaround the new instruction and then replace
         // all uses of the old one with the derived value. This prevents us replacing the original value with the
         // derived one in the code to insert the new element.
         Instruction *newInstr = rsrcInstr->clone();

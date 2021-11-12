@@ -273,7 +273,7 @@ bool PatchReadFirstLane::liftReadFirstLane(Function &function) {
     assert(m_insertLocations.size() <= blockInitialReadFirstLanes.second.size());
     BuilderBase builder(curBb->getContext());
     for (auto inst : m_insertLocations) {
-      // Avoid to insert reduncant readfirstlane
+      // Avoid to insert redundant readfirstlane
       if (auto intrinsic = dyn_cast<IntrinsicInst>(inst))
         if (intrinsic->getIntrinsicID() == Intrinsic::amdgcn_readfirstlane)
           continue;
@@ -366,7 +366,7 @@ void PatchReadFirstLane::collectAssumeUniforms(BasicBlock *block,
 // Find the best insert locations according to the heuristic.
 // The heuristic is: if an instruction that can be assumed to be uniform has multiple divergent operands, then you take
 // the definition of the divergent operand that is earliest in basic block order (call it "the earliest divergent
-// operand") and propagate up to that instruction; if it turns out that that instruction can be assumed to be uniform,
+// operand") and propagate up to that instruction; if it turns out that instruction can be assumed to be uniform,
 // then we can just insert the readfirstlane there (or propagate).
 //
 // @param readFirstLaneCount : The initial amdgcn_readfirstlane vector

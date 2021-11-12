@@ -325,7 +325,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const sp
                                     storageClass == StorageClassPushConstant ||
                                     storageClass == StorageClassPhysicalStorageBufferEXT;
 
-  // Finally we translate the struct we are pointing to to create it.
+  // Finally we translate the struct we are pointing to create it.
   StructType *const structType = cast<StructType>(
       transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, isBufferBlockPointer));
 
@@ -3990,9 +3990,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTranspose>(SPIRVValue *const spvValue) {
-  SPIRVInstTemplateBase *const spvTranpose = static_cast<SPIRVInstTemplateBase *>(spvValue);
+  SPIRVInstTemplateBase *const spvTranspose = static_cast<SPIRVInstTemplateBase *>(spvValue);
 
-  Value *const matrix = transValue(spvTranpose->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
+  Value *const matrix = transValue(spvTranspose->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                    getBuilder()->GetInsertBlock());
   return getBuilder()->CreateTransposeMatrix(matrix);
 }
@@ -5704,7 +5704,7 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *bi, Extracted
     // Modify coordinate for subpass data.
     if (!enableMultiView) {
       // Subpass data without multiview: Add the x,y dimensions (converted to
-      // signed int) of the fragment coordinate on to the texel coordate.
+      // signed int) of the fragment coordinate on to the texel coordinate.
       imageInfo->flags |= lgc::Builder::ImageFlagAddFragCoord;
     } else {
       // Subpass data with multiview: Use the fragment coordinate as x,y, and
@@ -7213,7 +7213,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     // Handle scalar or vector type or pointer type
     assert(inOutDec.Value.U32All != SPIRVID_INVALID);
 
-    // Build metadata for the scala/vector
+    // Build metadata for the scalar/vector
     ShaderInOutMetadata inOutMd = {};
     if (inOutDec.IsXfb)
       inOutMd.IsXfb = true;

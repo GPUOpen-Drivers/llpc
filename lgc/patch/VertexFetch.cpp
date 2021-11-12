@@ -61,7 +61,7 @@ struct VertexFormatInfo {
   unsigned numChannels; // Valid number of channels
 };
 
-// Represents vertex component info corresponding to to vertex data format (BufDataFormat).
+// Represents vertex component info corresponding to vertex data format (BufDataFormat).
 //
 // NOTE: This info is used by vertex fetch instructions. We split vertex fetch into its per-component fetches when
 // the original vertex fetch does not match the hardware requirements (such as vertex attribute offset, vertex
@@ -1100,7 +1100,7 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
 }
 
 // =====================================================================================================================
-// Checks whether post shuffle is required for vertex fetch oepration.
+// Checks whether post shuffle is required for vertex fetch operation.
 //
 // @param inputDesc : Vertex input description
 // @param [out] shuffleMask : Vector shuffle mask

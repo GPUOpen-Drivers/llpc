@@ -374,7 +374,7 @@ void InOutBuilder::markInterpolationInfo(InOutInfo &interpInfo) {
     break;
   }
 
-  // When per-smaple shading is enabled, force nonperspective and smooth input with center-based interpolation to do
+  // When per-sample shading is enabled, force nonperspective and smooth input with center-based interpolation to do
   // per-sample interpolation.
   // NOTE: if the input is used by interpolation functions (has auxiliary value), we should not modify its interpLoc
   // because it is used for modifyAuxInterpValue.

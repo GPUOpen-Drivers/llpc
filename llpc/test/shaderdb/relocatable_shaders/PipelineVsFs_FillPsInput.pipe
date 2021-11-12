@@ -1,5 +1,5 @@
 ; This test checks that the PS_INPUT_CNTL entries are continuous.  Tests fail
-; when there is they not not start at 0 or there is a gap.
+; when they do not start at 0 or there is a gap.
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s

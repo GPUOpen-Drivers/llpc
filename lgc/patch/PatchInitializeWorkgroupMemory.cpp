@@ -101,7 +101,7 @@ bool PatchInitializeWorkgroupMemory::runOnModule(Module &module) {
 
   SmallVector<GlobalVariable *> workgroupGlobals;
   for (GlobalVariable &global : module.globals()) {
-    // The pass process the cases that the workgroup memory is forced to be initialized or the workgorup variable has an
+    // The pass process the cases that the workgroup memory is forced to be initialized or the workgroup variable has an
     // zero initializer
     if (global.getType()->getPointerAddressSpace() == ADDR_SPACE_LOCAL &&
         (ForceInitWorkgroupMemory || (global.hasInitializer() && global.getInitializer()->isNullValue())))
@@ -247,7 +247,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
 // @param inputTy : The type to be calculated
 unsigned PatchInitializeWorkgroupMemory::getTypeSizeInDwords(Type *inputTy) {
   if (inputTy->isSingleValueType()) {
-    // Variabl in LDS is stored in dwords and padded as 4 dowrds
+    // Variable in LDS is stored in dwords and padded as 4 dwords
     unsigned dwordCount = 4;
     unsigned elemCount = inputTy->isVectorTy() ? cast<FixedVectorType>(inputTy)->getNumElements() : 1;
     if (inputTy->getScalarSizeInBits() == 64 && elemCount > 1)

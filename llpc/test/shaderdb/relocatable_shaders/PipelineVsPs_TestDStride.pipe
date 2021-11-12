@@ -8,7 +8,6 @@
 ; SHADERTEST: s_add_u32 s[[base1:[0-9]*]], {{s[0-9]*}}, [[offset]]
 ; SHADERTEST: s_addc_u32 s[[base2:[0-9]*]], {{s[0-9]*}}, [[sign]]
 ; SHADERTEST: s_load_dwordx8 s{{\[[0-9]*:[0-9]*\]}}, s{{\[}}[[base1]]:[[base2]]{{\]}}
-; SasdfaHADERTEST: s_load_dwordx8 s{{[0-9]*}}, 
 ; END_SHADERTEST
 
 

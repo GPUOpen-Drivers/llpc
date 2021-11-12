@@ -371,7 +371,7 @@ Value *BuilderRecorder::CreateDotProduct(Value *const vector1, Value *const vect
 //
 // @param vector1 : The integer vector 1
 // @param vector2 : The integer vector 2
-// @param accumulator : The accumulotor to the scalar of dot product
+// @param accumulator : The accumulator to the scalar of dot product
 // @param flags : Bit 0 is "first vector is signed" and bit 1 is "second vector is signed"
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateIntegerDotProduct(Value *vector1, Value *vector2, Value *accumulator, unsigned flags,
@@ -1909,7 +1909,7 @@ Value *BuilderRecorder::CreateCooperativeMatrixConvert(Value *source, Value *des
 }
 
 // =====================================================================================================================
-// Create cooparetive matrix binary operation
+// Create cooperative matrix binary operation
 //
 // @param coopMatArithOp : The cooperative matrix arithmetic operation to perform.
 // @param operand1 : The first operand.

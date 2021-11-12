@@ -178,7 +178,7 @@ void PalMetadata::record(Module *module) {
 // Read blob as PAL metadata and merge it into existing PAL metadata (if any)
 //
 // @param blob : MsgPack PAL metadata to merge
-// @param isGlueCode : True if the blob is was generated for glue code.
+// @param isGlueCode : True if the blob was generated for glue code.
 void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
   // Use msgpack::Document::readFromBlob to read the new MsgPack PAL metadata, merging it into the msgpack::Document
   // we already have. We pass it a lambda that determines how to cope with merge conflicts, which returns:

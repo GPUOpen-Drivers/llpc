@@ -1354,7 +1354,7 @@ Value *ImageBuilder::CreateImageQuerySamples(unsigned dim, unsigned flags, Value
   // Return sample number if resource type is 2D MSAA or 2D MSAA array. Otherwise, return 1.
   sampleNumber = CreateSelect(isMsaa, sampleNumber, getInt32(1), instName);
 
-  // The sampler number is clampled 0 if allowNullDescriptor is on and image descriptor is a null descriptor
+  // The sampler number is clamped 0 if allowNullDescriptor is on and image descriptor is a null descriptor
   if (m_pipelineState->getOptions().allowNullDescriptor) {
     // Check dword3 against 0 for a null descriptor
     Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
@@ -1982,7 +1982,7 @@ Value *ImageBuilder::fixImageDescForRead(Value *imageDesc) {
 }
 
 // =====================================================================================================================
-// Enforce readfirslane on the given descriptor.
+// Enforce readfirstlane on the given descriptor.
 //
 // @param imageInst : the image instruction
 // @param descIdx : the index of the descriptor to put readfirstlane on

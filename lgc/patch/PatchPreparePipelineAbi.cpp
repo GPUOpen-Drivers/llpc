@@ -190,7 +190,7 @@ void PatchPreparePipelineAbi::setRemainingCallingConvs(Module &module) {
 }
 
 // =====================================================================================================================
-// Merge shaders and set calling convention for the entry-point of each each shader (GFX9+)
+// Merge shaders and set calling convention for the entry-point of each shader (GFX9+)
 //
 // @param module : LLVM module
 void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {

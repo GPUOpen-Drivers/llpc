@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  vkgcPipelineDumper.cpp
-* @brief VKGC source file: contains implementation of VKGC pipline dump utility.
+* @brief VKGC source file: contains implementation of VKGC pipeline dump utility.
 ***********************************************************************************************************************
 */
 #include "llvm/Support/Mutex.h"
@@ -860,7 +860,7 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
 }
 
 // =====================================================================================================================
-// Builds hash code from graphics pipline build info.  If stage is a specific stage of the graphics pipeline, then only
+// Builds hash code from graphics pipeline build info.  If stage is a specific stage of the graphics pipeline, then only
 // the portions of the pipeline build info that affect that stage will be included in the hash.  Otherwise, stage must
 // be ShaderStageInvalid, and all values in the build info will be included.
 //
@@ -920,7 +920,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 }
 
 // =====================================================================================================================
-// Builds hash code from compute pipline build info.
+// Builds hash code from compute pipeline build info.
 //
 // @param pipeline : Info to build a compute pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
@@ -1246,7 +1246,7 @@ void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData 
 // =====================================================================================================================
 // Updates hash code context for resource mapping node.
 //
-// NOTE: This function will be called recusively if node's type is "DescriptorTableVaPtr"
+// NOTE: This function will be called recursively if node's type is "DescriptorTableVaPtr"
 //
 // @param userDataNode : Resource mapping node
 // @param isRootNode : TRUE if the node is in root level

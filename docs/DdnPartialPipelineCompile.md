@@ -122,7 +122,8 @@ To check whether shader hash is compatible with auto-layout pipeline, we need mo
  Beside this, color buffer format should be mapped to export format during hash calculation and apply to common path.
 The compile result of auto-layout pipeline isn’t stored in any Vulkan API object, it only affects the content of internal shader cache.
 
-To avoid increase the time in vkCreateShaderModule, build partial pipeline will be dispatch to a worker thread. Which is similar with async shader module, we create a PartialPipline class, in its Execute() method, we construct pipeline info by using previous exposed resource info, and then compile it.
+To avoid increase the time in vkCreateShaderModule, build partial pipeline will be dispatch to a worker thread. Which is similar with async shader module, we create a
+PartialPipeline class, in its Execute() method, we construct pipeline info by using previous exposed resource info, and then compile it.
 ```
 // =====================================================================================================================
 // Implementation of a async partial pipeline
