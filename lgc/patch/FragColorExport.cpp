@@ -47,49 +47,6 @@
 using namespace lgc;
 using namespace llvm;
 
-namespace {
-
-// The information needed for an export to a hardware color target.
-struct ColorExportValueInfo {
-  std::vector<Value *> value; // The value of each component to be exported.
-  unsigned location;          // The location that corresponds to the hardware color target.
-  bool isSigned;              // True if the values should be interpreted as signed integers.
-};
-
-// =====================================================================================================================
-// Pass to lower color export calls
-class LowerFragColorExport : public ModulePass {
-public:
-  LowerFragColorExport() : ModulePass(ID), m_exportValues(MaxColorTargets + 1, nullptr) {}
-  LowerFragColorExport(const LowerFragColorExport &) = delete;
-  LowerFragColorExport &operator=(const LowerFragColorExport &) = delete;
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-  }
-
-  virtual bool runOnModule(Module &module) override;
-
-  static char ID; // ID of this pass
-
-private:
-  void updateFragColors(CallInst *callInst, ColorExportValueInfo expFragColors[], BuilderBase &builder);
-  Value *getOutputValue(ArrayRef<Value *> expFragColor, unsigned int location, BuilderBase &builder);
-  void collectExportInfoForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder);
-  void collectExportInfoForBuiltinOutput(Function *module, BuilderBase &builder);
-  Value *generateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder);
-  Value *generateReturn(Function *fragEntryPoint, BuilderBase &builder);
-
-  LLVMContext *m_context;                  // The context the pass is being run in.
-  PipelineState *m_pipelineState;          // The pipeline state
-  ResourceUsage *m_resUsage;               // The resource usage object from the pipeline state.
-  SmallVector<ColorExportInfo, 8> m_info;  // The color export information for each export.
-  SmallVector<Value *, 10> m_exportValues; // The value to be exported indexed by the hw render target.
-};
-
-} // namespace
-
 namespace lgc {
 
 // =====================================================================================================================
@@ -98,6 +55,14 @@ namespace lgc {
 // @param pipelineState : Pipeline state
 FragColorExport::FragColorExport(LLVMContext *context, PipelineState *pipelineState)
     : m_context(context), m_pipelineState(pipelineState) {
+}
+
+// =====================================================================================================================
+LowerFragColorExport::LowerFragColorExport() : m_exportValues(MaxColorTargets + 1, nullptr) {
+}
+
+// =====================================================================================================================
+LegacyLowerFragColorExport::LegacyLowerFragColorExport() : ModulePass(ID) {
 }
 
 // =====================================================================================================================
@@ -435,25 +400,53 @@ Value *FragColorExport::convertToInt(Value *value, bool signedness, BuilderBase 
 
 } // namespace lgc
 
-char LowerFragColorExport::ID = 0;
+char LegacyLowerFragColorExport::ID = 0;
 
 // =====================================================================================================================
 // Create the color export pass
-ModulePass *lgc::createLowerFragColorExport() {
-  return new LowerFragColorExport();
+ModulePass *lgc::createLegacyLowerFragColorExport() {
+  return new LegacyLowerFragColorExport();
+}
+
+// =====================================================================================================================
+// Run the lower color export pass on a module
+//
+// @param [in/out] module : LLVM module to be run on
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyLowerFragColorExport::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
+  return m_impl.runImpl(module, pipelineShaders, pipelineState);
+}
+
+// =====================================================================================================================
+// Run the lower color export pass on a module
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
+  if (runImpl(module, pipelineShaders, pipelineState))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
 }
 
 // =====================================================================================================================
 // Run the lower color export pass on a module
 //
 // @param [in/out] module : Module
-bool LowerFragColorExport::runOnModule(Module &module) {
+// @param pipelineShaders : Pipeline shaders analysis result
+// @param pipelineState : Pipeline state
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
+                                   PipelineState *pipelineState) {
   m_context = &module.getContext();
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = pipelineState;
   m_resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
 
-  auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
-  Function *fragEntryPoint = pipelineShaders->getEntryPoint(ShaderStageFragment);
+  Function *fragEntryPoint = pipelineShaders.getEntryPoint(ShaderStageFragment);
   if (!fragEntryPoint)
     return false;
 
@@ -924,4 +917,4 @@ void FragColorExport::generateNullFragmentShaderBody(llvm::Function *entryPoint)
 
 // =====================================================================================================================
 // Initialize the lower fragment color export pass
-INITIALIZE_PASS(LowerFragColorExport, DEBUG_TYPE, "Lower fragment color export calls", false, false)
+INITIALIZE_PASS(LegacyLowerFragColorExport, DEBUG_TYPE, "Lower fragment color export calls", false, false)

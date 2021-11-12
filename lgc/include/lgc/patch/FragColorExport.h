@@ -33,8 +33,12 @@
 #include "lgc/Pipeline.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
 #include "lgc/util/BuilderBase.h"
 #include "lgc/util/Internal.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 
 namespace lgc {
 
@@ -79,6 +83,59 @@ private:
 
   llvm::LLVMContext *m_context;   // LLVM context
   PipelineState *m_pipelineState; // The pipeline state
+};
+
+// The information needed for an export to a hardware color target.
+struct ColorExportValueInfo {
+  std::vector<llvm::Value *> value; // The value of each component to be exported.
+  unsigned location;                // The location that corresponds to the hardware color target.
+  bool isSigned;                    // True if the values should be interpreted as signed integers.
+};
+
+// =====================================================================================================================
+// Pass to lower color export calls
+class LowerFragColorExport : public llvm::PassInfoMixin<LowerFragColorExport> {
+public:
+  LowerFragColorExport();
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+
+  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState);
+
+  static llvm::StringRef name() { return "Lower fragment color export calls"; }
+
+private:
+  void updateFragColors(llvm::CallInst *callInst, ColorExportValueInfo expFragColors[], BuilderBase &builder);
+  llvm::Value *getOutputValue(llvm::ArrayRef<llvm::Value *> expFragColor, unsigned int location, BuilderBase &builder);
+  void collectExportInfoForGenericOutputs(llvm::Function *fragEntryPoint, BuilderBase &builder);
+  void collectExportInfoForBuiltinOutput(llvm::Function *module, BuilderBase &builder);
+  llvm::Value *generateValueForOutput(llvm::Value *value, llvm::Type *outputTy, BuilderBase &builder);
+  llvm::Value *generateReturn(llvm::Function *fragEntryPoint, BuilderBase &builder);
+
+  llvm::LLVMContext *m_context;                        // The context the pass is being run in.
+  PipelineState *m_pipelineState;                      // The pipeline state
+  ResourceUsage *m_resUsage;                           // The resource usage object from the pipeline state.
+  llvm::SmallVector<ColorExportInfo, 8> m_info;        // The color export information for each export.
+  llvm::SmallVector<llvm::Value *, 10> m_exportValues; // The value to be exported indexed by the hw render target.
+};
+
+// =====================================================================================================================
+// Pass to lower color export calls
+class LegacyLowerFragColorExport : public llvm::ModulePass {
+public:
+  LegacyLowerFragColorExport();
+  LegacyLowerFragColorExport(const LegacyLowerFragColorExport &) = delete;
+  LegacyLowerFragColorExport &operator=(const LegacyLowerFragColorExport &) = delete;
+
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
+  }
+
+  virtual bool runOnModule(llvm::Module &module) override;
+
+  static char ID; // ID of this pass
+private:
+  LowerFragColorExport m_impl;
 };
 
 } // namespace lgc

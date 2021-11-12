@@ -510,6 +510,10 @@ public:
   PipelineStateWrapperResult(PipelineState *pipelineState);
   PipelineState *getPipelineState() { return m_pipelineState; }
 
+  bool invalidate(llvm::Module &, const llvm::PreservedAnalyses &, llvm::ModuleAnalysisManager::Invalidator &) {
+    return false;
+  }
+
 private:
   PipelineState *m_pipelineState = nullptr;
 };

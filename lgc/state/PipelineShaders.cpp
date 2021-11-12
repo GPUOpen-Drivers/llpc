@@ -48,37 +48,65 @@ ModulePass *createLegacyPipelineShaders() {
 }
 
 // =====================================================================================================================
+AnalysisKey PipelineShaders::Key;
+
+// =====================================================================================================================
+PipelineShadersResult::PipelineShadersResult() {
+  for (auto &entryPoint : m_entryPoints)
+    entryPoint = nullptr;
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPipelineShaders::runOnModule(Module &module) {
+  m_result = m_impl.runImpl(module);
+  return false;
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : Result object of the PipelineShaders pass
+PipelineShadersResult PipelineShaders::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  return runImpl(module);
+}
+
+// =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
 // This populates the shader array. In the pipeline module, a shader entrypoint is a non-internal function definition,
 // and it has metadata giving the SPIR-V execution model.
 //
 // @param [in/out] module : LLVM module to be run on
-bool LegacyPipelineShaders::runOnModule(Module &module) {
+// @returns : Result object of the PipelineShaders pass
+PipelineShadersResult PipelineShaders::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
 
-  m_entryPointMap.clear();
-  for (auto &entryPoint : m_entryPoints)
-    entryPoint = nullptr;
+  PipelineShadersResult result;
 
   for (auto &func : module) {
     if (isShaderEntryPoint(&func)) {
       auto shaderStage = lgc::getShaderStage(&func);
 
       if (shaderStage != ShaderStageInvalid) {
-        m_entryPoints[shaderStage] = &func;
-        m_entryPointMap[&func] = shaderStage;
+        result.m_entryPoints[shaderStage] = &func;
+        result.m_entryPointMap[&func] = shaderStage;
       }
     }
   }
-  return false;
+  return result;
 }
 
 // =====================================================================================================================
 // Get the shader for a particular API shader stage, or nullptr if none
 //
 // @param shaderStage : Shader stage
-Function *LegacyPipelineShaders::getEntryPoint(ShaderStage shaderStage) const {
+Function *PipelineShadersResult::getEntryPoint(ShaderStage shaderStage) const {
   assert((unsigned)shaderStage < ShaderStageCountInternal);
   return m_entryPoints[shaderStage];
 }
@@ -87,7 +115,7 @@ Function *LegacyPipelineShaders::getEntryPoint(ShaderStage shaderStage) const {
 // Get the ABI shader stage for a particular function, or ShaderStageInvalid if not a shader entrypoint.
 //
 // @param func : Function to look up
-ShaderStage LegacyPipelineShaders::getShaderStage(const Function *func) const {
+ShaderStage PipelineShadersResult::getShaderStage(const Function *func) const {
   auto entryMapIt = m_entryPointMap.find(func);
   if (entryMapIt == m_entryPointMap.end())
     return ShaderStageInvalid;

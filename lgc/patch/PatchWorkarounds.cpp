@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 
-#include "PatchWorkarounds.h"
+#include "lgc/patch/PatchWorkarounds.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -48,27 +48,52 @@ namespace lgc {
 
 // =====================================================================================================================
 // Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char PatchWorkarounds::ID;
+char LegacyPatchWorkarounds::ID;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
-ModulePass *createPatchWorkarounds() {
-  return new PatchWorkarounds();
+ModulePass *createLegacyPatchWorkarounds() {
+  return new LegacyPatchWorkarounds();
 }
 
-PatchWorkarounds::PatchWorkarounds() : LegacyPatch(ID) {
+LegacyPatchWorkarounds::LegacyPatchWorkarounds() : ModulePass(ID) {
 }
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
-// @param [in/out] module : Module that we will add workarounds in.
-bool PatchWorkarounds::runOnModule(Module &module) {
+// @param [in/out] module : LLVM module to be run on
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchWorkarounds::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  return m_impl.runImpl(module, pipelineState);
+}
+
+// =====================================================================================================================
+// Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PatchWorkarounds::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  if (runImpl(module, pipelineState))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in/out] module : Module that we will add workarounds in
+// @param pipelineState : Pipeline state
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchWorkarounds::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Workarounds\n");
 
-  LegacyPatch::init(&module);
+  Patch::init(&module);
 
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = pipelineState;
   m_builder = std::make_unique<IRBuilder<>>(*m_context);
   m_processed.clear();
 
@@ -221,7 +246,7 @@ void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLas
 // Get the analysis usage of this pass.
 //
 // @param [out] analysisUsage : The analysis usage.
-void PatchWorkarounds::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
+void LegacyPatchWorkarounds::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   analysisUsage.addRequired<LegacyPipelineShaders>();
   analysisUsage.addPreserved<LegacyPipelineShaders>();
@@ -231,4 +256,4 @@ void PatchWorkarounds::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations for workarounds
-INITIALIZE_PASS(PatchWorkarounds, DEBUG_TYPE, "Patch LLVM for workarounds", false, false)
+INITIALIZE_PASS(LegacyPatchWorkarounds, DEBUG_TYPE, "Patch LLVM for workarounds", false, false)

@@ -43,31 +43,25 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for input import and output export.
-class PatchInOutImportExport : public LegacyPatch {
+class PatchInOutImportExport : public Patch, public llvm::PassInfoMixin<PatchInOutImportExport> {
 public:
   PatchInOutImportExport();
-  ~PatchInOutImportExport();
 
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    analysisUsage.addRequired<llvm::PostDominatorTreeWrapperPass>();
-    analysisUsage.addPreserved<LegacyPipelineShaders>();
-  }
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runOnModule(llvm::Module &module) override;
+  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState,
+               std::function<llvm::PostDominatorTree &(llvm::Function &)> getPostDominatorTree);
+
+  static llvm::StringRef name() { return "Patch LLVM for input import and output export operations"; }
+
   void visitCallInst(llvm::CallInst &callInst);
   void visitReturnInst(llvm::ReturnInst &retInst);
 
-  static char ID; // ID of this pass
-
 private:
-  PatchInOutImportExport(const PatchInOutImportExport &) = delete;
-  PatchInOutImportExport &operator=(const PatchInOutImportExport &) = delete;
-
   void processFunction(llvm::Function &func, ShaderStage shaderStage,
                        llvm::SmallVectorImpl<llvm::Function *> &inputCallees,
-                       llvm::SmallVectorImpl<llvm::Function *> &otherCallees);
+                       llvm::SmallVectorImpl<llvm::Function *> &otherCallees,
+                       std::function<llvm::PostDominatorTree &(llvm::Function &)> getPostDominatorTree);
   void initPerShader();
 
   void markExportDone(llvm::Function *func, llvm::PostDominatorTree &postDomTree);
@@ -249,6 +243,31 @@ private:
 
   llvm::SmallVector<llvm::Instruction *, 4> m_tessLevelOuterInsts; // Collect the instructions of TessLevelOuter
   llvm::SmallVector<llvm::Instruction *, 2> m_tessLevelInnerInsts; // Collect the instructions of TessLevelInner
+};
+
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations for input import and output export.
+class LegacyPatchInOutImportExport : public llvm::ModulePass {
+public:
+  LegacyPatchInOutImportExport();
+  ~LegacyPatchInOutImportExport();
+
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
+    analysisUsage.addRequired<LegacyPipelineShaders>();
+    analysisUsage.addRequired<llvm::PostDominatorTreeWrapperPass>();
+    analysisUsage.addPreserved<LegacyPipelineShaders>();
+  }
+
+  bool runOnModule(llvm::Module &module) override;
+
+  static char ID; // ID of this pass
+
+private:
+  LegacyPatchInOutImportExport(const LegacyPatchInOutImportExport &) = delete;
+  LegacyPatchInOutImportExport &operator=(const LegacyPatchInOutImportExport &) = delete;
+
+  PatchInOutImportExport m_impl;
 };
 
 } // namespace lgc

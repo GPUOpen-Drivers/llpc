@@ -77,7 +77,7 @@ bool PatchLoadScalarizer::runOnFunction(Function &function) {
 
   auto pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
   auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
-  auto shaderStage = pipelineShaders->getShaderStage(&function);
+  auto shaderStage = pipelineShaders->getResult().getShaderStage(&function);
 
   // If the function is not a valid shader stage, or the optimization is disabled, bail.
   m_scalarThreshold = 0;

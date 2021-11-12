@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,61 +24,57 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  VertexFetch.h
- * @brief LLPC header file: contains declaration of class lgc::VertexFetch.
+ * @file  PatchInitializeWorkgroupMemory.h
+ * @brief LLPC header file: contains declaration of class lgc::PatchInitializeWorkgroupMemory.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/Pipeline.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/util/BuilderBase.h"
 
 namespace lgc {
 
-class BuilderBase;
-
 // =====================================================================================================================
-// Public interface to vertex fetch manager.
-class VertexFetch {
-public:
-  virtual ~VertexFetch() {}
-
-  // Create a VertexFetch
-  static VertexFetch *create(LgcContext *lgcContext);
-
-  // Generate code to fetch a vertex value
-  virtual llvm::Value *fetchVertex(llvm::Type *inputTy, const VertexInputDescription *description, unsigned location,
-                                   unsigned compIdx, BuilderBase &builder) = 0;
-};
-
-// =====================================================================================================================
-// Pass to lower vertex fetch calls
-class LowerVertexFetch : public llvm::PassInfoMixin<LowerVertexFetch> {
+// Represents the pass of setting up the value for workgroup global variables.
+class PatchInitializeWorkgroupMemory final : public Patch, public llvm::PassInfoMixin<PatchInitializeWorkgroupMemory> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
+  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState);
 
-  static llvm::StringRef name() { return "Lower vertex fetch calls"; }
+  static llvm::StringRef name() { return "Patch for initialize workgroup memory"; }
+
+private:
+  void initializeWithZero(llvm::GlobalVariable *lds, BuilderBase &builder);
+  unsigned getTypeSizeInDwords(llvm::Type *inputTy);
+
+  llvm::DenseMap<llvm::GlobalVariable *, llvm::Value *> m_globalLdsOffsetMap;
+  PipelineState *m_pipelineState = nullptr;
 };
 
 // =====================================================================================================================
-// Pass to lower vertex fetch calls
-class LegacyLowerVertexFetch : public llvm::ModulePass {
+// Represents the pass of setting up the value for workgroup global variables.
+class LegacyPatchInitializeWorkgroupMemory final : public llvm::ModulePass {
 public:
-  LegacyLowerVertexFetch();
-  LegacyLowerVertexFetch(const LegacyLowerVertexFetch &) = delete;
-  LegacyLowerVertexFetch &operator=(const LegacyLowerVertexFetch &) = delete;
+  LegacyPatchInitializeWorkgroupMemory();
 
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
+    analysisUsage.addRequired<LegacyPipelineShaders>();
     analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   }
 
   virtual bool runOnModule(llvm::Module &module) override;
 
   static char ID; // ID of this pass
+
 private:
-  LowerVertexFetch m_impl;
+  LegacyPatchInitializeWorkgroupMemory(const LegacyPatchInitializeWorkgroupMemory &) = delete;
+  LegacyPatchInitializeWorkgroupMemory &operator=(const LegacyPatchInitializeWorkgroupMemory &) = delete;
+
+  PatchInitializeWorkgroupMemory m_impl;
 };
 
 } // namespace lgc

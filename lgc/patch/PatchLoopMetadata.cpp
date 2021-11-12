@@ -28,9 +28,7 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchLoopMetadata.
  ***********************************************************************************************************************
  */
-#include "lgc/patch/Patch.h"
-#include "lgc/state/PipelineState.h"
-#include "lgc/state/TargetInfo.h"
+#include "lgc/patch/PatchLoopMetadata.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/Support/CommandLine.h"
@@ -42,39 +40,15 @@
 using namespace llvm;
 using namespace lgc;
 
-namespace {
-
-// =====================================================================================================================
-// Represents the LLVM pass for patching loop metadata.
-class PatchLoopMetadata : public LoopPass {
-public:
-  PatchLoopMetadata();
-
-  bool runOnLoop(Loop *loop, LPPassManager &loopPassMgr) override;
-
-  static char ID; // ID of this pass
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
-
-  MDNode *updateMetadata(MDNode *loopId, ArrayRef<StringRef> prefixesToRemove, Metadata *addMetadata, bool conditional);
-
-private:
-  llvm::LLVMContext *m_context;       // Associated LLVM context of the LLVM module that passes run on
-  unsigned m_forceLoopUnrollCount;    // Force loop unroll count
-  bool m_disableLoopUnroll;           // Forcibly disable loop unroll
-  unsigned m_disableLicmThreshold;    // Disable LLVM LICM pass loop block count threshold
-  unsigned m_unrollHintThreshold;     // Unroll hint threshold
-  unsigned m_dontUnrollHintThreshold; // DontUnroll hint threshold
-  GfxIpVersion m_gfxIp;
-};
-
-} // anonymous namespace
+namespace llvm {
+// A proxy from a ModuleAnalysisManager to a loop.
+typedef OuterAnalysisManagerProxy<ModuleAnalysisManager, Loop, LoopStandardAnalysisResults &>
+    ModuleAnalysisManagerLoopProxy;
+} // namespace llvm
 
 // =====================================================================================================================
 // Initializes static members.
-char PatchLoopMetadata::ID = 0;
+char LegacyPatchLoopMetadata::ID = 0;
 
 // =====================================================================================================================
 // Update metadata by removing any existing metadata with the specified prefix, and then adding the new metadata if
@@ -115,30 +89,63 @@ MDNode *PatchLoopMetadata::updateMetadata(MDNode *loopId, ArrayRef<StringRef> pr
 
 // =====================================================================================================================
 // Pass creator, creates the pass for patching loop metadata
-LoopPass *lgc::createPatchLoopMetadata() {
-  return new PatchLoopMetadata();
+LoopPass *lgc::createLegacyPatchLoopMetadata() {
+  return new LegacyPatchLoopMetadata();
 }
 
 // =====================================================================================================================
 PatchLoopMetadata::PatchLoopMetadata()
-    : LoopPass(ID), m_context(nullptr), m_forceLoopUnrollCount(0), m_disableLoopUnroll(false),
-      m_disableLicmThreshold(0), m_unrollHintThreshold(0), m_dontUnrollHintThreshold(0) {
+    : m_context(nullptr), m_forceLoopUnrollCount(0), m_disableLoopUnroll(false), m_disableLicmThreshold(0),
+      m_unrollHintThreshold(0), m_dontUnrollHintThreshold(0) {
+}
+
+// =====================================================================================================================
+LegacyPatchLoopMetadata::LegacyPatchLoopMetadata() : LoopPass(ID) {
 }
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
-// @param [in/out] module : LLVM module to be run on
-bool PatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) {
-  LLVM_DEBUG(dbgs() << "Run the pass lgc-patch-loop-metadata\n");
-
+// @param [in/out] loop : LLVM loop to be run on
+// @param [in/out] loopPassMgr : Legacy loop pass pass manager
+// @returns : True if the loop was modified by the transformation and false otherwise
+bool LegacyPatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) {
   if (skipLoop(loop))
     return false;
-
   Module *module = loop->getHeader()->getModule();
-  Function *func = loop->getHeader()->getFirstNonPHI()->getFunction();
-  PipelineState *mPipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(module);
-  m_context = &loop->getHeader()->getContext();
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(module);
+  return m_impl.runImpl(*loop, pipelineState);
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] loop : LLVM loop to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @param [in/out] loopAnalysisResult : Loop standard analysis results
+// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+PreservedAnalyses PatchLoopMetadata::run(Loop &loop, LoopAnalysisManager &analysisManager,
+                                         LoopStandardAnalysisResults &loopAnalysisResults, LPMUpdater &) {
+  Module *module = loop.getHeader()->getModule();
+  const auto &mamProxy = analysisManager.getResult<ModuleAnalysisManagerLoopProxy>(loop, loopAnalysisResults);
+  PipelineState *pipelineState = mamProxy.getCachedResult<PipelineStateWrapper>(*module)->getPipelineState();
+  if (runImpl(loop, pipelineState))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] loop : LLVM loop to be run on
+// @param pipelineState : Pipeline state
+// @returns : True if the loop was modified by the transformation and false otherwise
+bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
+  LLVM_DEBUG(dbgs() << "Run the pass lgc-patch-loop-metadata\n");
+
+  Function *func = loop.getHeader()->getFirstNonPHI()->getFunction();
+  PipelineState *mPipelineState = pipelineState;
+  m_context = &loop.getHeader()->getContext();
 
   m_gfxIp = mPipelineState->getTargetInfo().getGfxIpVersion();
   bool changed = false;
@@ -154,12 +161,12 @@ bool PatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) {
     m_dontUnrollHintThreshold = shaderOptions->dontUnrollHintThreshold;
   }
 
-  MDNode *loopMetaNode = loop->getLoopID();
+  MDNode *loopMetaNode = loop.getLoopID();
   if (!loopMetaNode || loopMetaNode->getOperand(0) != loopMetaNode)
     return false;
 
-  LLVM_DEBUG(dbgs() << "loop in " << func->getName() << " at depth " << loop->getLoopDepth() << " has "
-                    << loop->getNumBlocks() << " blocks\n");
+  LLVM_DEBUG(dbgs() << "loop in " << func->getName() << " at depth " << loop.getLoopDepth() << " has "
+                    << loop.getNumBlocks() << " blocks\n");
 
   if (m_disableLoopUnroll) {
     LLVM_DEBUG(dbgs() << "  disabling loop unroll\n");
@@ -218,7 +225,7 @@ bool PatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) {
     }
   }
 
-  if (m_disableLicmThreshold > 0 && loop->getNumBlocks() >= m_disableLicmThreshold) {
+  if (m_disableLicmThreshold > 0 && loop.getNumBlocks() >= m_disableLicmThreshold) {
     LLVM_DEBUG(dbgs() << "  disabling LICM\n");
     MDNode *licmDisableNode = MDNode::get(*m_context, MDString::get(*m_context, "llvm.licm.disable"));
     loopMetaNode = MDNode::concatenate(loopMetaNode, MDNode::get(*m_context, licmDisableNode));
@@ -226,7 +233,7 @@ bool PatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) {
   }
   if (changed) {
     loopMetaNode->replaceOperandWith(0, loopMetaNode);
-    loop->setLoopID(loopMetaNode);
+    loop.setLoopID(loopMetaNode);
   }
 
   return changed;
@@ -234,4 +241,4 @@ bool PatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) {
 
 // =====================================================================================================================
 // Initializes the pass for patching Loop metadata.
-INITIALIZE_PASS(PatchLoopMetadata, DEBUG_TYPE, "Set or amend metadata to control loop unrolling", false, false)
+INITIALIZE_PASS(LegacyPatchLoopMetadata, DEBUG_TYPE, "Set or amend metadata to control loop unrolling", false, false)

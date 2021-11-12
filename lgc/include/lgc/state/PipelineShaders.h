@@ -31,10 +31,34 @@
 #pragma once
 
 #include "lgc/CommonDefs.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include <map>
 
 namespace lgc {
+
+class PipelineShadersResult {
+  friend class PipelineShaders;
+
+public:
+  PipelineShadersResult();
+  llvm::Function *getEntryPoint(ShaderStage shaderStage) const;
+  ShaderStage getShaderStage(const llvm::Function *func) const;
+
+private:
+  llvm::Function *m_entryPoints[ShaderStageCountInternal];       // The entry-point for each shader stage.
+  std::map<const llvm::Function *, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
+};
+
+// =====================================================================================================================
+// Simple analysis pass that finds the shaders in the pipeline module
+class PipelineShaders : public llvm::AnalysisInfoMixin<PipelineShaders> {
+public:
+  using Result = PipelineShadersResult;
+  PipelineShadersResult run(llvm::Module &module, llvm::ModuleAnalysisManager &);
+  PipelineShadersResult runImpl(llvm::Module &module);
+  static llvm::AnalysisKey Key;
+};
 
 // =====================================================================================================================
 // Simple analysis pass that finds the shaders in the pipeline module
@@ -43,20 +67,18 @@ public:
   static char ID;
   LegacyPipelineShaders() : llvm::ModulePass(ID) {}
 
+  PipelineShadersResult &getResult() { return m_result; }
+
   bool runOnModule(llvm::Module &module) override;
 
   void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override { analysisUsage.setPreservesAll(); }
-
-  llvm::Function *getEntryPoint(ShaderStage shaderStage) const;
-
-  ShaderStage getShaderStage(const llvm::Function *func) const;
 
 private:
   LegacyPipelineShaders(const LegacyPipelineShaders &) = delete;
   LegacyPipelineShaders &operator=(const LegacyPipelineShaders &) = delete;
 
-  llvm::Function *m_entryPoints[ShaderStageCountInternal];       // The entry-point for each shader stage.
-  std::map<const llvm::Function *, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
+  PipelineShaders m_impl;
+  PipelineShadersResult m_result;
 };
 
 llvm::ModulePass *createLegacyPipelineShaders();
