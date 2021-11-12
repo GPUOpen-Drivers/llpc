@@ -33,18 +33,19 @@
 #define NOMINMAX
 #endif
 
-#include "llpcAutoLayout.h"
+#include "llpc.h"
 #include "llpcCompilationUtils.h"
+#include "llpcDebug.h"
+#include "llpcFile.h"
 #include "llpcInputUtils.h"
+#include "llpcUtil.h"
+#include "spvgen.h"
 #include "lgc/LgcContext.h"
 #include "llvm/ADT/ScopeExit.h"
-#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/raw_ostream.h"
 
 #if defined(LLPC_MEM_TRACK_LEAK) && defined(_DEBUG)
 #define _CRTDBG_MAP_ALLOC
@@ -62,14 +63,6 @@
 #include "vld.h"
 #endif
 
-#include "llpc.h"
-#include "llpcDebug.h"
-#include "llpcFile.h"
-#include "llpcSpirvLowerUtil.h"
-#include "llpcUtil.h"
-#include "spvgen.h"
-#include "vfx.h"
-#include "vkgcElfReader.h"
 #include <cstdlib> // getenv, EXIT_FAILURE, EXIT_SUCCESS
 
 #define DEBUG_TYPE "amd-llpc"
