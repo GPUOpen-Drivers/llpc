@@ -28,6 +28,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <array>
@@ -242,18 +243,6 @@ TEST(InputUtilsTest, ExpandInputFilenames) {
 }
 #endif
 
-// =====================================================================================================================
-// Checks if the expected value is an Error value. If so, prints the error message to stderr and consumes the error.
-//
-// @param valueOrError : Value to check
-// @returns : true on error state, false on success
-template <typename T> bool expectedToBool(Expected<T> &valueOrErr) {
-  Error err = valueOrErr.takeError();
-  if (err)
-    errs() << "Error: " << err << "\n";
-  return errorToBool(std::move(err));
-}
-
 // Test class for groupInputFiles tests. Manages temporary files created by tests.
 class GroupInputFilesTest : public ::testing::Test {
 public:
@@ -281,13 +270,13 @@ private:
 
 TEST_F(GroupInputFilesTest, NoInputs) {
   auto groupsOrErr = groupInputFiles({});
-  ASSERT_FALSE(expectedToBool(groupsOrErr));
+  ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
   EXPECT_TRUE(groupsOrErr->empty());
 }
 
 TEST_F(GroupInputFilesTest, NonExistentInput) {
   auto groupsOrErr = groupInputFiles({"/this/path/does/not/exit.pipe"});
-  EXPECT_TRUE(expectedToBool(groupsOrErr));
+  EXPECT_THAT_EXPECTED(groupsOrErr, Failed());
 }
 
 TEST_F(GroupInputFilesTest, OnePipe) {
@@ -295,8 +284,8 @@ TEST_F(GroupInputFilesTest, OnePipe) {
   createTestFile("a", "pipe", pipePath);
 
   auto groupsOrErr = groupInputFiles({pipePath});
-  ASSERT_FALSE(expectedToBool(groupsOrErr));
-  ASSERT_EQ(groupsOrErr->size(), 1);
+  ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
+  ASSERT_EQ(groupsOrErr->size(), 1u);
 
   InputFilesGroup &group = groupsOrErr->front();
   EXPECT_THAT(group, ElementsAre(pipePath));
@@ -309,8 +298,8 @@ TEST_F(GroupInputFilesTest, MultiplePipe) {
   std::string inputPathB;
   createTestFile("b", "pipe", inputPathB);
   auto groupsOrErr = groupInputFiles({inputPathA, inputPathB});
-  ASSERT_FALSE(expectedToBool(groupsOrErr));
-  ASSERT_EQ(groupsOrErr->size(), 2);
+  ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
+  ASSERT_EQ(groupsOrErr->size(), 2u);
 
   InputFilesGroup &group1 = groupsOrErr->front();
   EXPECT_THAT(group1, ElementsAre(inputPathA));
@@ -323,8 +312,8 @@ TEST_F(GroupInputFilesTest, OneShader) {
   createTestFile("a", "spv", shaderPath);
 
   auto groupsOrErr = groupInputFiles({shaderPath});
-  ASSERT_FALSE(expectedToBool(groupsOrErr));
-  ASSERT_EQ(groupsOrErr->size(), 1);
+  ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
+  ASSERT_EQ(groupsOrErr->size(), 1u);
 
   InputFilesGroup &group = groupsOrErr->front();
   EXPECT_THAT(group, ElementsAre(shaderPath));
@@ -338,8 +327,8 @@ TEST_F(GroupInputFilesTest, MultipleShaders) {
   createTestFile("c", "frag", shaderPaths[2]);
 
   auto groupsOrErr = groupInputFiles({shaderPaths[0], shaderPaths[1], shaderPaths[2]});
-  ASSERT_FALSE(expectedToBool(groupsOrErr));
-  ASSERT_EQ(groupsOrErr->size(), 1);
+  ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
+  ASSERT_EQ(groupsOrErr->size(), 1u);
 
   InputFilesGroup &group = groupsOrErr->front();
   EXPECT_THAT(group, ElementsAreArray(shaderPaths));
@@ -353,11 +342,11 @@ TEST_F(GroupInputFilesTest, MixShaderPipe) {
   createTestFile("b", "pipe", pipePath);
 
   auto groupsOrErr1 = groupInputFiles({shaderPath, pipePath});
-  EXPECT_TRUE(expectedToBool(groupsOrErr1));
+  EXPECT_THAT_EXPECTED(groupsOrErr1, Failed());
 
   // The other order should also result in an error.
   auto groupsOrErr2 = groupInputFiles({pipePath, shaderPath});
-  EXPECT_TRUE(expectedToBool(groupsOrErr2));
+  EXPECT_THAT_EXPECTED(groupsOrErr2, Failed());
 }
 
 } // namespace
