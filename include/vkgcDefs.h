@@ -57,7 +57,7 @@
 #endif
 #endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 50
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 49
 #error LLPC client version is too old
 #endif
 
@@ -249,8 +249,10 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorConstBufferCompact, ///< Generic descriptor: constBuffer,including dynamic storage buffer
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
-  InlineBuffer,                 ///< Push constant with binding
-  Count,                        ///< Count of resource mapping node types.
+#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50)
+  InlineBuffer, ///< Push constant with binding
+#endif
+  Count, ///< Count of resource mapping node types.
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
