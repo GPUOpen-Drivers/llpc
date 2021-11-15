@@ -133,7 +133,7 @@ void PatchWorkarounds::applyImageDescWorkaround(void) {
 }
 
 // =====================================================================================================================
-// Process calls to image instrinsics and apply buffer descriptor should be image descriptor workaround
+// Process calls to image intrinsics and apply buffer descriptor should be image descriptor workaround
 //
 // @param callInst  : The image intrinsic call instruction
 // @param isLastUse : The intrinsic being considered is a waterfall.last.use

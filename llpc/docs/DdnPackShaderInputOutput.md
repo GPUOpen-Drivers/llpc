@@ -74,7 +74,7 @@ layout(location = 7) in float16_t v8;
                        |                            (3,1,false) <-> (2,2,true)
                        |                                      |
                        |``````````````````````````````````````|
-            (Resemble output export)               (Fill InOutLocMap with AsIndex() of origin and new)
+            (Reassemble output export)               (Fill InOutLocMap with AsIndex() of origin and new)
                        |                                      |
             export.generic.*.v4f32                            |
             export.generic.*.v4f32                            |
