@@ -156,11 +156,12 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       targetFeatures += ",+cumode";
     }
 
-    if (m_pipelineState->getOptions().pageMigrationEnabled) {
-      // Enable xnack when page migration is enabled
-      targetFeatures += ",+xnack";
-    } else {
-      targetFeatures += ",-xnack";
+    if (m_pipelineState->getTargetInfo().getGpuProperty().supportsXnack) {
+      // Enable or disable xnack depending on whether page migration is enabled.
+      if (m_pipelineState->getOptions().pageMigrationEnabled)
+        targetFeatures += ",+xnack";
+      else
+        targetFeatures += ",-xnack";
     }
 
     // Set up denormal mode attributes.
