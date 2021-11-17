@@ -77,6 +77,7 @@ struct GpuProperty {
     unsigned sameSignedness : 1; // Whether the components of two vectors have the same signedness
     unsigned diffSignedness : 1; // Whether the components of two vectors have the diff signedness
   } supportIntegerDotFlag;       // The flag indicates the HW supports integer dot product
+  unsigned supportsXnack;        // GPU supports XNACK
 };
 
 // Contains flags for all of the hardware workarounds which affect pipeline compilation.

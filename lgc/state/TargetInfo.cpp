@@ -210,6 +210,7 @@ static void setGfx8Info(TargetInfo *targetInfo) {
 static void setGfx800Info(TargetInfo *targetInfo) {
   setGfx8Info(targetInfo);
   targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuProperty().supportsXnack = 1;
 }
 
 // gfx802/gfx805
@@ -256,6 +257,8 @@ static void setGfx9BaseInfo(TargetInfo *targetInfo) {
 // @param [in/out] targetInfo : Target info
 static void setGfx9Info(TargetInfo *targetInfo) {
   setGfx9BaseInfo(targetInfo);
+
+  targetInfo->getGpuProperty().supportsXnack = 1;
 
   // TODO: Clean up code for all 1d texture patch
   targetInfo->getGpuWorkarounds().gfx9.treat1dImagesAs2d = 1;
@@ -314,6 +317,8 @@ static void setGfx10Info(TargetInfo *targetInfo) {
 static void setGfx1010Info(TargetInfo *targetInfo) {
   setGfx10Info(targetInfo);
 
+  targetInfo->getGpuProperty().supportsXnack = 1;
+
   targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetch0 = 1;
   targetInfo->getGpuWorkarounds().gfx10.waDidtThrottleVmem = 1;
   targetInfo->getGpuWorkarounds().gfx10.waLdsVmemNotWaitingVmVsrc = 1;
@@ -330,6 +335,8 @@ static void setGfx1010Info(TargetInfo *targetInfo) {
 // @param [in/out] targetInfo : Target info
 static void setGfx1011Info(TargetInfo *targetInfo) {
   setGfx10Info(targetInfo);
+
+  targetInfo->getGpuProperty().supportsXnack = 1;
 
   targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetch0 = 1;
   targetInfo->getGpuWorkarounds().gfx10.waDidtThrottleVmem = 1;
@@ -353,6 +360,8 @@ static void setGfx1011Info(TargetInfo *targetInfo) {
 // @param [in/out] targetInfo : Target info
 static void setGfx1012Info(TargetInfo *targetInfo) {
   setGfx10Info(targetInfo);
+
+  targetInfo->getGpuProperty().supportsXnack = 1;
 
   targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetch0 = 1;
   targetInfo->getGpuWorkarounds().gfx10.waDidtThrottleVmem = 1;
