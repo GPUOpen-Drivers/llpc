@@ -21,7 +21,7 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
-; SHADERTEST: = fmul reassoc nnan nsz arcp contract afn <3 x float> %4, <float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
+; SHADERTEST: = fmul reassoc nnan nsz arcp contract afn <3 x float> %{{[0-9]+}}, <float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[0-9]*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000
 ; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0x3F91DF46A0000000

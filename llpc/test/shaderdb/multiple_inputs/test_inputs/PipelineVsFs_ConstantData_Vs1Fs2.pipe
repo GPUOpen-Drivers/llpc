@@ -1,7 +1,7 @@
 ; Test that constant data in the vertex shader is handled correctly.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t_0.elf %gfxip %s
-; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -D -r %t_0.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 --section=.text --section=.rodata -D -r %t_0.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
 ; SHADERTEST-NEXT: R_AMDGPU_REL32_LO    [[vs_data_sym:[.a-z]*]]
@@ -24,13 +24,13 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t_01.elf %gfxip %s
-; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -D -r %t_01.elf | FileCheck -check-prefix=SHADERTEST2 %s
+; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 --section=.text --section=.rodata -D -r %t_01.elf | FileCheck -check-prefix=SHADERTEST2 %s
 ; SHADERTEST2-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST2: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
 ; SHADERTEST2-NEXT: R_AMDGPU_REL32_LO    .rodata
 ; SHADERTEST2-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, {{4|12}}
 ; SHADERTEST2-NEXT: R_AMDGPU_REL32_HI    .rodata
-; SHADERTEST2-LABEL: <__llpc_global_proxy_>:
+; SHADERTEST2-LABEL: <__llpc_global_proxy_{{.*}}>:
 ; SHADERTEST2-NEXT: 000000000000: 3F800000
 ; SHADERTEST2-NEXT: 000000000004: 00000000
 ; SHADERTEST2-NEXT: 000000000008: 00000000
