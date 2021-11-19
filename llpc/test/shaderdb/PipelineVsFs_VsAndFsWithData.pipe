@@ -46,7 +46,7 @@
 ; SHADERTEST2-NEXT: R_AMDGPU_REL32_LO    .rodata
 ; SHADERTEST2-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, {{4|12}}
 ; SHADERTEST2-NEXT: R_AMDGPU_REL32_HI    .rodata
-; SHADERTEST2-LABEL: <__llpc_global_proxy_>
+; SHADERTEST2-LABEL: <__llpc_global_proxy_{{.*}}>
 ; SHADERTEST2-NEXT: {{[0-9]*}}: 3F800000
 ; SHADERTEST2-NEXT: {{[0-9]*}}: 00000000
 ; SHADERTEST2-NEXT: {{[0-9]*}}: 00000000

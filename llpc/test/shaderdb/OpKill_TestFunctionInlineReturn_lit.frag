@@ -11,7 +11,7 @@
 
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
 ; SHADERTEST: call void{{.*}} @lgc.create.kill
-; SHADERTEST-NEXT: br label %[[EXIT:.exit[0-9]*]]
+; SHADERTEST-NEXT: br label %"{{.*}}.exit"
 ; SHADERTEST: call void{{.*}} @lgc.create.kill
 ; SHADERTEST-NEXT: br label %[[LABEL:[0-9]*]]
 ; SHADERTEST-NOT: call void{{.*}} @lgc.create.kill

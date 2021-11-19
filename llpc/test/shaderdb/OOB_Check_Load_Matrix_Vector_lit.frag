@@ -7,10 +7,10 @@
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -enable-scratch-bounds-checks | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: .[[entry:[a-z0-9]+]]:
-; SHADERTEST: %[[mat:[0-9]+]] = alloca [4 x <4 x float>], align 16, addrspace(5)
-; SHADERTEST: load i32, i32 addrspace(7)* getelementptr inbounds (<{ i32 }>, <{ i32 }> addrspace(7)* @2, i32 0, i32 0), align 4
+; SHADERTEST: %[[mat:[a-z0-9]+]] = alloca [4 x <4 x float>], align 16, addrspace(5)
+; SHADERTEST: load i32, i32 addrspace(7)* getelementptr inbounds (<{ i32 }>, <{ i32 }> addrspace(7)* @c, i32 0, i32 0), align 4
 ; SHADERTEST: %[[idx1:[0-9]+]] = add i32 %{{.*}}, 1
-; SHADERTEST: load i32, i32 addrspace(7)* getelementptr inbounds (<{ i32 }>, <{ i32 }> addrspace(7)* @2, i32 0, i32 0), align 4
+; SHADERTEST: load i32, i32 addrspace(7)* getelementptr inbounds (<{ i32 }>, <{ i32 }> addrspace(7)* @c, i32 0, i32 0), align 4
 ; SHADERTEST: %[[idx2:[0-9]+]] = add i32 %{{.*}}, 2
 ; SHADERTEST: %[[gep:[0-9]+]] = getelementptr [4 x <4 x float>], [4 x <4 x float>] addrspace(5)* %[[mat]], i32 0, i32 %[[idx1]], i32 %[[idx2]]
 ; SHADERTEST-NEXT: %[[cmp1:[0-9]+]] = icmp ult i32 %[[idx1]], 4

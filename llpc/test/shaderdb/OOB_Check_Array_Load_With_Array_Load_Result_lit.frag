@@ -7,8 +7,8 @@
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -enable-scratch-bounds-checks | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: .[[entry:[a-z0-9]+]]:
-; SHADERTEST: %[[arr:[0-9]+]] = alloca [5 x i32], align 4, addrspace(5)
-; SHADERTEST: %[[idx1:[0-9]+]] = load i32, i32 addrspace(7)* getelementptr inbounds (<{ i32 }>, <{ i32 }> addrspace(7)* @0, i32 0, i32 0), align 4
+; SHADERTEST: %[[arr:[a-z0-9]+]] = alloca [5 x i32], align 4, addrspace(5)
+; SHADERTEST: %[[idx1:[0-9]+]] = load i32, i32 addrspace(7)* getelementptr inbounds (<{ i32 }>, <{ i32 }> addrspace(7)* @c, i32 0, i32 0), align 4
 ; SHADERTEST: %[[gep1:[0-9]+]] = getelementptr [5 x i32], [5 x i32] addrspace(5)* %[[arr]], i32 0, i32 %[[idx1]]
 ; SHADERTEST: %[[cmp1:[0-9]+]] = icmp ult i32 %[[idx1]], 5
 ; SHADERTEST: br i1 %[[cmp1]], label %{{.*}}, label %{{.*}}

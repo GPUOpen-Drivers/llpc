@@ -7,7 +7,7 @@
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -enable-scratch-bounds-checks | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: .[[parent:[a-z0-9]+]]:
-; SHADERTEST: %[[arr:[0-9]+]] = alloca [2048 x <4 x float>], align 16, addrspace(5)
+; SHADERTEST: %[[arr:[a-z0-9]+]] = alloca [2048 x <4 x float>], align 16, addrspace(5)
 ; SHADERTEST: {{.*}}:
 ; SHADERTEST: {{.*}}:
 ; SHADERTEST: [[check:[a-z0-9]+]]:
