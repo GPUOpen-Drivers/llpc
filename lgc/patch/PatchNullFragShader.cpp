@@ -30,6 +30,7 @@
  */
 #include "PatchNullFragShader.h"
 #include "lgc/LgcContext.h"
+#include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
@@ -114,75 +115,64 @@ bool PatchNullFragShader::runImpl(Module &module, PipelineState *pipelineState) 
   if (!pipelineState->isWholePipeline())
     return false;
 
-  const bool hasCs = pipelineState->hasShaderStage(ShaderStageCompute);
-  const bool hasVs = pipelineState->hasShaderStage(ShaderStageVertex);
-  const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
-  const bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
+  // If a fragment shader is not needed, then do not generate one.
   const bool hasFs = pipelineState->hasShaderStage(ShaderStageFragment);
-  if (hasCs || hasFs || (!hasVs && !hasTes && !hasGs)) {
-    // This is an incomplete graphics pipeline from the amdllpc command-line tool, or a compute pipeline, or a
-    // graphics pipeline that already has a fragment shader. A null fragment shader is not required.
+  if (hasFs || !pipelineState->isGraphics())
     return false;
-  }
 
-  // Create the null fragment shader:
-  // define void @llpc.shader.FS.null() !spirv.ExecutionModel !5
-  // {
-  // .entry:
-  //     %0 = tail call float @llpc.input.import.generic.f32(i32 0, i32 0, i32 0, i32 1)
-  //     tail call void @llpc.output.export.generic.f32(i32 0, i32 0, float %0)
-  //     ret void
-  // }
+  generateNullFragmentShader(module);
+  updatePipelineState(pipelineState);
+  return true;
+}
 
-  // Create type of new function: void()
-  auto entryPointTy = FunctionType::get(Type::getVoidTy(*m_context), ArrayRef<Type *>(), false);
-
-  // Create function for the null fragment shader entrypoint.
-  auto entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::NullFsEntryPoint, &module);
-  entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-
-  // Create its basic block, and terminate it with return.
-  auto block = BasicBlock::Create(*m_context, "", entryPoint, nullptr);
-  auto insertPos = ReturnInst::Create(*m_context, block);
-
-  // Add its code. First the import.
-  auto zero = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-  auto one = ConstantInt::get(Type::getInt32Ty(*m_context), 1);
-  Value *importArgs[] = {zero, zero, zero, one};
-  auto inputTy = Type::getFloatTy(*m_context);
-  std::string importName = lgcName::InputImportGeneric;
-  addTypeMangling(inputTy, importArgs, importName);
-  auto input = emitCall(importName, inputTy, importArgs, {}, insertPos);
-
-  // Then the export.
-  Value *exportArgs[] = {zero, zero, input};
-  std::string exportName = lgcName::OutputExportGeneric;
-  addTypeMangling(Type::getVoidTy(*m_context), exportArgs, exportName);
-  emitCall(exportName, Type::getVoidTy(*m_context), exportArgs, {}, insertPos);
-
-  // Set the shader stage on the new function.
-  setShaderStage(entryPoint, ShaderStageFragment);
-
-  // Initialize shader info.
+// =====================================================================================================================
+// Updates the the pipeline state with the data for the null fragment shader.
+//
+// @param [in/out] module : The LLVM module in which to add the shader.
+void PatchNullFragShader::updatePipelineState(PipelineState *pipelineState) const {
   auto resUsage = pipelineState->getShaderResourceUsage(ShaderStageFragment);
   pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | shaderStageToMask(ShaderStageFragment));
-
-  // Add usage info for dummy input
-  FsInterpInfo interpInfo = {0, false, false, false, false, false};
-  resUsage->builtInUsage.fs.smooth = true;
-  InOutLocationInfo origLocInfo;
-  origLocInfo.setLocation(0);
-  auto &newInLocInfo = resUsage->inOutUsage.inputLocInfoMap[origLocInfo];
-  newInLocInfo.setData(InvalidValue);
-  resUsage->inOutUsage.fs.interpInfo.push_back(interpInfo);
 
   // Add usage info for dummy output
   resUsage->inOutUsage.fs.cbShaderMask = 0;
   resUsage->inOutUsage.fs.isNullFs = true;
+  InOutLocationInfo origLocInfo;
+  origLocInfo.setLocation(0);
   auto &newOutLocInfo = resUsage->inOutUsage.outputLocInfoMap[origLocInfo];
   newOutLocInfo.setData(InvalidValue);
+}
 
-  return true;
+// =====================================================================================================================
+// Generate a new fragment shader that has the minimum code needed to make PAL happy.
+//
+// @param [in/out] module : The LLVM module in which to add the shader.
+void PatchNullFragShader::generateNullFragmentShader(Module &module) {
+  Function *entryPoint = generateNullFragmentEntryPoint(module);
+  generateNullFragmentShaderBody(entryPoint);
+}
+
+// =====================================================================================================================
+// Generate a new entry point for a null fragment shader.
+//
+// @param [in/out] module : The LLVM module in which to add the entry point.
+// @returns : The new entry point.
+Function *PatchNullFragShader::generateNullFragmentEntryPoint(Module &module) {
+  FunctionType *entryPointTy = FunctionType::get(Type::getVoidTy(module.getContext()), ArrayRef<Type *>(), false);
+  Function *entryPoint =
+      Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::NullFsEntryPoint, &module);
+  entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  setShaderStage(entryPoint, ShaderStageFragment);
+  return entryPoint;
+}
+
+// =====================================================================================================================
+// Generate the body of the null fragment shader.
+//
+// @param [in/out] entryPoint : The function in which the code will be inserted.
+void PatchNullFragShader::generateNullFragmentShaderBody(llvm::Function *entryPoint) {
+  BasicBlock *block = BasicBlock::Create(entryPoint->getContext(), "", entryPoint);
+  BuilderBase builder(block);
+  builder.CreateRetVoid();
 }
 
 // =====================================================================================================================

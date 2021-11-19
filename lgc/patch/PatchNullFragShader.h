@@ -25,6 +25,10 @@ public:
   bool runImpl(llvm::Module &module, PipelineState *pipelineState);
 
   static llvm::StringRef name() { return "Patch LLVM for null fragment shader generation"; }
+  static void generateNullFragmentShader(llvm::Module &module);
+  void updatePipelineState(PipelineState *pipelineState) const;
+  static llvm::Function *generateNullFragmentEntryPoint(llvm::Module &module);
+  static void generateNullFragmentShaderBody(llvm::Function *entryPoint);
 };
 
 } // namespace lgc
