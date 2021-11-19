@@ -1,0 +1,58 @@
+; Test that the null fragment shader is generated correctly for a graphics pipeline where the shader is not provided.
+
+; BEGIN_GEN_RELOC
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -D -r %t.elf | FileCheck -check-prefix=GEN_RELOC %s
+; Check that the PS is defined.  The body of the shader is not important since it should not be run.
+; GEN_RELOC-LABEL: <_amdgpu_ps_main>:
+; GEN_RELOC: s_endpgm
+; END_GEN_RELOC
+
+; BEGIN_PAL_RELOC
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=PAL_RELOC %s
+; Make sure the DX_RASTERIZATION_KILL is set in the PAL_RELOC metadata.
+; PAL_RELOC: PA_CL_CLIP_CNTL 0x0000000001400000
+; BEGIN_PAL_RELOC
+
+; BEGIN_GEN_FULL
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -D -r %t.elf | FileCheck -check-prefix=GEN_FULL %s
+; Check that the PS is defined.  The body of the shader is not important since it should not be run.
+; GEN_FULL-LABEL: <_amdgpu_ps_main>:
+; GEN_FULL: s_endpgm
+; END_GEN_FULL
+
+; BEGIN_PAL_FULL
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=PAL_FULL %s
+; Make sure the DX_RASTERIZATION_KILL is set in the PAL_FULL metadata.
+; PAL_FULL: PA_CL_CLIP_CNTL 0x0000000001400000
+; BEGIN_PAL_FULL
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+
+layout(location = 0) in vec4 in_var_POSITION;
+layout(location = 0) out float _13;
+
+void main()
+{
+    gl_Position = in_var_POSITION;
+    _13 = in_var_POSITION.x;
+}
+
+
+[VsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+rasterizerDiscardEnable = 1
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 48
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R16G16B16A16_UNORM
+attribute[0].offset = 0
