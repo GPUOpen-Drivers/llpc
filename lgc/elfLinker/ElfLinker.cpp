@@ -309,8 +309,7 @@ void ElfLinkerImpl::createGlueShaders() {
   if (!fetches.empty()) {
     VsEntryRegInfo vsEntryRegInfo = {};
     m_pipelineState->getPalMetadata()->getVsEntryRegInfo(vsEntryRegInfo);
-    m_glueShaders.push_back(
-        std::unique_ptr<GlueShader>(GlueShader::createFetchShader(m_pipelineState, fetches, vsEntryRegInfo)));
+    m_glueShaders.push_back(GlueShader::createFetchShader(m_pipelineState, fetches, vsEntryRegInfo));
   }
 
   // Create a color export shader if we need one.

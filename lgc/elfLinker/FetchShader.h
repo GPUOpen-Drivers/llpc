@@ -24,14 +24,13 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  GlueShader.h
- * @brief LGC header file: The abstract class for glue shaders (fetch shader, parameter/color export shader) generated
- *        while linking.
+ * @file  FetchShader.h
+ * @brief LGC header file: The class to generate the fetch shader used when linking a pipeline.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/LgcContext.h"
+#include "GlueShader.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 
@@ -40,66 +39,48 @@ namespace lgc {
 class LgcContext;
 
 // =====================================================================================================================
-// Base class for a glue shader (a fetch shader or parameter/color export shader generated during linking)
-class GlueShader {
+// A fetch shader
+class FetchShader : public GlueShader {
 public:
-  virtual ~GlueShader() {}
-
-  // Create a fetch shader
-  static std::unique_ptr<GlueShader> createFetchShader(PipelineState *pipelineState,
-                                                       llvm::ArrayRef<VertexFetchInfo> fetches,
-                                                       const VsEntryRegInfo &vsEntryRegInfo);
-  // Create a color export shader
-  static std::unique_ptr<GlueShader> createColorExportShader(PipelineState *pipelineState,
-                                                             llvm::ArrayRef<ColorExportInfo> exports);
+  FetchShader(PipelineState *pipelineState, llvm::ArrayRef<VertexFetchInfo> fetches,
+              const VsEntryRegInfo &vsEntryRegInfo);
 
   // Get the string for this glue shader. This is some encoding or hash of the inputs to the create*Shader function
   // that the front-end client can use as a cache key to avoid compiling the same glue shader more than once.
-  virtual llvm::StringRef getString() = 0;
+  llvm::StringRef getString() override;
 
-  // Get the ELF blob for this glue shader, compiling if not already compiled.
-  llvm::StringRef getElfBlob() {
-    if (m_elfBlob.empty()) {
-      llvm::raw_svector_ostream outStream(m_elfBlob);
-      compile(outStream);
-    }
-    return m_elfBlob;
-  }
-
-  // Set the ELF for this glue shader so that it does not have to be compiled.
-  void setElfBlob(llvm::StringRef elfBlob) { m_elfBlob = elfBlob; }
-
-  // Get the symbol name of the main shader that this glue shader is prolog or epilog for
-  virtual llvm::StringRef getMainShaderName() = 0;
+  // Get the symbol name of the main shader that this glue shader is prolog or epilog for.
+  llvm::StringRef getMainShaderName() override;
 
   // Get the symbol name of the glue shader.
-  virtual llvm::StringRef getGlueShaderName() = 0;
+  llvm::StringRef getGlueShaderName() override {
+    return getEntryPointName(m_vsEntryRegInfo.callingConv, /*isFetchlessVs=*/false);
+  }
 
   // Get whether this glue shader is a prolog (rather than epilog) for its main shader.
-  virtual bool isProlog() { return false; }
+  bool isProlog() override { return true; }
 
   // Get the name of this glue shader.
-  virtual llvm::StringRef getName() const = 0;
+  llvm::StringRef getName() const override { return "fetch shader"; }
 
-  // Update the PAL metadata entries that require the glue code data and the
-  // pipeline state.
-  virtual void updatePalMetadata(PalMetadata &palMetadata) = 0;
+  // No PAL metadata entries need updating for the fetch shader.
+  void updatePalMetadata(PalMetadata &) override { return; }
 
 protected:
-  GlueShader(LgcContext *lgcContext) : m_lgcContext(lgcContext) {}
-
-  // Compile the glue shader
-  void compile(llvm::raw_pwrite_stream &outStream);
-
-  // Generate the IR module for the glue shader
-  virtual llvm::Module *generate() = 0;
-
-  llvm::LLVMContext &getContext() const { return m_lgcContext->getContext(); }
-
-  LgcContext *m_lgcContext;
+  // Generate the glue shader to IR module
+  llvm::Module *generate() override;
 
 private:
-  llvm::SmallString<0> m_elfBlob;
+  llvm::Function *createFetchFunc();
+
+  // The information stored here is all that is needed to generate the fetch shader. We deliberately do not
+  // have access to PipelineState, so we can hash the information here and let the front-end use it as the
+  // key for a cache of glue shaders.
+  llvm::SmallVector<VertexFetchInfo, 8> m_fetches;
+  VsEntryRegInfo m_vsEntryRegInfo;
+  llvm::SmallVector<const VertexInputDescription *, 8> m_fetchDescriptions;
+  // The encoded or hashed (in some way) single string version of the above.
+  std::string m_shaderString;
 };
 
 } // namespace lgc
