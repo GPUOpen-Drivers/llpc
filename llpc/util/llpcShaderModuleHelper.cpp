@@ -118,7 +118,6 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
     case OpSource:
     case OpSourceContinued:
     case OpSourceExtension:
-    case OpName:
     case OpMemberName:
     case OpLine:
     case OpNop:
@@ -205,7 +204,6 @@ void ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsigned b
     case OpSource:
     case OpSourceContinued:
     case OpSourceExtension:
-    case OpName:
     case OpMemberName:
     case OpLine:
     case OpNop:
