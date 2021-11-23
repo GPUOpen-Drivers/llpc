@@ -42,18 +42,22 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations for globals (global variables, inputs, and outputs).
-class SpirvLowerGlobal : public SpirvLower,
-                         public llvm::PassInfoMixin<SpirvLowerGlobal>,
-                         public llvm::InstVisitor<SpirvLowerGlobal> {
+class SpirvLowerGlobal : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerGlobal> {
 public:
   SpirvLowerGlobal();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
   bool runImpl(llvm::Module &module);
 
-  virtual void visitReturnInst(llvm::ReturnInst &retInst);
-  virtual void visitCallInst(llvm::CallInst &callInst);
-  virtual void visitLoadInst(llvm::LoadInst &loadInst);
-  virtual void visitStoreInst(llvm::StoreInst &storeInst);
+  void handleCallInst(bool checkEmitCall, bool checkInterpCall);
+  void handleReturnInst();
+
+  void handleLoadInst();
+  void handleLoadInstGlobal(LoadInst &loadInst, const unsigned addrSpace);
+  void handleLoadInstGEP(GetElementPtrInst *const getElemPtr, LoadInst &loadInst, const unsigned addrSpace);
+
+  void handleStoreInst();
+  void handleStoreInstGlobal(StoreInst &storeInst);
+  void handleStoreInstGEP(GetElementPtrInst *const getElemPtr, StoreInst &storeInst);
 
   static llvm::StringRef name() { return "Lower SPIR-V globals (global variables, inputs, and outputs"; }
 
@@ -109,22 +113,6 @@ private:
 
   bool m_lowerInputInPlace;  // Whether to lower input inplace
   bool m_lowerOutputInPlace; // Whether to lower output inplace
-
-  // Flags controlling how to behave when visiting the instructions
-  union {
-    struct {
-      unsigned checkEmitCall : 1;   // Whether to check "emit" calls
-      unsigned checkInterpCall : 1; // Whether to check interpolation calls
-      unsigned checkReturn : 1;     // Whether to check "return" instructions
-      unsigned checkLoad : 1;       // Whether to check "load" instructions
-      unsigned checkStore : 1;      // Whether to check "store" instructions
-
-      unsigned unused : 27;
-    };
-
-    unsigned u32All;
-
-  } m_instVisitFlags;
 
   std::unordered_set<llvm::ReturnInst *> m_retInsts;  // "Return" instructions to be removed
   std::unordered_set<llvm::CallInst *> m_emitCalls;   // "Call" instructions to emit vertex (geometry shader)
