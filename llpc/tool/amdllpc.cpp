@@ -38,6 +38,7 @@
 #include "llpcDebug.h"
 #include "llpcFile.h"
 #include "llpcInputUtils.h"
+#include "llpcPipelineBuilder.h"
 #include "llpcUtil.h"
 #include "spvgen.h"
 #include "lgc/LgcContext.h"
@@ -415,9 +416,9 @@ static Result processInputs(ICompiler *compiler, ArrayRef<std::string> inFiles) 
   if (result != Result::Success)
     return result;
 
-  std::string fileNames;
+  SmallVector<std::string> fileNames;
   if (inFiles.size() == 1 && isPipelineInfoFile(inFiles[0])) {
-    fileNames = inFiles[0] + " ";
+    fileNames.push_back(inFiles[0]);
     result = processInputPipeline(compiler, compileInfo, inFiles[0], Unlinked, IgnoreColorAttachmentFormats);
     if (result != Result::Success)
       return result;
@@ -451,8 +452,10 @@ static Result processInputs(ICompiler *compiler, ArrayRef<std::string> inFiles) 
     dumpOptions->dumpDuplicatePipelines = DumpDuplicatePipelines;
   }
 
-  compileInfo.fileNames = fileNames.c_str();
-  result = buildPipeline(compiler, &compileInfo, dumpOptions, TimePassesIsEnabled || cl::EnableTimerProfile);
+  compileInfo.fileNames = std::move(fileNames);
+
+  PipelineBuilder builder(*compiler, compileInfo, dumpOptions, TimePassesIsEnabled || cl::EnableTimerProfile);
+  result = builder.build();
   if (result != Result::Success)
     return result;
 

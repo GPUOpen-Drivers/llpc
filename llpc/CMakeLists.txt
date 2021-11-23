@@ -299,6 +299,7 @@ add_library(llpc_standalone_compiler
     tool/llpcAutoLayout.cpp
     tool/llpcCompilationUtils.cpp
     tool/llpcInputUtils.cpp
+    tool/llpcPipelineBuilder.cpp
 )
 add_dependencies(llpc_standalone_compiler llpc)
 
