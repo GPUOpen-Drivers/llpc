@@ -263,86 +263,90 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
 }
 
 // =====================================================================================================================
-// Visits "return" instruction.
-//
-// @param retInst : "Ret" instruction
-void SpirvLowerGlobal::visitReturnInst(ReturnInst &retInst) {
-  // Skip if "return" instructions are not expected to be handled.
-  if (!static_cast<bool>(m_instVisitFlags.checkReturn))
-    return;
-
-  // We only handle the "return" in entry point
-  if (retInst.getParent()->getParent()->getLinkage() == GlobalValue::InternalLinkage)
-    return;
-
-  assert(m_retBlock); // Must have been created
-  BranchInst::Create(m_retBlock, retInst.getParent());
-  m_retInsts.insert(&retInst);
+// Handle "return" instructions.
+void SpirvLowerGlobal::handleReturnInst() {
+  for (Function &function : m_module->functions()) {
+    // We only handle the "return" in entry point
+    if (function.getLinkage() == GlobalValue::InternalLinkage)
+      continue;
+    for (BasicBlock &block : function) {
+      Instruction *terminator = block.getTerminator();
+      if (!terminator || terminator->getOpcode() != Instruction::Ret)
+        continue;
+      ReturnInst *returnInst = dyn_cast<ReturnInst>(terminator);
+      assert(m_retBlock);
+      BranchInst::Create(m_retBlock, &block);
+      m_retInsts.insert(returnInst);
+    }
+  }
 }
 
 // =====================================================================================================================
-// Visits "call" instruction.
+// Handle "call" instructions.
 //
-// @param callInst : "Call" instruction
-void SpirvLowerGlobal::visitCallInst(CallInst &callInst) {
-  // Skip if "emit" and interpolation calls are not expected to be handled
-  if (!static_cast<bool>(m_instVisitFlags.checkEmitCall) && !static_cast<bool>(m_instVisitFlags.checkInterpCall))
-    return;
+// @param checkEmitCall : Whether we should handle emit call or not
+// @param checkInterpCall : Whether we should handle interpolate call or not
+void SpirvLowerGlobal::handleCallInst(bool checkEmitCall, bool checkInterpCall) {
+  assert(checkEmitCall != checkInterpCall);
 
-  auto callee = callInst.getCalledFunction();
-  if (!callee)
-    return;
-
-  auto mangledName = callee->getName();
-
-  if (m_instVisitFlags.checkEmitCall) {
-    if (mangledName.startswith(gSPIRVName::EmitVertex) || mangledName.startswith(gSPIRVName::EmitStreamVertex))
-      m_emitCalls.insert(&callInst);
-  } else {
-    assert(m_instVisitFlags.checkInterpCall);
-
-    if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid) ||
-        mangledName.startswith(gSPIRVName::InterpolateAtSample) ||
-        mangledName.startswith(gSPIRVName::InterpolateAtOffset) ||
-        mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD)) {
-      // Translate interpolation functions to LLPC intrinsic calls
-      auto loadSrc = callInst.getArgOperand(0);
-      unsigned interpLoc = InterpLocUnknown;
-      Value *auxInterpValue = nullptr;
-
-      if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid))
-        interpLoc = InterpLocCentroid;
-      else if (mangledName.startswith(gSPIRVName::InterpolateAtSample)) {
-        interpLoc = InterpLocSample;
-        auxInterpValue = callInst.getArgOperand(1); // Sample ID
-      } else if (mangledName.startswith(gSPIRVName::InterpolateAtOffset)) {
-        interpLoc = InterpLocCenter;
-        auxInterpValue = callInst.getArgOperand(1); // Offset from pixel center
+  for (Function &function : m_module->functions()) {
+    auto mangledName = function.getName();
+    // We get all users before iterating because the iterator can be invalidated
+    // by interpolateInputElement
+    SmallVector<User *> users(function.users());
+    for (User *user : users) {
+      assert(dyn_cast<CallInst>(user) && "We should only have CallInst instructions here.");
+      CallInst *callInst = cast<CallInst>(user);
+      if (checkEmitCall) {
+        if (mangledName.startswith(gSPIRVName::EmitVertex) || mangledName.startswith(gSPIRVName::EmitStreamVertex))
+          m_emitCalls.insert(callInst);
       } else {
-        assert(mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD));
-        interpLoc = InterpLocCustom;
-        auxInterpValue = callInst.getArgOperand(1); // Vertex no.
-      }
+        assert(checkInterpCall);
 
-      if (isa<GetElementPtrInst>(loadSrc)) {
-        // The interpolant is an element of the input
-        interpolateInputElement(interpLoc, auxInterpValue, callInst);
-      } else {
-        // The interpolant is an input
-        assert(isa<GlobalVariable>(loadSrc));
+        if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid) ||
+            mangledName.startswith(gSPIRVName::InterpolateAtSample) ||
+            mangledName.startswith(gSPIRVName::InterpolateAtOffset) ||
+            mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD)) {
+          // Translate interpolation functions to LLPC intrinsic calls
+          auto loadSrc = callInst->getArgOperand(0);
+          unsigned interpLoc = InterpLocUnknown;
+          Value *auxInterpValue = nullptr;
 
-        auto input = cast<GlobalVariable>(loadSrc);
-        auto inputTy = input->getType()->getContainedType(0);
+          if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid))
+            interpLoc = InterpLocCentroid;
+          else if (mangledName.startswith(gSPIRVName::InterpolateAtSample)) {
+            interpLoc = InterpLocSample;
+            auxInterpValue = callInst->getArgOperand(1); // Sample ID
+          } else if (mangledName.startswith(gSPIRVName::InterpolateAtOffset)) {
+            interpLoc = InterpLocCenter;
+            auxInterpValue = callInst->getArgOperand(1); // Offset from pixel center
+          } else {
+            assert(mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD));
+            interpLoc = InterpLocCustom;
+            auxInterpValue = callInst->getArgOperand(1); // Vertex no.
+          }
 
-        MDNode *metaNode = input->getMetadata(gSPIRVMD::InOut);
-        assert(metaNode);
-        auto inputMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+          if (isa<GetElementPtrInst>(loadSrc)) {
+            // The interpolant is an element of the input
+            interpolateInputElement(interpLoc, auxInterpValue, *callInst);
+          } else {
+            // The interpolant is an input
+            assert(isa<GlobalVariable>(loadSrc));
 
-        auto loadValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, inputMeta, nullptr, 0, nullptr, nullptr,
-                                                   interpLoc, auxInterpValue, &callInst);
+            auto input = cast<GlobalVariable>(loadSrc);
+            auto inputTy = input->getType()->getContainedType(0);
 
-        m_interpCalls.insert(&callInst);
-        callInst.replaceAllUsesWith(loadValue);
+            MDNode *metaNode = input->getMetadata(gSPIRVMD::InOut);
+            assert(metaNode);
+            auto inputMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+
+            auto loadValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, inputMeta, nullptr, 0, nullptr, nullptr,
+                                                       interpLoc, auxInterpValue, callInst);
+
+            m_interpCalls.insert(callInst);
+            callInst->replaceAllUsesWith(loadValue);
+          }
+        }
       }
     }
   }
@@ -370,163 +374,215 @@ static bool hasVertexIdx(const Constant &metaVal) {
 }
 
 // =====================================================================================================================
-// Visits "load" instruction.
+// Handle a single "load" instruction directly loading a global.
 //
-// @param loadInst : "Load" instruction
-void SpirvLowerGlobal::visitLoadInst(LoadInst &loadInst) {
+// @param loadInst : Load instruction
+// @param addrSpace : Address space
+void SpirvLowerGlobal::handleLoadInstGlobal(LoadInst &loadInst, const unsigned addrSpace) {
   Value *loadSrc = loadInst.getOperand(0);
-  const unsigned addrSpace = loadSrc->getType()->getPointerAddressSpace();
+  auto inOut = cast<GlobalVariable>(loadSrc);
+  auto inOutTy = inOut->getType()->getContainedType(0);
 
-  if (addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output)
-    return;
+  MDNode *metaNode = inOut->getMetadata(gSPIRVMD::InOut);
+  assert(metaNode);
+  auto inOutMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-  // Skip if "load" instructions are not expected to be handled
-  const bool isTcsInput = (m_shaderStage == ShaderStageTessControl && addrSpace == SPIRAS_Input);
-  const bool isTcsOutput = (m_shaderStage == ShaderStageTessControl && addrSpace == SPIRAS_Output);
-  const bool isTesInput = (m_shaderStage == ShaderStageTessEval && addrSpace == SPIRAS_Input);
+  Value *loadValue = UndefValue::get(inOutTy);
 
-  if (!static_cast<bool>(m_instVisitFlags.checkLoad) || (!isTcsInput && !isTcsOutput && !isTesInput))
-    return;
+  if (inOutTy->isArrayTy() && hasVertexIdx(*inOutMetaVal)) {
+    auto elemTy = inOutTy->getArrayElementType();
+    auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
 
-  Value *loadValue = nullptr;
-
-  if (GetElementPtrInst *const getElemPtr = dyn_cast<GetElementPtrInst>(loadSrc)) {
-    std::vector<Value *> indexOperands;
-
-    assert(cast<ConstantInt>(getElemPtr->getOperand(1))->isZero() && "Non-zero GEP first index\n");
-
-    GlobalVariable *inOut = dyn_cast<GlobalVariable>(getElemPtr->getPointerOperand());
-    assert(!dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
-           "Chained GEPs should have been coalesced by SpirvLowerAccessChain.");
-    assert(inOut && "The root of the GEP should always be the global variable.");
-
-    for (auto i = getElemPtr->idx_begin() + 1, e = getElemPtr->idx_end(); i != e; ++i)
-      indexOperands.push_back(toInt32Value(*i, &loadInst));
-
-    unsigned operandIdx = 0;
-    Value *vertexIdx = nullptr;
-    auto inOutTy = inOut->getType()->getContainedType(0);
-
-    MDNode *metaNode = inOut->getMetadata(gSPIRVMD::InOut);
-    assert(metaNode);
-    auto inOutMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-
-    // If the input/output is arrayed, the outermost index might be used for vertex indexing
-    if (inOutTy->isArrayTy() && hasVertexIdx(*inOutMetaVal)) {
-      inOutTy = inOutTy->getArrayElementType();
-      vertexIdx = indexOperands[0];
-      ++operandIdx;
-      inOutMetaVal = cast<Constant>(inOutMetaVal->getOperand(1));
+    const unsigned elemCount = inOutTy->getArrayNumElements();
+    for (unsigned i = 0; i < elemCount; ++i) {
+      Value *vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
+      auto elemValue = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, nullptr, 0, nullptr, vertexIdx,
+                                                 InterpLocUnknown, nullptr, &loadInst);
+      loadValue = InsertValueInst::Create(loadValue, elemValue, {i}, "", &loadInst);
     }
-
-    loadValue = loadInOutMember(inOutTy, addrSpace, indexOperands, operandIdx, 0, inOutMetaVal, nullptr, vertexIdx,
-                                InterpLocUnknown, nullptr, &loadInst);
   } else {
-    assert(isa<GlobalVariable>(loadSrc));
-
-    auto inOut = cast<GlobalVariable>(loadSrc);
-    auto inOutTy = inOut->getType()->getContainedType(0);
-
-    MDNode *metaNode = inOut->getMetadata(gSPIRVMD::InOut);
-    assert(metaNode);
-    auto inOutMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-
-    loadValue = UndefValue::get(inOutTy);
-
-    if (inOutTy->isArrayTy() && hasVertexIdx(*inOutMetaVal)) {
-      auto elemTy = inOutTy->getArrayElementType();
-      auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
-
-      const unsigned elemCount = inOutTy->getArrayNumElements();
-      for (unsigned i = 0; i < elemCount; ++i) {
-        Value *vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
-        auto elemValue = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, nullptr, 0, nullptr, vertexIdx,
-                                                   InterpLocUnknown, nullptr, &loadInst);
-        loadValue = InsertValueInst::Create(loadValue, elemValue, {i}, "", &loadInst);
-      }
-    } else {
-      loadValue = addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, nullptr, 0, nullptr, nullptr,
-                                            InterpLocUnknown, nullptr, &loadInst);
-    }
+    loadValue = addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, nullptr, 0, nullptr, nullptr,
+                                          InterpLocUnknown, nullptr, &loadInst);
   }
   m_loadInsts.insert(&loadInst);
   loadInst.replaceAllUsesWith(loadValue);
 }
 
 // =====================================================================================================================
-// Visits "store" instruction.
+// Handle a single "load" instruction loading a global through a GEP instruction
 //
-// @param storeInst : "Store" instruction
-void SpirvLowerGlobal::visitStoreInst(StoreInst &storeInst) {
-  Value *storeValue = storeInst.getOperand(0);
-  Value *storeDest = storeInst.getOperand(1);
+// @param getElemPtr : Load source GEP instruction
+// @param loadInst : Load instruction
+// @param addrSpace : Address space
+void SpirvLowerGlobal::handleLoadInstGEP(GetElementPtrInst *const getElemPtr, LoadInst &loadInst,
+                                         const unsigned addrSpace) {
+  std::vector<Value *> indexOperands;
 
-  const unsigned addrSpace = storeDest->getType()->getPointerAddressSpace();
+  assert(cast<ConstantInt>(getElemPtr->getOperand(1))->isZero() && "Non-zero GEP first index\n");
 
-  if (addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output)
-    return;
+  GlobalVariable *inOut = dyn_cast<GlobalVariable>(getElemPtr->getPointerOperand());
+  assert(!dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
+         "Chained GEPs should have been coalesced by SpirvLowerAccessChain.");
+  assert(inOut && "The root of the GEP should always be the global variable.");
 
-  // Skip if "store" instructions are not expected to be handled
-  const bool isTcsOutput = (m_shaderStage == ShaderStageTessControl && addrSpace == SPIRAS_Output);
-  if (!static_cast<bool>(m_instVisitFlags.checkStore) || !isTcsOutput)
-    return;
+  for (auto i = getElemPtr->idx_begin() + 1, e = getElemPtr->idx_end(); i != e; ++i)
+    indexOperands.push_back(toInt32Value(*i, &loadInst));
 
-  if (GetElementPtrInst *const getElemPtr = dyn_cast<GetElementPtrInst>(storeDest)) {
-    std::vector<Value *> indexOperands;
+  unsigned operandIdx = 0;
+  Value *vertexIdx = nullptr;
+  auto inOutTy = inOut->getType()->getContainedType(0);
 
-    GlobalVariable *output = dyn_cast<GlobalVariable>(getElemPtr->getPointerOperand());
-    assert(!dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
-           "Chained GEPs should have been coalesced by SpirvLowerAccessChain.");
-    assert(output && "The root of the GEP should always be the global variable.");
+  MDNode *metaNode = inOut->getMetadata(gSPIRVMD::InOut);
+  assert(metaNode);
+  auto inOutMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-    for (Value *const index : getElemPtr->indices())
-      indexOperands.push_back(toInt32Value(index, &storeInst));
+  // If the input/output is arrayed, the outermost index might be used for vertex indexing
+  if (inOutTy->isArrayTy() && hasVertexIdx(*inOutMetaVal)) {
+    inOutTy = inOutTy->getArrayElementType();
+    vertexIdx = indexOperands[0];
+    ++operandIdx;
+    inOutMetaVal = cast<Constant>(inOutMetaVal->getOperand(1));
+  }
 
-    unsigned operandIdx = 0;
-    Value *vertexIdx = nullptr;
-    auto outputTy = output->getType()->getContainedType(0);
+  Value *loadValue = loadInOutMember(inOutTy, addrSpace, indexOperands, operandIdx, 0, inOutMetaVal, nullptr, vertexIdx,
+                                     InterpLocUnknown, nullptr, &loadInst);
+  m_loadInsts.insert(&loadInst);
+  loadInst.replaceAllUsesWith(loadValue);
+}
 
-    MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
-    assert(metaNode);
-    auto outputMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+// =====================================================================================================================
+// Handle "load" instructions.
+void SpirvLowerGlobal::handleLoadInst() {
+  auto shouldHandle = [&](const unsigned addrSpace) {
+    if (addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output)
+      return false;
+    // Skip if "load" instructions are not expected to be handled
+    const bool isTcsInput = (m_shaderStage == ShaderStageTessControl && addrSpace == SPIRAS_Input);
+    const bool isTcsOutput = (m_shaderStage == ShaderStageTessControl && addrSpace == SPIRAS_Output);
+    const bool isTesInput = (m_shaderStage == ShaderStageTessEval && addrSpace == SPIRAS_Input);
+    return isTcsInput || isTcsOutput || isTesInput;
+  };
 
-    // If the output is arrayed, the outermost index might be used for vertex indexing
-    if (outputTy->isArrayTy() && hasVertexIdx(*outputMetaVal)) {
-      outputTy = outputTy->getArrayElementType();
-      vertexIdx = indexOperands[1];
-      ++operandIdx;
-      outputMetaVal = cast<Constant>(outputMetaVal->getOperand(1));
-    }
-
-    storeOutputMember(outputTy, storeValue, indexOperands, operandIdx, 0, outputMetaVal, nullptr, vertexIdx,
-                      &storeInst);
-  } else {
-    assert(isa<GlobalVariable>(storeDest));
-
-    auto output = cast<GlobalVariable>(storeDest);
-    auto outputy = output->getType()->getContainedType(0);
-
-    MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
-    assert(metaNode);
-    auto outputMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-
-    // If the input/output is arrayed, the outermost dimension might for vertex indexing
-    if (outputy->isArrayTy() && hasVertexIdx(*outputMetaVal)) {
-      auto elemMeta = cast<Constant>(outputMetaVal->getOperand(1));
-
-      const unsigned elemCount = outputy->getArrayNumElements();
-      for (unsigned i = 0; i < elemCount; ++i) {
-        auto elemValue = ExtractValueInst::Create(storeValue, {i}, "", &storeInst);
-        Value *vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
-        addCallInstForOutputExport(elemValue, elemMeta, nullptr, 0, InvalidValue, 0, nullptr, vertexIdx, InvalidValue,
-                                   &storeInst);
+  for (GlobalVariable &global : m_module->globals()) {
+    const unsigned addrSpace = global.getType()->getPointerAddressSpace();
+    if (!shouldHandle(addrSpace))
+      continue;
+    for (User *user : global.users()) {
+      if (LoadInst *loadInst = dyn_cast<LoadInst>(user))
+        // The user is a load
+        handleLoadInstGlobal(*loadInst, addrSpace);
+      else if (GetElementPtrInst *gep = dyn_cast<GetElementPtrInst>(user)) {
+        // The user is a GEP
+        // We look for load instructions in the GEP users
+        for (User *gepUser : gep->users()) {
+          // We shouldn't have any chained GEPs here, they are coalesced by the LowerAccessChain pass.
+          assert(!dyn_cast<GetElementPtrInst>(gepUser));
+          if (LoadInst *loadInst = dyn_cast<LoadInst>(gepUser))
+            handleLoadInstGEP(gep, *loadInst, addrSpace);
+        }
       }
-    } else {
-      addCallInstForOutputExport(storeValue, outputMetaVal, nullptr, 0, InvalidValue, 0, nullptr, nullptr, InvalidValue,
-                                 &storeInst);
     }
   }
+}
+
+// =====================================================================================================================
+// Handle a single "store" instruction directly storing a global.
+//
+// @param storeInst : Store instruction
+void SpirvLowerGlobal::handleStoreInstGlobal(StoreInst &storeInst) {
+  Value *storeDest = storeInst.getOperand(1);
+  Value *storeValue = storeInst.getOperand(0);
+
+  auto output = cast<GlobalVariable>(storeDest);
+  auto outputy = output->getType()->getContainedType(0);
+
+  MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
+  assert(metaNode);
+  auto outputMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+
+  // If the input/output is arrayed, the outermost dimension might for vertex indexing
+  if (outputy->isArrayTy() && hasVertexIdx(*outputMetaVal)) {
+    auto elemMeta = cast<Constant>(outputMetaVal->getOperand(1));
+
+    const unsigned elemCount = outputy->getArrayNumElements();
+    for (unsigned i = 0; i < elemCount; ++i) {
+      auto elemValue = ExtractValueInst::Create(storeValue, {i}, "", &storeInst);
+      Value *vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
+      addCallInstForOutputExport(elemValue, elemMeta, nullptr, 0, InvalidValue, 0, nullptr, vertexIdx, InvalidValue,
+                                 &storeInst);
+    }
+  } else {
+    addCallInstForOutputExport(storeValue, outputMetaVal, nullptr, 0, InvalidValue, 0, nullptr, nullptr, InvalidValue,
+                               &storeInst);
+  }
   m_storeInsts.insert(&storeInst);
+}
+
+// =====================================================================================================================
+// Handle a single "store" instruction storing a global through a GEP instruction
+//
+// @param getElemPtr : Store destination GEP instruction
+// @param storeInst : Store instruction
+void SpirvLowerGlobal::handleStoreInstGEP(GetElementPtrInst *const getElemPtr, StoreInst &storeInst) {
+  Value *storeValue = storeInst.getOperand(0);
+  std::vector<Value *> indexOperands;
+
+  GlobalVariable *output = dyn_cast<GlobalVariable>(getElemPtr->getPointerOperand());
+  assert(!dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
+         "Chained GEPs should have been coalesced by SpirvLowerAccessChain.");
+  assert(output && "The root of the GEP should always be the global variable.");
+
+  for (Value *const index : getElemPtr->indices())
+    indexOperands.push_back(toInt32Value(index, &storeInst));
+
+  unsigned operandIdx = 0;
+  Value *vertexIdx = nullptr;
+  auto outputTy = output->getType()->getContainedType(0);
+
+  MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
+  assert(metaNode);
+  auto outputMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+
+  // If the output is arrayed, the outermost index might be used for vertex indexing
+  if (outputTy->isArrayTy() && hasVertexIdx(*outputMetaVal)) {
+    outputTy = outputTy->getArrayElementType();
+    vertexIdx = indexOperands[1];
+    ++operandIdx;
+    outputMetaVal = cast<Constant>(outputMetaVal->getOperand(1));
+  }
+
+  storeOutputMember(outputTy, storeValue, indexOperands, operandIdx, 0, outputMetaVal, nullptr, vertexIdx, &storeInst);
+  m_storeInsts.insert(&storeInst);
+}
+
+// =====================================================================================================================
+// Visits "store" instructions.
+void SpirvLowerGlobal::handleStoreInst() {
+  auto shouldHandle = [&](const unsigned addrSpace) {
+    const bool isTcsOutput = (m_shaderStage == ShaderStageTessControl && addrSpace == SPIRAS_Output);
+    return isTcsOutput;
+  };
+
+  for (GlobalVariable &global : m_module->globals()) {
+    const unsigned addrSpace = global.getType()->getPointerAddressSpace();
+    if (!shouldHandle(addrSpace))
+      continue;
+    for (User *user : global.users()) {
+      if (StoreInst *storeInst = dyn_cast<StoreInst>(user))
+        // The user is a store
+        handleStoreInstGlobal(*storeInst);
+      else if (GetElementPtrInst *gep = dyn_cast<GetElementPtrInst>(user)) {
+        // The user is a GEP
+        // We look for store instructions in the GEP users
+        for (User *gepUser : gep->users()) {
+          // We shouldn't have any chained GEPs here, they are coalesced by the LowerAccessChain pass.
+          assert(!dyn_cast<GetElementPtrInst>(gepUser));
+          if (StoreInst *storeInst = dyn_cast<StoreInst>(gepUser))
+            handleStoreInstGEP(gep, *storeInst);
+        }
+      }
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -653,9 +709,7 @@ void SpirvLowerGlobal::lowerInput() {
   // lowered in-place.
   if (m_shaderStage == ShaderStageFragment) {
     // Invoke handling of interpolation calls
-    m_instVisitFlags.u32All = 0;
-    m_instVisitFlags.checkInterpCall = true;
-    visit(m_module);
+    handleCallInst(false, true);
 
     // Remove interpolation calls, they must have been replaced with LLPC intrinsics
     std::unordered_set<GetElementPtrInst *> getElemInsts;
@@ -708,12 +762,9 @@ void SpirvLowerGlobal::lowerOutput() {
 
   m_retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
   // Invoke handling of "return" instructions or "emit" calls
-  m_instVisitFlags.u32All = 0;
   if (m_shaderStage == ShaderStageGeometry)
-    m_instVisitFlags.checkEmitCall = true;
-
-  m_instVisitFlags.checkReturn = true;
-  visit(m_module);
+    handleCallInst(true, false);
+  handleReturnInst();
 
   auto retInst = ReturnInst::Create(*m_context, m_retBlock);
 
@@ -806,11 +857,9 @@ void SpirvLowerGlobal::lowerInOutInPlace() {
   assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval);
 
   // Invoke handling of "load" and "store" instruction
-  m_instVisitFlags.u32All = 0;
-  m_instVisitFlags.checkLoad = true;
+  handleLoadInst();
   if (m_shaderStage == ShaderStageTessControl)
-    m_instVisitFlags.checkStore = true;
-  visit(m_module);
+    handleStoreInst();
 
   DenseSet<GetElementPtrInst *> getElemInsts;
 
