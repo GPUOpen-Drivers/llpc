@@ -102,6 +102,22 @@ obvious that you are running the default constructor, perhaps by appending `{}` 
 variable name. This is considered unnecessary for well-known types with a sensible default
 constructor, such as the standard library and LLVM container types.
 
+## Class member variable initialization
+
+Similar to local variables, a POD type class member variables should always be initialized.
+While more complicated initialization is typically done in user defined constructors,
+prefer to initialize POD member variables immediately after the declaration, unless it is
+a well-known type with a default constructor, e.g.:
+
+```c++
+private:
+  int m_foo = 0;
+  Vkgc::BinaryData m_data = {};
+  std::string m_filename; // This is fine because `std::string` has a default constructor.
+```
+
+This makes it clear that there are no uninitialized fields.
+
 ## Braces
 
 Brace placement is covered by clang-format below.
