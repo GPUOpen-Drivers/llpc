@@ -46,7 +46,8 @@ CPPFILES +=                   \
     amdllpc.cpp               \
     llpcAutoLayout.cpp        \
     llpcCompilationUtils.cpp  \
-    llpcInputUtils.cpp
+    llpcInputUtils.cpp        \
+    llpcPipelineBuilder.cpp
 
 EXE_TARGET = amdllpc
 

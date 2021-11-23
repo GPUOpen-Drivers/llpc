@@ -56,8 +56,8 @@
 
 #include "llpc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include <vector>
 
 namespace Llpc {
 namespace StandaloneCompiler {
@@ -73,17 +73,17 @@ struct ShaderModuleData {
 
 // Represents global compilation info of LLPC standalone tool (as tool context).
 struct CompileInfo {
-  Llpc::GfxIpVersion gfxIp;                                            // Graphics IP version info
-  VkFlags stageMask;                                                   // Shader stage mask
-  std::vector<StandaloneCompiler::ShaderModuleData> shaderModuleDatas; // ShaderModule Data
-  Llpc::GraphicsPipelineBuildInfo gfxPipelineInfo;                     // Info to build graphics pipeline
-  Llpc::GraphicsPipelineBuildOut gfxPipelineOut;                       // Output of building graphics pipeline
-  Llpc::ComputePipelineBuildInfo compPipelineInfo;                     // Info to build compute pipeline
-  Llpc::ComputePipelineBuildOut compPipelineOut;                       // Output of building compute pipeline
-  void *pipelineBuf;                                                   // Allocation buffer of building pipeline
-  void *pipelineInfoFile;                                              // VFX-style file containing pipeline info
-  const char *fileNames;                                               // Names of input shader source files
-  std::string entryTarget;                                             // Name of the entry target function.
+  Llpc::GfxIpVersion gfxIp;                                                  // Graphics IP version info
+  VkFlags stageMask;                                                         // Shader stage mask
+  llvm::SmallVector<StandaloneCompiler::ShaderModuleData> shaderModuleDatas; // ShaderModule Data
+  Llpc::GraphicsPipelineBuildInfo gfxPipelineInfo;                           // Info to build graphics pipeline
+  Llpc::GraphicsPipelineBuildOut gfxPipelineOut;                             // Output of building graphics pipeline
+  Llpc::ComputePipelineBuildInfo compPipelineInfo;                           // Info to build compute pipeline
+  Llpc::ComputePipelineBuildOut compPipelineOut;                             // Output of building compute pipeline
+  void *pipelineBuf;                                                         // Allocation buffer of building pipeline
+  void *pipelineInfoFile;                                                    // VFX-style file containing pipeline info
+  llvm::SmallVector<std::string> fileNames;                                  // Names of input shader source files
+  std::string entryTarget;                                                   // Name of the entry target function
   bool unlinked;                  // Whether to generate unlinked shader/part-pipeline ELF
   bool relocatableShaderElf;      // Whether to enable relocatable shader compilation
   bool scalarBlockLayout;         // Whether to enable scalar block layout
@@ -112,10 +112,6 @@ Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileI
 // Builds shader module based on the specified SPIR-V binary.
 Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo);
 
-// Builds pipeline and does linking.
-Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
-                     llvm::Optional<Vkgc::PipelineDumpOptions> pipelineDumpOptions, bool timePasses);
-
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, llvm::StringRef firstInFile);
 
@@ -125,7 +121,7 @@ Result processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const
 
 // Processes and compiles multiple shader stage input files.
 Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, llvm::ArrayRef<std::string> inFiles,
-                          bool validateSpirv, std::string &fileNames);
+                          bool validateSpirv, llvm::SmallVectorImpl<std::string> &fileNames);
 
 } // namespace StandaloneCompiler
 } // namespace Llpc

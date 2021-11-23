@@ -370,170 +370,6 @@ Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
 }
 
 // =====================================================================================================================
-// Builds pipeline and does linking.
-//
-// @param compiler : LLPC compiler object
-// @param [in/out] compileInfo : Compilation info of LLPC standalone tool
-// @param compileInfo : Pipeline dump options. Pipeline dumps are disabled when this is llvm::None.
-// @param timePasses : Whether to time compiler passes
-// @returns : Result::Success on success, other status codes on failure
-Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
-                     llvm::Optional<Vkgc::PipelineDumpOptions> pipelineDumpOptions, bool timePasses) {
-  Result result = Result::Success;
-
-  bool isGraphics = (compileInfo->stageMask & (shaderStageToMask(ShaderStageCompute) - 1)) != 0;
-  if (isGraphics) {
-    // Build graphics pipeline
-    GraphicsPipelineBuildInfo *pipelineInfo = &compileInfo->gfxPipelineInfo;
-    GraphicsPipelineBuildOut *pipelineOut = &compileInfo->gfxPipelineOut;
-
-    // Fill pipeline shader info
-    PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
-        &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
-    };
-
-    ResourceMappingNodeMap nodeSets;
-    unsigned pushConstSize = 0;
-    for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i) {
-
-      PipelineShaderInfo *shaderInfo = shaderInfos[compileInfo->shaderModuleDatas[i].shaderStage];
-      const ShaderModuleBuildOut *shaderOut = &(compileInfo->shaderModuleDatas[i].shaderOut);
-
-      if (!shaderInfo->pEntryTarget) {
-        // If entry target is not specified, use the one from command line option
-        shaderInfo->pEntryTarget = compileInfo->entryTarget.c_str();
-      }
-      shaderInfo->pModuleData = shaderOut->pModuleData;
-      shaderInfo->entryStage = compileInfo->shaderModuleDatas[i].shaderStage;
-
-      // If not compiling from pipeline, lay out user data now.
-      if (compileInfo->doAutoLayout) {
-        doAutoLayoutDesc(compileInfo->shaderModuleDatas[i].shaderStage, compileInfo->shaderModuleDatas[i].spirvBin,
-                         pipelineInfo, shaderInfo, nodeSets, pushConstSize,
-                         /*autoLayoutDesc = */ compileInfo->autoLayoutDesc);
-      }
-    }
-
-    if (compileInfo->doAutoLayout) {
-      buildTopLevelMapping(compileInfo->stageMask, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
-                           compileInfo->autoLayoutDesc);
-    }
-
-    pipelineInfo->pInstance = nullptr; // Dummy, unused
-    pipelineInfo->pUserData = &compileInfo->pipelineBuf;
-    pipelineInfo->pfnOutputAlloc = allocateBuffer;
-    pipelineInfo->unlinked = compileInfo->unlinked;
-
-    // NOTE: If number of patch control points is not specified, we set it to 3.
-    if (pipelineInfo->iaState.patchControlPoints == 0)
-      pipelineInfo->iaState.patchControlPoints = 3;
-
-    pipelineInfo->options.robustBufferAccess = compileInfo->robustBufferAccess;
-    pipelineInfo->options.enableRelocatableShaderElf = compileInfo->relocatableShaderElf;
-    pipelineInfo->options.scalarBlockLayout = compileInfo->scalarBlockLayout;
-    pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo->scratchAccessBoundsChecks;
-
-    void *pipelineDumpHandle = nullptr;
-    if (pipelineDumpOptions) {
-      PipelineBuildInfo localPipelineInfo = {};
-      localPipelineInfo.pGraphicsInfo = pipelineInfo;
-      pipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&*pipelineDumpOptions, localPipelineInfo);
-    }
-
-    if (timePasses) {
-      auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pipelineInfo);
-      outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash) << " Files: " << compileInfo->fileNames << "\n";
-      outs().flush();
-    }
-
-    result = compiler->BuildGraphicsPipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
-
-    if (result == Result::Success) {
-      if (pipelineDumpOptions) {
-        Vkgc::BinaryData pipelineBinary = {};
-        pipelineBinary.codeSize = pipelineOut->pipelineBin.codeSize;
-        pipelineBinary.pCode = pipelineOut->pipelineBin.pCode;
-        Vkgc::IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, compileInfo->gfxIp, &pipelineBinary);
-
-        Vkgc::IPipelineDumper::EndPipelineDump(pipelineDumpHandle);
-      }
-
-      result = decodePipelineBinary(&pipelineOut->pipelineBin, compileInfo, true);
-    }
-  }
-  else {
-    // Build compute pipeline
-    assert(compileInfo->shaderModuleDatas.size() == 1);
-    assert(compileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
-
-    ComputePipelineBuildInfo *pipelineInfo = &compileInfo->compPipelineInfo;
-    ComputePipelineBuildOut *pipelineOut = &compileInfo->compPipelineOut;
-
-    PipelineShaderInfo *shaderInfo = &pipelineInfo->cs;
-    const ShaderModuleBuildOut *shaderOut = &compileInfo->shaderModuleDatas[0].shaderOut;
-
-    if (!shaderInfo->pEntryTarget) {
-      // If entry target is not specified, use the one from command line option
-      shaderInfo->pEntryTarget = compileInfo->entryTarget.c_str();
-    }
-
-    shaderInfo->entryStage = ShaderStageCompute;
-    shaderInfo->pModuleData = shaderOut->pModuleData;
-
-    // If not compiling from pipeline, lay out user data now.
-    if (compileInfo->doAutoLayout) {
-      ResourceMappingNodeMap nodeSets;
-      unsigned pushConstSize = 0;
-      doAutoLayoutDesc(ShaderStageCompute, compileInfo->shaderModuleDatas[0].spirvBin, nullptr, shaderInfo, nodeSets,
-                       pushConstSize,
-                       /*autoLayoutDesc =*/compileInfo->autoLayoutDesc);
-
-      buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
-                           compileInfo->autoLayoutDesc);
-    }
-
-    pipelineInfo->pInstance = nullptr; // Dummy, unused
-    pipelineInfo->pUserData = &compileInfo->pipelineBuf;
-    pipelineInfo->pfnOutputAlloc = allocateBuffer;
-    pipelineInfo->unlinked = compileInfo->unlinked;
-    pipelineInfo->options.robustBufferAccess = compileInfo->robustBufferAccess;
-    pipelineInfo->options.enableRelocatableShaderElf = compileInfo->relocatableShaderElf;
-    pipelineInfo->options.scalarBlockLayout = compileInfo->scalarBlockLayout;
-    pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo->scratchAccessBoundsChecks;
-
-    void *pipelineDumpHandle = nullptr;
-    if (pipelineDumpOptions) {
-      PipelineBuildInfo localPipelineInfo = {};
-      localPipelineInfo.pComputeInfo = pipelineInfo;
-      pipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&*pipelineDumpOptions, localPipelineInfo);
-    }
-
-    if (timePasses) {
-      auto hash = Vkgc::IPipelineDumper::GetPipelineHash(pipelineInfo);
-      outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash) << " Files: " << compileInfo->fileNames << "\n";
-      outs().flush();
-    }
-
-    result = compiler->BuildComputePipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
-
-    if (result == Result::Success) {
-      if (pipelineDumpOptions) {
-        Vkgc::BinaryData pipelineBinary = {};
-        pipelineBinary.codeSize = pipelineOut->pipelineBin.codeSize;
-        pipelineBinary.pCode = pipelineOut->pipelineBin.pCode;
-        Vkgc::IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, compileInfo->gfxIp, &pipelineBinary);
-
-        Vkgc::IPipelineDumper::EndPipelineDump(pipelineDumpHandle);
-      }
-
-      result = decodePipelineBinary(&pipelineOut->pipelineBin, compileInfo, false);
-    }
-  }
-
-  return result;
-}
-
-// =====================================================================================================================
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 //
 // @param compileInfo : Compilation info of LLPC standalone tool
@@ -644,12 +480,12 @@ Result processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const
 // @param compiler : LLPC compiler
 // @param inFiles : Input filenames
 // @param validateSpirv : Whether to run the validator on each final SPIR-V module
-// @param [out] filenames : Space-separated list of used input file names
+// @param [out] filenames : List of used input file names
 // @returns : Result::Success on success, other status codes on failure
 Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef<std::string> inFiles,
-                          bool validateSpirv, std::string &fileNames) {
+                          bool validateSpirv, SmallVectorImpl<std::string> &fileNames) {
   for (const std::string &inFile : inFiles) {
-    fileNames += inFile + " ";
+    fileNames.push_back(inFile);
     Result result = Result::Success;
     std::string spvBinFile;
 
