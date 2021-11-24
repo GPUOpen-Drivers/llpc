@@ -76,44 +76,98 @@ namespace Llpc {
 namespace StandaloneCompiler {
 
 // =====================================================================================================================
+// Takes a raw input file spec and attempts to parse it. Examples:
+// 1.  "prefix/my_file.spv,main_cs" --> {filename: "prefix/my_file", entryPoint: "main_cs"}
+// 2.  "file.spv" --> {filename: "file.spv", entryPoint: "" (default)}
+// 3.  "file.spv," --> Error
+//
+// @param inputSpec : Raw input specification string to parse
+// @returns : Parsed input spec on success, Error on failure
+Expected<InputSpec> parseInputFileSpec(const StringRef inputSpec) {
+  InputSpec parsed = {};
+  parsed.rawInputSpec = inputSpec.str();
+  StringRef toProcess = parsed.rawInputSpec;
+
+  // 1. (Optional) Find entry point name.
+  const size_t entryPointSeparatorPos = toProcess.rfind(',');
+  if (entryPointSeparatorPos != StringRef::npos) {
+    const size_t entryPointNameLen = toProcess.size() - (entryPointSeparatorPos + 1);
+    if (entryPointNameLen == 0)
+      return createStringError(std::make_error_code(std::errc::invalid_argument),
+                               Twine("Expected entry point name after ',' in: ") + inputSpec);
+
+    parsed.entryPoint = parsed.rawInputSpec.substr(entryPointSeparatorPos + 1);
+    toProcess = toProcess.drop_back(entryPointNameLen + 1);
+  }
+
+  // 2. The filename is the remaining string, including the extension.
+  if (toProcess.empty())
+    return createStringError(std::make_error_code(std::errc::invalid_argument),
+                             Twine("File name missing for input: ") + inputSpec);
+
+  parsed.filename = toProcess.str();
+  return parsed;
+}
+
+// =====================================================================================================================
+// Takes list of raw inputs and attempts to parse all. See `Llpc::StandaloneCompiler::parseInputFileSpec` for details.
+//
+// @param inputSpec : List of raw input specification strings to parse
+// @returns : Parsed input specs on success, Error on failure
+llvm::Expected<llvm::SmallVector<InputSpec>> parseAndCollectInputFileSpecs(llvm::ArrayRef<std::string> inputSpecs) {
+  SmallVector<InputSpec> parsed;
+  parsed.reserve(inputSpecs.size());
+
+  for (StringRef input : inputSpecs) {
+    auto inputSpecOrErr = parseInputFileSpec(input);
+    if (Error err = inputSpecOrErr.takeError())
+      return std::move(err);
+
+    parsed.push_back(std::move(*inputSpecOrErr));
+  }
+
+  return parsed;
+}
+
+// =====================================================================================================================
 // Split the list of input file paths into groups. Each group will be compiled in its own context.
 // Validates the input files and returns Error on failure.
 //
-// @param inputFiles : Input files to group and validate
+// @param inputSpecs : Input files to group and validate
 // @returns : List of input groups on success, Error on failure
-Expected<SmallVector<InputFilesGroup>> groupInputFiles(ArrayRef<std::string> inputFiles) {
-  const size_t numInputs = inputFiles.size();
-  const size_t numPipe = count_if(inputFiles, isPipelineInfoFile);
+Expected<SmallVector<InputSpecGroup, 0>> groupInputSpecs(ArrayRef<InputSpec> inputSpecs) {
+  const size_t numInputs = inputSpecs.size();
+  const size_t numPipe = count_if(inputSpecs, [](const InputSpec &spec) { return isPipelineInfoFile(spec.filename); });
+
   if (numPipe > 0 && numPipe != numInputs)
     return createStringError(std::make_error_code(std::errc::invalid_argument),
                              "Mixing .pipe and shader inputs is not allowed");
 
   // Check that all files exist and are accessible.
-  for (StringRef filePath : inputFiles) {
+  for (const InputSpec &input : inputSpecs) {
     const char *errorMessage = nullptr;
-    if (!sys::fs::exists(filePath))
+    if (!sys::fs::exists(input.filename))
       errorMessage = "Input file does not exist";
-    else if (!sys::fs::is_regular_file(filePath))
+    else if (!sys::fs::is_regular_file(input.filename))
       errorMessage = "Input path is not a regular file";
 
     if (errorMessage)
-      return createStringError(std::make_error_code(std::errc::file_exists), Twine(errorMessage) + ": " + filePath);
+      return createStringError(std::make_error_code(std::errc::file_exists),
+                               Twine(errorMessage) + ": " + input.filename);
   }
 
   // All input shaders form one group.
-  SmallVector<InputFilesGroup> groups;
+  SmallVector<InputSpecGroup, 0> groups;
   if (numInputs == 0)
     return groups;
 
   if (numPipe == 0) {
-    groups.push_back({inputFiles.begin(), inputFiles.end()});
+    groups.push_back({inputSpecs.begin(), inputSpecs.end()});
     return groups;
   }
 
   // Each .pipe file forms its own group.
-  groups.reserve(numInputs);
-  for (const std::string &file : inputFiles)
-    groups.push_back({file});
+  append_range(groups, map_range(inputSpecs, [](const InputSpec &spec) { return InputSpecGroup{spec}; }));
   return groups;
 }
 
@@ -256,12 +310,12 @@ static void findAllMatchFiles(const std::string &inFile, std::vector<std::string
 // =====================================================================================================================
 // Expands all input files in a platform-specific way.
 //
-// @param inputFiles : Input paths.
+// @param inputSpecs : Input paths.
 // @param [out] expandedFilenames : Returned expanded input filenames.
 // @returns : Result::Success on success, Result::ErrorInvalidValue when expansion fails.
-Result expandInputFilenames(ArrayRef<std::string> inputFiles, std::vector<std::string> &expandedFilenames) {
+Result expandInputFilenames(ArrayRef<std::string> inputSpecs, std::vector<std::string> &expandedFilenames) {
   unsigned i = 0;
-  for (const auto &inFile : inputFiles) {
+  for (const auto &inFile : inputSpecs) {
 #ifdef WIN_OS
     {
       if (i > 0 && inFile.find_last_of("*?") != std::string::npos) {
