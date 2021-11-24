@@ -18,11 +18,20 @@ jobs:
         branch:         [dev]
         config:         [Release]
         assertions:     ["OFF", "ON"]
-        feature-set:    ["+gcc", "+clang", "+clang+shadercache", "+clang+sanitizers"]
+        feature-set:    ["+gcc", "+clang", "+clang+shadercache", "+clang+sanitizers", "+clang+coverage", "+clang+shadercache+coverage"]
         generator:      [Ninja]
+        exclude:
+          - feature-set: "+clang"
+            assertions:  "OFF"
+          - feature-set: "+clang+shadercache"
+            assertions:  "ON"
+          - feature-set: "+clang+coverage"
+            assertions:  "ON"
+          - feature-set: "+clang+shadercache+coverage"
+            assertions:  "OFF"
     steps:
       - name: Free up disk space
-        if: contains(matrix.feature-set, '+sanitizers')
+        if: contains(matrix.feature-set, '+sanitizers') || contains(matrix.feature-set, '+coverage')
         run: |
           echo 'Before:' && df -h
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache/boost /opt/ghc
@@ -57,6 +66,10 @@ jobs:
                          --build-arg FEATURES="${{ matrix.feature-set }}" \
                          --build-arg GENERATOR="${{ matrix.generator }}" \
                          --tag "$IMAGE_TAG"
+      - name: Upload code coverage report
+        if: contains(matrix.feature-set, '+coverage')
+        run: |
+          gsutil -m cp -r /vulkandriver/coverage_report/* gs://amdvlk-llpc-github-ci-artifacts-public/coverage_${IMAGE_TAG}_${GITHUB_SHA}/
       - name: Push the new image
         run: |
           docker push "$IMAGE_TAG"

@@ -46,7 +46,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir --upgrade cmake \
-    && for tool in clang clang++ clang-tidy llvm-symbolizer lld ld.lld ; do \
+    && for tool in clang clang++ clang-tidy llvm-symbolizer llvm-profdata llvm-cov lld ld.lld ; do \
          update-alternatives --install /usr/bin/"$tool" "$tool" /usr/bin/"$tool"-11 10 ; \
         done \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
@@ -62,34 +62,42 @@ RUN wget -P /usr/bin/ https://storage.googleapis.com/git-repo-downloads/repo \
     && cd /vulkandriver/drivers/spvgen/external \
     && python3 fetch_external_sources.py
 
-# Copy update script into container
+# Copy update and coverage report scripts into container.
 COPY docker/update-llpc.sh /vulkandriver/
+COPY docker/generate-coverage-report.sh /vulkandriver/
 
 # Build LLPC.
 WORKDIR /vulkandriver/builds/ci-build
-RUN EXTRA_FLAGS="" \
+RUN EXTRA_COMPILER_FLAGS=() \
+    && EXTRA_LINKER_FLAGS=() \
+    && EXTRA_FLAGS=() \
     && if echo "$FEATURES" | grep -q "+gcc" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_C_COMPILER=gcc"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_CXX_COMPILER=g++"; \
+         EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=gcc"); \
+         EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=g++"); \
        fi \
     && if echo "$FEATURES" | grep -q "+clang" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_C_COMPILER=clang"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_CXX_COMPILER=clang++"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DLLVM_USE_LINKER=lld"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld"; \
+         EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=clang"); \
+         EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=clang++"); \
+         EXTRA_FLAGS+=("-DLLVM_USE_LINKER=lld"); \
+         EXTRA_LINKER_FLAGS+=("-fuse-ld=lld"); \
        fi \
     && if echo "$FEATURES" | grep -q "+shadercache" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DLLPC_ENABLE_SHADER_CACHE=1"; \
+         EXTRA_FLAGS+=("-DLLPC_ENABLE_SHADER_CACHE=1"); \
+       fi \
+    && if echo "$FEATURES" | grep -q "+coverage" ; then \
+         EXTRA_COMPILER_FLAGS+=("-fprofile-instr-generate=/vulkandriver/profile%4m.profraw" "-fcoverage-mapping"); \
+         EXTRA_LINKER_FLAGS+=("-fprofile-instr-generate=/vulkandriver/profile%4m.profraw" "-fcoverage-mapping"); \
        fi \
     && if echo "$FEATURES" | grep -q "+sanitizers" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_USE_SANITIZER=Address;Undefined"; \
+         EXTRA_FLAGS+=("-DXGL_USE_SANITIZER=Address;Undefined"); \
          echo "export ASAN_OPTIONS=detect_leaks=0" >> /vulkandriver/env.sh; \
          echo "export LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan-x86_64.so)" >> /vulkandriver/env.sh; \
        else \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_BUILD_CACHE_CREATOR=ON"; \
+         EXTRA_FLAGS+=("-DXGL_BUILD_CACHE_CREATOR=ON"); \
        fi \
-    && echo "Extra CMake flags: $EXTRA_FLAGS" \
+    && EXTRA_FLAGS+=("-DCMAKE_C_FLAGS='${EXTRA_COMPILER_FLAGS[*]}'" "-DCMAKE_CXX_FLAGS='${EXTRA_COMPILER_FLAGS[*]}'") \
+    && EXTRA_FLAGS+=("-DCMAKE_EXE_LINKER_FLAGS='${EXTRA_LINKER_FLAGS[*]}'" "-DCMAKE_SHARED_LINKER_FLAGS='${EXTRA_LINKER_FLAGS[*]}'") \
+    && echo "Extra CMake flags:  ${EXTRA_FLAGS[@]}" \
     && echo "Extra env vars (/vulkandriver/env.sh): " \
     && cat /vulkandriver/env.sh \
     && source /vulkandriver/env.sh \
@@ -100,7 +108,7 @@ RUN EXTRA_FLAGS="" \
           -DXGL_ENABLE_ASSERTIONS="$ASSERTIONS" \
           -DICD_ANALYSIS_WARNINGS_AS_ERRORS=OFF \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-          $EXTRA_FLAGS \
+          "${EXTRA_FLAGS[@]}" \
     && cmake --build . \
     && cmake --build . --target lgc spvgen count FileCheck llvm-objdump not
 
@@ -108,6 +116,11 @@ RUN EXTRA_FLAGS="" \
 RUN source /vulkandriver/env.sh \
     && cmake --build . --target check-amdllpc check-amdllpc-units -- -v \
     && cmake --build . --target check-lgc check-lgc-units -- -v
+
+# Generate code coverage report for LLPC.
+RUN if echo "$FEATURES" | grep -q "+coverage" ; then \
+      /vulkandriver/generate-coverage-report.sh; \
+    fi
 
 # Save build info to /vulkandriver/build_info.txt.
 RUN cd /vulkandriver \
