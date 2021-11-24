@@ -59,15 +59,38 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
+#include <tuple>
 #include <vector>
 
 namespace Llpc {
 namespace StandaloneCompiler {
 
-using InputFilesGroup = llvm::SmallVector<std::string, 2>;
+// Represents a single input specification passed to the standalone compiler. This consists of a filename and,
+// optionally, an entry point.
+// The raw format is: `filename[,entry_point]`.
+struct InputSpec {
+  // Keep all chunks as `std::string` to simplify memory management.
+  std::string rawInputSpec;
+  std::string filename;
+  std::string entryPoint;
+
+  bool operator==(const InputSpec &rhs) const {
+    return std::tie(rawInputSpec, filename, entryPoint) == std::tie(rhs.rawInputSpec, rhs.filename, rhs.entryPoint);
+  }
+  bool operator!=(const InputSpec &rhs) const { return !(*this == rhs); }
+};
+
+// Takes a raw input spec and attempts to parse it. Returns llvm::Error on failure.
+llvm::Expected<InputSpec> parseInputFileSpec(llvm::StringRef inputSpec);
+
+// Takes a list of raw input specs and attempts to parse them. Returns llvm::Error if any of parsing fail on any of the
+// inputs.
+llvm::Expected<llvm::SmallVector<InputSpec>> parseAndCollectInputFileSpecs(llvm::ArrayRef<std::string> inputSpecs);
+
+using InputSpecGroup = llvm::SmallVector<InputSpec, 2>;
 // Split the list of input file paths into groups. Each group will be compiled in its own context.
 // Validates the input files and returns Error on failure.
-llvm::Expected<llvm::SmallVector<InputFilesGroup>> groupInputFiles(llvm::ArrayRef<std::string> inputFiles);
+llvm::Expected<llvm::SmallVector<InputSpecGroup, 0>> groupInputSpecs(llvm::ArrayRef<InputSpec> inputSpecs);
 
 // Represents allowed extensions of LLPC source files.
 namespace Ext {

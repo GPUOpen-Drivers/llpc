@@ -405,7 +405,8 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 // @param compiler : LLPC compiler
 // @param inFiles : Input filename(s)
 // @returns : Result::Success on success, other status codes on failure
-static Result processInputs(ICompiler *compiler, ArrayRef<std::string> inFiles) {
+static Result processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
+  assert(!inputSpecs.empty());
   CompileInfo compileInfo = {};
   compileInfo.unlinked = true;
   compileInfo.doAutoLayout = true;
@@ -416,14 +417,17 @@ static Result processInputs(ICompiler *compiler, ArrayRef<std::string> inFiles) 
   if (result != Result::Success)
     return result;
 
+  const std::string &firstFilename = inputSpecs[0].filename;
+
   SmallVector<std::string> fileNames;
-  if (inFiles.size() == 1 && isPipelineInfoFile(inFiles[0])) {
-    fileNames.push_back(inFiles[0]);
-    result = processInputPipeline(compiler, compileInfo, inFiles[0], Unlinked, IgnoreColorAttachmentFormats);
+  if (inputSpecs.size() == 1 && isPipelineInfoFile(firstFilename)) {
+    fileNames.push_back(firstFilename);
+    result = processInputPipeline(compiler, compileInfo, firstFilename, Unlinked, IgnoreColorAttachmentFormats);
     if (result != Result::Success)
       return result;
   } else {
-    result = processInputStages(compiler, compileInfo, inFiles, ValidateSpirv, fileNames);
+    const auto inputFiles = to_vector(map_range(inputSpecs, [](const InputSpec &spec) { return spec.filename; }));
+    result = processInputStages(compiler, compileInfo, inputFiles, ValidateSpirv, fileNames);
     if (result != Result::Success)
       return result;
   }
@@ -459,7 +463,7 @@ static Result processInputs(ICompiler *compiler, ArrayRef<std::string> inFiles) 
   if (result != Result::Success)
     return result;
 
-  return outputElf(&compileInfo, OutFile, inFiles[0]);
+  return outputElf(&compileInfo, OutFile, firstFilename);
 }
 
 #ifdef WIN_OS
@@ -543,13 +547,21 @@ int main(int argc, char *argv[]) {
   if (result != Result::Success)
     return EXIT_FAILURE;
 
-  auto inputGroupsOrErr = groupInputFiles(expandedInputFiles);
+  auto inputSpecsOrErr = parseAndCollectInputFileSpecs(expandedInputFiles);
+  if (Error err = inputSpecsOrErr.takeError()) {
+    reportError(std::move(err));
+    result = Result::ErrorInvalidValue;
+    return EXIT_FAILURE;
+  }
+
+  auto inputGroupsOrErr = groupInputSpecs(*inputSpecsOrErr);
   if (Error err = inputGroupsOrErr.takeError()) {
     reportError(std::move(err));
     result = Result::ErrorInvalidValue;
     return EXIT_FAILURE;
   }
-  for (InputFilesGroup &inputGroup : *inputGroupsOrErr) {
+
+  for (InputSpecGroup &inputGroup : *inputGroupsOrErr) {
     result = processInputs(compiler, inputGroup);
     if (result != Result::Success)
       return EXIT_FAILURE;

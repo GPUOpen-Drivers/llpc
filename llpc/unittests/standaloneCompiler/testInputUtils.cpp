@@ -32,10 +32,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <array>
+#include <initializer_list>
 
 using namespace llvm;
+using ::testing::AllOf;
 using ::testing::ElementsAre;
 using ::testing::ElementsAreArray;
+using ::testing::HasSubstr;
 
 namespace Llpc {
 namespace StandaloneCompiler {
@@ -51,6 +54,62 @@ constexpr std::array<uint8_t, 4> LlvmBitcodeMagic = {'B', 'C', 0xC0, 0xDE};
 // cppcheck-suppress syntaxError
 TEST(InputUtilsTests, PlaceholderPass) {
   EXPECT_TRUE(true);
+}
+
+TEST(InputUtilsTest, ParseFileInputSpecDefaultEntryPoint) {
+  const StringRef inputSpec = "my.pipe.file.spv";
+  auto parsedOrErr = parseInputFileSpec(inputSpec);
+  ASSERT_THAT_EXPECTED(parsedOrErr, Succeeded());
+  InputSpec &parsed = *parsedOrErr;
+
+  EXPECT_EQ(parsed.rawInputSpec, inputSpec);
+  EXPECT_TRUE(parsed.entryPoint.empty());
+  EXPECT_EQ(parsed.filename, inputSpec);
+}
+
+TEST(InputUtilsTest, ParseFileInputSpecWithEntryPoint) {
+  auto parsedOrErr = parseInputFileSpec("/my/file.spvasm,entry_point");
+  ASSERT_THAT_EXPECTED(parsedOrErr, Succeeded());
+  InputSpec &parsed = *parsedOrErr;
+
+  EXPECT_EQ(parsed.entryPoint, "entry_point");
+  EXPECT_EQ(parsed.filename, "/my/file.spvasm");
+}
+
+TEST(InputUtilsTest, ParseFileInputSpecWithSpaces) {
+  auto parsedOrErr = parseInputFileSpec("my file.spv, my entry point");
+  ASSERT_THAT_EXPECTED(parsedOrErr, Succeeded());
+  InputSpec &parsed = *parsedOrErr;
+
+  EXPECT_EQ(parsed.entryPoint, " my entry point");
+  EXPECT_EQ(parsed.filename, "my file.spv");
+}
+
+TEST(InputUtilsTest, ParseFileInputSpecExtensionOnly) {
+  // Edge case: filename with the extension only. This is a valid input.
+  auto parsedOrErr = parseInputFileSpec(".pipe");
+  ASSERT_THAT_EXPECTED(parsedOrErr, Succeeded());
+  InputSpec &parsed = *parsedOrErr;
+
+  EXPECT_EQ(parsed.rawInputSpec, ".pipe");
+  EXPECT_TRUE(parsed.entryPoint.empty());
+  EXPECT_EQ(parsed.filename, ".pipe");
+}
+
+TEST(InputUtilsTest, ParseFileInputSpecEmptySpec) {
+  auto parsedOrErr = parseInputFileSpec("");
+  EXPECT_THAT_EXPECTED(parsedOrErr, FailedWithMessage(HasSubstr("File name missing")));
+}
+
+TEST(InputUtilsTest, ParseFileInputSpecEmptyFilename) {
+  auto parsedOrErr = parseInputFileSpec(",main");
+  EXPECT_THAT_EXPECTED(parsedOrErr, FailedWithMessage(AllOf(HasSubstr("File name missing"), HasSubstr(",main"))));
+}
+
+TEST(InputUtilsTest, ParseFileInputSpecMissingEntryPointName) {
+  auto parsedOrErr = parseInputFileSpec("file.spv,");
+  EXPECT_THAT_EXPECTED(parsedOrErr,
+                       FailedWithMessage(AllOf(HasSubstr("Expected entry point name"), HasSubstr("file.spv,"))));
 }
 
 TEST(InputUtilsTest, IsElfBinaryGoodMagic) {
@@ -243,8 +302,8 @@ TEST(InputUtilsTest, ExpandInputFilenames) {
 }
 #endif
 
-// Test class for groupInputFiles tests. Manages temporary files created by tests.
-class GroupInputFilesTest : public ::testing::Test {
+// Test class for groupInputSpecs tests. Manages temporary files created by tests.
+class GroupInputSpecsTest : public ::testing::Test {
 public:
   // Creates a new temporary file in the form `some/temp/dir/<prefix>some_chars.<extension>`. The file will be
   // automatically removed at the end of the test. Sets `finalPath` to the full path of the created file.
@@ -254,6 +313,14 @@ public:
     ASSERT_FALSE(err) << "Failed to create temporary test file: " << err;
     m_createdFiles.emplace_back(bytes.begin(), bytes.end());
     finalPath = m_createdFiles.back();
+  }
+
+  // Converts a valid filename to input spec.
+  static InputSpec toInputSpec(StringRef filename) { return cantFail(parseInputFileSpec(filename)); };
+
+  // Converts a list of valid filenames to input specs.
+  static SmallVector<InputSpec> toInputSpecs(ArrayRef<std::string> filenames) {
+    return cantFail(parseAndCollectInputFileSpecs(filenames));
   }
 
   // Cleans up all the temporary files created.
@@ -268,84 +335,91 @@ private:
   SmallVector<std::string> m_createdFiles;
 };
 
-TEST_F(GroupInputFilesTest, NoInputs) {
-  auto groupsOrErr = groupInputFiles({});
+TEST_F(GroupInputSpecsTest, NoInputs) {
+  auto groupsOrErr = groupInputSpecs({});
   ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
   EXPECT_TRUE(groupsOrErr->empty());
 }
 
-TEST_F(GroupInputFilesTest, NonExistentInput) {
-  auto groupsOrErr = groupInputFiles({"/this/path/does/not/exit.pipe"});
+TEST_F(GroupInputSpecsTest, NonExistentInput) {
+  auto groupsOrErr = groupInputSpecs({toInputSpec("/this/path/does/not/exit.pipe")});
   EXPECT_THAT_EXPECTED(groupsOrErr, Failed());
 }
 
-TEST_F(GroupInputFilesTest, OnePipe) {
+TEST_F(GroupInputSpecsTest, OnePipe) {
   std::string pipePath;
   createTestFile("a", "pipe", pipePath);
+  const auto pipeSpec = toInputSpec(pipePath);
 
-  auto groupsOrErr = groupInputFiles({pipePath});
+  auto groupsOrErr = groupInputSpecs({pipeSpec});
   ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
   ASSERT_EQ(groupsOrErr->size(), 1u);
 
-  InputFilesGroup &group = groupsOrErr->front();
-  EXPECT_THAT(group, ElementsAre(pipePath));
+  InputSpecGroup &group = groupsOrErr->front();
+  EXPECT_THAT(group, ElementsAre(pipeSpec));
 }
 
 // Check that multiple pipe files are places in separate one-element groups.
-TEST_F(GroupInputFilesTest, MultiplePipe) {
+TEST_F(GroupInputSpecsTest, MultiplePipe) {
   std::string inputPathA;
   createTestFile("a", "pipe", inputPathA);
+  const auto specA = toInputSpec(inputPathA);
+
   std::string inputPathB;
   createTestFile("b", "pipe", inputPathB);
-  auto groupsOrErr = groupInputFiles({inputPathA, inputPathB});
+  const auto specB = toInputSpec(inputPathB);
+
+  auto groupsOrErr = groupInputSpecs({specA, specB});
   ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
   ASSERT_EQ(groupsOrErr->size(), 2u);
 
-  InputFilesGroup &group1 = groupsOrErr->front();
-  EXPECT_THAT(group1, ElementsAre(inputPathA));
-  InputFilesGroup &group2 = groupsOrErr->back();
-  EXPECT_THAT(group2, ElementsAre(inputPathB));
+  InputSpecGroup &group1 = groupsOrErr->front();
+  EXPECT_THAT(group1, ElementsAre(specA));
+  InputSpecGroup &group2 = groupsOrErr->back();
+  EXPECT_THAT(group2, ElementsAre(specB));
 }
 
-TEST_F(GroupInputFilesTest, OneShader) {
+TEST_F(GroupInputSpecsTest, OneShader) {
   std::string shaderPath;
   createTestFile("a", "spv", shaderPath);
+  const auto shaderSpec = toInputSpec(shaderPath);
 
-  auto groupsOrErr = groupInputFiles({shaderPath});
+  auto groupsOrErr = groupInputSpecs({shaderSpec});
   ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
   ASSERT_EQ(groupsOrErr->size(), 1u);
 
-  InputFilesGroup &group = groupsOrErr->front();
-  EXPECT_THAT(group, ElementsAre(shaderPath));
+  InputSpecGroup &group = groupsOrErr->front();
+  EXPECT_THAT(group, ElementsAre(shaderSpec));
 }
 
 // Check that multiple shader inputs are placed in a single group.
-TEST_F(GroupInputFilesTest, MultipleShaders) {
+TEST_F(GroupInputSpecsTest, MultipleShaders) {
   std::array<std::string, 3> shaderPaths = {};
   createTestFile("a", "spv", shaderPaths[0]);
   createTestFile("b", "spvasm", shaderPaths[1]);
   createTestFile("c", "frag", shaderPaths[2]);
 
-  auto groupsOrErr = groupInputFiles({shaderPaths[0], shaderPaths[1], shaderPaths[2]});
+  const auto inputSpecs = toInputSpecs({shaderPaths[0], shaderPaths[1], shaderPaths[2]});
+  auto groupsOrErr = groupInputSpecs(inputSpecs);
   ASSERT_THAT_EXPECTED(groupsOrErr, Succeeded());
   ASSERT_EQ(groupsOrErr->size(), 1u);
 
-  InputFilesGroup &group = groupsOrErr->front();
-  EXPECT_THAT(group, ElementsAreArray(shaderPaths));
+  InputSpecGroup &group = groupsOrErr->front();
+  EXPECT_THAT(group, ElementsAreArray(inputSpecs));
 }
 
 // Check that an Error is returned when mixing .pipe and shader inputs.
-TEST_F(GroupInputFilesTest, MixShaderPipe) {
+TEST_F(GroupInputSpecsTest, MixShaderPipe) {
   std::string shaderPath;
   createTestFile("a", "spv", shaderPath);
   std::string pipePath;
   createTestFile("b", "pipe", pipePath);
 
-  auto groupsOrErr1 = groupInputFiles({shaderPath, pipePath});
+  auto groupsOrErr1 = groupInputSpecs(toInputSpecs({shaderPath, pipePath}));
   EXPECT_THAT_EXPECTED(groupsOrErr1, Failed());
 
   // The other order should also result in an error.
-  auto groupsOrErr2 = groupInputFiles({pipePath, shaderPath});
+  auto groupsOrErr2 = groupInputSpecs(toInputSpecs({pipePath, shaderPath}));
   EXPECT_THAT_EXPECTED(groupsOrErr2, Failed());
 }
 

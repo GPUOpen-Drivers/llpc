@@ -1,0 +1,19 @@
+; Check that an error is produced when the specified entry point is empty.
+
+; BEGIN_SHADERTEST
+; RUN: not amdllpc -entry-target=foo -spvgen-dir=%spvgendir% -v %gfxip "%s," \
+; RUN:   | FileCheck --check-prefix=SHADERTEST %s
+;
+; SHADERTEST-LABEL: {{^}}ERROR: Expected entry point name after ','
+; SHADERTEST-LABEL: {{^}}===== AMDLLPC FAILED =====
+; END_SHADERTEST
+
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %1  "main"
+         %2 = OpTypeVoid
+         %3 = OpTypeFunction %2
+         %1 = OpFunction %2 None %3
+         %4 = OpLabel
+              OpReturn
+              OpFunctionEnd
