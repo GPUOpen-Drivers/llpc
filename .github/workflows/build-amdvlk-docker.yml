@@ -7,22 +7,21 @@ on:
 
 jobs:
   build-and-push-amdvlk:
-    name: "Features: ${{ matrix.feature-set }}, assertions: ${{ matrix.assertions }}"
+    name: "Features: ${{ matrix.feature-set }}"
     if: github.repository == 'GPUOpen-Drivers/llpc'
     runs-on: ${{ matrix.host-os }}
     strategy:
       fail-fast: false
       matrix:
         host-os:        ["ubuntu-20.04"]
-        image-template: ["gcr.io/stadia-open-source/amdvlk_%s%s_%s:nightly"]
+        image-template: ["gcr.io/stadia-open-source/amdvlk_%s%s:nightly"]
         branch:         [dev]
         config:         [Release]
-        assertions:     ["OFF", "ON"]
-        feature-set:    ["+gcc", "+clang", "+clang+shadercache", "+clang+sanitizers"]
+        feature-set:    ["+gcc", "+clang", "+clang+shadercache", "+clang+ubsan+asan",
+                         "+gcc+assertions", "+clang+assertions", "+clang+shadercache+assertions", "+clang+ubsan+asan+assertions"]
         generator:      [Ninja]
     steps:
       - name: Free up disk space
-        if: contains(matrix.feature-set, '+sanitizers')
         run: |
           echo 'Before:' && df -h
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache/boost /opt/ghc
@@ -45,15 +44,13 @@ jobs:
         run: |
           CONFIG_LOWER=$(echo "${{ matrix.config }}" | tr "[:upper:]" "[:lower:]")
           FEATURES_LOWER=$(echo "${{ matrix.feature-set }}" | tr "+" "_")
-          ASSERTS_LOWER=$(echo "${{ matrix.assertions }}" | tr "[:upper:]" "[:lower:]")
-          TAG=$(printf "${{ matrix.image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER" "$ASSERTS_LOWER")
+          TAG=$(printf "${{ matrix.image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER")
           echo "IMAGE_TAG=$TAG" | tee -a $GITHUB_ENV
       - name: Build and Test AMDVLK with Docker
         run: |
           docker build . --file docker/amdvlk.Dockerfile \
                          --build-arg BRANCH="${{ matrix.branch }}" \
                          --build-arg CONFIG="${{ matrix.config }}" \
-                         --build-arg ASSERTIONS="${{ matrix.assertions }}" \
                          --build-arg FEATURES="${{ matrix.feature-set }}" \
                          --build-arg GENERATOR="${{ matrix.generator }}" \
                          --tag "$IMAGE_TAG"
