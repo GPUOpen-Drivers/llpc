@@ -5,15 +5,13 @@
 #    docker build . --file docker/amdvlk.Dockerfile               \
 #                   --build-arg BRANCH=dev                        \
 #                   --build-arg CONFIG=Release                    \
-#                   --build-arg ASSERTIONS=ON                     \
-#                   --build-arg FEATURES="+clang+sanitizers"      \
+#                   --build-arg FEATURES="+clang+ubsan+asan"      \
 #                   --build-arg GENERATOR=Ninja                   \
 #                   --tag kuhar/amdvlk:nightly
 #
 # Required arguments:
 # - BRANCH: The base AMDVLK branch to use (e.g., master, dev, releases/<name>)
 # - CONFIG: Debug or Release
-# - ASSERTIONS: OFF or ON
 # - FEATURES: A '+'-separated set of features to enable
 # - GENERATOR: CMake generator to use (e.g., "Unix Makefiles", Ninja)
 #
@@ -22,7 +20,6 @@ FROM ubuntu:20.04
 
 ARG BRANCH
 ARG CONFIG
-ARG ASSERTIONS
 ARG FEATURES
 ARG GENERATOR
 
@@ -67,29 +64,46 @@ COPY docker/update-llpc.sh /vulkandriver/
 
 # Build LLPC.
 WORKDIR /vulkandriver/builds/ci-build
-RUN EXTRA_FLAGS="" \
+RUN EXTRA_COMPILER_FLAGS=() \
+    && EXTRA_LINKER_FLAGS=() \
+    && EXTRA_FLAGS=("-DXGL_BUILD_CACHE_CREATOR=ON") \
+    && SANITIZERS=() \
     && if echo "$FEATURES" | grep -q "+gcc" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_C_COMPILER=gcc"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_CXX_COMPILER=g++"; \
+         EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=gcc"); \
+         EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=g++"); \
        fi \
     && if echo "$FEATURES" | grep -q "+clang" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_C_COMPILER=clang"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_CXX_COMPILER=clang++"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DLLVM_USE_LINKER=lld"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"; \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld"; \
+         EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=clang"); \
+         EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=clang++"); \
+         EXTRA_FLAGS+=("-DLLVM_USE_LINKER=lld"); \
+         EXTRA_LINKER_FLAGS+=("-fuse-ld=lld"); \
        fi \
     && if echo "$FEATURES" | grep -q "+shadercache" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DLLPC_ENABLE_SHADER_CACHE=1"; \
+         EXTRA_FLAGS+=("-DLLPC_ENABLE_SHADER_CACHE=1"); \
        fi \
-    && if echo "$FEATURES" | grep -q "+sanitizers" ; then \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_USE_SANITIZER=Address;Undefined"; \
+    && if echo "$FEATURES" | grep -q "+asan" ; then \
+         SANITIZERS+=("Address"); \
          echo "export ASAN_OPTIONS=detect_leaks=0" >> /vulkandriver/env.sh; \
          echo "export LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan-x86_64.so)" >> /vulkandriver/env.sh; \
-       else \
-         EXTRA_FLAGS="$EXTRA_FLAGS -DXGL_BUILD_CACHE_CREATOR=ON"; \
        fi \
-    && echo "Extra CMake flags: $EXTRA_FLAGS" \
+    && if echo "$FEATURES" | grep -q "+ubsan" ; then \
+         SANITIZERS+=("Undefined"); \
+       fi \
+    && if [ ${#SANITIZERS[@]} -ne 0 ]; then  \
+         SANITIZERS_SEPARATED_LIST="${SANITIZERS[@]}"; \
+         SANITIZERS_SEPARATED_LIST="${SANITIZERS_SEPARATED_LIST// /;}"; \
+         EXTRA_FLAGS+=("-DXGL_USE_SANITIZER='${SANITIZERS_SEPARATED_LIST}'"); \
+       fi \
+    && if echo "$FEATURES" | grep -q "+assertions" ; then \
+         EXTRA_FLAGS+=("-DXGL_ENABLE_ASSERTIONS=ON"); \
+       fi \
+    && if [ ${#EXTRA_COMPILER_FLAGS[@]} -ne 0 ]; then \
+         EXTRA_FLAGS+=("-DCMAKE_C_FLAGS='${EXTRA_COMPILER_FLAGS[*]}'" "-DCMAKE_CXX_FLAGS='${EXTRA_COMPILER_FLAGS[*]}'"); \
+       fi \
+    && if [ ${#EXTRA_LINKER_FLAGS[@]} -ne 0 ]; then \
+         EXTRA_FLAGS+=("-DCMAKE_EXE_LINKER_FLAGS='${EXTRA_LINKER_FLAGS[*]}'" "-DCMAKE_SHARED_LINKER_FLAGS='${EXTRA_LINKER_FLAGS[*]}'"); \
+       fi \
+    && echo "Extra CMake flags: ${EXTRA_FLAGS[@]}" \
     && echo "Extra env vars (/vulkandriver/env.sh): " \
     && cat /vulkandriver/env.sh \
     && source /vulkandriver/env.sh \
@@ -97,10 +111,9 @@ RUN EXTRA_FLAGS="" \
           -G "$GENERATOR" \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
           -DXGL_BUILD_TESTS=ON \
-          -DXGL_ENABLE_ASSERTIONS="$ASSERTIONS" \
           -DICD_ANALYSIS_WARNINGS_AS_ERRORS=OFF \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-          $EXTRA_FLAGS \
+          "${EXTRA_FLAGS[@]}" \
     && cmake --build . \
     && cmake --build . --target lgc spvgen count FileCheck llvm-objdump not
 
