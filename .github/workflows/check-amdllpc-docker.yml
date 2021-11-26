@@ -9,19 +9,19 @@ on:
 
 jobs:
   build-and-test:
-    name: "Features: ${{ matrix.feature-set }}, assertions: ${{ matrix.assertions }}"
+    name: "Features: ${{ matrix.feature-set }}"
     runs-on: ${{ matrix.host-os }}
     strategy:
       fail-fast: false
       matrix:
         host-os:             ["ubuntu-20.04"]
-        base-image-template: ["gcr.io/stadia-open-source/amdvlk_%s%s_%s:nightly"]
+        image-template:      ["gcr.io/stadia-open-source/amdvlk_%s%s:nightly"]
         config:              [Release]
-        assertions:          ["OFF", "ON"]
-        feature-set:         ["+gcc", "+clang", "+clang+shadercache", "+clang+sanitizers"]
+        feature-set:         ["+gcc", "+clang", "+clang+shadercache", "+clang+ubsan+asan",
+                              "+gcc+assertions", "+clang+assertions", "+clang+shadercache+assertions", "+clang+ubsan+asan+assertions"]
     steps:
       - name: Free up disk space
-        if: contains(matrix.feature-set, '+sanitizers')
+        if: contains(matrix.feature-set, '+ubsan') || contains(matrix.feature-set, '+asan') || contains(matrix.feature-set, '+tsan') || contains(matrix.feature-set, '+coverage')
         run: |
           echo 'Before:' && df -h
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache/boost /opt/ghc
@@ -35,8 +35,7 @@ jobs:
         run: |
           CONFIG_LOWER=$(echo "${{ matrix.config }}" | tr "[:upper:]" "[:lower:]")
           FEATURES_LOWER=$(echo "${{ matrix.feature-set }}" | tr "+" "_")
-          ASSERTS_LOWER=$(echo "${{ matrix.assertions }}" | tr "[:upper:]" "[:lower:]")
-          TAG=$(printf "${{ matrix.base-image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER" "$ASSERTS_LOWER")
+          TAG=$(printf "${{ matrix.image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER")
           echo "IMAGE_TAG=$TAG" | tee -a $GITHUB_ENV
       - name: Fetch the latest prebuilt AMDVLK
         run: docker pull "$IMAGE_TAG"
