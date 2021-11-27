@@ -36,6 +36,7 @@
 #include "llpc.h"
 #include "llpcCompilationUtils.h"
 #include "llpcDebug.h"
+#include "llpcError.h"
 #include "llpcFile.h"
 #include "llpcInputUtils.h"
 #include "llpcPipelineBuilder.h"

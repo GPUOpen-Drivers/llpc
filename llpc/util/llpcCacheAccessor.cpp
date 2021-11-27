@@ -31,6 +31,7 @@
  */
 #include "llpcCacheAccessor.h"
 #include "llpcContext.h"
+#include "llpcError.h"
 
 #define DEBUG_TYPE "llpc-cache-accessor"
 

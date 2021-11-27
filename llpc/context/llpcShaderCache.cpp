@@ -29,6 +29,7 @@
 ***********************************************************************************************************************
 */
 #include "llpcShaderCache.h"
+#include "llpcError.h"
 #include "llpcFile.h"
 #include "vkgcUtil.h"
 #include "llvm/ADT/StringExtras.h"

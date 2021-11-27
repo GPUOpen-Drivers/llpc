@@ -36,6 +36,7 @@
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcElfWriter.h"
+#include "llpcError.h"
 #include "llpcFile.h"
 #include "llpcGraphicsContext.h"
 #include "llpcShaderModuleHelper.h"

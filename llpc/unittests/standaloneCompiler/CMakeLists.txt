@@ -26,6 +26,7 @@
 add_llpc_unittest(LlpcStandaloneCompilerTests
   testInputUtils.cpp
   testMetroHash.cpp
+  testResultError.cpp
   testShaderCache.cpp
 )
 
