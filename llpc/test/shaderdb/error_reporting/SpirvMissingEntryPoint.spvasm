@@ -1,7 +1,7 @@
 ; Check that an error is produced when the specified entry point is empty.
 
 ; BEGIN_SHADERTEST
-; RUN: not amdllpc -entry-target=foo -spvgen-dir=%spvgendir% -v %gfxip "%s," \
+; RUN: not amdllpc -spvgen-dir=%spvgendir% -v %gfxip "%s," \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST %s
 ;
 ; SHADERTEST-LABEL: {{^}}ERROR: Result::ErrorInvalidShader: Expected entry point name after ','

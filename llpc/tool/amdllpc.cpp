@@ -86,7 +86,7 @@ GfxIpVersion ParsedGfxIp = {8, 0, 2};
 
 // Input sources
 cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueRequired,
-                              cl::desc("<source>...\n"
+                              cl::desc("<input_file[,entry_point]>...\n"
                                        "Type of input file is determined by its filename extension:\n"
                                        "  .spv      SPIR-V binary\n"
                                        "  .spvasm   SPIR-V assembly text\n"
@@ -116,10 +116,6 @@ cl::opt<bool> Unlinked("unlinked", cl::desc("Build \"unlinked\" shader/part-pipe
 // -validate-spirv: validate input SPIR-V binary or text
 cl::opt<bool> ValidateSpirv("validate-spirv", cl::desc("Validate input SPIR-V binary or text (default: true)"),
                             cl::init(true));
-
-// -entry-target: name string of entry target (for multiple entry-points)
-cl::opt<std::string> EntryTarget("entry-target", cl::desc("Name string of entry target"),cl::value_desc("entryname"),
-		                 cl::init(""));
 
 // -ignore-color-attachment-formats: ignore color attachment formats
 cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
@@ -371,7 +367,6 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
 // @returns : Result::Success on success, other status codes on failure
 static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->gfxIp = ParsedGfxIp;
-  compileInfo->entryTarget = EntryTarget;
   compileInfo->relocatableShaderElf = EnableRelocatableShaderElf;
   compileInfo->autoLayoutDesc = AutoLayoutDesc;
   compileInfo->robustBufferAccess = RobustBufferAccess;
@@ -421,16 +416,12 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   if (result != Result::Success)
     return createResultError(result);
 
-  const std::string &firstFilename = inputSpecs[0].filename;
-
-  SmallVector<std::string> fileNames;
-  if (inputSpecs.size() == 1 && isPipelineInfoFile(firstFilename)) {
-    fileNames.push_back(firstFilename);
-    if (Error err = processInputPipeline(compiler, compileInfo, firstFilename, Unlinked, IgnoreColorAttachmentFormats))
+  const InputSpec &firstInput = inputSpecs.front();
+  if (isPipelineInfoFile(firstInput.filename)) {
+    if (Error err = processInputPipeline(compiler, compileInfo, firstInput, Unlinked, IgnoreColorAttachmentFormats))
       return err;
   } else {
-    const auto inputFiles = to_vector(map_range(inputSpecs, [](const InputSpec &spec) { return spec.filename; }));
-    if (Error err = processInputStages(compiler, compileInfo, inputFiles, ValidateSpirv, fileNames))
+    if (Error err = processInputStages(compiler, compileInfo, inputSpecs, ValidateSpirv))
       return err;
   }
 
@@ -456,14 +447,12 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
     dumpOptions->dumpDuplicatePipelines = DumpDuplicatePipelines;
   }
 
-  compileInfo.fileNames = std::move(fileNames);
-
   PipelineBuilder builder(*compiler, compileInfo, dumpOptions, TimePassesIsEnabled || cl::EnableTimerProfile);
   result = builder.build();
   if (result != Result::Success)
     return createResultError(result, "Failed to build pipeline");
 
-  return outputElf(&compileInfo, OutFile, firstFilename);
+  return outputElf(&compileInfo, OutFile, firstInput.filename);
 }
 
 #ifdef WIN_OS

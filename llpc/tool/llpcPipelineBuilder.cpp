@@ -59,6 +59,7 @@
 
 #include "llpcPipelineBuilder.h"
 #include "llpcAutoLayout.h"
+#include "llpcCompilationUtils.h"
 #include "llpcDebug.h"
 #include "llpcInputUtils.h"
 #include "llpcUtil.h"
@@ -128,7 +129,7 @@ Result PipelineBuilder::buildGraphicsPipeline(BinaryData &outBinaryData) {
 
     // If entry target is not specified, use the one from command line option.
     if (!shaderInfo->pEntryTarget)
-      shaderInfo->pEntryTarget = m_compileInfo.entryTarget.c_str();
+      shaderInfo->pEntryTarget = moduleData.entryPoint.c_str();
 
     shaderInfo->pModuleData = shaderOut->pModuleData;
     shaderInfo->entryStage = stage;
@@ -177,17 +178,19 @@ Result PipelineBuilder::buildGraphicsPipeline(BinaryData &outBinaryData) {
 // @returns : Result::Success on success, other status on failure.
 Result PipelineBuilder::buildComputePipeline(BinaryData &outBinaryData) {
   assert(m_compileInfo.shaderModuleDatas.size() == 1);
-  assert(m_compileInfo.shaderModuleDatas[0].shaderStage == ShaderStageCompute);
+
+  StandaloneCompiler::ShaderModuleData &moduleData = m_compileInfo.shaderModuleDatas[0];
+  assert(moduleData.shaderStage == ShaderStageCompute);
 
   ComputePipelineBuildInfo *pipelineInfo = &m_compileInfo.compPipelineInfo;
   ComputePipelineBuildOut *pipelineOut = &m_compileInfo.compPipelineOut;
 
   PipelineShaderInfo *shaderInfo = &pipelineInfo->cs;
-  const ShaderModuleBuildOut *shaderOut = &m_compileInfo.shaderModuleDatas[0].shaderOut;
+  const ShaderModuleBuildOut *shaderOut = &moduleData.shaderOut;
 
   // If entry target is not specified, use the one from command line option.
   if (!shaderInfo->pEntryTarget)
-    shaderInfo->pEntryTarget = m_compileInfo.entryTarget.c_str();
+    shaderInfo->pEntryTarget = moduleData.entryPoint.c_str();
 
   shaderInfo->entryStage = ShaderStageCompute;
   shaderInfo->pModuleData = shaderOut->pModuleData;
@@ -196,8 +199,8 @@ Result PipelineBuilder::buildComputePipeline(BinaryData &outBinaryData) {
   if (m_compileInfo.doAutoLayout) {
     ResourceMappingNodeMap nodeSets;
     unsigned pushConstSize = 0;
-    doAutoLayoutDesc(ShaderStageCompute, m_compileInfo.shaderModuleDatas[0].spirvBin, nullptr, shaderInfo, nodeSets,
-                     pushConstSize, /*autoLayoutDesc =*/m_compileInfo.autoLayoutDesc);
+    doAutoLayoutDesc(ShaderStageCompute, moduleData.spirvBin, nullptr, shaderInfo, nodeSets, pushConstSize,
+                     /*autoLayoutDesc =*/m_compileInfo.autoLayoutDesc);
 
     buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
                          m_compileInfo.autoLayoutDesc);
@@ -270,7 +273,10 @@ void PipelineBuilder::printPipelineInfo(PipelineBuildInfo buildInfo) {
   else
     llvm_unreachable("Unhandled pipeline kind");
 
-  LLPC_OUTS("LLPC PipelineHash: " << format("0x%016" PRIX64, hash) << " Files: " << join(m_compileInfo.fileNames, " ")
+  LLPC_OUTS("LLPC PipelineHash: " << format("0x%016" PRIX64, hash) << " Files: "
+                                  << join(map_range(m_compileInfo.inputSpecs,
+                                                    [](const InputSpec &spec) { return spec.filename; }),
+                                          " ")
                                   << "\n");
 }
 
