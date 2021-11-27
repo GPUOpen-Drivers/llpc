@@ -1,0 +1,16 @@
+; Check that two GLSL input shaders can be compiled into a single pipeline.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v \
+; RUN:      %S/test_inputs/Vs1.vert \
+; RUN:      %S/test_inputs/Fs1.frag \
+; RUN: | FileCheck -check-prefix=SHADERTEST %s
+;
+; SHADERTEST-LABEL: {{^//}} LLPC final pipeline module info
+; SHADERTEST:       define dllexport amdgpu_vs void @_amdgpu_vs_main
+; SHADERTEST:       define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main
+; SHADERTEST-LABEL: {{^//}} LLPC final ELF info
+; SHADERTEST-LABEL: _amdgpu_vs_main:
+; SHADERTEST-LABEL: _amdgpu_ps_main:
+; SHADERTEST-LABEL: {{^=====}} AMDLLPC SUCCESS ====
+; END_SHADERTEST

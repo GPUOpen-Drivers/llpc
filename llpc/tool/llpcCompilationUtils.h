@@ -55,6 +55,7 @@
 #pragma once
 
 #include "llpc.h"
+#include "llpcInputUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -66,15 +67,18 @@ namespace StandaloneCompiler {
 // Represents the module info for a shader module.
 struct ShaderModuleData {
   Llpc::ShaderStage shaderStage;          // Shader stage
+  std::string entryPoint;                 // Shader entry point
   Llpc::BinaryData spirvBin;              // SPIR-V binary codes
   Llpc::ShaderModuleBuildInfo shaderInfo; // Info to build shader modules
   Llpc::ShaderModuleBuildOut shaderOut;   // Output of building shader modules
   void *shaderBuf;                        // Allocation buffer of building shader modules
 };
 
-// Represents global compilation info of LLPC standalone tool (as tool context).
+// Represents a single compilation context of a pipeline or a group of shaders.
+// This is only used by the standalone compiler tool.
 struct CompileInfo {
   Llpc::GfxIpVersion gfxIp;                                                  // Graphics IP version info
+  llvm::SmallVector<InputSpec> inputSpecs;                                   // Input shader specification
   VkFlags stageMask;                                                         // Shader stage mask
   llvm::SmallVector<StandaloneCompiler::ShaderModuleData> shaderModuleDatas; // ShaderModule Data
   Llpc::GraphicsPipelineBuildInfo gfxPipelineInfo;                           // Info to build graphics pipeline
@@ -83,8 +87,6 @@ struct CompileInfo {
   Llpc::ComputePipelineBuildOut compPipelineOut;                             // Output of building compute pipeline
   void *pipelineBuf;                                                         // Allocation buffer of building pipeline
   void *pipelineInfoFile;                                                    // VFX-style file containing pipeline info
-  llvm::SmallVector<std::string> fileNames;                                  // Names of input shader source files
-  std::string entryTarget;                                                   // Name of the entry target function
   bool unlinked;                  // Whether to generate unlinked shader/part-pipeline ELF
   bool relocatableShaderElf;      // Whether to enable relocatable shader compilation
   bool scalarBlockLayout;         // Whether to enable scalar block layout
@@ -117,12 +119,12 @@ llvm::Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo);
 llvm::Error outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, llvm::StringRef firstInFile);
 
 // Processes and compiles one pipeline input file.
-llvm::Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const std::string &inFile,
+llvm::Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const InputSpec &inputSpec,
                                  bool unlinked, bool ignoreColorAttachmentFormats);
 
 // Processes and compiles multiple shader stage input files.
-llvm::Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, llvm::ArrayRef<std::string> inFiles,
-                               bool validateSpirv, llvm::SmallVectorImpl<std::string> &fileNames);
+llvm::Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, llvm::ArrayRef<InputSpec> inputSpecs,
+                               bool validateSpirv);
 
 } // namespace StandaloneCompiler
 } // namespace Llpc

@@ -1,10 +1,10 @@
-; Check that an error is produced when wildcards and entrypoint are specified
+; Check that an error is produced when the same shader stage is provided twice.
 
 ; BEGIN_SHADERTEST
-; RUN: not amdllpc -spvgen-dir=%spvgendir% -v %gfxip "%s*,bar" \
+; RUN: not amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s %s \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST %s
 ;
-; SHADERTEST-LABEL: {{^}}ERROR: Can't use wildcards as well as entrypoint
+; SHADERTEST-LABEL: {{^}}ERROR: Result::ErrorInvalidShader: Duplicate shader stage (vertex)
 ; SHADERTEST-LABEL: {{^}}===== AMDLLPC FAILED =====
 ; END_SHADERTEST
 
