@@ -237,6 +237,7 @@ if(ICD_BUILD_LLPC)
         util/llpcCacheAccessor.cpp
         util/llpcDebug.cpp
         util/llpcElfWriter.cpp
+        util/llpcError.cpp
         util/llpcFile.cpp
         util/llpcShaderModuleHelper.cpp
         util/llpcTimerProfiler.cpp

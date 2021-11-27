@@ -30,6 +30,7 @@
  */
 #include "llpcElfWriter.h"
 #include "llpcContext.h"
+#include "llpcError.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include <algorithm>

@@ -29,6 +29,7 @@
 ***********************************************************************************************************************
 */
 #include "llpcShaderCacheManager.h"
+#include "llpcError.h"
 
 #define DEBUG_TYPE "llpc-shader-cache-manager"
 

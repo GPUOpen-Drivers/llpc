@@ -85,15 +85,6 @@ bool EnableErrs() {
 }
 
 // =====================================================================================================================
-// Prints the error message in `err` to LLPC_ERRS and consumes the error.
-//
-// @param err : The error to handle.
-void reportError(Error &&err) {
-  // For details on llvm error handling, see https://llvm.org/docs/ProgrammersManual.html#recoverable-errors.
-  handleAllErrors(std::move(err), [](const ErrorInfoBase &baseError) { LLPC_ERRS(baseError.message() << "\n"); });
-}
-
-// =====================================================================================================================
 // Redirects the output of logs. It affects the behavior of llvm::outs(), dbgs() and errs().
 //
 // NOTE: This function redirects log output by modify the underlying static raw_fd_ostream object in outs() and errs().
