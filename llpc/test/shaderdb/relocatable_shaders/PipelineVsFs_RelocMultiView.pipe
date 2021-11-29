@@ -1,0 +1,64 @@
+; Test that the layer input is not output when multiview is enabled.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s
+; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: <_amdgpu_vs_main>:
+; SHADERTEST-NOT: exp param0
+; SHADERTEST: exp param0 off, off, off, off
+; SHADERTEST-NOT: exp param0
+; SHADERTEST: s_endpgm
+; END_SHADERTEST
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+
+layout(location = 0) in vec4 _17;
+
+void main()
+{
+    gl_Position = _17;
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+
+layout(location = 0) out vec4 _9;
+
+void main()
+{
+    _9 = vec4(0,0,0,0);
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 1
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 8
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+enableMultiView = 1
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 1
+
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 16
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
