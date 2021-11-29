@@ -89,6 +89,9 @@ RUN EXTRA_COMPILER_FLAGS=() \
     && if echo "$FEATURES" | grep -q "+ubsan" ; then \
          SANITIZERS+=("Undefined"); \
        fi \
+    && if echo "$FEATURES" | grep -q "+tsan" ; then \
+         SANITIZERS+=("Thread"); \
+       fi \
     && if [ ${#SANITIZERS[@]} -ne 0 ]; then  \
          SANITIZERS_SEPARATED_LIST="${SANITIZERS[@]}"; \
          SANITIZERS_SEPARATED_LIST="${SANITIZERS_SEPARATED_LIST// /;}"; \
