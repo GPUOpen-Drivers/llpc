@@ -1424,6 +1424,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
 
           hasViewportIndexExport = nextBuiltInUsage.viewportIndex;
+        } else if (nextStage == ShaderStageInvalid) {
+          hasViewportIndexExport = false;
         }
 
         if (hasViewportIndexExport) {
@@ -1449,6 +1451,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
 
           hasLayerExport = nextBuiltInUsage.layer || nextBuiltInUsage.viewIndex;
+        } else if (nextStage == ShaderStageInvalid) {
+          hasLayerExport = false;
         }
 
         if (hasLayerExport) {
@@ -5128,10 +5132,10 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
 // @param insertPos : Where to insert the "exp" instruction
 void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsigned builtInId, Instruction *insertPos) {
   // Check if the shader stage is valid to use "exp" instruction to export output
-  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage, true);
   const bool useExpInst = ((m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
                             m_shaderStage == ShaderStageCopyShader) &&
-                           (nextStage == ShaderStageInvalid || nextStage == ShaderStageFragment));
+                           (nextStage == ShaderStageFragment));
   assert(useExpInst);
   (void(useExpInst)); // unused
 
