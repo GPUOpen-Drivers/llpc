@@ -94,11 +94,12 @@ Module *FetchShader::generate() {
     const auto &fetch = m_fetches[idx];
     const VertexInputDescription *description = m_fetchDescriptions[idx];
     unsigned structIdx = idx + m_vsEntryRegInfo.sgprCount + m_vsEntryRegInfo.vgprCount;
-    Type *ty = cast<StructType>(result->getType())->getElementType(structIdx);
 
     if (description) {
       // Fetch the vertex.
-      Value *vertex = vertexFetch->fetchVertex(ty, description, fetch.location, fetch.component, builder);
+      Value *vertex = vertexFetch->fetchVertex(fetch.ty, description, fetch.location, fetch.component, builder);
+      Type *ty = cast<StructType>(result->getType())->getElementType(structIdx);
+      vertex = builder.CreateBitCast(vertex, ty);
       result = builder.CreateInsertValue(result, vertex, structIdx);
     }
   }

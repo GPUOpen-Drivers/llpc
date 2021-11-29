@@ -1,0 +1,68 @@
+// Tests that the 16-bit vertex inputs are correctly loaded in the fetch shader.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s
+; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: <_amdgpu_vs_main>:
+; SHADERTEST: tbuffer_load_format_d16_x {{v[0-9]*}}, [[vert_offset:v[0-9]*]], [[vert_base:s\[.*\]]], 0 format:[BUF_DATA_FORMAT_16,BUF_NUM_FORMAT_SINT] idxen
+; SHADERTEST: tbuffer_load_format_d16_x {{v[0-9]*}}, [[vert_offset]], [[vert_base]], 0 format:[BUF_DATA_FORMAT_16,BUF_NUM_FORMAT_SINT] idxen offset:2
+; SHADERTEST-LABEL: <_amdgpu_vs_main_fetchless>:
+; END_SHADERTEST
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 430
+#extension GL_AMD_gpu_shader_int16 : require
+
+layout(location = 0) in vec4 _4;
+layout(location = 1) in i16vec2 _6;
+
+layout(location = 0) out i16vec2 _8;
+
+void main()
+{
+    gl_Position = _4;
+    _8 = _6;
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 430
+#extension GL_AMD_gpu_shader_int16 : require
+
+layout(location = 0) out i16vec2 _4;
+layout(location = 0) flat in i16vec2 _6;
+
+void main()
+{
+    _4 = _6;
+}
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_R16G16_SINT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 32
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+binding[1].binding = 1
+binding[1].stride = 4
+binding[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 16
+attribute[1].location = 1
+attribute[1].binding = 1
+attribute[1].format = VK_FORMAT_R16G16_SINT
+attribute[1].offset = 0
