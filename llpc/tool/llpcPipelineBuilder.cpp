@@ -84,9 +84,9 @@ bool PipelineBuilder::isGraphicsPipeline() const {
 //
 // @returns : Result::Success on success, other status on failure.
 Result PipelineBuilder::build() {
-  llvm::SmallVector<BinaryData, 1> pipelines;
-  pipelines.push_back(BinaryData());
-  pipelines[0] = {};
+  // Use vector of BinaryData for future pipeline type
+  SmallVector<BinaryData, 1> pipelines;
+  pipelines.push_back({});
   const bool isGraphics = isGraphicsPipeline();
   if (isGraphics) {
     Result result = buildGraphicsPipeline(pipelines[0]);
@@ -99,7 +99,9 @@ Result PipelineBuilder::build() {
   }
 
   for (const auto &pipeline : pipelines) {
-    decodePipelineBinary(&pipeline, &m_compileInfo, isGraphics);
+    auto result = decodePipelineBinary(&pipeline, &m_compileInfo, isGraphics);
+    if (result != Result::Success)
+      return result;
   }
   return Result::Success;
 }
