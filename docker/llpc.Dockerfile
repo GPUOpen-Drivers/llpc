@@ -26,7 +26,8 @@ ARG LLPC_REPO_SHA
 # Use bash instead of sh in this docker file.
 SHELL ["/bin/bash", "-c"]
 
-COPY docker/update-llpc.sh /vulkandriver/
+# Copy helper scripts into container.
+COPY docker/*.sh /vulkandriver/
 
 # Sync the repos. Replace the base LLPC with a freshly checked-out one.
 RUN /vulkandriver/update-llpc.sh

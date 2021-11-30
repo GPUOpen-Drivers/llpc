@@ -94,6 +94,10 @@ RUN EXTRA_COMPILER_FLAGS=() \
          SANITIZERS_SEPARATED_LIST="${SANITIZERS_SEPARATED_LIST// /;}"; \
          EXTRA_FLAGS+=("-DXGL_USE_SANITIZER='${SANITIZERS_SEPARATED_LIST}'"); \
        fi \
+    && if echo "$FEATURES" | grep -q "+coverage" ; then \
+         EXTRA_COMPILER_FLAGS+=("-fprofile-instr-generate=/vulkandriver/profile%2m.profraw" "-fcoverage-mapping"); \
+         EXTRA_LINKER_FLAGS+=("-fprofile-instr-generate=/vulkandriver/profile%2m.profraw" "-fcoverage-mapping"); \
+       fi \
     && if echo "$FEATURES" | grep -q "+assertions" ; then \
          EXTRA_FLAGS+=("-DXGL_ENABLE_ASSERTIONS=ON"); \
        fi \
