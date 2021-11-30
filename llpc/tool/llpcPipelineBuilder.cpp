@@ -84,7 +84,8 @@ bool PipelineBuilder::isGraphicsPipeline() const {
 //
 // @returns : Result::Success on success, other status on failure.
 Result PipelineBuilder::build() {
-  // Use vector of BinaryData for future pipeline type
+  // Even though `build*Pipeline` produces a single `BinaryData` today, future pipeline types (e.g., raytracing) will
+  // result multiple outputs. We use a vector instead of a single variable to prepare for that.
   SmallVector<BinaryData, 1> pipelines;
   pipelines.push_back({});
   const bool isGraphics = isGraphicsPipeline();
@@ -99,7 +100,7 @@ Result PipelineBuilder::build() {
   }
 
   for (const auto &pipeline : pipelines) {
-    auto result = decodePipelineBinary(&pipeline, &m_compileInfo, isGraphics);
+    Result result = decodePipelineBinary(&pipeline, &m_compileInfo, isGraphics);
     if (result != Result::Success)
       return result;
   }
