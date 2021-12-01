@@ -1531,16 +1531,56 @@ unsigned PipelineState::getVerticesPerPrimitive() {
       return 3;
   } else {
     auto primType = getInputAssemblyState().primitiveType;
-    if (primType == PrimitiveType::Point)
+    switch (primType) {
+    case lgc::PrimitiveType::Point:
       return 1;
-    else if (primType == PrimitiveType::Line)
+    case lgc::PrimitiveType::Line_List:
+    case lgc::PrimitiveType::Line_Strip:
       return 2;
-    else if (primType == PrimitiveType::Triangle)
+    case lgc::PrimitiveType::Triangle_List:
+    case lgc::PrimitiveType::Triangle_Strip:
+    case lgc::PrimitiveType::Triangle_Fan:
+    case lgc::PrimitiveType::Triangle_List_Adjacency:
+    case lgc::PrimitiveType::Triangle_Strip_Adjacency:
       return 3;
+    default:
+      break;
+    }
   }
 
   llvm_unreachable("Unable to get vertices per primitive!");
   return 0;
+}
+
+// =====================================================================================================================
+// Get the primitive type. For GS, the type is for output primitive.
+PrimitiveType PipelineState::getPrimitiveType() {
+  if (hasShaderStage(ShaderStageGeometry)) {
+    const auto &geometryMode = getShaderModes()->getGeometryShaderMode();
+    switch (geometryMode.outputPrimitive) {
+    case OutputPrimitives::Points:
+      return PrimitiveType::Point;
+    case OutputPrimitives::LineStrip:
+      return PrimitiveType::Line_Strip;
+    case OutputPrimitives::TriangleStrip:
+      return PrimitiveType::Triangle_Strip;
+    default:
+      llvm_unreachable("Unexpected output primitive type!");
+    }
+  } else if (hasShaderStage(ShaderStageTessControl) || hasShaderStage(ShaderStageTessEval)) {
+    assert(getInputAssemblyState().primitiveType == PrimitiveType::Patch);
+    const auto &tessMode = getShaderModes()->getTessellationMode();
+    if (tessMode.pointMode)
+      return PrimitiveType::Point;
+    if (tessMode.primitiveMode == PrimitiveMode::Isolines)
+      return PrimitiveType::Line_Strip;
+    if (tessMode.primitiveMode == PrimitiveMode::Triangles || tessMode.primitiveMode == PrimitiveMode::Quads)
+      return PrimitiveType::Triangle_Strip;
+  } else {
+    return getInputAssemblyState().primitiveType;
+  }
+  llvm_unreachable("Unable to get primitive type!");
+  return PrimitiveType::Triangle_Strip;
 }
 
 // =====================================================================================================================

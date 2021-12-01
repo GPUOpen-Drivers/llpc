@@ -1522,14 +1522,25 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   } else {
     // Without tessellation
     const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
-    if (primType == PrimitiveType::Point)
+    switch (primType) {
+    case PrimitiveType::Point:
       gsOutputPrimitiveType = POINTLIST;
-    else if (primType == PrimitiveType::Line)
+      break;
+    case PrimitiveType::Line_List:
+    case PrimitiveType::Line_Strip:
       gsOutputPrimitiveType = LINESTRIP;
-    else if (primType == PrimitiveType::Triangle)
+      break;
+    case PrimitiveType::Triangle_List:
+    case PrimitiveType::Triangle_Strip:
+    case PrimitiveType::Triangle_Fan:
+    case PrimitiveType::Triangle_List_Adjacency:
+    case PrimitiveType::Triangle_Strip_Adjacency:
       gsOutputPrimitiveType = TRISTRIP;
-    else
+      break;
+    default:
       llvm_unreachable("Should never be called!");
+      break;
+    }
   }
 
   // TODO: Multiple output streams are not supported.

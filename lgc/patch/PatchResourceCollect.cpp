@@ -369,7 +369,7 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
         return false;
     } else {
       // Check primitive type specified in pipeline state
-      if (primType == PrimitiveType::Point || primType == PrimitiveType::Line)
+      if (primType < PrimitiveType::Triangle_List)
         return false;
     }
   }
@@ -1273,7 +1273,16 @@ void PatchResourceCollect::clearInactiveBuiltInInput() {
     if (builtInUsage.fs.pointCoord && m_activeInputBuiltIns.find(BuiltInPointCoord) == m_activeInputBuiltIns.end())
       builtInUsage.fs.pointCoord = false;
 
-    if (builtInUsage.fs.primitiveId && m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
+    if (builtInUsage.fs.baryCoord && m_activeInputBuiltIns.find(BuiltInBaryCoord) == m_activeInputBuiltIns.end())
+      builtInUsage.fs.baryCoord = false;
+
+    if (builtInUsage.fs.baryCoordNoPerspKHR &&
+        m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspKHR) == m_activeInputBuiltIns.end())
+      builtInUsage.fs.baryCoordNoPerspKHR = false;
+
+    // BaryCoord depends on PrimitiveID
+    if (builtInUsage.fs.primitiveId && !(builtInUsage.fs.baryCoordNoPerspKHR || builtInUsage.fs.baryCoord) &&
+        m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
       builtInUsage.fs.primitiveId = false;
 
     if (builtInUsage.fs.sampleId && m_activeInputBuiltIns.find(BuiltInSampleId) == m_activeInputBuiltIns.end())
@@ -1331,13 +1340,6 @@ void PatchResourceCollect::clearInactiveBuiltInInput() {
     if (builtInUsage.fs.baryCoordPullModel &&
         m_activeInputBuiltIns.find(BuiltInBaryCoordPullModel) == m_activeInputBuiltIns.end())
       builtInUsage.fs.baryCoordPullModel = false;
-
-    if (builtInUsage.fs.baryCoord && m_activeInputBuiltIns.find(BuiltInBaryCoord) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoord = false;
-
-    if (builtInUsage.fs.baryCoordNoPerspKHR &&
-        m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspKHR) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoordNoPerspKHR = false;
   }
 }
 

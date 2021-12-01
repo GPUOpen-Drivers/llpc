@@ -250,11 +250,16 @@ struct ResourceNode {
 // Primitive type.
 enum class PrimitiveType : unsigned {
   Point = 0,
-  Line = 1,
-  Triangle = 2,
-  Rect = 3,
-  Quad = 4,
-  Patch = 5,
+  Line_List = 1,
+  Line_Strip = 2,
+  Triangle_List = 3,
+  Triangle_Strip = 4,
+  Triangle_Fan = 5,
+  Triangle_List_Adjacency = 6,
+  Triangle_Strip_Adjacency = 7,
+  Rect = 8,
+  Quad = 9,
+  Patch = 10,
 };
 
 // Data format of vertex buffer entry. For ones that exist in GFX9 hardware, these match the hardware
