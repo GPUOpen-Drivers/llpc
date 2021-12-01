@@ -971,29 +971,30 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
 
   // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
   // flags on the handled instruction
-  if (SPIRVGenFastMathFlags & FastMathFlags::AllowReassoc)
-    fmf.setAllowReassoc();
+  if (SPIRVGenFastMathFlags) {
+    if (SPIRVGenFastMathFlags & FastMathFlags::AllowReassoc)
+      fmf.setAllowReassoc();
 
-  if (SPIRVGenFastMathFlags & FastMathFlags::NoNaNs)
-    fmf.setNoNaNs();
+    if (SPIRVGenFastMathFlags & FastMathFlags::NoNaNs)
+      fmf.setNoNaNs();
 
-  if (SPIRVGenFastMathFlags & FastMathFlags::NoInfs)
-    fmf.setNoInfs();
+    if (SPIRVGenFastMathFlags & FastMathFlags::NoInfs)
+      fmf.setNoInfs();
 
-  if (SPIRVGenFastMathFlags & FastMathFlags::NoSignedZeros)
-    fmf.setNoSignedZeros();
+    if (SPIRVGenFastMathFlags & FastMathFlags::NoSignedZeros)
+      fmf.setNoSignedZeros();
 
-  if (SPIRVGenFastMathFlags & FastMathFlags::AllowReciprocal)
-    fmf.setAllowReciprocal();
+    if (SPIRVGenFastMathFlags & FastMathFlags::AllowReciprocal)
+      fmf.setAllowReciprocal();
 
-  if (SPIRVGenFastMathFlags & FastMathFlags::AllowContract)
-    fmf.setAllowContract();
+    if (SPIRVGenFastMathFlags & FastMathFlags::AllowContract)
+      fmf.setAllowContract();
 
-  if (SPIRVGenFastMathFlags & FastMathFlags::ApproxFunc)
-    fmf.setApproxFunc();
+    if (SPIRVGenFastMathFlags & FastMathFlags::ApproxFunc)
+      fmf.setApproxFunc();
 
-  if (SPIRVGenFastMathFlags)
     return fmf;
+  }
 
   // Only do this for operations with floating point type.
   if (!bv->hasType())
