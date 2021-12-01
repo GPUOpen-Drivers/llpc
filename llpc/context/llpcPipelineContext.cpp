@@ -628,17 +628,27 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
     inputAssemblyState.primitiveType = PrimitiveType::Point;
     break;
   case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
-  case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
   case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+    inputAssemblyState.primitiveType = PrimitiveType::Line_List;
+    break;
+  case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
   case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
-    inputAssemblyState.primitiveType = PrimitiveType::Line;
+    inputAssemblyState.primitiveType = PrimitiveType::Line_Strip;
     break;
   case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+    inputAssemblyState.primitiveType = PrimitiveType::Triangle_List;
+    break;
   case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
+    inputAssemblyState.primitiveType = PrimitiveType::Triangle_Strip;
+    break;
   case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
+    inputAssemblyState.primitiveType = PrimitiveType::Triangle_Fan;
+    break;
   case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
+    inputAssemblyState.primitiveType = PrimitiveType::Triangle_List_Adjacency;
+    break;
   case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
-    inputAssemblyState.primitiveType = PrimitiveType::Triangle;
+    inputAssemblyState.primitiveType = PrimitiveType::Triangle_Strip_Adjacency;
     break;
   case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
     inputAssemblyState.primitiveType = PrimitiveType::Patch;

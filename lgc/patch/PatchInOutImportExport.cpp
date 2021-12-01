@@ -2540,16 +2540,17 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     builder.SetInsertPoint(insertPos);
     auto iCoord = builder.CreateExtractElement(iJCoord, uint64_t(0));
     auto jCoord = builder.CreateExtractElement(iJCoord, 1);
-    unsigned vertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
-    switch (vertsPerPrim) {
-    case 1: {
+    auto primType = m_pipelineState->getPrimitiveType();
+    switch (primType) {
+    case PrimitiveType::Point: {
       // Points
       input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 1.0), uint64_t(0));
       input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 1);
       input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 2);
       break;
     }
-    case 2: {
+    case PrimitiveType::Line_List:
+    case PrimitiveType::Line_Strip: {
       // Lines
       // The weight of vertex0 is (1 - i - j), the weight of vertex1 is (i + j).
       auto kCoord = builder.CreateFSub(ConstantFP::get(Type::getFloatTy(*m_context), 1.0), iCoord);
@@ -2557,9 +2558,10 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       jCoord = builder.CreateFAdd(iCoord, jCoord);
       input = builder.CreateInsertElement(input, kCoord, uint64_t(0));
       input = builder.CreateInsertElement(input, jCoord, 1);
+      input = builder.CreateInsertElement(input, ConstantFP::get(Type::getFloatTy(*m_context), 0.0), 2);
       break;
     }
-    case 3: {
+    case PrimitiveType::Triangle_List: {
       // Triangles
       // V0 ==> Attr_indx2
       // V1 ==> Attr_indx0
@@ -2569,6 +2571,48 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       input = builder.CreateInsertElement(input, iCoord, uint64_t(2));
       input = builder.CreateInsertElement(input, jCoord, uint64_t(0));
       input = builder.CreateInsertElement(input, kCoord, uint64_t(1));
+      break;
+    }
+    case PrimitiveType::Triangle_Strip:
+    case PrimitiveType::Triangle_Fan:
+    case PrimitiveType::Triangle_Strip_Adjacency: {
+      // Odd
+      auto kCoord = builder.CreateFSub(ConstantFP::get(Type::getFloatTy(*m_context), 1.0), iCoord);
+      kCoord = builder.CreateFSub(kCoord, jCoord);
+      Value *odd = UndefValue::get(inputTy);
+      odd = builder.CreateInsertElement(odd, iCoord, uint64_t(2));
+      odd = builder.CreateInsertElement(odd, jCoord, uint64_t(0));
+      odd = builder.CreateInsertElement(odd, kCoord, uint64_t(1));
+      // Even
+      Value *even = UndefValue::get(inputTy);
+      even = builder.CreateInsertElement(even, iCoord, uint64_t(1));
+      even = builder.CreateInsertElement(even, jCoord, uint64_t(2));
+      even = builder.CreateInsertElement(even, kCoord, uint64_t(0));
+
+      auto primitiveId = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInPrimitiveId, nullptr, insertPos);
+      auto evenV = builder.CreateSRem(primitiveId, builder.getInt32(2));
+      Value *con = builder.CreateICmpEQ(evenV, builder.getInt32(0));
+      input = builder.CreateSelect(con, even, odd);
+      break;
+    }
+    case PrimitiveType::Triangle_List_Adjacency: {
+      // Odd
+      auto kCoord = builder.CreateFSub(ConstantFP::get(Type::getFloatTy(*m_context), 1.0), iCoord);
+      kCoord = builder.CreateFSub(kCoord, jCoord);
+      Value *odd = UndefValue::get(inputTy);
+      odd = builder.CreateInsertElement(odd, iCoord, uint64_t(0));
+      odd = builder.CreateInsertElement(odd, jCoord, uint64_t(1));
+      odd = builder.CreateInsertElement(odd, kCoord, uint64_t(2));
+      // Even
+      Value *even = UndefValue::get(inputTy);
+      even = builder.CreateInsertElement(even, iCoord, uint64_t(1));
+      even = builder.CreateInsertElement(even, jCoord, uint64_t(2));
+      even = builder.CreateInsertElement(even, kCoord, uint64_t(0));
+
+      auto primitiveId = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInPrimitiveId, nullptr, insertPos);
+      auto evenV = builder.CreateSRem(primitiveId, builder.getInt32(2));
+      Value *con = builder.CreateICmpEQ(evenV, builder.getInt32(0));
+      input = builder.CreateSelect(con, even, odd);
       break;
     }
     default: {

@@ -613,6 +613,17 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
                                              isa<UndefValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
   }
 
+  case BuilderRecorder::Opcode::ReadPerVertexInput: {
+    InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
+    return m_builder->CreateReadPerVertexInput(call->getType(),                                 // Result type
+                                               cast<ConstantInt>(args[0])->getZExtValue(),      // Location
+                                               args[1],                                         // Location offset
+                                               isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Element index
+                                               cast<ConstantInt>(args[3])->getZExtValue(),      // Location count
+                                               inputInfo,                                       // Input info
+                                               isa<UndefValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
+  }
+
   case BuilderRecorder::Opcode::ReadGenericOutput: {
     InOutInfo outputInfo(cast<ConstantInt>(args[4])->getZExtValue());
     return m_builder->CreateReadGenericOutput(call->getType(),                                 // Result type

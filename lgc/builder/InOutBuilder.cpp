@@ -66,6 +66,161 @@ Value *InOutBuilder::CreateReadGenericInput(Type *resultTy, unsigned location, V
 }
 
 // =====================================================================================================================
+// Create a read of (part of) a perVertex input value, passed from the previous shader stage.
+// The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+// A "location" contains four "components", each of which can contain a 16- or 32-bit scalar value. A
+// 64-bit scalar value takes two components.
+//
+// @param resultTy : Type of value to read
+// @param location : Base location (row) of input
+// @param locationOffset : Variable location offset; must be within locationCount
+// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
+// 64-bit elements.)
+// @param locationCount : Count of locations taken by the input
+// @param inputInfo : Extra input info (FS interp info)
+// @param vertexIndex : Vertex index; for FS custom interpolated input: auxiliary interpolation value;
+// @param instName : Name to give instruction(s)
+Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location, Value *locationOffset, Value *elemIdx,
+                                              unsigned locationCount, InOutInfo inputInfo, Value *vertexIndex,
+                                              const Twine &instName) {
+  assert(resultTy->isAggregateType() == false);
+  assert(inputInfo.getInterpMode() == InOutInfo::InterpModeCustom);
+  assert(m_shaderStage == ShaderStageFragment);
+
+  // Fold constant pLocationOffset into location.
+  if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
+    location += constLocOffset->getZExtValue();
+    locationOffset = getInt32(0);
+    locationCount = (resultTy->getPrimitiveSizeInBits() + 127U) / 128U;
+  }
+
+  // Mark the usage of the input/output.
+  markGenericInputOutputUsage(false, location, locationCount, inputInfo, vertexIndex);
+
+  // Fixing the order
+  bool parity = false;
+  Value *odd = nullptr;
+  Value *even = nullptr;
+
+  auto primType = getPipelineState()->getPrimitiveType();
+  switch (primType) {
+  case PrimitiveType::Point:
+    break;
+  case PrimitiveType::Line_List:
+  case PrimitiveType::Line_Strip:
+    break;
+  case PrimitiveType::Triangle_List: {
+    switch (dyn_cast<ConstantInt>(vertexIndex)->getZExtValue()) {
+    case 0: {
+      vertexIndex = getInt32(2);
+      break;
+    }
+    case 1: {
+      vertexIndex = getInt32(0);
+      break;
+    }
+    case 2: {
+      vertexIndex = getInt32(1);
+      break;
+    }
+    }
+    break;
+  }
+  case PrimitiveType::Triangle_Strip:
+  case PrimitiveType::Triangle_Fan:
+  case PrimitiveType::Triangle_Strip_Adjacency: {
+    switch (dyn_cast<ConstantInt>(vertexIndex)->getZExtValue()) {
+    case 0: {
+      odd = getInt32(2);
+      even = vertexIndex;
+      break;
+    }
+    case 1: {
+      odd = getInt32(0);
+      even = vertexIndex;
+      break;
+    }
+    case 2: {
+      odd = getInt32(1);
+      even = vertexIndex;
+      break;
+    }
+    }
+    parity = true;
+    break;
+  }
+  case PrimitiveType::Triangle_List_Adjacency: {
+    switch (dyn_cast<ConstantInt>(vertexIndex)->getZExtValue()) {
+    case 0: {
+      odd = getInt32(1);
+      even = vertexIndex;
+      break;
+    }
+    case 1: {
+      odd = getInt32(2);
+      even = vertexIndex;
+      break;
+    }
+    case 2: {
+      odd = getInt32(0);
+      even = vertexIndex;
+      break;
+    }
+    }
+    parity = true;
+    break;
+  }
+  default:
+    llvm_unreachable("Unable to get vertices per primitive!");
+    break;
+  }
+
+  Value *result = nullptr;
+  if (parity) {
+    // Odd
+    SmallVector<Value *, 6> args;
+    args.push_back(getInt32(location));
+    args.push_back(locationOffset);
+    args.push_back(elemIdx);
+    args.push_back(getInt32(inputInfo.getInterpMode()));
+    args.push_back(odd);
+    std::string callName(lgcName::InputImportInterpolant);
+    addTypeMangling(resultTy, args, callName);
+    auto oddRes = emitCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn}, &*GetInsertPoint());
+
+    // Even
+    args.clear();
+    args.push_back(getInt32(location));
+    args.push_back(locationOffset);
+    args.push_back(elemIdx);
+    args.push_back(getInt32(inputInfo.getInterpMode()));
+    args.push_back(even);
+    callName = std::string(lgcName::InputImportInterpolant);
+    addTypeMangling(resultTy, args, callName);
+    auto evenRes = emitCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn}, &*GetInsertPoint());
+
+    auto primtiveId = readBuiltIn(false, BuiltInPrimitiveId, {}, nullptr, nullptr, "");
+    auto evenV = CreateSRem(primtiveId, getInt32(2));
+    Value *con = CreateICmpEQ(evenV, getInt32(0));
+    result = CreateSelect(con, evenRes, oddRes);
+  } else {
+    SmallVector<Value *, 6> args;
+    args.push_back(getInt32(location));
+    args.push_back(locationOffset);
+    args.push_back(elemIdx);
+    args.push_back(getInt32(inputInfo.getInterpMode()));
+    args.push_back(vertexIndex);
+
+    std::string callName(lgcName::InputImportInterpolant);
+    addTypeMangling(resultTy, args, callName);
+    result = emitCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn}, &*GetInsertPoint());
+  }
+
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
 // Create a read of (part of) a generic (user) output value, returning the value last written in this shader stage.
 // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
 // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
@@ -481,30 +636,6 @@ Value *InOutBuilder::modifyAuxInterpValue(Value *auxInterpValue, InOutInfo input
     }
   } else {
     assert(inputInfo.getInterpMode() == InOutInfo::InterpModeCustom);
-    if (inputInfo.isPerVertex()) {
-      unsigned vertsPerPrim = getPipelineState()->getVerticesPerPrimitive();
-      switch (vertsPerPrim) {
-      case 1:
-        // Points
-        break;
-      case 2:
-        // Lines
-        break;
-      case 3: {
-        // Triangles
-        // V0 ==> Attr_indx2
-        // V1 ==> Attr_indx0
-        // V2 ==> Attr_indx1
-        // just satisfies (idx + 2)%3.
-        Value *T = CreateAdd(getInt32(2), auxInterpValue);
-        auxInterpValue = CreateSRem(T, getInt32(3));
-        break;
-      }
-      default:
-        llvm_unreachable("Should never be called!");
-        break;
-      }
-    }
   }
   return auxInterpValue;
 }
@@ -1278,9 +1409,11 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySiz
       break;
     case BuiltInBaryCoord:
       usage.fs.baryCoord = true;
+      usage.fs.primitiveId = true;
       break;
     case BuiltInBaryCoordNoPerspKHR:
       usage.fs.baryCoordNoPerspKHR = true;
+      usage.fs.primitiveId = true;
       break;
 
     // Internal built-ins.

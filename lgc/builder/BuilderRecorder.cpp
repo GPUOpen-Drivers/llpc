@@ -160,6 +160,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "buffer.ptrdiff";
   case Opcode::ReadGenericInput:
     return "read.generic.input";
+  case Opcode::ReadPerVertexInput:
+    return "read.pervertex.input";
   case Opcode::ReadGenericOutput:
     return "read.generic.output";
   case Opcode::WriteGenericOutput:
@@ -1384,6 +1386,32 @@ Value *BuilderRecorder::CreateReadGenericInput(Type *resultTy, unsigned location
 }
 
 // =====================================================================================================================
+// Create a read of (part of) a perVertex input value, passed from the previous shader stage.
+//
+// @param resultTy : Type of value to read
+// @param location : Base location (row) of input
+// @param locationOffset : Variable location offset; must be within locationCount
+// @param elemIdx : Vector index
+// @param locationCount : Count of locations taken by the input
+// @param inputInfo : Extra input info (FS interp info)
+// @param vertexIndex : Vertex index
+// @param instName : Name to give instruction(s)
+Value *BuilderRecorder::CreateReadPerVertexInput(Type *resultTy, unsigned location, Value *locationOffset,
+                                                 Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
+                                                 Value *vertexIndex, const Twine &instName) {
+  return record(Opcode::ReadPerVertexInput, resultTy,
+                {
+                    getInt32(location),
+                    locationOffset,
+                    elemIdx,
+                    getInt32(locationCount),
+                    getInt32(inputInfo.getData()),
+                    vertexIndex,
+                },
+                instName);
+}
+
+// =====================================================================================================================
 // Create a read of (part of) a user output value, the last written value in the same shader stage.
 //
 // @param resultTy : Type of value to read
@@ -2079,6 +2107,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ReadBuiltInOutput:
     case Opcode::ReadGenericInput:
     case Opcode::ReadGenericOutput:
+    case Opcode::ReadPerVertexInput:
       // Functions that only read memory.
       func->addFnAttr(Attribute::ReadOnly);
       // Must be marked as returning for DCE.
