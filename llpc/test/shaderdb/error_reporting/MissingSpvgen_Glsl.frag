@@ -12,7 +12,7 @@
 ; RUN: not amdllpc -v %gfxip %s \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST_2 %s
 ;
-; SHADERTEST_2-LABEL: {{^}}ERROR: Failed to load SPVGEN -- cannot compile GLSL
+; SHADERTEST_2-LABEL: {{^}}ERROR: Result::ErrorUnavailable: Failed to load SPVGEN -- cannot compile GLSL
 ; SHADERTEST_2: {{^}}===== AMDLLPC FAILED =====
 ; END_SHADERTEST_2
 */

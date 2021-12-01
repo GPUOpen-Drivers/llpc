@@ -105,5 +105,18 @@ TEST(ResultErrorTest, ExpectedResult) {
   EXPECT_THAT_EXPECTED(valueOrErr, FailedWithMessage(StrEq("Result::ErrorInvalidValue: Zero passed")));
 }
 
+// This tests prints an error message to stderr. This is expected.
+TEST(ResultErrorTest, ReportErrorResultError) {
+  Error err = createResultError(Result::NotFound);
+  EXPECT_EQ(reportError(std::move(err)), Result::NotFound);
+}
+
+// This tests prints an error message to stderr. This is expected.
+TEST(ResultErrorTest, ReportErrorUnknownType) {
+  // Check that `reportError` handled `Error`s different than `ResultError`.
+  Error err = createStringError(std::make_error_code(std::errc::state_not_recoverable), "ReportErrorUnknownType");
+  EXPECT_EQ(reportError(std::move(err)), Result::ErrorUnknown);
+}
+
 } // namespace
 } // namespace Llpc

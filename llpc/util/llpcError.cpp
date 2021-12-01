@@ -55,15 +55,6 @@ void mustSucceed(Result result, const Twine &errorMessage) {
   assert(false && "Result is not Success");
 }
 
-// =====================================================================================================================
-// Prints the error message in `err` to LLPC_ERRS and consumes the error.
-//
-// @param err : The error to handle
-void reportError(Error &&err) {
-  // For details on llvm error handling, see https://llvm.org/docs/ProgrammersManual.html#recoverable-errors.
-  handleAllErrors(std::move(err), [](const ErrorInfoBase &baseError) { LLPC_ERRS(baseError.message() << "\n"); });
-}
-
 char ResultError::ID = 0;
 
 namespace {
@@ -115,6 +106,26 @@ struct ResultErrorCategory : std::error_category {
 std::error_code resultToErrorCode(Result result) {
   static ResultErrorCategory GlobalCategoryId{};
   return {static_cast<int>(result), GlobalCategoryId};
+}
+
+// =====================================================================================================================
+// Prints the error message in `err` to LLPC_ERRS and consumes the error.
+//
+// @param err : The error to handle. This must not be an `ErrorSuccess`.
+// @returns: The underlying `Result` when `err` is a `ResultError`, `Result::ErrorUnknown` otherwise.
+Result reportError(Error &&err) {
+  // For details on llvm error handling, see https://llvm.org/docs/ProgrammersManual.html#recoverable-errors.
+  assert(err && "llvm::ErrorSuccess is not an error");
+
+  Result result = Result::ErrorUnknown;
+  handleAllErrors(
+      std::move(err),
+      [&result](const ResultError &resultError) {
+        result = resultError.getResult();
+        LLPC_ERRS(resultError.message() << "\n");
+      },
+      [](const ErrorInfoBase &baseError) { LLPC_ERRS(baseError.message() << "\n"); });
+  return result;
 }
 
 // =====================================================================================================================

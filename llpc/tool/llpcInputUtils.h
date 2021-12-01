@@ -135,13 +135,14 @@ bool isPipelineInfoFile(llvm::StringRef fileName);
 llvm::StringLiteral fileExtFromBinary(BinaryData pipelineBin);
 
 // Expands all input files in a platform-specific way.
-Result expandInputFilenames(llvm::ArrayRef<std::string> inputFiles, std::vector<std::string> &expandedFilenames);
+LLPC_NODISCARD Result expandInputFilenames(llvm::ArrayRef<std::string> inputFiles,
+                                           std::vector<std::string> &expandedFilenames);
 
 // Reads SPIR-V binary code from the specified binary file.
-Result getSpirvBinaryFromFile(llvm::StringRef spvBinFile, BinaryData &spvBin);
+llvm::Expected<BinaryData> getSpirvBinaryFromFile(llvm::StringRef spvBinFile);
 
 // Write a binary into a file or to stdout. The file will be overwritten if it exists.
-Result writeFile(BinaryData pipelineBin, llvm::StringRef fileName);
+llvm::Error writeFile(BinaryData pipelineBin, llvm::StringRef fileName);
 
 } // namespace StandaloneCompiler
 } // namespace Llpc

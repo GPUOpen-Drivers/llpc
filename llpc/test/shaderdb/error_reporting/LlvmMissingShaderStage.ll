@@ -3,7 +3,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: not amdllpc -v %gfxip %s | FileCheck --check-prefix=SHADERTEST %s
 ;
-; SHADERTEST-LABEL: {{^}}ERROR: File {{.*}} parsed, but failed to determine shader stage
+; SHADERTEST-LABEL: {{^}}ERROR: Result::ErrorInvalidShader: File {{.*}} parsed, but failed to determine shader stage
 ; SHADERTEST-LABEL: {{^}}===== AMDLLPC FAILED =====
 ; END_SHADERTEST
 

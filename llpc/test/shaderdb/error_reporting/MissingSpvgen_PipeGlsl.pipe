@@ -9,7 +9,7 @@
 
 ; BEGIN_SHADERTEST_2
 ; RUN: not amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_2 %s
-; SHADERTEST_2-LABEL: {{^}}ERROR: Failed to parse input file:
+; SHADERTEST_2-LABEL: {{^}}ERROR: Result::ErrorInvalidShader: Failed to parse input file:
 ; SHADERTEST_2-LABEL: {{^}}Parse error at line {{[0-9]+}}: Failed to load SPVGEN: cannot compile GLSL
 ; SHADERTEST_2-LABEL: {{^}}===== AMDLLPC FAILED =====
 ; END_SHADERTEST_2

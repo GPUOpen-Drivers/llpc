@@ -60,16 +60,19 @@
 #include "llpcCompilationUtils.h"
 #include "llpcAutoLayout.h"
 #include "llpcDebug.h"
+#include "llpcError.h"
 #include "llpcInputUtils.h"
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLowerUtil.h"
 #include "llpcUtil.h"
 #include "vkgcElfReader.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
 
 #ifndef LLPC_ENABLE_SPIRV_OPT
 #define SPVGEN_STATIC_LIB 1
@@ -152,171 +155,124 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
 //
 // @param inFilename : Input filename, GLSL source text
 // @param [out] stage : Shader stage
-// @param [out] outFilename : Output filename, SPIR-V binary
 // @param defaultEntryTarget : Default shader entry point name
-// @returns : Result::Success on success, Result::ErrorUnavailable on failure.
-Result compileGlsl(const std::string &inFilename, ShaderStage *stage, std::string &outFilename,
-                   const std::string &defaultEntryTarget) {
-  if (!InitSpvGen()) {
-    LLPC_ERRS("Failed to load SPVGEN -- cannot compile GLSL\n");
-    return Result::ErrorUnavailable;
-  }
+// @returns : Filename of the output SPIR-V binary on success, `ResultError` on failure
+Expected<std::string> compileGlsl(const std::string &inFilename, ShaderStage *stage,
+                                  const std::string &defaultEntryTarget) {
+  if (!InitSpvGen())
+    return createResultError(Result::ErrorUnavailable, "Failed to load SPVGEN -- cannot compile GLSL");
 
-  Result result = Result::Success;
   bool isHlsl = false;
-
   SpvGenStage lang = spvGetStageTypeFromName(inFilename.c_str(), &isHlsl);
-  if (lang == SpvGenStageInvalid) {
-    LLPC_ERRS("File " << inFilename << ": Bad file extension; try -help\n");
-    return Result::ErrorInvalidShader;
-  }
+  if (lang == SpvGenStageInvalid)
+    return createResultError(Result::ErrorInvalidShader,
+                             Twine("File ") + inFilename + ": Bad file extension; try --help");
   *stage = sourceLangToShaderStage(lang);
 
   FILE *inFile = fopen(inFilename.c_str(), "r");
-  if (!inFile) {
-    LLPC_ERRS("Fails to open input file: " << inFilename << "\n");
-    result = Result::ErrorUnavailable;
-  }
+  if (!inFile)
+    return createResultError(Result::ErrorUnavailable, Twine("Failed to open input file: ") + inFilename);
+  auto closeInput = make_scope_exit([inFile] { fclose(inFile); });
 
-  FILE *outFile = nullptr;
-  if (result == Result::Success) {
-    outFilename = sys::path::filename(inFilename).str() + Ext::SpirvBin.str();
+  const std::string outFilename = sys::path::filename(inFilename).str() + Ext::SpirvBin.str();
+  FILE *outFile = fopen(outFilename.c_str(), "wb");
+  if (!outFile)
+    return createResultError(Result::ErrorUnavailable,
+                             Twine("Failed to compile GLSL input: Failed to open output file: ") + outFilename);
+  auto closeOutput = make_scope_exit([outFile] { fclose(outFile); });
 
-    outFile = fopen(outFilename.c_str(), "wb");
-    if (!outFile) {
-      LLPC_ERRS("Fails to open output file: " << outFilename << "\n");
-      result = Result::ErrorUnavailable;
-    }
-  }
+  fseek(inFile, 0, SEEK_END);
+  size_t textSize = ftell(inFile);
+  fseek(inFile, 0, SEEK_SET);
 
-  if (result == Result::Success) {
-    fseek(inFile, 0, SEEK_END);
-    size_t textSize = ftell(inFile);
-    fseek(inFile, 0, SEEK_SET);
+  char *glslText = new char[textSize + 1]();
+  auto deleteGlslText = make_scope_exit([&glslText] { delete[] glslText; });
+  auto readSize = fread(glslText, 1, textSize, inFile);
+  glslText[readSize] = '\0';
 
-    char *glslText = new char[textSize + 1];
-    assert(glslText);
-    memset(glslText, 0, textSize + 1);
-    auto readSize = fread(glslText, 1, textSize, inFile);
-    glslText[readSize] = 0;
+  LLPC_OUTS("===============================================================================\n");
+  LLPC_OUTS("// GLSL sources: " << inFilename << "\n\n");
+  LLPC_OUTS(glslText);
+  LLPC_OUTS("\n\n");
 
-    LLPC_OUTS("===============================================================================\n");
-    LLPC_OUTS("// GLSL sources: " << inFilename << "\n\n");
-    LLPC_OUTS(glslText);
-    LLPC_OUTS("\n\n");
+  int sourceStringCount = 1;
+  const char *const *sourceList[1] = {};
+  const char *fileName = inFilename.c_str();
+  const char *const *fileList[1] = {&fileName};
+  sourceList[0] = &glslText;
 
-    int sourceStringCount = 1;
-    const char *const *sourceList[1] = {};
-    const char *fileName = inFilename.c_str();
-    const char *const *fileList[1] = {&fileName};
-    sourceList[0] = &glslText;
+  void *program = nullptr;
+  const char *log = nullptr;
+  int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
+  compileOption |= isHlsl ? SpvGenOptionReadHlsl : 0;
+  const char *entryPoints[] = {defaultEntryTarget.c_str()};
+  bool compileResult = spvCompileAndLinkProgramEx(1, &lang, &sourceStringCount, sourceList, fileList,
+                                                  isHlsl ? entryPoints : nullptr, &program, &log, compileOption);
 
-    void *program = nullptr;
-    const char *log = nullptr;
-    int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
-    compileOption |= isHlsl ? SpvGenOptionReadHlsl : 0;
-    const char *entryPoints[] = {defaultEntryTarget.c_str()};
-    bool compileResult = spvCompileAndLinkProgramEx(1, &lang, &sourceStringCount, sourceList, fileList,
-                                                    isHlsl ? entryPoints : nullptr, &program, &log, compileOption);
+  LLPC_OUTS("// GLSL program compile/link log\n");
 
-    LLPC_OUTS("// GLSL program compile/link log\n");
+  if (!compileResult)
+    return createResultError(Result::ErrorInvalidShader,
+                             Twine("Failed to compile GLSL input file:") + inFilename + "\n" + log);
 
-    if (compileResult) {
-      const unsigned *spvBin = nullptr;
-      unsigned binSize = spvGetSpirvBinaryFromProgram(program, 0, &spvBin);
-      fwrite(spvBin, 1, binSize, outFile);
+  const unsigned *spvBin = nullptr;
+  unsigned binSize = spvGetSpirvBinaryFromProgram(program, 0, &spvBin);
+  fwrite(spvBin, 1, binSize, outFile);
 
-      textSize = binSize * 10 + 1024;
-      char *spvText = new char[textSize];
-      assert(spvText);
-      memset(spvText, 0, textSize);
-      LLPC_OUTS("\nSPIR-V disassembly: " << outFilename << "\n");
-      spvDisassembleSpirv(binSize, spvBin, textSize, spvText);
-      LLPC_OUTS(spvText << "\n");
-      delete[] spvText;
-    } else {
-      LLPC_ERRS("Fail to compile GLSL sources\n\n" << log << "\n");
-      result = Result::ErrorInvalidShader;
-    }
+  textSize = binSize * 10 + 1024;
+  SmallVector<char> spvText(textSize, '\0');
+  LLPC_OUTS("\nSPIR-V disassembly: " << outFilename << "\n");
+  spvDisassembleSpirv(binSize, spvBin, textSize, spvText.data());
+  LLPC_OUTS(spvText.data() << "\n");
 
-    delete[] glslText;
-
-    fclose(inFile);
-    fclose(outFile);
-  }
-
-  return result;
+  return outFilename;
 }
 
 // =====================================================================================================================
 // SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V binary file (output).
 //
 // @param inFilename : Input filename, SPIR-V assembly text
-// @param [out] outFilename : Output filename, SPIR-V binary
-// @returns : Result::Success on success, Result::ErrorUnavailable on failure.
-Result assembleSpirv(const std::string &inFilename, std::string &outFilename) {
-  if (!InitSpvGen()) {
-    LLPC_ERRS("Failed to load SPVGEN -- cannot assemble SPIR-V assembler source\n");
-    return Result::ErrorUnavailable;
-  }
-
-  Result result = Result::Success;
+// @returns : Filename of the assembled SPIR-V on success, `ResultError` on failure.
+Expected<std::string> assembleSpirv(const std::string &inFilename) {
+  if (!InitSpvGen())
+    return createResultError(Result::ErrorUnavailable,
+                             "Failed to load SPVGEN -- cannot assemble SPIR-V assembler source");
 
   FILE *inFile = fopen(inFilename.c_str(), "r");
-  if (!inFile) {
-    LLPC_ERRS("Fails to open input file: " << inFilename << "\n");
-    result = Result::ErrorUnavailable;
-  }
+  if (!inFile)
+    return createResultError(Result::ErrorUnavailable, Twine("Failed to open input file: ") + inFilename);
+  auto closeInput = make_scope_exit([inFile] { fclose(inFile); });
 
-  FILE *outFile = nullptr;
-  if (result == Result::Success) {
-    outFilename = sys::path::stem(sys::path::filename(inFilename)).str() + Ext::SpirvBin.str();
+  const std::string outFilename = sys::path::stem(sys::path::filename(inFilename)).str() + Ext::SpirvBin.str();
+  FILE *outFile = fopen(outFilename.c_str(), "wb");
+  if (!outFile)
+    return createResultError(Result::ErrorUnavailable, Twine("Failed to open output file: ") + outFilename);
+  auto closeOutput = make_scope_exit([outFile] { fclose(outFile); });
 
-    outFile = fopen(outFilename.c_str(), "wb");
-    if (!outFile) {
-      LLPC_ERRS("Fails to open output file: " << outFilename << "\n");
-      result = Result::ErrorUnavailable;
-    }
-  }
+  fseek(inFile, 0, SEEK_END);
+  size_t textSize = ftell(inFile);
+  fseek(inFile, 0, SEEK_SET);
 
-  if (result == Result::Success) {
-    fseek(inFile, 0, SEEK_END);
-    size_t textSize = ftell(inFile);
-    fseek(inFile, 0, SEEK_SET);
+  SmallVector<char, 0> spvText(textSize + 1, '\0');
+  size_t realSize = fread(spvText.data(), 1, textSize, inFile);
+  spvText[realSize] = '\0';
 
-    char *spvText = new char[textSize + 1];
-    assert(spvText);
-    memset(spvText, 0, textSize + 1);
+  int binSize = static_cast<int>(realSize) * 4 + 1024; // Estimated SPIR-V binary size.
+  SmallVector<unsigned> spvBin(binSize / sizeof(unsigned), 0);
 
-    size_t realSize = fread(spvText, 1, textSize, inFile);
-    spvText[realSize] = '\0';
+  const char *log = nullptr;
+  binSize = spvAssembleSpirv(spvText.data(), binSize, spvBin.data(), &log);
+  if (binSize < 0)
+    return createResultError(Result::ErrorInvalidShader, Twine("Failed to assemble SPIR-V: \n") + log);
 
-    int binSize = realSize * 4 + 1024; // Estimated SPIR-V binary size
-    unsigned *spvBin = new unsigned[binSize / sizeof(unsigned)];
-    assert(spvBin);
+  fwrite(spvBin.data(), 1, binSize, outFile);
 
-    const char *log = nullptr;
-    binSize = spvAssembleSpirv(spvText, binSize, spvBin, &log);
-    if (binSize < 0) {
-      LLPC_ERRS("Fails to assemble SPIR-V: \n" << log << "\n");
-      result = Result::ErrorInvalidShader;
-    } else {
-      fwrite(spvBin, 1, binSize, outFile);
+  LLPC_OUTS("===============================================================================\n");
+  LLPC_OUTS("// SPIR-V disassembly: " << inFilename << "\n");
+  LLPC_OUTS(spvText);
+  LLPC_OUTS("\n\n");
 
-      LLPC_OUTS("===============================================================================\n");
-      LLPC_OUTS("// SPIR-V disassembly: " << inFilename << "\n");
-      LLPC_OUTS(spvText);
-      LLPC_OUTS("\n\n");
-    }
-
-    fclose(inFile);
-    fclose(outFile);
-
-    delete[] spvText;
-    delete[] spvBin;
-  }
-
-  return result;
+  return outFilename;
 }
 
 // =====================================================================================================================
@@ -345,28 +301,24 @@ Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileI
 //
 // @param compiler : LLPC compiler object
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool
-// @returns : Result::Success on success, other return status on failure
-Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
-  Result result = Result::Success;
-
-  for (unsigned i = 0; i < compileInfo->shaderModuleDatas.size(); ++i) {
-    ShaderModuleBuildInfo *shaderInfo = &(compileInfo->shaderModuleDatas[i].shaderInfo);
-    ShaderModuleBuildOut *shaderOut = &(compileInfo->shaderModuleDatas[i].shaderOut);
+// @returns : `ErrorSuccess` on success, `ResultError` on failure
+Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
+  for (ShaderModuleData &shaderModuleData : compileInfo->shaderModuleDatas) {
+    ShaderModuleBuildInfo *shaderInfo = &shaderModuleData.shaderInfo;
+    ShaderModuleBuildOut *shaderOut = &shaderModuleData.shaderOut;
 
     shaderInfo->pInstance = nullptr; // Placeholder, unused.
-    shaderInfo->pUserData = &(compileInfo->shaderModuleDatas[i].shaderBuf);
+    shaderInfo->pUserData = &shaderModuleData.shaderBuf;
     shaderInfo->pfnOutputAlloc = allocateBuffer;
-    shaderInfo->shaderBin = compileInfo->shaderModuleDatas[i].spirvBin;
+    shaderInfo->shaderBin = shaderModuleData.spirvBin;
 
-    result = compiler->BuildShaderModule(shaderInfo, shaderOut);
-    if (result != Result::Success && result != Result::Delayed) {
-      LLPC_ERRS("Fails to build " << getShaderStageName(compileInfo->shaderModuleDatas[i].shaderStage)
-                                  << " shader module:\n");
-      break;
-    }
+    Result result = compiler->BuildShaderModule(shaderInfo, shaderOut);
+    if (result != Result::Success && result != Result::Delayed)
+      return createResultError(result, Twine("Failed to build ") + getShaderStageName(shaderModuleData.shaderStage) +
+                                           " shader module");
   }
 
-  return result;
+  return Error::success();
 }
 
 // =====================================================================================================================
@@ -376,8 +328,8 @@ Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
 // @param suppliedOutFile : Name of the file to output ELF binary (specify "" to use base name of first input file with
 // appropriate extension; specify "-" to use stdout)
 // @param firstInFile : Name of first input file
-// @returns : Result::Success on success, other return status on failure
-Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, StringRef firstInFile) {
+// @returns : `ErrorSuccess` on success, `ResultError` on failure
+Error outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, StringRef firstInFile) {
   const BinaryData &pipelineBin = (compileInfo->stageMask & shaderStageToMask(ShaderStageCompute))
                                       ? compileInfo->compPipelineOut.pipelineBin
                                       : compileInfo->gfxPipelineOut.pipelineBin;
@@ -399,24 +351,23 @@ Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, S
 // @param inFile : Input filename
 // @param unlinked : Whether to build an unlinked shader/part-pipeline ELF
 // @param ignoreColorAttachmentFormats : Whether to ignore color attachment formats
-// @returns : Result::Success on success, other status codes on failure
-Result processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const std::string &inFile, bool unlinked,
-                            bool ignoreColorAttachmentFormats) {
+// @returns : `ErrorSuccess` on success, `ResultError` on failure
+Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const std::string &inFile, bool unlinked,
+                           bool ignoreColorAttachmentFormats) {
   const char *log = nullptr;
   const bool vfxResult =
       Vfx::vfxParseFile(inFile.c_str(), 0, nullptr, VfxDocTypePipeline, &compileInfo.pipelineInfoFile, &log);
-  if (!vfxResult) {
-    LLPC_ERRS("Failed to parse input file: " << inFile << "\n" << log << "\n");
-    return Result::ErrorInvalidShader;
-  }
+  if (!vfxResult)
+    return createResultError(Result::ErrorInvalidShader, Twine("Failed to parse input file: ") + inFile + "\n" + log);
 
   VfxPipelineStatePtr pipelineState = nullptr;
   Vfx::vfxGetPipelineDoc(compileInfo.pipelineInfoFile, &pipelineState);
 
   if (pipelineState->version != Vkgc::Version) {
-    LLPC_ERRS("Version incompatible, SPVGEN::Version = " << pipelineState->version
-                                                         << " AMDLLPC::Version = " << Vkgc::Version << "\n");
-    return Result::ErrorInvalidShader;
+    std::string errMsg;
+    raw_string_ostream os(errMsg);
+    os << "Version incompatible, SPVGEN::Version = " << pipelineState->version << " LLPC::Version = " << Vkgc::Version;
+    return createResultError(Result::ErrorInvalidShader, os.str());
   }
 
   LLPC_OUTS("===============================================================================\n");
@@ -471,7 +422,7 @@ Result processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const
   // For a .pipe, build an "unlinked" shader/part-pipeline ELF if -unlinked is on.
   compileInfo.unlinked = unlinked;
   compileInfo.doAutoLayout = false;
-  return Result::Success;
+  return Error::success();
 }
 
 // =====================================================================================================================
@@ -481,28 +432,28 @@ Result processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const
 // @param inFiles : Input filenames
 // @param validateSpirv : Whether to run the validator on each final SPIR-V module
 // @param [out] filenames : List of used input file names
-// @returns : Result::Success on success, other status codes on failure
-Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef<std::string> inFiles,
-                          bool validateSpirv, SmallVectorImpl<std::string> &fileNames) {
+// @returns : `ErrorSuccess` on success, other `ResultError` on failure
+Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef<std::string> inFiles,
+                         bool validateSpirv, SmallVectorImpl<std::string> &fileNames) {
   for (const std::string &inFile : inFiles) {
     fileNames.push_back(inFile);
-    Result result = Result::Success;
     std::string spvBinFile;
 
     if (isSpirvTextFile(inFile) || isSpirvBinaryFile(inFile)) {
       // SPIR-V assembly text or SPIR-V binary.
       if (isSpirvTextFile(inFile)) {
-        result = assembleSpirv(inFile, spvBinFile);
-        if (result != Result::Success)
-          return result;
+        auto spvBinFilenameOrErr = assembleSpirv(inFile);
+        if (Error err = spvBinFilenameOrErr.takeError())
+          return err;
+        spvBinFile = *spvBinFilenameOrErr;
       } else {
         spvBinFile = inFile;
       }
 
-      BinaryData spvBin = {};
-      Result result = getSpirvBinaryFromFile(spvBinFile, spvBin);
-      if (result != Result::Success)
-        return result;
+      auto spvBinOrErr = getSpirvBinaryFromFile(spvBinFile);
+      if (Error err = spvBinOrErr.takeError())
+        return err;
+      BinaryData spvBin = *spvBinOrErr;
 
       if (!InitSpvGen()) {
         LLPC_OUTS("Failed to load SPVGEN -- no SPIR-V disassembler available\n");
@@ -517,13 +468,11 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
 
       if (validateSpirv) {
         if (!InitSpvGen()) {
-          errs() << "Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n";
+          LLPC_OUTS("Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n");
         } else {
           char log[1024] = {};
-          if (!spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log)) {
-            LLPC_ERRS("Failed to validate SPIR-V: \n" << log << "\n");
-            return Result::ErrorInvalidShader;
-          }
+          if (!spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log))
+            return createResultError(Result::ErrorInvalidShader, Twine("Failed to validate SPIR-V:\n") + log);
         }
       }
 
@@ -535,20 +484,20 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
       if ((stageMask & compileInfo.stageMask) != 0)
         break;
 
-      if (stageMask != 0) {
-        for (unsigned stage = ShaderStageVertex; stage < ShaderStageCount; ++stage) {
-          if (stageMask & shaderStageToMask(static_cast<ShaderStage>(stage))) {
-            StandaloneCompiler::ShaderModuleData shaderModuleData = {};
-            shaderModuleData.shaderStage = static_cast<ShaderStage>(stage);
-            shaderModuleData.spirvBin = spvBin;
-            compileInfo.shaderModuleDatas.push_back(shaderModuleData);
-            compileInfo.stageMask |= shaderStageToMask(static_cast<ShaderStage>(stage));
-            break;
-          }
+      if (stageMask == 0)
+        return createResultError(Result::ErrorInvalidShader,
+                                 Twine("Failed to identify shader stages by entry-point \"") + compileInfo.entryTarget +
+                                     "\"");
+
+      for (unsigned stage = ShaderStageVertex; stage < ShaderStageCount; ++stage) {
+        if (stageMask & shaderStageToMask(static_cast<ShaderStage>(stage))) {
+          StandaloneCompiler::ShaderModuleData shaderModuleData = {};
+          shaderModuleData.shaderStage = static_cast<ShaderStage>(stage);
+          shaderModuleData.spirvBin = spvBin;
+          compileInfo.shaderModuleDatas.push_back(shaderModuleData);
+          compileInfo.stageMask |= shaderStageToMask(static_cast<ShaderStage>(stage));
+          break;
         }
-      } else {
-        LLPC_ERRS(format("Failed to identify shader stages by entry-point \"%s\"\n", compileInfo.entryTarget.c_str()));
-        return Result::ErrorUnavailable;
       }
     } else if (isLlvmIrFile(inFile)) {
       LLVMContext context;
@@ -561,8 +510,7 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
         raw_string_ostream errStream(errMsg);
         errDiag.print(inFile.c_str(), errStream);
         errStream.flush();
-        LLPC_ERRS(errMsg);
-        return Result::ErrorInvalidShader;
+        return createResultError(Result::ErrorInvalidShader, errMsg);
       }
 
       // Verify LLVM module.
@@ -570,15 +518,15 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
       raw_string_ostream errStream(errMsg);
       if (verifyModule(*module.get(), &errStream)) {
         errStream.flush();
-        LLPC_ERRS("File " << inFile << " parsed, but failed to verify the module: " << errMsg << "\n");
-        return Result::ErrorInvalidShader;
+        return createResultError(Result::ErrorInvalidShader,
+                                 Twine("File ") + inFile + " parsed, but failed to verify the module: " + errMsg);
       }
 
       // Check the shader stage of input module.
       ShaderStage shaderStage = getShaderStageFromModule(module.get());
       if (shaderStage == ShaderStageInvalid) {
-        LLPC_ERRS("File " << inFile << " parsed, but failed to determine shader stage\n");
-        return Result::ErrorInvalidShader;
+        return createResultError(Result::ErrorInvalidShader,
+                                 Twine("File ") + inFile + " parsed, but failed to determine shader stage: " + errMsg);
       }
 
       if (compileInfo.stageMask & shaderStageToMask(static_cast<ShaderStage>(shaderStage)))
@@ -606,24 +554,31 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
         compileInfo.entryTarget = "main";
 
       ShaderStage stage = ShaderStageInvalid;
-      result = compileGlsl(inFile, &stage, spvBinFile, compileInfo.entryTarget);
-      if (result != Result::Success)
-        return result;
+      auto spvBinFilenameOrErr = compileGlsl(inFile, &stage, compileInfo.entryTarget);
+      if (Error err = spvBinFilenameOrErr.takeError())
+        return err;
+      spvBinFile = *spvBinFilenameOrErr;
 
       if (compileInfo.stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
         break;
 
       compileInfo.stageMask |= shaderStageToMask(stage);
       StandaloneCompiler::ShaderModuleData shaderModuleData = {};
-      result = getSpirvBinaryFromFile(spvBinFile, shaderModuleData.spirvBin);
+
+      auto spvBinOrErr = getSpirvBinaryFromFile(spvBinFile);
+      if (Error err = spvBinOrErr.takeError())
+        return err;
+      shaderModuleData.spirvBin = *spvBinOrErr;
+
       shaderModuleData.shaderStage = stage;
       compileInfo.shaderModuleDatas.push_back(shaderModuleData);
     } else {
-      LLPC_ERRS("File " << inFile << " has an unknown extension; try -help to list supported input formats\n");
-      return Result::ErrorInvalidShader;
+      return createResultError(Result::ErrorInvalidShader,
+                               Twine("File ") + inFile +
+                                   " has an unknown extension; try -help to list supported input formats");
     }
   }
-  return Result::Success;
+  return Error::success();
 }
 
 } // namespace StandaloneCompiler
