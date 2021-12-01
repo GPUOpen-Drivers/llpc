@@ -78,7 +78,7 @@ private:
   llvm::Value *addCallInstForInOutImport(llvm::Type *inOutTy, unsigned addrSpace, llvm::Constant *inOutMeta,
                                          llvm::Value *startLoc, unsigned maxLocOffset, llvm::Value *compIdx,
                                          llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,
-                                         llvm::Instruction *insertPos);
+                                         bool isPerVertexDimension, llvm::Instruction *insertPos);
 
   void addCallInstForOutputExport(llvm::Value *outputValue, llvm::Constant *outputMeta, llvm::Value *locOffset,
                                   unsigned maxLocOffset, unsigned xfbOffsetAdjust, unsigned xfbBufferAdjust,

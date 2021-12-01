@@ -98,9 +98,6 @@ public:
   unsigned getArraySize() const { return m_data.bits.arraySize; }
   void setArraySize(unsigned arraySize) { m_data.bits.arraySize = arraySize; }
 
-  bool isPerVertex() const { return m_data.bits.perVertex; }
-  void setPerVertex(bool perVertex = true) { m_data.bits.perVertex = perVertex; }
-
 private:
   union {
     struct {
@@ -114,7 +111,6 @@ private:
       unsigned arraySize : 4;    // Built-in array input: shader-defined array size. Must be set for
                                  //    a read or write of ClipDistance or CullDistance that is of the
                                  //    whole array or of an element with a variable index.
-      unsigned perVertex : 1;    // FS input: adjust the index of the per-vertex input variable
     } bits;
     unsigned u32All;
   } m_data;
@@ -1091,6 +1087,30 @@ public:
   virtual llvm::Value *CreateReadGenericInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
                                               llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
                                               llvm::Value *vertexIndex, const llvm::Twine &instName = "") = 0;
+
+  // -----------------------------------------------------------------------------------------------------------------
+  // Shader input/output methods
+
+  // Create a read of (part of) a perVertex input value, passed from the previous shader stage.
+  // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+  // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
+  // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
+  // A non-constant pLocationOffset is currently only supported for TCS and TES, and for an FS custom-interpolated
+  // input.
+  //
+  // @param resultTy : Type of value to read
+  // @param location : Base location (row) of input
+  // @param locationOffset : Location offset; must be within locationCount if variable
+  // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
+  // 64-bit elements.)
+  // @param locationCount : Count of locations taken by the input. Ignored if pLocationOffset is const
+  // @param inputInfo : Extra input info (FS interp info)
+  // @param vertexIndex : Vertex index (For FS custom interpolated input: auxiliary interpolation value)
+  // @param instName : Name to give instruction(s)
+  // @returns Value of input
+  virtual llvm::Value *CreateReadPerVertexInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
+                                                llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
+                                                llvm::Value *vertexIndex, const llvm::Twine &instName = "") = 0;
 
   // Create a read of (part of) a generic (user) output value, returning the value last written in this shader stage.
   // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.

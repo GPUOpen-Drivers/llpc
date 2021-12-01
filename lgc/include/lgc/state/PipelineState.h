@@ -333,6 +333,9 @@ public:
   // Get the count of vertices per primitive
   unsigned getVerticesPerPrimitive();
 
+  // Get the primitive type
+  PrimitiveType getPrimitiveType();
+
   // -----------------------------------------------------------------------------------------------------------------
   // Utility methods
 

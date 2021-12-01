@@ -477,6 +477,11 @@ public:
                                       llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
                                       llvm::Value *vertexIndex, const llvm::Twine &instName = "") override final;
 
+  // Create a read of (part of) a perVertex input value.
+  llvm::Value *CreateReadPerVertexInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
+                                        llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
+                                        llvm::Value *vertexIndex, const llvm::Twine &instName = "") override final;
+
   // Create a read of (part of) a user output value.
   llvm::Value *CreateReadGenericOutput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
                                        llvm::Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,

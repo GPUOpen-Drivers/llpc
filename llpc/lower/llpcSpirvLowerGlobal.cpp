@@ -341,7 +341,7 @@ void SpirvLowerGlobal::handleCallInst(bool checkEmitCall, bool checkInterpCall) 
             auto inputMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
             auto loadValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, inputMeta, nullptr, 0, nullptr, nullptr,
-                                                       interpLoc, auxInterpValue, callInst);
+                                                       interpLoc, auxInterpValue, false, callInst);
 
             m_interpCalls.insert(callInst);
             callInst->replaceAllUsesWith(loadValue);
@@ -397,12 +397,12 @@ void SpirvLowerGlobal::handleLoadInstGlobal(LoadInst &loadInst, const unsigned a
     for (unsigned i = 0; i < elemCount; ++i) {
       Value *vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
       auto elemValue = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, nullptr, 0, nullptr, vertexIdx,
-                                                 InterpLocUnknown, nullptr, &loadInst);
+                                                 InterpLocUnknown, nullptr, false, &loadInst);
       loadValue = InsertValueInst::Create(loadValue, elemValue, {i}, "", &loadInst);
     }
   } else {
     loadValue = addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, nullptr, 0, nullptr, nullptr,
-                                          InterpLocUnknown, nullptr, &loadInst);
+                                          InterpLocUnknown, nullptr, false, &loadInst);
   }
   m_loadInsts.insert(&loadInst);
   loadInst.replaceAllUsesWith(loadValue);
@@ -633,7 +633,7 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
 
   // Import input to proxy variable
   auto inputValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, meta, nullptr, 0, nullptr, nullptr,
-                                              InterpLocUnknown, nullptr, &*insertPos);
+                                              InterpLocUnknown, nullptr, false, &*insertPos);
   new StoreInst(inputValue, proxy, &*insertPos);
 
   m_inputProxyMap[input] = proxy;
@@ -942,11 +942,12 @@ void SpirvLowerGlobal::lowerInOutInPlace() {
 // @param auxInterpValue : Auxiliary value of interpolation (valid for fragment shader) - Value is sample ID for
 // "InterpLocSample" - Value is offset from the center of the pixel for "InterpLocCenter" - Value is vertex no. (0 ~ 2)
 // for "InterpLocCustom"
+// @param isPerVertexDimension : Whether this is a per vertex variable
 // @param insertPos : Where to insert this call
 Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrSpace, Constant *inOutMetaVal,
                                                    Value *locOffset, unsigned maxLocOffset, Value *elemIdx,
                                                    Value *vertexIdx, unsigned interpLoc, Value *auxInterpValue,
-                                                   Instruction *insertPos) {
+                                                   bool isPerVertexDimension, Instruction *insertPos) {
   assert(addrSpace == SPIRAS_Input || (addrSpace == SPIRAS_Output && m_shaderStage == ShaderStageTessControl));
 
   Value *inOutValue = UndefValue::get(inOutTy);
@@ -987,7 +988,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
           // Handle array elements recursively
           vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), idx);
           auto elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, nullptr, maxLocOffset, nullptr, vertexIdx,
-                                                interpLoc, auxInterpValue, insertPos);
+                                                interpLoc, auxInterpValue, false, insertPos);
           inOutValue = InsertValueInst::Create(inOutValue, elem, {idx}, "", insertPos);
         }
       } else {
@@ -1015,7 +1016,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
         for (unsigned idx = 0; idx < elemCount; ++idx) {
           vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), idx);
           auto elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, locOffset, maxLocOffset, nullptr,
-                                                vertexIdx, InterpLocUnknown, nullptr, insertPos);
+                                                vertexIdx, InterpLocUnknown, nullptr, false, insertPos);
           inOutValue = InsertValueInst::Create(inOutValue, elem, {idx}, "", insertPos);
         }
       } else {
@@ -1024,16 +1025,23 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
           locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
 
         for (unsigned idx = 0; idx < elemCount; ++idx) {
-          // Handle array elements recursively
-          // elemLocOffset = locOffset + stride * idx
-          Value *elemLocOffset = nullptr;
-          if (isa<ConstantInt>(locOffset))
-            elemLocOffset = m_builder->getInt32(cast<ConstantInt>(locOffset)->getZExtValue() + stride * idx);
-          else
-            elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * idx), "", insertPos);
+          Value *elem = nullptr;
+          if (inOutMeta.PerVertexDimension) {
+            assert(inOutMeta.InterpLoc == InterpLocCustom);
+            elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, nullptr, 0, nullptr, 0, inOutMeta.InterpLoc,
+                                             m_builder->getInt32(idx), true, insertPos);
+          } else {
+            // Handle array elements recursively
+            // elemLocOffset = locOffset + stride * idx
+            Value *elemLocOffset = nullptr;
+            if (isa<ConstantInt>(locOffset))
+              elemLocOffset = m_builder->getInt32(cast<ConstantInt>(locOffset)->getZExtValue() + stride * idx);
+            else
+              elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * idx), "", insertPos);
 
-          auto elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, elemLocOffset, maxLocOffset, elemIdx,
-                                                vertexIdx, InterpLocUnknown, nullptr, insertPos);
+            elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, elemLocOffset, maxLocOffset, elemIdx,
+                                             vertexIdx, interpLoc, auxInterpValue, isPerVertexDimension, insertPos);
+          }
           inOutValue = InsertValueInst::Create(inOutValue, elem, {idx}, "", insertPos);
         }
       }
@@ -1049,7 +1057,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
       auto memberMeta = cast<Constant>(inOutMetaVal->getOperand(memberIdx));
 
       auto member = addCallInstForInOutImport(memberTy, addrSpace, memberMeta, locOffset, maxLocOffset, nullptr,
-                                              vertexIdx, InterpLocUnknown, nullptr, insertPos);
+                                              vertexIdx, interpLoc, auxInterpValue, isPerVertexDimension, insertPos);
       inOutValue = InsertValueInst::Create(inOutValue, member, {memberIdx}, "", insertPos);
     }
   } else {
@@ -1114,8 +1122,12 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
           inOutInfo.setInterpLoc(interpLoc);
           inOutInfo.setInterpMode(inOutMeta.InterpMode);
         }
-        inOutValue = m_builder->CreateReadGenericInput(inOutTy, inOutMeta.Value, locOffset, elemIdx, maxLocOffset,
-                                                       inOutInfo, vertexIdx);
+        if (isPerVertexDimension)
+          inOutValue = m_builder->CreateReadPerVertexInput(inOutTy, inOutMeta.Value, locOffset, elemIdx, maxLocOffset,
+                                                           inOutInfo, vertexIdx);
+        else
+          inOutValue = m_builder->CreateReadGenericInput(inOutTy, inOutMeta.Value, locOffset, elemIdx, maxLocOffset,
+                                                         inOutInfo, vertexIdx);
       } else {
         inOutValue = m_builder->CreateReadGenericOutput(inOutTy, inOutMeta.Value, locOffset, elemIdx, maxLocOffset,
                                                         inOutInfo, vertexIdx);
@@ -1432,15 +1444,15 @@ Value *SpirvLowerGlobal::loadDynamicIndexedMembers(Type *inOutTy, unsigned addrS
       loadTy = cast<VectorType>(inOutTy)->getElementType();
       compIdx = indexOperands[operandIdx];
       Value *compValue = addCallInstForInOutImport(loadTy, addrSpace, inOutMetaVal, locOffset, 0, compIdx, nullptr,
-                                                   interpLoc, auxInterpValue, insertPos);
+                                                   interpLoc, auxInterpValue, false, insertPos);
       return InsertElementInst::Create(inOutValue, compValue, compIdx, "", insertPos);
     } else
       return addCallInstForInOutImport(loadTy, addrSpace, inOutMetaVal, locOffset, 0, compIdx, nullptr, interpLoc,
-                                       auxInterpValue, insertPos);
+                                       auxInterpValue, false, insertPos);
   } else {
     // simple scalar type
     return addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, locOffset, 0, nullptr, nullptr, interpLoc,
-                                     auxInterpValue, insertPos);
+                                     auxInterpValue, false, insertPos);
   }
 
   llvm_unreachable("Should never be called!");
@@ -1484,7 +1496,7 @@ Value *SpirvLowerGlobal::loadInOutMember(Type *inOutTy, unsigned addrSpace, cons
       assert(operandIdx == indexOperands.size() - 1);
       auto elemIdx = indexOperands[operandIdx];
       return addCallInstForInOutImport(elemTy, addrSpace, elemMeta, locOffset, inOutTy->getArrayNumElements(), elemIdx,
-                                       vertexIdx, interpLoc, auxInterpValue, insertPos);
+                                       vertexIdx, interpLoc, auxInterpValue, false, insertPos);
     } else {
       // NOTE: If the relative location offset is not specified, initialize it to 0.
       if (!locOffset)
@@ -1528,11 +1540,11 @@ Value *SpirvLowerGlobal::loadInOutMember(Type *inOutTy, unsigned addrSpace, cons
     }
 
     return addCallInstForInOutImport(loadTy, addrSpace, inOutMetaVal, locOffset, maxLocOffset, compIdx, vertexIdx,
-                                     interpLoc, auxInterpValue, insertPos);
+                                     interpLoc, auxInterpValue, false, insertPos);
   } else {
     // simple scalar type
     return addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, locOffset, maxLocOffset, nullptr, vertexIdx,
-                                     interpLoc, auxInterpValue, insertPos);
+                                     interpLoc, auxInterpValue, false, insertPos);
   }
 
   llvm_unreachable("Should never be called!");
