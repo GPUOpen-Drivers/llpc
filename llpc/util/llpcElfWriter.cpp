@@ -892,7 +892,9 @@ template <class Elf> void ElfWriter<Elf>::addRelocSymbols(const ElfReader<Elf> &
   SectionBuffer *inputRodataSection = nullptr;
   std::vector<ElfSymbol> inputRodataSymbols;
   auto inputRodataSecIndex = reader.GetSectionIndex(relocSym.secName);
-  reader.getSectionDataBySectionIndex(inputRodataSecIndex, &inputRodataSection);
+  Result result = reader.getSectionDataBySectionIndex(inputRodataSecIndex, &inputRodataSection);
+  assert(result == Result::Success || result == Result::ErrorInvalidValue);
+  (void)result;
   reader.GetSymbolsBySectionIndex(inputRodataSecIndex, inputRodataSymbols);
 
   SectionBuffer newSection = createNewSection(secName, inputRodataSection);
@@ -1044,8 +1046,10 @@ void ElfWriter<Elf>::processRelocSection(const ElfReader<Elf> &reader, size_t no
   auto fragmentRelocSecIndex = reader.GetSectionIndex(RelocName);
   auto nonFragmentRelocSecIndex = GetSectionIndex(RelocName);
 
-  reader.getSectionDataBySectionIndex(fragmentRelocSecIndex, &fragmentRelocSection);
-  Result result = getSectionDataBySectionIndex(nonFragmentRelocSecIndex, &nonFragmentRelocSection);
+  Result result = reader.getSectionDataBySectionIndex(fragmentRelocSecIndex, &fragmentRelocSection);
+  assert(result == Result::Success || result == Result::ErrorInvalidValue);
+  (void)result;
+  result = getSectionDataBySectionIndex(nonFragmentRelocSecIndex, &nonFragmentRelocSection);
   assert(result == Result::Success || result == Result::NotFound);
   (void)result;
 
@@ -1212,7 +1216,9 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
 
   auto fragmentTextSecIndex = reader.GetSectionIndex(TextName);
   auto nonFragmentSecIndex = GetSectionIndex(TextName);
-  reader.getSectionDataBySectionIndex(fragmentTextSecIndex, &fragmentTextSection);
+  Result result = reader.getSectionDataBySectionIndex(fragmentTextSecIndex, &fragmentTextSection);
+  assert(result == Result::Success || result == Result::ErrorInvalidValue);
+  (void)result;
   reader.GetSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
 
   mustSucceed(getSectionDataBySectionIndex(nonFragmentSecIndex, &nonFragmentTextSection));
@@ -1278,7 +1284,9 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   auto nonFragmentDisassemblySecIndex = GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
   ElfSectionBuffer<Elf64::SectionHeader> *fragmentDisassemblySection = nullptr;
   const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentDisassemblySection = nullptr;
-  reader.getSectionDataBySectionIndex(fragmentDisassemblySecIndex, &fragmentDisassemblySection);
+  result = reader.getSectionDataBySectionIndex(fragmentDisassemblySecIndex, &fragmentDisassemblySection);
+  assert(result == Result::Success || result == Result::ErrorInvalidValue);
+  (void)result;
   mustSucceed(getSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &nonFragmentDisassemblySection));
   if (nonFragmentDisassemblySection) {
     assert(fragmentDisassemblySection);
@@ -1316,8 +1324,11 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
 
   auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(llvmIrSectionName.c_str());
   auto nonFragmentLlvmIrSecIndex = GetSectionIndex(llvmIrSectionName.c_str());
-  reader.getSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &fragmentLlvmIrSection);
-  Result result = getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &nonFragmentLlvmIrSection);
+  result = reader.getSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &fragmentLlvmIrSection);
+  assert(result == Result::Success || result == Result::ErrorInvalidValue);
+  (void)result;
+
+  result = getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &nonFragmentLlvmIrSection);
   assert(result == Result::Success || result == Result::NotFound);
   (void)result;
 
