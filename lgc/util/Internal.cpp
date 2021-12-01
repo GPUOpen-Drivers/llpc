@@ -228,12 +228,10 @@ Type *getVgprTy(Type *ty) {
   // return value as an SGPR rather than a VGPR. For symmetry, we also use all floats in the input
   // args to the fetchless vertex shader. We use a vector of float, even if the integer element type is
   // not i32.
-  if (ty->isIntOrIntVectorTy()) {
-    unsigned numElements = (ty->getPrimitiveSizeInBits() + 31) / 32;
-    ty = Type::getFloatTy(ty->getContext());
-    if (numElements > 1)
-      ty = FixedVectorType::get(ty, numElements);
-  }
+  unsigned numElements = (ty->getPrimitiveSizeInBits() + 31) / 32;
+  ty = Type::getFloatTy(ty->getContext());
+  if (numElements > 1)
+    ty = FixedVectorType::get(ty, numElements);
   return ty;
 }
 

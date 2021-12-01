@@ -1,0 +1,72 @@
+// Tests that a double vertex input is pass in two vgprs
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: {{^}}// LLPC pipeline patching results
+; Check that the last input parameter is a float2.
+; SHADERTEST: define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless({{.*}}, <2 x float> %0)
+; SHADERTEST: {{^//}} LGC glue shader results
+; SHADERTEST: {{^;}} ModuleID = 'fetchShader'
+; Check that the last element in the return type is a float2.
+; SHADERTEST: define amdgpu_vs { {{.*}}, <2 x float> } @_amdgpu_vs_main
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+
+layout(location = 0) in double _30;
+
+void main()
+{
+    if (_30 < 1.0000000000000000818030539140313e-05lf)
+    {
+        gl_Position = vec4(-1.0, -1.0, 0.0, 1.0);
+    }
+    else
+    {
+        gl_Position = vec4(0.0);
+    }
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+
+void main()
+{
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 1
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 1
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 4
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 8
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R64_SFLOAT
+attribute[0].offset = 0
