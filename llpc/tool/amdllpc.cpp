@@ -405,8 +405,8 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 //
 // @param compiler : LLPC compiler
 // @param inFiles : Input filename(s)
-// @returns : Result::Success on success, other status codes on failure
-static Result processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
+// @returns : `ErrorSuccess` on success, `ResultError` on failure
+static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   assert(!inputSpecs.empty());
   CompileInfo compileInfo = {};
   compileInfo.unlinked = true;
@@ -416,34 +416,30 @@ static Result processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   auto onExit = make_scope_exit([&compileInfo] { cleanupCompileInfo(&compileInfo); });
   Result result = initCompileInfo(&compileInfo);
   if (result != Result::Success)
-    return result;
+    return createResultError(result);
 
   const std::string &firstFilename = inputSpecs[0].filename;
 
   SmallVector<std::string> fileNames;
   if (inputSpecs.size() == 1 && isPipelineInfoFile(firstFilename)) {
     fileNames.push_back(firstFilename);
-    result = processInputPipeline(compiler, compileInfo, firstFilename, Unlinked, IgnoreColorAttachmentFormats);
-    if (result != Result::Success)
-      return result;
+    if (Error err = processInputPipeline(compiler, compileInfo, firstFilename, Unlinked, IgnoreColorAttachmentFormats))
+      return err;
   } else {
     const auto inputFiles = to_vector(map_range(inputSpecs, [](const InputSpec &spec) { return spec.filename; }));
-    result = processInputStages(compiler, compileInfo, inputFiles, ValidateSpirv, fileNames);
-    if (result != Result::Success)
-      return result;
+    if (Error err = processInputStages(compiler, compileInfo, inputFiles, ValidateSpirv, fileNames))
+      return err;
   }
 
   //
   // Build shader modules
   //
-  if (compileInfo.stageMask != 0) {
-    result = buildShaderModules(compiler, &compileInfo);
-    if (result != Result::Success)
-      return result;
-  }
+  if (compileInfo.stageMask != 0)
+    if (Error err = buildShaderModules(compiler, &compileInfo))
+      return err;
 
   if (!ToLink)
-    return Result::Success;
+    return Error::success();
 
   //
   // Build pipeline
@@ -462,7 +458,7 @@ static Result processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   PipelineBuilder builder(*compiler, compileInfo, dumpOptions, TimePassesIsEnabled || cl::EnableTimerProfile);
   result = builder.build();
   if (result != Result::Success)
-    return result;
+    return createResultError(result, "Failed to build pipeline");
 
   return outputElf(&compileInfo, OutFile, firstFilename);
 }
@@ -550,22 +546,21 @@ int main(int argc, char *argv[]) {
 
   auto inputSpecsOrErr = parseAndCollectInputFileSpecs(expandedInputFiles);
   if (Error err = inputSpecsOrErr.takeError()) {
-    reportError(std::move(err));
-    result = Result::ErrorInvalidValue;
+    result = reportError(std::move(err));
     return EXIT_FAILURE;
   }
 
   auto inputGroupsOrErr = groupInputSpecs(*inputSpecsOrErr);
   if (Error err = inputGroupsOrErr.takeError()) {
-    reportError(std::move(err));
-    result = Result::ErrorInvalidValue;
+    result = reportError(std::move(err));
     return EXIT_FAILURE;
   }
 
   for (InputSpecGroup &inputGroup : *inputGroupsOrErr) {
-    result = processInputs(compiler, inputGroup);
-    if (result != Result::Success)
+    if (Error err = processInputs(compiler, inputGroup)) {
+      result = reportError(std::move(err));
       return EXIT_FAILURE;
+    }
   }
 
   assert(result == Result::Success);

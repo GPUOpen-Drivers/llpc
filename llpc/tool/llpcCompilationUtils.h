@@ -58,6 +58,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 
 namespace Llpc {
 namespace StandaloneCompiler {
@@ -100,28 +101,28 @@ void *VKAPI_CALL allocateBuffer(void *instance, void *userData, size_t size);
 void cleanupCompileInfo(CompileInfo *compileInfo);
 
 // GLSL compiler, compiles GLSL source text file (input) to SPIR-V binary file (output).
-Result compileGlsl(const std::string &inFilename, ShaderStage *stage, std::string &outFilename,
-                   const std::string &defaultEntryTarget);
+llvm::Expected<std::string> compileGlsl(const std::string &inFilename, ShaderStage *stage,
+                                        const std::string &defaultEntryTarget);
 
 // SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V binary file (output).
-Result assembleSpirv(const std::string &inFilename, std::string &outFilename);
+llvm::Expected<std::string> assembleSpirv(const std::string &inFilename);
 
 // Decodes the binary after building a pipeline and outputs the decoded info.
-Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo, bool isGraphics);
+LLPC_NODISCARD Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo, bool isGraphics);
 
 // Builds shader module based on the specified SPIR-V binary.
-Result buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo);
+llvm::Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo);
 
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
-Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, llvm::StringRef firstInFile);
+llvm::Error outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, llvm::StringRef firstInFile);
 
 // Processes and compiles one pipeline input file.
-Result processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const std::string &inFile, bool unlinked,
-                            bool ignoreColorAttachmentFormats);
+llvm::Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const std::string &inFile,
+                                 bool unlinked, bool ignoreColorAttachmentFormats);
 
 // Processes and compiles multiple shader stage input files.
-Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, llvm::ArrayRef<std::string> inFiles,
-                          bool validateSpirv, llvm::SmallVectorImpl<std::string> &fileNames);
+llvm::Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, llvm::ArrayRef<std::string> inFiles,
+                               bool validateSpirv, llvm::SmallVectorImpl<std::string> &fileNames);
 
 } // namespace StandaloneCompiler
 } // namespace Llpc

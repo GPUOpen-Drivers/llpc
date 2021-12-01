@@ -40,8 +40,9 @@ namespace Llpc {
 // Handles passed `result` and checks if it is a Success. Prints `errorMessage` if not.
 void mustSucceed(Vkgc::Result result, const llvm::Twine &errorMessage = {});
 
-// Prints the error to LLPC_ERRS and consumes it.
-void reportError(llvm::Error &&err);
+// Prints the error to LLPC_ERRS and consumes it. Returns the underlying `Result` when the error is a `ResultError`, or
+// `Result::ErrorUnknown` otherwise.
+LLPC_NODISCARD Vkgc::Result reportError(llvm::Error &&err);
 
 // Converts a `Vkgc::Result` to `std::error_code` with a custom error category.
 LLPC_NODISCARD std::error_code resultToErrorCode(Vkgc::Result result);

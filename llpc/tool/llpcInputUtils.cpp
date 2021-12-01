@@ -60,14 +60,14 @@
 #endif
 
 #include "llpcDebug.h"
+#include "llpcError.h"
 #include "llpcFile.h"
 #include "llpcInputUtils.h"
+#include "vkgcDefs.h"
 #include "vkgcElfReader.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include <cassert>
-#include <system_error>
 
 using namespace llvm;
 using namespace Vkgc;
@@ -93,7 +93,7 @@ Expected<InputSpec> parseInputFileSpec(const StringRef inputSpec) {
   if (entryPointSeparatorPos != StringRef::npos) {
     const size_t entryPointNameLen = toProcess.size() - (entryPointSeparatorPos + 1);
     if (entryPointNameLen == 0)
-      return createStringError(std::make_error_code(std::errc::invalid_argument),
+      return createResultError(Result::ErrorInvalidShader,
                                Twine("Expected entry point name after ',' in: ") + inputSpec);
 
     parsed.entryPoint = parsed.rawInputSpec.substr(entryPointSeparatorPos + 1);
@@ -102,8 +102,7 @@ Expected<InputSpec> parseInputFileSpec(const StringRef inputSpec) {
 
   // 2. The filename is the remaining string, including the extension.
   if (toProcess.empty())
-    return createStringError(std::make_error_code(std::errc::invalid_argument),
-                             Twine("File name missing for input: ") + inputSpec);
+    return createResultError(Result::ErrorInvalidShader, Twine("File name missing for input: ") + inputSpec);
 
   parsed.filename = toProcess.str();
   return parsed;
@@ -152,8 +151,7 @@ Expected<SmallVector<InputSpecGroup, 0>> groupInputSpecs(ArrayRef<InputSpec> inp
       errorMessage = "Input path is not a regular file";
 
     if (errorMessage)
-      return createStringError(std::make_error_code(std::errc::file_exists),
-                               Twine(errorMessage) + ": " + input.filename);
+      return createResultError(Result::NotFound, Twine(errorMessage) + ": " + input.filename);
   }
 
   // All input shaders form one group.
@@ -341,26 +339,23 @@ Result expandInputFilenames(ArrayRef<std::string> inputSpecs, std::vector<std::s
 // Reads SPIR-V binary code from the specified binary file.
 //
 // @param spvBinFile : Path to a SPIR-V binary file
-// @param [out] spvBin : SPIR-V binary code
-// @returns : Result::Success on success, Result::ErrorUnavailable when the input file cannot be accessed.
-Result getSpirvBinaryFromFile(StringRef spvBinFile, BinaryData &spvBin) {
+// @returns : SPIR-V binary code on success, `ResultError` when the input file cannot be accessed
+Expected<BinaryData> getSpirvBinaryFromFile(StringRef spvBinFile) {
   File file;
-  Result openRes = file.open(spvBinFile.str().c_str(), FileAccessRead | FileAccessBinary);
-  if (openRes != Result::Success)
-    return openRes;
+  Result result = file.open(spvBinFile.str().c_str(), FileAccessRead | FileAccessBinary);
+  if (result != Result::Success)
+    return createResultError(result, Twine("Cannot open file for read: ") + spvBinFile);
 
   const size_t fileSize = File::getFileSize(spvBinFile.str().c_str());
   char *bin = new char[fileSize]();
   size_t bytesRead = 0;
-  Result readRes = file.read(bin, fileSize, &bytesRead);
-  if (readRes != Result::Success) {
+  result = file.read(bin, fileSize, &bytesRead);
+  if (result != Result::Success) {
     delete[] bin;
-    return readRes;
+    return createResultError(result, Twine("Failed to read: ") + spvBinFile);
   }
-  spvBin.codeSize = bytesRead;
-  spvBin.pCode = bin;
 
-  return Result::Success;
+  return BinaryData{bytesRead, bin};
 }
 
 // =====================================================================================================================
@@ -368,18 +363,16 @@ Result getSpirvBinaryFromFile(StringRef spvBinFile, BinaryData &spvBin) {
 //
 // @param pipelineBin : Data to be written
 // @param fileName : Name of the file that should be written or "-" for stdout
-// @returns : Result::Success on success, Result::ErrorUnavailable on failure
-Result writeFile(BinaryData pipelineBin, StringRef fileName) {
+// @returns : `ErrorSuccess` on success, `ResultError` on failure
+Error writeFile(BinaryData pipelineBin, StringRef fileName) {
   FILE *outFile = stdout;
   if (fileName != "-")
     outFile = fopen(fileName.str().c_str(), "wb");
 
-  if (!outFile) {
-    LLPC_ERRS("Failed to open output file: " << fileName << "\n");
-    return Result::ErrorUnavailable;
-  }
+  if (!outFile)
+    return createResultError(Result::ErrorUnavailable, Twine("Failed to open output file: " + fileName));
 
-  auto result = Result::Success;
+  Result result = Result::Success;
   if (fwrite(pipelineBin.pCode, 1, pipelineBin.codeSize, outFile) != pipelineBin.codeSize)
     result = Result::ErrorUnavailable;
 
@@ -387,9 +380,9 @@ Result writeFile(BinaryData pipelineBin, StringRef fileName) {
     result = Result::ErrorUnavailable;
 
   if (result != Result::Success)
-    LLPC_ERRS("Failed to write output file: " << fileName << "\n");
+    return createResultError(Result::ErrorUnavailable, Twine("Failed to write output file: " + fileName));
 
-  return result;
+  return Error::success();
 }
 
 } // namespace StandaloneCompiler
