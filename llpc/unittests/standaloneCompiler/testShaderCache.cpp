@@ -87,7 +87,8 @@ private:
 TEST_F(ShaderCacheTest, CreateEmpty) {
   ShaderCache &cache = getCache();
   size_t size = 0;
-  cache.Serialize(nullptr, &size);
+  Result result = cache.Serialize(nullptr, &size);
+  EXPECT_EQ(result, Result::Success);
   EXPECT_EQ(size, sizeof(ShaderCacheSerializedHeader));
 }
 
@@ -127,7 +128,8 @@ TEST_F(ShaderCacheTest, InsertOne) {
   EXPECT_THAT(charArrayFromBlob(blob, blobSize), ElementsAreArray(cacheEntry));
 
   size_t cacheSize = 0;
-  cache.Serialize(nullptr, &cacheSize);
+  result = cache.Serialize(nullptr, &cacheSize);
+  EXPECT_EQ(result, Result::Success);
   EXPECT_GE(cacheSize, sizeof(ShaderCacheSerializedHeader) + blobSize);
 }
 
@@ -164,7 +166,8 @@ TEST_F(ShaderCacheTest, InsertsShaders) {
   }
 
   size_t cacheSize = 0;
-  cache.Serialize(nullptr, &cacheSize);
+  Result result = cache.Serialize(nullptr, &cacheSize);
+  EXPECT_EQ(result, Result::Success);
   EXPECT_GE(cacheSize, sizeof(ShaderCacheSerializedHeader) + (numShaders * cacheEntry.size()));
 }
 
@@ -227,7 +230,8 @@ TEST_F(ShaderCacheTest, InsertsShadersMultithreaded) {
   }
 
   size_t cacheSize = 0;
-  cache.Serialize(nullptr, &cacheSize);
+  Result result = cache.Serialize(nullptr, &cacheSize);
+  EXPECT_EQ(result, Result::Success);
   EXPECT_GE(cacheSize, sizeof(ShaderCacheSerializedHeader) + (numShaders * cacheEntry.size()));
 }
 

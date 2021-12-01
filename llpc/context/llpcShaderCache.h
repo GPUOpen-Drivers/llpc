@@ -122,37 +122,38 @@ public:
   ShaderCache();
   ~ShaderCache() override;
 
-  Result init(const ShaderCacheCreateInfo *createInfo, const ShaderCacheAuxCreateInfo *auxCreateInfo);
+  LLPC_NODISCARD Result init(const ShaderCacheCreateInfo *createInfo, const ShaderCacheAuxCreateInfo *auxCreateInfo);
   void Destroy() override;
 
-  Result Serialize(void *blob, size_t *size) override;
+  LLPC_NODISCARD Result Serialize(void *blob, size_t *size) override;
 
-  Result Merge(unsigned srcCacheCount, const IShaderCache **ppSrcCaches) override;
+  LLPC_NODISCARD Result Merge(unsigned srcCacheCount, const IShaderCache **ppSrcCaches) override;
 
-  ShaderEntryState findShader(MetroHash::Hash hash, bool allocateOnMiss, CacheEntryHandle *phEntry);
+  LLPC_NODISCARD ShaderEntryState findShader(MetroHash::Hash hash, bool allocateOnMiss, CacheEntryHandle *phEntry);
 
   void insertShader(CacheEntryHandle hEntry, const void *blob, size_t size);
 
   void resetShader(CacheEntryHandle hEntry);
 
-  Result retrieveShader(CacheEntryHandle hEntry, const void **ppBlob, size_t *size);
+  LLPC_NODISCARD Result retrieveShader(CacheEntryHandle hEntry, const void **ppBlob, size_t *size);
 
-  bool isCompatible(const ShaderCacheCreateInfo *createInfo, const ShaderCacheAuxCreateInfo *auxCreateInfo);
+  LLPC_NODISCARD bool isCompatible(const ShaderCacheCreateInfo *createInfo,
+                                   const ShaderCacheAuxCreateInfo *auxCreateInfo);
 
 private:
   ShaderCache(const ShaderCache &) = delete;
   ShaderCache &operator=(const ShaderCache &) = delete;
 
-  Result buildFileName(const char *executableName, const char *cacheFilePath, GfxIpVersion gfxIp,
-                       bool *cacheFileExists);
-  Result validateAndLoadHeader(const ShaderCacheSerializedHeader *header, size_t dataSourceSize);
-  Result loadCacheFromBlob(const void *initialData, size_t initialDataSize);
-  Result populateIndexMap(void *dataStart, size_t dataSize);
-  uint64_t calculateCrc(const uint8_t *data, size_t numBytes);
+  LLPC_NODISCARD Result buildFileName(const char *executableName, const char *cacheFilePath, GfxIpVersion gfxIp,
+                                      bool *cacheFileExists);
+  LLPC_NODISCARD Result validateAndLoadHeader(const ShaderCacheSerializedHeader *header, size_t dataSourceSize);
+  LLPC_NODISCARD Result loadCacheFromBlob(const void *initialData, size_t initialDataSize);
+  LLPC_NODISCARD Result populateIndexMap(void *dataStart, size_t dataSize);
+  LLPC_NODISCARD uint64_t calculateCrc(const uint8_t *data, size_t numBytes);
 
-  Result loadCacheFromFile();
+  LLPC_NODISCARD Result loadCacheFromFile();
   void resetCacheFile();
-  Result addShaderToFile(const ShaderIndex *index);
+  LLPC_NODISCARD Result addShaderToFile(const ShaderIndex *index);
 
   void *getCacheSpace(size_t numBytes);
 
