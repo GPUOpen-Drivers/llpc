@@ -1029,7 +1029,7 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
     if (!m_moduleUsage->useIsNan)
       fmf.setNoNaNs();
 
-    fmf.setNoSignedZeros(allowContract);
+    fmf.setNoSignedZeros();
   }
   return fmf;
 }
