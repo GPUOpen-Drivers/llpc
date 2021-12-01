@@ -882,6 +882,14 @@ static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *no
 //
 // @param [in] resourceMapping : resource mapping data, containing user data nodes
 static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMapping) {
+  auto descriptorRangeValues = ArrayRef<StaticDescriptorValue>(resourceMapping->pStaticDescriptorValues,
+                                                               resourceMapping->staticDescriptorValueCount);
+  for (const auto &range : descriptorRangeValues) {
+    if (range.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
+      return true;
+    }
+  }
+
   for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
     if (isUnrelocatableResourceMappingRootNode(&resourceMapping->pUserDataNodes[i].node))
       return true;
