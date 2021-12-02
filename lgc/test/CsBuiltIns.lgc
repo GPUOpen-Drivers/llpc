@@ -136,9 +136,9 @@ attributes #0 = { nounwind }
 
 ; RUN: lgc -extract=5 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK5 %s
 ; CHECK5-LABEL: _amdgpu_cs_main:
-; CHECK5-DAG: v_mov_b32_e32 v0, s3
-; CHECK5-DAG: v_mov_b32_e32 v1, s4
-; CHECK5-DAG: v_mov_b32_e32 v2, s5
+; CHECK5-DAG: v_mov_b32_e32 v0, s{{[0-9]*}}
+; CHECK5-DAG: v_mov_b32_e32 v1, s{{[0-9]*}}
+; CHECK5-DAG: v_mov_b32_e32 v2, s{{[0-9]*}}
 ; CHECK5: buffer_store_dwordx3 v[0:2],
 ; rsrc2 bits 7,8,9 need to be set to enable the three WorkgroupId SGPRs
 ; CHECK5: COMPUTE_PGM_RSRC2): 0x{{[0-9a-f]*[7f][89a-f][0-9a-f]$}}
