@@ -17,8 +17,12 @@ jobs:
         host-os:             ["ubuntu-20.04"]
         image-template:      ["gcr.io/stadia-open-source/amdvlk_%s%s:nightly"]
         config:              [Release]
-        feature-set:         ["+gcc", "+clang", "+clang+shadercache", "+clang+ubsan+asan",
-                              "+gcc+assertions", "+clang+assertions", "+clang+shadercache+assertions", "+clang+ubsan+asan+assertions"]
+        feature-set:         ["+gcc", "+gcc+assertions",
+                              "+clang", "+clang+coverage",
+                              "+clang+shadercache+coverage+assertions",
+                              "+clang+shadercache+ubsan+asan",
+                              "+clang+shadercache+ubsan+asan+assertions",
+                              "+clang+shadercache+tsan"]
     steps:
       - name: Free up disk space
         if: contains(matrix.feature-set, '+ubsan') || contains(matrix.feature-set, '+asan') || contains(matrix.feature-set, '+tsan') || contains(matrix.feature-set, '+coverage')
