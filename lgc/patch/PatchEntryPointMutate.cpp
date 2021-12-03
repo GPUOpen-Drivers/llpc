@@ -640,7 +640,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
             } else {
               // Shader compilation. Use a relocation to get the descriptor
               // table offset for the descriptor set userDataIdx.
-              offset = builder.CreateRelocationConstant("descset_" + Twine(userDataIdx));
+              offset = builder.CreateRelocationConstant(reloc::DescriptorTableOffset + Twine(userDataIdx));
               namePrefix = "descSet";
             }
             Value *addr = builder.CreateGEP(builder.getInt8Ty(), spillTable, offset);

@@ -63,6 +63,12 @@ const static char DescriptorOffset[] = "doff_";
 //  * 1: descriptor pointer should be loaded from the spill table
 const static char DescriptorUseSpillTable[] = "dusespill_";
 
+// The offset in the root table of the descriptor table that contains the descriptor set.  The value is in bytes.
+// The format is: "descset_X" where:
+// * X is the descriptor set number
+//
+const static char DescriptorTableOffset[] = "descset_";
+
 // Descriptor stride is "dstride_X_Y" where:
 // * X is the descriptor set number
 // * Y is the binding number

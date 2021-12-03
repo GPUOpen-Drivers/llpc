@@ -115,6 +115,26 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
     }
   }
 
+  if (name.startswith(reloc::DescriptorTableOffset)) {
+    unsigned descSet = 0;
+    if (!name.drop_front(strlen(reloc::DescriptorTableOffset)).consumeInteger(10, descSet)) {
+      const ResourceNode *outerNode = nullptr;
+      const ResourceNode *node = nullptr;
+      std::tie(outerNode, node) =
+          getPipelineState()->findResourceNode(ResourceNodeType::DescriptorTableVaPtr, descSet, 0);
+
+      // If all entries for the descriptor set are in the root table, then the descriptor table will not be found.
+      // In that case, the value does not matter, so just return 0.
+      if (node) {
+        value = node->offsetInDwords * 4;
+        m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+      } else {
+        value = 0;
+      }
+      return true;
+    }
+  }
+
   if (name.startswith(reloc::DescriptorUseSpillTable)) {
     // If the corresponding node is a root node and the type is DescriptorBuffer, use the spill table to get the
     // descriptor pointer.
