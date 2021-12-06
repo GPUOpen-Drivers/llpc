@@ -330,7 +330,7 @@ Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
 // @param firstInFile : Name of first input file
 // @returns : `ErrorSuccess` on success, `ResultError` on failure
 Error outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, StringRef firstInFile) {
-  const BinaryData &pipelineBin = (compileInfo->stageMask & shaderStageToMask(ShaderStageCompute))
+  const BinaryData &pipelineBin = (compileInfo->stageMask & ShaderStageComputeBit)
                                       ? compileInfo->compPipelineOut.pipelineBin
                                       : compileInfo->gfxPipelineOut.pipelineBin;
   SmallString<64> outFileName(suppliedOutFile);
@@ -413,7 +413,7 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
     }
   }
 
-  const bool isGraphics = (compileInfo.stageMask & shaderStageToMask(ShaderStageCompute)) == 0;
+  const bool isGraphics = (compileInfo.stageMask & ShaderStageComputeBit) == 0;
   for (unsigned i = 0; i < compileInfo.shaderModuleDatas.size(); ++i) {
     compileInfo.shaderModuleDatas[i].shaderInfo.options.pipelineOptions =
         isGraphics ? compileInfo.gfxPipelineInfo.options : compileInfo.compPipelineInfo.options;

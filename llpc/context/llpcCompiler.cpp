@@ -1178,9 +1178,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       };
 
   // Only enable per stage cache for full graphic pipeline
-  bool checkPerStageCache =
-      cl::EnablePerStageCache && context->isGraphics() && !buildingRelocatableElf &&
-      (context->getShaderStageMask() & (shaderStageToMask(ShaderStageVertex) | shaderStageToMask(ShaderStageFragment)));
+  bool checkPerStageCache = cl::EnablePerStageCache && context->isGraphics() && !buildingRelocatableElf &&
+                            (context->getShaderStageMask() & (ShaderStageVertexBit | ShaderStageFragmentBit));
   if (!checkPerStageCache)
     checkShaderCacheFunc = nullptr;
 
@@ -1213,7 +1212,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   }
 
   if (result == Result::Success && fragmentShaderInfo && fragmentShaderInfo->options.updateDescInElf &&
-      (context->getShaderStageMask() & shaderStageToMask(ShaderStageFragment)))
+      (context->getShaderStageMask() & ShaderStageFragmentBit))
     graphicsShaderCacheChecker.updateRootUserDateOffset(pipelineElf);
 
   context->setDiagnosticHandler(nullptr);

@@ -51,7 +51,7 @@ public:
   virtual const void *getPipelineBuildInfo() const { return m_pipelineInfo; }
 
   // Gets the mask of active shader stages bound to this pipeline
-  virtual unsigned getShaderStageMask() const { return shaderStageToMask(ShaderStageCompute); }
+  virtual unsigned getShaderStageMask() const { return ShaderStageComputeBit; }
 
   // Sets the mask of active shader stages bound to this pipeline
   void setShaderStageMask(unsigned mask) { assert(mask == getShaderStageMask()); }
