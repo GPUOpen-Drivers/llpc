@@ -6340,6 +6340,31 @@ Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicB
     result = ConvertingSamplerSelectLadderHelper(result, convertingSamplerIdx, createImageGetLod);
   }
 
+  // NOTE: This is a workaround. When UV width equals 0, the result return 0, but we expect the value is
+  // -22.0 to -infinity.
+  // Derivative operations are performed on the XY of UV coordinate respectively, if both of result
+  // are zero, we will return -FLT_MAX for LOD.
+  Value *absDpdx =
+      getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, getBuilder()->CreateDerivative(coord, false, false));
+  Value *absDpdy =
+      getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, getBuilder()->CreateDerivative(coord, true, false));
+  Value *absDdpxPlusDpdy = getBuilder()->CreateFAdd(absDpdx, absDpdy);
+  Value *maybeZero = getBuilder()->CreateFCmpOEQ(absDdpxPlusDpdy, ConstantFP::get(coord->getType(), 0.0));
+
+  Value *isZero = getBuilder()->getTrue();
+  if (maybeZero->getType()->isVectorTy()) {
+    for (unsigned elemIdx = 0; elemIdx < cast<FixedVectorType>(maybeZero->getType())->getNumElements(); elemIdx++) {
+      Value *elem = getBuilder()->CreateExtractElement(maybeZero, elemIdx);
+      isZero = getBuilder()->CreateAnd(elem, isZero);
+    }
+  } else {
+    isZero = maybeZero;
+  }
+
+  auto fixValue = getBuilder()->CreateInsertElement(
+      result, ConstantFP::get(m_builder->getFloatTy(), -std::numeric_limits<float>::max()), 1u);
+  result = getBuilder()->CreateSelect(isZero, fixValue, result);
+
   return result;
 }
 
