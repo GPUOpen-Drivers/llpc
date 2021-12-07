@@ -41,10 +41,12 @@ using Hash128 = std::array<uint64_t, 2>;
 
 /// Enumerates LGC shader stages.
 enum ShaderStage : unsigned {
-  ShaderStageVertex = 0,                                ///< Vertex shader
+  ShaderStageTask = 0,                                  ///< Task shader
+  ShaderStageVertex,                                    ///< Vertex shader
   ShaderStageTessControl,                               ///< Tessellation control shader
   ShaderStageTessEval,                                  ///< Tessellation evaluation shader
   ShaderStageGeometry,                                  ///< Geometry shader
+  ShaderStageMesh,                                      ///< Mesh shader
   ShaderStageFragment,                                  ///< Fragment shader
   ShaderStageCompute,                                   ///< Compute shader
   ShaderStageCount,                                     ///< Count of shader stages

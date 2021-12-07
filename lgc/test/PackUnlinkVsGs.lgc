@@ -20,7 +20,7 @@ target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:3
 target triple = "amdgcn--amdpal"
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !9 !lgc.shaderstage !9 {
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !2 {
 .entry:
   %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 1, i32 1, i32 0, i32 0)
   %1 = call {}* @llvm.invariant.start.p7i8(i64 -1, i8 addrspace(7)* %0)
@@ -48,7 +48,7 @@ declare void @lgc.create.write.builtin.output(...) local_unnamed_addr #0
 declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.GS.main() local_unnamed_addr #0 !spirv.ExecutionModel !10 !lgc.shaderstage !10 {
+define dllexport spir_func void @lgc.shader.GS.main() local_unnamed_addr #0 !lgc.shaderstage !9 {
 .entry:
   %0 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 0, i32 undef)
   %1 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 1, i32 undef)
@@ -103,5 +103,4 @@ attributes #2 = { argmemonly nofree nosync nounwind willreturn }
 !6 = !{i32 2, i32 3}
 !7 = !{i32 0, i32 0, i32 0, i32 1}
 !8 = !{!"\82\B0amdpal.pipelines\91\84\AA.registers\80\B0.spill_threshold\CE\FF\FF\FF\FF\B0.user_data_limit\00\AF.xgl_cache_info\82\B3.128_bit_cache_hash\92\CF\DD\BF\E3\A1\D6\C4\0F<\CF\EB\95#\AB\F5\17\DC\B4\AD.llpc_version\A449.0\AEamdpal.version\92\02\03"}
-!9 = !{i32 0}
-!10 = !{i32 3}
+!9 = !{i32 4}

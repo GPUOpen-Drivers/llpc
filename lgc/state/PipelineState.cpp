@@ -427,9 +427,9 @@ ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage, bool fake
 // =====================================================================================================================
 // Check whether the pipeline is a graphics pipeline
 bool PipelineState::isGraphics() const {
-  return (getShaderStageMask() &
-          ((1U << ShaderStageVertex) | (1U << ShaderStageTessControl) | (1U << ShaderStageTessEval) |
-           (1U << ShaderStageGeometry) | (1U << ShaderStageFragment))) != 0;
+  return (getShaderStageMask() & ((1U << ShaderStageTask) | (1U << ShaderStageVertex) | (1U << ShaderStageTessControl) |
+                                  (1U << ShaderStageTessEval) | (1U << ShaderStageGeometry) | (1U << ShaderStageMesh) |
+                                  (1U << ShaderStageFragment))) != 0;
 }
 
 // =====================================================================================================================

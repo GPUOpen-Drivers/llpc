@@ -24,7 +24,7 @@ target triple = "amdgcn--amdpal"
 ; CHECK-NEXT: [[EXTRACTELEMENT:%[0-9]+]] = extractelement <4 x float> [[INSERTELEMENT3]], i32 [[SELECT1]]
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !15 !lgc.shaderstage !15 {
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !15 {
 .entry:
   %0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 2, i32 0, i32 0, i32 0, i32 0, i32 undef)
   %1 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
@@ -42,7 +42,7 @@ declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr
 declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spirv.ExecutionModel !16 !lgc.shaderstage !16 {
+define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !lgc.shaderstage !16 {
 .entry:
   %0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 2, i32 0, i32 0, i32 0, i32 16, i32 undef)
   %1 = call i32 (...) @lgc.create.extract.bit.field.i32(i32 12816, i32 0, i32 4, i1 false)
@@ -98,5 +98,5 @@ attributes #4 = { nofree nosync nounwind readnone speculatable willreturn }
 !12 = !{i32 2, i32 3}
 !13 = !{i32 0, i32 0, i32 0, i32 1, i32 0, i32 0, i32 0, i32 0, i32 1}
 !14 = !{!"\82\B0amdpal.pipelines\91\84\AA.registers\80\B0.spill_threshold\CE\FF\FF\FF\FF\B0.user_data_limit\00\AF.xgl_cache_info\82\B3.128_bit_cache_hash\92\CF\D2=9\F1\99\1BM\8E\CF\A8y\98tI\99\D7'\AD.llpc_version\A446.1\AEamdpal.version\92\02\03"}
-!15 = !{i32 0}
-!16 = !{i32 4}
+!15 = !{i32 1}
+!16 = !{i32 6}
