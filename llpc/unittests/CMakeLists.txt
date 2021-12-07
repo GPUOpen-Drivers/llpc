@@ -46,7 +46,7 @@ endif()
 
 # Based on add_unittest in llvm/cmake/modules/AddLLVM.cmake. Note that because LLPC is not an
 # (internal) LLVM project in the CMake sense, we cannot use the LLVM implementation here.
-function(llpc_add_unittest_impl test_suite test_name)
+function(add_llpc_unittest_impl test_suite test_name)
   add_executable(${test_name})
   add_dependencies(${test_suite} ${test_name})
   target_sources(${test_name} PRIVATE ${ARGN})
@@ -54,7 +54,7 @@ function(llpc_add_unittest_impl test_suite test_name)
   set(outdir ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
   set_output_directory(${test_name} BINARY_DIR ${outdir} LIBRARY_DIR ${outdir})
 
-  target_link_libraries(${test_name} PRIVATE ${LLVM_GTEST_LIBS})
+  target_link_libraries(${test_name} PRIVATE ${LLVM_GTEST_LIBS} llpc_standalone_compiler)
   target_compile_definitions(${test_name} PRIVATE
     LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION}  # Required by vkgcDefs.h.
   )
@@ -70,9 +70,10 @@ function(llpc_add_unittest_impl test_suite test_name)
 endfunction()
 
 function(add_llpc_unittest test_dirname)
-  llpc_add_unittest_impl(LlpcUnitTests ${test_dirname} ${ARGN})
+  add_llpc_unittest_impl(LlpcUnitTests ${test_dirname} ${ARGN})
 endfunction()
 
+add_subdirectory(context)
 add_subdirectory(standaloneCompiler)
 add_subdirectory(util)
 
