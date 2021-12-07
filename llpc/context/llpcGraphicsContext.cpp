@@ -52,6 +52,7 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
     : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_stageMask(0),
       m_activeStageCount(0) {
   setUnlinked(pipelineInfo->unlinked);
+  // clang-format off
   const PipelineShaderInfo *shaderInfo[ShaderStageGfxCount] = {
     &pipelineInfo->vs,
     &pipelineInfo->tcs,
@@ -59,7 +60,7 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
     &pipelineInfo->gs,
     &pipelineInfo->fs,
   };
-
+  // clang-format on
   for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
     if (shaderInfo[stage]->pModuleData) {
       m_stageMask |= shaderStageToMask(static_cast<ShaderStage>(stage));
@@ -119,6 +120,7 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
 // =====================================================================================================================
 // Check whether the pipeline uses features relevant to subgroup size
 bool GraphicsContext::usesSubgroupSize() const {
+  // clang-format off
   std::array<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfos = {
     &m_pipelineInfo->vs,
     &m_pipelineInfo->tcs,
@@ -126,6 +128,7 @@ bool GraphicsContext::usesSubgroupSize() const {
     &m_pipelineInfo->gs,
     &m_pipelineInfo->fs,
   };
+  // clang-format on
   for (auto shaderInfo : shaderInfos) {
     if (!shaderInfo->pModuleData)
       continue;

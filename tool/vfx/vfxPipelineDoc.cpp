@@ -151,6 +151,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
 
   if (m_pipelineState.pipelineType == VfxPipelineTypeGraphics ||
       m_pipelineState.pipelineType == VfxPipelineTypeCompute) {
+    // clang-format off
     PipelineShaderInfo *shaderInfo[NativeShaderStageCount] = {
       &m_pipelineState.gfxPipelineInfo.vs,
       &m_pipelineState.gfxPipelineInfo.tcs,
@@ -159,6 +160,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       &m_pipelineState.gfxPipelineInfo.fs,
       &m_pipelineState.compPipelineInfo.cs,
     };
+    // clang-format on
 
     m_shaderSources.resize(NativeShaderStageCount);
     m_pipelineState.numStages = NativeShaderStageCount;

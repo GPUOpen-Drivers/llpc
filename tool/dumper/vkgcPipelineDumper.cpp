@@ -431,9 +431,11 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorFmask:
   case ResourceMappingNodeType::DescriptorBufferCompact:
   case ResourceMappingNodeType::PushConst:
+// clang-format off
 #if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
   case ResourceMappingNodeType::InlineBuffer:
 #endif
+  // clang-format on
   case ResourceMappingNodeType::DescriptorConstBuffer:
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
@@ -812,6 +814,7 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
                                               const GraphicsPipelineBuildInfo *pipelineInfo) {
   dumpVersionInfo(*dumpFile);
   // Dump pipeline
+  // clang-format off
   const PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
     &pipelineInfo->vs,
     &pipelineInfo->tcs,
@@ -819,6 +822,7 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
     &pipelineInfo->gs,
     &pipelineInfo->fs,
   };
+  // clang-format on
 
   for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
     const PipelineShaderInfo *shaderInfo = shaderInfos[stage];
@@ -835,7 +839,7 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
 }
 
 // =====================================================================================================================
-// Builds hash code from graphics pipline build info.  If stage is a specific stage of the graphics pipeline, then only
+// Builds hash code from graphics pipeline build info.  If stage is a specific stage of the graphics pipeline, then only
 // the portions of the pipeline build info that affect that stage will be included in the hash.  Otherwise, stage must
 // be ShaderStageInvalid, and all values in the build info will be included.
 //
@@ -1241,9 +1245,11 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
     // Do nothing for the stream-out table
     break;
   }
+// clang-format off
 #if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
   case ResourceMappingNodeType::InlineBuffer:
 #endif
+  // clang-format on
   case ResourceMappingNodeType::PushConst: {
     if (!isRootNode)
       hasher->Update(userDataNode->srdRange);

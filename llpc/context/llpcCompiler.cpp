@@ -1415,7 +1415,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
                                        GraphicsPipelineBuildOut *pipelineOut, void *pipelineDumpFile) {
   Result result = Result::Success;
   BinaryData elfBin = {};
-
+  // clang-format off
   SmallVector<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfo = {
     &pipelineInfo->vs,
     &pipelineInfo->tcs,
@@ -1423,7 +1423,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     &pipelineInfo->gs,
     &pipelineInfo->fs,
   };
-
+  // clang-format on
   const bool relocatableElfRequested = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
   const bool buildUsingRelocatableElf =
       relocatableElfRequested && canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo);

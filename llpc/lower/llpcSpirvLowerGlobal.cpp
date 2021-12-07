@@ -1026,6 +1026,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
 
         for (unsigned idx = 0; idx < elemCount; ++idx) {
           Value *elem = nullptr;
+          // clang-format off
           if (inOutMeta.PerVertexDimension) {
             assert(inOutMeta.InterpLoc == InterpLocCustom);
             elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, nullptr, 0, nullptr, 0, inOutMeta.InterpLoc,

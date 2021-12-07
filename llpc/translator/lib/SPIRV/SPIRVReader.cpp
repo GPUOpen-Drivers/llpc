@@ -1470,9 +1470,10 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
   }
 
   Constant *const zero = getBuilder()->getInt32(0);
-
+  // clang-format off
   if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
   ) {
+    //clang-format on
     // For structs we lookup the mapping of the elements and use it to reverse map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -1624,9 +1625,10 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
   }
 
   Constant *const zero = getBuilder()->getInt32(0);
-
+  // clang-format off
   if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
   ) {
+    // clang-format on
     // For structs we lookup the mapping of the elements and use it to map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -6787,13 +6789,14 @@ bool SPIRVToLLVM::transMetadata() {
             }
           }
         }
-
+        // clang-format off
           // Give the workgroup size to the middle-end.
           ComputeShaderMode computeMode = {};
           computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
           computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
           computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
           getBuilder()->setComputeShaderMode(computeMode);
+        // clang-format on
       } else
         llvm_unreachable("Invalid execution model");
 
@@ -7294,7 +7297,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     if (alignTo64Bit)
       startXfbExtraOffset = roundUpToMultiple(inOutDec.XfbOffset + inOutDec.XfbExtraOffset, 8u) - inOutDec.XfbOffset;
 
-    // PerVetex is not inherted.
+    // PerVertex is not inherted.
     bool isPerVertexDimension = inOutDec.PerVertexDimension;
     inOutDec.PerVertexDimension = false;
 
