@@ -389,7 +389,11 @@ Result buildPipeline(ICompiler *compiler, CompileInfo *compileInfo,
 
     // Fill pipeline shader info
     PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
-        &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
+      &pipelineInfo->vs,
+      &pipelineInfo->tcs,
+      &pipelineInfo->tes,
+      &pipelineInfo->gs,
+      &pipelineInfo->fs,
     };
 
     ResourceMappingNodeMap nodeSets;
@@ -565,7 +569,7 @@ Result outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, S
 // @param ignoreColorAttachmentFormats : Whether to ignore color attachment formats
 // @returns : Result::Success on success, other status codes on failure
 Result processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const std::string &inFile, bool unlinked,
-                            bool ignoreColorAttachmentFormats) {
+                                   bool ignoreColorAttachmentFormats) {
   const char *log = nullptr;
   const bool vfxResult =
       Vfx::vfxParseFile(inFile.c_str(), 0, nullptr, VfxDocTypePipeline, &compileInfo.pipelineInfoFile, &log);
@@ -647,7 +651,7 @@ Result processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const
 // @param [out] filenames : Space-separated list of used input file names
 // @returns : Result::Success on success, other status codes on failure
 Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef<std::string> inFiles,
-                          bool validateSpirv, std::string &fileNames) {
+                                 bool validateSpirv, std::string &fileNames) {
   for (const std::string &inFile : inFiles) {
     fileNames += inFile + " ";
     Result result = Result::Success;
@@ -657,7 +661,7 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
       // SPIR-V assembly text or SPIR-V binary.
       if (isSpirvTextFile(inFile)) {
         result = assembleSpirv(inFile, spvBinFile);
-        if (result != Result::Success)
+      if (result != Result::Success)
           return result;
       } else {
         spvBinFile = inFile;
@@ -667,7 +671,6 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
       Result result = getSpirvBinaryFromFile(spvBinFile, spvBin);
       if (result != Result::Success)
         return result;
-
       if (!InitSpvGen()) {
         LLPC_OUTS("Failed to load SPVGEN -- no SPIR-V disassembler available\n");
       } else {
@@ -682,7 +685,7 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
       if (validateSpirv) {
         if (!InitSpvGen()) {
           errs() << "Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n";
-        } else {
+	} else {
           char log[1024] = {};
           if (!spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log)) {
             LLPC_ERRS("Failed to validate SPIR-V: \n" << log << "\n");
@@ -690,7 +693,6 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
           }
         }
       }
-
       // NOTE: If the entry target is not specified, we set it to the one gotten from SPIR-V binary.
       if (compileInfo.entryTarget.empty())
         compileInfo.entryTarget = Vkgc::getEntryPointNameFromSpirvBinary(&spvBin);
@@ -711,7 +713,7 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
           }
         }
       } else {
-        LLPC_ERRS(format("Failed to identify shader stages by entry-point \"%s\"\n", compileInfo.entryTarget.c_str()));
+	LLPC_ERRS(format("Failed to identify shader stages by entry-point \"%s\"\n", compileInfo.entryTarget.c_str()));
         return Result::ErrorUnavailable;
       }
     } else if (isLlvmIrFile(inFile)) {
@@ -771,7 +773,7 @@ Result processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRe
 
       ShaderStage stage = ShaderStageInvalid;
       result = compileGlsl(inFile, &stage, spvBinFile, compileInfo.entryTarget);
-      if (result != Result::Success)
+            if (result != Result::Success)
         return result;
 
       if (compileInfo.stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))

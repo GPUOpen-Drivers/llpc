@@ -149,6 +149,7 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeRoundingModeRTE:
   case ExecutionModeRoundingModeRTZ:
   case ExecutionModeSubgroupUniformControlFlowKHR:
+  case ExecutionModeStencilRefReplacingEXT:
     return true;
   default:
     return false;

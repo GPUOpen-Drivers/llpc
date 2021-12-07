@@ -50,6 +50,7 @@ void main()
     O2.o2 = dvec4(b1.d1, 0, 0, 0) + dvec4(b1.d2, 0, 0) + dvec4(b1.d3, 0) + b1.d4;
 }
 
+
 [CsInfo]
 entryPoint = main
 userDataNode[0].type = DescriptorTableVaPtr
@@ -60,7 +61,7 @@ userDataNode[0].next[0].offsetInDwords = 0
 userDataNode[0].next[0].sizeInDwords = 4
 userDataNode[0].next[0].set = 0
 userDataNode[0].next[0].binding = 0
-userDataNode[0].next[1].type = PushConst
+userDataNode[0].next[1].type = InlineBuffer
 userDataNode[0].next[1].offsetInDwords = 4
 userDataNode[0].next[1].sizeInDwords = 64
 userDataNode[0].next[1].set = 0

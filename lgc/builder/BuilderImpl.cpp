@@ -264,6 +264,14 @@ bool BuilderImplBase::supportPermLaneDpp() const {
 }
 
 // =====================================================================================================================
+// Get whether the context we are building in supports permute lane 64 DPP operations.
+bool BuilderImplBase::supportPermLane64Dpp() const {
+  auto gfxip = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
+  auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
+  return gfxip >= 11 && waveSize == 64;
+}
+
+// =====================================================================================================================
 // Create an "if..endif" or "if..else..endif" structure. The current basic block becomes the "endif" block, and all
 // instructions in that block before the insert point are moved to the "if" block. The insert point is moved to
 // the start of the "then" block; the caller can save the insert point before calling this method then restore it

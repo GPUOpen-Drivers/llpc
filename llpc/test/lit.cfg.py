@@ -25,6 +25,8 @@
 
 # -*- Python -*-
 
+import subprocess
+
 import lit.formats
 import lit.util
 
@@ -76,3 +78,4 @@ tool_dirs = [config.llvm_tools_dir, config.amdllpc_dir]
 tools = ['amdllpc', 'llvm-objdump', 'llvm-readelf', 'not', 'count']
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)
+

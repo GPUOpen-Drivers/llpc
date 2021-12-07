@@ -1429,7 +1429,11 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   BinaryData elfBin = {};
 
   SmallVector<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfo = {
-      &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
+    &pipelineInfo->vs,
+    &pipelineInfo->tcs,
+    &pipelineInfo->tes,
+    &pipelineInfo->gs,
+    &pipelineInfo->fs,
   };
 
   const bool relocatableElfRequested = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
@@ -1991,6 +1995,7 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
   case ShaderStageGeometry:
     return lgc::ShaderStageGeometry;
   case ShaderStageFragment:
+    // TODO: Will add mesh support in LGC
     return lgc::ShaderStageFragment;
   default:
     llvm_unreachable("");

@@ -35,6 +35,7 @@
 #include "palPipelineAbi.h"
 #include "spirvExt.h"
 #include "vkgcElfReader.h"
+
 #include <cassert>
 
 using namespace llvm;

@@ -83,7 +83,9 @@ enum SpvGenOptions : uint32_t
     SpvGenOptionOptimizeDisable      = (1 << 9),
     SpvGenOptionOptimizeSize         = (1 << 10),
     SpvGenOptionInvertY              = (1 << 11),
-    SpvGenOptionSuppressInfolog      = (1 << 12)
+    SpvGenOptionSuppressInfolog      = (1 << 12),
+    SpvGenOptionHlslDX9compatible    = (1 << 13),
+    SpvGenOptionHlslEnable16BitTypes = (1 << 14)
 };
 
 enum SpvSourceLanguage : uint32_t
@@ -176,10 +178,17 @@ bool SH_IMPORT_EXPORT spvDisassembleSpirv(
     char*        pBuffer);
 
 bool SH_IMPORT_EXPORT spvCrossSpirv(
-    SpvSourceLanguage spvLanguage,
-    unsigned int size,
-    const void* pSpvToken,
-    char** ppBuffer);
+    SpvSourceLanguage   sourceLanguage,
+    unsigned int        size,
+    const void*         pSpvToken,
+    char**              spvCrossSpirv);
+
+bool SH_IMPORT_EXPORT spvCrossSpirvEx(
+    SpvSourceLanguage   sourceLanguage,
+    uint32_t            version,
+    unsigned int        size,
+    const void*         pSpvToken,
+    char**              spvCrossSpirv);
 
 bool SH_IMPORT_EXPORT spvValidateSpirv(
     unsigned int size,
@@ -296,10 +305,17 @@ typedef bool SH_IMPORT_EXPORT (SPVAPI* PFN_spvDisassembleSpirv)(
     char*               pSpvTextBuf);
 
 typedef bool SH_IMPORT_EXPORT (SPVAPI* PFN_spvCrossSpirv)(
-    SpvSourceLanguage spvLanguage,
-    unsigned int size,
-    const void* pSpvToken,
-    char** ppBuffer);
+    SpvSourceLanguage   sourceLanguage,
+    unsigned int        size,
+    const void*         pSpvToken,
+    char**              ppSourceString);
+
+typedef bool SH_IMPORT_EXPORT(SPVAPI* PFN_spvCrossSpirvEx)(
+    SpvSourceLanguage   sourceLanguage,
+    uint32_t            version,
+    unsigned int        size,
+    const void*         pSpvToken,
+    char**              ppSourceString);
 
 typedef bool SH_IMPORT_EXPORT (SPVAPI* PFN_spvValidateSpirv)(
     unsigned int        size,
@@ -362,6 +378,7 @@ DECL_EXPORT_FUNC(spvGetStageTypeFromName);
 DECL_EXPORT_FUNC(spvAssembleSpirv);
 DECL_EXPORT_FUNC(spvDisassembleSpirv);
 DECL_EXPORT_FUNC(spvCrossSpirv);
+DECL_EXPORT_FUNC(spvCrossSpirvEx);
 DECL_EXPORT_FUNC(spvValidateSpirv);
 DECL_EXPORT_FUNC(spvOptimizeSpirv);
 DECL_EXPORT_FUNC(spvFreeBuffer);
@@ -391,6 +408,7 @@ DEFI_EXPORT_FUNC(spvGetStageTypeFromName);
 DEFI_EXPORT_FUNC(spvAssembleSpirv);
 DEFI_EXPORT_FUNC(spvDisassembleSpirv);
 DEFI_EXPORT_FUNC(spvCrossSpirv);
+DEFI_EXPORT_FUNC(spvCrossSpirvEx);
 DEFI_EXPORT_FUNC(spvValidateSpirv);
 DEFI_EXPORT_FUNC(spvOptimizeSpirv);
 DEFI_EXPORT_FUNC(spvFreeBuffer);
@@ -482,6 +500,7 @@ bool SPVAPI InitSpvGen(
         INITFUNC(spvAssembleSpirv);
         INITFUNC(spvDisassembleSpirv);
         INITFUNC(spvCrossSpirv);
+        INITFUNC(spvCrossSpirvEx);
         INITFUNC(spvValidateSpirv);
         INITFUNC(spvOptimizeSpirv);
         INITFUNC(spvFreeBuffer);
@@ -520,6 +539,7 @@ bool SPVAPI InitSpvGen(
         DEINITFUNC(spvAssembleSpirv);
         DEINITFUNC(spvDisassembleSpirv);
         DEINITFUNC(spvCrossSpirv);
+        DEINITFUNC(spvCrossSpirvEx);
         DEINITFUNC(spvValidateSpirv);
         DEINITFUNC(spvOptimizeSpirv);
         DEINITFUNC(spvFreeBuffer);
@@ -547,6 +567,7 @@ bool SPVAPI InitSpvGen(
 #define spvAssembleSpirv                    g_pfnspvAssembleSpirv
 #define spvDisassembleSpirv                 g_pfnspvDisassembleSpirv
 #define spvCrossSpirv                       g_pfnspvCrossSpirv
+#define spvCrossSpirvEx                     g_pfnspvCrossSpirvEx
 #define spvValidateSpirv                    g_pfnspvValidateSpirv
 #define spvOptimizeSpirv                    g_pfnspvOptimizeSpirv
 #define spvFreeBuffer                       g_pfnspvFreeBuffer
@@ -590,3 +611,4 @@ static inline void vfxPrintDoc(
 }
 
 #endif
+

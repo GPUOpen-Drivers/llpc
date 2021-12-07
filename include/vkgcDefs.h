@@ -226,8 +226,8 @@ enum ShaderStageBit : unsigned {
   ShaderStageTessControlBit = (1 << ShaderStageTessControl), ///< Tessellation control shader bit
   ShaderStageTessEvalBit = (1 << ShaderStageTessEval),       ///< Tessellation evaluation shader bit
   ShaderStageGeometryBit = (1 << ShaderStageGeometry),       ///< Geometry shader bit
-  ShaderStageFragmentBit = (1 << ShaderStageFragment),       ///< Fragment shader bit
-  ShaderStageComputeBit = (1 << ShaderStageCompute),         ///< Compute shader bit
+  ShaderStageFragmentBit = (1 << ShaderStageFragment), ///< Fragment shader bit
+  ShaderStageComputeBit = (1 << ShaderStageCompute),   ///< Compute shader bit
   ShaderStageAllGraphicsBit = ShaderStageVertexBit | ShaderStageTessControlBit | ShaderStageTessEvalBit |
                               ShaderStageGeometryBit | ShaderStageFragmentBit, ///< All graphics bits
 };
@@ -264,10 +264,12 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorConstBufferCompact, ///< Generic descriptor: constBuffer,including dynamic storage buffer
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50)
-  InlineBuffer, ///< Push constant with binding
+
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
+  InlineBuffer,                 ///< Push constant with binding
 #endif
-  Count, ///< Count of resource mapping node types.
+
+  Count,                        ///< Count of resource mapping node types.
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
@@ -395,6 +397,7 @@ struct PipelineOptions {
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.
   ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the
                                                          ///  features of VK_EXT_robustness2.
+  bool reserved1f;                /// Reserved for future functionality
   bool enableInterpModePatch; ///< If set, per-sample interpolation for nonperspective and smooth input is enabled
   bool pageMigrationEnabled;  ///< If set, page migration is enabled
 };

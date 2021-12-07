@@ -507,6 +507,7 @@ union ShaderInOutMetadata {
                                   //   occupied byte count of an element)
     // byte 10~11
     uint64_t XfbExtraOffset : 16; // Transform feedback extra offset
+    uint64_t PerVertexDimension : 1; // Whether this is the per-vertex dimension (outermost) for an array
   };
   uint64_t U64All[2];
 };
@@ -532,6 +533,8 @@ struct ShaderInOutDecorate {
 
   bool PerPatch; // Whether this is a per-patch input/output
                  // (tessellation shader)
+  bool PerVertexDimension; // Whether this is decorated by "pervertexKHR"
+                           // (Fragment shader)
   struct {
     SPIRVInterpModeKind Mode; // Interpolation mode
     SPIRVInterpLocKind Loc;   // Interpolation location

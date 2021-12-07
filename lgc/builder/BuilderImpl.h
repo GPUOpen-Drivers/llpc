@@ -69,6 +69,9 @@ protected:
   // Get whether the context we are building in supports permute lane DPP operations.
   bool supportPermLaneDpp() const;
 
+  // Get whether the context we are building in supports permute lane 64 DPP operations.
+  bool supportPermLane64Dpp() const;
+
   // Create an "if..endif" or "if..else..endif" structure.
   llvm::BranchInst *createIf(llvm::Value *condition, bool wantElse, const llvm::Twine &instName);
 
@@ -829,6 +832,7 @@ private:
                                 unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl);
   llvm::Value *createPermLaneX16(llvm::Value *const origValue, llvm::Value *const updateValue, unsigned selectBitsLow,
                                  unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl);
+  llvm::Value *createPermLane64(llvm::Value *const updateValue);
 
   llvm::Value *createDsSwizzle(llvm::Value *const value, uint16_t dsPattern);
   llvm::Value *createWwm(llvm::Value *const value);

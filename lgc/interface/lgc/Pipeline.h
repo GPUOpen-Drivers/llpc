@@ -124,7 +124,7 @@ struct Options {
   unsigned disableImageResourceCheck;  // Don't do image resource type check
   unsigned reserved0f;                 // Reserved for future functionality
   unsigned reserved10;                 // Reserved for future functionality
-  unsigned reserved1f;                 // Reserved for future functionality
+  unsigned reserved1f;         // Reserved for future functionality
   unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
   unsigned pageMigrationEnabled;  // Enable page migration
 };

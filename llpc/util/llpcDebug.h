@@ -56,7 +56,6 @@ class Error;
 namespace MetroHash {
 struct Hash;
 } // namespace MetroHash
-
 namespace Llpc {
 
 // Gets the value of option "enable-outs"

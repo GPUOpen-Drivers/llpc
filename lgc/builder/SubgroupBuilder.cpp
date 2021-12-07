@@ -522,12 +522,14 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
                                          createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false)),
           result);
 
-      Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
-      Value *const broadcast63 = CreateSubgroupBroadcast(result, getInt32(63), instName);
+      {
+        Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
+        Value *const broadcast63 = CreateSubgroupBroadcast(result, getInt32(63), instName);
 
-      // Combine broadcast from the 31st and 63rd for the final result.
-      result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
-                            createGroupArithmeticOperation(groupArithOp, broadcast31, broadcast63), result);
+        // Combine broadcast from the 31st and 63rd for the final result.
+        result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
+                              createGroupArithmeticOperation(groupArithOp, broadcast31, broadcast63), result);
+      }
     } else {
       // Use a row broadcast to move the 15th element in each cluster of 16 to the next cluster. The row mask is
       // set to 0xa (0b1010) so that only the 2nd and 4th clusters of 16 perform the calculation.

@@ -61,6 +61,7 @@ StrToMemberAddr SectionVertexInput::m_addrTable[SectionVertexInput::MemberCount]
 StrToMemberAddr SectionSpecEntryItem::m_addrTable[SectionSpecEntryItem::MemberCount];
 StrToMemberAddr SectionSpecInfo::m_addrTable[SectionSpecInfo::MemberCount];
 
+#ifndef VFX_DISABLE_SPVGEN
 // =====================================================================================================================
 // A helper method to convert ShaderStage enumerant to corresponding SpvGenStage enumerant.
 //
@@ -84,6 +85,7 @@ static SpvGenStage shaderStageToSpvGenStage(ShaderStage shaderStage) {
     return SpvGenStageInvalid;
   }
 }
+#endif
 
 // =====================================================================================================================
 // Dummy class used to initialize all static variables
