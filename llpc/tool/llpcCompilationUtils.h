@@ -108,7 +108,7 @@ llvm::Expected<std::string> compileGlsl(const std::string &inFilename, ShaderSta
 llvm::Expected<std::string> assembleSpirv(const std::string &inFilename);
 
 // Decodes the binary after building a pipeline and outputs the decoded info.
-LLPC_NODISCARD Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo, bool isGraphics);
+LLPC_NODISCARD Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo);
 
 // Builds shader module based on the specified SPIR-V binary.
 llvm::Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo);

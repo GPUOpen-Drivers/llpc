@@ -39,6 +39,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Twine.h"
+#include <cassert>
 
 namespace Llpc {
 
@@ -129,6 +130,45 @@ const char *getUnlinkedShaderStageName(Vkgc::UnlinkedShaderStage type);
 inline bool doesShaderStageExist(llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, ShaderStage stage) {
   return stage < shaderInfo.size() && shaderInfo[stage] && shaderInfo[stage]->pModuleData;
 }
+
+// =====================================================================================================================
+// Returns true iff `stage` is present in the `stageMask`.
+//
+// @param stage : Shader stage to look for
+// @param stageMask : Stage mask to check
+// @returns : true iff `stageMask` contains `stage`
+inline bool isShaderStageInMask(Vkgc::ShaderStage stage, unsigned stageMask) {
+  assert(stage != Vkgc::ShaderStageInvalid);
+  return (Vkgc::shaderStageToMask(stage) & stageMask) != 0;
+}
+
+// =====================================================================================================================
+// Returns true iff `stage` is a native stage (graphics or compute).
+//
+// @param stage : Shader stage to check
+// @returns : true iff `stage` is a native shader stage
+inline bool isNativeStage(Vkgc::ShaderStage stage) {
+  return lgc::toUnderlying(stage) < lgc::toUnderlying(Vkgc::ShaderStage::ShaderStageNativeStageCount);
+}
+
+// =====================================================================================================================
+// Return true iff `stageMask` contains only the compute stage.
+//
+// @param stageMask : Stage mask to check
+// @returns : true iff `stageMask` contains only the compute stage
+inline bool isComputePipeline(unsigned stageMask) {
+  return stageMask == Vkgc::ShaderStageBit::ShaderStageComputeBit;
+}
+
+// =====================================================================================================================
+// Return true iff `stageMask` contains only graphics stage(s).
+//
+// @param stageMask : Stage mask to check
+// @returns : true iff `stageMask` contains only graphics stages
+inline bool isGraphicsPipeline(unsigned stageMask) {
+  return (stageMask & Vkgc::ShaderStageBit::ShaderStageAllGraphicsBit) != 0 &&
+         (stageMask & Vkgc::ShaderStageBit::ShaderStageComputeBit) == 0;
+}
 } // namespace Llpc
 
 namespace llvm {
@@ -153,6 +193,21 @@ inline auto gfxShaderStages() {
 // Returns the range of all internal ShaderStages.
 inline auto internalShaderStages() {
   return lgc::enumRange(Vkgc::ShaderStage::ShaderStageCopyShader, Vkgc::ShaderStage::ShaderStageCountInternal);
+}
+
+// =====================================================================================================================
+// Returns a vector with all shader stages in the `stageMask`. You can use this function to iterate over all stages in
+// the mask.
+//
+// @param stageMask : Stage mask to check
+// @returns : Vector of all shader stages contained in `stageMask`, in the same order as defined in `Vkgc::ShaderStage`.
+inline llvm::SmallVector<Vkgc::ShaderStage, 4> maskToShaderStages(unsigned stageMask) {
+  llvm::SmallVector<Vkgc::ShaderStage, 4> stages;
+  for (auto stage : lgc::enumRange<Vkgc::ShaderStage>())
+    if (isShaderStageInMask(stage, stageMask))
+      stages.push_back(stage);
+
+  return stages;
 }
 } // namespace Llpc
 

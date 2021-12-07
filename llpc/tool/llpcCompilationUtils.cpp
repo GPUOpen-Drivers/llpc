@@ -280,9 +280,8 @@ Expected<std::string> assembleSpirv(const std::string &inFilename) {
 //
 // @param pipelineBin : Pipeline binary
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool
-// @param isGraphics : Whether it is graphics pipeline
 // @returns : Always returns Result::Success
-Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo, bool isGraphics) {
+Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo) {
   // Ignore failure from ElfReader. It fails if pPipelineBin is not ELF, as happens with
   // -filetype=asm.
   ElfReader<Elf64> reader(compileInfo->gfxIp);
@@ -413,7 +412,9 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
     }
   }
 
-  const bool isGraphics = (compileInfo.stageMask & ShaderStageComputeBit) == 0;
+  const bool isGraphics = isGraphicsPipeline(compileInfo.stageMask);
+  assert(!(isGraphics && isComputePipeline(compileInfo.stageMask)) && "Bad stage mask");
+
   for (unsigned i = 0; i < compileInfo.shaderModuleDatas.size(); ++i) {
     compileInfo.shaderModuleDatas[i].shaderInfo.options.pipelineOptions =
         isGraphics ? compileInfo.gfxPipelineInfo.options : compileInfo.compPipelineInfo.options;
@@ -483,21 +484,18 @@ Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef
       if ((stageMask & compileInfo.stageMask) != 0)
         break;
 
-      if (stageMask == 0)
+      const auto stages = maskToShaderStages(stageMask);
+      if (stages.empty())
         return createResultError(Result::ErrorInvalidShader,
                                  Twine("Failed to identify shader stages by entry-point \"") + compileInfo.entryTarget +
                                      "\"");
 
-      for (unsigned stage = 0; stage < ShaderStageCount; ++stage) {
-        if (stageMask & shaderStageToMask(static_cast<ShaderStage>(stage))) {
-          StandaloneCompiler::ShaderModuleData shaderModuleData = {};
-          shaderModuleData.shaderStage = static_cast<ShaderStage>(stage);
-          shaderModuleData.spirvBin = spvBin;
-          compileInfo.shaderModuleDatas.push_back(shaderModuleData);
-          compileInfo.stageMask |= shaderStageToMask(static_cast<ShaderStage>(stage));
-          break;
-        }
-      }
+      ShaderStage stage = stages.front();
+      StandaloneCompiler::ShaderModuleData shaderModuleData = {};
+      shaderModuleData.shaderStage = stage;
+      shaderModuleData.spirvBin = spvBin;
+      compileInfo.shaderModuleDatas.push_back(shaderModuleData);
+      compileInfo.stageMask |= shaderStageToMask(stage);
     } else if (isLlvmIrFile(inFile)) {
       LLVMContext context;
       SMDiagnostic errDiag;
@@ -558,7 +556,7 @@ Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef
         return err;
       spvBinFile = *spvBinFilenameOrErr;
 
-      if (compileInfo.stageMask & shaderStageToMask(static_cast<ShaderStage>(stage)))
+      if (isShaderStageInMask(stage, compileInfo.stageMask))
         break;
 
       compileInfo.stageMask |= shaderStageToMask(stage);

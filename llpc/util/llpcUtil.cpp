@@ -147,14 +147,12 @@ bool hasDataForUnlinkedShaderType(Vkgc::UnlinkedShaderStage type, ArrayRef<const
 unsigned getShaderStageMaskForType(Vkgc::UnlinkedShaderStage type) {
   switch (type) {
   case UnlinkedStageVertexProcess:
-    return shaderStageToMask(static_cast<ShaderStage>(ShaderStageVertex)) |
-           shaderStageToMask(static_cast<ShaderStage>(ShaderStageGeometry)) |
-           shaderStageToMask(static_cast<ShaderStage>(ShaderStageTessControl)) |
-           shaderStageToMask(static_cast<ShaderStage>(ShaderStageTessEval));
+    return ShaderStageBit::ShaderStageVertexBit | ShaderStageBit::ShaderStageTessControlBit |
+           ShaderStageBit::ShaderStageTessEvalBit | ShaderStageBit::ShaderStageGeometryBit;
   case UnlinkedStageFragment:
-    return shaderStageToMask(static_cast<ShaderStage>(ShaderStageFragment));
+    return ShaderStageBit::ShaderStageFragmentBit;
   case UnlinkedStageCompute:
-    return shaderStageToMask(static_cast<ShaderStage>(ShaderStageCompute));
+    return ShaderStageBit::ShaderStageComputeBit;
   default:
     return 0;
   }
