@@ -61,6 +61,7 @@
 #include "llpcAutoLayout.h"
 #include "llpcDebug.h"
 #include "llpcInputUtils.h"
+#include "llpcUtil.h"
 #include "vkgcUtil.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringExtras.h"
@@ -72,14 +73,6 @@ namespace Llpc {
 namespace StandaloneCompiler {
 
 // =====================================================================================================================
-// Returns true iff the compiled pipeline is a graphics pipeline.
-//
-// @returns : True if the compiled pipeline is a graphics pipeline, false if compute.
-bool PipelineBuilder::isGraphicsPipeline() const {
-  return (m_compileInfo.stageMask & (shaderStageToMask(ShaderStageCompute) - 1)) != 0;
-}
-
-// =====================================================================================================================
 // Builds pipeline using the provided build info and performs linking.
 //
 // @returns : Result::Success on success, other status on failure.
@@ -88,19 +81,24 @@ Result PipelineBuilder::build() {
   // result multiple outputs. We use a vector instead of a single variable to prepare for that.
   SmallVector<BinaryData, 1> pipelines;
   pipelines.push_back({});
-  const bool isGraphics = isGraphicsPipeline();
+  const bool isGraphics = isGraphicsPipeline(m_compileInfo.stageMask);
+  const bool isCompute = isComputePipeline(m_compileInfo.stageMask);
+  assert(!(isGraphics && isCompute) && "Bad stage mask");
+
   if (isGraphics) {
     Result result = buildGraphicsPipeline(pipelines[0]);
     if (result != Result::Success)
       return result;
-  } else {
+  } else if (isCompute) {
     Result result = buildComputePipeline(pipelines[0]);
     if (result != Result::Success)
       return result;
+  } else {
+    return Result::ErrorInvalidShader;
   }
 
   for (const auto &pipeline : pipelines) {
-    Result result = decodePipelineBinary(&pipeline, &m_compileInfo, isGraphics);
+    Result result = decodePipelineBinary(&pipeline, &m_compileInfo);
     if (result != Result::Success)
       return result;
   }
@@ -265,10 +263,12 @@ void PipelineBuilder::runPostBuildActions(void *pipelineDumpHandle, BinaryData p
 // @param buildInfo : Build info of the pipeline.
 void PipelineBuilder::printPipelineInfo(PipelineBuildInfo buildInfo) {
   uint64_t hash = 0;
-  if (isGraphicsPipeline())
+  if (isGraphicsPipeline(m_compileInfo.stageMask))
     hash = IPipelineDumper::GetPipelineHash(buildInfo.pGraphicsInfo);
-  else
+  else if (isComputePipeline(m_compileInfo.stageMask))
     hash = IPipelineDumper::GetPipelineHash(buildInfo.pComputeInfo);
+  else
+    llvm_unreachable("Unhandled pipeline kind");
 
   LLPC_OUTS("LLPC PipelineHash: " << format("0x%016" PRIX64, hash) << " Files: " << join(m_compileInfo.fileNames, " ")
                                   << "\n");

@@ -54,9 +54,6 @@ public:
   // Compiles the pipeline and performs linking.
   LLPC_NODISCARD Result build();
 
-  // Returns true iff the compiled pipeline is a graphics pipeline.
-  LLPC_NODISCARD bool isGraphicsPipeline() const;
-
 private:
   // Returns true iff pipeline dumps are requested.
   LLPC_NODISCARD bool shouldDumpPipelines() const { return m_dumpOptions.hasValue(); }

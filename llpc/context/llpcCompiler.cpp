@@ -47,6 +47,7 @@
 #include "llpcTimerProfiler.h"
 #include "llpcUtil.h"
 #include "spirvExt.h"
+#include "vkgcDefs.h"
 #include "vkgcElfReader.h"
 #include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
@@ -67,6 +68,7 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include <cassert>
 #include <mutex>
 #include <set>
 #include <unordered_set>
@@ -760,6 +762,8 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 
     unsigned shaderStageMask = getShaderStageMaskForType(stage) & originalShaderStageMask;
     context->getPipelineContext()->setShaderStageMask(shaderStageMask);
+    const auto shaderStages = maskToShaderStages(shaderStageMask);
+    assert(all_of(shaderStages, isNativeStage) && "Unexpected stage kind");
 
     // Check the cache for the relocatable shader for this stage .
     MetroHash::Hash cacheHash = {};
@@ -784,28 +788,23 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       auto data = reinterpret_cast<const char *>(elfBin.pCode);
       elf[stage].assign(data, data + elfBin.codeSize);
       LLPC_OUTS("Cache hit for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-      for (ShaderStage gfxStage : gfxShaderStages()) {
-        if (shaderStageMask & shaderStageToMask(gfxStage))
-          stageCacheAccesses[gfxStage] =
-              cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
-      }
+      for (ShaderStage stage : shaderStages)
+        stageCacheAccesses[stage] =
+            cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+
       continue;
     }
+
     LLPC_OUTS("Cache miss for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-    for (ShaderStage gfxStage : gfxShaderStages()) {
-      if (shaderStageMask & shaderStageToMask(gfxStage))
-        stageCacheAccesses[gfxStage] = CacheAccessInfo::CacheMiss;
-    }
+    for (ShaderStage stage : shaderStages)
+      stageCacheAccesses[stage] = CacheAccessInfo::CacheMiss;
 
     // There was a cache miss, so we need to build the relocatable shader for
     // this stage.
     const PipelineShaderInfo *singleStageShaderInfo[ShaderStageNativeStageCount] = {nullptr, nullptr, nullptr,
                                                                                     nullptr, nullptr, nullptr};
-
-    for (ShaderStage nativeStage : nativeShaderStages()) {
-      if (shaderStageMask & shaderStageToMask(nativeStage))
-        singleStageShaderInfo[nativeStage] = shaderInfo[nativeStage];
-    }
+    for (ShaderStage stage : shaderStages)
+      singleStageShaderInfo[stage] = shaderInfo[stage];
 
     Vkgc::ElfPackage &stageElf = elf[stage];
     result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &stageElf, stageCacheAccesses);
@@ -1985,6 +1984,8 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
   case ShaderStageFragment:
     // TODO: Will add mesh support in LGC
     return lgc::ShaderStageFragment;
+  case ShaderStageCopyShader:
+    return lgc::ShaderStageCopyShader;
   default:
     llvm_unreachable("");
     return lgc::ShaderStageInvalid;
