@@ -23,7 +23,6 @@
  #
  #######################################################################################################################
 
-add_llpc_unittest(LlpcUtilTests
-  testError.cpp
-  testMetroHash.cpp
+add_llpc_unittest(LlpcContextTests
+  testShaderCache.cpp
 )

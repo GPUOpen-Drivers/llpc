@@ -25,11 +25,4 @@
 
 add_llpc_unittest(LlpcStandaloneCompilerTests
   testInputUtils.cpp
-  testMetroHash.cpp
-  testResultError.cpp
-  testShaderCache.cpp
-)
-
-target_link_libraries(LlpcStandaloneCompilerTests PRIVATE
-  llpc_standalone_compiler
 )
