@@ -6,7 +6,7 @@ target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:3
 target triple = "amdgcn--amdpal"
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.VS.main(i64 %0, <4 x i32> addrspace(1)* %1) local_unnamed_addr #0 !spirv.ExecutionModel !12 !lgc.shaderstage !12 {
+define dllexport spir_func void @lgc.shader.VS.main(i64 %0, <4 x i32> addrspace(1)* %1) local_unnamed_addr #0 !lgc.shaderstage !10 {
 ; CHECK: IR Dump After Patch LLVM for peephole optimizations
 ; CHECK: [[INTTOPTR:%[0-9]+]] = inttoptr i64 %[[#]] to i32 addrspace(1)*
 ; CHECK: [[LOAD:%[0-9]+]] = load i32, i32 addrspace(1)* [[INTTOPTR]], align 4
@@ -67,4 +67,3 @@ attributes #1 = { nounwind readonly }
 !0 = !{i32 739459867, i32 836497279, i32 -1935591037, i32 -652075177, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
 !1 = !{i32 801932830, i32 600683540, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 15, i32 3}
 !10 = !{i32 1}
-!12 = !{i32 0}

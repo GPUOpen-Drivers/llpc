@@ -488,7 +488,7 @@ Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef
                                  Twine("Failed to identify shader stages by entry-point \"") + compileInfo.entryTarget +
                                      "\"");
 
-      for (unsigned stage = ShaderStageVertex; stage < ShaderStageCount; ++stage) {
+      for (unsigned stage = 0; stage < ShaderStageCount; ++stage) {
         if (stageMask & shaderStageToMask(static_cast<ShaderStage>(stage))) {
           StandaloneCompiler::ShaderModuleData shaderModuleData = {};
           shaderModuleData.shaderStage = static_cast<ShaderStage>(stage);

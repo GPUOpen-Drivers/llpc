@@ -9,7 +9,7 @@ target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:3
 target triple = "amdgcn--amdpal"
 
 ; Function Attrs: nounwind
-define spir_func void @func() local_unnamed_addr #0 !spirv.ExecutionModel !6 !lgc.shaderstage !6 {
+define spir_func void @func() local_unnamed_addr #0 !lgc.shaderstage !6 {
 .entry:
   ret void
 }
@@ -27,4 +27,4 @@ attributes #0 = { nounwind }
 !3 = !{!"StreamOutTableVaPtr", i32 0, i32 1, i32 0, i32 -1, i32 -1}
 !4 = !{!"PushConst", i32 1, i32 6, i32 0, i32 -1, i32 0}
 !5 = !{!"DescriptorTableVaPtr", i32 8, i32 1, i32 0, i32 1, i32 4}
-!6 = !{i32 5}
+!6 = !{i32 7}

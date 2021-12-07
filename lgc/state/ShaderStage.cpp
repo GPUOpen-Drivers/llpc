@@ -104,7 +104,7 @@ const char *lgc::getShaderStageAbbreviation(ShaderStage shaderStage) {
   if (shaderStage > ShaderStageCompute)
     return "Bad";
 
-  static const char *ShaderStageAbbrs[] = {"VS", "TCS", "TES", "GS", "FS", "CS"};
+  static const char *ShaderStageAbbrs[] = {"TASK", "VS", "TCS", "TES", "GS", "MESH", "FS", "CS"};
   return ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
 }
 

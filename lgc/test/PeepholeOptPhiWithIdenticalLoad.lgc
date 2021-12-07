@@ -13,7 +13,7 @@ target triple = "amdgcn--amdpal"
 @lds = addrspace(3) global i32 undef, align 16
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !spirv.ExecutionModel !0 !lgc.shaderstage !0 {
+define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
   %load0 = load i32, i32 addrspace(3)* @lds, align 16
   br label %.block0
@@ -40,4 +40,4 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !spi
   ret void
 }
 
-!0 = !{i32 0}
+!0 = !{i32 7}

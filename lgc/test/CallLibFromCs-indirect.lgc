@@ -4,14 +4,14 @@
 ; CHECK: IR Dump After Patch LLVM for entry-point mutation
 ; CHECK: define dllexport spir_func void @lgc.shader.CS.main(i32 inreg %globalTable, i32 inreg %perShaderTable, <3 x i32> addrspace(4)* inreg %numWorkgroupsPtr, i32 inreg %descTable2, i32 inreg %0, i32 inreg %1, i32 inreg %2, i32 inreg %3, i32 inreg %4, i32 inreg %5, i32 inreg %6, i32 inreg %7, i32 inreg %8, i32 inreg %9, i32 inreg %spillTable, <3 x i32> inreg %WorkgroupId, i32 inreg %MultiDispatchInfo, <3 x i32> %LocalInvocationId) #1 !lgc.shaderstage !7 {
 ; CHECK: %[[#]] = call amdgpu_gfx i32 %[[#]](i32 inreg %globalTable, i32 inreg %perShaderTable, <3 x i32> addrspace(4)* inreg %numWorkgroupsPtr, i32 inreg %descTable2, i32 inreg %0, i32 inreg %1, i32 inreg %2, i32 inreg %3, i32 inreg %4, i32 inreg %5, i32 inreg %6, i32 inreg %7, i32 inreg %8, i32 inreg %9, i32 inreg %spillTable, <3 x i32> inreg %WorkgroupId, i32 inreg %MultiDispatchInfo, <3 x i32> %LocalInvocationId)
-; CHECK: !7 = !{i32 5}
+; CHECK: !7 = !{i32 7}
 
 ; ModuleID = 'lgcPipeline'
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
 target triple = "amdgcn--amdpal"
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !spirv.ExecutionModel !7 !lgc.shaderstage !7 {
+define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !7 {
 .entry:
   %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 2, i32 0, i32 2)
   %1 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
@@ -60,4 +60,4 @@ attributes #1 = { nounwind readonly }
 !4 = !{!"DescriptorBuffer", i32 4, i32 16, i32 0, i32 1, i32 4}
 !5 = !{!"DescriptorTableVaPtr", i32 20, i32 1, i32 1}
 !6 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 2, i32 4}
-!7 = !{i32 5}
+!7 = !{i32 7}

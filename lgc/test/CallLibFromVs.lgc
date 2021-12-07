@@ -3,9 +3,9 @@
 ; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-entry-point-mutate -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
 ; CHECK: IR Dump After Patch LLVM for entry-point mutation
 ; CHECK: declare amdgpu_gfx <4 x float> @compute_library_func() #0
-; CHECK: define dllexport spir_func void @lgc.shader.VS.main(i32 inreg %globalTable, i32 inreg %perShaderTable, i32 inreg %0, i32 inreg %1, i32 inreg %2, i32 inreg %3, i32 inreg %4, i32 inreg %5, i32 inreg %6, i32 inreg %7, i32 inreg %8, i32 inreg %9, i32 inreg %esGsLdsSize, i32 inreg %baseVertex, i32 inreg %baseInstance, i32 inreg %spillTable, i32 %VertexId, i32 %RelVertexId, i32 %PrimitiveId, i32 %InstanceId) #1 !lgc.shaderstage !4 {
+; CHECK: define dllexport spir_func void @lgc.shader.VS.main(i32 inreg %globalTable, i32 inreg %perShaderTable, i32 inreg %0, i32 inreg %1, i32 inreg %2, i32 inreg %3, i32 inreg %4, i32 inreg %5, i32 inreg %6, i32 inreg %7, i32 inreg %8, i32 inreg %9, i32 inreg %esGsLdsSize, i32 inreg %baseVertex, i32 inreg %baseInstance, i32 inreg %spillTable, i32 %VertexId, i32 %RelVertexId, i32 %PrimitiveId, i32 %InstanceId) #1 !lgc.shaderstage !0 {
 ; CHECK: %[[#]] = call amdgpu_gfx <4 x float> bitcast (<4 x float> ()* @compute_library_func to <4 x float> (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32)*)(i32 inreg %globalTable, i32 inreg %perShaderTable, i32 inreg %0, i32 inreg %1, i32 inreg %2, i32 inreg %3, i32 inreg %4, i32 inreg %5, i32 inreg %6, i32 inreg %7, i32 inreg %8, i32 inreg %9, i32 inreg %esGsLdsSize, i32 inreg %baseVertex, i32 inreg %baseInstance, i32 inreg %spillTable, i32 %VertexId, i32 %RelVertexId, i32 %PrimitiveId, i32 %InstanceId)
-; CHECK: !4 = !{i32 0}
+; CHECK: !0 = !{i32 1}
 
 ; ModuleID = 'lgcPipeline'
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
@@ -14,7 +14,7 @@ target triple = "amdgcn--amdpal"
 declare spir_func <4 x float> @compute_library_func() #0
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !5 !lgc.shaderstage !5 {
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
   %res = call spir_func <4 x float> @compute_library_func()
   call void (...) @lgc.create.write.generic.output(<4 x float> %res, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
@@ -35,4 +35,3 @@ attributes #0 = { nounwind }
 !1 = !{i32 628083063, i32 1661573491, i32 -2141117829, i32 766255606, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
 !2 = !{i32 1951548461, i32 273960056, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
 !4 = !{i32 2, i32 3}
-!5 = !{i32 0}

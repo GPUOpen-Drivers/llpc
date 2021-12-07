@@ -15,7 +15,7 @@ target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:3
 target triple = "amdgcn--amdpal"
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.VS.VkMain() local_unnamed_addr #0 !spirv.ExecutionModel !10 !lgc.shaderstage !10 {
+define dllexport spir_func void @lgc.shader.VS.VkMain() local_unnamed_addr #0 !lgc.shaderstage !2 {
 .entry:
   %0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 2, i32 0, i32 0, i32 0, i32 0, i32 undef)
   call void (...) @lgc.create.write.generic.output(<4 x float> %0, i32 6, i32 0, i32 0, i32 0, i32 0, i32 undef)
@@ -29,7 +29,7 @@ declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr
 declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.TCS.VkMain() local_unnamed_addr #0 !spirv.ExecutionModel !2 !lgc.shaderstage !2 {
+define dllexport spir_func void @lgc.shader.TCS.VkMain() local_unnamed_addr #0 !lgc.shaderstage !10 {
 .entry:
   br label %0, !llvm.loop !11
 
@@ -38,7 +38,7 @@ define dllexport spir_func void @lgc.shader.TCS.VkMain() local_unnamed_addr #0 !
 }
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.TES.VkMain() local_unnamed_addr #0 !spirv.ExecutionModel !13 !lgc.shaderstage !13 {
+define dllexport spir_func void @lgc.shader.TES.VkMain() local_unnamed_addr #0 !lgc.shaderstage !13 {
 .entry:
   ret void
 }
@@ -67,7 +67,7 @@ attributes #1 = { nounwind readonly willreturn }
 !7 = !{i32 5, i32 3}
 !8 = !{i32 0, i32 0, i32 0, i32 1}
 !9 = !{!"\82\B0amdpal.pipelines\91\84\AA.registers\80\B0.spill_threshold\CE\FF\FF\FF\FF\B0.user_data_limit\00\AF.xgl_cache_info\82\B3.128_bit_cache_hash\92\CF\87kq8\12\B1v`\CF\BC\B6Q\EB \00\F2\B2\AD.llpc_version\A450.0\AEamdpal.version\92\02\03"}
-!10 = !{i32 0}
+!10 = !{i32 2}
 !11 = distinct !{!11}
 !12 = distinct !{!12}
-!13 = !{i32 2}
+!13 = !{i32 3}
