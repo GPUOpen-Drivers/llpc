@@ -475,7 +475,6 @@ Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef
             return createResultError(Result::ErrorInvalidShader, Twine("Failed to validate SPIR-V:\n") + log);
         }
       }
-
       // NOTE: If the entry target is not specified, we set it to the one gotten from SPIR-V binary.
       if (compileInfo.entryTarget.empty())
         compileInfo.entryTarget = Vkgc::getEntryPointNameFromSpirvBinary(&spvBin);

@@ -53,7 +53,11 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
       m_activeStageCount(0) {
   setUnlinked(pipelineInfo->unlinked);
   const PipelineShaderInfo *shaderInfo[ShaderStageGfxCount] = {
-      &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
+    &pipelineInfo->vs,
+    &pipelineInfo->tcs,
+    &pipelineInfo->tes,
+    &pipelineInfo->gs,
+    &pipelineInfo->fs,
   };
 
   for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
@@ -115,8 +119,12 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
 // =====================================================================================================================
 // Check whether the pipeline uses features relevant to subgroup size
 bool GraphicsContext::usesSubgroupSize() const {
-  std::array<const PipelineShaderInfo *, 5> shaderInfos = {
-      &m_pipelineInfo->vs, &m_pipelineInfo->tcs, &m_pipelineInfo->tes, &m_pipelineInfo->gs, &m_pipelineInfo->fs,
+  std::array<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfos = {
+    &m_pipelineInfo->vs,
+    &m_pipelineInfo->tcs,
+    &m_pipelineInfo->tes,
+    &m_pipelineInfo->gs,
+    &m_pipelineInfo->fs,
   };
   for (auto shaderInfo : shaderInfos) {
     if (!shaderInfo->pModuleData)

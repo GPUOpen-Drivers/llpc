@@ -23,6 +23,9 @@
  #
  #######################################################################################################################
 
+# This CMakeLists.txt simply forwards to the real one in llpc/test, and is present only
+# to cater for an old build script that still looks for it in the old location.
+
 # Only build if llpc is built as part of xgl
 if(NOT LLPC_IS_STANDALONE)
   find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED

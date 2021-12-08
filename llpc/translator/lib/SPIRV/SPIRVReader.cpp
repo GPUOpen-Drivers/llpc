@@ -410,7 +410,7 @@ template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, const unsigned matrixStride,
                                                       const bool isColumnMajor, const bool isParentPointer,
                                                       const bool isExplicitlyLaidOut) {
-  const SPIRVStorageClassKind storageClass = spvType->getPointerStorageClass();
+  SPIRVStorageClassKind storageClass = spvType->getPointerStorageClass();
 
   // Handle image etc types first, if in UniformConstant memory.
   if (storageClass == StorageClassUniformConstant) {
@@ -1471,7 +1471,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
   Constant *const zero = getBuilder()->getInt32(0);
 
-  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage) {
+  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
+  ) {
     // For structs we lookup the mapping of the elements and use it to reverse map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -1624,7 +1625,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
   Constant *const zero = getBuilder()->getInt32(0);
 
-  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage) {
+  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
+  ) {
     // For structs we lookup the mapping of the elements and use it to map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -6735,18 +6737,20 @@ bool SPIRVToLLVM::transMetadata() {
         if (bf->getExecutionMode(ExecutionModePostDepthCoverage))
           execModeMd.fs.PostDepthCoverage = true;
 
+        bool enableEarlyAndLateTests = false;
         // Give the fragment mode to the middle-end.
         FragmentShaderMode fragmentMode = {};
         fragmentMode.pixelCenterInteger = execModeMd.fs.PixelCenterInteger;
         fragmentMode.earlyFragmentTests = execModeMd.fs.EarlyFragmentTests;
         fragmentMode.postDepthCoverage = execModeMd.fs.PostDepthCoverage;
+        fragmentMode.earlyAndLatFragmentTests = enableEarlyAndLateTests;
         fragmentMode.conservativeDepth = ConservativeDepth::Any;
         if (execModeMd.fs.DepthLess)
           fragmentMode.conservativeDepth = ConservativeDepth::LessEqual;
         else if (execModeMd.fs.DepthGreater)
           fragmentMode.conservativeDepth = ConservativeDepth::GreaterEqual;
-        getBuilder()->setFragmentShaderMode(fragmentMode);
 
+        getBuilder()->setFragmentShaderMode(fragmentMode);
       } else if (execModel == ExecutionModelGLCompute) {
         // Set values of local sizes from execution model
         if (auto em = bf->getExecutionMode(ExecutionModeLocalSize)) {
@@ -6784,12 +6788,12 @@ bool SPIRVToLLVM::transMetadata() {
           }
         }
 
-        // Give the workgroup size to the middle-end.
-        ComputeShaderMode computeMode = {};
-        computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
-        computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
-        computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
-        getBuilder()->setComputeShaderMode(computeMode);
+          // Give the workgroup size to the middle-end.
+          ComputeShaderMode computeMode = {};
+          computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
+          computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
+          computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
+          getBuilder()->setComputeShaderMode(computeMode);
       } else
         llvm_unreachable("Invalid execution model");
 
@@ -7290,10 +7294,16 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     if (alignTo64Bit)
       startXfbExtraOffset = roundUpToMultiple(inOutDec.XfbOffset + inOutDec.XfbExtraOffset, 8u) - inOutDec.XfbOffset;
 
+    // PerVetex is not inherted.
+    bool isPerVertexDimension = inOutDec.PerVertexDimension;
+    inOutDec.PerVertexDimension = false;
+
     Type *elemMdTy = nullptr;
     auto elemDec = inOutDec; // Inherit from parent
     elemDec.XfbExtraOffset = startXfbExtraOffset;
     auto elemMd = buildShaderInOutMetadata(elemTy, elemDec, elemMdTy);
+
+    inOutDec.PerVertexDimension = isPerVertexDimension;
 
     if (elemDec.PerPatch)
       inOutDec.PerPatch = true; // Set "per-patch" flag
@@ -7357,6 +7367,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     inOutMd.XfbOffset = inOutDec.XfbOffset;
     inOutMd.XfbArrayStride = xfbArrayStride;
     inOutMd.XfbExtraOffset = startXfbExtraOffset;
+    inOutMd.PerVertexDimension = inOutDec.PerVertexDimension;
 
     std::vector<Constant *> mdValues;
     mdValues.push_back(ConstantInt::get(int32Ty, stride));

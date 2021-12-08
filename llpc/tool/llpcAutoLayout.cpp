@@ -52,6 +52,9 @@ using namespace SPIRV;
 namespace Llpc {
 namespace StandaloneCompiler {
 
+// Offset in Node will be a fixed number, which will be conveniently to identify offset in auto-layout.
+static const unsigned OffsetStrideInDwords = 12;
+
 // =====================================================================================================================
 // Get the storage size in bytes of a SPIR-V type.
 // This does not need to be completely accurate, as it is only used to fake up a push constant user data node.
@@ -75,6 +78,211 @@ static unsigned getTypeDataSize(const SPIRVType *ty) {
   default:
     return (ty->getBitWidth() + 7) / 8;
   }
+}
+
+// =====================================================================================================================
+// Find VaPtr userDataNode with the specified set.
+//
+// @param resourceMapping : Resource mapping data, possibly containing user data nodes
+// @param set : Accroding this set to find ResourceMappingNode
+// @returns : userDataNode with the specified set
+static const ResourceMappingRootNode *findDescriptorTableVaPtr(const ResourceMappingData *resourceMapping,
+                                                               unsigned set) {
+  const ResourceMappingRootNode *descriptorTableVaPtr = nullptr;
+
+  for (unsigned k = 0; k < resourceMapping->userDataNodeCount; ++k) {
+    const ResourceMappingRootNode *userDataNode = &resourceMapping->pUserDataNodes[k];
+
+    if (userDataNode->node.type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr) {
+      if (userDataNode->node.tablePtr.pNext[0].srdRange.set == set) {
+        descriptorTableVaPtr = userDataNode;
+        break;
+      }
+    }
+  }
+
+  return descriptorTableVaPtr;
+}
+
+// =====================================================================================================================
+// Find userDataNode with specified set and binding. And return Node index.
+//
+// @param userDataNode : ResourceMappingNode pointer
+// @param nodeCount : User data node count
+// @param set : Find same set in node array
+// @param binding : Find same binding in node array
+// @param [out] index : Return node position in node array
+static const ResourceMappingNode *findResourceNode(const ResourceMappingNode *userDataNode, unsigned nodeCount,
+                                                   unsigned set, unsigned binding, unsigned *index) {
+  const ResourceMappingNode *resourceNode = nullptr;
+
+  for (unsigned j = 0; j < nodeCount; ++j) {
+    const ResourceMappingNode *next = &userDataNode[j];
+
+    if (set == next->srdRange.set && binding == next->srdRange.binding) {
+      resourceNode = next;
+      *index = j;
+      break;
+    }
+  }
+
+  return resourceNode;
+}
+
+// =====================================================================================================================
+// Find userDataNode with specified set and binding. And return Node index.
+//
+// @param userDataNode : ResourceMappingRootNode pointer
+// @param nodeCount : User data node count
+// @param set : Find same set in node array
+// @param binding : Find same binding in node array
+// @param [out] index : Return node position in node array
+// @returns : The Node index
+static const ResourceMappingRootNode *findResourceNode(const ResourceMappingRootNode *userDataNode, unsigned nodeCount,
+                                                       unsigned set, unsigned binding, unsigned *index) {
+  const ResourceMappingRootNode *resourceNode = nullptr;
+
+  for (unsigned j = 0; j < nodeCount; ++j) {
+    const ResourceMappingRootNode *next = &userDataNode[j];
+
+    if (set == next->node.srdRange.set && binding == next->node.srdRange.binding) {
+      resourceNode = next;
+      *index = j;
+      break;
+    }
+  }
+
+  return resourceNode;
+}
+
+// =====================================================================================================================
+// Check if autoLayoutUserDataNodes is a subset of userDataNodes.
+//
+// @param [in] resourceMapping : Resource mapping data, which can contain user data nodes
+// @param [in] autoLayoutUserDataNodeCount : UserData Node count
+// @param [in] autoLayoutUserDataNodes : ResourceMappingNode
+// @returns : true if compatible
+bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
+                                   const ResourceMappingRootNode *autoLayoutUserDataNodes) {
+  bool hit = false;
+
+  if (autoLayoutUserDataNodeCount == 0)
+    hit = true;
+  else if (resourceMapping->pStaticDescriptorValues)
+    hit = false;
+  else if (resourceMapping->userDataNodeCount >= autoLayoutUserDataNodeCount) {
+    for (unsigned n = 0; n < autoLayoutUserDataNodeCount; ++n) {
+      const ResourceMappingRootNode *autoLayoutUserDataNode = &autoLayoutUserDataNodes[n];
+
+      // Multiple levels
+      if (autoLayoutUserDataNode->node.type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr) {
+        unsigned set = autoLayoutUserDataNode->node.tablePtr.pNext[0].srdRange.set;
+        const ResourceMappingRootNode *userDataNode = findDescriptorTableVaPtr(resourceMapping, set);
+
+        if (userDataNode) {
+          bool hitNode = false;
+          for (unsigned i = 0; i < autoLayoutUserDataNode->node.tablePtr.nodeCount; ++i) {
+            const ResourceMappingNode *autoLayoutNext = &autoLayoutUserDataNode->node.tablePtr.pNext[i];
+
+            unsigned index = 0;
+            const ResourceMappingNode *node =
+                findResourceNode(userDataNode->node.tablePtr.pNext, userDataNode->node.tablePtr.nodeCount,
+                                 autoLayoutNext->srdRange.set, autoLayoutNext->srdRange.binding, &index);
+
+            if (node) {
+              if (autoLayoutNext->type == node->type && autoLayoutNext->sizeInDwords == node->sizeInDwords &&
+                  autoLayoutNext->sizeInDwords <= OffsetStrideInDwords &&
+                  autoLayoutNext->offsetInDwords == (index * OffsetStrideInDwords)) {
+                hitNode = true;
+                continue;
+              } else {
+                outs() << "AutoLayoutNode:"
+                       << "\n ->type                    : "
+                       << format("0x%016" PRIX64, static_cast<unsigned>(autoLayoutNext->type))
+                       << "\n ->sizeInDwords            : " << autoLayoutNext->sizeInDwords
+                       << "\n ->offsetInDwords          : " << autoLayoutNext->offsetInDwords;
+
+                outs() << "\nShaderInfoNode:"
+                       << "\n ->type                    : "
+                       << format("0x%016" PRIX64, static_cast<unsigned>(node->type))
+                       << "\n ->sizeInDwords            : " << node->sizeInDwords
+                       << "\n OffsetStrideInDwords      : " << OffsetStrideInDwords
+                       << "\n index*OffsetStrideInDwords: " << (index * OffsetStrideInDwords) << "\n";
+                hitNode = false;
+                break;
+              }
+            } else
+              break;
+          }
+          if (!hitNode) {
+            hit = false;
+            break;
+          } else
+            hit = true;
+        } else {
+          hit = false;
+          break;
+        }
+      }
+      // Single level
+      else {
+        unsigned index = 0;
+        const ResourceMappingRootNode *node = findResourceNode(
+            resourceMapping->pUserDataNodes, resourceMapping->userDataNodeCount,
+            autoLayoutUserDataNode->node.srdRange.set, autoLayoutUserDataNode->node.srdRange.binding, &index);
+        if (node && autoLayoutUserDataNode->node.sizeInDwords == node->node.sizeInDwords) {
+          hit = true;
+          continue;
+        } else {
+          hit = false;
+          break;
+        }
+      }
+    }
+  }
+
+  return hit;
+}
+
+// =====================================================================================================================
+// Check if necessary pipeline state is same.
+//
+// @param compiler : LLPC compiler object
+// @param pipelineInfo : Graphics pipeline info
+// @param autoLayoutPipelineInfo : Layout pipeline info
+// @param gfxIp : Graphics IP version
+// @returns : true if compatible
+bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipelineBuildInfo *pipelineInfo,
+                                  Llpc::GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, Llpc::GfxIpVersion gfxIp) {
+  bool compatible = true;
+
+  auto cbState = &pipelineInfo->cbState;
+  auto autoLayoutCbState = &autoLayoutPipelineInfo->cbState;
+
+  for (unsigned i = 0; i < MaxColorTargets; ++i) {
+    if (cbState->target[i].format != VK_FORMAT_UNDEFINED) {
+      // NOTE: Alpha-to-coverage only take effect for output from color target 0.
+      const bool enableAlphaToCoverage = cbState->alphaToCoverageEnable && i == 0;
+      unsigned exportFormat =
+          compiler->ConvertColorBufferFormatToExportFormat(&cbState->target[i], enableAlphaToCoverage);
+      const bool autoLayoutEnableAlphaToCoverage = autoLayoutCbState->alphaToCoverageEnable && i == 0;
+      unsigned autoLayoutExportFormat = compiler->ConvertColorBufferFormatToExportFormat(
+          &autoLayoutCbState->target[i], autoLayoutEnableAlphaToCoverage);
+
+      if (exportFormat != autoLayoutExportFormat) {
+        outs() << "pPipelineInfo->cbState.target[" << i << "] export format:" << format("0x%016" PRIX64, exportFormat)
+               << "\n"
+               << "pAutoLayoutPipelineInfo->cbState.target[" << i
+               << "] export format:" << format("0x%016" PRIX64, autoLayoutExportFormat) << "\n";
+
+        compatible = false;
+        break;
+      }
+    }
+  }
+  // TODO: RsState and other members in CbState except target[].format
+
+  return compatible;
 }
 
 // =====================================================================================================================

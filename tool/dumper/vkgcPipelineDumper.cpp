@@ -431,7 +431,7 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorFmask:
   case ResourceMappingNodeType::DescriptorBufferCompact:
   case ResourceMappingNodeType::PushConst:
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50)
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
   case ResourceMappingNodeType::InlineBuffer:
 #endif
   case ResourceMappingNodeType::DescriptorConstBuffer:
@@ -813,7 +813,11 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
   dumpVersionInfo(*dumpFile);
   // Dump pipeline
   const PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
-      &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
+    &pipelineInfo->vs,
+    &pipelineInfo->tcs,
+    &pipelineInfo->tes,
+    &pipelineInfo->gs,
+    &pipelineInfo->fs,
   };
 
   for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
@@ -831,7 +835,7 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
 }
 
 // =====================================================================================================================
-// Builds hash code from graphics pipeline build info.  If stage is a specific stage of the graphics pipeline, then only
+// Builds hash code from graphics pipline build info.  If stage is a specific stage of the graphics pipeline, then only
 // the portions of the pipeline build info that affect that stage will be included in the hash.  Otherwise, stage must
 // be ShaderStageInvalid, and all values in the build info will be included.
 //
@@ -1237,7 +1241,7 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
     // Do nothing for the stream-out table
     break;
   }
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50)
+#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
   case ResourceMappingNodeType::InlineBuffer:
 #endif
   case ResourceMappingNodeType::PushConst: {

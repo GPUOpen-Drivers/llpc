@@ -88,7 +88,6 @@ class TestCase:
   def GetResult(self, fmt):
     return self.results[fmt]
 
-
 class TestRunner:
   def RunTest(self, tc):
     print("Testing {}".format(tc.GetInputPath()))
@@ -122,7 +121,6 @@ class TestRunner:
       return False
 
     return True
-
 
   def RunTests(self):
     for tc in self.test_cases:
@@ -158,7 +156,6 @@ class TestRunner:
     print('  Failures:   {}'.format(len(self.failures)))
     print('  Suppressed: {}'.format(len(self.suppressed)))
     print('')
-
 
   def Run(self):
     base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -219,7 +216,6 @@ class TestRunner:
 def main():
   runner = TestRunner()
   return runner.Run()
-
 
 if __name__ == '__main__':
   sys.exit(main())

@@ -118,8 +118,8 @@ cl::opt<bool> ValidateSpirv("validate-spirv", cl::desc("Validate input SPIR-V bi
                             cl::init(true));
 
 // -entry-target: name string of entry target (for multiple entry-points)
-cl::opt<std::string> EntryTarget("entry-target", cl::desc("Name string of entry target"), cl::value_desc("entryname"),
-                                 cl::init(""));
+cl::opt<std::string> EntryTarget("entry-target", cl::desc("Name string of entry target"),cl::value_desc("entryname"),
+		                 cl::init(""));
 
 // -ignore-color-attachment-formats: ignore color attachment formats
 cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
@@ -129,7 +129,8 @@ cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
 cl::opt<bool> EnableNgg("enable-ngg", cl::desc("Enable implicit primitive shader (NGG) mode"), cl::init(true));
 
 // -enable-gs-use: enable NGG use on geometry shader
-cl::opt<bool> NggEnableGsUse("ngg-enable-gs-use", cl::desc("Enable NGG use on geometry shader"), cl::init(false));
+cl::opt<bool> NggEnableGsUse("ngg-enable-gs-use", cl::desc("Enable NGG use on geometry shader"),
+                             cl::init(false));
 
 // -ngg-force-culling-mode: force NGG to run in culling mode
 cl::opt<bool> NggForceCullingMode("ngg-force-culling-mode", cl::desc("Force NGG to run in culling mode"),
@@ -144,7 +145,7 @@ cl::opt<unsigned> NggCompactionMode("ngg-compaction-mode",
 
 // -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
 cl::opt<bool> NggEnableVertexReuse("ngg-enable-vertex-reuse",
-                                   cl::desc("Enable optimization to cull duplicate vertices (NGG)"), cl::init(false));
+                                   cl::desc("Enable optimization to cull duplicate vertices (NGG)"),cl::init(false));
 
 // -ngg-enable-backface-culling: enable culling of primitives that don't meet facing criteria (NGG)
 cl::opt<bool> NggEnableBackfaceCulling("ngg-enable-backface-culling",
@@ -163,11 +164,13 @@ cl::opt<bool> NggEnableBoxFilterCulling("ngg-enable-box-filter-culling",
 
 // -ngg-enable-sphere-culling: enable frustum culling based on a sphere (NGG)
 cl::opt<bool> NggEnableSphereCulling("ngg-enable-sphere-culling",
-                                     cl::desc("Enable frustum culling based on a sphere (NGG)"), cl::init(false));
+                                     cl::desc("Enable frustum culling based on a sphere (NGG)"),
+                                     cl::init(false));
 
 // -ngg-enable-small-prim-filter: enable trivial sub-sample primitive culling (NGG)
 cl::opt<bool> NggEnableSmallPrimFilter("ngg-enable-small-prim-filter",
-                                       cl::desc("Enable trivial sub-sample primitive culling (NGG)"), cl::init(false));
+                                       cl::desc("Enable trivial sub-sample primitive culling (NGG)"),
+                                       cl::init(false));
 
 // -ngg-cull-distance-culling: enable culling when "cull distance" exports are present (NGG)
 cl::opt<bool> NggEnableCullDistanceCulling("ngg-enable-cull-distance-culling",
