@@ -1,0 +1,81 @@
+; Test that code that merges the VS and GS generates valid code when there is a vertex fetch of a short int.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: {{^//}} LLPC pipeline patching results
+
+; The i16vec4 fetch comes in as a <2 x float>, and passed on to the vertex shader.
+; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main_fetchless({{.*}}, <2 x float> [[fetch:%[0-9]*]])
+; SHADERTEST: call void @_amdgpu_es_main_fetchless({{.*}}, <2 x float> [[fetch]])
+; SHADERTEST: =====  AMDLLPC SUCCESS  =====
+; END_SHADERTEST
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+#extension GL_AMD_gpu_shader_int16 : require
+
+layout(location = 2) in i16vec4 _8;
+layout(location = 2) out i16vec4 _9;
+
+void main()
+{
+    _9 = _8;
+}
+
+
+[VsInfo]
+entryPoint = main
+
+[GsGlsl]
+#version 450
+layout(triangles) in;
+layout(max_vertices = 3, triangle_strip) out;
+
+void main()
+{
+}
+
+
+[GsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+
+void main()
+{
+}
+
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 8
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 1
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 8
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 8
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 2
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R16G16B16A16_SINT
+attribute[0].offset = 0
