@@ -130,6 +130,8 @@ an "if..else if..else if..else", if any body is braced, the others should be too
 
 ## Result handling
 
+### Public APIs
+
 LLPC uses the `Vkgc::Result` enum for return type of functions that may succeed
 (`Result::Success`) or fail (other enum values). We follow the LLVM convention and
 [prefer early exits](https://llvm.org/docs/CodingStandards.html#use-early-exits-and-continue-to-simplify-code)
@@ -194,6 +196,48 @@ Note that you can also use `LLPC_NODISCARD` with functions whose return value ca
 be meaningfully ignored, e.g.:
 ```c++
 LLPC_NODISCARD size_t getFileSize(const std::string& path);
+```
+
+`Vkgc::Result` can be converted to `std::error_code` using `Llpc::resultToErrorCode`.
+
+### Internal APIs
+
+LLPC tries to follow the LLVM conventions for
+[recoverable error handling](https://llvm.org/docs/ProgrammersManual.html#recoverable-errors).
+In short, functions that either return a value or fail should return `llvm::Expected<T>`,
+while functions that do not return any value should have `llvm::Error` for the return type.
+
+LLPC has its own concrete error type, `Llpc::ResultError`, which bridges
+`llvm::Error`/`Expected<T>` and `Vkgc::Result`. In addition to being compatible with the
+usual LLVM error handling utilities like `llvm::cantFail`, `llvm::handleErrors`, etc.,
+we allow `llvm::Error`s to be converted to `Vkgc::Result` using
+`result = Llpc::reportError(std::move(err))` and `result = Llpc::errorToResult(std::move(err))`.
+See [`llpcError.h`](../llpc/util/llpcError.h) for more details.
+
+Sample error handling code:
+```c++
+Expected<size_t> getFileSize(StringRef path) {
+  if (exists(path))
+    return file_size(path);
+  return createResultError(Result::NotFound, Twine("File ") + path + " does not exist");
+
+// An internal LLPC function.
+Error readSpirvFile(StringRef path) {
+  auto sizeOrErr = getFileSize(path);
+  if (Error err = sizeOrErr.takeError())
+    return err; // Let the caller decide how to handle this error and whether to print it.
+  ...
+  return Error::success();
+}
+
+// A public function exposed to XGL.
+Result getCacheSize(size_t *outSize) {
+  auto sizeOrErr = getFileSize(m_cacheFile);
+  if (Error err = sizeOrErr.takeError())
+    return errorToResult(std::move(err)); // We do not return LLVM errors to XGL.
+  *outSize = *sizeOrErr;
+  return Result::Success;
+}
 ```
 
 ## Redundant comparisons
