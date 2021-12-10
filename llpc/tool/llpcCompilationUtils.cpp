@@ -220,7 +220,7 @@ Expected<std::string> compileGlsl(const std::string &inFilename, ShaderStage *st
   fwrite(spvBin, 1, binSize, outFile);
 
   textSize = binSize * 10 + 1024;
-  SmallVector<char> spvText(textSize, '\0');
+  std::vector<char> spvText(textSize, '\0');
   LLPC_OUTS("\nSPIR-V disassembly: " << outFilename << "\n");
   spvDisassembleSpirv(binSize, spvBin, textSize, spvText.data());
   LLPC_OUTS(spvText.data() << "\n");
@@ -253,12 +253,12 @@ Expected<std::string> assembleSpirv(const std::string &inFilename) {
   size_t textSize = ftell(inFile);
   fseek(inFile, 0, SEEK_SET);
 
-  SmallVector<char, 0> spvText(textSize + 1, '\0');
+  std::vector<char> spvText(textSize + 1, '\0');
   size_t realSize = fread(spvText.data(), 1, textSize, inFile);
   spvText[realSize] = '\0';
 
   int binSize = static_cast<int>(realSize) * 4 + 1024; // Estimated SPIR-V binary size.
-  SmallVector<unsigned> spvBin(binSize / sizeof(unsigned), 0);
+  std::vector<unsigned> spvBin(binSize / sizeof(unsigned), 0);
 
   const char *log = nullptr;
   binSize = spvAssembleSpirv(spvText.data(), binSize, spvBin.data(), &log);
@@ -269,7 +269,7 @@ Expected<std::string> assembleSpirv(const std::string &inFilename) {
 
   LLPC_OUTS("===============================================================================\n");
   LLPC_OUTS("// SPIR-V disassembly: " << inFilename << "\n");
-  LLPC_OUTS(spvText);
+  LLPC_OUTS(spvText.data());
   LLPC_OUTS("\n\n");
 
   return outFilename;
@@ -405,7 +405,7 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
         unsigned textSize = binSize * 10 + 1024;
         LLPC_OUTS("\nSPIR-V disassembly for " << getShaderStageName(pipelineState->stages[stage].stage)
                                               << " shader module:\n");
-        SmallVector<char> spvText(textSize);
+        std::vector<char> spvText(textSize);
         spvDisassembleSpirv(binSize, shaderModuleData.spirvBin.pCode, textSize, spvText.data());
         LLPC_OUTS(spvText.data() << "\n");
       }
@@ -461,7 +461,7 @@ Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef
       } else {
         // Disassemble SPIR-V code
         unsigned textSize = spvBin.codeSize * 10 + 1024;
-        SmallVector<char> spvText(textSize);
+        std::vector<char> spvText(textSize);
         LLPC_OUTS("\nSPIR-V disassembly for " << inFile << "\n");
         spvDisassembleSpirv(spvBin.codeSize, spvBin.pCode, textSize, spvText.data());
         LLPC_OUTS(spvText.data() << "\n");
