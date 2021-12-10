@@ -1982,7 +1982,6 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
   case ShaderStageGeometry:
     return lgc::ShaderStageGeometry;
   case ShaderStageFragment:
-    // TODO: Will add mesh support in LGC
     return lgc::ShaderStageFragment;
   case ShaderStageCopyShader:
     return lgc::ShaderStageCopyShader;
