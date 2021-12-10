@@ -1190,6 +1190,62 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
     return;
   }
 
+  // Define the function
+  auto addPushConstArgs = [&](const ResourceNode &node) {
+    // Always spill for compute libraries.
+    if (!isComputeWithCalls()) {
+      // We add a potential unspilled arg for each separate dword offset of the push const at which there is a load.
+      // We already know that loads we have on our pushConstOffsets lists are at dword-aligned offset and
+      // dword-aligned size. We need to ensure that all loads are the same size, by removing ones that are bigger than
+      // the minimum size.
+      //
+      // First cope with the case that the app uses more push const than the size of the resource node. This is
+      // a workaround for an incorrect application; according to the Vulkan spec (version 1.2.151, section 14.6.1
+      // "Push Constant Interface"):
+      //
+      //    Each statically used member of a push constant block must be placed at an Offset such that the entire
+      //    member is entirely contained within the VkPushConstantRange for each OpEntryPoint that uses it, and
+      //    the stageFlags for that range must specify the appropriate VkShaderStageFlagBits for that stage.
+      unsigned dwordEndOffset = userDataUsage->pushConstOffsets.size();
+      if (dwordEndOffset > node.sizeInDwords) {
+        userDataUsage->pushConstSpill = true;
+        dwordEndOffset = node.sizeInDwords;
+      }
+
+      for (unsigned dwordOffset = 0; dwordOffset != dwordEndOffset; ++dwordOffset) {
+        UserDataNodeUsage &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
+        if (pushConstOffset.users.empty())
+          continue;
+
+        // Check that the load size does not overlap with the next used offset in the push constant.
+        bool haveOverlap = false;
+        unsigned endOffset =
+            std::min(dwordOffset + pushConstOffset.dwordSize, unsigned(userDataUsage->pushConstOffsets.size()));
+        for (unsigned followingOffset = dwordOffset + 1; followingOffset != endOffset; ++followingOffset) {
+          if (!userDataUsage->pushConstOffsets[followingOffset].users.empty()) {
+            haveOverlap = true;
+            break;
+          }
+        }
+        if (haveOverlap) {
+          userDataUsage->pushConstSpill = true;
+          continue;
+        }
+
+        // Add the arg (part of the push const) that we can potentially unspill.
+        addUserDataArg(userDataArgs, node.offsetInDwords + dwordOffset, pushConstOffset.dwordSize,
+                       "pushConst" + Twine(dwordOffset), &pushConstOffset.entryArgIdx, builder);
+      }
+    } else {
+      // Mark push constant for spill for compute library.
+      userDataUsage->pushConstSpill = true;
+    }
+
+    // Ensure we mark the push constant's part of the spill table as used.
+    if (userDataUsage->pushConstSpill)
+      userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, node.offsetInDwords);
+  };
+
   // We do have user data layout.
   // Add entries from the root user data layout (not vertex buffer or streamout, and not unused ones).
 
@@ -1202,6 +1258,11 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       break;
 
     case ResourceNodeType::DescriptorTableVaPtr: {
+      // PushConst is in table.
+      if (node.innerTable[0].type == ResourceNodeType::PushConst) {
+        addPushConstArgs(node.innerTable[0]);
+      }
+
       // Check if the descriptor set is in use. For compute with calls, enable it anyway.
       UserDataNodeUsage *descSetUsage = nullptr;
       if (userDataUsage->descriptorTables.size() > userDataNodeIdx)
@@ -1228,59 +1289,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
     }
 
     case ResourceNodeType::PushConst: {
-      // Always spill for compute libraries.
-      if (!isComputeWithCalls()) {
-        // We add a potential unspilled arg for each separate dword offset of the push const at which there is a load.
-        // We already know that loads we have on our pushConstOffsets lists are at dword-aligned offset and
-        // dword-aligned size. We need to ensure that all loads are the same size, by removing ones that are bigger than
-        // the minimum size.
-        //
-        // First cope with the case that the app uses more push const than the size of the resource node. This is
-        // a workaround for an incorrect application; according to the Vulkan spec (version 1.2.151, section 14.6.1
-        // "Push Constant Interface"):
-        //
-        //    Each statically used member of a push constant block must be placed at an Offset such that the entire
-        //    member is entirely contained within the VkPushConstantRange for each OpEntryPoint that uses it, and
-        //    the stageFlags for that range must specify the appropriate VkShaderStageFlagBits for that stage.
-        unsigned dwordEndOffset = userDataUsage->pushConstOffsets.size();
-        if (dwordEndOffset > node.sizeInDwords) {
-          userDataUsage->pushConstSpill = true;
-          dwordEndOffset = node.sizeInDwords;
-        }
-
-        for (unsigned dwordOffset = 0; dwordOffset != dwordEndOffset; ++dwordOffset) {
-          UserDataNodeUsage &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
-          if (pushConstOffset.users.empty())
-            continue;
-
-          // Check that the load size does not overlap with the next used offset in the push constant.
-          bool haveOverlap = false;
-          unsigned endOffset =
-              std::min(dwordOffset + pushConstOffset.dwordSize, unsigned(userDataUsage->pushConstOffsets.size()));
-          for (unsigned followingOffset = dwordOffset + 1; followingOffset != endOffset; ++followingOffset) {
-            if (!userDataUsage->pushConstOffsets[followingOffset].users.empty()) {
-              haveOverlap = true;
-              break;
-            }
-          }
-          if (haveOverlap) {
-            userDataUsage->pushConstSpill = true;
-            continue;
-          }
-
-          // Add the arg (part of the push const) that we can potentially unspill.
-          addUserDataArg(userDataArgs, node.offsetInDwords + dwordOffset, pushConstOffset.dwordSize,
-                         "pushConst" + Twine(dwordOffset), &pushConstOffset.entryArgIdx, builder);
-        }
-      } else {
-        // Mark push constant for spill for compute library.
-        userDataUsage->pushConstSpill = true;
-      }
-
-      // Ensure we mark the push constant's part of the spill table as used.
-      if (userDataUsage->pushConstSpill)
-        userDataUsage->spillUsage = std::min(userDataUsage->spillUsage, node.offsetInDwords);
-
+      addPushConstArgs(node);
       break;
     }
 
