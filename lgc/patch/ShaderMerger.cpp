@@ -1000,7 +1000,7 @@ void ShaderMerger::appendVertexFetchTypes(std::vector<Type *> &argTys) const {
     m_pipelineState->getPalMetadata()->getVertexFetchInfo(fetches);
     m_pipelineState->getPalMetadata()->addVertexFetchInfo(fetches);
     for (const auto &fetchInfo : fetches) {
-      argTys.push_back(fetchInfo.ty);
+      argTys.push_back(getVgprTy(fetchInfo.ty));
     }
   }
 }
