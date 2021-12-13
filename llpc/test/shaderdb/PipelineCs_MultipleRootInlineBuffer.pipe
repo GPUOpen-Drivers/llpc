@@ -1,0 +1,128 @@
+; Test that LLPC can handle multiple inline buffer in the root table.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^//}} LLPC SPIR-V lowering result
+; SHADERTEST: define dllexport spir_func void @main()
+; SHADERTEST-DAG: call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 0)
+; SHADERTEST-DAG: call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 0, i32 0)
+; SHADERTEST: ret void
+; SHADERTEST-LABEL: {{^//}} LLPC pipeline before-patching results
+; SHADERTEST: define dllexport spir_func void @lgc.shader.CS.main()
+
+; Get a pointer to the spill table
+; SHADERTEST: [[spill_table1:%[0-9]*]] = call i8 addrspace(4)* @lgc.spill.table() #2
+
+; Get a pointer to the second inline buffer in the spill table.  Offset 40 comes from the user data nodes.
+; SHADERTEST: [[buf_addr1:%[0-9]*]] = getelementptr i8, i8 addrspace(4)* [[spill_table1]], i32 40
+; SHADERTEST: [[buf1:%[0-9]*]] = ptrtoint i8 addrspace(4)* [[buf_addr1]] to i64
+
+; Build the descriptor.  The first two elements comes from the address of the buffer.
+; SHADERTEST: [[buf1_vec:%[0-9]*]] = bitcast i64 [[buf1]] to <2 x i32>
+; SHADERTEST: [[buf1_0:%[0-9]*]] = extractelement <2 x i32> [[buf1_vec]], i64 0
+; SHADERTEST: [[buf1_1:%[0-9]*]] = extractelement <2 x i32> [[buf1_vec]], i64 1
+; SHADERTEST: [[desc1_0:%[0-9]*]] = insertelement <4 x i32> undef, i32 [[buf1_0]], i64 0
+; SHADERTEST: [[buf1_2:%[0-9]*]] = and i32 [[buf1_1]], 65535
+; SHADERTEST: [[desc1_1:%[0-9]*]] = insertelement <4 x i32> [[desc1_0]], i32 [[buf1_2]], i64 1
+
+; The rest of the descriptor is filled in with the literals.
+; SHADERTEST: [[desc1_2:%[0-9]*]] = insertelement <4 x i32> [[desc1_1]], i32 -1, i64 2
+; SHADERTEST: [[desc1_3:%[0-9]*]] = insertelement <4 x i32> [[desc1_2]], i32 151468, i64 3
+
+; Get the "fat pointer" for the buffer
+; SHADERTEST: call i8 addrspace(7)* @lgc.late.launder.fat.pointer(<4 x i32> [[desc1_3]]) #2
+
+; Get a pointer to the spill table
+; SHADERTEST: [[spill_table0:%[0-9]*]] = call i8 addrspace(4)* @lgc.spill.table() #2
+
+; SHADERTEST: ret void
+; SHADERTEST-LABEL: {{^//}} LLPC pipeline patching results
+; END_SHADERTEST
+
+[Version]
+version = 46
+
+[CsSpirv]
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpSource HLSL 600
+               OpName %type_ConstantBuffer_RootConstType "type.ConstantBuffer.RootConstType"
+               OpMemberName %type_ConstantBuffer_RootConstType 0 "foo"
+               OpName %rootConst1 "rootConst1"
+               OpName %rootConst2 "rootConst2"
+               OpName %type_RWStructuredBuffer_RootConstType "type.RWStructuredBuffer.RootConstType"
+               OpName %RootConstType "RootConstType"
+               OpMemberName %RootConstType 0 "foo"
+               OpName %bufferOut "bufferOut"
+               OpName %main "main"
+               OpDecorate %rootConst1 DescriptorSet 0
+               OpDecorate %rootConst1 Binding 0
+               OpDecorate %rootConst2 DescriptorSet 0
+               OpDecorate %rootConst2 Binding 1
+               OpDecorate %bufferOut DescriptorSet 0
+               OpDecorate %bufferOut Binding 3
+               OpMemberDecorate %type_ConstantBuffer_RootConstType 0 Offset 0
+               OpDecorate %type_ConstantBuffer_RootConstType Block
+               OpMemberDecorate %RootConstType 0 Offset 0
+               OpDecorate %_runtimearr_RootConstType ArrayStride 4
+               OpMemberDecorate %type_RWStructuredBuffer_RootConstType 0 Offset 0
+               OpDecorate %type_RWStructuredBuffer_RootConstType BufferBlock
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+%type_ConstantBuffer_RootConstType = OpTypeStruct %uint
+%_ptr_Uniform_type_ConstantBuffer_RootConstType = OpTypePointer Uniform %type_ConstantBuffer_RootConstType
+%RootConstType = OpTypeStruct %uint
+%_runtimearr_RootConstType = OpTypeRuntimeArray %RootConstType
+%type_RWStructuredBuffer_RootConstType = OpTypeStruct %_runtimearr_RootConstType
+%_ptr_Uniform_type_RWStructuredBuffer_RootConstType = OpTypePointer Uniform %type_RWStructuredBuffer_RootConstType
+       %void = OpTypeVoid
+         %16 = OpTypeFunction %void
+%_ptr_Uniform_uint = OpTypePointer Uniform %uint
+ %rootConst1 = OpVariable %_ptr_Uniform_type_ConstantBuffer_RootConstType Uniform
+ %rootConst2 = OpVariable %_ptr_Uniform_type_ConstantBuffer_RootConstType Uniform
+  %bufferOut = OpVariable %_ptr_Uniform_type_RWStructuredBuffer_RootConstType Uniform
+       %main = OpFunction %void None %16
+         %18 = OpLabel
+         %19 = OpAccessChain %_ptr_Uniform_uint %rootConst1 %int_0
+         %20 = OpLoad %uint %19
+         %21 = OpAccessChain %_ptr_Uniform_uint %rootConst2 %int_0
+         %22 = OpLoad %uint %21
+         %23 = OpIAdd %uint %20 %22
+         %24 = OpAccessChain %_ptr_Uniform_uint %bufferOut %int_0 %uint_0 %int_0
+               OpStore %24 %23
+               OpReturn
+               OpFunctionEnd
+
+[CsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 1
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 32
+userDataNode[1].type = InlineBuffer
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 9
+userDataNode[1].set = 0
+userDataNode[1].binding = 0
+userDataNode[2].visibility = 32
+userDataNode[2].type = InlineBuffer
+userDataNode[2].offsetInDwords = 10
+userDataNode[2].sizeInDwords = 9
+userDataNode[2].set = 0
+userDataNode[2].binding = 1
+userDataNode[3].visibility = 32
+userDataNode[3].type = DescriptorTableVaPtr
+userDataNode[3].offsetInDwords = 10
+userDataNode[3].sizeInDwords = 1
+userDataNode[3].next[0].type = DescriptorBuffer
+userDataNode[3].next[0].offsetInDwords = 20
+userDataNode[3].next[0].sizeInDwords = 4
+userDataNode[3].next[0].set = 0x00000000
+userDataNode[3].next[0].binding = 3
