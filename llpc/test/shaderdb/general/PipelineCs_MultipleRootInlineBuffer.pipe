@@ -39,6 +39,16 @@
 ; SHADERTEST-LABEL: {{^//}} LLPC pipeline patching results
 ; END_SHADERTEST
 
+; Test the use of InlineBuffer with relocatable shaders.  This is currently not supported, and we
+; should fall back to full pipeline compilation.
+; BEGIN_RELOCTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% --enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=RELOCTEST %s
+; RELOCTEST-LABEL: {{^// LLPC}} calculated hash results (compute pipeline)
+; RELOCTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible
+; RELOCTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; RELOCTEST: {{^=====}} AMDLLPC SUCCESS
+; END_RELOCTEST
+
 [Version]
 version = 46
 
