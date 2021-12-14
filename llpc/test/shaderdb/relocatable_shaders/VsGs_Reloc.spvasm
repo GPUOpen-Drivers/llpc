@@ -1,0 +1,115 @@
+; Check that we can compile Vertex and Geometry stages together, without having to provide a .pipe file.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf %gfxip %s,main_vs %s,main_gs -v \
+; RUN:   | FileCheck -check-prefix=SHADERTEST %s
+;
+; SHADERTEST:       {{^}}Building pipeline with relocatable shader elf.
+; SHADERTEST-LABEL: {{^}}.AMDGPU.disasm
+; SHADERTEST:       {{^}}_amdgpu_gs_main:
+; SHADERTEST:       {{^}}_amdgpu_vs_main:
+; SHADERTEST-LABEL: {{^}} PalMetadata
+; SHADERTEST-LABEL: .hardware_stages
+; SHADERTEST-LABEL: .gs:
+; SHADERTEST-LABEL: .entry_point: _amdgpu_gs_main
+; SHADERTEST-LABEL: .vs:
+; SHADERTEST-LABEL: .entry_point: _amdgpu_vs_main
+; SHADERTEST-LABEL: .type: Gs
+; SHADERTEST-LABEL: {{^}}===== AMDLLPC SUCCESS =====
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.5
+; Generator: Khronos; 17
+; Bound: 44
+; Schema: 0
+               OpCapability Shader
+               OpCapability Geometry
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main_vs" %out_TEXCOORD0
+               OpEntryPoint Geometry %main_0 "main_gs" %gl_in %output
+               OpExecutionMode %main_0 Triangles
+               OpExecutionMode %main_0 Invocations 1
+               OpExecutionMode %main_0 OutputTriangleStrip
+               OpExecutionMode %main_0 OutputVertices 3
+               OpSource GLSL 430
+               OpSourceExtension "GL_ARB_separate_shader_objects"
+               OpSourceExtension "GL_ARB_shading_language_420pack"
+               OpName %main "main"
+               OpName %out_TEXCOORD0 "out_TEXCOORD0"
+               OpName %main_0 "main"
+               OpName %gl_PerVertex "gl_PerVertex"
+               OpMemberName %gl_PerVertex 0 "gl_Position"
+               OpMemberName %gl_PerVertex 1 "gl_PointSize"
+               OpMemberName %gl_PerVertex 2 "gl_ClipDistance"
+               OpName %gl_in "gl_in"
+               OpName %gl_PerVertex_0 "gl_PerVertex"
+               OpMemberName %gl_PerVertex_0 0 "gl_Position"
+               OpMemberName %gl_PerVertex_0 1 "gl_PointSize"
+               OpMemberName %gl_PerVertex_0 2 "gl_ClipDistance"
+               OpName %output "output"
+               OpModuleProcessed "Linked by SPIR-V Tools Linker"
+               OpDecorate %out_TEXCOORD0 Location 0
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex 2 BuiltIn ClipDistance
+               OpDecorate %gl_PerVertex Block
+               OpMemberDecorate %gl_PerVertex_0 0 Invariant
+               OpMemberDecorate %gl_PerVertex_0 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex_0 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex_0 2 BuiltIn ClipDistance
+               OpDecorate %gl_PerVertex_0 Block
+       %void = OpTypeVoid
+         %10 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v2float = OpTypeVector %float 2
+%_ptr_Output_v2float = OpTypePointer Output %v2float
+%out_TEXCOORD0 = OpVariable %_ptr_Output_v2float Output
+         %14 = OpConstantNull %v2float
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+%gl_PerVertex = OpTypeStruct %v4float %float %_arr_float_uint_1
+     %uint_3 = OpConstant %uint 3
+%_arr_gl_PerVertex_uint_3 = OpTypeArray %gl_PerVertex %uint_3
+%_ptr_Input__arr_gl_PerVertex_uint_3 = OpTypePointer Input %_arr_gl_PerVertex_uint_3
+      %gl_in = OpVariable %_ptr_Input__arr_gl_PerVertex_uint_3 Input
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+%gl_PerVertex_0 = OpTypeStruct %v4float %float %_arr_float_uint_1
+%_ptr_Output_gl_PerVertex_0 = OpTypePointer Output %gl_PerVertex_0
+     %output = OpVariable %_ptr_Output_gl_PerVertex_0 Output
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+       %main = OpFunction %void None %10
+         %29 = OpLabel
+               OpStore %out_TEXCOORD0 %14
+               OpReturn
+               OpFunctionEnd
+     %main_0 = OpFunction %void None %10
+         %30 = OpLabel
+         %31 = OpAccessChain %_ptr_Input_v4float %gl_in %int_0 %int_0
+         %32 = OpLoad %v4float %31
+         %33 = OpCompositeExtract %float %32 1
+         %34 = OpAccessChain %_ptr_Input_v4float %gl_in %int_1 %int_0
+         %35 = OpLoad %v4float %34
+         %36 = OpCompositeExtract %float %35 1
+         %37 = OpAccessChain %_ptr_Input_v4float %gl_in %int_2 %int_0
+         %38 = OpLoad %v4float %37
+         %39 = OpCompositeExtract %float %38 1
+         %40 = OpCompositeInsert %v4float %33 %32 1
+         %41 = OpAccessChain %_ptr_Output_v4float %output %int_0
+               OpStore %41 %40
+               OpEmitVertex
+         %42 = OpCompositeInsert %v4float %36 %35 1
+               OpStore %41 %42
+               OpEmitVertex
+         %43 = OpCompositeInsert %v4float %39 %38 1
+               OpStore %41 %43
+               OpEmitVertex
+               OpReturn
+               OpFunctionEnd
