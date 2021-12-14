@@ -42,11 +42,11 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc
   %a6 = shufflevector <3 x float> %a5, <3 x float> undef, <4 x i32> <i32 0, i32 1, i32 2, i32 undef>
   %a7 = insertelement <4 x float> %a6, float 1.000000e+00, i32 3
 
-; CHECK: %[[e0:.+]] = extractelement <3 x float> %[[bitcast]], i32 0
+; CHECK: %[[e0:.+]] = extractelement <3 x float> %[[bitcast]], i{{32|64}} 0
 ; CHECK: %[[bitcast1:.+]] = bitcast <3 x i32> %[[input_load]] to <3 x float>
-; CHECK: %[[e1:.+]] = extractelement <3 x float> %[[bitcast1]], i32 1
+; CHECK: %[[e1:.+]] = extractelement <3 x float> %[[bitcast1]], i{{32|64}} 1
 ; CHECK: %[[bitcast2:.+]] = bitcast <3 x i32> %[[input_load]] to <3 x float>
-; CHECK: %[[e2:.+]] = extractelement <3 x float> %[[bitcast2]], i32 2
+; CHECK: %[[e2:.+]] = extractelement <3 x float> %[[bitcast2]], i{{32|64}} 2
 
   call void (...) @lgc.create.write.generic.output(<4 x float> %a7, i32 3, i32 0, i32 0, i32 0, i32 0, i32 undef)
   call void (...) @lgc.create.write.builtin.output(<4 x float> %a7, i32 0, i32 0, i32 undef, i32 undef)
@@ -68,8 +68,8 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !lgc
   %a2 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 16, i32 undef)
   %e = extractelement <4 x float> %a2, i32 3
 
-; CHECK-DAG: %[[i0:.+]] = extractelement <2 x float> %[[ps_input:.+]], i32 0
-; CHECK-DAG: %[[i1:.+]] = extractelement <2 x float> %[[ps_input]],    i32 1
+; CHECK-DAG: %[[i0:.+]] = extractelement <2 x float> %[[ps_input:.+]], i{{32|64}} 0
+; CHECK-DAG: %[[i1:.+]] = extractelement <2 x float> %[[ps_input]],    i{{32|64}} 1
 
   %a6 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 3, i32 0, i32 0, i32 0, i32 16, i32 undef)
   %a7 = shufflevector <4 x float> %a6, <4 x float> undef, <3 x i32> <i32 0, i32 1, i32 2>
