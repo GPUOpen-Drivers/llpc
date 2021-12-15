@@ -24,20 +24,21 @@
  **********************************************************************************************************************/
 
 #include "llpc.h"
+#include "llpcError.h"
 #include "llpcShaderCache.h"
+#include "llpcThreading.h"
 #include "vkgcDefs.h"
 #include "vkgcMetroHash.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <list>
 #include <numeric>
 #include <random>
-#include <thread>
 
 using namespace llvm;
 using ::testing::ElementsAreArray;
@@ -195,28 +196,27 @@ TEST_F(ShaderCacheTest, InsertsShadersMultithreaded) {
   for (auto &hash : hashes) {
     std::atomic<size_t> numInsertions{0};
     std::atomic<size_t> numHits{0};
-    std::list<std::thread> threads;
-    for (size_t i = 0; i != numThreads; ++i) {
-      threads.emplace_back([&cache, &cacheEntry, &getWaitTime, &hash, &numInsertions, &numHits] {
-        CacheEntryHandle handle = nullptr;
-        ShaderEntryState state = cache.findShader(hash, true, &handle);
-        EXPECT_NE(handle, nullptr);
-        if (state == ShaderEntryState::Compiling) {
-          // Insert the new entry. Sleep to simulate compilation time.
-          std::this_thread::sleep_for(getWaitTime());
-          cache.insertShader(handle, cacheEntry.data(), cacheEntry.size());
-          ++numInsertions;
-        } else {
-          EXPECT_EQ(state, ShaderEntryState::Ready);
-          ++numHits;
-        }
-      });
-    }
 
-    // Wait for all threads to finish.
-    for (std::thread &t : threads)
-      t.join();
+    Error err = parallelFor(numThreads, seq(size_t(0), numThreads),
+                            [&cache, &cacheEntry, hash, &getWaitTime, &numInsertions, &numHits](size_t) -> Error {
+                              CacheEntryHandle handle = nullptr;
+                              ShaderEntryState state = cache.findShader(hash, true, &handle);
+                              if (!handle)
+                                return createResultError(Result::ErrorUnavailable);
 
+                              if (state == ShaderEntryState::Compiling) {
+                                // Insert the new entry. Sleep to simulate compilation time.
+                                std::this_thread::sleep_for(getWaitTime());
+                                cache.insertShader(handle, cacheEntry.data(), cacheEntry.size());
+                                ++numInsertions;
+                              } else {
+                                EXPECT_EQ(state, ShaderEntryState::Ready);
+                                ++numHits;
+                              }
+                              return Error::success();
+                            });
+
+    EXPECT_THAT_ERROR(std::move(err), Succeeded());
     EXPECT_EQ(numInsertions, 1);
     EXPECT_EQ(numHits, numThreads - 1);
   }
