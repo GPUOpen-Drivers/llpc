@@ -64,6 +64,7 @@
 #include "llpcInputUtils.h"
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llpcThreading.h"
 #include "llpcUtil.h"
 #include "vkgcElfReader.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -81,6 +82,7 @@
 #include "spvgen.h"
 #include "vfx.h"
 #include <cassert>
+#include <mutex>
 
 using namespace llvm;
 using namespace Vkgc;
@@ -435,15 +437,20 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
   return Error::success();
 }
 
-static Error processInputSpirvStage(ICompiler *compiler, CompileInfo &compileInfo, const InputSpec &spirvInput,
-                                    bool validateSpirv) {
+// =====================================================================================================================
+// Processes a single SPIR-V input file (text or binary).
+//
+// @param spirvInput : Input specification
+// @param validateSpirv : Whether to validate the input SPIR-V
+// @returns : `ShaderModuleData` on success, `ResultError` on failure
+static Expected<ShaderModuleData> processInputSpirvStage(const InputSpec &spirvInput, bool validateSpirv) {
   assert(isSpirvBinaryFile(spirvInput.filename) || isSpirvTextFile(spirvInput.filename));
   std::string spvBinFile;
   // SPIR-V assembly text or SPIR-V binary.
   if (isSpirvTextFile(spirvInput.filename)) {
     auto spvBinFilenameOrErr = assembleSpirv(spirvInput.filename);
     if (Error err = spvBinFilenameOrErr.takeError())
-      return err;
+      return std::move(err);
     spvBinFile = *spvBinFilenameOrErr;
   } else {
     spvBinFile = spirvInput.filename;
@@ -451,7 +458,7 @@ static Error processInputSpirvStage(ICompiler *compiler, CompileInfo &compileInf
 
   auto spvBinOrErr = getSpirvBinaryFromFile(spvBinFile);
   if (Error err = spvBinOrErr.takeError())
-    return err;
+    return std::move(err);
   BinaryData spvBin = *spvBinOrErr;
 
   const bool isSpvGenLoaded = InitSpvGen();
@@ -487,23 +494,20 @@ static Error processInputSpirvStage(ICompiler *compiler, CompileInfo &compileInf
     return createResultError(Result::ErrorInvalidShader,
                              Twine("Failed to identify shader stages by entry-point \"") + entryPoint + "\"");
 
-  for (ShaderStage existingStage : maskToShaderStages(compileInfo.stageMask))
-    if (is_contained(shaderStages, existingStage))
-      return createResultError(Result::ErrorInvalidShader,
-                               Twine("Duplicate shader stage (") + getShaderStageName(existingStage) + ")");
-
   ShaderStage stage = shaderStages.front(); // Note: there can be more than one stage, but we always pick the first one.
   StandaloneCompiler::ShaderModuleData shaderModuleData = {};
   shaderModuleData.shaderStage = stage;
   shaderModuleData.entryPoint = entryPoint;
   shaderModuleData.spirvBin = spvBin;
-  compileInfo.shaderModuleDatas.push_back(std::move(shaderModuleData));
-  compileInfo.stageMask |= shaderStageToMask(stage);
-
-  return Error::success();
+  return std::move(shaderModuleData);
 }
 
-static Error processInputLlvmIrStage(ICompiler *compiler, CompileInfo &compileInfo, const InputSpec &llvmIrInput) {
+// =====================================================================================================================
+// Processes a single LLVM IR input file.
+//
+// @param llvmIrInput : Input specification
+// @returns : `ShaderModuleData` on success, `ResultError` on failure
+static Expected<ShaderModuleData> processInputLlvmIrStage(const InputSpec &llvmIrInput) {
   assert(isLlvmIrFile(llvmIrInput.filename));
   LLVMContext context;
   SMDiagnostic errDiag;
@@ -533,9 +537,6 @@ static Error processInputLlvmIrStage(ICompiler *compiler, CompileInfo &compileIn
                              Twine("File ") + llvmIrInput.filename +
                                  " parsed, but failed to determine shader stage: " + errMsg);
 
-  if ((compileInfo.stageMask & shaderStageToMask(shaderStage)) != 0)
-    return createResultError(Result::ErrorInvalidShader, "Duplicate shader stage");
-
   // Translate LLVM module to LLVM bitcode.
   SmallString<1024> bitcodeBuf;
   raw_svector_ostream bitcodeStream(bitcodeBuf);
@@ -543,29 +544,27 @@ static Error processInputLlvmIrStage(ICompiler *compiler, CompileInfo &compileIn
   void *code = new uint8_t[bitcodeBuf.size()];
   memcpy(code, bitcodeBuf.data(), bitcodeBuf.size());
 
-  StandaloneCompiler::ShaderModuleData shaderModuledata = {};
-  shaderModuledata.spirvBin.codeSize = bitcodeBuf.size();
-  shaderModuledata.spirvBin.pCode = code;
-  shaderModuledata.shaderStage = shaderStage;
-
-  compileInfo.shaderModuleDatas.push_back(std::move(shaderModuledata));
-  compileInfo.stageMask |= shaderStageToMask(shaderStage);
-  compileInfo.doAutoLayout = false;
-  return Error::success();
+  StandaloneCompiler::ShaderModuleData shaderModuleData = {};
+  shaderModuleData.spirvBin.codeSize = bitcodeBuf.size();
+  shaderModuleData.spirvBin.pCode = code;
+  shaderModuleData.shaderStage = shaderStage;
+  shaderModuleData.disableDoAutoLayout = true;
+  return std::move(shaderModuleData);
 }
 
-static Error processInputGlslStage(ICompiler *compiler, CompileInfo &compileInfo, const InputSpec &glslInput) {
+// =====================================================================================================================
+// Processes a single GLSL input file. Translates the source to a SPIR-V binary.
+//
+// @param glslInput : Input specification
+// @returns : `ShaderModuleData` on success, `ResultError` on failure
+static Expected<ShaderModuleData> processInputGlslStage(const InputSpec &glslInput) {
   assert(isGlslShaderTextFile(glslInput.filename));
   // Note: If the entry target is not specified, we set it to the GLSL default.
   const std::string entryPoint = glslInput.entryPoint.empty() ? "main" : glslInput.entryPoint;
   ShaderStage stage = ShaderStageInvalid;
   auto spvBinFileOrErr = compileGlsl(glslInput.filename, &stage, entryPoint);
   if (Error err = spvBinFileOrErr.takeError())
-    return err;
-
-  if (isShaderStageInMask(stage, compileInfo.stageMask))
-    return createResultError(Result::ErrorInvalidShader,
-                             Twine("Duplicate shader stage (") + getShaderStageName(stage) + ")");
+    return std::move(err);
 
   StandaloneCompiler::ShaderModuleData shaderModuleData = {};
   shaderModuleData.shaderStage = stage;
@@ -573,46 +572,68 @@ static Error processInputGlslStage(ICompiler *compiler, CompileInfo &compileInfo
   shaderModuleData.entryPoint = entryPoint;
   auto spvBinOrErr = getSpirvBinaryFromFile(*spvBinFileOrErr);
   if (Error err = spvBinOrErr.takeError())
-    return err;
+    return std::move(err);
   shaderModuleData.spirvBin = *spvBinOrErr;
 
-  compileInfo.stageMask |= shaderStageToMask(stage);
-  compileInfo.shaderModuleDatas.push_back(std::move(shaderModuleData));
-  return Error::success();
+  return std::move(shaderModuleData);
+}
+
+// =====================================================================================================================
+// Processes a single shader stage input file. Translates sources to SPIR-V binaries, if necessary.
+//
+// @param inputSpec : Input specification
+// @param validateSpirv : Whether to run the validator on each final SPIR-V module
+// @returns : `ShaderModuleData` on success, `ResultError` on failure
+static Expected<ShaderModuleData> processInputStage(const InputSpec &inputSpec, bool validateSpirv) {
+  const std::string &inFile = inputSpec.filename;
+
+  if (isSpirvTextFile(inFile) || isSpirvBinaryFile(inFile))
+    return processInputSpirvStage(inputSpec, validateSpirv);
+
+  if (isLlvmIrFile(inFile))
+    return processInputLlvmIrStage(inputSpec);
+
+  if (isGlslShaderTextFile(inFile))
+    return processInputGlslStage(inputSpec);
+
+  return createResultError(Result::ErrorInvalidShader,
+                           Twine("File ") + inFile +
+                               " has an unknown extension; try -help to list supported input formats");
 }
 
 // =====================================================================================================================
 // Processes multiple shader stage input files. Translates sources to SPIR-V binaries, if necessary.
-// Appends all used inputs to `compileInfo.inputSpecs`.
+// Adds compilation results to `compileInfo`.
 //
-// @param compiler : LLPC compiler
 // @param [in/out] compileInfo : Compilation context of the current pipeline
 // @param inputSpec : Input specifications
 // @param validateSpirv : Whether to run the validator on each final SPIR-V module
+// @param numThreads : Number of CPU threads to use to process stages, where 0 means all logical cores
 // @returns : `ErrorSuccess` on success, `ResultError` on failure
-Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef<InputSpec> inputSpecs,
-                         bool validateSpirv) {
-  for (const InputSpec &inputSpec : inputSpecs) {
-    const std::string &inFile = inputSpec.filename;
+Error processInputStages(CompileInfo &compileInfo, ArrayRef<InputSpec> inputSpecs, bool validateSpirv,
+                         unsigned numThreads) {
+  std::mutex compileInfoMutex;
 
-    if (isSpirvTextFile(inFile) || isSpirvBinaryFile(inFile)) {
-      if (Error err = processInputSpirvStage(compiler, compileInfo, inputSpec, validateSpirv))
-        return err;
-    } else if (isLlvmIrFile(inFile)) {
-      if (Error err = processInputLlvmIrStage(compiler, compileInfo, inputSpec))
-        return err;
-    } else if (isGlslShaderTextFile(inFile)) {
-      if (Error err = processInputGlslStage(compiler, compileInfo, inputSpec))
-        return err;
-    } else {
+  return parallelFor(numThreads, inputSpecs, [&](const InputSpec &inputSpec) -> Error {
+    auto dataOrErr = processInputStage(inputSpec, validateSpirv);
+    if (Error err = dataOrErr.takeError())
+      return err;
+
+    ShaderModuleData &data = *dataOrErr;
+    const ShaderStage stage = data.shaderStage;
+
+    std::lock_guard<std::mutex> lock(compileInfoMutex);
+    if (isShaderStageInMask(stage, compileInfo.stageMask))
       return createResultError(Result::ErrorInvalidShader,
-                               Twine("File ") + inFile +
-                                   " has an unknown extension; try -help to list supported input formats");
-    }
+                               Twine("Duplicate shader stage (") + getShaderStageName(stage) + ")");
 
     compileInfo.inputSpecs.push_back(inputSpec);
-  }
-  return Error::success();
+    compileInfo.stageMask |= shaderStageToMask(stage);
+    if (data.disableDoAutoLayout)
+      compileInfo.doAutoLayout = false;
+    compileInfo.shaderModuleDatas.emplace_back(std::move(data));
+    return Error::success();
+  });
 }
 
 } // namespace StandaloneCompiler

@@ -21,18 +21,30 @@
 ; SHADERTEST_FS-LABEL: {{^=====}} AMDLLPC SUCCESS =====
 ; END_SHADERTES_FS
 
-; BEGIN_SHADERTEST_BOTH
+; BEGIN_SHADERTEST_BOTH_ST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s,main_vs %s,main_fs \
-; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH %s
+; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_ST %s
 ;
-; SHADERTEST_BOTH-LABEL: {{^//}} LLPC final pipeline module info
-; SHADERTEST_BOTH:       define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless
-; SHADERTEST_BOTH:       define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main
-; SHADERTEST_BOTH-LABEL: {{^//}} LLPC final ELF info
-; SHADERTEST_BOTH-LABEL: _amdgpu_vs_main_fetchless:
-; SHADERTEST_BOTH-LABEL: _amdgpu_ps_main:
-; SHADERTEST_BOTH-LABEL: {{^=====}} AMDLLPC SUCCESS =====
-; END_SHADERTES_BOTH
+; SHADERTEST_BOTH_ST-LABEL: {{^//}} LLPC final pipeline module info
+; SHADERTEST_BOTH_ST:       define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless
+; SHADERTEST_BOTH_ST:       define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main
+; SHADERTEST_BOTH_ST-LABEL: {{^//}} LLPC final ELF info
+; SHADERTEST_BOTH_ST-LABEL: _amdgpu_vs_main_fetchless:
+; SHADERTEST_BOTH_ST-LABEL: _amdgpu_ps_main:
+; SHADERTEST_BOTH_ST-LABEL: {{^=====}} AMDLLPC SUCCESS =====
+; END_SHADERTES_BOTH_ST
+
+; BEGIN_SHADERTEST_BOTH_MT
+; This test uses llvm-objdump instead of verbose output, as it is not allowed to mix multi-threaded
+; compilation with verbose output.
+;
+; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip %s,main_vs %s,main_fs --num-threads=2 -o %t.both.elf
+; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.both.elf \
+; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_MT %s
+;
+; SHADERTEST_BOTH_MT-LABEL: <_amdgpu_vs_main_fetchless>:
+; SHADERTEST_BOTH_MT-LABEL: <_amdgpu_ps_main>:
+; END_SHADERTES_BOTH_MT
 
 ; SPIR-V
 ; Version: 1.5

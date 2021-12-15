@@ -1,0 +1,39 @@
+; Check that we can compile pipelines in parallel.
+
+; BEGIN_SHADERTEST_1
+; Use fewer threads than the number of inputs.
+; RUN: amdllpc -spvgen-dir=%spvgendir% --num-threads=2 \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs2.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs2Fs1.pipe
+; END_SHADERTEST_1
+
+; BEGIN_SHADERTEST_2
+; Request more theads than the number of inputs.
+; RUN: amdllpc -spvgen-dir=%spvgendir% --num-threads=8 \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs2.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs2Fs1.pipe
+; END_SHADERTEST_2
+
+; BEGIN_SHADERTEST_3
+; Large number of inputs. Use all available CPUs.
+; RUN: amdllpc -spvgen-dir=%spvgendir% --num-threads=0 \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs2.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs2Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs2.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs2Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs2.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs2Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs2.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs2Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs2Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs2.pipe \
+; RUN:   %S/test_inputs/PipelineVsFs_ConstantData_Vs2Fs1.pipe
+; END_SHADERTEST_3

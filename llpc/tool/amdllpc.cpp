@@ -40,6 +40,7 @@
 #include "llpcFile.h"
 #include "llpcInputUtils.h"
 #include "llpcPipelineBuilder.h"
+#include "llpcThreading.h"
 #include "llpcUtil.h"
 #include "spvgen.h"
 #include "lgc/LgcContext.h"
@@ -120,6 +121,14 @@ cl::opt<bool> ValidateSpirv("validate-spirv", cl::desc("Validate input SPIR-V bi
 // -ignore-color-attachment-formats: ignore color attachment formats
 cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                            cl::desc("Ignore color attachment formats"), cl::init(false));
+
+// -num-threads: number of CPU threads to use when compiling the inputs
+cl::opt<unsigned> NumThreads("num-threads",
+                             cl::desc("Number of CPU threads to use when compiling the inputs:\n"
+                                      "0: Use all logical CPUs\n"
+                                      "1: Single-threaded compilation\n"
+                                      "k: Spawn <k> compiler threads"),
+                             cl::value_desc("integer"), cl::init(1));
 
 // -enable-ngg: enable NGG mode
 cl::opt<bool> EnableNgg("enable-ngg", cl::desc("Enable implicit primitive shader (NGG) mode"), cl::init(true));
@@ -357,6 +366,11 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
     return Result::ErrorUnavailable;
   }
 
+  if (EnableOuts() && NumThreads != 1) {
+    LLPC_ERRS("Verbose output is not available when compiling with multiple threads\n");
+    return Result::Unsupported;
+  }
+
   return Result::Success;
 }
 
@@ -421,7 +435,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
     if (Error err = processInputPipeline(compiler, compileInfo, firstInput, Unlinked, IgnoreColorAttachmentFormats))
       return err;
   } else {
-    if (Error err = processInputStages(compiler, compileInfo, inputSpecs, ValidateSpirv))
+    if (Error err = processInputStages(compileInfo, inputSpecs, ValidateSpirv, NumThreads))
       return err;
   }
 
@@ -548,11 +562,10 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  for (InputSpecGroup &inputGroup : *inputGroupsOrErr) {
-    if (Error err = processInputs(compiler, inputGroup)) {
-      result = reportError(std::move(err));
-      return EXIT_FAILURE;
-    }
+  if (Error err = parallelFor(NumThreads, *inputGroupsOrErr,
+                              [compiler](InputSpecGroup &inputGroup) { return processInputs(compiler, inputGroup); })) {
+    result = reportError(std::move(err));
+    return EXIT_FAILURE;
   }
 
   assert(result == Result::Success);
