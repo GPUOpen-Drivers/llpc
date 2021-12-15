@@ -72,6 +72,7 @@ struct ShaderModuleData {
   Llpc::ShaderModuleBuildInfo shaderInfo; // Info to build shader modules
   Llpc::ShaderModuleBuildOut shaderOut;   // Output of building shader modules
   void *shaderBuf;                        // Allocation buffer of building shader modules
+  bool disableDoAutoLayout;               // Indicates whether to disable auto layout of descriptors
 };
 
 // Represents a single compilation context of a pipeline or a group of shaders.
@@ -123,8 +124,8 @@ llvm::Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, 
                                  bool unlinked, bool ignoreColorAttachmentFormats);
 
 // Processes and compiles multiple shader stage input files.
-llvm::Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, llvm::ArrayRef<InputSpec> inputSpecs,
-                               bool validateSpirv);
+llvm::Error processInputStages(CompileInfo &compileInfo, llvm::ArrayRef<InputSpec> inputSpecs, bool validateSpirv,
+                               unsigned numThreads);
 
 } // namespace StandaloneCompiler
 } // namespace Llpc

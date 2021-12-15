@@ -1,22 +1,36 @@
 ; Check that we can compile Vertex and Geometry stages together, without having to provide a .pipe file.
 
-; BEGIN_SHADERTEST
+; BEGIN_SHADERTEST_ST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf %gfxip %s,main_vs %s,main_gs -v \
-; RUN:   | FileCheck -check-prefix=SHADERTEST %s
+; RUN:   | FileCheck -check-prefix=SHADERTEST_ST %s
 ;
-; SHADERTEST:       {{^}}Building pipeline with relocatable shader elf.
-; SHADERTEST-LABEL: {{^}}.AMDGPU.disasm
-; SHADERTEST:       {{^}}_amdgpu_gs_main:
-; SHADERTEST:       {{^}}_amdgpu_vs_main:
-; SHADERTEST-LABEL: {{^}} PalMetadata
-; SHADERTEST-LABEL: .hardware_stages
-; SHADERTEST-LABEL: .gs:
-; SHADERTEST-LABEL: .entry_point: _amdgpu_gs_main
-; SHADERTEST-LABEL: .vs:
-; SHADERTEST-LABEL: .entry_point: _amdgpu_vs_main
-; SHADERTEST-LABEL: .type: Gs
-; SHADERTEST-LABEL: {{^}}===== AMDLLPC SUCCESS =====
-; END_SHADERTEST
+; SHADERTEST_ST:       {{^}}Building pipeline with relocatable shader elf.
+; SHADERTEST_ST-LABEL: {{^}}.AMDGPU.disasm
+; SHADERTEST_ST:       {{^}}_amdgpu_gs_main:
+; SHADERTEST_ST:       {{^}}_amdgpu_vs_main:
+; SHADERTEST_ST-LABEL: {{^}} PalMetadata
+; SHADERTEST_ST-LABEL: .hardware_stages
+; SHADERTEST_ST-LABEL: .gs:
+; SHADERTEST_ST-LABEL: .entry_point: _amdgpu_gs_main
+; SHADERTEST_ST-LABEL: .vs:
+; SHADERTEST_ST-LABEL: .entry_point: _amdgpu_vs_main
+; SHADERTEST_ST-LABEL: .type: Gs
+; SHADERTEST_ST-LABEL: {{^}}===== AMDLLPC SUCCESS =====
+; END_SHADERTEST_ST
+
+; BEGIN_SHADERTEST_MT
+; This test uses llvm-objdump instead of verbose output, as it is not allowed to mix multi-threaded
+; compilation with verbose output.
+;
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf %gfxip %s,main_vs %s,main_gs \
+; RUN:   --num-threads=2 -o %t.mt.elf
+; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.mt.elf \
+; RUN:   | FileCheck -check-prefix=SHADERTEST_MT %s
+;
+; SHADERTEST_MT-LABEL: <_amdgpu_gs_main>:
+; SHADERTEST_MT-LABEL: <_amdgpu_vs_main>:
+; END_SHADERTEST_MT
+
 
 ; SPIR-V
 ; Version: 1.5
