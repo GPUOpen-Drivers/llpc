@@ -223,7 +223,7 @@ public:
   bool isComputeLibrary() const { return m_computeLibrary; }
   ShaderStage getLastVertexProcessingStage() const;
   ShaderStage getPrevShaderStage(ShaderStage shaderStage) const;
-  ShaderStage getNextShaderStage(ShaderStage shaderStage, bool fakeFs = false) const;
+  ShaderStage getNextShaderStage(ShaderStage shaderStage) const;
 
   // Get client name
   const char *getClient() const { return m_client.c_str(); }
