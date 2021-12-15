@@ -518,8 +518,10 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
   if (!isOutput || m_shaderStage != ShaderStageGeometry) {
     bool keepAllLocations = false;
     if (getPipelineState()->isUnlinked()) {
-      if (isOutput && m_pipelineState->getNextShaderStage(m_shaderStage, true) == ShaderStageFragment)
-        keepAllLocations = true;
+      if (isOutput && m_shaderStage != ShaderStageFragment) {
+        ShaderStage nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+        keepAllLocations = nextStage == ShaderStageFragment || nextStage == ShaderStageInvalid;
+      }
       if (m_shaderStage == ShaderStageFragment && !isOutput)
         keepAllLocations = true;
     }

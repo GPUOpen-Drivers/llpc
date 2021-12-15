@@ -397,8 +397,7 @@ ShaderStage PipelineState::getPrevShaderStage(ShaderStage shaderStage) const {
 // Gets the next active shader stage in this pipeline
 //
 // @param shaderStage : Current shader stage
-// @param fakeFs : True to return FS even if it is not present
-ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage, bool fakeFs) const {
+ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage) const {
   if (shaderStage == ShaderStageCompute)
     return ShaderStageInvalid;
 
@@ -411,7 +410,7 @@ ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage, bool fake
 
   ShaderStage nextStage = ShaderStageInvalid;
   unsigned stageMask = m_stageMask;
-  if (fakeFs)
+  if (isPartPipeline())
     stageMask |= shaderStageToMask(ShaderStageFragment);
 
   for (unsigned stage = shaderStage + 1; stage < ShaderStageGfxCount; ++stage) {

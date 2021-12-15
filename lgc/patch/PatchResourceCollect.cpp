@@ -1532,7 +1532,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
   auto &builtInUsage = resUsage->builtInUsage;
   auto &inOutUsage = resUsage->inOutUsage;
 
-  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage, m_processMissingFs);
+  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
   auto nextResUsage = nextStage != ShaderStageInvalid ? m_pipelineState->getShaderResourceUsage(nextStage) : nullptr;
 
   assert(inOutUsage.builtInInputLocMap.empty()); // Should be empty
@@ -2325,7 +2325,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
 // =====================================================================================================================
 // Clear unused output from outputLocInfoMap and perPatchOutputLocMap
 void PatchResourceCollect::clearUnusedOutput() {
-  ShaderStage nextStage = m_pipelineState->getNextShaderStage(m_shaderStage, m_processMissingFs);
+  ShaderStage nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
   if (nextStage != ShaderStageInvalid) {
@@ -2586,7 +2586,7 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
 
   if (m_shaderStage != ShaderStageGeometry) {
     assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval);
-    auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage, m_processMissingFs);
+    auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
     assert(nextStage != ShaderStageInvalid);
     // In reassembleOutputExportCalls, the unused calls in next stage have been added into dead call set.
     bool isMarkedDeadCall = (m_shaderStage == m_pipelineState->getLastVertexProcessingStage());
