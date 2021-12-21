@@ -22,7 +22,7 @@ void main()
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 293, <2 x {{.*}}, i32 2, float 0.000000e+00, <2 x {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.gather4.l.o.2d.v4f32.f32(i32 4,{{.*}},{{.*}},{{.*}},{{.*}},{{.*}}, i1 false, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.gather4.lz.o.2d.v4f32.f32(i32 4,{{.*}},{{.*}},{{.*}},{{.*}}, i1 false, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
