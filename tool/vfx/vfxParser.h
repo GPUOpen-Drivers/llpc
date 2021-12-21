@@ -108,4 +108,8 @@ protected:
   unsigned m_currentSectionLineNum;               // Current section line number
 };
 
+// Splits the input string by modifying it in place. Returns a vector of (inner) fragment strings. This can be used
+// thread-safe replacement for `strtok`, although the semantics are not identical.
+std::vector<char *> split(char *str, const char *delimiters);
+
 } // namespace Vfx
