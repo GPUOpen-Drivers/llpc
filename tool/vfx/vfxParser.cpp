@@ -49,6 +49,13 @@
 #include <vector>
 
 namespace Vfx {
+// Disallow accidental uses of the `strtok` functions as they are not thread safe.
+#define VFX_BAN_STRTOK static_assert(false, "strtok is not thread safe and must not be used")
+
+#define strtok(...) VFX_BAN_STRTOK
+#define strtok_s(...) VFX_BAN_STRTOK
+#define strtok_r(...) VFX_BAN_STRTOK
+
 // Parser functions to parse a value by it's type
 bool parseInt(char *str, unsigned lineNum, IUFValue *output);
 bool parseFloat(char *str, unsigned lineNum, IUFValue *output);
@@ -93,6 +100,43 @@ bool isArrayAccess(const char *str);
 // Gets one word for a string and return the start position of next word, nullptr is returned if word isn't found
 // in the string
 char *getWordFromString(char *str, char *wordBuffer);
+
+// =====================================================================================================================
+// Splits the input string by modifying it in place. Returns a vector of (inner) fragment strings. Skips over adjacent
+// delimiters.
+// This can be used as a thread-safe replacement for `strtok`, although the semantics are not identical.
+//
+// Example:
+// ```c++
+//   char str[] = "a,bb c, d";
+//   std::vector<char *> fragments = split(str, ", "); // Contains: {"a", "bb", "c", "d"}.
+//   // The original string, `str`, becomes: "a\0bb\0c\0\0d".
+// ```
+//
+// For more examples, see `testVfxParser.cpp`.
+//
+// @param [in/out] str : String to scan and modify.
+// @param delimiters : Null-terminated string with the set of delimiter characters separating string fragments.
+// @returns : Vector of null-terminated string fragments.
+std::vector<char *> split(char *str, const char *delimiters) {
+  VFX_ASSERT(str);
+  VFX_ASSERT(delimiters);
+  std::vector<char *> fragments;
+
+  while (str) {
+    fragments.push_back(str);
+    // Find the first occurrence of any of the delimiters.
+    str = strpbrk(str, delimiters);
+
+    // Skip to the first character that is not a delimiter.
+    while (str && *str != '\0' && strchr(delimiters, *str)) {
+      *str = '\0';
+      ++str;
+    }
+  }
+
+  return fragments;
+}
 
 // =====================================================================================================================
 Document::~Document() {
@@ -211,8 +255,10 @@ bool Document::beginSection(char *line) {
 
   if (result) {
     line = line + 1;
-    char *sectionName = strtok(line, ",");
-    m_currentSection = getFreeSection(sectionName);
+    if (char *sectionNameBack = strchr(line, ','))
+      *sectionNameBack = '\0';
+
+    m_currentSection = getFreeSection(line);
     if (m_currentSection) {
       // Next line is the first line of section content.
       m_currentSectionLineNum = m_currentLineNum + 1;
@@ -309,24 +355,29 @@ bool Document::parseKey(const char *key, unsigned lineNum, Section *sectionObjec
   VFX_ASSERT(sectionObjectIn);
   Section *tempSectionObj = sectionObjectIn;
 
-  // Process member access
-  char *keyTok = strtok(keyBuffer, ".");
-  keyTok = trimStringBeginning(keyTok);
-  keyTok = trimStringEnd(keyTok);
+  std::vector<char *> fragments = split(keyBuffer, ".");
 
+  // Process member access
   bool isSection = false;        // Is this member an Section object
   unsigned parsedArrayIndex = 0; // Array access index
   MemberType memberType;
 
-  while (keyTok) {
+  for (size_t i = 0, e = fragments.size(); i != e; ++i) {
+    char *keyTok = fragments[i];
+    if (i == 0) {
+      keyTok = trimStringBeginning(keyTok);
+      keyTok = trimStringEnd(keyTok);
+    }
+
     if (isArrayAccess(keyTok)) {
       char *lBracket = nullptr;
       result = parseArrayAccess(keyTok, lineNum, &parsedArrayIndex, &lBracket, nullptr, &m_errorMsg);
       // Remove bracket from string token
       *lBracket = '\0';
       keyTok = trimStringEnd(keyTok);
-    } else
+    } else {
       parsedArrayIndex = 0;
+    }
 
     result = tempSectionObj->isSection(lineNum, keyTok, &isSection, &memberType, &m_errorMsg);
     if (!result)
@@ -341,8 +392,6 @@ bool Document::parseKey(const char *key, unsigned lineNum, Section *sectionObjec
       if (!result)
         break;
     }
-
-    keyTok = strtok(nullptr, ".");
   }
 
   if (arrayIndex)
@@ -766,24 +815,23 @@ bool parseIVec4(char *str, unsigned lineNum, IUFValue *output) {
   if (p0x)
     isHex = true;
 
-  char *number = strtok(str, ", ");
-  unsigned numberId = 0;
-  while (number) {
+  std::vector<char *> numbers = split(str, ", ");
+  VFX_ASSERT(numbers.size() <= 4);
+
+  for (size_t i = 0, e = numbers.size(); i != e; ++i) {
+    char *number = numbers[i];
     result = true;
-    VFX_ASSERT(numberId < 4);
     if (isHex)
-      output->uVec4[numberId] = strtoul(number, nullptr, 0);
+      output->uVec4[i] = strtoul(number, nullptr, 0);
     else
-      output->iVec4[numberId] = strtol(number, nullptr, 0);
-    number = strtok(nullptr, ", ");
-    ++numberId;
+      output->iVec4[i] = strtol(number, nullptr, 0);
   }
 
   output->props.isInt64 = false;
   output->props.isFloat = false;
   output->props.isDouble = false;
   output->props.isHex = isHex;
-  output->props.length = numberId;
+  output->props.length = numbers.size();
 
   return result;
 }
@@ -804,24 +852,23 @@ bool parseI64Vec2(char *str, unsigned lineNum, IUFValue *output) {
   if (p0x)
     isHex = true;
 
-  char *number = strtok(str, ", ");
-  unsigned numberId = 0;
-  while (number) {
+  std::vector<char *> numbers = split(str, ", ");
+  VFX_ASSERT(numbers.size() <= 2);
+
+  for (size_t i = 0, e = numbers.size(); i != e; ++i) {
+    char *number = numbers[i];
     result = true;
-    VFX_ASSERT(numberId < 2);
     if (isHex)
-      output->i64Vec2[numberId] = strtoull(number, nullptr, 0);
+      output->i64Vec2[i] = strtoull(number, nullptr, 0);
     else
-      output->i64Vec2[numberId] = strtoll(number, nullptr, 0);
-    number = strtok(nullptr, ", ");
-    ++numberId;
+      output->i64Vec2[i] = strtoll(number, nullptr, 0);
   }
 
   output->props.isInt64 = true;
   output->props.isFloat = false;
   output->props.isDouble = false;
   output->props.isHex = isHex;
-  output->props.length = numberId;
+  output->props.length = numbers.size();
 
   return result;
 }
@@ -837,22 +884,19 @@ bool parseFVec4(char *str, unsigned lineNum, IUFValue *output) {
   VFX_ASSERT(output);
   bool result = false;
 
-  char *number = strtok(str, ", ");
-  unsigned numberId = 0;
-  while (number) {
+  std::vector<char *> numbers = split(str, ", ");
+  VFX_ASSERT(numbers.size() <= 4);
+
+  for (size_t i = 0, e = numbers.size(); i != e; ++i) {
+    char *number = numbers[i];
     result = true;
-    VFX_ASSERT(numberId < 4);
-
-    output->fVec4[numberId] = static_cast<float>(strtod(number, nullptr));
-
-    number = strtok(nullptr, ", ");
-    ++numberId;
+    output->fVec4[i] = static_cast<float>(strtod(number, nullptr));
   }
 
   output->props.isInt64 = false;
   output->props.isFloat = true;
   output->props.isDouble = false;
-  output->props.length = numberId;
+  output->props.length = numbers.size();
 
   return result;
 }
@@ -868,26 +912,24 @@ bool parseF16Vec4(char *str, unsigned lineNum, IUFValue *output) {
   VFX_ASSERT(output);
   bool result = false;
 
-  char *number = strtok(str, ", ");
-  unsigned numberId = 0;
-  while (number) {
+  std::vector<char *> numbers = split(str, ", ");
+  VFX_ASSERT(numbers.size() <= 4);
+
+  for (size_t i = 0, e = numbers.size(); i != e; ++i) {
+    char *number = numbers[i];
     result = true;
-    VFX_ASSERT(numberId < 4);
 
     float v = static_cast<float>(strtod(number, nullptr));
     Float16 v16;
     v16.FromFloat32(v);
-    output->f16Vec4[numberId] = v16;
-
-    number = strtok(nullptr, ", ");
-    ++numberId;
+    output->f16Vec4[i] = v16;
   }
 
   output->props.isInt64 = false;
   output->props.isFloat = false;
   output->props.isFloat16 = true;
   output->props.isDouble = false;
-  output->props.length = numberId;
+  output->props.length = numbers.size();
 
   return result;
 }
@@ -903,22 +945,20 @@ bool parseDVec2(char *str, unsigned lineNum, IUFValue *output) {
   VFX_ASSERT(output);
   bool result = false;
 
-  char *number = strtok(str, ", ");
-  unsigned numberId = 0;
-  while (number) {
+  std::vector<char *> numbers = split(str, ", ");
+  VFX_ASSERT(numbers.size() <= 2);
+
+  for (size_t i = 0, e = numbers.size(); i != e; ++i) {
+    char *number = numbers[i];
     result = true;
-    VFX_ASSERT(numberId < 2);
 
-    output->dVec2[numberId] = strtod(number, nullptr);
-
-    number = strtok(nullptr, ", ");
-    ++numberId;
+    output->dVec2[i] = strtod(number, nullptr);
   }
 
   output->props.isInt64 = false;
   output->props.isFloat = false;
   output->props.isDouble = true;
-  output->props.length = numberId;
+  output->props.length = numbers.size();
 
   return result;
 }
@@ -933,9 +973,11 @@ bool parseDVec2(char *str, unsigned lineNum, IUFValue *output) {
 // @param [in/out] bufMem : Buffer data
 bool parseIArray(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> &bufMem) {
   bool result = true;
+  std::vector<char *> numbers = split(str, ", ");
 
-  char *number = strtok(str, ", ");
-  while (number) {
+  for (char *number : numbers) {
+    result = true;
+
     bool isHex = false;
     char *p0x = strstr(number, "0x");
     if (p0x)
@@ -955,8 +997,6 @@ bool parseIArray(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> 
 
     for (unsigned i = 0; i < sizeof(val); ++i)
       bufMem.push_back(val[i]);
-
-    number = strtok(nullptr, ", ");
   }
 
   return result;
@@ -972,9 +1012,9 @@ bool parseIArray(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> 
 // @param [in/out] bufMem : Buffer data
 bool parseI64Array(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> &bufMem) {
   bool result = true;
+  std::vector<char *> numbers = split(str, ", ");
 
-  char *number = strtok(str, ", ");
-  while (number) {
+  for (char *number : numbers) {
     bool isHex = false;
     char *p0x = strstr(number, "0x");
     if (p0x)
@@ -995,8 +1035,6 @@ bool parseI64Array(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t
 
     for (unsigned i = 0; i < sizeof(val); ++i)
       bufMem.push_back(val[i]);
-
-    number = strtok(nullptr, ", ");
   }
 
   return result;
@@ -1011,9 +1049,9 @@ bool parseI64Array(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t
 // @param [in/out] bufMem : Buffer data
 bool parseFArray(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
   bool result = true;
+  std::vector<char *> numbers = split(str, ", ");
 
-  char *number = strtok(str, ", ");
-  while (number) {
+  for (char *number : numbers) {
     union {
       float fVal;
       unsigned uVal;
@@ -1024,8 +1062,6 @@ bool parseFArray(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
 
     for (unsigned i = 0; i < sizeof(val); ++i)
       bufMem.push_back(val[i]);
-
-    number = strtok(nullptr, ", ");
   }
 
   return result;
@@ -1040,9 +1076,9 @@ bool parseFArray(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
 // @param [in/out] bufMem : Buffer data
 bool parseF16Array(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
   bool result = true;
+  std::vector<char *> numbers = split(str, ", ");
 
-  char *number = strtok(str, ", ");
-  while (number) {
+  for (char *number : numbers) {
     union {
       Float16Bits fVal;
       uint16_t uVal;
@@ -1056,8 +1092,6 @@ bool parseF16Array(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
 
     for (unsigned i = 0; i < sizeof(val); ++i)
       bufMem.push_back(val[i]);
-
-    number = strtok(nullptr, ", ");
   }
 
   return result;
@@ -1072,9 +1106,9 @@ bool parseF16Array(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
 // @param [in/out] bufMem : Buffer data
 bool parseDArray(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
   bool result = true;
+  std::vector<char *> numbers = split(str, ", ");
 
-  char *number = strtok(str, ", ");
-  while (number) {
+  for (char *number : numbers) {
     union {
       double dVal;
       unsigned uVal[2];
@@ -1085,8 +1119,6 @@ bool parseDArray(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem) {
 
     for (unsigned i = 0; i < sizeof(val); ++i)
       bufMem.push_back(val[i]);
-
-    number = strtok(nullptr, ", ");
   }
 
   return result;
@@ -1108,30 +1140,30 @@ bool parseBinding(char *str, unsigned lineNum, IUFValue *output) {
   if (p0x)
     isHex = true;
 
-  char *number = strtok(str, ", ");
-  unsigned numberId = 0;
-  while (number) {
+  std::vector<char *> numbers = split(str, ", ");
+  VFX_ASSERT(numbers.size() <= 3);
+
+  for (size_t i = 0, e = numbers.size(); i != e; ++i) {
     result = true;
-    VFX_ASSERT(numberId < 3);
+    char *number = numbers[i];
+
     if (strcmp(number, "vb") == 0)
-      output->uVec4[numberId] = VfxVertexBufferSetId;
+      output->uVec4[i] = VfxVertexBufferSetId;
     else if (strcmp(number, "ib") == 0)
-      output->uVec4[numberId] = VfxIndexBufferSetId;
+      output->uVec4[i] = VfxIndexBufferSetId;
     else {
       if (isHex)
-        output->uVec4[numberId] = strtoul(number, nullptr, 0);
+        output->uVec4[i] = strtoul(number, nullptr, 0);
       else
-        output->iVec4[numberId] = strtol(number, nullptr, 0);
+        output->iVec4[i] = strtol(number, nullptr, 0);
     }
-    number = strtok(nullptr, ", ");
-    ++numberId;
   }
 
   output->props.isInt64 = false;
   output->props.isFloat = false;
   output->props.isDouble = false;
   output->props.isHex = isHex;
-  output->props.length = numberId;
+  output->props.length = numbers.size();
 
   return result;
 }

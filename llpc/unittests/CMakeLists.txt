@@ -76,6 +76,7 @@ endfunction()
 add_subdirectory(context)
 add_subdirectory(standaloneCompiler)
 add_subdirectory(util)
+add_subdirectory(vfx)
 
 # Add a LIT target to execute all unit tests.
 # Required by lit.site.cfg.py.in.
