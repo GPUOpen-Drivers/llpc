@@ -43,7 +43,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir --upgrade cmake \
-    && for tool in clang clang++ clang-tidy llvm-symbolizer lld ld.lld ; do \
+    && for tool in clang clang++ clang-tidy llvm-cov llvm-profdata llvm-symbolizer lld ld.lld ; do \
          update-alternatives --install /usr/bin/"$tool" "$tool" /usr/bin/"$tool"-11 10 ; \
         done \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
