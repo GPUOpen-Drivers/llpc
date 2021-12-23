@@ -1393,13 +1393,13 @@ public:
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName = "") = 0;
 
+  // -----------------------------------------------------------------------------------------------------------------
+  // Subgroup operations
+
   // Create a get wave size query.
   //
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateGetWaveSize(const llvm::Twine &instName = "") = 0;
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Subgroup operations
 
   // Create a get subgroup size query.
   //

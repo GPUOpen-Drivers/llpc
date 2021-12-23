@@ -1180,6 +1180,11 @@ unsigned PipelineState::getMergedShaderWaveSize(ShaderStage stage) {
   }
 }
 
+// =====================================================================================================================
+// Get subgroup size for the specified shader stage.
+//
+// @param stage : Shader stage
+// @returns : Subgroup size of the specified shader stage
 unsigned PipelineState::getShaderSubgroupSize(ShaderStage stage) {
   if (stage == ShaderStageCopyShader) {
     // Treat copy shader as part of geometry shader

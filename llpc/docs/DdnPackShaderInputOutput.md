@@ -7,8 +7,8 @@ This DDN introduces the workflow change of packing in/out in VS/FS pipeline in L
 VS/FS is the most popular pipeline. To reduce risk, we support packing for VS/FS pipeline as the goal of phase 1. Considering component-based interpolation of the input of fragment shader, we adopt the idea of vector scalarization and then re-assembling vectors to achieve the purpose of packing. We use cl::PackInOut as a global switch control.
 In the LLPC middle-end, fragment shader inputs are represented by two kinds of intrinsic:
 ```
-@llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
-@llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 interpMode, T auxInterValue)
+@lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
+@lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 interpMode, T auxInterValue)
 ```
 ## 3 Interface change
 No interface change.

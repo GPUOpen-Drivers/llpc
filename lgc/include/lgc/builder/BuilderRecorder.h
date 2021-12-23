@@ -66,13 +66,13 @@ public:
 
 // =====================================================================================================================
 // Builder recorder, to record all Builder calls as intrinsics
-// Each call to a Builder method causes the insertion of a call to llpc.call.*, so the Builder calls can be replayed
+// Each call to a Builder method causes the insertion of a call to lgc.call.*, so the Builder calls can be replayed
 // later on.
 class BuilderRecorder final : public Builder, BuilderRecorderMetadataKinds {
   friend LgcContext;
 
 public:
-  // llpc.call.* opcodes
+  // lgc.call.* opcodes
   enum Opcode : unsigned {
     // NOP
     Nop = 0,

@@ -1906,7 +1906,7 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
 
   if (flags & ImageFlagAddFragCoord) {
     // Get FragCoord, convert to signed i32, and add its x,y to the coordinate.
-    // For now, this just generates a call to llpc.input.import.builtin. A future commit will
+    // For now, this just generates a call to lgc.input.import.builtin. A future commit will
     // change it to use a Builder call to read the built-in.
     getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage.fs.fragCoord = true;
 
@@ -1929,7 +1929,7 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
 
   if (useViewIndex) {
     // Get ViewIndex and use it as the z coordinate.
-    // For now, this just generates a call to llpc.input.import.builtin. A future commit will
+    // For now, this just generates a call to lgc.input.import.builtin. A future commit will
     // change it to use a Builder call to read the built-in.
     auto &builtInUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
     switch (m_shaderStage) {
