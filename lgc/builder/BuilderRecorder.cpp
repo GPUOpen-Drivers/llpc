@@ -41,7 +41,7 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
-// Given an opcode, get the call name (without the "llpc.call." prefix)
+// Given an opcode, get the call name (without the "lgc.call." prefix)
 //
 // @param opcode : Opcode
 StringRef BuilderRecorder::getCallName(Opcode opcode) {

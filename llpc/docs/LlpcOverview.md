@@ -29,7 +29,7 @@ does not show BuilderReplayer.
 The SPIR-V translator is based on the Khronos SPIR-V-to-LLVM translator.
 
 After this, when using LGC's Builder in its BuilderRecorder mode, as LLPC does, the
-pipeline IR module contains calls to `llpc.call.*` functions that record the Builder
+pipeline IR module contains calls to `lgc.call.*` functions that record the Builder
 methods used by the front-end. The IR module also contains metadata representing the
 pipeline state.
 
@@ -39,7 +39,7 @@ See
 [LGC (LLPC middle-end) overview](../../lgc/docs/LgcOverview.md)
 for more details.
 
-* In BuilderRecorder mode, run the BuilderReplayer pass to lower the `llpc.call.*` calls
+* In BuilderRecorder mode, run the BuilderReplayer pass to lower the `lgc.call.*` calls
   into actual IR, and read the pipeline state metadata.
 * Perform further lowering on the LLVM IR to obtain LLVM IR with `llvm.amdgcn.*` intrinsics
   understood by the AMDGPU back-end, and the PAL metadata needed by the back-end to

@@ -3476,7 +3476,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
 }
 
 // =====================================================================================================================
-// Creates the LLPC intrinsic "llpc.streamoutbuffer.store.f32" to store value to stream-out buffer.
+// Creates the LLPC intrinsic "lgc.streamoutbuffer.store.f32" to store value to stream-out buffer.
 //
 // @param storeValue : Value to store
 // @param xfbStride : Transform feedback stride
@@ -3485,7 +3485,7 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(Value *storeValu
                                                                 std::string &funcName) {
   addTypeMangling(nullptr, {storeValue}, funcName);
 
-  // define void @llpc.streamoutbuffer.store.f32(
+  // define void @lgc.streamoutbuffer.store.f32(
   //      float %storeValue, <4 x i32> %streamOutBufDesc, i32 %writeIndex, i32 %threadId,
   //      i32 %vertexCount, i32 %xfbOffset, i32 %streamOffset)
   // {
@@ -4584,14 +4584,14 @@ void PatchInOutImportExport::storeTessFactorToBuffer(ArrayRef<Value *> tessFacto
 }
 
 // =====================================================================================================================
-// Creates the LLPC intrinsic "llpc.tfbuffer.store.%tfValueType" to store tessellation factor.
+// Creates the LLPC intrinsic "lgc.tfbuffer.store.%tfValueType" to store tessellation factor.
 //
 // param@ funcName : The internal function name
 // param@ compCount : The component count of the store value
 // param@ tfValueTy : The type of the store value
 void PatchInOutImportExport::createTessBufferStoreFunction(StringRef funcName, unsigned compCount, Type *tfValueTy) {
   // %tfValueType could be one of {f32, v2f32, v3f32, v4f32}
-  // define void @llpc.tfbuffer.store.%tfValueType(
+  // define void @lgc.tfbuffer.store.%tfValueType(
   //     <4 x i32> %tfBufferDesc, i32 %tfBufferBase, i32 %relPatchId, i32 %tfStride, i32 %tfOffset, %tfValueType
   //     %tfValue)
   // {

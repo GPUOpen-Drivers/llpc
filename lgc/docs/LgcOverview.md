@@ -51,7 +51,7 @@ The front-end decides which one of two modes Builder works in, although which mo
 does not otherwise affect the front-end:
 
 * BuilderRecorder, where methods to generate IR for graphics-pipeline-specific constructs are
-  "recorded" in the IR by a call to `@llpc.call.*` for each one, and then replayed at the start
+  "recorded" in the IR by a call to `@lgc.call.*` for each one, and then replayed at the start
   of the middle-end;
 
 * BuilderImpl, where those same methods generate IR more directly.
@@ -238,7 +238,7 @@ it via PipelineState.
 If the front-end selects BuilderRecorder mode for Builder (or it is a shader compile), then
 the Builder created by `BuilderContext::CreateBuilder` is a BuilderRecorder. For each Create
 method, such as `CreateImageSample`, BuilderRecorder records the call in the IR at the insertion
-point as a call to an `llpc.call.*` method, in this example `llpc.call.image.sample`. Such a
+point as a call to an `lgc.call.*` method, in this example `lgc.call.image.sample`. Such a
 call is a varargs call, so BuilderRecorder only needs to overload the declarations by return
 type, not by arg types.
 

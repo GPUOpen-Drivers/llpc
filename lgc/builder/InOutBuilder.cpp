@@ -278,8 +278,8 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
 
   case ShaderStageTessControl:
   case ShaderStageTessEval: {
-    // TCS: @llpc.{input|output}.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-    // TES: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+    // TCS: @lgc.{input|output}.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+    // TES: @lgc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
     args.push_back(getInt32(location));
     args.push_back(locationOffset);
     args.push_back(elemIdx);
@@ -290,7 +290,7 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
   }
 
   case ShaderStageGeometry: {
-    // GS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
+    // GS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
     args.push_back(elemIdx);
@@ -299,9 +299,9 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
   }
 
   case ShaderStageFragment: {
-    // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
-    //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-    //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
+    // FS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
+    //      @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
+    //                                           i32 interpMode, <2 x float> | i32 auxInterpValue)
     if (inOutInfo.hasInterpAux()) {
       // Prepare arguments for import interpolant call
       Value *auxInterpValue = modifyAuxInterpValue(vertexIndex, inOutInfo);
@@ -370,8 +370,8 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
   switch (m_shaderStage) {
   case ShaderStageVertex:
   case ShaderStageTessEval: {
-    // VS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-    // TES: @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // VS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // TES: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
     args.push_back(elemIdx);
@@ -379,8 +379,8 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
   }
 
   case ShaderStageTessControl: {
-    // TCS: @llpc.output.export.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx,
-    //                                         %Type% outputValue)
+    // TCS: @lgc.output.export.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx,
+    //                                        %Type% outputValue)
     args.push_back(getInt32(location));
     args.push_back(locationOffset);
     args.push_back(elemIdx);
@@ -389,7 +389,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
   }
 
   case ShaderStageGeometry: {
-    // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
+    // GS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
     unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
@@ -402,7 +402,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
     // Mark fragment output type.
     markFsOutputType(valueToWrite->getType(), location, outputInfo);
 
-    // FS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // FS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
     args.push_back(elemIdx);
@@ -772,7 +772,7 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
     }
   }
 
-  // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 streamId, %Type% outputValue)
+  // XFB: @lgc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 streamId, %Type% outputValue)
   SmallVector<Value *, 4> args;
   std::string instName = lgcName::OutputExportXfb;
   args.push_back(getInt32(xfbBuffer));
@@ -866,7 +866,7 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
       return result;
   }
 
-  // For now, this just generates a call to llpc.input.import.builtin. A future commit will
+  // For now, this just generates a call to lgc.input.import.builtin. A future commit will
   // change it to generate IR more directly here.
   // A vertex index is valid only in TCS, TES, GS.
   // Currently we can only cope with an array/vector index in TCS/TES.
@@ -1136,17 +1136,17 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
           valueToWrite->getType()->getArrayElementType() == expectedTy->getArrayElementType()));
 #endif
 
-  // For now, this just generates a call to llpc.output.export.builtin. A future commit will
+  // For now, this just generates a call to lgc.output.export.builtin. A future commit will
   // change it to generate IR more directly here.
-  // A vertex index is valid only in TCS.
+  // A vertex index is valid only in TCS, TES, GS.
   // Currently we can only cope with an array/vector index in TCS.
   //
-  // VS:  @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
-  // TCS: @llpc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx,
-  //                                                   %Type% outputValue)
-  // TES: @llpc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, %Type% outputValue)
-  // GS:  @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
-  // FS:  @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
+  // VS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
+  // TCS: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx,
+  //                                                  %Type% outputValue)
+  // TES: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, %Type% outputValue)
+  // GS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
+  // FS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
   SmallVector<Value *, 4> args;
   args.push_back(getInt32(builtIn));
   switch (m_shaderStage) {

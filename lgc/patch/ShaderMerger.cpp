@@ -188,7 +188,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   //     br i1 %lsEnable, label %.beginls, label %.endls
   //
   // .beginls:
-  //     call void @llpc.ls.main(%sgpr..., %userData..., %vgpr...)
+  //     call void @lgc.shader.LS.main(%sgpr..., %userData..., %vgpr...)
   //     br label %.endls
   //
   // .endls:
@@ -197,7 +197,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   //     br i1 %hsEnable, label %.beginhs, label %.endhs
   //
   // .beginhs:
-  //     call void @llpc.hs.main(%sgpr..., %userData..., %vgpr...)
+  //     call void @lgc.shader.HS.main(%sgpr..., %userData..., %vgpr...)
   //     br label %.endhs
   //
   // .endhs:
@@ -599,7 +599,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   //     br i1 %esEnable, label %.begines, label %.endes
   //
   // .begines:
-  //     call void @llpc.es.main(%sgpr..., %userData..., %vgpr...)
+  //     call void @lgc.shader.ES.main(%sgpr..., %userData..., %vgpr...)
   //     br label %.endes
   //
   // .endes:
@@ -608,7 +608,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   //     br i1 %gsEnable, label %.begings, label %.endgs
   //
   // .begings:
-  //     call void @llpc.gs.main(%sgpr..., %userData..., %vgpr...)
+  //     call void @lgc.shader.GS.main(%sgpr..., %userData..., %vgpr...)
   //     br label %.endgs
   //
   // .endgs:
