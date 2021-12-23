@@ -506,13 +506,17 @@ bool PalMetadata::isGraphics() {
 // =====================================================================================================================
 // Finalize PAL metadata user data limit for any compilation (shader, part-pipeline, whole pipeline)
 void PalMetadata::finalizeUserDataLimit() {
-  // Ensure user_data_limit is set correctly if no user data used or spill is in use.
-  // If the spill is used, the entire user data table is considered used.
-  if (userDataNodesAreSpilled())
-    setUserDataLimit();
-  // If there are root user data nodes but none of them are used, then PAL wants a non-zero user data limit.
-  else if (m_userDataLimit->getUInt() == 0 && !m_pipelineState->getUserDataNodes().empty())
-    *m_userDataLimit = 1U;
+  if (!m_pipelineState->getUserDataNodes().empty()) {
+    // Ensure user_data_limit is set correctly if no user data used or spill is in use.
+    // If the spill is used, the entire user data table is considered used.
+    if (userDataNodesAreSpilled()) {
+      setUserDataLimit();
+    }
+    // If there are root user data nodes but none of them are used, then PAL wants a non-zero user data limit.
+    else if (m_userDataLimit->getUInt() == 0) {
+      *m_userDataLimit = 1U;
+    }
+  }
 }
 
 // =====================================================================================================================
