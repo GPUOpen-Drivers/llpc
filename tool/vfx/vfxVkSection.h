@@ -104,7 +104,7 @@ private:
     return static_cast<void *>(&castedObj->m_state.userDataPtr.sizeInDwords);
   }
 
-  static const unsigned MemberCount = 8;
+  static const unsigned MemberCount = 10;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   std::vector<SectionResourceMappingNode> m_next; // Next resource mapping node

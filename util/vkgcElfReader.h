@@ -392,7 +392,7 @@ struct MsgPackIterator {
 };
 
 // =====================================================================================================================
-// Represents a reader for loading data from an [Executable and Linkable Format (ELF)](http://tinyurl.com/2toj8) buffer.
+// Represents a reader for loading data from an [Executable and Linkable Format (ELF)] buffer.
 //
 // The client should call "ReadFromBuffer()" to initialize the context with the contents of an ELF, then
 // "GetSectionData()" to retrieve the contents of a particular named section.

@@ -1415,7 +1415,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
                                        GraphicsPipelineBuildOut *pipelineOut, void *pipelineDumpFile) {
   Result result = Result::Success;
   BinaryData elfBin = {};
-
+  // clang-format off
   SmallVector<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfo = {
     &pipelineInfo->vs,
     &pipelineInfo->tcs,
@@ -1423,7 +1423,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     &pipelineInfo->gs,
     &pipelineInfo->fs,
   };
-
+  // clang-format on
   const bool relocatableElfRequested = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
   const bool buildUsingRelocatableElf =
       relocatableElfRequested && canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo);
@@ -1534,8 +1534,14 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
   context->attachPipelineContext(computeContext);
 
   std::vector<const PipelineShaderInfo *> shadersInfo = {
-      nullptr, nullptr, nullptr, nullptr, nullptr, &pipelineInfo->cs,
+    nullptr,          ///< Vertex shader
+    nullptr,          ///< Tessellation control shader
+    nullptr,          ///< Tessellation evaluation shader
+    nullptr,          ///< Geometry shader
+    nullptr,          ///< Fragment shader
+    &pipelineInfo->cs ///< Compute shader
   };
+
   Result result = Result::ErrorUnavailable;
   CacheAccessInfo stageCacheAccesses[ShaderStageCount] = {};
   if (buildingRelocatableElf) {
@@ -1983,7 +1989,6 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
   case ShaderStageGeometry:
     return lgc::ShaderStageGeometry;
   case ShaderStageFragment:
-    // TODO: Will add mesh support in LGC
     return lgc::ShaderStageFragment;
   default:
     llvm_unreachable("");

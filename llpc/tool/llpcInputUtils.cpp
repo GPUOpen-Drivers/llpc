@@ -278,8 +278,8 @@ StringLiteral fileExtFromBinary(BinaryData pipelineBin) {
 // =====================================================================================================================
 // Finds all filenames which can match input file name
 //
-// @param       inFil    : Input file name, including a wildcard.
-// @param [out] outFiles :  Output vector with matching filenames.
+// @param       inFile     : Input file name, including a wildcard.
+// @param [out] outFiles   : Output vector with matching filenames.
 static void findAllMatchFiles(const std::string &inFile, std::vector<std::string> *outFiles) {
   WIN32_FIND_DATAA data = {};
 
@@ -314,17 +314,32 @@ static void findAllMatchFiles(const std::string &inFile, std::vector<std::string
 Result expandInputFilenames(ArrayRef<std::string> inputSpecs, std::vector<std::string> &expandedFilenames) {
   unsigned i = 0;
   for (const auto &inFile : inputSpecs) {
+    // Handle any optional entry point after the filename.
+    // inputSpecs can be of the form <filename>,<entrypoint> and <filename>
+    // can use wildcards, but not both at the same time.
+    bool entryPointFound = inFile.find_last_of(",?") != std::string::npos;
+    bool wildcardFound = inFile.find_last_of("*?") != std::string::npos;
+
+    if (entryPointFound && wildcardFound) {
+      LLPC_ERRS("Can't use wildcards as well as entrypoint\n");
+      return Result::ErrorInvalidValue;
+    }
 #ifdef WIN_OS
     {
-      if (i > 0 && inFile.find_last_of("*?") != std::string::npos) {
-        LLPC_ERRS("\nCan't use wilecards with multiple inputs files\n");
+      if (i > 0 && wildcardFound) {
+        LLPC_ERRS("\nCan't use wildcards with multiple inputs files\n");
         return Result::ErrorInvalidValue;
       }
-      size_t initialSize = expandedFilenames.size();
-      findAllMatchFiles(inFile, &expandedFilenames);
-      if (expandedFilenames.size() == initialSize) {
-        LLPC_ERRS("\nNo matching files found\n");
-        return Result::ErrorInvalidValue;
+
+      if (entryPointFound) {
+        expandedFilenames.push_back(inFile);
+      } else {
+        size_t initialSize = expandedFilenames.size();
+        findAllMatchFiles(inFile, &expandedFilenames);
+        if (expandedFilenames.size() == initialSize) {
+          LLPC_ERRS("\nNo matching files found\n");
+          return Result::ErrorInvalidValue;
+        }
       }
     }
 #else // WIN_OS

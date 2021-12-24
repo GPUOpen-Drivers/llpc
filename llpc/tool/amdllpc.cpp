@@ -74,9 +74,9 @@ using namespace Llpc;
 using namespace Llpc::StandaloneCompiler;
 using namespace Vkgc;
 
+// clang-format off
 namespace {
 // Represents options of the amdllpc standalone tool.
-
 // -gfxip: graphics IP version
 cl::opt<std::string> GfxIp("gfxip", cl::desc("Graphics IP version"), cl::value_desc("major.minor.step"),
                            cl::init("8.0.2"));
@@ -249,7 +249,7 @@ cl::opt<bool> AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when 
 #endif
 
 } // namespace
-
+// clang-format on
 namespace llvm {
 namespace cl {
 

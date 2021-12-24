@@ -33,7 +33,6 @@
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
-//#include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Transforms/Scalar/LoopPassManager.h"
 
 namespace lgc {

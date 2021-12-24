@@ -28,6 +28,7 @@
  * @brief SPVGEN header file: contains the definition and the wrap implementation of SPIR-V generator entry-points.
  ***********************************************************************************************************************
  */
+// clang-format off
 #pragma once
 
 #define SPVGEN_VERSION  0x20000
@@ -55,7 +56,6 @@
 #endif
 
 #include "vfx.h"
-
 enum SpvGenVersion : uint32_t
 {
     SpvGenVersionGlslang,
@@ -611,4 +611,4 @@ static inline void vfxPrintDoc(
 }
 
 #endif
-
+// clang-format on

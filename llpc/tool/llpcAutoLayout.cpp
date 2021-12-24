@@ -84,7 +84,7 @@ static unsigned getTypeDataSize(const SPIRVType *ty) {
 // Find VaPtr userDataNode with the specified set.
 //
 // @param resourceMapping : Resource mapping data, possibly containing user data nodes
-// @param set : Accroding this set to find ResourceMappingNode
+// @param set : According this set to find ResourceMappingNode
 // @returns : userDataNode with the specified set
 static const ResourceMappingRootNode *findDescriptorTableVaPtr(const ResourceMappingData *resourceMapping,
                                                                unsigned set) {
@@ -162,8 +162,8 @@ static const ResourceMappingRootNode *findResourceNode(const ResourceMappingRoot
 // @param [in] autoLayoutUserDataNodeCount : UserData Node count
 // @param [in] autoLayoutUserDataNodes : ResourceMappingNode
 // @returns : true if compatible
-bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
-                                   const ResourceMappingRootNode *autoLayoutUserDataNodes) {
+bool checkResourceMappingCompatible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
+                                    const ResourceMappingRootNode *autoLayoutUserDataNodes) {
   bool hit = false;
 
   if (autoLayoutUserDataNodeCount == 0)
@@ -195,7 +195,7 @@ bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, u
                   autoLayoutNext->offsetInDwords == (index * OffsetStrideInDwords)) {
                 hitNode = true;
                 continue;
-              } else {
+              } else { // NOLINT
                 outs() << "AutoLayoutNode:"
                        << "\n ->type                    : "
                        << format("0x%016" PRIX64, static_cast<unsigned>(autoLayoutNext->type))
@@ -217,7 +217,7 @@ bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, u
           if (!hitNode) {
             hit = false;
             break;
-          } else
+          } else // NOLINT
             hit = true;
         } else {
           hit = false;
@@ -233,7 +233,7 @@ bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, u
         if (node && autoLayoutUserDataNode->node.sizeInDwords == node->node.sizeInDwords) {
           hit = true;
           continue;
-        } else {
+        } else { // NOLINT
           hit = false;
           break;
         }
@@ -313,7 +313,7 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
   for (unsigned i = 0, funcCount = module->getNumFunctions(); i < funcCount; ++i) {
     func = module->getFunction(i);
     entryPoint = module->getEntryPoint(func->getId());
-    if (entryPoint && entryPoint->getExecModel() == SPIRVExecutionModelKind(shaderStage) &&
+    if (entryPoint && entryPoint->getExecModel() == convertToExecModel(shaderStage) &&
         entryPoint->getName() == shaderInfo->pEntryTarget)
       break;
     func = nullptr;

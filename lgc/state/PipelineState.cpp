@@ -427,9 +427,9 @@ ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage, bool fake
 // =====================================================================================================================
 // Check whether the pipeline is a graphics pipeline
 bool PipelineState::isGraphics() const {
-  return (getShaderStageMask() &
-          ((1U << ShaderStageVertex) | (1U << ShaderStageTessControl) | (1U << ShaderStageTessEval) |
-           (1U << ShaderStageGeometry) | (1U << ShaderStageFragment))) != 0;
+  return (getShaderStageMask() & ((1U << ShaderStageTask) | (1U << ShaderStageVertex) | (1U << ShaderStageTessControl) |
+                                  (1U << ShaderStageTessEval) | (1U << ShaderStageGeometry) | (1U << ShaderStageMesh) |
+                                  (1U << ShaderStageFragment))) != 0;
 }
 
 // =====================================================================================================================
@@ -1236,7 +1236,7 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
       // If subgroup size is used in any shader in the pipeline, use the specified subgroup size as wave size.
       if (getShaderModes()->getAnyUseSubgroupSize()) {
         // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
-	subgroupSize = getShaderOptions(checkingStage).subgroupSize;
+        subgroupSize = getShaderOptions(checkingStage).subgroupSize;
         subgroupSize = (subgroupSize == 0) ? waveSize : subgroupSize;
 
         m_subgroupSize[checkingStage] = subgroupSize;

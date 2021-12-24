@@ -20,7 +20,7 @@ define dllexport spir_func void @llpc.shader.CS.main() !lgc.shaderstage !1 {
 !lgc.compute.mode = !{!0}
 
 !0 = !{i32 1, i32 1, i32 1}
-!1 = !{i32 5}
+!1 = !{i32 7}
 
 ; Another module
 
@@ -36,4 +36,4 @@ define dllexport spir_func void @llpc.shader.FS.main() !lgc.shaderstage !0 {
   ret void
 }
 
-!0 = !{i32 4}
+!0 = !{i32 6}

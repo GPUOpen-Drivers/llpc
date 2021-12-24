@@ -8,7 +8,7 @@ target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:3
 target triple = "amdgcn--amdpal"
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !12 !lgc.shaderstage !12 {
+define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !10 {
 .entry:
   %0 = call [76 x i8] addrspace(4)* (...) @lgc.create.load.push.constants.ptr.p4a76i8()
   %1 = call <3 x float> (...) @lgc.create.read.generic.input.v3f32(i32 2, i32 0, i32 0, i32 0, i32 0, i32 undef)
@@ -47,4 +47,3 @@ attributes #1 = { nounwind readonly }
 !0 = !{i32 739459867, i32 836497279, i32 -1935591037, i32 -652075177, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
 !1 = !{i32 801932830, i32 600683540, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 15, i32 3}
 !10 = !{i32 1}
-!12 = !{i32 0}

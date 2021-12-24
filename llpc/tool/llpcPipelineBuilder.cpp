@@ -61,6 +61,7 @@
 #include "llpcAutoLayout.h"
 #include "llpcDebug.h"
 #include "llpcInputUtils.h"
+#include "llpcUtil.h"
 #include "vkgcUtil.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringExtras.h"
@@ -72,11 +73,11 @@ namespace Llpc {
 namespace StandaloneCompiler {
 
 // =====================================================================================================================
-// Returns true iff the compiled pipeline is a graphics pipeline.
+// Returns true if the compiled pipeline is a graphics pipeline.
 //
-// @returns : True if the compiled pipeline is a graphics pipeline, false if compute.
+// @returns : True if the compiled pipeline is a graphics pipeline, false if not.
 bool PipelineBuilder::isGraphicsPipeline() const {
-  return (m_compileInfo.stageMask & (shaderStageToMask(ShaderStageCompute) - 1)) != 0;
+  return (m_compileInfo.stageMask & ShaderStageAllGraphicsBit) != 0;
 }
 
 // =====================================================================================================================
@@ -84,7 +85,7 @@ bool PipelineBuilder::isGraphicsPipeline() const {
 //
 // @returns : Result::Success on success, other status on failure.
 Result PipelineBuilder::build() {
-  // Even though `build*Pipeline` produces a single `BinaryData` today, future pipeline types (e.g., raytracing) will
+  // Even though `build*Pipeline` produces a single `BinaryData` today, future pipeline types () will
   // result multiple outputs. We use a vector instead of a single variable to prepare for that.
   SmallVector<BinaryData, 1> pipelines;
   pipelines.push_back({});
@@ -100,7 +101,7 @@ Result PipelineBuilder::build() {
   }
 
   for (const auto &pipeline : pipelines) {
-    Result result = decodePipelineBinary(&pipeline, &m_compileInfo, isGraphics);
+    Result result = decodePipelineBinary(&pipeline, &m_compileInfo);
     if (result != Result::Success)
       return result;
   }
@@ -118,7 +119,11 @@ Result PipelineBuilder::buildGraphicsPipeline(BinaryData &outBinaryData) {
 
   // Fill pipeline shader info.
   PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
-      &pipelineInfo->vs, &pipelineInfo->tcs, &pipelineInfo->tes, &pipelineInfo->gs, &pipelineInfo->fs,
+      &pipelineInfo->vs,
+      &pipelineInfo->tcs,
+      &pipelineInfo->tes,
+      &pipelineInfo->gs,
+      &pipelineInfo->fs,
   };
 
   ResourceMappingNodeMap nodeSets;
@@ -162,13 +167,17 @@ Result PipelineBuilder::buildGraphicsPipeline(BinaryData &outBinaryData) {
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pGraphicsInfo = pipelineInfo;
   void *pipelineDumpHandle = runPreBuildActions(localPipelineInfo);
-  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, outBinaryData); });
 
   Result result = m_compiler.BuildGraphicsPipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
   if (result != Result::Success)
     return result;
 
+  SmallVector<BinaryData, 1> pipelines;
   outBinaryData = pipelineOut->pipelineBin;
+  pipelines.push_back(outBinaryData);
+
+  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, pipelines); });
+
   return Result::Success;
 }
 
@@ -217,13 +226,17 @@ Result PipelineBuilder::buildComputePipeline(BinaryData &outBinaryData) {
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pComputeInfo = pipelineInfo;
   void *pipelineDumpHandle = runPreBuildActions(localPipelineInfo);
-  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, outBinaryData); });
 
   Result result = m_compiler.BuildComputePipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
   if (result != Result::Success)
     return result;
 
   outBinaryData = pipelineOut->pipelineBin;
+  SmallVector<BinaryData, 1> pipelines;
+  pipelines.push_back(outBinaryData);
+
+  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, pipelines); });
+
   return Result::Success;
 }
 
@@ -249,12 +262,13 @@ void *PipelineBuilder::runPreBuildActions(PipelineBuildInfo buildInfo) {
 //
 // @param pipelineDumpHandle : Handle to the started pipeline dump.
 // @param pipeline : The compiled pipeline.
-void PipelineBuilder::runPostBuildActions(void *pipelineDumpHandle, BinaryData pipeline) {
+void PipelineBuilder::runPostBuildActions(void *pipelineDumpHandle, SmallVector<BinaryData, 1>& pipelines) {
   if (!pipelineDumpHandle)
     return;
 
-  if (pipeline.pCode)
-    IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, m_compileInfo.gfxIp, &pipeline);
+  for (const auto& pipeline: pipelines)
+    if (pipeline.pCode)
+      IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, m_compileInfo.gfxIp, &pipeline);
 
   IPipelineDumper::EndPipelineDump(pipelineDumpHandle);
 }

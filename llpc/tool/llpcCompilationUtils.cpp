@@ -280,9 +280,8 @@ Expected<std::string> assembleSpirv(const std::string &inFilename) {
 //
 // @param pipelineBin : Pipeline binary
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool
-// @param isGraphics : Whether it is graphics pipeline
 // @returns : Always returns Result::Success
-Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo, bool isGraphics) {
+Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo) {
   // Ignore failure from ElfReader. It fails if pPipelineBin is not ELF, as happens with
   // -filetype=asm.
   ElfReader<Elf64> reader(compileInfo->gfxIp);
@@ -468,10 +467,10 @@ Error processInputStages(ICompiler *compiler, CompileInfo &compileInfo, ArrayRef
 
       if (validateSpirv) {
         if (!InitSpvGen()) {
-          LLPC_OUTS("Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n");
-        } else {
+	  LLPC_OUTS("Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n");
+	} else {
           char log[1024] = {};
-          if (!spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log))
+	  if (!spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log))
             return createResultError(Result::ErrorInvalidShader, Twine("Failed to validate SPIR-V:\n") + log);
         }
       }

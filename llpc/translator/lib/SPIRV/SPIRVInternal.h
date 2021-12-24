@@ -533,7 +533,7 @@ struct ShaderInOutDecorate {
 
   bool PerPatch; // Whether this is a per-patch input/output
                  // (tessellation shader)
-  bool PerVertexDimension; // Whether this is decorated by "pervertexKHR"
+  bool PerVertexDimension; // Whether this is decorated by "pervertexKHR" // NOLINT
                            // (Fragment shader)
   struct {
     SPIRVInterpModeKind Mode; // Interpolation mode

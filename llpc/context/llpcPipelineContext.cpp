@@ -546,9 +546,8 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.type = ResourceNodeType::DescriptorBuffer;
       else
         destNode.type = static_cast<ResourceNodeType>(node.type);
-
-      destNode.set = node.srdRange.set;
-      destNode.binding = node.srdRange.binding;
+        destNode.set = node.srdRange.set;
+        destNode.binding = node.srdRange.binding;
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
       switch (node.type) {

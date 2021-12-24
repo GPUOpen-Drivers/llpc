@@ -59,8 +59,8 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
 void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &resNodeSets, unsigned pushConstSize,
                           ResourceMappingData *resourceMapping, bool autoLayoutDesc);
 
-bool checkResourceMappingComptible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
-                                   const ResourceMappingRootNode *autoLayoutUserDataNodes);
+bool checkResourceMappingCompatible(const ResourceMappingData *resourceMapping, unsigned autoLayoutUserDataNodeCount,
+                                    const ResourceMappingRootNode *autoLayoutUserDataNodes);
 
 bool checkPipelineStateCompatible(const ICompiler *compiler, GraphicsPipelineBuildInfo *pipelineInfo,
                                   GraphicsPipelineBuildInfo *autoLayoutPipelineInfo, GfxIpVersion gfxIp);

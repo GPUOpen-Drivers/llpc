@@ -24,6 +24,12 @@
  #
  #######################################################################################################################
 
+# Run an amber test and capture the generated pipelines. Print the pipelines to stdout, so they can be piped e.g. into
+# FileCheck.
+# Takes a .amber file as argument.
+# Run with e.g. ./run_amber_test.py --icd ../build/amdvlk64.so test.amber
+# Or with an installed driver: ./run_amber_test.py --icd /usr/lib/amdvlk64.so --icd-json /etc/vulkan/icd.d/amd_icd64.json test.amber
+
 import json
 import argparse
 import os
