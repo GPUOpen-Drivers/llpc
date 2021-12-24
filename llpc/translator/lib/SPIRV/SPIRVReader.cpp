@@ -1473,7 +1473,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
   // clang-format off
   if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
   ) {
-    //clang-format on
+    // clang-format on
     // For structs we lookup the mapping of the elements and use it to reverse map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 

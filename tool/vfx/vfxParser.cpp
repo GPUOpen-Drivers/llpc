@@ -470,79 +470,79 @@ bool Document::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Sectio
         result = parseIVec4(valueStr, lineNum, &value);
         if (!result)
           break;
-        result = accessedSectionObject->set(lineNum, memberName, &value);
+        result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &value);
         break;
       }
       case MemberTypeI64Vec2: {
         result = parseI64Vec2(valueStr, lineNum, &value);
         if (!result)
           break;
-        result = accessedSectionObject->set(lineNum, memberName, &value);
+        result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &value);
         break;
       }
       case MemberTypeBinding: {
         result = parseBinding(valueStr, lineNum, &value);
         if (!result)
           break;
-        result = accessedSectionObject->set(lineNum, memberName, &value);
+        result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &value);
         break;
       }
       case MemberTypeFVec4: {
         result = parseFVec4(valueStr, lineNum, &value);
         if (!result)
           break;
-        result = accessedSectionObject->set(lineNum, memberName, &value);
+        result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &value);
         break;
       }
       case MemberTypeF16Vec4: {
         result = parseF16Vec4(valueStr, lineNum, &value);
         if (!result)
           break;
-        result = accessedSectionObject->set(lineNum, memberName, &value);
+        result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &value);
         break;
       }
       case MemberTypeDVec2: {
         result = parseDVec2(valueStr, lineNum, &value);
         if (!result)
           break;
-        result = accessedSectionObject->set(lineNum, memberName, &value);
+        result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &value);
         break;
       }
       case MemberTypeIArray:
       case MemberTypeUArray: {
         std::vector<uint8_t> **ppIntData = nullptr;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, &m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, arrayIndex, &ppIntData, &m_errorMsg);
         result = parseIArray(valueStr, lineNum, valueType == MemberTypeIArray, **ppIntData);
         break;
       }
       case MemberTypeI64Array:
       case MemberTypeU64Array: {
         std::vector<uint8_t> **ppIntData = nullptr;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppIntData, &m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, arrayIndex, &ppIntData, &m_errorMsg);
         result = parseI64Array(valueStr, lineNum, valueType == MemberTypeI64Array, **ppIntData);
         break;
       }
       case MemberTypeFArray: {
         std::vector<uint8_t> **ppFloatData = nullptr;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, &m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, arrayIndex, &ppFloatData, &m_errorMsg);
         result = parseFArray(valueStr, lineNum, **ppFloatData);
         break;
       }
       case MemberTypeF16Array: {
         std::vector<uint8_t> **ppFloatData = nullptr;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppFloatData, &m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, arrayIndex, &ppFloatData, &m_errorMsg);
         result = parseF16Array(valueStr, lineNum, **ppFloatData);
         break;
       }
       case MemberTypeDArray: {
         std::vector<uint8_t> **ppDoubleData;
-        accessedSectionObject->getPtrOf(lineNum, memberName, true, 0, &ppDoubleData, &m_errorMsg);
+        accessedSectionObject->getPtrOf(lineNum, memberName, true, arrayIndex, &ppDoubleData, &m_errorMsg);
         result = parseDArray(valueStr, lineNum, **ppDoubleData);
         break;
       }
       case MemberTypeString: {
         std::string str = valueStr;
-        result = accessedSectionObject->set(lineNum, memberName, &str);
+        result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &str);
         break;
       }
       default: {

@@ -609,8 +609,7 @@ Value *ArithBuilder::CreateLog(Value *x, const Twine &instName) {
 Value *ArithBuilder::CreateSqrt(Value *x, const Twine &instName) {
   if (x->getType()->getScalarType()->isDoubleTy()) {
     // NOTE: For double type, the SQRT and RSQ instructions don't have required precision, we apply Goldschmidt's
-    // algorithm (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Goldschmidt%E2%80%99s_algorithm) to
-    // improve the result:
+    // algorithm to improve the result:
     //
     //   y0 = rsq(x)
     //   g0 = x * y0

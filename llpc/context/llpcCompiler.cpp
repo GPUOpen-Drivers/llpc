@@ -1553,8 +1553,14 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
   context->attachPipelineContext(computeContext);
 
   std::vector<const PipelineShaderInfo *> shadersInfo = {
-      nullptr, nullptr, nullptr, nullptr, nullptr, &pipelineInfo->cs,
+    nullptr,          ///< Vertex shader
+    nullptr,          ///< Tessellation control shader
+    nullptr,          ///< Tessellation evaluation shader
+    nullptr,          ///< Geometry shader
+    nullptr,          ///< Fragment shader
+    &pipelineInfo->cs ///< Compute shader
   };
+
   Result result = Result::ErrorUnavailable;
   CacheAccessInfo stageCacheAccesses[ShaderStageCount] = {};
   if (buildingRelocatableElf) {

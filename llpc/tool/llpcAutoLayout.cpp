@@ -313,7 +313,7 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
   for (unsigned i = 0, funcCount = module->getNumFunctions(); i < funcCount; ++i) {
     func = module->getFunction(i);
     entryPoint = module->getEntryPoint(func->getId());
-    if (entryPoint && entryPoint->getExecModel() == SPIRVExecutionModelKind(shaderStage) &&
+    if (entryPoint && entryPoint->getExecModel() == convertToExecModel(shaderStage) &&
         entryPoint->getName() == shaderInfo->pEntryTarget)
       break;
     func = nullptr;

@@ -205,12 +205,12 @@ enum class BasicType : unsigned {
 
 /// Enumerates LLPC shader stages.
 enum ShaderStage : unsigned {
-  ShaderStageVertex = 0, ///< Vertex shader
+  ShaderStageVertex = 0,  ///< Vertex shader
   ShaderStageTessControl, ///< Tessellation control shader
   ShaderStageTessEval,    ///< Tessellation evaluation shader
   ShaderStageGeometry,    ///< Geometry shader
-  ShaderStageFragment, ///< Fragment shader
-  ShaderStageCompute,  ///< Compute shader
+  ShaderStageFragment,    ///< Fragment shader
+  ShaderStageCompute,     ///< Compute shader
   ShaderStageCount,                                     ///< Count of shader stages
   ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
   ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
@@ -266,8 +266,8 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
                                 // clang-format off
 #if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
-                                // clang-format on
   InlineBuffer,                 ///< Push constant with binding
+                                // clang-format on
 #endif
 
   Count, ///< Count of resource mapping node types.
@@ -285,8 +285,10 @@ struct ResourceMappingNode {
     /// Info for generic descriptor nodes (DescriptorResource, DescriptorSampler, DescriptorCombinedTexture,
     /// DescriptorTexelBuffer, DescriptorBuffer and DescriptorBufferCompact)
     struct {
-      unsigned set;     ///< Descriptor set
-      unsigned binding; ///< Descriptor binding
+      unsigned set;          ///< Descriptor set
+      unsigned binding;      ///< Descriptor binding
+      unsigned reserv0;
+      unsigned reserv1;
     } srdRange;
     /// Info for hierarchical nodes (DescriptorTableVaPtr)
     struct {

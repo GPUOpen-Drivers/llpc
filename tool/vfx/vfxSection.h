@@ -120,6 +120,7 @@ enum MemberType : unsigned {
   MemberTypeGlVertexFormat,        // GL vertex attribute format
   MemberTypeGlSpirvPipelineLayout, // GL SPIRV explicit pipeline layout
   MemberTypeGlPatchParameter,      // GL program patch parameter
+  MemberTypeGlSpeicalizeUniformDesc, // GL program specialized uniform
   MemberTypeGlFfxTexturekey,       // GL FFX texture key
 };
 

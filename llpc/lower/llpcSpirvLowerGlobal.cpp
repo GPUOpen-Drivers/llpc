@@ -1031,7 +1031,8 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
             assert(inOutMeta.InterpLoc == InterpLocCustom);
             elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, nullptr, 0, nullptr, 0, inOutMeta.InterpLoc,
                                              m_builder->getInt32(idx), true, insertPos);
-          } else {
+          }
+          else {
             // Handle array elements recursively
             // elemLocOffset = locOffset + stride * idx
             Value *elemLocOffset = nullptr;

@@ -68,7 +68,7 @@ private:
   LLPC_NODISCARD void *runPreBuildActions(Vkgc::PipelineBuildInfo buildInfo);
 
   // Runs post-build cleanup code. Must be called after `runPrebuildActions`.
-  void runPostBuildActions(void *pipelineDumpHandle, Vkgc::BinaryData pipeline);
+  void runPostBuildActions(void *pipelineDumpHandle, llvm::SmallVector<BinaryData, 1>& pipelines);
 
   // Prints pipeline dump hash code and filenames.
   void printPipelineInfo(Vkgc::PipelineBuildInfo buildInfo);

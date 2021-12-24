@@ -186,6 +186,9 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       pShaderInfoSection->getSubState(m_descriptorRangeValues);
     }
   }
+  else {
+    VFX_NEVER_CALLED();
+  }
 
   ResourceMappingData* resourceMapping = nullptr;
   switch (m_pipelineState.pipelineType) {

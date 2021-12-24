@@ -336,7 +336,6 @@ TEST(InputUtilsTest, ExpandInputFilenames) {
   EXPECT_EQ(expanded, inputs);
 }
 #endif
-
 // Test class for groupInputSpecs tests. Manages temporary files created by tests.
 class GroupInputSpecsTest : public ::testing::Test {
 public:

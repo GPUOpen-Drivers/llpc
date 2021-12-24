@@ -109,6 +109,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcCacheAccessor.cpp               \
         llpcDebug.cpp                       \
         llpcElfWriter.cpp                   \
+        llpcError.cpp                       \
         llpcFile.cpp                        \
         llpcShaderModuleHelper.cpp          \
         llpcTimerProfiler.cpp               \
