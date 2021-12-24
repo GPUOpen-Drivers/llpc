@@ -116,6 +116,7 @@ Result PipelineBuilder::buildGraphicsPipeline(BinaryData &outBinaryData) {
   GraphicsPipelineBuildOut *pipelineOut = &m_compileInfo.gfxPipelineOut;
 
   // Fill pipeline shader info.
+  // clang-format off
   PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
       &pipelineInfo->vs,
       &pipelineInfo->tcs,
@@ -123,7 +124,7 @@ Result PipelineBuilder::buildGraphicsPipeline(BinaryData &outBinaryData) {
       &pipelineInfo->gs,
       &pipelineInfo->fs,
   };
-
+  // clang-format on
   ResourceMappingNodeMap nodeSets;
   unsigned pushConstSize = 0;
   for (StandaloneCompiler::ShaderModuleData &moduleData : m_compileInfo.shaderModuleDatas) {
@@ -262,11 +263,11 @@ void *PipelineBuilder::runPreBuildActions(PipelineBuildInfo buildInfo) {
 //
 // @param pipelineDumpHandle : Handle to the started pipeline dump.
 // @param pipeline : The compiled pipeline.
-void PipelineBuilder::runPostBuildActions(void *pipelineDumpHandle, SmallVector<BinaryData, 1>& pipelines) {
+void PipelineBuilder::runPostBuildActions(void *pipelineDumpHandle, SmallVector<BinaryData, 1> &pipelines) {
   if (!pipelineDumpHandle)
     return;
 
-  for (const auto& pipeline: pipelines)
+  for (const auto &pipeline : pipelines)
     if (pipeline.pCode)
       IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, m_compileInfo.gfxIp, &pipeline);
 

@@ -112,16 +112,16 @@ enum MemberType : unsigned {
   MemberTypePipelineOption,           // VFX member type: SectionPipelineOption
   MemberTypeShaderOption,             // VFX member type: SectionShaderOption
   MemberTypeNggState,                 // VFX member type: SectionNggState
-  MemberTypeExtendedRobustness,    // VFX member type: SectionExtendedRobustness
-  MemberTypeGlAttribLocation,      // GL vertex attribute location
-  MemberTypeGlShaderInfo,          // GL SPIRV parameters
-  MemberTypeGlVertexAttrib,        // GL vertex input attribute
-  MemberTypeGlVertexBinding,       // GL vertex input binding
-  MemberTypeGlVertexFormat,        // GL vertex attribute format
-  MemberTypeGlSpirvPipelineLayout, // GL SPIRV explicit pipeline layout
-  MemberTypeGlPatchParameter,      // GL program patch parameter
-  MemberTypeGlSpeicalizeUniformDesc, // GL program specialized uniform
-  MemberTypeGlFfxTexturekey,       // GL FFX texture key
+  MemberTypeExtendedRobustness,       // VFX member type: SectionExtendedRobustness
+  MemberTypeGlAttribLocation,         // GL vertex attribute location
+  MemberTypeGlShaderInfo,             // GL SPIRV parameters
+  MemberTypeGlVertexAttrib,           // GL vertex input attribute
+  MemberTypeGlVertexBinding,          // GL vertex input binding
+  MemberTypeGlVertexFormat,           // GL vertex attribute format
+  MemberTypeGlSpirvPipelineLayout,    // GL SPIRV explicit pipeline layout
+  MemberTypeGlPatchParameter,         // GL program patch parameter
+  MemberTypeGlSpeicalizeUniformDesc,  // GL program specialized uniform
+  MemberTypeGlFfxTexturekey,          // GL FFX texture key
 };
 
 // =====================================================================================================================

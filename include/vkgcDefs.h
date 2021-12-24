@@ -205,12 +205,12 @@ enum class BasicType : unsigned {
 
 /// Enumerates LLPC shader stages.
 enum ShaderStage : unsigned {
-  ShaderStageVertex = 0,  ///< Vertex shader
-  ShaderStageTessControl, ///< Tessellation control shader
-  ShaderStageTessEval,    ///< Tessellation evaluation shader
-  ShaderStageGeometry,    ///< Geometry shader
-  ShaderStageFragment,    ///< Fragment shader
-  ShaderStageCompute,     ///< Compute shader
+  ShaderStageVertex = 0,                                ///< Vertex shader
+  ShaderStageTessControl,                               ///< Tessellation control shader
+  ShaderStageTessEval,                                  ///< Tessellation evaluation shader
+  ShaderStageGeometry,                                  ///< Geometry shader
+  ShaderStageFragment,                                  ///< Fragment shader
+  ShaderStageCompute,                                   ///< Compute shader
   ShaderStageCount,                                     ///< Count of shader stages
   ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
   ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
@@ -285,8 +285,8 @@ struct ResourceMappingNode {
     /// Info for generic descriptor nodes (DescriptorResource, DescriptorSampler, DescriptorCombinedTexture,
     /// DescriptorTexelBuffer, DescriptorBuffer and DescriptorBufferCompact)
     struct {
-      unsigned set;          ///< Descriptor set
-      unsigned binding;      ///< Descriptor binding
+      unsigned set;     ///< Descriptor set
+      unsigned binding; ///< Descriptor binding
       unsigned reserv0;
       unsigned reserv1;
     } srdRange;

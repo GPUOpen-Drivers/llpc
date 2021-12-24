@@ -148,10 +148,9 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])->getSubState(m_vertexInputState);
     m_pipelineState.gfxPipelineInfo.pVertexInput = &m_vertexInputState;
   }
-
+  // clang-format off
   if (m_pipelineState.pipelineType == VfxPipelineTypeGraphics ||
       m_pipelineState.pipelineType == VfxPipelineTypeCompute) {
-    // clang-format off
     PipelineShaderInfo *shaderInfo[NativeShaderStageCount] = {
       &m_pipelineState.gfxPipelineInfo.vs,
       &m_pipelineState.gfxPipelineInfo.tcs,
@@ -160,7 +159,6 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       &m_pipelineState.gfxPipelineInfo.fs,
       &m_pipelineState.compPipelineInfo.cs,
     };
-    // clang-format on
 
     m_shaderSources.resize(NativeShaderStageCount);
     m_pipelineState.numStages = NativeShaderStageCount;
@@ -189,7 +187,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
   else {
     VFX_NEVER_CALLED();
   }
-
+  // clang-format on
   ResourceMappingData* resourceMapping = nullptr;
   switch (m_pipelineState.pipelineType) {
   case VfxPipelineTypeGraphics:

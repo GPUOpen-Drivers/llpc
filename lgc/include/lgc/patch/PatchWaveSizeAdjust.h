@@ -45,6 +45,7 @@ public:
   bool runImpl(llvm::Module &module, PipelineState *pipelineState);
 
   static llvm::StringRef name() { return "Patch LLVM for per-shader wave size adjustment"; }
+
 private:
 };
 
