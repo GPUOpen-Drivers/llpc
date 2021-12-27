@@ -108,6 +108,15 @@ public:
 
   virtual Result BuildComputePipeline(const ComputePipelineBuildInfo *pipelineInfo,
                                       ComputePipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr);
+
+  virtual Result BuildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipelineInfo,
+                                          GraphicsPipelineBuildOut *pipelineOut,
+                                          Vkgc::UnlinkedShaderStage stage, void *pPipelineDumpFile = nullptr);
+
+  virtual Result BuildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *pipelineInfo,
+                                              GraphicsPipelineBuildOut *pipelineOut, const BinaryData *pElfpackage,
+                                              void *pPipelineDumpFile = nullptr);
+
   Result buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                        llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
                                        bool buildingRelocatableElf, ElfPackage *pipelineElf,
@@ -158,6 +167,10 @@ private:
   bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo,
                                           const GraphicsPipelineBuildInfo *pipelineInfo);
   bool canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo);
+
+  Result buildUnlinkedShaderInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
+                                     Vkgc::UnlinkedShaderStage stage, ElfPackage &elfPackage,
+                                     llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
 
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options

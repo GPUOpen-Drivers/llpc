@@ -728,6 +728,260 @@ template <typename T> static FormattedBytes formatBytesLittleEndian(ArrayRef<T> 
   return format_bytes(bytes, /* FirstByteOffset = */ None, /* NumPerLine = */ 16, /* ByteGroupSize = */ 1);
 }
 
+// Build shader from the specified info.
+//
+// @param [in]  pShaderInfo : Info to build this shader module
+// @param [out] pShaderOut : Output of building this shader module
+// @param [in]  stage : Shader stage of needing to compile
+// @param pipelineDumpFile : Handle of pipeline dump file
+//
+// @returns : Result::Success if successful. Other return codes indicate failure.
+Result Compiler::BuildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipelineInfo,
+                                          GraphicsPipelineBuildOut *pipelineOut,
+                                          UnlinkedShaderStage stage,
+                                          void *pPipelineDumpFile) {
+  Result result = Result::Success;
+
+  BinaryData elfBin = {};
+  SmallVector<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfo = {
+#if VKI_MESH_SHADER
+    &pipelineInfo->task,
+#endif
+    &pipelineInfo->vs,
+    &pipelineInfo->tcs,
+    &pipelineInfo->tes,
+    &pipelineInfo->gs,
+#if VKI_MESH_SHADER
+    &pipelineInfo->mesh,
+#endif
+    &pipelineInfo->fs,
+  };
+
+  MetroHash::Hash cacheHash = {};
+  MetroHash::Hash pipelineHash = {};
+  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true);
+  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true);
+
+  if (result == Result::Success && pPipelineDumpFile) {
+    std::stringstream strStream;
+    strStream << ";Compiler Options: ";
+    for (auto& option : m_options)
+      strStream << option << " ";
+    std::string extraInfo = strStream.str();
+    PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
+  }
+
+  Optional<CacheAccessor> cacheAccessor;
+  ElfPackage candidateElf;
+
+  if (!cacheAccessor || !cacheAccessor->isInCache()) {
+    LLPC_OUTS("Cache miss for graphics pipeline.\n");
+
+    // Compile
+    GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+    Context *context = acquireContext();
+    context->attachPipelineContext(&graphicsContext);
+
+    result = buildUnlinkedShaderInternal(context, shaderInfo, stage, candidateElf, pipelineOut->stageCacheAccesses);
+    releaseContext(context);
+
+    if (result == Result::Success) {
+      elfBin.codeSize = candidateElf.size();
+      elfBin.pCode = candidateElf.data();
+    }
+
+    if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
+  }
+  else {
+    LLPC_OUTS("Cache hit for graphics pipeline.\n");
+    elfBin = cacheAccessor->getElfFromCache();
+    if (cacheAccessor->isInCache()) {
+      pipelineOut->pipelineCacheAccess =
+          cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+    }
+  }
+
+  if (result == Result::Success) {
+    void *allocBuf = nullptr;
+    if (pipelineInfo->pfnOutputAlloc) {
+      allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfBin.codeSize);
+
+      uint8_t *code = static_cast<uint8_t *>(allocBuf);
+      memcpy(code, elfBin.pCode, elfBin.codeSize);
+
+      pipelineOut->pipelineBin.codeSize = elfBin.codeSize;
+      pipelineOut->pipelineBin.pCode = code;
+    } else {
+      // Allocator is not specified
+      result = Result::ErrorInvalidPointer;
+    }
+  }
+
+  if (cacheAccessor && !cacheAccessor->isInCache() && result == Result::Success) {
+      LLPC_OUTS("Adding graphics pipeline to the cache.\n");
+      cacheAccessor->setElfInCache(elfBin);
+  }
+  return result;
+}
+
+// Build shader from the specified info.
+//
+// @param [in]  pShaderInfo    Info to build this shader module
+// @param [out] pShaderOut  : Output of building this shader module
+// @param [in]  pElfpackage :  Early compiled elfPackage
+// @param pipelineDumpFile : Handle of pipeline dump file
+//
+// @returns : Result::Success if successful. Other return codes indicate failure.
+Result Compiler::BuildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *pipelineInfo,
+                                              GraphicsPipelineBuildOut *pipelineOut, const BinaryData *pElfpackage,
+                                              void *pPipelineDumpFile) {
+
+  Result result = Result::Success;
+
+  SmallVector<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfo = {
+#if VKI_MESH_SHADER
+  &pipelineInfo->task,
+#endif
+  &pipelineInfo->vs,
+  &pipelineInfo->tcs,
+  &pipelineInfo->tes,
+  &pipelineInfo->gs,
+#if VKI_MESH_SHADER
+  &pipelineInfo->mesh,
+#endif
+  &pipelineInfo->fs,
+  };
+
+  ElfPackage elf[UnlinkedStageCount] = {};
+
+  MetroHash::Hash cacheHash = {};
+  MetroHash::Hash pipelineHash = {};
+  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true);
+  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true);
+
+  GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+  Context *context = acquireContext();
+  context->attachPipelineContext(&graphicsContext);
+
+  for (unsigned idx = 0; idx < UnlinkedStageCount; idx++) {
+    if (pElfpackage[idx].pCode) {
+      auto data = reinterpret_cast<const char *>(pElfpackage[idx].pCode);
+      elf[idx].assign(data, data + pElfpackage[idx].codeSize);
+    } else {
+      graphicsContext.setUnlinked(true);
+      result = buildUnlinkedShaderInternal(context, shaderInfo, static_cast<UnlinkedShaderStage>(idx), elf[idx],
+                                            pipelineOut->stageCacheAccesses);
+    }
+  }
+
+  // Link    
+  graphicsContext.setUnlinked(false);
+  ElfPackage pipelineElf;
+  bool hasError = false;
+  context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+  hasError |= !linkRelocatableShaderElf(elf, &pipelineElf, context);
+  context->setDiagnosticHandler(nullptr);
+  if (hasError)
+      result = Result::ErrorInvalidShader;
+  releaseContext(context);
+
+  if (result == Result::Success) {
+    void * allocBuf = nullptr;
+    if (pipelineInfo->pfnOutputAlloc) {
+      allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, pipelineElf.size());
+
+      uint8_t *code = static_cast<uint8_t *>(allocBuf);
+      memcpy(code, pipelineElf.data(), pipelineElf.size());
+
+      pipelineOut->pipelineBin.codeSize = pipelineElf.size();
+      pipelineOut->pipelineBin.pCode = code;
+    } else {
+      // Allocator is not specified
+      result = Result::ErrorInvalidPointer;
+    }
+  }
+
+  return result;
+}
+
+// Build unlinked shader from the specified info.
+//
+// @param context : Acquired context
+// @param shaderInfo : Shader info of this pipeline
+// @param stage : Shader info of this pipeline
+// @param [out] pipelineElf : Output Elf package
+// @param [out] stageCacheAccesses : Stage cache access result. All elements
+//                                   must be initialized in the caller as
+//                                   CacheAccessInfo::CacheNotChecked
+//
+// @returns : Result::Success if successful. Other return codes indicate failure.
+Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo,
+                                             Vkgc::UnlinkedShaderStage stage, ElfPackage &elfPackage,
+                                             MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
+  Result result = Result::Success;
+  if (!hasDataForUnlinkedShaderType(stage, shaderInfo))
+    return result;
+  
+  unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
+  const MetroHash::Hash originalCacheHash = context->getPipelineContext()->getCacheHashCodeWithoutCompact();
+  unsigned shaderStageMask = getShaderStageMaskForType(stage) & originalShaderStageMask;
+  context->getPipelineContext()->setShaderStageMask(shaderStageMask);
+  const auto shaderStages = maskToShaderStages(shaderStageMask);
+
+  // Check the cache for the relocatable shader for this stage .
+  MetroHash::Hash cacheHash = {};
+  if (context->isGraphics()) {
+    auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
+    cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
+  }
+  else {
+    auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
+    cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, true);
+  }
+  // Note that this code updates m_pipelineHash of the pipeline context. It
+  // must be restored before we link the pipeline ELF at the end of this for-loop.
+  context->getPipelineContext()->setHashForCacheLookUp(cacheHash);
+  LLPC_OUTS("Finalized hash for " << getUnlinkedShaderStageName(stage) << " stage cache lookup: "
+                                  << format_hex(context->getPipelineContext()->get128BitCacheHashCode()[0], 18) << ' '
+                                  << format_hex(context->getPipelineContext()->get128BitCacheHashCode()[1], 18)
+                                  << '\n');
+
+  CacheAccessor cacheAccessor(context, cacheHash, getInternalCaches());
+  if (cacheAccessor.isInCache()) {
+    BinaryData elfBin = cacheAccessor.getElfFromCache();
+    auto data = reinterpret_cast<const char *>(elfBin.pCode);
+    elfPackage.assign(data, data + elfBin.codeSize);
+    LLPC_OUTS("Cache hit for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
+    for (ShaderStage gfxStage : shaderStages)
+      stageCacheAccesses[gfxStage] =
+          cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+  } else {
+    LLPC_OUTS("Cache miss for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
+    for (ShaderStage gfxStage : shaderStages)
+      stageCacheAccesses[gfxStage] = CacheAccessInfo::CacheMiss;
+
+    // There was a cache miss, so we need to build the relocatable shader for
+    // this stage.
+    const PipelineShaderInfo *singleStageShaderInfo[ShaderStageNativeStageCount] = {nullptr, nullptr, nullptr,
+                                                                                    nullptr, nullptr, nullptr};
+
+    for (ShaderStage nativeStage : shaderStages)
+      singleStageShaderInfo[nativeStage] = shaderInfo[nativeStage];
+
+    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &elfPackage, stageCacheAccesses);
+    if (result == Result::Success) {
+      // Add the result to the cache.
+      BinaryData elfBin = { elfPackage.size(), elfPackage.data() };
+      cacheAccessor.setElfInCache(elfBin);
+      LLPC_OUTS("Updating the cache for unlinked shader stage " << getUnlinkedShaderStageName(stage) << "\n");
+    }
+  }
+  context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
+  context->getPipelineContext()->setHashForCacheLookUp(originalCacheHash);
+  return result;
+}
+
 // =====================================================================================================================
 // Builds a pipeline by building relocatable elf files and linking them together.  The relocatable elf files will be
 // cached for future use.
@@ -759,62 +1013,9 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
   for (UnlinkedShaderStage stage : lgc::enumRange<UnlinkedShaderStage>()) {
     if (!hasDataForUnlinkedShaderType(stage, shaderInfo))
       continue;
-
-    unsigned shaderStageMask = getShaderStageMaskForType(stage) & originalShaderStageMask;
-    context->getPipelineContext()->setShaderStageMask(shaderStageMask);
-    const auto shaderStages = maskToShaderStages(shaderStageMask);
-    assert(all_of(shaderStages, isNativeStage) && "Unexpected stage kind");
-
-    // Check the cache for the relocatable shader for this stage .
-    MetroHash::Hash cacheHash = {};
-    if (context->isGraphics()) {
-      auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
-      cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
-    } else {
-      auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
-      cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, true);
-    }
-    // Note that this code updates m_pipelineHash of the pipeline context. It
-    // must be restored before we link the pipeline ELF at the end of this for-loop.
-    context->getPipelineContext()->setHashForCacheLookUp(cacheHash);
-    LLPC_OUTS("Finalized hash for " << getUnlinkedShaderStageName(stage) << " stage cache lookup: "
-                                    << format_hex(context->getPipelineContext()->get128BitCacheHashCode()[0], 18) << ' '
-                                    << format_hex(context->getPipelineContext()->get128BitCacheHashCode()[1], 18)
-                                    << '\n');
-
-    CacheAccessor cacheAccessor(context, cacheHash, getInternalCaches());
-    if (cacheAccessor.isInCache()) {
-      BinaryData elfBin = cacheAccessor.getElfFromCache();
-      auto data = reinterpret_cast<const char *>(elfBin.pCode);
-      elf[stage].assign(data, data + elfBin.codeSize);
-      LLPC_OUTS("Cache hit for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-      for (ShaderStage stage : shaderStages)
-        stageCacheAccesses[stage] =
-            cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
-
-      continue;
-    }
-
-    LLPC_OUTS("Cache miss for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
-    for (ShaderStage stage : shaderStages)
-      stageCacheAccesses[stage] = CacheAccessInfo::CacheMiss;
-
-    // There was a cache miss, so we need to build the relocatable shader for
-    // this stage.
-    const PipelineShaderInfo *singleStageShaderInfo[ShaderStageNativeStageCount] = {nullptr, nullptr, nullptr,
-                                                                                    nullptr, nullptr, nullptr};
-    for (ShaderStage stage : shaderStages)
-      singleStageShaderInfo[stage] = shaderInfo[stage];
-
-    Vkgc::ElfPackage &stageElf = elf[stage];
-    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &stageElf, stageCacheAccesses);
-    if (result != Result::Success)
+    if (buildUnlinkedShaderInternal(context, shaderInfo, stage, elf[stage], stageCacheAccesses) !=
+        Result::Success)
       break;
-
-    // Add the result to the cache.
-    BinaryData elfBin = {stageElf.size(), stageElf.data()};
-    cacheAccessor.setElfInCache(elfBin);
-    LLPC_OUTS("Updating the cache for unlinked shader stage " << getUnlinkedShaderStageName(stage) << "\n");
   }
   context->getPipelineContext()->setHashForCacheLookUp(originalCacheHash);
   context->getPipelineContext()->setShaderStageMask(originalShaderStageMask);
