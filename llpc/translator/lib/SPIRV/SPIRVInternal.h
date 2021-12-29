@@ -215,12 +215,7 @@ const static char Block[] = "spirv.Block";
 const static char PushConst[] = "spirv.PushConst";
 const static char Resource[] = "spirv.Resource";
 const static char ExecutionModel[] = "spirv.ExecutionModel";
-const static char ImageCall[] = "spirv.ImageCall";
 const static char ImageMemory[] = "spirv.ImageMemory";
-const static char BufferLoad[] = "spirv.BufferLoad";
-const static char BufferStore[] = "spirv.BufferStore";
-const static char AccessChain[] = "spirv.AccessChain";
-const static char StorageBufferCall[] = "spirv.StorageBufferCall";
 const static char NonUniform[] = "spirv.NonUniform";
 } // namespace gSPIRVMD
 
@@ -232,7 +227,6 @@ const static char InterpolateAtSample[] = "interpolateAtSample";
 const static char InterpolateAtOffset[] = "interpolateAtOffset";
 const static char InterpolateAtVertexAMD[] = "InterpolateAtVertexAMD";
 const static char NonUniform[] = "spirv.NonUniform";
-const static char UnpackHalf2x16[] = "unpackHalf2x16";
 } // namespace gSPIRVName
 
 enum SPIRVBlockTypeKind {
@@ -325,116 +319,6 @@ template <> inline void SPIRVMap<Op, std::string, ImageQueryOpKindNameMapId>::in
 }
 typedef SPIRVMap<Op, std::string, ImageQueryOpKindNameMapId> SPIRVImageQueryOpKindNameMap;
 
-union SPIRVImageOpInfo {
-  struct {
-    SPIRVImageOpKind OpKind : 6;       // Kind of image operation
-    unsigned OperMask : 3;             // Index of image operand mask
-    unsigned OperDref : 3;             // Index of Dref operand
-    unsigned HasProj : 1;              // Whether project is present
-    unsigned IsSparse : 1;             // Is sparse image operation
-    unsigned OperAtomicData : 3;       // Index of atomic value
-                                       // operand
-    unsigned OperAtomicComparator : 3; // Index of atomic comparator
-                                       // operand (valid for
-                                       // CompareExchange)
-    unsigned OperScope : 3;            // Index of the scope (valid for atomics)
-    unsigned Unused : 9;
-  };
-  unsigned U32All;
-};
-
-static const unsigned InvalidOperIdx = 0x7;
-
-template <> inline void SPIRVMap<Op, SPIRVImageOpInfo>::init() {
-  //       Image OpCode                           OpCode Kind                 Mask              ref             Proj
-  //       Sparse  AtomicData      AtomicComparator    Scope
-  //---------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  add(OpImageSampleImplicitLod,
-      {ImageOpSample, 2, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSampleExplicitLod,
-      {ImageOpSample, 2, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSampleDrefImplicitLod,
-      {ImageOpSample, 3, 3, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSampleDrefExplicitLod,
-      {ImageOpSample, 3, 3, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSampleProjImplicitLod,
-      {ImageOpSample, 2, InvalidOperIdx, true, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSampleProjExplicitLod,
-      {ImageOpSample, 2, InvalidOperIdx, true, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSampleProjDrefImplicitLod,
-      {ImageOpSample, 3, 3, true, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSampleProjDrefExplicitLod,
-      {ImageOpSample, 3, 3, true, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageFetch, {ImageOpFetch, 2, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageGather, {ImageOpGather, 3, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageDrefGather, {ImageOpGather, 3, 3, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageRead, {ImageOpRead, 2, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageWrite, {ImageOpWrite, 3, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-
-  add(OpImageSparseSampleImplicitLod,
-      {ImageOpSample, 2, InvalidOperIdx, false, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseSampleExplicitLod,
-      {ImageOpSample, 2, InvalidOperIdx, false, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseSampleDrefImplicitLod,
-      {ImageOpSample, 3, 3, false, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseSampleDrefExplicitLod,
-      {ImageOpSample, 3, 3, false, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseSampleProjImplicitLod,
-      {ImageOpSample, 2, InvalidOperIdx, true, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseSampleProjExplicitLod,
-      {ImageOpSample, 2, InvalidOperIdx, true, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseSampleProjDrefImplicitLod,
-      {ImageOpSample, 3, 3, true, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseSampleProjDrefExplicitLod,
-      {ImageOpSample, 3, 3, true, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseFetch,
-      {ImageOpFetch, 2, InvalidOperIdx, false, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseGather,
-      {ImageOpGather, 3, InvalidOperIdx, false, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseDrefGather, {ImageOpGather, 3, 3, false, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageSparseRead, {ImageOpRead, 2, InvalidOperIdx, false, true, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-
-  add(OpImageQuerySizeLod, {ImageOpQueryNonLod, InvalidOperIdx, InvalidOperIdx, false, false, InvalidOperIdx,
-                            InvalidOperIdx, InvalidOperIdx});
-  add(OpImageQuerySize, {ImageOpQueryNonLod, InvalidOperIdx, InvalidOperIdx, false, false, InvalidOperIdx,
-                         InvalidOperIdx, InvalidOperIdx});
-  add(OpImageQueryLod,
-      {ImageOpQueryLod, InvalidOperIdx, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, InvalidOperIdx});
-  add(OpImageQueryLevels, {ImageOpQueryNonLod, InvalidOperIdx, InvalidOperIdx, false, false, InvalidOperIdx,
-                           InvalidOperIdx, InvalidOperIdx});
-  add(OpImageQuerySamples, {ImageOpQueryNonLod, InvalidOperIdx, InvalidOperIdx, false, false, InvalidOperIdx,
-                            InvalidOperIdx, InvalidOperIdx});
-
-  add(OpAtomicLoad,
-      {ImageOpAtomicLoad, InvalidOperIdx, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, 1});
-  add(OpAtomicStore, {ImageOpAtomicStore, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicExchange, {ImageOpAtomicExchange, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicCompareExchange, {ImageOpAtomicCompareExchange, InvalidOperIdx, InvalidOperIdx, false, false, 4, 5, 1});
-  add(OpAtomicIIncrement,
-      {ImageOpAtomicIIncrement, InvalidOperIdx, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, 1});
-  add(OpAtomicIDecrement,
-      {ImageOpAtomicIDecrement, InvalidOperIdx, InvalidOperIdx, false, false, InvalidOperIdx, InvalidOperIdx, 1});
-  add(OpAtomicIAdd, {ImageOpAtomicIAdd, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicISub, {ImageOpAtomicISub, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicSMin, {ImageOpAtomicSMin, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicUMin, {ImageOpAtomicUMin, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicSMax, {ImageOpAtomicSMax, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicUMax, {ImageOpAtomicUMax, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicAnd, {ImageOpAtomicAnd, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicOr, {ImageOpAtomicOr, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicXor, {ImageOpAtomicXor, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicFMinEXT, {ImageAtomicFMin, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicFMaxEXT, {ImageAtomicFMax, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-  add(OpAtomicFAddEXT, {ImageAtomicFAdd, InvalidOperIdx, InvalidOperIdx, false, false, 3, InvalidOperIdx, 1});
-}
-typedef SPIRVMap<Op, SPIRVImageOpInfo> SPIRVImageOpInfoMap;
-
-// "<" operator overloading, just to pass compilation for "SPIRVMap::rmap",
-// not actually used
-inline bool operator<(const SPIRVImageOpInfo &L, const SPIRVImageOpInfo &R) {
-  return L.U32All < R.U32All;
-}
-
 /// @returns : a vector of types for a collection of values.
 template <class T> std::vector<Type *> getTypes(T V) {
   std::vector<Type *> Tys;
@@ -499,7 +383,6 @@ union ShaderInOutMetadata {
     // byte 6~7
     uint64_t XfbStride : 16; // Transform feedback stride
     // byte 8~9
-    uint64_t IsBlockArray : 1;    // Whether we are handling block array
     uint64_t XfbArrayStride : 16; // Transform feedback array stride (for
                                   //   block array, it's flatten dimension
                                   //   of an element (1 if element is not
@@ -507,6 +390,8 @@ union ShaderInOutMetadata {
                                   //   occupied byte count of an element)
     // byte 10~11
     uint64_t XfbExtraOffset : 16; // Transform feedback extra offset
+    // byte 12
+    uint64_t IsBlockArray : 1;       // Whether we are handling block array
     uint64_t PerVertexDimension : 1; // Whether this is the per-vertex dimension (outermost) for an array
   };
   uint64_t U64All[2];
@@ -533,8 +418,10 @@ struct ShaderInOutDecorate {
 
   bool PerPatch; // Whether this is a per-patch input/output
                  // (tessellation shader)
+
   bool PerVertexDimension; // Whether this is decorated by "pervertexKHR" // NOLINT
                            // (Fragment shader)
+
   struct {
     SPIRVInterpModeKind Mode; // Interpolation mode
     SPIRVInterpLocKind Loc;   // Interpolation location

@@ -65,7 +65,7 @@ ModulePass *createSpirvLowerResourceCollect(bool collectDetailUsage) {
 //
 // @param collectDetailUsage : Whether to collect detailed usages of resource node datas and FS output infos
 SpirvLowerResourceCollect::SpirvLowerResourceCollect(bool collectDetailUsage)
-    : LegacySpirvLower(ID), m_collectDetailUsage(collectDetailUsage), m_pushConstSize(0), m_detailUsageValid(false) {
+    : LegacySpirvLower(ID), m_collectDetailUsage(collectDetailUsage), m_detailUsageValid(false) {
 }
 
 // =====================================================================================================================
@@ -171,12 +171,8 @@ bool SpirvLowerResourceCollect::runOnModule(Module &module) {
     auto addrSpace = global->getType()->getAddressSpace();
     switch (addrSpace) {
     case SPIRAS_Constant: {
-      if (global->hasMetadata(gSPIRVMD::PushConst)) {
-        // Push constant
-        MDNode *metaNode = global->getMetadata(gSPIRVMD::PushConst);
-        m_pushConstSize = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
-      } else {
-        // Only collect resource node data when requested
+      if (!global->hasMetadata(gSPIRVMD::PushConst)) {
+        // Non push constant, only collect resource node data when requested
         if (m_collectDetailUsage)
           collectResourceNodeData(&*global);
       }
