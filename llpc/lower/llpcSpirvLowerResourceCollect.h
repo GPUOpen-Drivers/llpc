@@ -63,7 +63,6 @@ class SpirvLowerResourceCollect : public LegacySpirvLower, public llvm::InstVisi
 public:
   SpirvLowerResourceCollect(bool collectDetailUsage = false);
   auto &getResourceNodeDatas() { return m_resNodeDatas; }
-  auto getPushConstSize() { return m_pushConstSize; }
   auto &getFsOutInfos() { return m_fsOutInfos; }
   bool detailUsageValid() { return m_detailUsageValid; }
 
@@ -86,7 +85,6 @@ private:
   bool m_collectDetailUsage; // If enabled, collect detailed usages of resource node datas and FS output infos
   std::map<ResourceNodeDataKey, ResourceMappingNodeType, ResNodeDataSortingComparer> m_resNodeDatas; // Resource
                                                                                                      // node data
-  unsigned m_pushConstSize;            // Push constant size in byte
   std::vector<FsOutInfo> m_fsOutInfos; // FS output info array
   bool m_detailUsageValid;             // Indicate whether detailed usages (resource node datas
                                        // or fragment shader output infos) are valid

@@ -171,7 +171,7 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
 
   if (m_pipelineState->isGraphics()) {
     // Process each shader in turn, but not the copy shader.
-    for (unsigned shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
+    for (unsigned shaderStage = 0; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
       m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(shaderStage));
       if (m_entryPoint) {
         m_shaderStage = static_cast<ShaderStage>(shaderStage);
