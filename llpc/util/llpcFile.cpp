@@ -111,8 +111,13 @@ Result File::open(const char *filename, unsigned accessFlags) {
 
     if (result == Result::Success) {
 #if defined(_WIN32)
-      // MS compilers provide fopen_s, which is supposedly "safer" than traditional fopen.
-      fopen_s(&m_fileHandle, filename, &fileMode[0]);
+      // MS compilers provide _fsopen, which allows the shareable modes to be
+      // specified.
+      // In this case _SH_DENYNO which effectively makes it the equivalent of
+      // fopen.
+      // Note: changed from fopen_s which doesn't allow shareable access
+      // (required for multi-thread).
+      m_fileHandle = _fsopen(filename, &fileMode[0], _SH_DENYNO);
 #else
       // Just use the traditional fopen.
       m_fileHandle = fopen(filename, &fileMode[0]);
