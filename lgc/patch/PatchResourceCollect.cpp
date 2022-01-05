@@ -1000,11 +1000,13 @@ void PatchResourceCollect::processShader() {
     // If we're compiling a fragment shader only, then serialize inputLocInfoMap and builtInInputLocMap
     // into PAL metadata, for the other half of the pipeline to be compiled against later.
     if (m_pipelineState->getShaderStageMask() == 1U << ShaderStageFragment) {
-      FsInputMappings fsInputMappings;
+      FsInputMappings fsInputMappings = {};
       for (auto it : m_resUsage->inOutUsage.inputLocInfoMap)
         fsInputMappings.locationInfo.push_back({it.first.getData(), it.second.getData()});
       for (auto it : m_resUsage->inOutUsage.builtInInputLocMap)
         fsInputMappings.builtInLocationInfo.push_back({it.first, it.second});
+      fsInputMappings.clipDistanceCount = m_resUsage->builtInUsage.fs.clipDistance;
+      fsInputMappings.cullDistanceCount = m_resUsage->builtInUsage.fs.cullDistance;
       m_pipelineState->getPalMetadata()->addFragmentInputInfo(fsInputMappings);
     }
 
@@ -1042,7 +1044,7 @@ void PatchResourceCollect::processMissingFs() {
     return;
   m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
-  FsInputMappings fsInputMappings;
+  FsInputMappings fsInputMappings = {};
   m_pipelineState->getPalMetadata()->retrieveFragmentInputInfo(fsInputMappings);
   // Deserialize generic inputs. We deserialize into both m_locationInfoMapManager and inputLocInfoMap as
   // later code seems to use both places to look up a mapping.
@@ -1054,12 +1056,6 @@ void PatchResourceCollect::processMissingFs() {
   for (std::pair<unsigned, unsigned> oneLocInfo : fsInputMappings.builtInLocationInfo) {
     m_resUsage->inOutUsage.builtInInputLocMap[oneLocInfo.first] = oneLocInfo.second;
     switch (oneLocInfo.first) {
-    case BuiltInClipDistance:
-      m_resUsage->builtInUsage.fs.clipDistance = 1;
-      break;
-    case BuiltInCullDistance:
-      m_resUsage->builtInUsage.fs.cullDistance = 1;
-      break;
     case BuiltInPrimitiveId:
       m_resUsage->builtInUsage.fs.primitiveId = true;
       break;
@@ -1076,6 +1072,8 @@ void PatchResourceCollect::processMissingFs() {
       break;
     }
   }
+  m_resUsage->builtInUsage.fs.clipDistance = fsInputMappings.clipDistanceCount;
+  m_resUsage->builtInUsage.fs.cullDistance = fsInputMappings.cullDistanceCount;
 }
 
 // =====================================================================================================================

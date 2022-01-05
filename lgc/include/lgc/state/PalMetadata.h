@@ -92,6 +92,9 @@ struct FsInputMappings {
   // For each built-in input that is implemented as a generic input passed from the previous shader stage,
   // such as CullDistance and ClipDistance, the built-in id and the mapped location number.
   llvm::SmallVector<std::pair<unsigned, unsigned>> builtInLocationInfo;
+  // Array sizes for ClipDistance and CullDistance.
+  unsigned clipDistanceCount;
+  unsigned cullDistanceCount;
 };
 
 // =====================================================================================================================
