@@ -212,6 +212,12 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
             return 0;
           }
         }
+        // Allow bool merging (for things like .uses_viewport_array_index).
+        if (destNode->getKind() == msgpack::Type::Boolean && srcNode.getKind() == msgpack::Type::Boolean) {
+          if (srcNode.getBool())
+            *destNode = srcNode.getDocument()->getNode(true);
+          return 0;
+        }
         // Disallow merging other than uint.
         if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt)
           return -1;
