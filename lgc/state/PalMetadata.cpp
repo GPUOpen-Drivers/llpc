@@ -871,6 +871,9 @@ void PalMetadata::addFragmentInputInfo(const FsInputMappings &fsInputMappings) {
     fragInputMappingArray2.push_back(m_document->getNode(item.first));
     fragInputMappingArray2.push_back(m_document->getNode(item.second));
   }
+  auto fragInputMappingArray3 = m_pipelineNode[PipelineMetadataKey::FragInputMapping3].getArray(true);
+  fragInputMappingArray3.push_back(m_document->getNode(fsInputMappings.clipDistanceCount));
+  fragInputMappingArray3.push_back(m_document->getNode(fsInputMappings.cullDistanceCount));
 }
 
 // =====================================================================================================================
@@ -883,6 +886,7 @@ void PalMetadata::addFragmentInputInfo(const FsInputMappings &fsInputMappings) {
 void PalMetadata::setOtherPartPipeline(PalMetadata &other) {
   m_pipelineNode[PipelineMetadataKey::FragInputMapping1] = other.m_pipelineNode[PipelineMetadataKey::FragInputMapping1];
   m_pipelineNode[PipelineMetadataKey::FragInputMapping2] = other.m_pipelineNode[PipelineMetadataKey::FragInputMapping2];
+  m_pipelineNode[PipelineMetadataKey::FragInputMapping3] = other.m_pipelineNode[PipelineMetadataKey::FragInputMapping3];
 }
 
 // =====================================================================================================================
@@ -901,11 +905,16 @@ StringRef PalMetadata::getFsInputMappings() {
   m_fsInputMappingsBlob.clear();
   auto fragInputMappingArray1 = m_pipelineNode[PipelineMetadataKey::FragInputMapping1].getArray(true);
   auto fragInputMappingArray2 = m_pipelineNode[PipelineMetadataKey::FragInputMapping2].getArray(true);
+  auto fragInputMappingArray3 = m_pipelineNode[PipelineMetadataKey::FragInputMapping3].getArray(true);
   for (auto &element : fragInputMappingArray1) {
     unsigned elementVal = element.getUInt();
     m_fsInputMappingsBlob.append(StringRef(reinterpret_cast<const char *>(&elementVal), sizeof(elementVal)));
   }
   for (auto &element : fragInputMappingArray2) {
+    unsigned elementVal = element.getUInt();
+    m_fsInputMappingsBlob.append(StringRef(reinterpret_cast<const char *>(&elementVal), sizeof(elementVal)));
+  }
+  for (auto &element : fragInputMappingArray3) {
     unsigned elementVal = element.getUInt();
     m_fsInputMappingsBlob.append(StringRef(reinterpret_cast<const char *>(&elementVal), sizeof(elementVal)));
   }
@@ -936,6 +945,16 @@ void PalMetadata::retrieveFragmentInputInfo(FsInputMappings &fsInputMappings) {
       fsInputMappings.builtInLocationInfo.push_back(
           {fragInputMappingArray2[idx * 2].getUInt(), fragInputMappingArray2[idx * 2 + 1].getUInt()});
   }
+
+  auto array3It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping3));
+  if (array3It != m_pipelineNode.end()) {
+    auto fragInputMappingArray3 = array3It->second.getArray(true);
+    if (fragInputMappingArray3.size() >= 1) {
+      fsInputMappings.clipDistanceCount = fragInputMappingArray3[0].getUInt();
+      if (fragInputMappingArray3.size() >= 2)
+        fsInputMappings.cullDistanceCount = fragInputMappingArray3[1].getUInt();
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -948,6 +967,10 @@ void PalMetadata::eraseFragmentInputInfo() {
   auto array2It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping2));
   if (array2It != m_pipelineNode.end())
     m_pipelineNode.erase(array2It);
+
+  auto array3It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping3));
+  if (array3It != m_pipelineNode.end())
+    m_pipelineNode.erase(array3It);
 }
 
 // =====================================================================================================================
