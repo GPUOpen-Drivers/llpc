@@ -31,8 +31,8 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache/boost /opt/ghc
           echo 'After:' && df -h
       - name: Setup Google Cloud SDK
-        if: contains(matrix.feature-set, '+coverage') && github.repository == 'GPUOpen-Drivers/llpc' && secrets.GCR_KEY
-        uses: google-github-actions/setup-gcloud@master
+        if: contains(matrix.feature-set, '+coverage') && github.repository == 'GPUOpen-Drivers/llpc'
+        uses: google-github-actions/setup-gcloud@v0
         with:
           version: '290.0.1'
           service_account_email: ${{ secrets.GCR_USER }}
@@ -62,13 +62,13 @@ jobs:
                             --build-arg FEATURES="${{ matrix.feature-set }}"
                             --tag llpc/ci-shaderdb
       - name: Copy code coverage report to host and upload to GCS
-        if: contains(matrix.feature-set, '+coverage') && github.event.pull_request.number && github.repository == 'GPUOpen-Drivers/llpc' && secrets.GCR_KEY
+        if: contains(matrix.feature-set, '+coverage') && github.event.pull_request.number && github.repository == 'GPUOpen-Drivers/llpc'
         run: |
           docker run -v "$HOME:/host" llpc/ci-shaderdb 'bash' '-c' 'cp -r /vulkandriver/coverage_report /host/'
           sudo chown -R runner $HOME/coverage_report
           gsutil -m cp -r "$HOME/coverage_report/*" "gs://amdvlk-llpc-github-ci-artifacts-public/coverage_${CONFIG_TAG}_${GITHUB_SHA}/"
       - name: Add comment with code coverage report link
-        if: contains(matrix.feature-set, '+coverage') && github.event.pull_request.number && github.repository == 'GPUOpen-Drivers/llpc' && secrets.GCR_KEY
+        if: contains(matrix.feature-set, '+coverage') && github.event.pull_request.number && github.repository == 'GPUOpen-Drivers/llpc'
         uses: peter-evans/create-or-update-comment@v1.4.5
         with:
           issue-number: ${{ github.event.pull_request.number }}
