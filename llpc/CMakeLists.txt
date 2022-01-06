@@ -299,6 +299,8 @@ if(ICD_BUILD_LLPC)
 add_library(llpc_standalone_compiler
     tool/llpcAutoLayout.cpp
     tool/llpcCompilationUtils.cpp
+    tool/llpcComputePipelineBuilder.cpp
+    tool/llpcGraphicsPipelineBuilder.cpp
     tool/llpcInputUtils.cpp
     tool/llpcPipelineBuilder.cpp
 )
