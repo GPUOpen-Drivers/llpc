@@ -238,6 +238,15 @@ Expected<std::string> compileGlsl(const std::string &inFilename, ShaderStage *st
 }
 
 // =====================================================================================================================
+// Get reference to common mutex for assembling spvasm files in multi-threaded contexts
+//
+// @returns : Reference to common mutex used for processing spvasm files
+static std::mutex &getCommonAsmFileMutex() {
+  static std::mutex AsmFileMutex;
+  return AsmFileMutex;
+}
+
+// =====================================================================================================================
 // SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V binary file (output).
 //
 // @param inFilename : Input filename, SPIR-V assembly text
@@ -442,16 +451,27 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
 //
 // @param spirvInput : Input specification
 // @param validateSpirv : Whether to validate the input SPIR-V
+// @param assembledInputs : Records input spvasm that's already been assembled
 // @returns : `ShaderModuleData` on success, `ResultError` on failure
-static Expected<ShaderModuleData> processInputSpirvStage(const InputSpec &spirvInput, bool validateSpirv) {
+static Expected<ShaderModuleData> processInputSpirvStage(const InputSpec &spirvInput, bool validateSpirv,
+                                                         std::map<std::string, std::string> &assembledInputs) {
   assert(isSpirvBinaryFile(spirvInput.filename) || isSpirvTextFile(spirvInput.filename));
   std::string spvBinFile;
   // SPIR-V assembly text or SPIR-V binary.
   if (isSpirvTextFile(spirvInput.filename)) {
-    auto spvBinFilenameOrErr = assembleSpirv(spirvInput.filename);
-    if (Error err = spvBinFilenameOrErr.takeError())
-      return std::move(err);
-    spvBinFile = *spvBinFilenameOrErr;
+    // For a multi-threaded invocation, it's possible that the same input file is
+    // used. Ensure that this will work in that situation
+    std::unique_lock<std::mutex> asmWriteLockGuard(getCommonAsmFileMutex());
+
+    if (assembledInputs.count(spirvInput.filename)) {
+      spvBinFile = assembledInputs[spirvInput.filename];
+    } else {
+      auto spvBinFilenameOrErr = assembleSpirv(spirvInput.filename);
+      if (Error err = spvBinFilenameOrErr.takeError())
+        return std::move(err);
+      spvBinFile = *spvBinFilenameOrErr;
+      assembledInputs[spirvInput.filename] = spvBinFile;
+    }
   } else {
     spvBinFile = spirvInput.filename;
   }
@@ -583,12 +603,14 @@ static Expected<ShaderModuleData> processInputGlslStage(const InputSpec &glslInp
 //
 // @param inputSpec : Input specification
 // @param validateSpirv : Whether to run the validator on each final SPIR-V module
+// @param assembledInputs : Records input spvasm that's already been assembled
 // @returns : `ShaderModuleData` on success, `ResultError` on failure
-static Expected<ShaderModuleData> processInputStage(const InputSpec &inputSpec, bool validateSpirv) {
+static Expected<ShaderModuleData> processInputStage(const InputSpec &inputSpec, bool validateSpirv,
+                                                    std::map<std::string, std::string> &assembledInputs) {
   const std::string &inFile = inputSpec.filename;
 
   if (isSpirvTextFile(inFile) || isSpirvBinaryFile(inFile))
-    return processInputSpirvStage(inputSpec, validateSpirv);
+    return processInputSpirvStage(inputSpec, validateSpirv, assembledInputs);
 
   if (isLlvmIrFile(inFile))
     return processInputLlvmIrStage(inputSpec);
@@ -613,9 +635,10 @@ static Expected<ShaderModuleData> processInputStage(const InputSpec &inputSpec, 
 Error processInputStages(CompileInfo &compileInfo, ArrayRef<InputSpec> inputSpecs, bool validateSpirv,
                          unsigned numThreads) {
   std::mutex compileInfoMutex;
+  std::map<std::string, std::string> assembledInputs;
 
   return parallelFor(numThreads, inputSpecs, [&](const InputSpec &inputSpec) -> Error {
-    auto dataOrErr = processInputStage(inputSpec, validateSpirv);
+    auto dataOrErr = processInputStage(inputSpec, validateSpirv, assembledInputs);
     if (Error err = dataOrErr.takeError())
       return err;
 
