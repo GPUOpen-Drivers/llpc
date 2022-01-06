@@ -42,11 +42,13 @@ endif
 
 vpath %.cpp $(LLPC_DEPTH)/tool
 
-CPPFILES +=                   \
-    amdllpc.cpp               \
-    llpcAutoLayout.cpp        \
-    llpcCompilationUtils.cpp  \
-    llpcInputUtils.cpp        \
+CPPFILES +=                          \
+    amdllpc.cpp                      \
+    llpcAutoLayout.cpp               \
+    llpcCompilationUtils.cpp         \
+    llpcComputePipelineBuilder.cpp   \
+    llpcGraphicsPipelineBuilder.cpp  \
+    llpcInputUtils.cpp               \
     llpcPipelineBuilder.cpp
 
 EXE_TARGET = amdllpc

@@ -48,8 +48,9 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPipelineBuilder.cpp
- * @brief LLPC source file: contains the implementation LLPC pipeline compilation logic for standalone LLPC compilers.
+ * @file  llpcComputePipelineBuilder.cpp
+ * @brief LLPC source file: contains the implementation LLPC compute pipeline compilation logic for standalone LLPC
+ *        compilers.
  ***********************************************************************************************************************
  */
 #ifdef WIN_OS
@@ -57,14 +58,12 @@
 #define NOMINMAX
 #endif
 
-#include "llpcPipelineBuilder.h"
-#include "llpcCompilationUtils.h"
 #include "llpcComputePipelineBuilder.h"
-#include "llpcDebug.h"
-#include "llpcGraphicsPipelineBuilder.h"
+#include "llpcAutoLayout.h"
+#include "llpcCompilationUtils.h"
 #include "llpcUtil.h"
 #include "vkgcUtil.h"
-#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/ScopeExit.h"
 
 using namespace llvm;
 using namespace Vkgc;
@@ -73,74 +72,86 @@ namespace Llpc {
 namespace StandaloneCompiler {
 
 // =====================================================================================================================
-// Factory function that returns a `PipelineBuilder` appropriate for the given pipeline type (e.g., graphics, compute).
-// To support new pipeline types, create a new class deriving from `PipelineBuilder` and register its constructor here.
+// Builds pipeline using the provided build info and performs linking.
 //
-// @param compiler : LLPC compiler object.
-// @param [in/out] compileInfo : Compilation info of LLPC standalone tool.
-// @param dumpOptions : Pipeline dump options. Pipeline dumps are disabled when `llvm::None` is passed.
-// @param printPipelineInfo : Whether to print pipeline info (hash, filenames) before compilation.
-// @returns : Concrete `PipelineBuilder` object for this pipeline type.
-std::unique_ptr<PipelineBuilder> createPipelineBuilder(ICompiler &compiler, CompileInfo &compileInfo,
-                                                       llvm::Optional<Vkgc::PipelineDumpOptions> dumpOptions,
-                                                       bool printPipelineInfo) {
-  const unsigned stageMask = compileInfo.stageMask;
-  assert(!(isGraphicsPipeline(stageMask) && isComputePipeline(stageMask)) && "Invalid stage mask");
+// @returns : `llvm::ErrorSuccess` on success, `llpc::ResultError` on failure.
+Error ComputePipelineBuilder::build() {
+  CompileInfo &compileInfo = getCompileInfo();
 
-  if (isGraphicsPipeline(stageMask))
-    return std::make_unique<GraphicsPipelineBuilder>(compiler, compileInfo, std::move(dumpOptions), printPipelineInfo);
+  Expected<BinaryData> pipelineOrErr = buildComputePipeline();
+  if (Error err = pipelineOrErr.takeError())
+    return err;
 
-  if (isComputePipeline(stageMask))
-    return std::make_unique<ComputePipelineBuilder>(compiler, compileInfo, std::move(dumpOptions), printPipelineInfo);
+  Result result = decodePipelineBinary(&*pipelineOrErr, &compileInfo);
+  if (result != Result::Success)
+    return createResultError(result, "Failed to decode pipeline");
 
-  llvm_unreachable("Unknown pipeline kind");
-  return nullptr;
+  return Error::success();
 }
 
 // =====================================================================================================================
-// Runs pre-compilation actions: starts a pipeline dump (if requested) and prints pipeline info (if requested).
-// The caller must call `runPostBuildActions` after calling this function to perform the necessary cleanup.
+// Build the compute pipeline.
 //
-// @param buildInfo : Build info of the pipeline.
-// @returns : Handle to the started pipeline dump, nullptr if pipeline dump was not started.
-void *PipelineBuilder::runPreBuildActions(PipelineBuildInfo buildInfo) {
-  void *pipelineDumpHandle = nullptr;
-  if (shouldDumpPipelines())
-    pipelineDumpHandle = IPipelineDumper::BeginPipelineDump(m_dumpOptions.getPointer(), buildInfo);
+// @returns : Pipeline binary data on success, `llvm::ResultError` on failure.
+Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
+  CompileInfo &compileInfo = getCompileInfo();
+  assert(compileInfo.shaderModuleDatas.size() == 1);
 
-  if (m_printPipelineInfo)
-    printPipelineInfo(buildInfo);
+  StandaloneCompiler::ShaderModuleData &moduleData = compileInfo.shaderModuleDatas[0];
+  assert(moduleData.shaderStage == ShaderStageCompute);
 
-  return pipelineDumpHandle;
+  ComputePipelineBuildInfo *pipelineInfo = &compileInfo.compPipelineInfo;
+  ComputePipelineBuildOut *pipelineOut = &compileInfo.compPipelineOut;
+
+  PipelineShaderInfo *shaderInfo = &pipelineInfo->cs;
+  const ShaderModuleBuildOut *shaderOut = &moduleData.shaderOut;
+
+  // If entry target is not specified, use the one from command line option.
+  if (!shaderInfo->pEntryTarget)
+    shaderInfo->pEntryTarget = moduleData.entryPoint.c_str();
+
+  shaderInfo->entryStage = ShaderStageCompute;
+  shaderInfo->pModuleData = shaderOut->pModuleData;
+
+  // If not compiling from pipeline, lay out user data now.
+  if (compileInfo.doAutoLayout) {
+    ResourceMappingNodeMap nodeSets;
+    unsigned pushConstSize = 0;
+    doAutoLayoutDesc(ShaderStageCompute, moduleData.spirvBin, nullptr, shaderInfo, nodeSets, pushConstSize,
+                     /*autoLayoutDesc =*/compileInfo.autoLayoutDesc);
+
+    buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
+                         compileInfo.autoLayoutDesc);
+  }
+
+  pipelineInfo->pInstance = nullptr; // Placeholder, unused.
+  pipelineInfo->pUserData = &compileInfo.pipelineBuf;
+  pipelineInfo->pfnOutputAlloc = allocateBuffer;
+  pipelineInfo->unlinked = compileInfo.unlinked;
+  pipelineInfo->options.robustBufferAccess = compileInfo.robustBufferAccess;
+  pipelineInfo->options.enableRelocatableShaderElf = compileInfo.relocatableShaderElf;
+  pipelineInfo->options.scalarBlockLayout = compileInfo.scalarBlockLayout;
+  pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo.scratchAccessBoundsChecks;
+
+  PipelineBuildInfo localPipelineInfo = {};
+  localPipelineInfo.pComputeInfo = pipelineInfo;
+  void *pipelineDumpHandle = runPreBuildActions(localPipelineInfo);
+  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, {pipelineOut->pipelineBin}); });
+
+  Result result = getCompiler().BuildComputePipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
+  if (result != Result::Success)
+    return createResultError(result, "Compute pipeline compilation failed");
+
+  return pipelineOut->pipelineBin;
 }
 
 // =====================================================================================================================
-// Runs post-compilation actions: finalizes the pipeline dump, if started. Must be called after `runPreBuildActions`.
+// Calculates the pipeline hash.
 //
-// @param pipelineDumpHandle : Handle to the started pipeline dump.
-// @param pipeline : The compiled pipeline.
-void PipelineBuilder::runPostBuildActions(void *pipelineDumpHandle, MutableArrayRef<BinaryData> pipelines) {
-  if (!pipelineDumpHandle)
-    return;
-
-  for (const auto &pipeline : pipelines)
-    if (pipeline.pCode)
-      IPipelineDumper::DumpPipelineBinary(pipelineDumpHandle, m_compileInfo.gfxIp, &pipeline);
-
-  IPipelineDumper::EndPipelineDump(pipelineDumpHandle);
-}
-
-// =====================================================================================================================
-// Prints pipeline dump hash code and filenames. Can be called before pipeline compilation.
-//
-// @param buildInfo : Build info of the pipeline.
-void PipelineBuilder::printPipelineInfo(PipelineBuildInfo buildInfo) {
-  const uint64_t hash = getPipelineHash(buildInfo);
-  LLPC_OUTS("LLPC PipelineHash: " << format("0x%016" PRIX64, hash) << " Files: "
-                                  << join(map_range(m_compileInfo.inputSpecs,
-                                                    [](const InputSpec &spec) { return spec.filename; }),
-                                          " ")
-                                  << "\n");
+// @param buildInfo : Pipeline build info.
+// @returns : Calculated pipeline hash.
+uint64_t ComputePipelineBuilder::getPipelineHash(Vkgc::PipelineBuildInfo buildInfo) {
+  return IPipelineDumper::GetPipelineHash(buildInfo.pComputeInfo);
 }
 
 } // namespace StandaloneCompiler

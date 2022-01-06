@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -461,10 +461,10 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
     dumpOptions->dumpDuplicatePipelines = DumpDuplicatePipelines;
   }
 
-  PipelineBuilder builder(*compiler, compileInfo, dumpOptions, TimePassesIsEnabled || cl::EnableTimerProfile);
-  result = builder.build();
-  if (result != Result::Success)
-    return createResultError(result, "Failed to build pipeline");
+  std::unique_ptr<PipelineBuilder> builder =
+      createPipelineBuilder(*compiler, compileInfo, dumpOptions, TimePassesIsEnabled || cl::EnableTimerProfile);
+  if (Error err = builder->build())
+    return err;
 
   return outputElf(&compileInfo, OutFile, firstInput.filename);
 }
