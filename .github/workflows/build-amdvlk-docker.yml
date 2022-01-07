@@ -1,14 +1,11 @@
 name: Build AMDVLK for LLPC
 
 on:
-  schedule:
-    - cron:  "0 */12 * * *"
   workflow_dispatch:
 
 jobs:
   build-and-push-amdvlk:
     name: "Features: ${{ matrix.feature-set }}"
-    if: github.repository == 'GPUOpen-Drivers/llpc'
     runs-on: ${{ matrix.host-os }}
     strategy:
       fail-fast: false
@@ -17,47 +14,15 @@ jobs:
         image-template: ["gcr.io/stadia-open-source/amdvlk_%s%s:nightly"]
         branch:         [dev]
         config:         [Release]
-        feature-set:    ["+gcc", "+gcc+assertions",
-                         "+clang", "+clang+coverage",
-                         "+clang+shadercache+coverage+assertions",
-                         "+clang+shadercache+ubsan+asan",
-                         "+clang+shadercache+ubsan+asan+assertions",
-                         "+clang+shadercache+tsan"]
+        feature-set:    ["+gcc"]
         generator:      [Ninja]
     steps:
-      - name: Free up disk space
-        run: |
-          echo 'Before:' && df -h
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache/boost /opt/ghc
-          echo 'After:' && df -h
-      - name: Checkout LLPC
-        run: |
-          git clone https://github.com/${GITHUB_REPOSITORY}.git .
-          git checkout ${GITHUB_SHA}
-      - name: Setup Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@master
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v0'
         with:
-          version: '290.0.1'
-          service_account_email: ${{ secrets.GCR_USER }}
-          service_account_key: ${{ secrets.GCR_KEY }}
-          export_default_credentials: true
+          credentials_json: '${{ secrets.GCR_KEY }}'
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
       - name: Setup Docker to use the GCR
         run: |
           gcloud auth configure-docker
-      - name: Generate Docker image tag string
-        run: |
-          CONFIG_LOWER=$(echo "${{ matrix.config }}" | tr "[:upper:]" "[:lower:]")
-          FEATURES_LOWER=$(echo "${{ matrix.feature-set }}" | tr "+" "_")
-          TAG=$(printf "${{ matrix.image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER")
-          echo "IMAGE_TAG=$TAG" | tee -a $GITHUB_ENV
-      - name: Build and Test AMDVLK with Docker
-        run: |
-          docker build . --file docker/amdvlk.Dockerfile \
-                         --build-arg BRANCH="${{ matrix.branch }}" \
-                         --build-arg CONFIG="${{ matrix.config }}" \
-                         --build-arg FEATURES="${{ matrix.feature-set }}" \
-                         --build-arg GENERATOR="${{ matrix.generator }}" \
-                         --tag "$IMAGE_TAG"
-      - name: Push the new image
-        run: |
-          docker push "$IMAGE_TAG"
