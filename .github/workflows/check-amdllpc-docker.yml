@@ -41,12 +41,34 @@ jobs:
           FEATURES_LOWER=$(echo "${{ matrix.feature-set }}" | tr "+" "_")
           TAG=$(printf "${{ matrix.image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER")
           echo "IMAGE_TAG=$TAG" | tee -a $GITHUB_ENV
+          CONFIG_TAG=$(printf "%s%s" "$CONFIG_LOWER" "$FEATURES_LOWER")
+          echo "CONFIG_TAG=$CONFIG_TAG" | tee -a $GITHUB_ENV
       - name: Fetch the latest prebuilt AMDVLK
         run: docker pull "$IMAGE_TAG"
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc.Dockerfile
-                            --build-arg AMDVLK_IMAGE="$IMAGE_TAG"
-                            --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
-                            --build-arg LLPC_REPO_REF="${GITHUB_REF}"
-                            --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
-                            --tag llpc/ci-shaderdb
+                             --build-arg AMDVLK_IMAGE="$IMAGE_TAG"
+                             --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
+                             --build-arg LLPC_REPO_REF="${GITHUB_REF}"
+                             --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
+                             --build-arg FEATURES="${{ matrix.feature-set }}"
+                             --tag llpc/ci-shaderdb
+      - name: Copy code coverage report to host and save PR number
+        if: contains(matrix.feature-set, '+coverage') && github.event.pull_request.number
+        run: |
+          docker run -v "$HOME:/host" llpc/ci-shaderdb 'bash' '-c' 'cp -r /vulkandriver/coverage_report /host/'
+          sudo chown -R runner $HOME/coverage_report
+          echo "COVERAGE_REPORT_FILES=$HOME/coverage_report/*" | tee -a $GITHUB_ENV
+          echo "${{ github.event.pull_request.number }}" > pr_num.txt
+      - name: Upload code coverage report as a GitHub artifact
+        if:  contains(matrix.feature-set, '+coverage') && github.event.pull_request.number
+        uses: actions/upload-artifact@v2
+        with:
+          name: cov_report_${{ env.CONFIG_TAG }}
+          path: ${{ env.COVERAGE_REPORT_FILES }}
+      - name: Upload the PR number as a GitHub artifact
+        if: contains(matrix.feature-set, '+coverage') && github.event.pull_request.number
+        uses: actions/upload-artifact@v2
+        with:
+          name: pr_num
+          path: pr_num.txt
