@@ -35,22 +35,12 @@ jobs:
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
           git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
           git checkout ${GITHUB_SHA}
-      - name: Setup Google Cloud SDK
-        if: contains(matrix.feature-set, '+coverage') && github.repository == 'GPUOpen-Drivers/llpc'
-        uses: google-github-actions/setup-gcloud@v0
-        with:
-          version: '290.0.1'
-          service_account_email: ${{ secrets.GCR_USER }}
-          service_account_key: ${{ secrets.GCR_KEY }}
-          export_default_credentials: true
       - name: Generate Docker base image tag string
         run: |
           CONFIG_LOWER=$(echo "${{ matrix.config }}" | tr "[:upper:]" "[:lower:]")
           FEATURES_LOWER=$(echo "${{ matrix.feature-set }}" | tr "+" "_")
           TAG=$(printf "${{ matrix.image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER")
           echo "IMAGE_TAG=$TAG" | tee -a $GITHUB_ENV
-          CONFIG_TAG=$(printf "%s%s" "$CONFIG_LOWER" "$FEATURES_LOWER")
-          echo "CONFIG_TAG=$CONFIG_TAG" | tee -a $GITHUB_ENV
       - name: Fetch the latest prebuilt AMDVLK
         run: docker pull "$IMAGE_TAG"
       - name: Build and Test with Docker
@@ -59,19 +49,4 @@ jobs:
                             --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
                             --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                             --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
-                            --build-arg FEATURES="${{ matrix.feature-set }}"
                             --tag llpc/ci-shaderdb
-      - name: Copy code coverage report to host and upload to GCS
-        if: contains(matrix.feature-set, '+coverage') && github.event.pull_request.number && github.repository == 'GPUOpen-Drivers/llpc'
-        run: |
-          docker run -v "$HOME:/host" llpc/ci-shaderdb 'bash' '-c' 'cp -r /vulkandriver/coverage_report /host/'
-          sudo chown -R runner $HOME/coverage_report
-          gsutil -m cp -r "$HOME/coverage_report/*" "gs://amdvlk-llpc-github-ci-artifacts-public/coverage_${CONFIG_TAG}_${GITHUB_SHA}/"
-      - name: Add comment with code coverage report link
-        if: contains(matrix.feature-set, '+coverage') && github.event.pull_request.number && github.repository == 'GPUOpen-Drivers/llpc'
-        uses: peter-evans/create-or-update-comment@v1.4.5
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            The LLPC code coverage report is available at https://storage.googleapis.com/amdvlk-llpc-github-ci-artifacts-public/coverage_${{ env.CONFIG_TAG }}_${{ github.sha }}/index.html.
-            Configuration: ${{ env.CONFIG_TAG }}.
