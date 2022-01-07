@@ -34,13 +34,13 @@ jobs:
         run: |
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
           git checkout ${GITHUB_SHA}
-      - name: Setup Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@master
+      - name: Authenticate with Google Cloud
+        id: 'auth'
+        uses: 'google-github-actions/auth@v0'
         with:
-          version: '290.0.1'
-          service_account_email: ${{ secrets.GCR_USER }}
-          service_account_key: ${{ secrets.GCR_KEY }}
-          export_default_credentials: true
+          credentials_json: '${{ secrets.GCR_KEY }}'
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
       - name: Setup Docker to use the GCR
         run: |
           gcloud auth configure-docker
