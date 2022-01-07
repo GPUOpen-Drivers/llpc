@@ -24,18 +24,15 @@
  **********************************************************************************************************************/
 /**
 ***********************************************************************************************************************
-* @file  PatchPrepareAbi.cpp
-* @brief LLPC source file: contains declaration and implementation of class lgc::PatchPreparePipelineAbi.
+* @file  PatchPreparePipelineAbi.cpp
+* @brief LLPC source file: contains implementation of class lgc::PatchPreparePipelineAbi.
 ***********************************************************************************************************************
 */
+#include "lgc/patch/PatchPreparePipelineAbi.h"
 #include "Gfx6ConfigBuilder.h"
 #include "Gfx9ConfigBuilder.h"
 #include "ShaderMerger.h"
-#include "lgc/patch/Patch.h"
 #include "lgc/state/PalMetadata.h"
-#include "lgc/state/PipelineShaders.h"
-#include "lgc/state/PipelineState.h"
-#include "lgc/state/TargetInfo.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 
@@ -44,75 +41,65 @@
 using namespace llvm;
 using namespace lgc;
 
-namespace lgc {
-
-// =====================================================================================================================
-// Pass to prepare the pipeline ABI
-class PatchPreparePipelineAbi final : public LegacyPatch {
-public:
-  static char ID;
-  PatchPreparePipelineAbi(bool onlySetCallingConvs = false)
-      : LegacyPatch(ID), m_onlySetCallingConvs(onlySetCallingConvs) {}
-
-  bool runOnModule(Module &module) override;
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-  }
-
-private:
-  PatchPreparePipelineAbi(const PatchPreparePipelineAbi &) = delete;
-  PatchPreparePipelineAbi &operator=(const PatchPreparePipelineAbi &) = delete;
-
-  void setCallingConvs(Module &module);
-
-  void setRemainingCallingConvs(Module &module);
-
-  void mergeShaderAndSetCallingConvs(Module &module);
-
-  void setCallingConv(ShaderStage stage, CallingConv::ID callingConv);
-
-  void setAbiEntryNames(Module &module);
-
-  void addAbiMetadata(Module &module);
-
-  PipelineState *m_pipelineState;     // Pipeline state
-  LegacyPipelineShaders *m_pipelineShaders; // API shaders in the pipeline
-
-  bool m_hasVs;  // Whether the pipeline has vertex shader
-  bool m_hasTcs; // Whether the pipeline has tessellation control shader
-  bool m_hasTes; // Whether the pipeline has tessellation evaluation shader
-  bool m_hasGs;  // Whether the pipeline has geometry shader
-
-  GfxIpVersion m_gfxIp; // Graphics IP version info
-
-  const bool m_onlySetCallingConvs; // Whether to only set the calling conventions
-};
-
-char PatchPreparePipelineAbi::ID = 0;
-
-} // namespace lgc
+char LegacyPatchPreparePipelineAbi::ID = 0;
 
 // =====================================================================================================================
 // Create pass to prepare the pipeline ABI
 //
 // @param onlySetCallingConvs : Should we only set the calling conventions, or do the full prepare.
-ModulePass *lgc::createPatchPreparePipelineAbi(bool onlySetCallingConvs) {
-  return new PatchPreparePipelineAbi(onlySetCallingConvs);
+ModulePass *lgc::createLegacyPatchPreparePipelineAbi(bool onlySetCallingConvs) {
+  return new LegacyPatchPreparePipelineAbi(onlySetCallingConvs);
+}
+
+// =====================================================================================================================
+PatchPreparePipelineAbi::PatchPreparePipelineAbi(bool onlySetCallingConvs)
+    : m_onlySetCallingConvs(onlySetCallingConvs) {
+}
+
+// =====================================================================================================================
+LegacyPatchPreparePipelineAbi::LegacyPatchPreparePipelineAbi(bool onlySetCallingConvs)
+    : ModulePass(ID), m_impl(onlySetCallingConvs) {
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchPreparePipelineAbi::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchPreparePipelineAbi::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
+  return m_impl.runImpl(module, pipelineShaders, pipelineState);
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchPreparePipelineAbi::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
+  runImpl(module, pipelineShaders, pipelineState);
+  return PreservedAnalyses::none();
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] pipelineShaders : Pipeline shaders result object to use for this pass
+// @param [in/out] pipelineState : Pipeline state object to use for this pass
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchPreparePipelineAbi::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
+                                      PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Pipeline-Abi\n");
 
-  LegacyPatch::init(&module);
+  Patch::init(&module);
 
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  m_pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
+  m_pipelineState = pipelineState;
+  m_pipelineShaders = &pipelineShaders;
 
   m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
   m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
@@ -210,8 +197,8 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
     if (hasTs && m_hasGs) {
       // TS-GS pipeline
       if (m_hasTcs) {
-        auto lsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageVertex);
-        auto hsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageTessControl);
+        auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
+        auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
 
         if (hsEntryPoint) {
           if (lsEntryPoint)
@@ -222,14 +209,14 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
         }
       }
 
-      auto esEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageTessEval);
-      auto gsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageGeometry);
+      auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
+      auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageGeometry);
 
       if (enableNgg) {
         if (gsEntryPoint) {
           if (esEntryPoint)
             lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
-          auto copyShaderEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageCopyShader);
+          auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
           if (copyShaderEntryPoint)
             lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
@@ -250,8 +237,8 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
     } else if (hasTs) {
       // TS-only pipeline
       if (m_hasTcs) {
-        auto lsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageVertex);
-        auto hsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageTessControl);
+        auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
+        auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
 
         if (hsEntryPoint) {
           if (lsEntryPoint)
@@ -264,7 +251,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
 
       if (enableNgg) {
         // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
-        auto esEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageTessEval);
+        auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
 
         if (esEntryPoint) {
           lgc::setShaderStage(esEntryPoint, ShaderStageTessEval);
@@ -277,14 +264,14 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
       }
     } else if (m_hasGs) {
       // GS-only pipeline
-      auto esEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageVertex);
-      auto gsEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageGeometry);
+      auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
+      auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageGeometry);
 
       if (enableNgg) {
         if (gsEntryPoint) {
           if (esEntryPoint)
             lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
-          auto copyShaderEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageCopyShader);
+          auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
           if (copyShaderEntryPoint)
             lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
@@ -306,7 +293,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
       // VS_FS pipeline
       if (enableNgg) {
         // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
-        auto esEntryPoint = m_pipelineShaders->getResult().getEntryPoint(ShaderStageVertex);
+        auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
         if (esEntryPoint) {
           if (esEntryPoint)
             lgc::setShaderStage(esEntryPoint, ShaderStageVertex);
@@ -326,7 +313,7 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
 // @param shaderStage : Shader stage
 // @param callingConv : Calling convention to set it to
 void PatchPreparePipelineAbi::setCallingConv(ShaderStage shaderStage, CallingConv::ID callingConv) {
-  auto entryPoint = m_pipelineShaders->getResult().getEntryPoint(shaderStage);
+  auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
   if (entryPoint)
     entryPoint->setCallingConv(callingConv);
 }
@@ -387,4 +374,4 @@ void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(PatchPreparePipelineAbi, DEBUG_TYPE, "Patch LLVM for preparing pipeline ABI", false, false)
+INITIALIZE_PASS(LegacyPatchPreparePipelineAbi, DEBUG_TYPE, "Patch LLVM for preparing pipeline ABI", false, false)

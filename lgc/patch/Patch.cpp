@@ -29,17 +29,21 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/Patch.h"
-#include "PatchCheckShaderCache.h"
 #include "PatchNullFragShader.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/builder/BuilderReplayer.h"
 #include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/PatchCheckShaderCache.h"
 #include "lgc/patch/PatchCopyShader.h"
 #include "lgc/patch/PatchEntryPointMutate.h"
 #include "lgc/patch/PatchInOutImportExport.h"
 #include "lgc/patch/PatchInitializeWorkgroupMemory.h"
+#include "lgc/patch/PatchLoadScalarizer.h"
 #include "lgc/patch/PatchLoopMetadata.h"
+#include "lgc/patch/PatchPeepholeOpt.h"
+#include "lgc/patch/PatchPreparePipelineAbi.h"
+#include "lgc/patch/PatchReadFirstLane.h"
 #include "lgc/patch/PatchResourceCollect.h"
 #include "lgc/patch/PatchWaveSizeAdjust.h"
 #include "lgc/patch/PatchWorkarounds.h"
@@ -54,16 +58,33 @@
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/IPO/ConstantMerge.h"
 #include "llvm/Transforms/IPO/ForceFunctionAttrs.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/IPO/SCCP.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/ADCE.h"
+#include "llvm/Transforms/Scalar/BDCE.h"
+#include "llvm/Transforms/Scalar/CorrelatedValuePropagation.h"
+#include "llvm/Transforms/Scalar/DivRemPairs.h"
+#include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/IndVarSimplify.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
+#include "llvm/Transforms/Scalar/LICM.h"
+#include "llvm/Transforms/Scalar/LoopDeletion.h"
+#include "llvm/Transforms/Scalar/LoopIdiomRecognize.h"
 #include "llvm/Transforms/Scalar/LoopPassManager.h"
+#include "llvm/Transforms/Scalar/LoopRotation.h"
+#include "llvm/Transforms/Scalar/LoopUnrollPass.h"
 #include "llvm/Transforms/Scalar/NewGVN.h"
+#include "llvm/Transforms/Scalar/Reassociate.h"
+#include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Scalar/Scalarizer.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "llvm/Transforms/Scalar/SpeculativeExecution.h"
 #include "llvm/Transforms/Utils.h"
 
 #define DEBUG_TYPE "lgc-patch"
@@ -132,6 +153,9 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   // Lower fragment export operations.
   passMgr.addPass(LowerFragColorExport());
 
+  // Run IPSCCP before EntryPointMutate to avoid adding unnecessary arguments to an entry point.
+  passMgr.addPass(IPSCCPPass());
+
   // Patch entry-point mutation (should be done before external library link)
   passMgr.addPass(PatchEntryPointMutate());
 
@@ -147,6 +171,27 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
 
   // Patch loop metadata
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
+
+  // Check shader cache
+  passMgr.addPass(PatchCheckShaderCache(checkShaderCacheFunc));
+
+  // Stop timer for patching passes and start timer for optimization passes.
+  if (patchTimer) {
+    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
+    LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
+  }
+
+  // Prepare pipeline ABI but only set the calling conventions to AMDGPU ones for now.
+  passMgr.addPass(PatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
+
+  // Add some optimization passes
+  addOptimizationPasses(passMgr);
+
+  // Stop timer for optimization passes and restart timer for patching passes.
+  if (patchTimer) {
+    LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
+    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
+  }
 
   // NOTE: The new pass manager is not fully implemented yet. We should add all
   // the other patching passes here.
@@ -219,7 +264,7 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   passMgr.add(createLegacyPatchLoopMetadata());
 
   // Check shader cache
-  auto checkShaderCachePass = createPatchCheckShaderCache();
+  auto checkShaderCachePass = createLegacyPatchCheckShaderCache();
   passMgr.add(checkShaderCachePass);
   checkShaderCachePass->setCallbackFunction(checkShaderCacheFunc);
 
@@ -230,7 +275,7 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   }
 
   // Prepare pipeline ABI but only set the calling conventions to AMDGPU ones for now.
-  passMgr.add(createPatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
+  passMgr.add(createLegacyPatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
 
   // Add some optimization passes
   addOptimizationPasses(passMgr);
@@ -246,7 +291,7 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   passMgr.add(createInstructionCombiningPass(2));
 
   // Fully prepare the pipeline ABI (must be after optimizations)
-  passMgr.add(createPatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
+  passMgr.add(createLegacyPatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
   const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
                          (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
@@ -298,6 +343,60 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
 // Add optimization passes to pass manager
 //
 // @param [in/out] passMgr : Pass manager to add passes to
+void Patch::addOptimizationPasses(lgc::PassManager &passMgr) {
+  LLPC_OUTS("PassManager optimization level = " << cl::OptLevel << "\n");
+
+  passMgr.addPass(ForceFunctionAttrsPass());
+  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(EarlyCSEPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SpeculativeExecutionPass(/* OnlyIfDivergentTarget = */ true)));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(CorrelatedValuePropagationPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(AggressiveInstCombinePass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(PatchPeepholeOpt()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(ReassociatePass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopRotatePass())));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LICMPass())));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(IndVarSimplifyPass())));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopIdiomRecognizePass())));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopDeletionPass())));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(LoopUnrollPass(
+      LoopUnrollOptions(cl::OptLevel).setPartial(false).setRuntime(false).setPeeling(false).setUpperBound(false))));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(ScalarizerPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(PatchLoadScalarizer()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(InstSimplifyPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(NewGVNPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(BDCEPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(CorrelatedValuePropagationPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(ADCEPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopRotatePass())));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass(SimplifyCFGOptions()
+                                                                        .bonusInstThreshold(1)
+                                                                        .forwardSwitchCondToPhi(true)
+                                                                        .convertSwitchToLookupTable(true)
+                                                                        .needCanonicalLoops(true)
+                                                                        .sinkCommonInsts(true))));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(LoopUnrollPass(
+      LoopUnrollOptions(cl::OptLevel).setPartial(true).setRuntime(true).setPeeling(true).setUpperBound(true))));
+  // uses DivergenceAnalysis
+  passMgr.addPass(createModuleToFunctionPassAdaptor(PatchReadFirstLane()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
+  passMgr.addPass(ConstantMergePass());
+  passMgr.addPass(createModuleToFunctionPassAdaptor(DivRemPairsPass()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
+}
+
+// =====================================================================================================================
+// Add optimization passes to pass manager
+//
+// @param [in/out] passMgr : Pass manager to add passes to
 void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr) {
   LLPC_OUTS("PassManager optimization level = " << cl::OptLevel << "\n");
 
@@ -311,7 +410,7 @@ void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr) {
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createAggressiveInstCombinerPass());
   passMgr.add(createInstructionCombiningPass(1));
-  passMgr.add(createPatchPeepholeOpt());
+  passMgr.add(createLegacyPatchPeepholeOpt());
   passMgr.add(createCFGSimplificationPass());
   passMgr.add(createReassociatePass());
   passMgr.add(createLoopRotatePass());
@@ -323,7 +422,7 @@ void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr) {
   passMgr.add(createLoopDeletionPass());
   passMgr.add(createSimpleLoopUnrollPass(cl::OptLevel));
   passMgr.add(createScalarizerPass());
-  passMgr.add(createPatchLoadScalarizer());
+  passMgr.add(createLegacyPatchLoadScalarizer());
   passMgr.add(createInstSimplifyLegacyPass());
   passMgr.add(createNewGVNPass());
   passMgr.add(createBitTrackingDCEPass());
@@ -339,7 +438,7 @@ void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr) {
                                               .sinkCommonInsts(true)));
   passMgr.add(createLoopUnrollPass(cl::OptLevel));
   // uses DivergenceAnalysis
-  passMgr.add(createPatchReadFirstLane());
+  passMgr.add(createLegacyPatchReadFirstLane());
   passMgr.add(createInstructionCombiningPass(1));
   passMgr.add(createConstantMergePass());
   passMgr.add(createDivRemPairsPass());

@@ -123,7 +123,7 @@ bool LegacyPatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) 
 // @param [in/out] loop : LLVM loop to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @param [in/out] loopAnalysisResult : Loop standard analysis results
-// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchLoopMetadata::run(Loop &loop, LoopAnalysisManager &analysisManager,
                                          LoopStandardAnalysisResults &loopAnalysisResults, LPMUpdater &) {
   Module *module = loop.getHeader()->getModule();
