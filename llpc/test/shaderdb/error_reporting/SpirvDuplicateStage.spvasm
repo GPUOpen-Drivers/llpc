@@ -9,7 +9,9 @@
 ; END_SHADERTEST_ST
 
 ; BEGIN_SHADERTEST_MT
-; RUN: not amdllpc -spvgen-dir=%spvgendir% %gfxip --num-threads=2 %s %s \
+; Copy the input shader so that we do not attempt to produce two temporary .spv files under the same location.
+; RUN: cp %s %t.copy.spvasm
+; RUN: not amdllpc -spvgen-dir=%spvgendir% %gfxip --num-threads=2 %s %t.copy.spvasm \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_MT %s
 ;
 ; SHADERTEST_MT-LABEL: {{^}}ERROR: Result::ErrorInvalidShader: Duplicate shader stage (vertex)

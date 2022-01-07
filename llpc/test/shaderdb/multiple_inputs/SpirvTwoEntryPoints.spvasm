@@ -38,7 +38,9 @@
 ; This test uses llvm-objdump instead of verbose output, as it is not allowed to mix multi-threaded
 ; compilation with verbose output.
 ;
-; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip %s,main_vs %s,main_fs --num-threads=2 -o %t.both.elf
+; Copy the input shader so that we do not produce two temporary .spv files under the same location.
+; RUN: cp %s %t.both_mt.spvasm
+; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip %s,main_vs %t.both_mt.spvasm,main_fs --num-threads=2 -o %t.both.elf
 ; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.both.elf \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_MT %s
 ;
