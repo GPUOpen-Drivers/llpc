@@ -1,0 +1,29 @@
+; Test that the value of DB_SHADER_CONTROL is set correctly.
+
+; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: LLPC final ELF info
+; SHADERTEST: DB_SHADER_CONTROL 0x0000000000000010
+; SHADERTEST: AMDLLPC SUCCESS
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+void main() { }
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+
+void main() { }
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+alphaToCoverageEnable = 1
+
+

@@ -526,6 +526,56 @@ void PalMetadata::finalizeUserDataLimit() {
 }
 
 // =====================================================================================================================
+// Finalize PAL register settings for pipeline, part-pipeline or shader compilation.
+//
+// @param isWholePipeline : True if called for a whole pipeline compilation or an ELF link, false if called
+//                          for part-pipeline or shader compilation.
+void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
+  assert(m_pipelineState->isGraphics());
+
+  // Set PA_CL_CLIP_CNTL from pipeline state settings.
+  // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
+  // version 629), and are no longer part of the PAL ELF ABI.
+  const unsigned usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
+  const bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
+  PA_CL_CLIP_CNTL paClClipCntl = {};
+  paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
+  paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
+  paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
+  paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
+  paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
+  paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
+  paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
+  paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
+  setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
+
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
+      m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+    DB_SHADER_CONTROL dbShaderControl = {};
+    dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
+    dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = dbShaderControl.bitfields.MASK_EXPORT_ENABLE;
+    setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
+  }
+
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
+    WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStageFragment).waveBreakSize;
+    PA_SC_SHADER_CONTROL paScShaderControl = {};
+    paScShaderControl.gfx10.WAVE_BREAK_REGION_SIZE = static_cast<unsigned>(waveBreakSize);
+    setRegister(mmPA_SC_SHADER_CONTROL, paScShaderControl.u32All);
+  }
+
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion{9, 0, 0}) {
+    PA_SC_AA_CONFIG paScAaConfig = {};
+    if (m_pipelineState->getRasterizerState().innerCoverage) {
+      paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_INNER_COVERAGE;
+    } else {
+      paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
+    }
+    setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
+  }
+}
+
+// =====================================================================================================================
 // Finalize PAL metadata for pipeline.
 //
 // @param isWholePipeline : True if called for a whole pipeline compilation or an ELF link, false if called
@@ -533,6 +583,11 @@ void PalMetadata::finalizeUserDataLimit() {
 void PalMetadata::finalizePipeline(bool isWholePipeline) {
   // Ensure user_data_limit is set correctly.
   finalizeUserDataLimit();
+
+  // Finalize register settings.
+  if (m_pipelineState->isGraphics()) {
+    finalizeRegisterSettings(isWholePipeline);
+  }
 
   // The rest of this function is used only for whole pipeline PAL metadata.
   if (!isWholePipeline)
@@ -543,50 +598,6 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
   const auto &options = m_pipelineState->getOptions();
   pipelineHashNode[0] = options.hash[0];
   pipelineHashNode[1] = options.hash[1];
-
-  if (isGraphics()) {
-    // Set PA_CL_CLIP_CNTL from pipeline state settings.
-    // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
-    // version 629), and are no longer part of the PAL ELF ABI.
-    uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-    bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
-    PA_CL_CLIP_CNTL paClClipCntl = {};
-    paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
-    paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
-    paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
-    paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
-    paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
-    paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
-    paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
-    paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
-    setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
-
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-      DB_SHADER_CONTROL dbShaderControl = {};
-      dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
-      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE =
-          dbShaderControl.bitfields.MASK_EXPORT_ENABLE ||
-          m_pipelineState->getColorExportState().alphaToCoverageEnable == false;
-      setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
-    }
-
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
-      auto waveBreakSize = m_pipelineState->getShaderOptions(ShaderStageFragment).waveBreakSize;
-      PA_SC_SHADER_CONTROL paScShaderControl = {};
-      paScShaderControl.gfx10.WAVE_BREAK_REGION_SIZE = static_cast<unsigned int>(waveBreakSize);
-      setRegister(mmPA_SC_SHADER_CONTROL, paScShaderControl.u32All);
-    }
-
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-      PA_SC_AA_CONFIG paScAaConfig = {};
-      if (m_pipelineState->getRasterizerState().innerCoverage) {
-        paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_INNER_COVERAGE;
-      } else {
-        paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
-      }
-      setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
-    }
-  }
 
   // Erase the PAL metadata for FS input mappings.
   eraseFragmentInputInfo();

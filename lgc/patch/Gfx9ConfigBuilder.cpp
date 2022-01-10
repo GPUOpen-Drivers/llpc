@@ -1799,7 +1799,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, Z_EXPORT_ENABLE, builtInUsage.fragDepth);
   SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, STENCIL_TEST_VAL_EXPORT_ENABLE, builtInUsage.fragStencilRef);
   SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, MASK_EXPORT_ENABLE, builtInUsage.sampleMask);
-  SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE, 0); // Set during pipeline finalization.
+  SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE, 1); // Set during pipeline finalization.
   SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, fragmentMode.earlyFragmentTests);
   SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                 (fragmentMode.earlyFragmentTests && resUsage->resourceWrite));
