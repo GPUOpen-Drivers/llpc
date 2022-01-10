@@ -158,9 +158,9 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
 // @param inFilename : Input filename, GLSL source text
 // @param [out] stage : Shader stage
 // @param defaultEntryTarget : Default shader entry point name
-// @returns : Filename of the output SPIR-V binary on success, `ResultError` on failure
-Expected<std::string> compileGlsl(const std::string &inFilename, ShaderStage *stage,
-                                  const std::string &defaultEntryTarget) {
+// @returns : BinaryData object of the output SPIR-V binary on success, `ResultError` on failure
+Expected<BinaryData> compileGlsl(const std::string &inFilename, ShaderStage *stage,
+                                 const std::string &defaultEntryTarget) {
   if (!InitSpvGen())
     return createResultError(Result::ErrorUnavailable, "Failed to load SPVGEN -- cannot compile GLSL");
 
@@ -182,13 +182,6 @@ Expected<std::string> compileGlsl(const std::string &inFilename, ShaderStage *st
   if (!inFile)
     return createResultError(Result::ErrorUnavailable, Twine("Failed to open input file: ") + inFilename);
   auto closeInput = make_scope_exit([inFile] { fclose(inFile); });
-
-  const std::string outFilename = sys::path::filename(inFilename).str() + Ext::SpirvBin.str();
-  FILE *outFile = fopen(outFilename.c_str(), "wb");
-  if (!outFile)
-    return createResultError(Result::ErrorUnavailable,
-                             Twine("Failed to compile GLSL input: Failed to open output file: ") + outFilename);
-  auto closeOutput = make_scope_exit([outFile] { fclose(outFile); });
 
   fseek(inFile, 0, SEEK_END);
   size_t textSize = ftell(inFile);
@@ -226,23 +219,28 @@ Expected<std::string> compileGlsl(const std::string &inFilename, ShaderStage *st
 
   const unsigned *spvBin = nullptr;
   unsigned binSize = spvGetSpirvBinaryFromProgram(program, 0, &spvBin);
-  fwrite(spvBin, 1, binSize, outFile);
+
+  // We create / copy the binary blob to a new allocation. The caller is
+  // responsible for calling delete[] (note: this will normally happen as part of
+  // cleanupCompileInfo).
+  void *bin = new char[binSize]();
+  llvm::copy(llvm::make_range(spvBin, spvBin + binSize / sizeof(unsigned)), reinterpret_cast<unsigned *>(bin));
 
   textSize = binSize * 10 + 1024;
   std::vector<char> spvText(textSize, '\0');
-  LLPC_OUTS("\nSPIR-V disassembly: " << outFilename << "\n");
+  LLPC_OUTS("\nSPIR-V disassembly:\n");
   spvDisassembleSpirv(binSize, spvBin, textSize, spvText.data());
   LLPC_OUTS(spvText.data() << "\n");
 
-  return outFilename;
+  return BinaryData{static_cast<size_t>(binSize), bin};
 }
 
 // =====================================================================================================================
 // SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V binary file (output).
 //
 // @param inFilename : Input filename, SPIR-V assembly text
-// @returns : Filename of the assembled SPIR-V on success, `ResultError` on failure.
-Expected<std::string> assembleSpirv(const std::string &inFilename) {
+// @returns : BinaryData object of the assembled SPIR-V on success, `ResultError` on failure.
+Expected<BinaryData> assembleSpirv(const std::string &inFilename) {
   if (!InitSpvGen())
     return createResultError(Result::ErrorUnavailable,
                              "Failed to load SPVGEN -- cannot assemble SPIR-V assembler source");
@@ -251,12 +249,6 @@ Expected<std::string> assembleSpirv(const std::string &inFilename) {
   if (!inFile)
     return createResultError(Result::ErrorUnavailable, Twine("Failed to open input file: ") + inFilename);
   auto closeInput = make_scope_exit([inFile] { fclose(inFile); });
-
-  const std::string outFilename = sys::path::stem(sys::path::filename(inFilename)).str() + Ext::SpirvBin.str();
-  FILE *outFile = fopen(outFilename.c_str(), "wb");
-  if (!outFile)
-    return createResultError(Result::ErrorUnavailable, Twine("Failed to open output file: ") + outFilename);
-  auto closeOutput = make_scope_exit([outFile] { fclose(outFile); });
 
   fseek(inFile, 0, SEEK_END);
   size_t textSize = ftell(inFile);
@@ -274,14 +266,18 @@ Expected<std::string> assembleSpirv(const std::string &inFilename) {
   if (binSize < 0)
     return createResultError(Result::ErrorInvalidShader, Twine("Failed to assemble SPIR-V: \n") + log);
 
-  fwrite(spvBin.data(), 1, binSize, outFile);
+  // Caller is responsible for calling delete[] (note: this will normally happen
+  // as part of cleanupCompileInfo).
+  char *bin = new char[binSize]();
+  llvm::copy(llvm::make_range(spvBin.data(), spvBin.data() + binSize / sizeof(unsigned)),
+             reinterpret_cast<unsigned *>(bin));
 
   LLPC_OUTS("===============================================================================\n");
   LLPC_OUTS("// SPIR-V disassembly: " << inFilename << "\n");
   LLPC_OUTS(spvText.data());
   LLPC_OUTS("\n\n");
 
-  return outFilename;
+  return BinaryData{static_cast<size_t>(binSize), bin};
 }
 
 // =====================================================================================================================
@@ -445,21 +441,19 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
 // @returns : `ShaderModuleData` on success, `ResultError` on failure
 static Expected<ShaderModuleData> processInputSpirvStage(const InputSpec &spirvInput, bool validateSpirv) {
   assert(isSpirvBinaryFile(spirvInput.filename) || isSpirvTextFile(spirvInput.filename));
-  std::string spvBinFile;
+  BinaryData spvBin = {};
   // SPIR-V assembly text or SPIR-V binary.
   if (isSpirvTextFile(spirvInput.filename)) {
-    auto spvBinFilenameOrErr = assembleSpirv(spirvInput.filename);
-    if (Error err = spvBinFilenameOrErr.takeError())
+    auto spvBinDataOrErr = assembleSpirv(spirvInput.filename);
+    if (Error err = spvBinDataOrErr.takeError())
       return std::move(err);
-    spvBinFile = *spvBinFilenameOrErr;
+    spvBin = *spvBinDataOrErr;
   } else {
-    spvBinFile = spirvInput.filename;
+    auto spvBinOrErr = getSpirvBinaryFromFile(spirvInput.filename);
+    if (Error err = spvBinOrErr.takeError())
+      return std::move(err);
+    spvBin = *spvBinOrErr;
   }
-
-  auto spvBinOrErr = getSpirvBinaryFromFile(spvBinFile);
-  if (Error err = spvBinOrErr.takeError())
-    return std::move(err);
-  BinaryData spvBin = *spvBinOrErr;
 
   const bool isSpvGenLoaded = InitSpvGen();
   if (!isSpvGenLoaded) {
@@ -562,17 +556,14 @@ static Expected<ShaderModuleData> processInputGlslStage(const InputSpec &glslInp
   // Note: If the entry target is not specified, we set it to the GLSL default.
   const std::string entryPoint = glslInput.entryPoint.empty() ? "main" : glslInput.entryPoint;
   ShaderStage stage = ShaderStageInvalid;
-  auto spvBinFileOrErr = compileGlsl(glslInput.filename, &stage, entryPoint);
-  if (Error err = spvBinFileOrErr.takeError())
+  auto spvBinOrErr = compileGlsl(glslInput.filename, &stage, entryPoint);
+  if (Error err = spvBinOrErr.takeError())
     return std::move(err);
 
   StandaloneCompiler::ShaderModuleData shaderModuleData = {};
   shaderModuleData.shaderStage = stage;
   // In SPIR-V, we always set the entry point to "main", regardless of the entry point name in GLSL.
   shaderModuleData.entryPoint = entryPoint;
-  auto spvBinOrErr = getSpirvBinaryFromFile(*spvBinFileOrErr);
-  if (Error err = spvBinOrErr.takeError())
-    return std::move(err);
   shaderModuleData.spirvBin = *spvBinOrErr;
 
   return std::move(shaderModuleData);

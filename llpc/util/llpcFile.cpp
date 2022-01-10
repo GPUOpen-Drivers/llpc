@@ -110,13 +110,7 @@ Result File::open(const char *filename, unsigned accessFlags) {
     }
 
     if (result == Result::Success) {
-#if defined(_WIN32)
-      // MS compilers provide fopen_s, which is supposedly "safer" than traditional fopen.
-      fopen_s(&m_fileHandle, filename, &fileMode[0]);
-#else
-      // Just use the traditional fopen.
       m_fileHandle = fopen(filename, &fileMode[0]);
-#endif
       if (!m_fileHandle)
         result = Result::ErrorUnknown;
     }

@@ -103,12 +103,12 @@ void *VKAPI_CALL allocateBuffer(void *instance, void *userData, size_t size);
 // Performs cleanup work for LLPC standalone compiler.
 void cleanupCompileInfo(CompileInfo *compileInfo);
 
-// GLSL compiler, compiles GLSL source text file (input) to SPIR-V binary file (output).
-llvm::Expected<std::string> compileGlsl(const std::string &inFilename, ShaderStage *stage,
-                                        const std::string &defaultEntryTarget);
+// GLSL compiler, compiles GLSL source text file (input) to SPIR-V BinaryData object (output).
+llvm::Expected<BinaryData> compileGlsl(const std::string &inFilename, ShaderStage *stage,
+                                       const std::string &defaultEntryTarget);
 
-// SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V binary file (output).
-llvm::Expected<std::string> assembleSpirv(const std::string &inFilename);
+// SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V BinaryData object (output).
+llvm::Expected<BinaryData> assembleSpirv(const std::string &inFilename);
 
 // Decodes the binary after building a pipeline and outputs the decoded info.
 LLPC_NODISCARD Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo);
