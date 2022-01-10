@@ -5205,7 +5205,13 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
 
     SPIRVWord maxOffset = 0;
     if (ba->hasDecorate(DecorationMaxByteOffset, 0, &maxOffset)) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 409358
+      // Old version of the code
       AttrBuilder builder;
+#else
+      // New version of the code (also handles unknown version, which we treat as latest)
+      AttrBuilder builder(*m_context);
+#endif
       builder.addDereferenceableAttr(maxOffset);
       i->addAttrs(builder);
     }

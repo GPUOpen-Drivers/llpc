@@ -793,7 +793,13 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
 // =====================================================================================================================
 // Set Attributes on new function
 void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 409358
+  // Old version of the code
   AttrBuilder builder;
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  AttrBuilder builder(entryPoint->getContext());
+#endif
   if (m_shaderStage == ShaderStageFragment) {
     auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
     SpiPsInputAddr spiPsInputAddr = {};
