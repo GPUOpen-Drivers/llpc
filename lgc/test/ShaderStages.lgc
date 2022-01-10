@@ -397,9 +397,10 @@ attributes #1 = { nounwind readonly }
 ; CHECK-NO-NGG7: !11 = !{i32 4}
 ; CHECK-NO-NGG7: !12 = !{i32 6}
 
-; _amdgpu_gs_main must be first, so it can be linked with a potential vertex fetch shader.
-; CHECK-NGG7: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage [[geom_stage:![0-9]*]] {
+; When there is are tes and geom shader, _amdgpu_hs_main must be first, so it can be linked with a potential
+; vertex fetch shader.
 ; CHECK-NGG7: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage [[tc_stage:![0-9]*]] {
+; CHECK-NGG7: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage [[geom_stage:![0-9]*]] {
 ; CHECK-NGG7: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage [[copy_stage:![0-9]*]] {
 ; CHECK-NGG7: define internal dllexport amdgpu_ls void @_amdgpu_ls_main{{.*}} !lgc.shaderstage [[tc_stage]] {
 ; CHECK-NGG7: define internal dllexport amdgpu_hs void @_amdgpu_hs_main.1{{.*}} !lgc.shaderstage [[tc_stage]] {
