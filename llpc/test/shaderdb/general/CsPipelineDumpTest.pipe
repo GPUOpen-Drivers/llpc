@@ -1,0 +1,89 @@
+; Check that a compute pipeline dump can be correctly recompiled.
+
+; Create a fresh directory for pipeline dump files.
+; RUN: mkdir -p %t/dump
+
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -o %t.orig.elf \
+; RUN:   --enable-pipeline-dump --pipeline-dump-dir=%t/dump \
+; RUN:   | FileCheck -check-prefix=COMPILE %s
+; COMPILE-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; COMPILE-LABEL: ==== AMDLLPC SUCCESS ====
+
+; Check that all the expected dump files are in place.
+; RUN: ls -1 %t/dump | FileCheck -check-prefix=FILES %s
+; FILES:     {{^}}PipelineCs_0x[[PIPE_HASH:[0-9A-F]+]].elf{{$}}
+; FILES:     {{^}}PipelineCs_0x[[PIPE_HASH]].pipe{{$}}
+; FILES-NOT: {{^}}Pipeline
+; FILES:     {{^}}Shader_0x{{[0-9A-F]+}}.spv{{$}}
+; FILES-NOT: {{^}}Shader_
+
+; Check that the dumped `.pipe` file contains the dumped shaders, the original CsInfo, and some disassembly.
+; RUN: cat %t/dump/PipelineCs_0x*.pipe | FileCheck -check-prefix=PIPE %s
+; PIPE-LABEL: {{^}}[CsSpvFile]
+; PIPE-NEXT:  fileName = Shader_0x{{[0-9A-F]+}}.spv{{$}}
+;
+; PIPE-LABEL: {{^}}[CsInfo]
+; PIPE-NEXT:  entryPoint = main{{$}}
+; PIPE-LABEL: userDataNode[0].type = DescriptorBuffer
+; PIPE-LABEL: userDataNode[0].offsetInDwords = 0{{$}}
+; PIPE-LABEL: serDataNode[0].sizeInDwords = 4
+; PIPE-LABEL: userDataNode[1].type = DescriptorBuffer
+; PIPE-LABEL: userDataNode[1].offsetInDwords = 4
+; PIPE-LABEL: userDataNode[1].sizeInDwords = 4
+; PIPE-LABEL: userDataNode[1].set = {{0|(0x(0)+)}}{{$}}
+; PIPE-LABEL: userDataNode[1].binding = 1
+;
+; PIPE-LABEL: {{^}}.AMDGPU.disasm
+; PIPE-NEXT:  _amdgpu_cs_main:
+; PIPE-LABEL: {{^}}.note
+; PIPE-LABEL: {{^}} PalMetadata
+
+; Check that we can compile with the pipeline dump as input.
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %t/dump/PipelineCs_0x*.pipe -o %t.recompile.elf \
+; RUN:   | FileCheck -check-prefix=RECOMPILE %s
+; RECOMPILE-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; RECOMPILE-LABEL: ==== AMDLLPC SUCCESS ====
+
+; Compare the dissassembly to make sure all 3 Elfs have the same code. We do not expect the binaries to be bit-identical,
+; but the text section and symbol table should be the same.
+; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 --syms --reloc -d %t.orig.elf | tail -n +4 > %t.orig.s
+; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 --syms --reloc -d %t/dump/PipelineCs_0x*.elf | tail -n +4 > %t.dump.s
+; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 --syms --reloc -d %t.recompile.elf | tail -n +4 > %t.recompile.s
+;
+; RUN: cmp %t.orig.s %t.dump.s
+; RUN: cmp %t.orig.s %t.recompile.s
+
+; Cleanup.
+; RUN: rm -rf %t/dump
+
+[CsGlsl]
+#version 450
+
+layout(binding = 0, std430) buffer OUT
+{
+    uvec4 o;
+};
+
+layout(binding = 1, std430) buffer IN
+{
+    uvec4 i;
+};
+
+layout(local_size_x = 2, local_size_y = 3) in;
+void main()
+{
+    o = i;
+}
+
+[CsInfo]
+entryPoint = main
+userDataNode[0].type = DescriptorBuffer
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 4
+userDataNode[0].set = 0
+userDataNode[0].binding = 0
+userDataNode[1].type = DescriptorBuffer
+userDataNode[1].offsetInDwords = 4
+userDataNode[1].sizeInDwords = 4
+userDataNode[1].set = 0
+userDataNode[1].binding = 1
