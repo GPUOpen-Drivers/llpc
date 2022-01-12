@@ -74,7 +74,7 @@ bool LegacyPatchWorkarounds::runOnModule(Module &module) {
 //
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
-// @returns : The preserved analyses (The Analyses that are still valid after this pass)
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchWorkarounds::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   if (runImpl(module, pipelineState))

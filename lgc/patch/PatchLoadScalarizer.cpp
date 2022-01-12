@@ -28,7 +28,7 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchLoadScalarizer.
  ***********************************************************************************************************************
  */
-#include "PatchLoadScalarizer.h"
+#include "lgc/patch/PatchLoadScalarizer.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/IR/Constants.h"
@@ -45,24 +45,28 @@ namespace lgc {
 
 // =====================================================================================================================
 // Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char PatchLoadScalarizer::ID;
+char LegacyPatchLoadScalarizer::ID;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for load scalarizer optimizations.
-FunctionPass *createPatchLoadScalarizer() {
-  return new PatchLoadScalarizer();
+FunctionPass *createLegacyPatchLoadScalarizer() {
+  return new LegacyPatchLoadScalarizer();
 }
 
 // =====================================================================================================================
-PatchLoadScalarizer::PatchLoadScalarizer() : FunctionPass(ID) {
+PatchLoadScalarizer::PatchLoadScalarizer() {
   m_scalarThreshold = 0;
+}
+
+// =====================================================================================================================
+LegacyPatchLoadScalarizer::LegacyPatchLoadScalarizer() : FunctionPass(ID) {
 }
 
 // =====================================================================================================================
 // Get the analysis usage of this pass.
 //
 // @param [out] analysisUsage : The analysis usage.
-void PatchLoadScalarizer::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
+void LegacyPatchLoadScalarizer::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   analysisUsage.addRequired<LegacyPipelineShaders>();
   analysisUsage.addPreserved<LegacyPipelineShaders>();
@@ -71,13 +75,38 @@ void PatchLoadScalarizer::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
+// @param [in/out] function : Function that we will peephole optimize.
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchLoadScalarizer::runOnFunction(Function &function) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
+  return m_impl.runImpl(function, pipelineState);
+}
+
+// =====================================================================================================================
+// Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in/out] function : Function that we will peephole optimize.
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchLoadScalarizer::run(Function &function, FunctionAnalysisManager &analysisManager) {
+  const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
+  PipelineState *pipelineState =
+      moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
+  if (runImpl(function, pipelineState))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Executes this LLVM pass on the specified LLVM function.
+//
 // @param [in/out] function : Function that will run this optimization.
-bool PatchLoadScalarizer::runOnFunction(Function &function) {
+// @param [in/out] pipelineState : Pipeline state object to use for this pass
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchLoadScalarizer::runImpl(Function &function, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Load-Scalarizer-Opt\n");
 
-  auto pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
-  auto pipelineShaders = &getAnalysis<LegacyPipelineShaders>();
-  auto shaderStage = pipelineShaders->getResult().getShaderStage(&function);
+  auto shaderStage = lgc::getShaderStage(&function);
 
   // If the function is not a valid shader stage, or the optimization is disabled, bail.
   m_scalarThreshold = 0;
@@ -177,4 +206,4 @@ void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations for load scalarizer optimization.
-INITIALIZE_PASS(PatchLoadScalarizer, DEBUG_TYPE, "Patch LLVM for load scalarizer optimization", false, false)
+INITIALIZE_PASS(LegacyPatchLoadScalarizer, DEBUG_TYPE, "Patch LLVM for load scalarizer optimization", false, false)

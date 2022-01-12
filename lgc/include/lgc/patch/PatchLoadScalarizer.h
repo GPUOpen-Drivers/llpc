@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,44 +24,57 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  PatchCheckShaderCache.h
- * @brief LLPC header file: contains declaration of class lgc::PatchCheckShaderCache
+ * @file  PatchLoadScalarizer.h
+ * @brief LLPC header file: contains declaration of class lgc::PatchLoadScalarizer.
  ***********************************************************************************************************************
  */
 #pragma once
 
+#include "lgc/Builder.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "llvm/IR/InstVisitor.h"
 
 namespace lgc {
 
 // =====================================================================================================================
-// Represents the pass of LLVM patching operations for checking shader cache
-class PatchCheckShaderCache : public LegacyPatch {
+// Represents the pass of LLVM patching operations for scalarize load.
+class PatchLoadScalarizer final : public llvm::InstVisitor<PatchLoadScalarizer>,
+                                  public llvm::PassInfoMixin<PatchLoadScalarizer> {
 public:
-  PatchCheckShaderCache();
+  explicit PatchLoadScalarizer();
 
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-  }
+  llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  virtual bool runOnModule(llvm::Module &module) override;
+  bool runImpl(llvm::Function &function, PipelineState *pipelineState);
 
-  // Set the callback function that this pass uses to ask the front-end whether it wants to remove
-  // any shader stages. The function takes the LLVM IR module and a per-shader-stage array of input/output
-  // usage checksums, and it returns the shader stage mask with bits removed for shader stages that it wants
-  // removed.
-  void setCallbackFunction(Pipeline::CheckShaderCacheFunc callbackFunc) { m_callbackFunc = callbackFunc; }
+  static llvm::StringRef name() { return "Patch LLVM for load scalarizer optimization"; }
 
-  static char ID; // ID of this pass
+  void visitLoadInst(llvm::LoadInst &loadInst);
 
 private:
-  PatchCheckShaderCache(const PatchCheckShaderCache &) = delete;
-  PatchCheckShaderCache &operator=(const PatchCheckShaderCache &) = delete;
+  llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase; // Instructions to erase
+  std::unique_ptr<llvm::IRBuilder<>> m_builder;             // The IRBuilder.
+  unsigned m_scalarThreshold;                               // The threshold for load scalarizer
+};
 
-  Pipeline::CheckShaderCacheFunc m_callbackFunc;
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations for scalarize load.
+class LegacyPatchLoadScalarizer final : public llvm::FunctionPass {
+public:
+  explicit LegacyPatchLoadScalarizer();
+
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
+  bool runOnFunction(llvm::Function &function) override;
+
+  static char ID; // NOLINT
+
+private:
+  LegacyPatchLoadScalarizer(const LegacyPatchLoadScalarizer &) = delete;
+  LegacyPatchLoadScalarizer &operator=(const LegacyPatchLoadScalarizer &) = delete;
+
+  PatchLoadScalarizer m_impl;
 };
 
 } // namespace lgc

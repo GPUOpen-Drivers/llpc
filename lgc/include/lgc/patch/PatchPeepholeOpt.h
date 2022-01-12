@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2021 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,38 +24,61 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  PatchLoadScalarizer.h
- * @brief LLPC header file: contains declaration of class lgc::PatchLoadScalarizer.
+ * @file  PatchPeepholeOpt.h
+ * @brief LLPC header file: contains declaration of class lgc::PatchPeepholeOpt.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/Builder.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 
 namespace lgc {
 
 // =====================================================================================================================
-// Represents the pass of LLVM patching operations for scalarize load.
-class PatchLoadScalarizer final : public llvm::FunctionPass, public llvm::InstVisitor<PatchLoadScalarizer> {
+// Represents the pass of LLVM patching operations for peephole optimizations, with the following patterns covered:
+//
+// - Change inttoptr ( add x, const ) -> gep ( inttoptr x, const ) to improve value tracking and load/store
+//   vectorization.
+//
+class PatchPeepholeOpt final : public llvm::InstVisitor<PatchPeepholeOpt>,
+                               public llvm::PassInfoMixin<PatchPeepholeOpt> {
 public:
-  explicit PatchLoadScalarizer();
+  llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
+  bool runImpl(llvm::Function &function);
+
+  static llvm::StringRef name() { return "Patch LLVM for peephole optimizations"; }
+
+  void visitIntToPtr(llvm::IntToPtrInst &intToPtr);
+
+private:
+  llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase;
+};
+
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations for peephole optimizations, with the following patterns covered:
+//
+// - Change inttoptr ( add x, const ) -> gep ( inttoptr x, const ) to improve value tracking and load/store
+//   vectorization.
+//
+class LegacyPatchPeepholeOpt final : public llvm::FunctionPass {
+public:
+  LegacyPatchPeepholeOpt();
+
   bool runOnFunction(llvm::Function &function) override;
 
-  void visitLoadInst(llvm::LoadInst &loadInst);
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
 
   static char ID; // ID of this pass
 
 private:
-  PatchLoadScalarizer(const PatchLoadScalarizer &) = delete;
-  PatchLoadScalarizer &operator=(const PatchLoadScalarizer &) = delete;
+  LegacyPatchPeepholeOpt(const LegacyPatchPeepholeOpt &) = delete;
+  LegacyPatchPeepholeOpt &operator=(const LegacyPatchPeepholeOpt &) = delete;
 
-  llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase; // Instructions to erase
-  std::unique_ptr<llvm::IRBuilder<>> m_builder;             // The IRBuilder.
-  unsigned m_scalarThreshold;                               // The threshold for load scalarizer
+  PatchPeepholeOpt m_impl;
 };
 
 } // namespace lgc

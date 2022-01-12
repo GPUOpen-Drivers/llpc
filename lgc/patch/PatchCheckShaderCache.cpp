@@ -28,7 +28,7 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchCheckShaderCache.
  ***********************************************************************************************************************
  */
-#include "PatchCheckShaderCache.h"
+#include "lgc/patch/PatchCheckShaderCache.h"
 #include "lgc/CommonDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "llvm/Support/Debug.h"
@@ -40,14 +40,14 @@ using namespace lgc;
 
 // =====================================================================================================================
 // Initializes static members.
-char PatchCheckShaderCache::ID = 0;
+char LegacyPatchCheckShaderCache::ID = 0;
 
 namespace lgc {
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for checking shader cache
-PatchCheckShaderCache *createPatchCheckShaderCache() {
-  return new PatchCheckShaderCache();
+LegacyPatchCheckShaderCache *createLegacyPatchCheckShaderCache() {
+  return new LegacyPatchCheckShaderCache();
 }
 
 } // namespace lgc
@@ -72,14 +72,44 @@ static void streamMapEntries(MapType &map, raw_ostream &stream) {
 } // namespace
 
 // =====================================================================================================================
-PatchCheckShaderCache::PatchCheckShaderCache() : LegacyPatch(ID) {
+PatchCheckShaderCache::PatchCheckShaderCache(Pipeline::CheckShaderCacheFunc callbackFunc)
+    : m_callbackFunc(callbackFunc) {
+}
+
+// =====================================================================================================================
+LegacyPatchCheckShaderCache::LegacyPatchCheckShaderCache() : ModulePass(ID) {
 }
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchCheckShaderCache::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchCheckShaderCache::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  return m_impl.runImpl(module, pipelineState);
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchCheckShaderCache::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  if (runImpl(module, pipelineState))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] pipelineState : Pipeline state object to use for this pass
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Check-Shader-Cache\n");
 
   if (m_callbackFunc == nullptr) {
@@ -87,11 +117,10 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
     return false;
   }
 
-  LegacyPatch::init(&module);
+  Patch::init(&module);
 
   std::string inOutUsageStreams[ShaderStageGfxCount];
   ArrayRef<uint8_t> inOutUsageValues[ShaderStageGfxCount];
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   auto stageMask = pipelineState->getShaderStageMask();
 
   // Build input/output layout hash per shader stage
@@ -144,4 +173,4 @@ bool PatchCheckShaderCache::runOnModule(Module &module) {
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for checking shader cache
-INITIALIZE_PASS(PatchCheckShaderCache, DEBUG_TYPE, "Patch LLVM for checking shader cache", false, false)
+INITIALIZE_PASS(LegacyPatchCheckShaderCache, DEBUG_TYPE, "Patch LLVM for checking shader cache", false, false)

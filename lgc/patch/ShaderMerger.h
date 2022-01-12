@@ -77,7 +77,7 @@ enum EsGsSpecialSysValue {
 // Represents the manager doing shader merge operations.
 class ShaderMerger {
 public:
-  ShaderMerger(PipelineState *pipelineState, LegacyPipelineShaders *pipelineShaders);
+  ShaderMerger(PipelineState *pipelineState, PipelineShadersResult *pipelineShaders);
 
   llvm::Function *generateLsHsEntryPoint(llvm::Function *lsEntryPoint, llvm::Function *hsEntryPoint);
   llvm::Function *generateEsGsEntryPoint(llvm::Function *esEntryPoint, llvm::Function *gsEntryPoint);

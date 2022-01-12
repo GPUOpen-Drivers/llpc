@@ -28,9 +28,10 @@
  * @brief LLPC source file: contains declaration and implementation of class lgc::PatchReadFirstLane.
  ***********************************************************************************************************************
  */
+#include "lgc/patch/PatchReadFirstLane.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
-#include "lgc/util/BuilderBase.h"
+#include "llvm/Analysis/DivergenceAnalysis.h"
 #include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
@@ -48,9 +49,9 @@ using namespace lgc;
 using namespace llvm;
 
 namespace {
-class PatchReadFirstLane final : public FunctionPass {
+class LegacyPatchReadFirstLane final : public FunctionPass {
 public:
-  PatchReadFirstLane();
+  LegacyPatchReadFirstLane();
 
   virtual bool runOnFunction(Function &function) override;
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override;
@@ -58,42 +59,22 @@ public:
   static char ID; // ID of this pass
 
 private:
-  PatchReadFirstLane(const PatchReadFirstLane &) = delete;
-  PatchReadFirstLane &operator=(const PatchReadFirstLane &) = delete;
+  LegacyPatchReadFirstLane(const LegacyPatchReadFirstLane &) = delete;
+  LegacyPatchReadFirstLane &operator=(const LegacyPatchReadFirstLane &) = delete;
 
-  bool promoteEqualUniformOps(Function &function);
-  bool liftReadFirstLane(Function &function);
-  void collectAssumeUniforms(BasicBlock *block, const SmallVectorImpl<Instruction *> &initialReadFirstLanes);
-  void findBestInsertLocation(const SmallVectorImpl<Instruction *> &initialReadFirstLanes);
-  bool isAllUsersAssumedUniform(Instruction *inst);
-  void applyReadFirstLane(Instruction *inst, BuilderBase &builder);
-
-  // We only support to apply amdgcn_readfirstlane on float or int type
-  // TODO: Support various types when backend work is ready
-  bool isSupportedType(Instruction *inst) { return inst->getType()->isFloatTy() || inst->getType()->isIntegerTy(32); }
-
-  LegacyDivergenceAnalysis *m_divergenceAnalysis; // The divergence analysis
-  TargetTransformInfo *m_targetTransformInfo;     // The target transform info to determine stop propagation
-  DenseMap<Instruction *, SmallVector<Instruction *, 2>>
-      m_uniformDivergentUsesMap; // The map key is an instruction `I` that can be assumed uniform.
-                                 // That is, we can apply readfirstlane to the result of `I` and remain
-                                 // correct. If the map value vector is non-empty, it contains a list of
-                                 // instructions that we can apply readfirstlane on to achieve the same effect
-                                 // as a readfirstlane on `I`. An empty vector means that it is not possible to
-                                 // life a readfirstlane beyond `I`.
-  DenseSet<Instruction *> m_insertLocations; // The insert locations of readfirstlane
+  PatchReadFirstLane m_impl;
 };
 
 } // anonymous namespace
 
 // =====================================================================================================================
 // Initializes static members.
-char PatchReadFirstLane::ID = 0;
+char LegacyPatchReadFirstLane::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for readfirstlane optimizations.
-FunctionPass *lgc::createPatchReadFirstLane() {
-  return new PatchReadFirstLane();
+FunctionPass *lgc::createLegacyPatchReadFirstLane() {
+  return new LegacyPatchReadFirstLane();
 }
 
 // =====================================================================================================================
@@ -125,21 +106,61 @@ static bool areAllUserReadFirstLane(Instruction *inst) {
   return true;
 }
 
-PatchReadFirstLane::PatchReadFirstLane() : FunctionPass(ID), m_targetTransformInfo(nullptr) {
+// =====================================================================================================================
+PatchReadFirstLane::PatchReadFirstLane() : m_targetTransformInfo(nullptr) {
+}
+
+// =====================================================================================================================
+LegacyPatchReadFirstLane::LegacyPatchReadFirstLane() : FunctionPass(ID) {
+}
+
+// =====================================================================================================================
+// Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in/out] function : Function that we will peephole optimize.
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchReadFirstLane::runOnFunction(Function &function) {
+  auto *targetTransformInfoWrapperPass = getAnalysisIfAvailable<TargetTransformInfoWrapperPass>();
+  TargetTransformInfo *targetTransformInfo;
+  if (targetTransformInfoWrapperPass)
+    targetTransformInfo = &targetTransformInfoWrapperPass->getTTI(function);
+  else
+    llvm_unreachable("TTI should be available");
+
+  LegacyDivergenceAnalysis *divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
+  auto isDivergentUse = [divergenceAnalysis](const Use &use) { return divergenceAnalysis->isDivergentUse(&use); };
+  return m_impl.runImpl(function, isDivergentUse, targetTransformInfo);
+}
+
+// =====================================================================================================================
+// Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in/out] function : Function that we will peephole optimize.
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchReadFirstLane::run(Function &function, FunctionAnalysisManager &analysisManager) {
+  TargetTransformInfo &targetTransformInfo = analysisManager.getResult<TargetIRAnalysis>(function);
+
+  DivergenceInfo &divergenceInfo = analysisManager.getResult<DivergenceAnalysis>(function);
+  auto isDivergentUse = [&](const Use &use) { return divergenceInfo.isDivergentUse(use); };
+  if (runImpl(function, isDivergentUse, &targetTransformInfo))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
 }
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
 // @param [in,out] function : LLVM function to be run on.
-bool PatchReadFirstLane::runOnFunction(Function &function) {
+// @param isDivergentUse : Function returning true if the given use is divergent.
+// @param targetTransformInfo : The TTI to use for this pass.
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchReadFirstLane::runImpl(Function &function, std::function<bool(const Use &)> isDivergentUse,
+                                 TargetTransformInfo *targetTransformInfo) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Read-First-Lane\n");
 
-  m_divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
-  auto *targetTransformInfoWrapperPass = getAnalysisIfAvailable<TargetTransformInfoWrapperPass>();
-  if (targetTransformInfoWrapperPass)
-    m_targetTransformInfo = &targetTransformInfoWrapperPass->getTTI(function);
-  assert(m_targetTransformInfo);
+  m_isDivergentUse = isDivergentUse;
+  m_targetTransformInfo = targetTransformInfo;
 
   bool changed = promoteEqualUniformOps(function);
   changed |= liftReadFirstLane(function);
@@ -150,7 +171,7 @@ bool PatchReadFirstLane::runOnFunction(Function &function) {
 // Specify what analysis passes this pass depends on.
 //
 // @param [in,out] analysisUsage : The place to record our analysis pass usage requirements.
-void PatchReadFirstLane::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
+void LegacyPatchReadFirstLane::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.addRequired<LegacyDivergenceAnalysis>();
   analysisUsage.setPreservesCFG();
 }
@@ -209,7 +230,7 @@ bool PatchReadFirstLane::promoteEqualUniformOps(Function &function) {
     Value *divergentVal = nullptr, *uniformVal = nullptr;
     for (int i = 0; i < 2; ++i) {
       const Use &cmpArg = cmpInst->getOperandUse(i);
-      if (m_divergenceAnalysis->isDivergentUse(&cmpArg))
+      if (m_isDivergentUse(cmpArg))
         divergentVal = cmpArg.get();
       else
         uniformVal = cmpArg.get();
@@ -319,7 +340,7 @@ void PatchReadFirstLane::collectAssumeUniforms(BasicBlock *block,
     SmallVector<Instruction *, 3> operandInsts;
     if (!cannotPropagate) {
       for (Use &use : candidate->operands()) {
-        if (!m_divergenceAnalysis->isDivergentUse(&use))
+        if (!m_isDivergentUse(use))
           continue; // already known to be uniform -- no need to consider this operand
 
         auto operandInst = dyn_cast<Instruction>(use.get());
@@ -539,7 +560,7 @@ void PatchReadFirstLane::applyReadFirstLane(Instruction *inst, BuilderBase &buil
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations for readfirstlane optimizations.
-INITIALIZE_PASS_BEGIN(PatchReadFirstLane, DEBUG_TYPE, "Patch LLVM for readfirstlane optimizations", false, false)
+INITIALIZE_PASS_BEGIN(LegacyPatchReadFirstLane, DEBUG_TYPE, "Patch LLVM for readfirstlane optimizations", false, false)
 INITIALIZE_PASS_DEPENDENCY(LegacyDivergenceAnalysis)
 INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
-INITIALIZE_PASS_END(PatchReadFirstLane, DEBUG_TYPE, "Patch LLVM for readfirstlane optimizations", false, false)
+INITIALIZE_PASS_END(LegacyPatchReadFirstLane, DEBUG_TYPE, "Patch LLVM for readfirstlane optimizations", false, false)

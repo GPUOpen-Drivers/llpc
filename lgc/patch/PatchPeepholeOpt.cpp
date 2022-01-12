@@ -28,7 +28,7 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchPeepholeOpt.
  ***********************************************************************************************************************
  */
-#include "PatchPeepholeOpt.h"
+#include "lgc/patch/PatchPeepholeOpt.h"
 #include "lgc/patch/Patch.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -45,22 +45,44 @@ namespace lgc {
 
 // =====================================================================================================================
 // Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char PatchPeepholeOpt::ID;
+char LegacyPatchPeepholeOpt::ID;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
-FunctionPass *createPatchPeepholeOpt() {
-  return new PatchPeepholeOpt();
+FunctionPass *createLegacyPatchPeepholeOpt() {
+  return new LegacyPatchPeepholeOpt();
 }
 
-PatchPeepholeOpt::PatchPeepholeOpt() : FunctionPass(ID) {
+LegacyPatchPeepholeOpt::LegacyPatchPeepholeOpt() : FunctionPass(ID) {
 }
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
 // @param [in/out] function : Function that we will peephole optimize.
-bool PatchPeepholeOpt::runOnFunction(Function &function) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchPeepholeOpt::runOnFunction(Function &function) {
+  return m_impl.runImpl(function);
+}
+
+// =====================================================================================================================
+// Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in/out] function : Function that we will peephole optimize.
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchPeepholeOpt::run(Function &function, FunctionAnalysisManager &analysisManager) {
+  if (runImpl(function))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in/out] function : Function that we will peephole optimize.
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchPeepholeOpt::runImpl(Function &function) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Peephole-Opt\n");
 
   visit(function);
@@ -80,7 +102,7 @@ bool PatchPeepholeOpt::runOnFunction(Function &function) {
 // Specify what analysis passes this pass depends on.
 //
 // @param [in/out] analysisUsage : The place to record our analysis pass usage requirements.
-void PatchPeepholeOpt::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
+void LegacyPatchPeepholeOpt::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.setPreservesCFG();
 }
 
@@ -138,4 +160,4 @@ void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations for peephole optimizations.
-INITIALIZE_PASS(PatchPeepholeOpt, DEBUG_TYPE, "Patch LLVM for peephole optimizations", false, false)
+INITIALIZE_PASS(LegacyPatchPeepholeOpt, DEBUG_TYPE, "Patch LLVM for peephole optimizations", false, false)
