@@ -1,0 +1,41 @@
+; Check that timer profile and pipeline info printing works for pipe inputs.
+
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --enable-timer-profile 2>&1 \
+; RUN:   | FileCheck %s
+; CHECK:       {{^}} LLPC ShaderModule Phases 0x[[#%X,SHADER_HASH:]]{{$}}
+; CHECK:       {{^}} LLPC ShaderModule 0x[[#SHADER_HASH]]
+; CHECK-NOT:   {{^}} LLPC ShaderModule
+;
+; CHECK:       {{^//}} Pipeline file info for [[INPUT:.+\.pipe]] {{$}}
+; CHECK:       {{^}}LLPC PipelineHash: 0x[[#%X,PIPE_HASH:]] Files: [[INPUT]]{{$}}
+;
+; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+;
+; CHECK:       {{^}} LLPC Phases 0x[[#PIPE_HASH]]{{$}}
+; CHECK:       {{^}} Total Execution Time:
+; CHECK:       {{^}} LLPC 0x[[#PIPE_HASH]]{{$}}
+; CHECK:       {{^}} Total Execution Time:
+;
+; CHECK-LABEL: {{^}}===== AMDLLPC SUCCESS =====
+
+[CsGlsl]
+#version 450
+
+layout(binding = 0, std430) buffer OUT
+{
+    uvec4 o;
+};
+
+layout(binding = 1, std430) buffer IN
+{
+    uvec4 i;
+};
+
+layout(local_size_x = 2, local_size_y = 3) in;
+void main()
+{
+    o = i;
+}
+
+[CsInfo]
+entryPoint = main

@@ -1,0 +1,29 @@
+; Check that timer profile and pipeline info printing works with shader inputs.
+
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --enable-timer-profile 2>&1 \
+; RUN:   | FileCheck %s
+; CHECK:       {{^}} LLPC ShaderModule Phases 0x[[#%X,SHADER:]]{{$}}
+; CHECK:       {{^}} LLPC ShaderModule 0x[[#SHADER]]
+; CHECK-NOT:   {{^}} LLPC ShaderModule
+;
+; CHECK:       {{^}}SPIR-V disassembly for [[INPUT:.+\.spvasm]]{{$}}
+; CHECK:       {{^}}LLPC PipelineHash: 0x[[#%X,PIPE_HASH:]] Files: [[INPUT]]{{$}}
+;
+; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+;
+; CHECK:       {{^}} LLPC Phases 0x[[#PIPE_HASH]]{{$}}
+; CHECK:       {{^}} Total Execution Time:
+; CHECK:       {{^}} LLPC 0x[[#PIPE_HASH]]{{$}}
+; CHECK:       {{^}} Total Execution Time:
+;
+; CHECK-LABEL: {{^}}===== AMDLLPC SUCCESS =====
+
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %1 "main"
+         %12 = OpTypeVoid
+         %21 = OpTypeFunction %12
+          %1 = OpFunction %12 None %21
+         %66 = OpLabel
+               OpReturn
+               OpFunctionEnd
