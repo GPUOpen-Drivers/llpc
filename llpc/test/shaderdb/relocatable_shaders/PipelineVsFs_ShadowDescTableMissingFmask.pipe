@@ -1,6 +1,7 @@
 // This test case checks that descriptor offset and descriptor buffer pointer relocation works
 // for buffer descriptors in a vs/fs pipeline.
 // Also check that the user data limit is set correctly.
+; REQUIRES: do-not-run-me
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s

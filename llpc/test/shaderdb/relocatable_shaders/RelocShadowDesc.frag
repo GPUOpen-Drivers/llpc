@@ -14,6 +14,7 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d -r %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; REQUIRES: do-not-run-me
 ; SHADERTEST: s_getpc_b64 s[0:1]
 ; SHADERTEST: s_mov_b32 s1, 0
 ; SHADERTEST-NEXT: R_AMDGPU_ABS32 $shadowdesctable
