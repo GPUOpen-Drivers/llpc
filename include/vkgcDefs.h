@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 52
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -86,6 +86,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     52.2 | Add provokingVertexMode to rsState                                                                    |
 //  |     52.1 | Add pageMigrationEnabled to PipelineOptions                                                           |
 //  |     52.0 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
 //  |     50.2 | Add the member dsState to GraphicsPipelineBuildInfo                                                   |
@@ -793,6 +794,10 @@ struct GraphicsPipelineBuildInfo {
                                   ///  matches the sample pattern used by the rasterizer when rendering
                                   ///  with this pipeline.
     uint8_t usrClipPlaneMask;     ///< Mask to indicate the enabled user defined clip planes
+
+    VkProvokingVertexModeEXT provokingVertexMode; ///< Specifies which vertex of a primitive is the _provoking
+                                                  ///  vertex_, this impacts which vertex's "flat" VS outputs
+                                                  ///  are passed to the PS.
   } rsState; ///< Rasterizer State
   struct {
     bool alphaToCoverageEnable; ///< Enable alpha to coverage

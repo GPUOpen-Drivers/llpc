@@ -63,6 +63,7 @@ std::ostream &operator<<(std::ostream &out, NggCompactMode compactMode);
 std::ostream &operator<<(std::ostream &out, DenormalMode denormalMode);
 std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize);
 std::ostream &operator<<(std::ostream &out, ShadowDescriptorTableUsage shadowDescriptorTableUsage);
+std::ostream &operator<<(std::ostream &out, VkProvokingVertexModeEXT provokingVertexMode);
 
 template std::ostream &operator<<(std::ostream &out, ElfReader<Elf64> &reader);
 template raw_ostream &operator<<(raw_ostream &out, ElfReader<Elf64> &reader);
@@ -727,6 +728,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
 
   // Output pipeline states
   dumpFile << "topology = " << pipelineInfo->iaState.topology << "\n";
+  dumpFile << "provokingVertexMode = " << pipelineInfo->rsState.provokingVertexMode << "\n";
   dumpFile << "patchControlPoints = " << pipelineInfo->iaState.patchControlPoints << "\n";
   dumpFile << "deviceIndex = " << pipelineInfo->iaState.deviceIndex << "\n";
   dumpFile << "disableVertexReuse = " << pipelineInfo->iaState.disableVertexReuse << "\n";
@@ -1974,6 +1976,24 @@ std::ostream &operator<<(std::ostream &out, VkFormat format) {
     CASE_ENUM_TO_STRING(VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG)
     CASE_ENUM_TO_STRING(VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT)
     CASE_ENUM_TO_STRING(VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT)
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+  return out << string;
+}
+
+// =====================================================================================================================
+// Translates enum "VkProvokingVertexModeEXT" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param provokingVertexMode : Provoking vertex mode
+std::ostream &operator<<(std::ostream &out, VkProvokingVertexModeEXT provokingVertexMode) {
+  const char *string = nullptr;
+  switch (provokingVertexMode) {
+    CASE_ENUM_TO_STRING(VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT)
+    CASE_ENUM_TO_STRING(VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT)
     break;
   default:
     llvm_unreachable("Should never be called!");

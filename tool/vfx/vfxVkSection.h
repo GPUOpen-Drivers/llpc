@@ -415,6 +415,7 @@ public:
   static void initialAddrTable() {
     StrToMemberAddr *tableItem = m_addrTable;
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, topology, MemberTypeEnum, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, provokingVertexMode, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, patchControlPoints, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, deviceIndex, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, disableVertexReuse, MemberTypeInt, false);
@@ -451,7 +452,7 @@ public:
 
 private:
   SectionNggState m_nggState;
-  static const unsigned MemberCount = 27;
+  static const unsigned MemberCount = 28;
   static StrToMemberAddr m_addrTable[MemberCount];
   SubState m_state;
   SectionColorBuffer m_colorBuffer[Vkgc::MaxColorTargets]; // Color buffer

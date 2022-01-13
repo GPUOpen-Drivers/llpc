@@ -373,6 +373,13 @@ enum ShadingRateFlags : unsigned {
   ShadingRateHorizontal4Pixels = 8,
 };
 
+// Specifies which vertex of a primitive is the _provoking vertex_, this impacts which vertex's
+// "flat" VS outputs are passed to the PS.
+enum ProvokingVertexMode : unsigned {
+  ProvokingVertexFirst = 0, // The provoking vertex is the first non-adjacency vertex used by a primitive.
+  ProvokingVertexLast = 1,  // The provoking vertex is the last non-adjacency vertex used by a primitive.
+};
+
 // Struct to pass to SetRasterizerState
 struct RasterizerState {
   unsigned rasterizerDiscardEnable; // Kill all rasterized pixels. This is implicitly true if stream out
@@ -385,6 +392,9 @@ struct RasterizerState {
                                     //  matches the sample pattern used by the rasterizer when rendering
                                     //  with this pipeline.
   unsigned usrClipPlaneMask;        // Mask to indicate the enabled user defined clip planes
+
+  ProvokingVertexMode provokingVertexMode; // Specifies which vertex of a primitive is the _provoking vertex_,
+                                           // this impacts which vertex's "flat" VS outputs are passed to the PS.
 };
 
 // Struct to pass to depth/stencil state
