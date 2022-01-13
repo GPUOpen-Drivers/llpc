@@ -498,21 +498,22 @@ struct ColorBuffer {
 // =====================================================================================================================
 // Represents GraphicsPipelineState section.
 struct GraphicsPipelineState {
-  VkPrimitiveTopology topology;     // Primitive type
-  unsigned patchControlPoints;      // Patch control points
-  unsigned deviceIndex;             // Device index for device group
-  unsigned disableVertexReuse;      // Disable reusing vertex shader output for indexed draws
-  unsigned depthClipEnable;         // Enable clipping based on Z coordinate
-  unsigned rasterizerDiscardEnable; // Kill all rasterized pixels
-  unsigned perSampleShading;        // Enable per sample shading
-  unsigned numSamples;              // Number of coverage samples used when rendering with this pipeline
-  unsigned samplePatternIdx;        // Index into the currently bound MSAA sample pattern table
-  unsigned usrClipPlaneMask;        // Mask to indicate the enabled user defined clip planes
-  unsigned alphaToCoverageEnable;   // Enable alpha to coverage
-  unsigned dualSourceBlendEnable;   // Blend state bound at draw time will use a dual source blend mode
-  unsigned switchWinding;           // reverse the TCS declared output primitive vertex order
-  unsigned enableMultiView;         // Whether to enable multi-view support
-  Vkgc::PipelineOptions options;    // Pipeline options
+  VkPrimitiveTopology topology;                 // Primitive type
+  VkProvokingVertexModeEXT provokingVertexMode; // Provoking vertex mode
+  unsigned patchControlPoints;                  // Patch control points
+  unsigned deviceIndex;                         // Device index for device group
+  unsigned disableVertexReuse;                  // Disable reusing vertex shader output for indexed draws
+  unsigned depthClipEnable;                     // Enable clipping based on Z coordinate
+  unsigned rasterizerDiscardEnable;             // Kill all rasterized pixels
+  unsigned perSampleShading;                    // Enable per sample shading
+  unsigned numSamples;                          // Number of coverage samples used when rendering with this pipeline
+  unsigned samplePatternIdx;                    // Index into the currently bound MSAA sample pattern table
+  unsigned usrClipPlaneMask;                    // Mask to indicate the enabled user defined clip planes
+  unsigned alphaToCoverageEnable;               // Enable alpha to coverage
+  unsigned dualSourceBlendEnable;               // Blend state bound at draw time will use a dual source blend mode
+  unsigned switchWinding;                       // reverse the TCS declared output primitive vertex order
+  unsigned enableMultiView;                     // Whether to enable multi-view support
+  Vkgc::PipelineOptions options;                // Pipeline options
 
   Vkgc::NggState nggState; // NGG state
 
