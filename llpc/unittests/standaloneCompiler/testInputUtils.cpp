@@ -44,7 +44,6 @@ namespace Llpc {
 namespace StandaloneCompiler {
 namespace {
 
-// ELF magic format described at https://en.wikipedia.org/wiki/Executable_and_Linkable_Format.
 constexpr std::array<uint8_t, 4> ElfMagic = {0x7F, 'E', 'L', 'F'};
 constexpr size_t ElfHeaderLength = 64;
 
