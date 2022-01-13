@@ -1,23 +1,25 @@
 ; Check that timer profile and pipeline info printing works for pipe inputs.
 
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --enable-timer-profile 2>&1 \
-; RUN:   | FileCheck %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --enable-timer-profile >%t.stdout 2>%t.stderr \
+; RUN:   && cat %t.stdout %t.stderr | FileCheck %s
+;
+; Check stdout.
+; CHECK:       {{^//}} Pipeline file info for [[INPUT:.+\.pipe]] {{$}}
+; CHECK:       {{^}}LLPC PipelineHash: 0x[[#%X,PIPE_HASH:]] Files: [[INPUT]]{{$}}
+;
+; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; CHECK-LABEL: {{^}}===== AMDLLPC SUCCESS =====
+;
+; Check stderr.
 ; CHECK:       {{^}} LLPC ShaderModule Phases 0x[[#%X,SHADER1:]]{{$}}
 ; CHECK:       {{^}} LLPC ShaderModule 0x[[#SHADER1]]
 ; CHECK:       {{^}} LLPC ShaderModule Phases 0x[[#%X,SHADER2:]]{{$}}
 ; CHECK:       {{^}} LLPC ShaderModule 0x[[#SHADER2]]
 ;
-; CHECK:       {{^//}} Pipeline file info for [[INPUT:.+\.pipe]] {{$}}
-; CHECK:       {{^}}LLPC PipelineHash: 0x[[#%X,PIPE_HASH:]] Files: [[INPUT]]{{$}}
-;
-; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-;
 ; CHECK:       {{^}} LLPC Phases 0x[[#PIPE_HASH]]{{$}}
 ; CHECK:       {{^}} Total Execution Time:
 ; CHECK:       {{^}} LLPC 0x[[#PIPE_HASH]]{{$}}
 ; CHECK:       {{^}} Total Execution Time:
-;
-; CHECK-LABEL: {{^}}===== AMDLLPC SUCCESS =====
 
 [VsGlsl]
 #version 450 core
