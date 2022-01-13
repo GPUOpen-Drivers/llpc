@@ -102,6 +102,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
         ->getSubState(m_fileName, graphicState, &m_errorMsg);
     auto gfxPipelineInfo = &m_pipelineState.gfxPipelineInfo;
     gfxPipelineInfo->iaState.topology = graphicState.topology;
+    gfxPipelineInfo->rsState.provokingVertexMode = graphicState.provokingVertexMode;
     gfxPipelineInfo->iaState.patchControlPoints = graphicState.patchControlPoints;
     gfxPipelineInfo->iaState.deviceIndex = graphicState.deviceIndex;
     gfxPipelineInfo->iaState.disableVertexReuse = graphicState.disableVertexReuse != 0;

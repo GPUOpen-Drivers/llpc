@@ -670,6 +670,7 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
   rasterizerState.numSamples = inputRsState.numSamples;
   rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
   rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
+  rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
 
   pipeline->setGraphicsState(inputAssemblyState, rasterizerState);
 
