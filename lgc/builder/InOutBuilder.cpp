@@ -105,6 +105,7 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
   Value *even = nullptr;
 
   auto primType = getPipelineState()->getPrimitiveType();
+  auto provokingVertexMode = getPipelineState()->getRasterizerState().provokingVertexMode;
   switch (primType) {
   case PrimitiveType::Point:
     break;
@@ -128,25 +129,85 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
     }
     break;
   }
+  case PrimitiveType::Triangle_Fan: {
+    if (provokingVertexMode == ProvokingVertexLast) {
+      switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
+      case 0: {
+        odd = getInt32(1);
+        even = getInt32(2);
+        break;
+      }
+      case 1: {
+        odd = getInt32(2);
+        even = getInt32(0);
+        break;
+      }
+      case 2: {
+        odd = getInt32(0);
+        even = getInt32(1);
+        break;
+      }
+      }
+    } else {
+      switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
+      case 0: {
+        odd = getInt32(2);
+        even = vertexIndex;
+        break;
+      }
+      case 1: {
+        odd = getInt32(0);
+        even = vertexIndex;
+        break;
+      }
+      case 2: {
+        odd = getInt32(1);
+        even = vertexIndex;
+        break;
+      }
+      }
+    }
+    parity = true;
+    break;
+  }
   case PrimitiveType::Triangle_Strip:
-  case PrimitiveType::Triangle_Fan:
   case PrimitiveType::Triangle_Strip_Adjacency: {
-    switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
-    case 0: {
-      odd = getInt32(2);
-      even = vertexIndex;
-      break;
-    }
-    case 1: {
-      odd = getInt32(0);
-      even = vertexIndex;
-      break;
-    }
-    case 2: {
-      odd = getInt32(1);
-      even = vertexIndex;
-      break;
-    }
+    if (provokingVertexMode == ProvokingVertexLast) {
+      switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
+      case 0: {
+        odd = getInt32(1);
+        even = getInt32(0);
+        break;
+      }
+      case 1: {
+        odd = getInt32(2);
+        even = getInt32(1);
+        break;
+      }
+      case 2: {
+        odd = getInt32(0);
+        even = getInt32(2);
+        break;
+      }
+      }
+    } else {
+      switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
+      case 0: {
+        odd = getInt32(2);
+        even = vertexIndex;
+        break;
+      }
+      case 1: {
+        odd = getInt32(0);
+        even = vertexIndex;
+        break;
+      }
+      case 2: {
+        odd = getInt32(1);
+        even = vertexIndex;
+        break;
+      }
+      }
     }
     parity = true;
     break;

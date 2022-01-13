@@ -2589,6 +2589,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     auto iCoord = builder.CreateExtractElement(iJCoord, uint64_t(0));
     auto jCoord = builder.CreateExtractElement(iJCoord, 1);
     auto primType = m_pipelineState->getPrimitiveType();
+    auto provokingVertexMode = m_pipelineState->getRasterizerState().provokingVertexMode;
     switch (primType) {
     case PrimitiveType::Point: {
       // Points
@@ -2616,27 +2617,62 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       // V2 ==> Attr_indx1
       auto kCoord = builder.CreateFSub(ConstantFP::get(builder.getFloatTy(), 1.0), iCoord);
       kCoord = builder.CreateFSub(kCoord, jCoord);
-      input = builder.CreateInsertElement(input, iCoord, uint64_t(2));
+      input = builder.CreateInsertElement(input, iCoord, 2);
       input = builder.CreateInsertElement(input, jCoord, uint64_t(0));
-      input = builder.CreateInsertElement(input, kCoord, uint64_t(1));
+      input = builder.CreateInsertElement(input, kCoord, 1);
+      break;
+    }
+    case PrimitiveType::Triangle_Fan: {
+      Value *odd = UndefValue::get(inputTy);
+      Value *even = UndefValue::get(inputTy);
+      auto kCoord = builder.CreateFSub(ConstantFP::get(builder.getFloatTy(), 1.0), iCoord);
+      kCoord = builder.CreateFSub(kCoord, jCoord);
+      if (provokingVertexMode == ProvokingVertexLast) {
+        odd = builder.CreateInsertElement(odd, iCoord, uint64_t(0));
+        odd = builder.CreateInsertElement(odd, jCoord, 1);
+        odd = builder.CreateInsertElement(odd, kCoord, 2);
+
+        even = builder.CreateInsertElement(even, iCoord, 2);
+        even = builder.CreateInsertElement(even, jCoord, uint64_t(0));
+        even = builder.CreateInsertElement(even, kCoord, 1);
+      } else {
+        odd = builder.CreateInsertElement(odd, iCoord, 2);
+        odd = builder.CreateInsertElement(odd, jCoord, uint64_t(0));
+        odd = builder.CreateInsertElement(odd, kCoord, 1);
+
+        even = builder.CreateInsertElement(even, iCoord, 1);
+        even = builder.CreateInsertElement(even, jCoord, 2);
+        even = builder.CreateInsertElement(even, kCoord, uint64_t(0));
+      }
+      auto primitiveId = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInPrimitiveId, nullptr, insertPos);
+      auto evenV = builder.CreateSRem(primitiveId, builder.getInt32(2));
+      Value *con = builder.CreateICmpEQ(evenV, builder.getInt32(0));
+      input = builder.CreateSelect(con, even, odd);
       break;
     }
     case PrimitiveType::Triangle_Strip:
-    case PrimitiveType::Triangle_Fan:
     case PrimitiveType::Triangle_Strip_Adjacency: {
-      // Odd
+      Value *odd = UndefValue::get(inputTy);
+      Value *even = UndefValue::get(inputTy);
       auto kCoord = builder.CreateFSub(ConstantFP::get(builder.getFloatTy(), 1.0), iCoord);
       kCoord = builder.CreateFSub(kCoord, jCoord);
-      Value *odd = UndefValue::get(inputTy);
-      odd = builder.CreateInsertElement(odd, iCoord, uint64_t(2));
-      odd = builder.CreateInsertElement(odd, jCoord, uint64_t(0));
-      odd = builder.CreateInsertElement(odd, kCoord, uint64_t(1));
-      // Even
-      Value *even = UndefValue::get(inputTy);
-      even = builder.CreateInsertElement(even, iCoord, uint64_t(1));
-      even = builder.CreateInsertElement(even, jCoord, uint64_t(2));
-      even = builder.CreateInsertElement(even, kCoord, uint64_t(0));
+      if (provokingVertexMode == ProvokingVertexLast) {
+        odd = builder.CreateInsertElement(odd, iCoord, uint64_t(0));
+        odd = builder.CreateInsertElement(odd, jCoord, 1);
+        odd = builder.CreateInsertElement(odd, kCoord, 2);
 
+        even = builder.CreateInsertElement(even, iCoord, 1);
+        even = builder.CreateInsertElement(even, jCoord, 2);
+        even = builder.CreateInsertElement(even, kCoord, uint64_t(0));
+      } else {
+        odd = builder.CreateInsertElement(odd, iCoord, 2);
+        odd = builder.CreateInsertElement(odd, jCoord, uint64_t(0));
+        odd = builder.CreateInsertElement(odd, kCoord, 1);
+
+        even = builder.CreateInsertElement(even, iCoord, 1);
+        even = builder.CreateInsertElement(even, jCoord, 2);
+        even = builder.CreateInsertElement(even, kCoord, uint64_t(0));
+      }
       auto primitiveId = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInPrimitiveId, nullptr, insertPos);
       auto evenV = builder.CreateSRem(primitiveId, builder.getInt32(2));
       Value *con = builder.CreateICmpEQ(evenV, builder.getInt32(0));
@@ -2644,17 +2680,16 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       break;
     }
     case PrimitiveType::Triangle_List_Adjacency: {
-      // Odd
       auto kCoord = builder.CreateFSub(ConstantFP::get(builder.getFloatTy(), 1.0), iCoord);
       kCoord = builder.CreateFSub(kCoord, jCoord);
       Value *odd = UndefValue::get(inputTy);
       odd = builder.CreateInsertElement(odd, iCoord, uint64_t(0));
-      odd = builder.CreateInsertElement(odd, jCoord, uint64_t(1));
-      odd = builder.CreateInsertElement(odd, kCoord, uint64_t(2));
-      // Even
+      odd = builder.CreateInsertElement(odd, jCoord, 1);
+      odd = builder.CreateInsertElement(odd, kCoord, 2);
+
       Value *even = UndefValue::get(inputTy);
-      even = builder.CreateInsertElement(even, iCoord, uint64_t(1));
-      even = builder.CreateInsertElement(even, jCoord, uint64_t(2));
+      even = builder.CreateInsertElement(even, iCoord, 1);
+      even = builder.CreateInsertElement(even, jCoord, 2);
       even = builder.CreateInsertElement(even, kCoord, uint64_t(0));
 
       auto primitiveId = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInPrimitiveId, nullptr, insertPos);
