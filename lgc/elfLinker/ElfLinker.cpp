@@ -999,7 +999,7 @@ void OutputSection::write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr) {
     shdr->sh_link = 2; // Section index of symbol table
     shdr->sh_info = 3; // Section index of the .text section
     outStream << StringRef(reinterpret_cast<const char *>(relocations.data()),
-                           relocations.size() * sizeof(ELF::Elf64_Sym));
+                           relocations.size() * sizeof(ELF::Elf64_Rel));
     return;
   }
 
