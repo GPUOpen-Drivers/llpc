@@ -88,10 +88,10 @@ std::unique_ptr<PipelineBuilder> createPipelineBuilder(ICompiler &compiler, Comp
   assert(!(isGraphicsPipeline(stageMask) && isComputePipeline(stageMask)) && "Invalid stage mask");
 
   if (isGraphicsPipeline(stageMask))
-    return std::make_unique<GraphicsPipelineBuilder>(compiler, compileInfo, std::move(dumpOptions), printPipelineInfo);
+    return std::make_unique<GraphicsPipelineBuilder>(compiler, compileInfo, dumpOptions, printPipelineInfo);
 
   if (isComputePipeline(stageMask))
-    return std::make_unique<ComputePipelineBuilder>(compiler, compileInfo, std::move(dumpOptions), printPipelineInfo);
+    return std::make_unique<ComputePipelineBuilder>(compiler, compileInfo, dumpOptions, printPipelineInfo);
 
   llvm_unreachable("Unknown pipeline kind");
   return nullptr;

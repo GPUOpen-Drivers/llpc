@@ -940,8 +940,8 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
   if (cl::RelocatableShaderElfLimit != -1) {
     if (m_relocatablePipelineCompilations >= cl::RelocatableShaderElfLimit)
       return false;
-    else
-      ++m_relocatablePipelineCompilations;
+
+    ++m_relocatablePipelineCompilations;
   }
   return true;
 }
@@ -965,8 +965,8 @@ bool Compiler::canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo 
   if (cl::RelocatableShaderElfLimit != -1) {
     if (m_relocatablePipelineCompilations >= cl::RelocatableShaderElfLimit)
       return false;
-    else
-      ++m_relocatablePipelineCompilations;
+
+    ++m_relocatablePipelineCompilations;
   }
   return true;
 }
@@ -1010,7 +1010,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   if (shaderInfoEntry) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
     if (moduleData && moduleData->binType == BinaryType::LlvmBc)
-      pipelineModule.reset(context->loadLibrary(&moduleData->binCode).release());
+      pipelineModule = context->loadLibrary(&moduleData->binCode);
   }
 
   // If not IR input, run the per-shader passes, including SPIR-V translation, and then link the modules

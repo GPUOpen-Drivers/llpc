@@ -163,8 +163,8 @@ unsigned getShaderStageMaskForType(Vkgc::UnlinkedShaderStage type) {
 //
 // @param type : The unlinked shader type.
 const char *getUnlinkedShaderStageName(Vkgc::UnlinkedShaderStage type) {
-  static const char *names[] = {"vertex", "fragment", "compute", "unknown"};
-  return names[type];
+  static const char *Names[] = {"vertex", "fragment", "compute", "unknown"};
+  return Names[type];
 }
 
 } // namespace Llpc

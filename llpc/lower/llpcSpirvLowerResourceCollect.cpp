@@ -95,7 +95,7 @@ void SpirvLowerResourceCollect::collectResourceNodeData(const GlobalVariable *gl
     const std::string imageTypeName(imageType->getStructName());
     // Format of image opaque type: ...[.SampledImage.<date type><dim>]...
     if (imageTypeName.find(".SampledImage") != std::string::npos) {
-      auto pos = imageTypeName.find("_");
+      auto pos = imageTypeName.find('_');
       assert(pos != std::string::npos);
 
       ++pos;

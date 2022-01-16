@@ -202,7 +202,8 @@ Result File::readLine(void *buffer, size_t bufferSize, size_t *bytesReadOut) {
       if (c == '\n') {
         result = Result::Success;
         break;
-      } else if (c == EOF) {
+      }
+      if (c == EOF) {
         result = Result::ErrorUnknown;
         break;
       }

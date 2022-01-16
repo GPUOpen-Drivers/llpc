@@ -592,10 +592,10 @@ void SpirvLowerGlobal::handleStoreInst() {
 void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   const auto &dataLayout = m_module->getDataLayout();
   Type *globalVarTy = globalVar->getType()->getContainedType(0);
-  Twine prefix = LlpcName::GlobalProxyPrefix;
   auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
-  auto proxy = new AllocaInst(globalVarTy, dataLayout.getAllocaAddrSpace(), prefix + globalVar->getName(), &*insertPos);
+  auto proxy = new AllocaInst(globalVarTy, dataLayout.getAllocaAddrSpace(),
+                              Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName(), &*insertPos);
 
   if (globalVar->hasInitializer()) {
     auto initializer = globalVar->getInitializer();
@@ -622,14 +622,14 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
   Type *inputTy = input->getType()->getContainedType(0);
   if (inputTy->isPointerTy())
     inputTy = m_builder->getInt64Ty();
-  Twine prefix = LlpcName::InputProxyPrefix;
   auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
   MDNode *metaNode = input->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);
 
   auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-  auto proxy = new AllocaInst(inputTy, dataLayout.getAllocaAddrSpace(), prefix + input->getName(), &*insertPos);
+  auto proxy = new AllocaInst(inputTy, dataLayout.getAllocaAddrSpace(),
+                              Twine(LlpcName::InputProxyPrefix) + input->getName(), &*insertPos);
 
   // Import input to proxy variable
   auto inputValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, meta, nullptr, 0, nullptr, nullptr,
@@ -662,9 +662,9 @@ void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
   Type *outputTy = output->getType()->getContainedType(0);
   if (outputTy->isPointerTy())
     outputTy = m_builder->getInt64Ty();
-  Twine prefix = LlpcName::OutputProxyPrefix;
 
-  auto proxy = new AllocaInst(outputTy, dataLayout.getAllocaAddrSpace(), prefix + output->getName(), &*insertPos);
+  auto proxy = new AllocaInst(outputTy, dataLayout.getAllocaAddrSpace(),
+                              Twine(LlpcName::OutputProxyPrefix) + output->getName(), &*insertPos);
 
   if (output->hasInitializer()) {
     auto initializer = output->getInitializer();
@@ -1045,6 +1045,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
                                              vertexIdx, interpLoc, auxInterpValue, isPerVertexDimension, insertPos);
           }
           inOutValue = InsertValueInst::Create(inOutValue, elem, {idx}, "", insertPos);
+          // clang-format on
         }
       }
     }
@@ -1413,20 +1414,22 @@ Value *SpirvLowerGlobal::loadDynamicIndexedMembers(Type *inOutTy, unsigned addrS
         inOutValue = InsertValueInst::Create(inOutValue, elem, {idx}, "", insertPos);
       }
       return inOutValue;
-    } else {
-      // for constant index, we only need to load the specified value
-      unsigned elemIdx = cast<ConstantInt>(indexOperands[operandIdx])->getZExtValue();
-      Value *elemLocOffset = nullptr;
-      if (isa<ConstantInt>(locOffset))
-        elemLocOffset = m_builder->getInt32(cast<ConstantInt>(locOffset)->getZExtValue() + stride * elemIdx);
-      else
-        elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * elemIdx), "", insertPos);
-
-      Value *elem = loadDynamicIndexedMembers(elemTy, addrSpace, indexOperands, operandIdx + 1, elemMeta, elemLocOffset,
-                                              interpLoc, auxInterpValue, insertPos);
-      return InsertValueInst::Create(inOutValue, elem, {elemIdx}, "", insertPos);
     }
-  } else if (inOutTy->isStructTy()) {
+
+    // for constant index, we only need to load the specified value
+    unsigned elemIdx = cast<ConstantInt>(indexOperands[operandIdx])->getZExtValue();
+    Value *elemLocOffset = nullptr;
+    if (isa<ConstantInt>(locOffset))
+      elemLocOffset = m_builder->getInt32(cast<ConstantInt>(locOffset)->getZExtValue() + stride * elemIdx);
+    else
+      elemLocOffset = BinaryOperator::CreateAdd(locOffset, m_builder->getInt32(stride * elemIdx), "", insertPos);
+
+    Value *elem = loadDynamicIndexedMembers(elemTy, addrSpace, indexOperands, operandIdx + 1, elemMeta, elemLocOffset,
+                                            interpLoc, auxInterpValue, insertPos);
+    return InsertValueInst::Create(inOutValue, elem, {elemIdx}, "", insertPos);
+  }
+
+  if (inOutTy->isStructTy()) {
     // struct type always has a constant operand-index
     unsigned memberIdx = cast<ConstantInt>(indexOperands[operandIdx])->getZExtValue();
 
@@ -1436,7 +1439,9 @@ Value *SpirvLowerGlobal::loadDynamicIndexedMembers(Type *inOutTy, unsigned addrS
     auto loadValue = loadDynamicIndexedMembers(memberTy, addrSpace, indexOperands, operandIdx + 1, memberMeta,
                                                locOffset, interpLoc, auxInterpValue, insertPos);
     return InsertValueInst::Create(inOutValue, loadValue, {memberIdx}, "", insertPos);
-  } else if (inOutTy->isVectorTy()) {
+  }
+
+  if (inOutTy->isVectorTy()) {
     assert(operandIdx <= indexOperands.size());
 
     Type *loadTy = inOutTy;
@@ -1448,17 +1453,14 @@ Value *SpirvLowerGlobal::loadDynamicIndexedMembers(Type *inOutTy, unsigned addrS
       Value *compValue = addCallInstForInOutImport(loadTy, addrSpace, inOutMetaVal, locOffset, 0, compIdx, nullptr,
                                                    interpLoc, auxInterpValue, false, insertPos);
       return InsertElementInst::Create(inOutValue, compValue, compIdx, "", insertPos);
-    } else
-      return addCallInstForInOutImport(loadTy, addrSpace, inOutMetaVal, locOffset, 0, compIdx, nullptr, interpLoc,
-                                       auxInterpValue, false, insertPos);
-  } else {
-    // simple scalar type
-    return addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, locOffset, 0, nullptr, nullptr, interpLoc,
+    }
+    return addCallInstForInOutImport(loadTy, addrSpace, inOutMetaVal, locOffset, 0, compIdx, nullptr, interpLoc,
                                      auxInterpValue, false, insertPos);
   }
 
-  llvm_unreachable("Should never be called!");
-  return nullptr;
+  // simple scalar type
+  return addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, locOffset, 0, nullptr, nullptr, interpLoc,
+                                   auxInterpValue, false, insertPos);
 }
 // =====================================================================================================================
 // Inserts instructions to load value from input/ouput member.
@@ -1499,28 +1501,30 @@ Value *SpirvLowerGlobal::loadInOutMember(Type *inOutTy, unsigned addrSpace, cons
       auto elemIdx = indexOperands[operandIdx];
       return addCallInstForInOutImport(elemTy, addrSpace, elemMeta, locOffset, inOutTy->getArrayNumElements(), elemIdx,
                                        vertexIdx, interpLoc, auxInterpValue, false, insertPos);
-    } else {
-      // NOTE: If the relative location offset is not specified, initialize it to 0.
-      if (!locOffset)
-        locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-
-      // elemLocOffset = locOffset + stride * elemIdx
-      unsigned stride = cast<ConstantInt>(inOutMetaVal->getOperand(0))->getZExtValue();
-      auto elemIdx = indexOperands[operandIdx];
-      Value *elemLocOffset =
-          BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context), stride), elemIdx, "", insertPos);
-      elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
-
-      // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
-      // so it knows how many locations to mark as used by this access.
-      if (maxLocOffset == 0 && !isa<ConstantInt>(elemIdx)) {
-        maxLocOffset = cast<ConstantInt>(locOffset)->getZExtValue() + stride * inOutTy->getArrayNumElements();
-      }
-
-      return loadInOutMember(elemTy, addrSpace, indexOperands, operandIdx + 1, maxLocOffset, elemMeta, elemLocOffset,
-                             vertexIdx, interpLoc, auxInterpValue, insertPos);
     }
-  } else if (inOutTy->isStructTy()) {
+
+    // NOTE: If the relative location offset is not specified, initialize it to 0.
+    if (!locOffset)
+      locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
+
+    // elemLocOffset = locOffset + stride * elemIdx
+    unsigned stride = cast<ConstantInt>(inOutMetaVal->getOperand(0))->getZExtValue();
+    auto elemIdx = indexOperands[operandIdx];
+    Value *elemLocOffset =
+        BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context), stride), elemIdx, "", insertPos);
+    elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
+
+    // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
+    // so it knows how many locations to mark as used by this access.
+    if (maxLocOffset == 0 && !isa<ConstantInt>(elemIdx)) {
+      maxLocOffset = cast<ConstantInt>(locOffset)->getZExtValue() + stride * inOutTy->getArrayNumElements();
+    }
+
+    return loadInOutMember(elemTy, addrSpace, indexOperands, operandIdx + 1, maxLocOffset, elemMeta, elemLocOffset,
+                           vertexIdx, interpLoc, auxInterpValue, insertPos);
+  }
+
+  if (inOutTy->isStructTy()) {
     // Structure type
     unsigned memberIdx = cast<ConstantInt>(indexOperands[operandIdx])->getZExtValue();
 
@@ -1529,7 +1533,9 @@ Value *SpirvLowerGlobal::loadInOutMember(Type *inOutTy, unsigned addrSpace, cons
 
     return loadInOutMember(memberTy, addrSpace, indexOperands, operandIdx + 1, maxLocOffset, memberMeta, locOffset,
                            vertexIdx, interpLoc, auxInterpValue, insertPos);
-  } else if (inOutTy->isVectorTy()) {
+  }
+
+  if (inOutTy->isVectorTy()) {
     // Vector type
     assert(operandIdx <= indexOperands.size());
 
@@ -1543,14 +1549,11 @@ Value *SpirvLowerGlobal::loadInOutMember(Type *inOutTy, unsigned addrSpace, cons
 
     return addCallInstForInOutImport(loadTy, addrSpace, inOutMetaVal, locOffset, maxLocOffset, compIdx, vertexIdx,
                                      interpLoc, auxInterpValue, false, insertPos);
-  } else {
-    // simple scalar type
-    return addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, locOffset, maxLocOffset, nullptr, vertexIdx,
-                                     interpLoc, auxInterpValue, false, insertPos);
   }
 
-  llvm_unreachable("Should never be called!");
-  return nullptr;
+  // simple scalar type
+  return addCallInstForInOutImport(inOutTy, addrSpace, inOutMetaVal, locOffset, maxLocOffset, nullptr, vertexIdx,
+                                   interpLoc, auxInterpValue, false, insertPos);
 }
 
 // =====================================================================================================================
@@ -1588,28 +1591,30 @@ void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, cons
         auto elemIdx = indexOperands[operandIdx + 1];
         return addCallInstForOutputExport(storeValue, elemMeta, nullptr, outputTy->getArrayNumElements(), InvalidValue,
                                           0, elemIdx, vertexIdx, InvalidValue, insertPos);
-      } else {
-        // NOTE: If the relative location offset is not specified, initialize it.
-        if (!locOffset)
-          locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-
-        // elemLocOffset = locOffset + stride * elemIdx
-        unsigned stride = cast<ConstantInt>(outputMetaVal->getOperand(0))->getZExtValue();
-        auto elemIdx = indexOperands[operandIdx + 1];
-        Value *elemLocOffset =
-            BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context), stride), elemIdx, "", insertPos);
-        elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
-
-        // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
-        // so it knows how many locations to mark as used by this access.
-        if (maxLocOffset == 0 && !isa<ConstantInt>(elemIdx)) {
-          maxLocOffset = cast<ConstantInt>(locOffset)->getZExtValue() + stride * outputTy->getArrayNumElements();
-        }
-
-        return storeOutputMember(elemTy, storeValue, indexOperands, operandIdx + 1, maxLocOffset, elemMeta,
-                                 elemLocOffset, vertexIdx, insertPos);
       }
-    } else if (outputTy->isStructTy()) {
+
+      // NOTE: If the relative location offset is not specified, initialize it.
+      if (!locOffset)
+        locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
+
+      // elemLocOffset = locOffset + stride * elemIdx
+      unsigned stride = cast<ConstantInt>(outputMetaVal->getOperand(0))->getZExtValue();
+      auto elemIdx = indexOperands[operandIdx + 1];
+      Value *elemLocOffset =
+          BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_context), stride), elemIdx, "", insertPos);
+      elemLocOffset = BinaryOperator::CreateAdd(locOffset, elemLocOffset, "", insertPos);
+
+      // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
+      // so it knows how many locations to mark as used by this access.
+      if (maxLocOffset == 0 && !isa<ConstantInt>(elemIdx)) {
+        maxLocOffset = cast<ConstantInt>(locOffset)->getZExtValue() + stride * outputTy->getArrayNumElements();
+      }
+
+      return storeOutputMember(elemTy, storeValue, indexOperands, operandIdx + 1, maxLocOffset, elemMeta, elemLocOffset,
+                               vertexIdx, insertPos);
+    }
+
+    if (outputTy->isStructTy()) {
       // Structure type
       unsigned memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
 
@@ -1618,7 +1623,9 @@ void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, cons
 
       return storeOutputMember(memberTy, storeValue, indexOperands, operandIdx + 1, maxLocOffset, memberMeta, locOffset,
                                vertexIdx, insertPos);
-    } else if (outputTy->isVectorTy()) {
+    }
+
+    if (outputTy->isVectorTy()) {
       // Vector type
       assert(operandIdx + 1 == indexOperands.size() - 1);
       auto compIdx = indexOperands[operandIdx + 1];

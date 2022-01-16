@@ -84,7 +84,7 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
     }
     case OpExtension: {
       StringRef extName = reinterpret_cast<const char *>(&codePos[1]);
-      if ((extName == "SPV_AMD_shader_ballot") && (shaderModuleUsage->useSubgroupSize == false)) {
+      if ((extName == "SPV_AMD_shader_ballot") && (!shaderModuleUsage->useSubgroupSize)) {
         shaderModuleUsage->useSubgroupSize = true;
       }
       break;
@@ -159,7 +159,7 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
   if (capabilities.find(CapabilityVariablePointers) != capabilities.end())
     shaderModuleUsage->enableVarPtr = true;
 
-  if ((shaderModuleUsage->useSubgroupSize == false) &&
+  if ((!shaderModuleUsage->useSubgroupSize) &&
       ((capabilities.count(CapabilityGroupNonUniform) > 0) || (capabilities.count(CapabilityGroupNonUniformVote) > 0) ||
        (capabilities.count(CapabilityGroupNonUniformArithmetic) > 0) ||
        (capabilities.count(CapabilityGroupNonUniformBallot) > 0) ||

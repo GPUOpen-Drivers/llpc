@@ -72,7 +72,7 @@ public:
   LegacySpirvLowerMathConstFolding &operator=(const LegacySpirvLowerMathConstFolding &) = delete;
 
 private:
-  SpirvLowerMathConstFolding Impl;
+  SpirvLowerMathConstFolding m_impl;
 };
 
 // =====================================================================================================================
@@ -89,7 +89,7 @@ public:
   LegacySpirvLowerMathFloatOp &operator=(const LegacySpirvLowerMathFloatOp &) = delete;
 
 private:
-  SpirvLowerMathFloatOp Impl;
+  SpirvLowerMathFloatOp m_impl;
 };
 
 } // namespace Llpc
@@ -207,8 +207,8 @@ void SpirvLowerMath::disableFastMath(Value *value) {
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 bool LegacySpirvLowerMathConstFolding::runOnModule(Module &module) {
-  return Impl.runImpl(module, [&]() -> TargetLibraryInfo & {
-    return getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(*(Impl.getEntryPoint()));
+  return m_impl.runImpl(module, [&]() -> TargetLibraryInfo & {
+    return getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(*(m_impl.getEntryPoint()));
   });
 }
 
@@ -230,7 +230,8 @@ PreservedAnalyses SpirvLowerMathConstFolding::run(Module &module, ModuleAnalysis
 // Executes constant folding SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool SpirvLowerMathConstFolding::runImpl(Module &module, std::function<TargetLibraryInfo &()> getTargetLibraryInfo) {
+bool SpirvLowerMathConstFolding::runImpl(Module &module,
+                                         const std::function<TargetLibraryInfo &()> &getTargetLibraryInfo) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Const-Folding\n");
 
   SpirvLowerMath::init(module);
@@ -319,7 +320,7 @@ bool SpirvLowerMathFloatOp::runImpl(Module &module) {
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 bool LegacySpirvLowerMathFloatOp::runOnModule(Module &module) {
-  return Impl.runImpl(module);
+  return m_impl.runImpl(module);
 }
 
 // =====================================================================================================================
