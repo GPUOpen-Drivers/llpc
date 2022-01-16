@@ -180,16 +180,14 @@ ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
 
   if (shaderInfo->options.clientHash.upper != 0 && shaderInfo->options.clientHash.lower != 0)
     return shaderInfo->options.clientHash;
-  else {
-    ShaderHash hash = {};
-    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+  ShaderHash hash = {};
+  const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
 
-    if (moduleData) {
-      hash.lower = MetroHash::compact64(reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash));
-      hash.upper = 0;
-    }
-    return hash;
+  if (moduleData) {
+    hash.lower = MetroHash::compact64(reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash));
+    hash.upper = 0;
   }
+  return hash;
 }
 
 // =====================================================================================================================

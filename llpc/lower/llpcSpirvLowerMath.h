@@ -67,7 +67,7 @@ public:
   // needed because the passes for the legacy and new pass managers use different ways to
   // retrieve it. That also ensures the object is retrieved once the passes are properly
   // initialized. This can be removed once the switch to the new pass manager is completed.
-  bool runImpl(llvm::Module &module, std::function<llvm::TargetLibraryInfo &()> getTargetLibraryInfo);
+  bool runImpl(llvm::Module &module, const std::function<llvm::TargetLibraryInfo &()> &getTargetLibraryInfo);
 
   static llvm::StringRef name() { return "Lower SPIR-V math constant folding"; }
 
