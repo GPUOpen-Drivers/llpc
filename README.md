@@ -8,6 +8,8 @@
 
 * [Coding standard](docs/CodingStandards.md)
 
+* [Contributing guidelines](docs/Contributing.md)
+
 ## Third Party Software
 LLPC contains code written by third parties:
 * SPIRV-LLVM translator is distributed under the terms of University of Illinois/NCSA Open Source License. See llpc/translator/LICENSE.TXT.
