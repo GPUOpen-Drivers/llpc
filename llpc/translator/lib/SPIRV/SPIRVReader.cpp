@@ -6820,6 +6820,7 @@ bool SPIRVToLLVM::transMetadata() {
             }
           }
         }
+
         // clang-format off
           // Give the workgroup size to the middle-end.
           ComputeShaderMode computeMode = {};
@@ -6827,7 +6828,7 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
           computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
           getBuilder()->setComputeShaderMode(computeMode);
-        // clang-format on
+	// clang-format on
       } else
         llvm_unreachable("Invalid execution model");
 

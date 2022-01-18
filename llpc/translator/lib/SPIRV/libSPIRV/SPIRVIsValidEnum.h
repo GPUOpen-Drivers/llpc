@@ -157,7 +157,8 @@ inline bool isValid(spv::ExecutionMode V) {
 }
 
 inline bool isValid(spv::StorageClass V) {
-  switch (V) {
+  uint32_t StorageClass = V;
+  switch (StorageClass) {
   case StorageClassUniformConstant:
   case StorageClassInput:
   case StorageClassUniform:

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -1138,12 +1138,11 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
 
   // For now, this just generates a call to lgc.output.export.builtin. A future commit will
   // change it to generate IR more directly here.
-  // A vertex index is valid only in TCS, TES, GS.
+  // A vertex index is valid only in TCS.
   // Currently we can only cope with an array/vector index in TCS.
   //
   // VS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
-  // TCS: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx,
-  //                                                  %Type% outputValue)
+  // TCS: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx, %Type% outputValue)
   // TES: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, %Type% outputValue)
   // GS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
   // FS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)

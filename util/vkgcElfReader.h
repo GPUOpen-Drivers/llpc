@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2021 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -392,7 +392,7 @@ struct MsgPackIterator {
 };
 
 // =====================================================================================================================
-// Represents a reader for loading data from an [Executable and Linkable Format (ELF)] buffer.
+// Represents a reader for loading data from an Executable and Linkable Format (ELF) buffer.
 //
 // The client should call "ReadFromBuffer()" to initialize the context with the contents of an ELF, then
 // "GetSectionData()" to retrieve the contents of a particular named section.
