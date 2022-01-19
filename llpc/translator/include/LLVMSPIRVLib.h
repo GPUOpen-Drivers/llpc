@@ -41,9 +41,10 @@
 #ifndef LLVM_SUPPORT_SPIRV_H
 #define LLVM_SUPPORT_SPIRV_H
 
-#include <string>
-#include <iostream>
 #include "spirvExt.h"
+#include <iostream>
+#include <map>
+#include <string>
 
 namespace llvm {
 // llvm::Pass initialization functions need to be declared before inclusion of
