@@ -32,6 +32,7 @@
 
 #include "lgc/builder/BuilderRecorder.h"
 #include "llvm/IR/PassManager.h"
+#include <map>
 
 namespace lgc {
 

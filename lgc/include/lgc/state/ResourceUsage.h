@@ -33,6 +33,7 @@
 #include "lgc/state/Defs.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/util/Internal.h"
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 
