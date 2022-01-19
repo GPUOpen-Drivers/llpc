@@ -464,6 +464,9 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
   for (auto &elfInput : m_elfInputs) {
     for (object::SymbolRef symRef : elfInput.objectFile->symbols()) {
       object::ELFSymbolRef elfSymRef(symRef);
+      StringRef name = cantFail(elfSymRef.getName());
+      if (name == "llvmir" && findSymbol(getStringIndex(name)) != 0)
+        continue;
       if (elfSymRef.getBinding() == ELF::STB_GLOBAL) {
         object::section_iterator containingSect = cantFail(elfSymRef.getSection());
         if (containingSect != elfInput.objectFile->section_end()) {
