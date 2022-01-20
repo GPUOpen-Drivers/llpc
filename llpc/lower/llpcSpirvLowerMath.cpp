@@ -128,6 +128,7 @@ void SpirvLowerMath::init(Module &module) {
 //
 // @param inst : Instruction to flush denormals if needed
 void SpirvLowerMath::flushDenormIfNeeded(Instruction *inst) {
+  return;
   auto destTy = inst->getType();
   if ((destTy->getScalarType()->isHalfTy() && m_fp16DenormFlush) ||
       (destTy->getScalarType()->isFloatTy() && m_fp32DenormFlush) ||
