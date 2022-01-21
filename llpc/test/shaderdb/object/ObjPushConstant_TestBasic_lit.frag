@@ -1,6 +1,6 @@
 #version 450
 
-layout(binding = 1, std140, push_constant) uniform PushConstant
+layout(std140, push_constant) uniform PushConstant
 {
    vec4 m1;
    vec4 m2;
