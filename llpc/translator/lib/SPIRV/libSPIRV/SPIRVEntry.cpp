@@ -275,6 +275,14 @@ bool SPIRVEntry::hasDecorate(Decoration Kind, size_t Index,
   return true;
 }
 
+const char *SPIRVEntry::getDecorateString(Decoration kind) const {
+  DecorateMapType::const_iterator loc = Decorates.find(kind);
+  if (loc == Decorates.end())
+    return "";
+
+  return loc->second->getLiteralString();
+}
+
 // Check if an entry has Kind of member decoration at MemberIndex and get the
 // literal of the first decoration of such kind at Index.
 bool SPIRVEntry::hasMemberDecorate(SPIRVWord MemberIndex, Decoration Kind,

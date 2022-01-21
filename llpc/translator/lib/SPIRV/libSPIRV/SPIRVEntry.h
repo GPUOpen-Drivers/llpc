@@ -241,6 +241,7 @@ public:
   const std::string &getName() const { return Name; }
   bool hasDecorate(Decoration Kind, size_t Index = 0,
                    SPIRVWord *Result = 0) const;
+  const char *getDecorateString(Decoration kind) const;
   bool hasMemberDecorate(SPIRVWord MemberIndex, Decoration Kind,
                          size_t Index = 0, SPIRVWord *Result = 0) const;
   std::set<SPIRVWord> getDecorate(Decoration Kind, size_t Index = 0) const;
