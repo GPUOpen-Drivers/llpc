@@ -1,0 +1,165 @@
+// This test tests pervertex variable, the input variable is 2-dim array, we must load value for each vertex,
+// the index is 0-2.
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 0)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 1, i32 0, i32 0, i32 195, i32 0)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 1)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 1, i32 0, i32 0, i32 195, i32 1)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 2)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 1, i32 0, i32 0, i32 195, i32 2)
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+
+[Version]
+version = 52
+
+[VsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %4 "main" %gl_VertexIndex %19 %30 %36
+               OpDecorate %gl_VertexIndex BuiltIn VertexIndex
+               OpDecorate %19 Location 0
+               OpMemberDecorate %_struct_28 0 BuiltIn Position
+               OpMemberDecorate %_struct_28 1 BuiltIn PointSize
+               OpDecorate %_struct_28 Block
+               OpDecorate %36 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+%_ptr_Function_int = OpTypePointer Function %int
+%_ptr_Input_int = OpTypePointer Input %int
+%gl_VertexIndex = OpVariable %_ptr_Input_int Input
+      %int_1 = OpConstant %int 1
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %uint_2 = OpConstant %uint 2
+%_arr_float_uint_2 = OpTypeArray %float %uint_2
+%_ptr_Output__arr_float_uint_2 = OpTypePointer Output %_arr_float_uint_2
+         %19 = OpVariable %_ptr_Output__arr_float_uint_2 Output
+    %float_3 = OpConstant %float 3
+    %v4float = OpTypeVector %float 4
+ %_struct_28 = OpTypeStruct %v4float %float
+%_ptr_Output__struct_28 = OpTypePointer Output %_struct_28
+         %30 = OpVariable %_ptr_Output__struct_28 Output
+    %float_1 = OpConstant %float 1
+%_ptr_Output_float = OpTypePointer Output %float
+      %int_0 = OpConstant %int 0
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+         %36 = OpVariable %_ptr_Input_v4float Input
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+          %8 = OpVariable %_ptr_Function_int Function
+         %11 = OpLoad %int %gl_VertexIndex
+         %13 = OpIAdd %int %11 %int_1
+               OpStore %8 %13
+         %20 = OpLoad %int %8
+         %21 = OpConvertSToF %float %20
+         %23 = OpLoad %int %8
+         %24 = OpConvertSToF %float %23
+         %25 = OpFMul %float %float_3 %24
+         %26 = OpCompositeConstruct %_arr_float_uint_2 %21 %25
+               OpStore %19 %26
+         %33 = OpAccessChain %_ptr_Output_float %30 %int_1
+               OpStore %33 %float_1
+         %37 = OpLoad %v4float %36
+         %39 = OpAccessChain %_ptr_Output_v4float %30 %int_0
+               OpStore %39 %37
+               OpReturn
+               OpFunctionEnd
+[VsInfo]
+entryPoint = main
+
+[FsSpirv]
+	       OpCapability Shader
+               OpCapability FragmentBarycentricKHR
+               OpExtension "SPV_KHR_fragment_shader_barycentric"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %15 %40
+               OpExecutionMode %4 OriginUpperLeft
+               OpDecorate %15 Location 0
+               OpDecorate %15 PerVertexKHR
+               OpDecorate %40 Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+%_ptr_Function_float = OpTypePointer Function %float
+       %uint = OpTypeInt 32 0
+     %uint_2 = OpConstant %uint 2
+%_arr_float_uint_2 = OpTypeArray %float %uint_2
+     %uint_3 = OpConstant %uint 3
+%_arr__arr_float_uint_2_uint_3 = OpTypeArray %_arr_float_uint_2 %uint_3
+%_ptr_Input__arr__arr_float_uint_2_uint_3 = OpTypePointer Input %_arr__arr_float_uint_2_uint_3
+         %15 = OpVariable %_ptr_Input__arr__arr_float_uint_2_uint_3 Input
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+%_ptr_Input_float = OpTypePointer Input %float
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+         %40 = OpVariable %_ptr_Output_v4float Output
+    %float_1 = OpConstant %float 1
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+          %8 = OpVariable %_ptr_Function_float Function
+         %25 = OpVariable %_ptr_Function_float Function
+         %31 = OpVariable %_ptr_Function_float Function
+         %19 = OpAccessChain %_ptr_Input_float %15 %int_0 %int_0
+         %20 = OpLoad %float %19
+         %22 = OpAccessChain %_ptr_Input_float %15 %int_0 %int_1
+         %23 = OpLoad %float %22
+         %24 = OpFAdd %float %20 %23
+               OpStore %8 %24
+         %26 = OpAccessChain %_ptr_Input_float %15 %int_1 %int_0
+         %27 = OpLoad %float %26
+         %28 = OpAccessChain %_ptr_Input_float %15 %int_1 %int_1
+         %29 = OpLoad %float %28
+         %30 = OpFAdd %float %27 %29
+               OpStore %25 %30
+         %33 = OpAccessChain %_ptr_Input_float %15 %int_2 %int_0
+         %34 = OpLoad %float %33
+         %35 = OpAccessChain %_ptr_Input_float %15 %int_2 %int_1
+         %36 = OpLoad %float %35
+         %37 = OpFAdd %float %34 %36
+               OpStore %31 %37
+         %41 = OpLoad %float %8
+         %42 = OpLoad %float %25
+         %43 = OpLoad %float %31
+         %45 = OpCompositeConstruct %v4float %41 %42 %43 %float_1
+               OpStore %40 %45
+               OpReturn
+               OpFunctionEnd
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 4
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 1
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 2
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 2
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 4
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 16
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+
