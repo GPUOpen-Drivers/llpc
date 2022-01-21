@@ -61,6 +61,10 @@ public:
   SPIRVDecorateGeneric(Op OC);
 
   SPIRVWord getLiteral(size_t) const;
+  const char *getLiteralString() const {
+    assert(!Literals.empty());
+    return reinterpret_cast<const char *>(Literals.data());
+  }
   Decoration getDecorateKind() const;
   size_t getLiteralCount() const;
   /// Compare for kind and literal only.
