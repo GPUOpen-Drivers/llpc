@@ -1992,12 +1992,8 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
   } else
     assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
-  const unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
   // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend byte/word to dword and
   // store dword to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size is based on number of dwords.
-  unsigned byteSize = (outputTy->getScalarSizeInBits() / 8) * compCount;
-  if (bitWidth == 8 || bitWidth == 16)
-    byteSize *= (32 / bitWidth);
 
   assert(compIdx <= 4);
 
