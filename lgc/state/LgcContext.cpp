@@ -40,11 +40,9 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/CommandFlags.h"
-#include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CodeGen.h"
-#include "llvm/Support/CommandLine.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 401324
 // Old version
 #include "llvm/Support/TargetRegistry.h"
@@ -57,16 +55,6 @@
 #include "llvm/Target/TargetOptions.h"
 
 #define DEBUG_TYPE "lgc-context"
-
-namespace llvm {
-
-namespace cl {
-
-// Set the optimization level
-extern opt<CodeGenOpt::Level> OptLevel;
-
-} // namespace cl
-} // namespace llvm
 
 using namespace lgc;
 using namespace llvm;
@@ -96,6 +84,14 @@ static cl::opt<bool> EmitLgc("emit-lgc", cl::desc("Emit LLVM assembly suitable f
 // -show-encoding: show the instruction encoding when emitting assembler. This mirrors llvm-mc behaviour
 static cl::opt<bool> ShowEncoding("show-encoding", cl::desc("Show instruction encodings"), cl::init(false));
 
+// -opt: Override the optimization level passed in to LGC with the given one.
+static cl::opt<CodeGenOpt::Level> OptLevel("opt", cl::desc("Set the optimization level for LGC:"),
+                                           cl::init(CodeGenOpt::Default),
+                                           values(clEnumValN(CodeGenOpt::None, "none", "no optimizations"),
+                                                  clEnumValN(CodeGenOpt::Less, "quick", "quick compilation time"),
+                                                  clEnumValN(CodeGenOpt::Default, "default", "default optimizations"),
+                                                  clEnumValN(CodeGenOpt::Aggressive, "fast", "fast execution time")));
+
 // =====================================================================================================================
 // Set default for a command-line option, but only if command-line processing has not happened yet, or did not see
 // an occurrence of this option.
@@ -116,7 +112,7 @@ static void setOptionDefault(const char *name, StringRef value) {
 }
 
 // =====================================================================================================================
-// Initialize the middle-end. This must be called before the first LgcContext::Create, although you are
+// Initialize the middle-end. This must be called before the first LgcContext::create, although you are
 // allowed to call it again after that. It must also be called before LLVM command-line processing, so
 // that you can use a pass name in an option such as -print-after. If multiple concurrent compiles are
 // possible, this should be called in a thread-safe way.
@@ -218,8 +214,9 @@ bool LgcContext::isGpuNameValid(llvm::StringRef gpuName) {
 // @param context : LLVM context to give each Builder
 // @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
 // @param palAbiVersion : PAL pipeline ABI version to compile for
-LgcContext *LgcContext::Create(LLVMContext &context, StringRef gpuName, unsigned palAbiVersion) {
-  assert(Initialized && "Must call LgcContext::Initialize before LgcContext::Create");
+LgcContext *LgcContext::create(LLVMContext &context, StringRef gpuName, unsigned palAbiVersion,
+                               CodeGenOpt::Level optLevel) {
+  assert(Initialized && "Must call LgcContext::Initialize before LgcContext::create");
 
   LgcContext *builderContext = new LgcContext(context, palAbiVersion);
 
@@ -250,10 +247,15 @@ LgcContext *LgcContext::Create(LLVMContext &context, StringRef gpuName, unsigned
     targetOpts.MCOptions.AsmVerbose = true;
   }
 
-  LLPC_OUTS("TargetMachine optimization level = " << cl::OptLevel << "\n");
+  // If the "opt" option is given, set the optimization level to that value.
+  if (OptLevel.getPosition() != 0) {
+    optLevel = OptLevel;
+  }
+
+  LLPC_OUTS("TargetMachine optimization level = " << optLevel << "\n");
 
   builderContext->m_targetMachine =
-      target->createTargetMachine(triple, gpuName, "", targetOpts, Optional<Reloc::Model>(), None, cl::OptLevel);
+      target->createTargetMachine(triple, gpuName, "", targetOpts, Optional<Reloc::Model>(), None, optLevel);
   assert(builderContext->m_targetMachine);
   return builderContext;
 }
@@ -379,6 +381,10 @@ void LgcContext::addTargetPasses(lgc::LegacyPassManager &passMgr, Timer *codeGen
   // Stop timer for codegen passes.
   if (codeGenTimer)
     passMgr.add(createStartStopTimer(codeGenTimer, false));
+}
+
+llvm::CodeGenOpt::Level LgcContext::getOptimizationLevel() const {
+  return m_targetMachine->getOptLevel();
 }
 
 // =====================================================================================================================

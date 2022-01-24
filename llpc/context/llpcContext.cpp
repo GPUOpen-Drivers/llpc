@@ -46,6 +46,7 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
@@ -83,7 +84,8 @@ LgcContext *Context::getLgcContext() {
   if (!m_builderContext) {
     // First time: Create the LgcContext.
     std::string gpuName = LgcContext::getGpuNameString(m_gfxIp.major, m_gfxIp.minor, m_gfxIp.stepping);
-    m_builderContext.reset(LgcContext::Create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
+    m_builderContext.reset(
+        LgcContext::create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION, CodeGenOpt::Level::Default));
     if (!m_builderContext)
       report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
   }

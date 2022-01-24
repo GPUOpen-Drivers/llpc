@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/CodeGen.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace llvm {
@@ -83,7 +84,9 @@ public:
   // @param context : LLVM context to use on all compiles
   // @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
   // @param palAbiVersion : PAL pipeline ABI version to compile for
-  static LgcContext *Create(llvm::LLVMContext &context, llvm::StringRef gpuName, unsigned palAbiVersion);
+  // @param optLevel : The optimization level to use.
+  static LgcContext *create(llvm::LLVMContext &context, llvm::StringRef gpuName, unsigned int palAbiVersion,
+                            llvm::CodeGenOpt::Level optLevel);
 
   ~LgcContext();
 
@@ -129,6 +132,9 @@ public:
 
   // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
   void addTargetPasses(lgc::LegacyPassManager &passMgr, llvm::Timer *codeGenTimer, llvm::raw_pwrite_stream &outStream);
+
+  // Returns the optimization level for the context.
+  llvm::CodeGenOpt::Level getOptimizationLevel() const;
 
   // Utility method to create a start/stop timer pass
   static llvm::ModulePass *createStartStopTimer(llvm::Timer *timer, bool starting);

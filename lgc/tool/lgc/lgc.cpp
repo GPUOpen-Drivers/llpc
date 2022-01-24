@@ -160,7 +160,8 @@ int main(int argc, char **argv) {
   }
 
   // Create the LgcContext.
-  std::unique_ptr<LgcContext> lgcContext(LgcContext::Create(context, gpuName, PalAbiVersion));
+  std::unique_ptr<LgcContext> lgcContext(
+      LgcContext::create(context, gpuName, PalAbiVersion, CodeGenOpt::Level::Default));
   if (!lgcContext) {
     errs() << progName << ": GPU type '" << gpuName << "' not recognized\n";
     return 1;
