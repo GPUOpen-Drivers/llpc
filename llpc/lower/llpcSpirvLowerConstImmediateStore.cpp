@@ -108,7 +108,7 @@ void SpirvLowerConstImmediateStore::processAllocaInsts(Function *func) {
   for (auto instIt = entryBlock->begin(), instItEnd = entryBlock->end(); instIt != instItEnd; ++instIt) {
     auto inst = &*instIt;
     if (auto allocaInst = dyn_cast<AllocaInst>(inst)) {
-      if (allocaInst->getType()->getElementType()->isAggregateType()) {
+      if (allocaInst->getAllocatedType()->isAggregateType()) {
         // Got an "alloca" instruction of aggregate type.
         auto storeInst = findSingleStore(allocaInst);
         if (storeInst && isa<Constant>(storeInst->getValueOperand())) {
@@ -175,7 +175,7 @@ StoreInst *SpirvLowerConstImmediateStore::findSingleStore(AllocaInst *allocaInst
 // @param storeInst : The single constant store into the "alloca"
 void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *storeInst) {
   auto allocaInst = cast<AllocaInst>(storeInst->getPointerOperand());
-  auto globalType = allocaInst->getType()->getElementType();
+  auto globalType = allocaInst->getAllocatedType();
   auto global = new GlobalVariable(*m_module, globalType,
                                    true, // isConstant
                                    GlobalValue::InternalLinkage, cast<Constant>(storeInst->getValueOperand()), "",
