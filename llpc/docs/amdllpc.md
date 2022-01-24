@@ -1,13 +1,16 @@
 # amdllpc Standalone Compiler
 
-LLPC can be built into a standalone offline compiler (amdllpc). It supports GLSL, SPIR-V binary and SPIR-V assemble file as input and output GPU ISA code and related register settings.
+LLPC can be built into a standalone offline compiler (amdllpc). It supports GLSL, SPIR-V binary and SPIR-V assembly file as input and outputs GPU ISA code and related register settings (PAL metadata).
 
-## Build Instruction
+## Build instructions
 
-LLPC is normally built as part of the [AMD Open Source Driver for Vulkan](../AMDVLK/README.md). The build include standalone `lgc` and `amdllpc`. You can build `lgc amdllpc` only or build `check-lgc check-lgc-units check-amdllpc check-amdllpc-units` to run local tests besides the build.
+LLPC is normally built as part of the [AMD Open Source Driver for Vulkan](../AMDVLK/README.md). The build includes standalone `lgc` and `amdllpc`. You can build `lgc amdllpc` only or build `check-lgc check-lgc-units check-amdllpc check-amdllpc-units` to run local tests besides the build.
 ```
 cmake --build xgl/builds/Release64 --target lgc amdllpc
+```
+
 or
+```
 cmake --build xgl/builds/Release64 --target check-lgc check-lgc-units check-amdllpc check-amdllpc-units
 ```
 
@@ -51,12 +54,12 @@ cmake --build build --target check-lgc check-lgc-units check-amdllpc check-amdll
 ```
 
 See above if this gives an error due to not finding an include file from glslang or SPIRV-Tools.
-If you want to make the amdllpc compatible with driver, you could get <pal_interface_version> from the ICD_PAL_CLIENT_MAJOR_VERSION defined in xgl/icd/make/importdefs and add it in the build option. If the build option is not added, latest PAL interface version will be used.
+If you want to make amdllpc compatible with driver, you could get `<pal_interface_version>` from the `ICD_PAL_CLIENT_MAJOR_VERSION` defined in `xgl/icd/make/importdefs` and add it in the build option. If the build option is not added, the latest PAL interface version will be used.
 
 ## Usage
 ```
 export LD_LIBRARY_PATH=<path_to_spvgen>:$LD_LIBRARY_PATH
-amdllpc [<options>...] [<files>...]
+amdllpc [<options>...] [<input_file[,entry_point]>...]
 ```
 
 ### Options
@@ -68,9 +71,18 @@ amdllpc [<options>...] [<files>...]
 | `-help`                          | Print detail help, include all LLVM options                       |                               |
 | `-gfxip=<major.minor.step>`      | Graphics IP version                                               | 8.0.0                         |
 | `-o=<filename>`                  | Output ELF binary file                                            |                               |
-| `-entry-target=<entryname>`      | Name string of entry target in SPIRV                              | main                          |
-| `-val`                           | Validate input SPIR-V binary or text                              |                               |
+| `-validate-spirv`                | Validate input SPIR-V binary or text                              |                               |
 | `-verify-ir`                     | Verify LLVM IR after each pass                                    | false                         |
+
+* Pipeline compilation options
+
+| Option Name                      | Description                                                       | Default Value                 |
+| -------------------------------- | ----------------------------------------------------------------- | ------------------------------|
+| `-auto-layout-desc`              | Automatically create descriptor layout based on resource usages   | false                         |
+| `-robust-buffer-access`          | Validate if buffer index is out of bounds                         | false                         |
+| `-enable-relocatable-shader-elf` | Compile pipelines using relocatable shader elf                    | false                         |
+| `-enable-scratch-bounds-checks`  | Insert scratch access bounds checks on loads and stores           | false                         |
+| `-scalar-block-layout`           | Allow scalar block layout of types                                | false                         |
 
 * Dump options
 
@@ -93,7 +105,6 @@ amdllpc [<options>...] [<files>...]
 
 | Option Name                      | Description                                                       | Default Value                 |
 | -------------------------------- | ----------------------------------------------------------------- | ------------------------------|
-| `-enable-errs`                   | Enable error message output (to stdout or external file)          |                               |
 | `-enable-si-scheduler`           | Enable target option si-scheduler                                 |                               |
 | `-disable-gs-onchip`             | Disable geometry shader on-chip mode                              |                               |
 | `-enable-tess-offchip`           | Enable tessellation off-chip mode                                 |                               |
@@ -139,7 +150,7 @@ amdllpc [<options>...] [<files>...]
 > **Note:** To compile a GLSL source text file or a SPIR-V text (assembly) file,
 or a Pipeline info file that contains or points to either of those, amdllpc needs to
 call [spvgen](https://github.com/GPUOpen-Drivers/spvgen). The directory of the spvgen library
-needs to be added to the environment variable LD_LIBRARY_PATH. Compiling SPIR-V binary
+needs to be added to the environment variable `LD_LIBRARY_PATH`. Compiling SPIR-V binary
 or a Pipeline info file that contains or points to SPIR-V binary does not require spvgen.
 
 ### Examples

@@ -216,7 +216,7 @@ cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load SPVGEN 
 cl::opt<bool> RobustBufferAccess("robust-buffer-access", cl::desc("Validate if the index is out of bounds"),
                                  cl::init(false));
 
-cl::opt<bool> ScalarBlockLayout("scalar-block-layout", cl::desc("Allows scalar block layout of types"),
+cl::opt<bool> ScalarBlockLayout("scalar-block-layout", cl::desc("Allow scalar block layout of types"),
                                 cl::init(false));
 
 cl::opt<bool> EnableRelocatableShaderElf("enable-relocatable-shader-elf",
