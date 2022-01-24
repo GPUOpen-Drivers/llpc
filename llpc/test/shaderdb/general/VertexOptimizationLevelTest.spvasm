@@ -1,0 +1,44 @@
+; Check that enabling pipeline dumps produces the expected files (.pipe, .spv, and .elf).
+
+; REQUIRES: llpc-client-interface-53
+
+; Create a fresh directory for pipeline dump files.
+; RUN: mkdir -p %t/dump
+
+; Do a compilation with the fast optimization level.
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -o %t.orig.elf -llpc-opt=quick \
+; RUN:   --enable-pipeline-dump --pipeline-dump-dir=%t/dump \
+; RUN:   | tee %t/dump/fast.log | FileCheck -check-prefix=COMPILE %s
+; COMPILE-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; COMPILE-LABEL: ==== AMDLLPC SUCCESS ====
+
+; Do a compilation with the default optimization level.
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -o %t.orig.elf -llpc-opt=default \
+; RUN:   --enable-pipeline-dump --pipeline-dump-dir=%t/dump \
+; RUN:   | tee %t/dump/default.log | FileCheck -check-prefix=COMPILE %s
+
+; Check that the new option is in the pipeline dump
+; RUN: cat %t/dump/*pipe | FileCheck --match-full-lines --check-prefix=PIPE %s
+; PIPE-DAG:  options.optimizationLevel = 1
+; PIPE-DAG:  options.optimizationLevel = 2
+
+; Check that we can compile with the pipeline dump as input and get the same optimization level
+; RUN: grep -l "options.optimizationLevel = 1" %t/dump/PipelineVsFs_0x*.pipe \
+; RUN:   | xargs amdllpc -spvgen-dir=%spvgendir% -v %gfxip -o %t.recompile.elf \
+; RUN:   | FileCheck --match-full-lines -check-prefix=RECOMPILE %s
+; RECOMPILE-LABEL: TargetMachine optimization level = 1
+; RECOMPILE-LABEL: PassManager optimization level = 1
+; RECOMPILE-LABEL: =====  AMDLLPC SUCCESS  =====
+
+; Cleanup.
+; RUN: rm -rf %t/dump
+
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %1 "main"
+         %12 = OpTypeVoid
+         %21 = OpTypeFunction %12
+          %1 = OpFunction %12 None %21
+         %66 = OpLabel
+               OpReturn
+               OpFunctionEnd

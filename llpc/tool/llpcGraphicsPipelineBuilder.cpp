@@ -145,6 +145,11 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
   pipelineInfo->options.enableRelocatableShaderElf = compileInfo.relocatableShaderElf;
   pipelineInfo->options.scalarBlockLayout = compileInfo.scalarBlockLayout;
   pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo.scratchAccessBoundsChecks;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
+  if (compileInfo.optimizationLevel.hasValue()) {
+    pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.getValue();
+  }
+#endif
 
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pGraphicsInfo = pipelineInfo;

@@ -248,6 +248,16 @@ cl::opt<bool> DumpDuplicatePipelines(
     "dump-duplicate-pipelines",
     cl::desc("If TRUE, duplicate pipelines will be dumped to a file with a numeric suffix attached"), cl::init(false));
 
+// -llpc_opt: Override the optimization level passed in to LGC with the given one.  This options is the same as the
+// `-opt` option in lgc.  The reason for the second option is to be able to test the LLPC API.  If both options are set
+// then `-opt` wins.
+cl::opt<CodeGenOpt::Level> LlpcOptLevel("llpc-opt", cl::desc("The optimization level for amdllpc to pass to LLPC:"),
+                                        cl::init(CodeGenOpt::Default),
+                                        values(clEnumValN(CodeGenOpt::None, "none", "no optimizations"),
+                                               clEnumValN(CodeGenOpt::Less, "quick", "quick compilation time"),
+                                               clEnumValN(CodeGenOpt::Default, "default", "default optimizations"),
+                                               clEnumValN(CodeGenOpt::Aggressive, "fast", "fast execution time")));
+
 #ifdef WIN_OS
 // -assert-to-msgbox: pop message box when an assert is hit, only valid in Windows
 cl::opt<bool> AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when assert is hit"));
@@ -393,6 +403,16 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->robustBufferAccess = RobustBufferAccess;
   compileInfo->scalarBlockLayout = ScalarBlockLayout;
   compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
+
+  if (LlpcOptLevel.getPosition() != 0) {
+    compileInfo->optimizationLevel = LlpcOptLevel;
+  }
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
+  // We want the default optimization level to be "Default" which is not 0.
+  compileInfo->gfxPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
+  compileInfo->compPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
+#endif
 
   // Set NGG control settings
   if (ParsedGfxIp.major >= 10) {
