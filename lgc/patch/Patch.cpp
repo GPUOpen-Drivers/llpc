@@ -54,7 +54,6 @@
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
@@ -91,21 +90,6 @@
 
 using namespace llvm;
 
-namespace llvm {
-
-namespace cl {
-
-// -opt: Set the optimization level
-opt<CodeGenOpt::Level> OptLevel("opt", desc("Set the optimization level:"), init(CodeGenOpt::Default),
-                                values(clEnumValN(CodeGenOpt::None, "none", "no optimizations"),
-                                       clEnumValN(CodeGenOpt::Less, "quick", "quick compilation time"),
-                                       clEnumValN(CodeGenOpt::Default, "default", "default optimizations"),
-                                       clEnumValN(CodeGenOpt::Aggressive, "fast", "fast execution time")));
-
-} // namespace cl
-
-} // namespace llvm
-
 namespace lgc {
 
 // =====================================================================================================================
@@ -115,9 +99,12 @@ namespace lgc {
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param patchTimer : Timer to time patch passes with, nullptr if not timing
 // @param optTimer : Timer to time LLVM optimization passes with, nullptr if not timing
-// @param checkShaderCacheDunc : Callback function to check shader cache
+// @param checkShaderCacheFunc : Callback function to check shader cache
+// @param optLevel : The optimization level uses to adjust the aggressiveness of
+//                   passes and which passes to add.
 void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, bool addReplayerPass, Timer *patchTimer,
-                      Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc) {
+                      Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc,
+                      CodeGenOpt::Level optLevel) {
   // Start timer for patching passes.
   if (patchTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
@@ -185,7 +172,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   passMgr.addPass(PatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
 
   // Add some optimization passes
-  addOptimizationPasses(passMgr);
+  addOptimizationPasses(passMgr, optLevel);
 
   // Stop timer for optimization passes and restart timer for patching passes.
   if (patchTimer) {
@@ -205,8 +192,12 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
 // @param replayerPass : BuilderReplayer pass, or nullptr if not needed
 // @param patchTimer : Timer to time patch passes with, nullptr if not timing
 // @param optTimer : Timer to time LLVM optimization passes with, nullptr if not timing
+// @param checkShaderCacheFunc : Callback function to check shader cache
+// @param optLevel : The optimization level uses to adjust the aggressiveness of
+//                   passes and which passes to add.
 void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &passMgr, ModulePass *replayerPass,
-                            Timer *patchTimer, Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc)
+                            Timer *patchTimer, Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc,
+                            CodeGenOpt::Level optLevel)
 // Callback function to check shader cache
 {
   // Start timer for patching passes.
@@ -278,7 +269,7 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   passMgr.add(createLegacyPatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
 
   // Add some optimization passes
-  addOptimizationPasses(passMgr);
+  addOptimizationPasses(passMgr, optLevel);
 
   // Stop timer for optimization passes and restart timer for patching passes.
   if (patchTimer) {
@@ -343,8 +334,10 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
 // Add optimization passes to pass manager
 //
 // @param [in/out] passMgr : Pass manager to add passes to
-void Patch::addOptimizationPasses(lgc::PassManager &passMgr) {
-  LLPC_OUTS("PassManager optimization level = " << cl::OptLevel << "\n");
+// @param optLevel : The optimization level uses to adjust the aggressiveness of
+//                   passes and which passes to add.
+void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level optLevel) {
+  LLPC_OUTS("PassManager optimization level = " << optLevel << "\n");
 
   passMgr.addPass(ForceFunctionAttrsPass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
@@ -367,7 +360,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr) {
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopIdiomRecognizePass())));
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopDeletionPass())));
   passMgr.addPass(createModuleToFunctionPassAdaptor(LoopUnrollPass(
-      LoopUnrollOptions(cl::OptLevel).setPartial(false).setRuntime(false).setPeeling(false).setUpperBound(false))));
+      LoopUnrollOptions(optLevel).setPartial(false).setRuntime(false).setPeeling(false).setUpperBound(false))));
   passMgr.addPass(createModuleToFunctionPassAdaptor(ScalarizerPass()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(PatchLoadScalarizer()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(InstSimplifyPass()));
@@ -384,7 +377,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr) {
                                                                         .needCanonicalLoops(true)
                                                                         .sinkCommonInsts(true))));
   passMgr.addPass(createModuleToFunctionPassAdaptor(LoopUnrollPass(
-      LoopUnrollOptions(cl::OptLevel).setPartial(true).setRuntime(true).setPeeling(true).setUpperBound(true))));
+      LoopUnrollOptions(optLevel).setPartial(true).setRuntime(true).setPeeling(true).setUpperBound(true))));
   // uses DivergenceAnalysis
   passMgr.addPass(createModuleToFunctionPassAdaptor(PatchReadFirstLane()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
@@ -397,8 +390,10 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr) {
 // Add optimization passes to pass manager
 //
 // @param [in/out] passMgr : Pass manager to add passes to
-void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr) {
-  LLPC_OUTS("PassManager optimization level = " << cl::OptLevel << "\n");
+// @param optLevel : The optimization level uses to adjust the aggressiveness of
+//                   passes and which passes to add.
+void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr, CodeGenOpt::Level optLevel) {
+  LLPC_OUTS("PassManager optimization level = " << optLevel << "\n");
 
   passMgr.add(createForceFunctionAttrsLegacyPass());
   passMgr.add(createInstructionCombiningPass(1));
@@ -420,7 +415,7 @@ void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr) {
   passMgr.add(createIndVarSimplifyPass());
   passMgr.add(createLoopIdiomPass());
   passMgr.add(createLoopDeletionPass());
-  passMgr.add(createSimpleLoopUnrollPass(cl::OptLevel));
+  passMgr.add(createSimpleLoopUnrollPass(optLevel));
   passMgr.add(createScalarizerPass());
   passMgr.add(createLegacyPatchLoadScalarizer());
   passMgr.add(createInstSimplifyLegacyPass());
@@ -436,7 +431,7 @@ void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr) {
                                               .convertSwitchToLookupTable(true)
                                               .needCanonicalLoops(true)
                                               .sinkCommonInsts(true)));
-  passMgr.add(createLoopUnrollPass(cl::OptLevel));
+  passMgr.add(createLoopUnrollPass(optLevel));
   // uses DivergenceAnalysis
   passMgr.add(createLegacyPatchReadFirstLane());
   passMgr.add(createInstructionCombiningPass(1));

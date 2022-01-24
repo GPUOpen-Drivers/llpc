@@ -184,9 +184,9 @@ bool PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
   m_lastError.clear();
 
   if (newPassManager)
-    generateWithNewPassManager(std::move(pipelineModule), outStream, checkShaderCacheFunc, timers);
+    generateWithNewPassManager(std::move(pipelineModule), outStream, std::move(checkShaderCacheFunc), timers);
   else
-    generateWithLegacyPassManager(std::move(pipelineModule), outStream, checkShaderCacheFunc, timers);
+    generateWithLegacyPassManager(std::move(pipelineModule), outStream, std::move(checkShaderCacheFunc), timers);
 
   // See if there was a recoverable error.
   return getLastError() == "";
@@ -222,7 +222,8 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
     passMgr->addPass(PrintModulePass(outStream));
   else {
     // Patching.
-    Patch::addPasses(this, *passMgr, m_noReplayer, patchTimer, optTimer, checkShaderCacheFunc);
+    Patch::addPasses(this, *passMgr, m_noReplayer, patchTimer, optTimer, std::move(checkShaderCacheFunc),
+                     getLgcContext()->getOptimizationLevel());
 
     // Add pass to clear pipeline state from IR
     passMgr->addPass(PipelineStateClearer());
@@ -274,7 +275,8 @@ void PipelineState::generateWithLegacyPassManager(std::unique_ptr<Module> pipeli
     replayerPass = createLegacyBuilderReplayer(this);
 
   // Patching.
-  LegacyPatch::addPasses(this, *passMgr, replayerPass, patchTimer, optTimer, checkShaderCacheFunc);
+  LegacyPatch::addPasses(this, *passMgr, replayerPass, patchTimer, optTimer, std::move(checkShaderCacheFunc),
+                         getLgcContext()->getOptimizationLevel());
 
   // Add pass to clear pipeline state from IR
   passMgr->add(createLegacyPipelineStateClearer());

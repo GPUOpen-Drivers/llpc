@@ -73,7 +73,7 @@ class LegacyPatchCheckShaderCache;
 // Initialize passes for patching
 //
 // @param passRegistry : Pass registry
-inline static void initializePatchPasses(llvm::PassRegistry &passRegistry) {
+inline void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializeLegacyLowerFragColorExportPass(passRegistry);
   initializeLegacyLowerVertexFetchPass(passRegistry);
   initializePatchBufferOpPass(passRegistry);
@@ -127,12 +127,12 @@ public:
 
   static void addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, bool addReplayerPass,
                         llvm::Timer *patchTimer, llvm::Timer *optTimer,
-                        Pipeline::CheckShaderCacheFunc checkShaderCacheFunc);
+                        Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, llvm::CodeGenOpt::Level optLevel);
 
   static llvm::GlobalVariable *getLdsVariable(PipelineState *pipelineState, llvm::Module *module);
 
 protected:
-  static void addOptimizationPasses(lgc::PassManager &passMgr);
+  static void addOptimizationPasses(lgc::PassManager &passMgr, llvm::CodeGenOpt::Level optLevel);
 
   void init(llvm::Module *module);
 
@@ -151,10 +151,10 @@ public:
 
   static void addPasses(PipelineState *pipelineState, llvm::legacy::PassManager &passMgr,
                         llvm::ModulePass *replayerPass, llvm::Timer *patchTimer, llvm::Timer *optTimer,
-                        Pipeline::CheckShaderCacheFunc checkShaderCacheFunc);
+                        Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, llvm::CodeGenOpt::Level optLevel);
 
 private:
-  static void addOptimizationPasses(llvm::legacy::PassManager &passMgr);
+  static void addOptimizationPasses(llvm::legacy::PassManager &passMgr, llvm::CodeGenOpt::Level optLevel);
 
   LegacyPatch() = delete;
   LegacyPatch(const LegacyPatch &) = delete;
