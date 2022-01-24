@@ -220,6 +220,7 @@ Expected<size_t> getFileSize(StringRef path) {
   if (exists(path))
     return file_size(path);
   return createResultError(Result::NotFound, Twine("File ") + path + " does not exist");
+}
 
 // An internal LLPC function.
 Error readSpirvFile(StringRef path) {
