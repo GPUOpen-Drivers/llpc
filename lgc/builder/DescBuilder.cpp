@@ -430,7 +430,13 @@ Value *DescBuilder::CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm
   Type *const rhsType = rhs->getType();
   if (!lhsType->isPointerTy() || lhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER ||
       !rhsType->isPointerTy() || rhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 412285
+    // Old version of the code
     return IRBuilderBase::CreatePtrDiff(lhs, rhs, instName);
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    return IRBuilderBase::CreatePtrDiff(lhsType->getPointerElementType(), lhs, rhs, instName);
+#endif
 
   std::string callName = lgcName::LateBufferPtrDiff;
   addTypeMangling(getInt64Ty(), {lhs, rhs}, callName);
