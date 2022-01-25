@@ -1,0 +1,176 @@
+; Test a reloctable shader compilation with every shader stage and a vertex input.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | \
+; RUN: FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: Building pipeline with relocatable shader elf.
+; SHADERTEST: {{^//}} LLPC pipeline patching results
+
+; Make sure the hs shader comes first and has the vertex attribute as its last parameter.
+; SHADERTEST: define dllexport amdgpu_hs void @_amdgpu_hs_main_fetchless({{.*}}, <4 x float> [[vert_attrib:%[0-9]*]])
+
+; Call the original vertex shader passing in the attribute
+; SHADERTEST: call void @_amdgpu_ls_main_fetchless({{.*}}, <4 x float> [[vert_attrib]])
+
+; Reach the end of the hs shader
+; SHADERTEST: ret void
+
+; Make sure that the GS shader does not have the vertex attribute.  It is not needed if it does not call the original
+; vertex shader.
+; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main({{.*}}, i32 {{%[0-9]*}})
+
+; SHADERTEST: {{^//}} LLPC final pipeline module info
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+
+layout(location = 0) in vec4 _14;
+layout(location = 0) out vec4 _18;
+
+void main()
+{
+    _18 = _14;
+}
+
+[VsInfo]
+entryPoint = main
+
+[TcsGlsl]
+#version 450
+layout(vertices = 3) out;
+
+void main()
+{
+}
+
+
+[TcsInfo]
+entryPoint = main
+
+[TesGlsl]
+#version 450
+layout(triangles, ccw, equal_spacing) in;
+
+void main()
+{
+}
+
+[TesInfo]
+entryPoint = main
+
+[GsGlsl]
+#version 450
+layout(triangles) in;
+layout(max_vertices = 3, triangle_strip) out;
+
+void main()
+{
+}
+
+
+[GsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+
+void main()
+{
+}
+
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 1
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorConstBuffer
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 4
+userDataNode[0].next[0].set = 0x00000000
+userDataNode[0].next[0].binding = 0
+userDataNode[1].visibility = 31
+userDataNode[1].type = PushConst
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 12
+userDataNode[1].set = 0xFFFFFFFF
+userDataNode[1].binding = 0
+userDataNode[2].visibility = 8
+userDataNode[2].type = StreamOutTableVaPtr
+userDataNode[2].offsetInDwords = 13
+userDataNode[2].sizeInDwords = 1
+userDataNode[3].visibility = 1
+userDataNode[3].type = IndirectUserDataVaPtr
+userDataNode[3].offsetInDwords = 14
+userDataNode[3].sizeInDwords = 1
+userDataNode[3].indirectUserDataCount = 4
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+patchControlPoints = 3
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 1
+rasterizerDiscardEnable = 0
+perSampleShading = 0
+numSamples = 0
+samplePatternIdx = 0
+usrClipPlaneMask = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+nggState.enableNgg = 0
+nggState.enableGsUse = 0
+nggState.forceCullingMode = 0
+nggState.compactMode = NggCompactDisable
+nggState.enableVertexReuse = 0
+nggState.enableBackfaceCulling = 0
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 0
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 0
+nggState.vertsPerSubgroup = 0
+dynamicVertexStride = 0
+enableUberFetchShader = 0
+enableEarlyCompile = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 1
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+options.shadowDescriptorTableUsage = Enable
+options.shadowDescriptorTablePtrHigh = 2
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 0
+options.extendedRobustness.nullDescriptor = 0
+
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 32
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+attribute[1].location = 1
+attribute[1].binding = 0
+attribute[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[1].offset = 16

@@ -534,9 +534,9 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
     argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
     argTys.push_back(Type::getInt32Ty(*m_context)); // Primitive ID (VS)
     argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
+    appendVertexFetchTypes(argTys);
   }
 
-  appendVertexFetchTypes(argTys);
 
   return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
 }
@@ -831,10 +831,11 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
         args.push_back(instanceId);
         ++esArgIdx;
       }
+
+      appendArguments(args, vertexFetchesStart, vertexFetchesEnd);
+      esArgIdx += (vertexFetchesEnd - vertexFetchesStart);
     }
 
-    appendArguments(args, vertexFetchesStart, vertexFetchesEnd);
-    esArgIdx += (vertexFetchesEnd - vertexFetchesStart);
     CallInst::Create(esEntryPoint, args, "", beginEsBlock);
   }
   BranchInst::Create(endEsBlock, beginEsBlock);
