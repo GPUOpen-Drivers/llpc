@@ -1096,11 +1096,13 @@ Value *BuilderRecorder::CreateGetBufferDescLength(Value *const bufferDesc, Value
 // =====================================================================================================================
 // Return the i64 difference between two buffer fat pointer values, dividing out the size of the pointed-to objects.
 //
+// @param ty : Element type of the pointers.
 // @param lhs : Left hand side of the subtraction.
 // @param rhs : Reft hand side of the subtraction.
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName) {
-  return record(Opcode::PtrDiff, getInt64Ty(), {lhs, rhs}, instName);
+Value *BuilderRecorder::CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName) {
+  // We can't store a type, so store a zero value of the type instead
+  return record(Opcode::PtrDiff, getInt64Ty(), {Constant::getNullValue(ty), lhs, rhs}, instName);
 }
 
 // =====================================================================================================================
