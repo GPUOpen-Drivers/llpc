@@ -751,10 +751,12 @@ public:
   // Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
   // For buffer fat pointers, delays the translation to patch phase.
   //
+  // @param ty : Element type of the pointers.
   // @param lhs : Left hand side of the subtraction.
   // @param rhs : Reft hand side of the subtraction.
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs,
+                                     const llvm::Twine &instName = "") = 0;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Image operations

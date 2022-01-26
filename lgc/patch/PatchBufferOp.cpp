@@ -512,11 +512,11 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
 
     callInst.replaceAllUsesWith(numRecords);
   } else if (callName.startswith(lgcName::LateBufferPtrDiff)) {
-    Value *const lhs = getPointerOperandAsInst(callInst.getArgOperand(0));
-    Value *const rhs = getPointerOperandAsInst(callInst.getArgOperand(1));
-    Type *const lhsType = lhs->getType();
+    Type *const ty = callInst.getArgOperand(0)->getType();
+    Value *const lhs = getPointerOperandAsInst(callInst.getArgOperand(1));
+    Value *const rhs = getPointerOperandAsInst(callInst.getArgOperand(2));
 
-    assert(lhsType->isPointerTy() && lhsType->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
+    assert(lhs->getType()->isPointerTy() && lhs->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
            rhs->getType()->isPointerTy() && rhs->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
            "Argument to BufferPtrDiff is not a buffer fat pointer");
 
@@ -527,7 +527,7 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     copyMetadata(rhsPtrToInt, rhs);
 
     Value *const difference = m_builder->CreateSub(lhsPtrToInt, rhsPtrToInt);
-    Constant *const size = ConstantExpr::getSizeOf(cast<PointerType>(lhsType)->getElementType());
+    Constant *const size = ConstantExpr::getSizeOf(ty);
     Value *const elementDifference = m_builder->CreateExactSDiv(difference, size);
 
     // Record the call instruction so we remember to delete it later.

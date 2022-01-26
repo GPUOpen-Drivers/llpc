@@ -1,0 +1,102 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: call i64 (...) @lgc.create.buffer.ptrdiff.i64(i32 0, i32 addrspace(7)* getelementptr inbounds (<{ [32 x i32] }>, <{ [32 x i32] }> addrspace(7)* {{@[0-9]+}}, i32 0, i32 0, i32 0), i32 addrspace(7)* {{%[0-9]+}})
+; SHADERTEST: call i64 (...) @lgc.create.buffer.ptrdiff.i64(i64 0, i64 addrspace(7)* getelementptr inbounds (<{ [32 x i64] }>, <{ [32 x i64] }> addrspace(7)* {{@[0-9]+}}, i32 0, i32 0, i32 0), i64 addrspace(7)* {{%[0-9]+}})
+
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+
+; SHADERTEST: call i64 @lgc.late.buffer.ptrdiff.i32.p7i8.p7i32(i32 0, i8 addrspace(7)* {{%[0-9]+}}, i32 addrspace(7)* {{%[0-9]+}})
+; SHADERTEST: call i64 @lgc.late.buffer.ptrdiff.i64.p7i8.p7i64(i64 0, i8 addrspace(7)* {{%[0-9]+}}, i64 addrspace(7)* {{%[0-9]+}})
+
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+
+; SHADERTEST: [[a:%[0-9a-zA-Z.]+]] = shl i32 {{%[0-9a-zA-Z.]+}}, 2
+; SHADERTEST: [[b:%[0-9]+]] = zext i32 [[a]] to i64
+; SHADERTEST: [[c:%[0-9]+]] = sub nsw i64 0, [[b]]
+; SHADERTEST: [[d:%[0-9]+]] = ashr exact i64 [[c]], 2
+; SHADERTEST: {{%[0-9]+}} = trunc i64 [[d]] to i32
+
+; SHADERTEST: [[a:%[0-9a-zA-Z.]+]] = shl i32 {{%[0-9a-zA-Z.]+}}, 3
+; SHADERTEST: [[b:%[0-9]+]] = zext i32 [[a]] to i64
+; SHADERTEST: [[c:%[0-9]+]] = sub nsw i64 0, [[b]]
+; SHADERTEST: [[d:%[0-9]+]] = ashr exact i64 [[c]], 3
+; SHADERTEST: {{%[0-9]+}} = trunc i64 [[d]] to i32
+
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.4
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 41
+; Schema: 0
+               OpCapability Int64
+               OpCapability Shader
+               OpCapability VariablePointers
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %1 "main" %gl_GlobalInvocationID %arr_i32 %arr_i64 %out
+               OpExecutionMode %1 LocalSize 1 1 1
+               OpDecorate %_runtimearr_v2int ArrayStride 8
+               OpDecorate %_struct_7 Block
+               OpMemberDecorate %_struct_7 0 Offset 0
+               OpDecorate %out DescriptorSet 0
+               OpDecorate %out Binding 0
+               OpDecorate %_ptr_Workgroup_i32 ArrayStride 4
+               OpDecorate %_ptr_Workgroup_i64 ArrayStride 8
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpDecorate %Block_32 Block
+               OpDecorate %Block_64 Block
+               OpMemberDecorate %Block_32 0 Offset 0
+               OpMemberDecorate %Block_64 0 Offset 0
+               OpDecorate %_arr_int_int_32 ArrayStride 4
+               OpDecorate %_arr_int_int_64 ArrayStride 8
+               OpDecorate %arr_i32 DescriptorSet 0
+               OpDecorate %arr_i32 Binding 0
+               OpDecorate %arr_i64 DescriptorSet 0
+               OpDecorate %arr_i64 Binding 0
+       %void = OpTypeVoid
+       %bool = OpTypeBool
+        %i32 = OpTypeInt 32 1
+        %i64 = OpTypeInt 64 1
+      %int_0 = OpConstant %i32 0
+     %int_32 = OpConstant %i32 32
+      %v2int = OpTypeVector %i32 2
+%_arr_int_int_32 = OpTypeArray %i32 %int_32
+%_arr_int_int_64 = OpTypeArray %i64 %int_32
+%_ptr_Workgroup__arr_int_int_32 = OpTypePointer StorageBuffer %_arr_int_int_32
+%_ptr_Workgroup__arr_int_int_64 = OpTypePointer StorageBuffer %_arr_int_int_64
+      %Block_32 = OpTypeStruct %_arr_int_int_32
+      %Block_64 = OpTypeStruct %_arr_int_int_64
+%_ptr_StorageBuffer_Block_32 = OpTypePointer StorageBuffer %Block_32
+%_ptr_StorageBuffer_Block_64 = OpTypePointer StorageBuffer %Block_64
+          %arr_i32 = OpVariable %_ptr_StorageBuffer_Block_32 StorageBuffer
+          %arr_i64 = OpVariable %_ptr_StorageBuffer_Block_64 StorageBuffer
+%_runtimearr_v2int = OpTypeRuntimeArray %v2int
+  %_struct_7 = OpTypeStruct %_runtimearr_v2int
+%_ptr_StorageBuffer__struct_7 = OpTypePointer StorageBuffer %_struct_7
+          %out = OpVariable %_ptr_StorageBuffer__struct_7 StorageBuffer
+%_ptr_Workgroup_i32 = OpTypePointer StorageBuffer %i32
+%_ptr_Workgroup_i64 = OpTypePointer StorageBuffer %i64
+%_ptr_StorageBuffer_v2int = OpTypePointer StorageBuffer %v2int
+         %v3uint = OpTypeVector %i32 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+         %void_ty = OpTypeFunction %void
+         %1 = OpFunction %void None %void_ty
+         %2 = OpLabel
+         %inv_id = OpLoad %v3uint %gl_GlobalInvocationID
+         %i = OpCompositeExtract %i32 %inv_id 0
+
+         %a_i32 = OpAccessChain %_ptr_Workgroup_i32 %arr_i32 %int_0 %int_0
+         %b_i32 = OpPtrAccessChain %_ptr_Workgroup_i32 %a_i32 %i
+         %diff_i32 = OpPtrDiff %i32 %a_i32 %b_i32
+
+         %a_i64 = OpAccessChain %_ptr_Workgroup_i64 %arr_i64 %int_0 %int_0
+         %b_i64 = OpPtrAccessChain %_ptr_Workgroup_i64 %a_i64 %i
+         %diff_i64 = OpPtrDiff %i32 %a_i64 %b_i64
+         %res = OpCompositeConstruct %v2int %diff_i32 %diff_i64
+         %out_addr = OpAccessChain %_ptr_StorageBuffer_v2int %out %int_0 %int_0
+               OpStore %out_addr %res
+               OpReturn
+               OpFunctionEnd

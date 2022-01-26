@@ -460,8 +460,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
 
   case BuilderRecorder::Opcode::PtrDiff: {
-    return m_builder->CreatePtrDiff(args[0],  // lhs
-                                    args[1]); // rhs
+    return m_builder->CreatePtrDiff(args[0]->getType(), // ty
+                                    args[1],            // lhs
+                                    args[2]);           // rhs
   }
 
   // Replayer implementations of ImageBuilder methods

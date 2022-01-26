@@ -305,7 +305,8 @@ public:
                                          const llvm::Twine &instName = "") override final;
 
   // Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
-  llvm::Value *CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName = "") override final;
+  llvm::Value *CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs,
+                             const llvm::Twine &instName = "") override final;
 
 private:
   DescBuilder() = delete;

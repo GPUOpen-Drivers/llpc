@@ -4901,8 +4901,9 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
         transValue(bi->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
     Value *const op2 =
         transValue(bi->getOpValue(1), getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+    Type *ty = transType(bi->getOpValue(0)->getType()->getPointerElementType());
 
-    Value *ptrDiff = getBuilder()->CreatePtrDiff(op1, op2);
+    Value *ptrDiff = getBuilder()->CreatePtrDiff(ty, op1, op2);
 
     auto destType = dyn_cast<IntegerType>(transType(bv->getType()));
     auto ptrDiffType = dyn_cast<IntegerType>(ptrDiff->getType());
