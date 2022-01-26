@@ -167,15 +167,15 @@ Result PipelineBuilder::buildGraphicsPipeline(BinaryData &outBinaryData) {
   localPipelineInfo.pGraphicsInfo = pipelineInfo;
   void *pipelineDumpHandle = runPreBuildActions(localPipelineInfo);
 
+  SmallVector<BinaryData, 1> pipelines;
+  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, pipelines); });
+
   Result result = m_compiler.BuildGraphicsPipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
   if (result != Result::Success)
     return result;
 
-  SmallVector<BinaryData, 1> pipelines;
   outBinaryData = pipelineOut->pipelineBin;
   pipelines.push_back(outBinaryData);
-
-  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, pipelines); });
 
   return Result::Success;
 }
@@ -228,15 +228,15 @@ Result PipelineBuilder::buildComputePipeline(BinaryData &outBinaryData) {
   localPipelineInfo.pComputeInfo = pipelineInfo;
   void *pipelineDumpHandle = runPreBuildActions(localPipelineInfo);
 
+  SmallVector<BinaryData, 1> pipelines;
+  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, pipelines); });
+
   Result result = m_compiler.BuildComputePipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
   if (result != Result::Success)
     return result;
 
   outBinaryData = pipelineOut->pipelineBin;
-  SmallVector<BinaryData, 1> pipelines;
   pipelines.push_back(outBinaryData);
-
-  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, pipelines); });
 
   return Result::Success;
 }

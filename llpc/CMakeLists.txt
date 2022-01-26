@@ -143,6 +143,10 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
 
+if(VKI_SPIRV_1_6)
+  target_compile_definitions(llpc PRIVATE VKI_SPIRV_1_6)
+endif()
+
 option(LLPC_ENABLE_SHADER_CACHE "Enable experimental shader cache" OFF)
 if(LLPC_ENABLE_SHADER_CACHE)
     target_compile_definitions(llpc PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
@@ -339,6 +343,10 @@ target_include_directories(llpc_standalone_compiler PUBLIC
     ${XGL_PAL_PATH}/inc/util
     ${LLVM_INCLUDE_DIRS}
 )
+
+if(VKI_SPIRV_1_6)
+  target_compile_definitions(llpc_standalone_compiler PUBLIC VKI_SPIRV_1_6)
+endif()
 
 llvm_map_components_to_libnames(llvm_libs
     lgc

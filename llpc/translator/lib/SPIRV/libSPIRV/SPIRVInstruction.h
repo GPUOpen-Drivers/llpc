@@ -932,6 +932,9 @@ protected:
            getCondition()->getType()->isTypeInt());
     assert(getTrueLabel()->isForward() || getTrueLabel()->isLabel());
     assert(getFalseLabel()->isForward() || getFalseLabel()->isLabel());
+#if SPV_VERSION >= 0x10600
+    assert(TrueLabelId != FalseLabelId);
+#endif
   }
   SPIRVId ConditionId;
   SPIRVId TrueLabelId;
