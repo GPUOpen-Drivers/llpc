@@ -5680,6 +5680,12 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskI
       mask &= ~ImageOperandsZeroExtendMask;
 #endif
 
+#if SPV_VERSION >= 0x10600
+    // Nontemporal (0x4000)
+    if (mask & ImageOperandsNontemporalMask)
+      mask &= ~ImageOperandsNontemporalMask;
+#endif
+
     assert(!mask && "Unknown image operand");
   }
 }
