@@ -217,7 +217,7 @@ public:
 
   bool exist(SPIRVId) const;
   template <class T> T *get(SPIRVId TheId) const {
-    return static_cast<T *>(getEntry(TheId)); // NOLINT
+    return reinterpret_cast<T *>(getEntry(TheId));
   }
   SPIRVEntry *getEntry(SPIRVId) const;
   SPIRVEntry *getOrCreate(SPIRVId TheId) const;
