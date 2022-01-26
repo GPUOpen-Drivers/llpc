@@ -422,10 +422,11 @@ Value *DescBuilder::CreateGetBufferDescLength(Value *const bufferDesc, Value *of
 // Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
 // For buffer fat pointers, delays the translation to patch phase.
 //
+// @param ty : Element type of the pointers.
 // @param lhs : Left hand side of the subtraction.
 // @param rhs : Reft hand side of the subtraction.
 // @param instName : Name to give instruction(s)
-Value *DescBuilder::CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName) {
+Value *DescBuilder::CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName) {
   Type *const lhsType = lhs->getType();
   Type *const rhsType = rhs->getType();
   if (!lhsType->isPointerTy() || lhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER ||
@@ -435,12 +436,14 @@ Value *DescBuilder::CreatePtrDiff(llvm::Value *lhs, llvm::Value *rhs, const llvm
     return IRBuilderBase::CreatePtrDiff(lhs, rhs, instName);
 #else
     // New version of the code (also handles unknown version, which we treat as latest)
-    return IRBuilderBase::CreatePtrDiff(lhsType->getPointerElementType(), lhs, rhs, instName);
+    return IRBuilderBase::CreatePtrDiff(ty, lhs, rhs, instName);
 #endif
 
+  // Add a dummy value of the pointer element type so we can later determine its size
+  Value *dummyValue = Constant::getNullValue(ty);
   std::string callName = lgcName::LateBufferPtrDiff;
-  addTypeMangling(getInt64Ty(), {lhs, rhs}, callName);
-  return CreateNamedCall(callName, getInt64Ty(), {lhs, rhs}, Attribute::ReadNone);
+  addTypeMangling(getVoidTy(), {dummyValue, lhs, rhs}, callName);
+  return CreateNamedCall(callName, getInt64Ty(), {dummyValue, lhs, rhs}, Attribute::ReadNone);
 }
 
 // =====================================================================================================================
