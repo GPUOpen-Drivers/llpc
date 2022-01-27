@@ -576,6 +576,42 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
 }
 
 // =====================================================================================================================
+// Finalize SPI_PS_INPUT_CNTL_0_* register setting for pipeline or part-pipeline compilation.
+//
+// Adjust the value if gl_ViewportIndex is not used in the pre-rasterizer stages.
+void PalMetadata::finalizeInputControlRegisterSetting() {
+  assert(isShaderStageInMask(ShaderStageFragment, m_pipelineState->getShaderStageMask()));
+
+  unsigned viewportIndexLoc = getFragmentShaderBuiltInLoc(BuiltInViewportIndex);
+  if (viewportIndexLoc == InvalidValue) {
+    auto &builtInInLocMap = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->inOutUsage.builtInInputLocMap;
+    auto builtInInputLocMapIt = builtInInLocMap.find(BuiltInViewportIndex);
+    if (builtInInputLocMapIt == builtInInLocMap.end())
+      return;
+    viewportIndexLoc = builtInInputLocMapIt->second;
+  }
+  assert(viewportIndexLoc != InvalidValue);
+
+  auto usesViewportArrayIndexNode = &m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex];
+  if (usesViewportArrayIndexNode->isEmpty())
+    *usesViewportArrayIndexNode = false;
+  const bool usesViewportArrayIndex = usesViewportArrayIndexNode->getBool();
+
+  if (!usesViewportArrayIndex) {
+    SPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
+    spiPsInputCntl.u32All = getRegister(mmSPI_PS_INPUT_CNTL_0 + viewportIndexLoc);
+    // Check if pointCoordLoc is not used
+    if (!spiPsInputCntl.bits.PT_SPRITE_TEX) {
+      // Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
+      constexpr unsigned defaultVal = (1 << 5);
+      spiPsInputCntl.bits.OFFSET = defaultVal;
+      spiPsInputCntl.bits.FLAT_SHADE = false;
+      setRegister(mmSPI_PS_INPUT_CNTL_0 + viewportIndexLoc, spiPsInputCntl.u32All);
+    }
+  }
+}
+
+// =====================================================================================================================
 // Finalize PAL metadata for pipeline.
 //
 // @param isWholePipeline : True if called for a whole pipeline compilation or an ELF link, false if called
@@ -585,13 +621,16 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
   finalizeUserDataLimit();
 
   // Finalize register settings.
-  if (m_pipelineState->isGraphics()) {
+  if (m_pipelineState->isGraphics())
     finalizeRegisterSettings(isWholePipeline);
-  }
 
-  // The rest of this function is used only for whole pipeline PAL metadata.
+  // The rest of this function is used only for whole pipeline PAL metadata or an ELF link.
   if (!isWholePipeline)
     return;
+
+  // In the part-pipeline compilation only at ELF link stage do we know how gl_ViewportIndex was used in all stages.
+  if (isShaderStageInMask(ShaderStageFragment, m_pipelineState->getShaderStageMask()))
+    finalizeInputControlRegisterSetting();
 
   // Set pipeline hash.
   auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
@@ -990,6 +1029,22 @@ bool PalMetadata::fragmentShaderUsesMappedBuiltInInputs() {
     return !fragInputMappingArray2.empty();
   }
   return false;
+}
+
+// =====================================================================================================================
+// Returns the location of the fragment builtin or InvalidValue if the builtin is not found.
+//
+// @param builtin : Fragment builtin to check.
+unsigned PalMetadata::getFragmentShaderBuiltInLoc(unsigned builtin) {
+  auto array2It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping2));
+  if (array2It != m_pipelineNode.end()) {
+    auto fragInputMappingArray2 = array2It->second.getArray(true);
+    for (unsigned idx = 0, e = fragInputMappingArray2.size() / 2; idx != e; ++idx) {
+      if (fragInputMappingArray2[idx * 2].getUInt() == builtin)
+        return fragInputMappingArray2[idx * 2 + 1].getUInt();
+    }
+  }
+  return InvalidValue;
 }
 
 // =====================================================================================================================

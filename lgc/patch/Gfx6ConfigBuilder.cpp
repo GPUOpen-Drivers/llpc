@@ -914,18 +914,11 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, resUsage->inOutUsage.fs.interpInfo.size());
 
   unsigned pointCoordLoc = InvalidValue;
-  unsigned viewportIndexLoc = InvalidValue;
 
   auto builtInInputLocMapIt = resUsage->inOutUsage.builtInInputLocMap.find(BuiltInPointCoord);
   if (builtInInputLocMapIt != resUsage->inOutUsage.builtInInputLocMap.end()) {
     // Get generic input corresponding to gl_PointCoord (to set the field PT_SPRITE_TEX)
     pointCoordLoc = builtInInputLocMapIt->second;
-  }
-
-  builtInInputLocMapIt = resUsage->inOutUsage.builtInInputLocMap.find(BuiltInViewportIndex);
-  if (builtInInputLocMapIt != resUsage->inOutUsage.builtInInputLocMap.end()) {
-    // Get generic input corresponding to gl_ViewportIndex (to set the field OFFSET and FLAT_SHADE)
-    viewportIndexLoc = builtInInputLocMapIt->second;
   }
 
   // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none
@@ -967,12 +960,11 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
 
       // NOTE: Set the offset value to force hardware to select input defaults (no VS match).
       spiPsInputCntl.bits.OFFSET = UseDefaultVal;
-    } else if (viewportIndexLoc == i && !usesViewportArrayIndex()) {
-      // NOTE: Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
-      spiPsInputCntl.bits.OFFSET = UseDefaultVal;
-      spiPsInputCntl.bits.FLAT_SHADE = false;
     }
 
+    // NOTE: Set SPI_PS_INPUT_CNTL_* here, but the register can still be changed later,
+    // when it becomes known that gl_ViewportIndex is not used and fields OFFSET and FLAT_SHADE
+    // can be amended.
     appendConfig(mmSPI_PS_INPUT_CNTL_0 + i, spiPsInputCntl.u32All);
   }
 

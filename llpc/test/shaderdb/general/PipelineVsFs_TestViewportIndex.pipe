@@ -1,0 +1,45 @@
+; Test that the value of SPI_PS_INPUT_CNTL_0 is set correctly.
+
+; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: LLPC final ELF info
+; SHADERTEST: SPI_PS_INPUT_CNTL_0                           0x0000000000000400
+; SHADERTEST: AMDLLPC SUCCESS
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+#extension GL_ARB_shader_viewport_layer_array : require
+layout(location = 0) out vec4 _28;
+
+void main()
+{
+    gl_ViewportIndex = 1;
+}
+
+[VsInfo]
+entryPoint = main
+
+
+[FsGlsl]
+#version 450
+
+layout(binding = 0, std140) uniform _13_15
+{
+    vec4 _m0[2];
+} _15;
+
+layout(location = 0) out vec4 _9;
+layout(location = 0) in vec4 _25;
+
+void main()
+{
+    _9 = _15._m0[gl_ViewportIndex];
+}
+
+[FsInfo]
+entryPoint = main
+
+

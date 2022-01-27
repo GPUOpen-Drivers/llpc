@@ -52,6 +52,16 @@ constexpr unsigned shaderStageToMask(Stage theStage, Stages... otherStages) {
   return (1U << static_cast<unsigned>(theStage)) | shaderStageToMask(otherStages...);
 }
 
+// Return true iff `stage` is present in the `stageMask`.
+//
+// @param stage : Shader stage to look for
+// @param stageMask : Stage mask to check
+// @returns : True iff `stageMask` contains `stage`
+inline bool isShaderStageInMask(ShaderStage stage, unsigned stageMask) {
+  assert(stage != ShaderStageInvalid);
+  return (shaderStageToMask(stage) & stageMask) != 0;
+}
+
 // Set shader stage metadata on every defined function in a module
 void setShaderStage(llvm::Module *module, ShaderStage stage);
 
