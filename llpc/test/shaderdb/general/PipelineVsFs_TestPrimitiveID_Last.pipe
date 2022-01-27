@@ -1,0 +1,80 @@
+; Test primitiveID when provoking vertex mode is LAST
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v --gfxip=10.1.0 %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: @[[LDS:[^ ]*]] = external addrspace(3) global [{{[0-9]*}} x i32], align 4
+; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main({{.*}}, i32 %esGsOffsets01, i32 %esGsOffsets23, i32 %gsPrimitiveId,
+; Extract bits 20 to 28 from %esGsOffsets01. These bit encode the thread ID in sub-group which will be used to
+; calculate the address at which to store the provoking vertex.
+; SHADERTEST: [[offset1:%[0-9]*]] = lshr i32 %esGsOffsets01, 18
+; SHADERTEST: [[offset2:%[0-9]*]] = and i32 [[offset1]], 2044
+; SHADERTEST: [[Addr1:%[0-9]*]] = getelementptr i8, i8 addrspace(3)* bitcast ([{{[0-9]*}} x i32] addrspace(3)* @[[LDS]] to i8 addrspace(3)*), i32 [[offset2]]
+; SHADERTEST: [[Addr2:%[0-9]*]] = bitcast i8 addrspace(3)* [[Addr1]] to i32 addrspace(3)*
+; SHADERTEST: store i32 %gsPrimitiveId, i32 addrspace(3)* [[Addr2]], align 4
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+layout(location = 0) in vec4 in_position;
+out gl_PerVertex {
+  vec4 gl_Position;
+  float gl_PointSize;
+};
+void main(void)
+{
+  gl_Position	= in_position;
+  gl_PointSize = 1.0f;
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+layout(binding = 0, rgba8) writeonly uniform image2D image;
+void main(void)
+{
+    imageStore(image, ivec2(gl_PrimitiveID % 4, 0), vec4(1.0, 0.5, 0.25, 1.0));
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 64
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 1
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorImage
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 8
+userDataNode[0].next[0].set = 0x00000000
+userDataNode[0].next[0].binding = 0
+userDataNode[1].visibility = 4
+userDataNode[1].type = StreamOutTableVaPtr
+userDataNode[1].offsetInDwords = 2
+userDataNode[1].sizeInDwords = 1
+userDataNode[2].visibility = 2
+userDataNode[2].type = IndirectUserDataVaPtr
+userDataNode[2].offsetInDwords = 3
+userDataNode[2].sizeInDwords = 1
+userDataNode[2].indirectUserDataCount = 4
+
+[GraphicsPipelineState]
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT
+nggState.enableNgg = 1
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 16
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+
