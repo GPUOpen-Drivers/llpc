@@ -253,6 +253,7 @@ constexpr unsigned mmSPI_SHADER_Z_FORMAT = 0xA1C4;
 constexpr unsigned mmCB_SHADER_MASK = 0xA08F;
 
 // PS register numbers in PAL metadata
+constexpr unsigned mmSPI_PS_INPUT_CNTL_0 = 0xA191; // NOLINT
 constexpr unsigned mmSPI_PS_INPUT_ENA = 0xA1B3;
 constexpr unsigned mmSPI_PS_INPUT_ADDR = 0xA1B4;
 constexpr unsigned mmSPI_PS_IN_CONTROL = 0xA1B6;
@@ -363,6 +364,26 @@ union PA_SC_AA_CONFIG {
     unsigned : 4;
   } bits, bitfields;
 
+  unsigned u32All;
+};
+
+union SPI_PS_INPUT_CNTL_0 {
+  struct {
+    unsigned OFFSET : 6;              // NOLINT
+    unsigned : 2;                     // NOLINT
+    unsigned DEFAULT_VAL : 2;         // NOLINT
+    unsigned FLAT_SHADE : 1;          // NOLINT
+    unsigned : 6;                     // NOLINT
+    unsigned PT_SPRITE_TEX : 1;       // NOLINT
+    unsigned DUP : 1;                 // NOLINT
+    unsigned FP16_INTERP_MODE : 1;    // NOLINT
+    unsigned USE_DEFAULT_ATTR1 : 1;   // NOLINT
+    unsigned DEFAULT_VAL_ATTR1 : 2;   // NOLINT
+    unsigned PT_SPRITE_TEX_ATTR1 : 1; // NOLINT
+    unsigned ATTR0_VALID : 1;         // NOLINT
+    unsigned ATTR1_VALID : 1;         // NOLINT
+    unsigned : 6;                     // NOLINT
+  } bits, bitfields;
   unsigned u32All;
 };
 

@@ -199,6 +199,9 @@ public:
   // Returns true if the fragment input info has an entry for a builtin.
   bool fragmentShaderUsesMappedBuiltInInputs();
 
+  // Returns the location of the fragment builtin or InvalidValue if the builtin is not found.
+  unsigned getFragmentShaderBuiltInLoc(unsigned builtIn);
+
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
   void initialize();
@@ -223,6 +226,9 @@ private:
 
   // Finalize PAL register settings for pipeline, part-pipeline or shader compilation.
   void finalizeRegisterSettings(bool isWholePipeline);
+
+  // Finalize SPI_PS_INPUT_CNTL_0_* register setting for pipeline or part-pipeline compilation.
+  void finalizeInputControlRegisterSetting();
 
   // The maximum possible value for the spill threshold entry in the PAL metadata.
   static constexpr uint64_t MAX_SPILL_THRESHOLD = UINT_MAX;
