@@ -7011,7 +7011,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, descSet)));
       resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, binding)));
       resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, blockTy->getOpCode())));
-      resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, blockType)));
       auto resMdNode = MDNode::get(*m_context, resMDs);
       gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
 
@@ -7569,7 +7568,6 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     // Build element metadata
     Type *elemMdTy = nullptr;
     auto elemDec = blockDec; // Inherit from parent
-    elemDec.Offset = 0;      // Offset should be cleared for the element type of array, pointer, matrix
     auto elemMd = buildShaderBlockMetadata(elemTy, elemDec, elemMdTy);
 
     // Build metadata for the array/matrix
@@ -7610,7 +7608,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
       // Check member decorations
       auto memberDec = blockDec; // Inherit from parent
 
-      const unsigned remappedIdx = lookupRemappedTypeElements(bt, memberIdx);
+      const unsigned remappedIdx = isRemappedTypeElements(bt) ? lookupRemappedTypeElements(bt, memberIdx) : memberIdx;
       const DataLayout &dl = m_m->getDataLayout();
       Type *const ty = transType(bt, 0, false, true, true);
       assert(ty->isStructTy());
