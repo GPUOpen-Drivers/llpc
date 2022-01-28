@@ -7083,33 +7083,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, opaqueTy->getOpCode())));
       auto mdNode = MDNode::get(*m_context, mDs);
       gv->addMetadata(gSPIRVMD::Resource, *mdNode);
-
-      // Build image memory metadata
-      if (opaqueTy->isTypeImage()) {
-        auto imageTy = static_cast<SPIRVTypeImage *>(opaqueTy);
-        auto desc = imageTy->getDescriptor();
-        assert(desc.Sampled <= 2); // 0 - runtime, 1 - sampled, 2 - non sampled
-
-        if (desc.Sampled == 2) {
-          // For a storage image, build the memory metadata
-          ShaderImageMemoryMetadata imageMemoryMd = {};
-          if (bv->hasDecorate(DecorationRestrict))
-            imageMemoryMd.Restrict = true;
-          if (bv->hasDecorate(DecorationCoherent))
-            imageMemoryMd.Coherent = true;
-          if (bv->hasDecorate(DecorationVolatile))
-            imageMemoryMd.Volatile = true;
-          if (bv->hasDecorate(DecorationNonWritable))
-            imageMemoryMd.NonWritable = true;
-          if (bv->hasDecorate(DecorationNonReadable))
-            imageMemoryMd.NonReadable = true;
-
-          std::vector<Metadata *> imageMemoryMDs;
-          imageMemoryMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, imageMemoryMd.U32All)));
-          auto imageMemoryMdNode = MDNode::get(*m_context, imageMemoryMDs);
-          gv->addMetadata(gSPIRVMD::ImageMemory, *imageMemoryMdNode);
-        }
-      }
     }
   } else {
     bool isNonUniform = bv->hasDecorate(DecorationNonUniformEXT);
