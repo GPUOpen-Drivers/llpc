@@ -44,7 +44,7 @@ using namespace llvm;
 
 // =====================================================================================================================
 // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
-// The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+// The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
 // A "location" contains four "components", each of which can contain a 16- or 32-bit scalar value. A
 // 64-bit scalar value takes two components.
 //
@@ -67,7 +67,7 @@ Value *InOutBuilder::CreateReadGenericInput(Type *resultTy, unsigned location, V
 
 // =====================================================================================================================
 // Create a read of (part of) a perVertex input value, passed from the previous shader stage.
-// The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+// The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
 // A "location" contains four "components", each of which can contain a 16- or 32-bit scalar value. A
 // 64-bit scalar value takes two components.
 //
@@ -272,7 +272,7 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
 
 // =====================================================================================================================
 // Create a read of (part of) a generic (user) output value, returning the value last written in this shader stage.
-// The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+// The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
 // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
 // 64-bit components. Two locations together can contain up to a 4-vector of 64-bit components.
 // This operation is only supported for TCS.
