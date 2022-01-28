@@ -278,7 +278,7 @@ bool SPIRVEntry::hasDecorate(Decoration Kind, size_t Index,
 const char *SPIRVEntry::getDecorateString(Decoration kind) const {
   DecorateMapType::const_iterator loc = Decorates.find(kind);
   if (loc == Decorates.end())
-    return "";
+    return nullptr;
 
   return loc->second->getLiteralString();
 }
