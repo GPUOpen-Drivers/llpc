@@ -1052,13 +1052,6 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *config) {
   if (posCount > 3) {
     SET_REG_FIELD(&config->vsRegs, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, SPI_SHADER_4COMP);
   }
-
-  if (m_pipelineState->getTargetInfo().getGpuProperty().supportSpiPrefPriority) {
-    SET_REG_FIELD(&config->vsRegs, SPI_SHADER_USER_ACCUM_VS_0, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->vsRegs, SPI_SHADER_USER_ACCUM_VS_1, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->vsRegs, SPI_SHADER_USER_ACCUM_VS_2, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->vsRegs, SPI_SHADER_USER_ACCUM_VS_3, CONTRIBUTION, 1);
-  }
 }
 
 // =====================================================================================================================
@@ -1145,13 +1138,6 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   // Set up VGT_TF_PARAM
   setupVgtTfParam(&config->lsHsRegs);
-
-  if (m_pipelineState->getTargetInfo().getGpuProperty().supportSpiPrefPriority) {
-    SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_USER_ACCUM_LSHS_0, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_USER_ACCUM_LSHS_1, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_USER_ACCUM_LSHS_2, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_USER_ACCUM_LSHS_3, CONTRIBUTION, 1);
-  }
 }
 
 // =====================================================================================================================
@@ -1350,13 +1336,6 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   setNumAvailSgprs(Util::Abi::HardwareStage::Gs, gsResUsage->numSgprsAvailable);
   setNumAvailVgprs(Util::Abi::HardwareStage::Gs, gsResUsage->numVgprsAvailable);
-
-  if (m_pipelineState->getTargetInfo().getGpuProperty().supportSpiPrefPriority) {
-    SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_USER_ACCUM_ESGS_0, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_USER_ACCUM_ESGS_1, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_USER_ACCUM_ESGS_2, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_USER_ACCUM_ESGS_3, CONTRIBUTION, 1);
-  }
 }
 
 // =====================================================================================================================
@@ -1564,13 +1543,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
       setNumAvailSgprs(Util::Abi::HardwareStage::Gs, vsResUsage->numSgprsAvailable);
       setNumAvailVgprs(Util::Abi::HardwareStage::Gs, vsResUsage->numVgprsAvailable);
     }
-  }
-
-  if (m_pipelineState->getTargetInfo().getGpuProperty().supportSpiPrefPriority) {
-    SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_USER_ACCUM_ESGS_0, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_USER_ACCUM_ESGS_1, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_USER_ACCUM_ESGS_2, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_USER_ACCUM_ESGS_3, CONTRIBUTION, 1);
   }
 
   //
@@ -1956,13 +1928,6 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *config) {
 
   setNumAvailSgprs(Util::Abi::HardwareStage::Ps, resUsage->numSgprsAvailable);
   setNumAvailVgprs(Util::Abi::HardwareStage::Ps, resUsage->numVgprsAvailable);
-
-  if (m_pipelineState->getTargetInfo().getGpuProperty().supportSpiPrefPriority) {
-    SET_REG_FIELD(&config->psRegs, SPI_SHADER_USER_ACCUM_PS_0, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->psRegs, SPI_SHADER_USER_ACCUM_PS_1, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->psRegs, SPI_SHADER_USER_ACCUM_PS_2, CONTRIBUTION, 1);
-    SET_REG_FIELD(&config->psRegs, SPI_SHADER_USER_ACCUM_PS_3, CONTRIBUTION, 1);
-  }
 }
 
 // =====================================================================================================================
@@ -2033,13 +1998,6 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
 
   setNumAvailSgprs(Util::Abi::HardwareStage::Cs, resUsage->numSgprsAvailable);
   setNumAvailVgprs(Util::Abi::HardwareStage::Cs, resUsage->numVgprsAvailable);
-
-  if (m_pipelineState->getTargetInfo().getGpuProperty().supportSpiPrefPriority) {
-    SET_REG_FIELD(config, COMPUTE_USER_ACCUM_0, CONTRIBUTION, 1);
-    SET_REG_FIELD(config, COMPUTE_USER_ACCUM_1, CONTRIBUTION, 1);
-    SET_REG_FIELD(config, COMPUTE_USER_ACCUM_2, CONTRIBUTION, 1);
-    SET_REG_FIELD(config, COMPUTE_USER_ACCUM_3, CONTRIBUTION, 1);
-  }
 }
 
 // =====================================================================================================================
