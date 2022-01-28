@@ -731,10 +731,6 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
                                           highHalf, &callInst);
         break;
       }
-      case ShaderStageCompute: {
-        llvm_unreachable("Should never be called!");
-        break;
-      }
       default: {
         llvm_unreachable("Should never be called!");
         break;
@@ -882,10 +878,6 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         patchCopyShaderBuiltInOutputExport(output, builtInId, &callInst);
         break;
       }
-      case ShaderStageCompute: {
-        llvm_unreachable("Should never be called!");
-        break;
-      }
       default: {
         llvm_unreachable("Should never be called!");
         break;
@@ -1002,10 +994,6 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         }
         case ShaderStageCopyShader: {
           patchCopyShaderGenericOutputExport(output, loc, &callInst);
-          break;
-        }
-        case ShaderStageCompute: {
-          llvm_unreachable("Should never be called!");
           break;
         }
         default: {
