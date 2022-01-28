@@ -1161,47 +1161,47 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
 // @param resourceMapping : Pipeline resource mapping data.
 // @param [in,out] hasher : Haher to generate hash code.
 // @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
-void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData *pResourceMapping, MetroHash64 *hasher,
+void PipelineDumper::updateHashForResourceMappingInfo(const ResourceMappingData *resourceMapping, MetroHash64 *hasher,
                                                       ShaderStage stage) {
-  hasher->Update(pResourceMapping->staticDescriptorValueCount);
-  if (pResourceMapping->staticDescriptorValueCount > 0) {
-      for (unsigned i = 0; i < pResourceMapping->staticDescriptorValueCount; ++i) {
-          auto staticDescriptorValue = &pResourceMapping->pStaticDescriptorValues[i];
-          if (stage == ShaderStageInvalid || (staticDescriptorValue->visibility & shaderStageToMask(stage))) {
-            if (stage == ShaderStageInvalid)
-              hasher->Update(staticDescriptorValue->visibility);
-            hasher->Update(staticDescriptorValue->type);
-            hasher->Update(staticDescriptorValue->set);
-            hasher->Update(staticDescriptorValue->binding);
-            hasher->Update(staticDescriptorValue->arraySize);
-          }
-
-          // TODO: We should query descriptor size from patch
-
-          // The second part of StaticDescriptorValue is YCbCrMetaData, which is 4 dwords.
-          // The hasher should be updated when the content changes, this is because YCbCrMetaData
-          // is engaged in pipeline compiling.
-          const unsigned descriptorSize =
-              16 + (staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler
-                        ? 0
-                        : sizeof(SamplerYCbCrConversionMetaData));
-
-          hasher->Update(reinterpret_cast<const uint8_t *>(staticDescriptorValue->pValue),
-                         staticDescriptorValue->arraySize * descriptorSize);
+  hasher->Update(resourceMapping->staticDescriptorValueCount);
+  if (resourceMapping->staticDescriptorValueCount > 0) {
+    for (unsigned i = 0; i < resourceMapping->staticDescriptorValueCount; ++i) {
+      auto staticDescriptorValue = &resourceMapping->pStaticDescriptorValues[i];
+      if (stage == ShaderStageInvalid || (staticDescriptorValue->visibility & shaderStageToMask(stage))) {
+        if (stage == ShaderStageInvalid)
+          hasher->Update(staticDescriptorValue->visibility);
+        hasher->Update(staticDescriptorValue->type);
+        hasher->Update(staticDescriptorValue->set);
+        hasher->Update(staticDescriptorValue->binding);
+        hasher->Update(staticDescriptorValue->arraySize);
       }
+
+      // TODO: We should query descriptor size from patch
+
+      // The second part of StaticDescriptorValue is YCbCrMetaData, which is 4 dwords.
+      // The hasher should be updated when the content changes, this is because YCbCrMetaData
+      // is engaged in pipeline compiling.
+      const unsigned descriptorSize =
+          16 + (staticDescriptorValue->type != ResourceMappingNodeType::DescriptorYCbCrSampler
+                    ? 0
+                    : sizeof(SamplerYCbCrConversionMetaData));
+
+      hasher->Update(reinterpret_cast<const uint8_t *>(staticDescriptorValue->pValue),
+                     staticDescriptorValue->arraySize * descriptorSize);
+    }
   }
 
-    hasher->Update(pResourceMapping->userDataNodeCount);
-    if (pResourceMapping->userDataNodeCount > 0) {
-      for (unsigned i = 0; i < pResourceMapping->userDataNodeCount; ++i) {
-        auto userDataNode = &pResourceMapping->pUserDataNodes[i];
-        if (stage == ShaderStageInvalid || (userDataNode->visibility & shaderStageToMask(stage))) {
-          if (stage == ShaderStageInvalid)
-            hasher->Update(userDataNode->visibility);
-          updateHashForResourceMappingNode(&userDataNode->node, true, hasher);
-        }
+  hasher->Update(resourceMapping->userDataNodeCount);
+  if (resourceMapping->userDataNodeCount > 0) {
+    for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+      auto userDataNode = &resourceMapping->pUserDataNodes[i];
+      if (stage == ShaderStageInvalid || (userDataNode->visibility & shaderStageToMask(stage))) {
+        if (stage == ShaderStageInvalid)
+          hasher->Update(userDataNode->visibility);
+        updateHashForResourceMappingNode(&userDataNode->node, true, hasher);
       }
     }
+  }
 }
 
 // =====================================================================================================================

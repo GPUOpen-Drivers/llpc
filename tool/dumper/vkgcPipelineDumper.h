@@ -78,7 +78,7 @@ public:
   static void updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo, bool isCacheHash,
                                               MetroHash64 *hasher, bool isRelocatableShader);
 
-  static void updateHashForResourceMappingInfo(const ResourceMappingData *pResourceMapping, MetroHash64 *hasher,
+  static void updateHashForResourceMappingInfo(const ResourceMappingData *resourceMapping, MetroHash64 *hasher,
                                                ShaderStage stage = ShaderStageInvalid);
 
   static void updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
@@ -118,7 +118,7 @@ private:
 
   static void dumpVersionInfo(std::ostream &dumpFile);
   static void dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo, std::ostream &dumpFile);
-  static void dumpResourceMappingInfo(const ResourceMappingData* pResourceMapping, std::ostream &dumpFile);
+  static void dumpResourceMappingInfo(const ResourceMappingData *resourceMapping, std::ostream &dumpFile);
   static void dumpResourceMappingNode(const ResourceMappingNode *userDataNode, const char *prefix,
                                       std::ostream &dumpFile);
   static void dumpComputeStateInfo(const ComputePipelineBuildInfo *pipelineInfo, const char *dumpDir,

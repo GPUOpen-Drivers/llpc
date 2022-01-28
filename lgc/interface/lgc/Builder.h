@@ -934,7 +934,7 @@ public:
                                         const llvm::Twine &instName = "") = 0;
 
   // Create an image sample.
-  // The return type is specified by pResultTy as follows:
+  // The return type is specified by resultTy as follows:
   // * If it is a struct, then the method generates a TFE (texel fail enable) operation. The first field is the
   //   texel type, and the second field is i32, where bit 0 is the TFE bit. Otherwise, the return type is the texel
   //   type.
@@ -970,7 +970,7 @@ public:
                                                 const llvm::Twine &instName = "") = 0;
 
   // Create an image gather.
-  // The return type is specified by pResultTy as follows:
+  // The return type is specified by resultTy as follows:
   // * If it is a struct, then the method generates a TFE (texel fail enable) operation. The first field is the
   //   texel type, and the second field is i32, where bit 0 is the TFE bit. Otherwise, the return type is the texel
   //   type.
@@ -1068,7 +1068,7 @@ public:
   // Shader input/output methods
 
   // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
-  // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+  // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
   // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
   // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
   // A non-constant pLocationOffset is currently only supported for TCS and TES, and for an FS custom-interpolated
@@ -1092,7 +1092,7 @@ public:
   // Shader input/output methods
 
   // Create a read of (part of) a perVertex input value, passed from the previous shader stage.
-  // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+  // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
   // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
   // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
   // A non-constant pLocationOffset is currently only supported for TCS and TES, and for an FS custom-interpolated
@@ -1113,7 +1113,7 @@ public:
                                                 llvm::Value *vertexIndex, const llvm::Twine &instName = "") = 0;
 
   // Create a read of (part of) a generic (user) output value, returning the value last written in this shader stage.
-  // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+  // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
   // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
   // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
   // This operation is only supported for TCS; other shader stages do not have per-vertex outputs, and
