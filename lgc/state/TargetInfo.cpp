@@ -304,7 +304,6 @@ static void setGfx10Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 2;
   targetInfo->getGpuProperty().supportShaderPowerProfiling = true;
   targetInfo->getGpuProperty().tessFactorBufferSizePerSe = 8192;
-  targetInfo->getGpuProperty().supportSpiPrefPriority = true;
 
   // Hardware workarounds for GFX10 based GPU's:
   targetInfo->getGpuWorkarounds().gfx10.waLimitedMaxOutputVertexCount = 1;

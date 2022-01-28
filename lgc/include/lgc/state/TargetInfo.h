@@ -69,7 +69,6 @@ struct GpuProperty {
   unsigned maxVgprsAvailable;         // Number of max available VGPRs
   unsigned tessFactorBufferSizePerSe; // Size of the tessellation-factor buffer per SE, in dwords.
   bool supportShaderPowerProfiling;   // Hardware supports Shader Profiling for Power
-  bool supportSpiPrefPriority;        // Hardware supports SPI shader preference priority
   struct {
     unsigned compBitwidth16 : 1; // Whether the vector is 16-bit component
     unsigned compBitwidth8 : 1;  // Whether the vector is 8-bit component

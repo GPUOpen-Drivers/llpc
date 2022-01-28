@@ -63,10 +63,6 @@ VsRegConfig::VsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_3);
 
   INIT_REG_GFX10(gfxIp.major, SPI_SHADER_PGM_CHKSUM_VS);
-  INIT_REG_GFX10(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_0);
-  INIT_REG_GFX10(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_1);
-  INIT_REG_GFX10(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_2);
-  INIT_REG_GFX10(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_3);
 }
 
 // =====================================================================================================================
@@ -82,11 +78,6 @@ LsHsRegConfig::LsHsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(VGT_HOS_MAX_TESS_LEVEL);
   INIT_REG(VGT_TF_PARAM);
   INIT_REG_APU09_1X_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_HS);
-
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_0);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_1);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_2);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_3);
 }
 
 // =====================================================================================================================
@@ -120,11 +111,6 @@ EsGsRegConfig::EsGsRegConfig(GfxIpVersion gfxIp) {
 
   INIT_REG_GFX10_PLUS(gfxIp.major, GE_NGG_SUBGRP_CNTL);
   INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_IDX_FORMAT);
-
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_0);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_1);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_2);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_3);
 }
 
 // =====================================================================================================================
@@ -160,11 +146,6 @@ PrimShaderRegConfig::PrimShaderRegConfig(GfxIpVersion gfxIp) {
 
   INIT_REG_GFX10_PLUS(gfxIp.major, GE_MAX_OUTPUT_PER_SUBGROUP);
   INIT_REG_APU09_1X_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_GS);
-
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_0);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_1);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_2);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_3);
 
   INIT_REG(SPI_SHADER_POS_FORMAT);
   INIT_REG(SPI_VS_OUT_CONFIG);
@@ -205,10 +186,6 @@ PsRegConfig::PsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG_APU09_1X_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_PS);
 
   INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_RSRC4_PS);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_0);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_1);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_2);
-  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_3);
 
   INIT_REG_GFX10_PLUS(gfxIp.major, GE_USER_VGPR_EN);
 }
@@ -304,11 +281,6 @@ CsRegConfig::CsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(COMPUTE_NUM_THREAD_Z);
   INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_SHADER_CHKSUM);
   INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_PGM_RSRC3);
-
-  INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_0);
-  INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_1);
-  INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_2);
-  INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_3);
 }
 
 } // namespace Gfx9
