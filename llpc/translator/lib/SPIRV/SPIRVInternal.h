@@ -215,7 +215,6 @@ const static char Block[] = "spirv.Block";
 const static char PushConst[] = "spirv.PushConst";
 const static char Resource[] = "spirv.Resource";
 const static char ExecutionModel[] = "spirv.ExecutionModel";
-const static char ImageMemory[] = "spirv.ImageMemory";
 const static char NonUniform[] = "spirv.NonUniform";
 } // namespace gSPIRVMD
 
@@ -470,35 +469,6 @@ struct ShaderBlockDecorate {
   bool Volatile;         // Whether "volatile" qualifier is present
   bool NonWritable;      // Whether "readonly" qualifier is present
   bool NonReadable;      // Whether "writeonly" qualifier is present
-};
-
-/// Metadata for image emulation call.
-union ShaderImageCallMetadata {
-  struct {
-    SPIRVImageOpKind OpKind : 6;     // Kind of image operation
-    unsigned Dim : 3;                // Image dimension
-    unsigned Arrayed : 1;            // Whether image is arrayed
-    unsigned Multisampled : 1;       // Whether image is multisampled
-    unsigned NonUniformSampler : 1;  // Whether sampler is non-uniform
-    unsigned NonUniformResource : 1; // Whether resource is non-uniform
-    unsigned WriteOnly : 1;          // Whether it is a write-only operation
-    unsigned Unused : 18;
-  };
-  unsigned U32All;
-};
-
-/// Metadata for image memory (memory qualifiers)
-union ShaderImageMemoryMetadata {
-  struct {
-    unsigned Restrict : 1;    // Whether "restrict" qualifier is present
-    unsigned Coherent : 1;    // Whether "coherent" qualifier is present
-    unsigned Volatile : 1;    // Whether "volatile" qualifier is present
-    unsigned NonWritable : 1; // Whether "readonly" qualifier is present
-    unsigned NonReadable : 1; // Whether "writeonly" qualifier is present
-
-    unsigned Unused : 27;
-  };
-  unsigned U32All;
 };
 
 /// Flags used for floating-point control
