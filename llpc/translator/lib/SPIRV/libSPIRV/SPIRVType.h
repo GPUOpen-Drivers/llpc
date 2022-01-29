@@ -65,10 +65,12 @@ public:
 
   SPIRVType *getArrayElementType() const;
   uint64_t getArrayLength() const;
+  unsigned getDerivedArrayStride() const;
   unsigned getBitWidth() const;
   unsigned getFloatBitWidth() const;
-  SPIRVType *getFunctionReturnType() const;
   unsigned getIntegerBitWidth() const;
+  unsigned getSizeInBytes() const;
+  SPIRVType *getFunctionReturnType() const;
   SPIRVType *getPointerElementType() const;
   SPIRVStorageClassKind getPointerStorageClass() const;
   SPIRVType *getStructMemberType(size_t) const;
@@ -77,6 +79,7 @@ public:
   SPIRVType *getVectorComponentType() const;
   SPIRVWord getMatrixColumnCount() const;
   SPIRVType *getMatrixColumnType() const;
+  unsigned getDerivedMatrixStride() const;
   SPIRVType *getCompositeElementType(size_t) const;
   SPIRVWord getCompositeElementCount() const;
 
