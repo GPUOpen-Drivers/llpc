@@ -7516,7 +7516,8 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
 }
 
 // Builds shader block metadata.
-Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy) {
+Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,
+                                                bool deriveStride) {
   if (bt->isTypeVector() || bt->isTypeScalar()) {
     // Handle scalar or vector type
     ShaderBlockMetadata blockMd = {};
@@ -7547,28 +7548,39 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
       // members.
       blockDec.IsMatrix = false;
       SPIRVWord arrayStride = 0;
-      if (!bt->hasDecorate(DecorationArrayStride, 0, &arrayStride))
-        llvm_unreachable("Missing array stride decoration");
+      if (!bt->hasDecorate(DecorationArrayStride, 0, &arrayStride)) {
+        if (deriveStride)
+          arrayStride = bt->getDerivedArrayStride();
+        else
+          llvm_unreachable("Missing array stride decoration");
+      }
       stride = arrayStride;
       elemTy = bt->getArrayElementType();
 
     } else if (bt->isTypePointer()) {
       blockDec.IsMatrix = false;
       SPIRVWord arrayStride = 0;
-      bt->hasDecorate(DecorationArrayStride, 0, &arrayStride);
+      if (!bt->hasDecorate(DecorationArrayStride, 0, &arrayStride))
+        llvm_unreachable("Missing array stride decoration");
       stride = arrayStride;
       elemTy = bt->getPointerElementType();
       blockMd.IsPointer = true;
     } else {
       blockDec.IsMatrix = true;
       stride = blockDec.MatrixStride;
+      if (stride == 0) {
+        if (deriveStride)
+          stride = bt->getDerivedMatrixStride();
+        else
+          llvm_unreachable("Missing matrix stride decoration");
+      }
       elemTy = bt->getMatrixColumnType();
     }
 
     // Build element metadata
     Type *elemMdTy = nullptr;
     auto elemDec = blockDec; // Inherit from parent
-    auto elemMd = buildShaderBlockMetadata(elemTy, elemDec, elemMdTy);
+    auto elemMd = buildShaderBlockMetadata(elemTy, elemDec, elemMdTy, deriveStride);
 
     // Build metadata for the array/matrix
     std::vector<Type *> mdTys;
@@ -7638,7 +7650,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
       // Build metadata for structure member
       auto memberTy = bt->getStructMemberType(memberIdx);
       Type *memberMdTy = nullptr;
-      auto memberMeta = buildShaderBlockMetadata(memberTy, memberDec, memberMdTy);
+      auto memberMeta = buildShaderBlockMetadata(memberTy, memberDec, memberMdTy, deriveStride);
 
       if (remappedIdx > memberIdx) {
         memberMdTys.push_back(Type::getInt32Ty(*m_context));
