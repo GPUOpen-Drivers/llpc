@@ -63,6 +63,11 @@ uint64_t SPIRVType::getArrayLength() const {
       ->getZExtIntValue();
 }
 
+unsigned SPIRVType::getDerivedArrayStride() const {
+  assert((OpCode == OpTypeArray || OpCode == OpTypeRuntimeArray) && "Not array type");
+  return getArrayElementType()->getSizeInBytes();
+}
+
 SPIRVWord SPIRVType::getBitWidth() const {
   if (isTypeVector())
     return getVectorComponentType()->getBitWidth();
@@ -84,6 +89,34 @@ SPIRVWord SPIRVType::getIntegerBitWidth() const {
   if (isTypeBool())
     return 1;
   return static_cast<const SPIRVTypeInt *const>(this)->getBitWidth();
+}
+
+unsigned SPIRVType::getSizeInBytes() const {
+  // NOTE: Here, we assume data are tightly packed and alignments are not taken into
+  // consideration.
+  if (isTypeVector())
+    return getVectorComponentType()->getSizeInBytes() * getVectorComponentCount();
+  if (isTypeMatrix())
+    return getMatrixColumnType()->getSizeInBytes() * getMatrixColumnCount();
+  if (isTypeArray())
+    return getArrayElementType()->getSizeInBytes() * getArrayLength();
+  if (isTypeStruct()) {
+    unsigned sizeInBytes = 0;
+    for (unsigned member = 0; member < getStructMemberCount(); ++member)
+      sizeInBytes += getStructMemberType(member)->getSizeInBytes();
+    return sizeInBytes;
+  }
+
+  switch (OpCode) {
+  case OpTypeBool:
+  case OpTypeInt:
+  case OpTypeFloat:
+    return (getBitWidth() + 7) / 8;
+  default:
+    llvm_unreachable("Cannot get the size of this type!");
+  }
+
+  return 0;
 }
 
 SPIRVType *SPIRVType::getFunctionReturnType() const {
@@ -141,6 +174,11 @@ SPIRVWord SPIRVType::getMatrixColumnCount() const {
 SPIRVType* SPIRVType::getMatrixColumnType() const {
   assert(OpCode == OpTypeMatrix && "Not matrix type");
   return static_cast<const SPIRVTypeMatrix *const>(this)->getColumnType();
+}
+
+unsigned SPIRVType::getDerivedMatrixStride() const {
+  assert(OpCode == OpTypeMatrix && "Not matrix type");
+  return getMatrixColumnType()->getSizeInBytes();
 }
 
 SPIRVType* SPIRVType::getCompositeElementType(size_t Index) const {
