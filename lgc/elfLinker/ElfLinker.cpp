@@ -379,7 +379,9 @@ StringRef ElfLinkerImpl::compileGlue(unsigned glueIndex) {
 // @param [out] outStream : Stream to write linked ELF to
 // @returns : True for success, false if something about the pipeline state stops linking
 bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
-  doneInputs();
+  // The call to doneInputs creates any needed glue shaders, but we only need to do it here for unlinked shaders.
+  if (m_pipelineState->isUnlinked())
+    doneInputs();
 
   // Insert glue shaders (if any).
   if (!insertGlueShaders())

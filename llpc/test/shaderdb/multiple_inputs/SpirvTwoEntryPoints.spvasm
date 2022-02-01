@@ -9,7 +9,7 @@
 ; SHADERTEST_VS-LABEL: define dllexport spir_func void @lgc.shader.VS.main()
 ; SHADERTEST_VS-NOT:   define dllexport spir_func void @lgc.shader.FS.main()
 ; SHADERTEST_VS-LABEL: {{^=====}} AMDLLPC SUCCESS =====
-; END_SHADERTES_VS
+; END_SHADERTEST_VS
 
 ; BEGIN_SHADERTEST_FS
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s,main_fs \
@@ -19,20 +19,34 @@
 ; SHADERTEST_FS-LABEL: define dllexport spir_func void @lgc.shader.FS.main()
 ; SHADERTEST_FS-NOT:   define dllexport spir_func void @lgc.shader.VS.main()
 ; SHADERTEST_FS-LABEL: {{^=====}} AMDLLPC SUCCESS =====
-; END_SHADERTES_FS
+; END_SHADERTEST_FS
 
-; BEGIN_SHADERTEST_BOTH_ST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s,main_vs %s,main_fs \
-; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_ST %s
+; BEGIN_SHADERTEST_BOTH_ST_PP0
+; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s,main_vs %s,main_fs \
+; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_ST_PP0 %s
 ;
-; SHADERTEST_BOTH_ST-LABEL: {{^//}} LLPC final pipeline module info
-; SHADERTEST_BOTH_ST:       define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless
-; SHADERTEST_BOTH_ST:       define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main
-; SHADERTEST_BOTH_ST-LABEL: {{^//}} LLPC final ELF info
-; SHADERTEST_BOTH_ST-LABEL: _amdgpu_vs_main_fetchless:
-; SHADERTEST_BOTH_ST-LABEL: _amdgpu_ps_main:
-; SHADERTEST_BOTH_ST-LABEL: {{^=====}} AMDLLPC SUCCESS =====
-; END_SHADERTES_BOTH_ST
+; SHADERTEST_BOTH_ST_PP0-LABEL: {{^//}} LLPC final pipeline module info
+; SHADERTEST_BOTH_ST_PP0:       define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless
+; SHADERTEST_BOTH_ST_PP0:       define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main
+; SHADERTEST_BOTH_ST_PP0-LABEL: {{^//}} LLPC final ELF info
+; SHADERTEST_BOTH_ST_PP0-LABEL: _amdgpu_vs_main_fetchless:
+; SHADERTEST_BOTH_ST_PP0-LABEL: _amdgpu_ps_main:
+; SHADERTEST_BOTH_ST_PP0-LABEL: {{^=====}} AMDLLPC SUCCESS =====
+; END_SHADERTEST_BOTH_ST_PP0
+
+; BEGIN_SHADERTEST_BOTH_ST_PP1
+; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s,main_vs %s,main_fs \
+; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_ST_PP1 %s
+;
+; SHADERTEST_BOTH_ST_PP1-LABEL: {{^//}} LLPC final pipeline module info
+; SHADERTEST_BOTH_ST_PP1:       define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main
+; SHADERTEST_BOTH_ST_PP1-LABEL: {{^//}} LLPC final pipeline module info
+; SHADERTEST_BOTH_ST_PP1:       define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless
+; SHADERTEST_BOTH_ST_PP1-LABEL: {{^//}} LLPC final ELF info
+; SHADERTEST_BOTH_ST_PP1-LABEL: _amdgpu_vs_main_fetchless:
+; SHADERTEST_BOTH_ST_PP1-LABEL: _amdgpu_ps_main:
+; SHADERTEST_BOTH_ST_PP1-LABEL: {{^=====}} AMDLLPC SUCCESS =====
+; END_SHADERTEST_BOTH_ST_PP1
 
 ; BEGIN_SHADERTEST_BOTH_MT
 ; This test uses llvm-objdump instead of verbose output, as it is not allowed to mix multi-threaded
@@ -44,7 +58,7 @@
 ;
 ; SHADERTEST_BOTH_MT-LABEL: <_amdgpu_vs_main_fetchless>:
 ; SHADERTEST_BOTH_MT-LABEL: <_amdgpu_ps_main>:
-; END_SHADERTES_BOTH_MT
+; END_SHADERTEST_BOTH_MT
 
 ; SPIR-V
 ; Version: 1.5
