@@ -27,7 +27,9 @@ jobs:
         if: contains(matrix.feature-set, '+ubsan') || contains(matrix.feature-set, '+asan') || contains(matrix.feature-set, '+tsan') || contains(matrix.feature-set, '+coverage')
         run: |
           echo 'Before:' && df -h
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache/boost /opt/ghc
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache/boost /opt/ghc \
+                      /usr/lib/jvm /opt/hostedtoolcache/go /opt/hostedtoolcache/CodeQL /opt/az \
+                      /usr/share/swift /usr/local/.ghcup /usr/local/graalvm /usr/local/lib/node_modules
           echo 'After:' && df -h
       - name: Checkout LLPC
         run: |
