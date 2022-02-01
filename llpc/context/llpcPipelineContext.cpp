@@ -218,6 +218,8 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
     pipeline->set128BitCacheHash(get128BitCacheHashCode(),
                                  VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION));
     pipeline->setClient("Vulkan");
+    if (getPreRasterHasGs())
+      pipeline->setPreRasterHasGs(true);
   }
 
   // Give the pipeline options to the middle-end, and/or hash them.

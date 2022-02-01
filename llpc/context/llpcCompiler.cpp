@@ -1290,6 +1290,9 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
                                  : wholeStageMask & ~shaderStageToMask(ShaderStageFragment);
     context->getPipelineContext()->setShaderStageMask(partStageMask);
 
+    if (partPipelineStage == PartPipelineStageFragment && isShaderStageInMask(ShaderStageGeometry, wholeStageMask))
+      context->getPipelineContext()->setPreRasterHasGs(true);
+
     // Hash the selected shaders and the pipeline state applicable to them.
     Util::MetroHash64 hasher;
     for (const PipelineShaderInfo *shaderInfoEntry : shaderInfo) {

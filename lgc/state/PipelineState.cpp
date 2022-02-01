@@ -52,6 +52,7 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable t
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";
+static const char PreRasterHasGsMetadataName[] = "lgc.prerast.has.gs";
 static const char ClientMetadataName[] = "lgc.client";
 static const char OptionsMetadataName[] = "lgc.options";
 static const char UserDataMetadataName[] = "lgc.user.data.nodes";
@@ -466,6 +467,8 @@ void PipelineState::recordOptions(Module *module) {
 
   if (unsigned unlinkedAsInt = unsigned(m_pipelineLink))
     setNamedMetadataToArrayOfInt32(module, unlinkedAsInt, UnlinkedMetadataName);
+  if (unsigned preRasterHasGs = unsigned(m_preRasterHasGs))
+    setNamedMetadataToArrayOfInt32(module, preRasterHasGs, PreRasterHasGsMetadataName);
   setNamedMetadataToArrayOfInt32(module, m_options, OptionsMetadataName);
   for (unsigned stage = 0; stage != m_shaderOptions.size(); ++stage) {
     std::string metadataName =
@@ -494,6 +497,9 @@ void PipelineState::readOptions(Module *module) {
   unsigned unlinkedAsInt = 0;
   readNamedMetadataArrayOfInt32(module, UnlinkedMetadataName, unlinkedAsInt);
   m_pipelineLink = PipelineLink(unlinkedAsInt);
+  unsigned preRasterHasGsAsInt = 0;
+  readNamedMetadataArrayOfInt32(module, PreRasterHasGsMetadataName, preRasterHasGsAsInt);
+  m_preRasterHasGs = preRasterHasGsAsInt;
 
   readNamedMetadataArrayOfInt32(module, OptionsMetadataName, m_options);
   for (unsigned stage = 0; stage != ShaderStageCompute + 1; ++stage) {

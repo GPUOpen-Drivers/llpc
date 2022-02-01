@@ -118,6 +118,14 @@ public:
   // Sets the mask of active shader stages bound to this pipeline
   virtual void setShaderStageMask(unsigned mask) = 0;
 
+  // Sets whether pre-rasterization part has a geometry shader.
+  // NOTE: Only applicable in the part pipeline compilation mode.
+  virtual void setPreRasterHasGs(bool preRasterHasGs) = 0;
+
+  // Gets whether pre-rasterization part has a geometry shader.
+  // NOTE: Only applicable in the part pipeline compilation mode.
+  virtual bool getPreRasterHasGs() const = 0;
+
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const = 0;
 

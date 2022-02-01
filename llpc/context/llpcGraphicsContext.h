@@ -55,8 +55,14 @@ public:
   // Gets the mask of active shader stages bound to this pipeline
   virtual unsigned getShaderStageMask() const { return m_stageMask; }
 
-  // Gets the mask of active shader stages bound to this pipeline
+  // Sets the mask of active shader stages bound to this pipeline
   void setShaderStageMask(unsigned mask) { m_stageMask = mask; }
+
+  // Sets whether pre-rasterization part has a geometry shader
+  void setPreRasterHasGs(bool preRasterHasGs) { m_preRasterHasGs = preRasterHasGs; }
+
+  // Gets whether pre-rasterization part has a geometry shader
+  bool getPreRasterHasGs() const { return m_preRasterHasGs; };
 
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const { return m_activeStageCount; }
@@ -75,6 +81,7 @@ private:
   const GraphicsPipelineBuildInfo *m_pipelineInfo; // Info to build a graphics pipeline
 
   unsigned m_stageMask;        // Mask of active shader stages bound to this graphics pipeline
+  bool m_preRasterHasGs;       // Whether pre-rasterization part has a geometry shader
   unsigned m_activeStageCount; // Count of active shader stages
 };
 
