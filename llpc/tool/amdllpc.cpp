@@ -360,6 +360,13 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
   if (result != Result::Success)
     return result;
 
+  // Debug utility that prints all LLVM option values. This is activated by passing:
+  // `--print-options`     -- prints all LLVM options with non-default values, or
+  // `--print-all-options` -- prints all LLVM options and their values.
+  //
+  // We call this after compiler initialization to account for any flags overridden by LLPC.
+  cl::PrintOptionValues();
+
   if (SpvGenDir != "" && !InitSpvGen(SpvGenDir.c_str())) {
     // -spvgen-dir option: preload spvgen from the given directory
     LLPC_ERRS("Failed to load SPVGEN from specified directory\n");
