@@ -56,6 +56,12 @@ public:
   // Sets the mask of active shader stages bound to this pipeline
   void setShaderStageMask(unsigned mask) { assert(mask == getShaderStageMask()); }
 
+  // Sets whether pre-rasterization part has a geometry shader
+  void setPreRasterHasGs(bool /*preRasterHasGs*/) { llvm_unreachable("Should never be called!"); }
+
+  // Gets whether pre-rasterization part has a geometry shader
+  bool getPreRasterHasGs() const { return false; };
+
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const { return 1; }
 

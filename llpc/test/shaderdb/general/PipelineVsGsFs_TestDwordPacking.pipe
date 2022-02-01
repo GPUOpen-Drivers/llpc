@@ -1,0 +1,138 @@
+; Test that GS outputs get extended from 16-bit to 32-bit during in/out packing.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: LLPC location input/output mapping results (GS shader)
+; SHADERTEST: (GS) Output: stream = 0,  loc = 1, comp = 0  =>  Mapped = 0, 0
+; SHADERTEST: (GS) Output: stream = 0,  loc = 1, comp = 1  =>  Mapped = 0, 1
+; SHADERTEST: (GS) Output: stream = 0,  loc = 1, comp = 2  =>  Mapped = 0, 2
+; SHADERTEST: (GS) Output: stream = 0,  loc = 1, comp = 3  =>  Mapped = 0, 3
+; SHADERTEST: (GS) Output: stream = 0,  loc = 2, comp = 0  =>  Mapped = 1, 0
+; SHADERTEST: (GS) Output: stream = 0,  loc = 2, comp = 1  =>  Mapped = 1, 1
+; SHADERTEST: (GS) Output: stream = 0,  loc = 2, comp = 2  =>  Mapped = 1, 2
+; SHADERTEST: (GS) Output: stream = 0,  loc = 2, comp = 3  =>  Mapped = 1, 3
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+#extension GL_AMD_gpu_shader_int16 : require
+
+layout(location = 0) in vec4 inp0;
+layout(location = 1) out vec4 outp1;
+layout(location = 1) in vec4 inp1;
+layout(location = 2) in u16vec4 inp2;
+layout(location = 2) out u16vec4 outp2;
+
+void main()
+{
+    outp2 = inp2;
+    gl_Position = inp0;
+    outp1 = inp1;
+}
+
+[VsInfo]
+entryPoint = main
+
+[GsGlsl]
+#version 450
+#extension GL_AMD_gpu_shader_int16 : require
+layout(triangles) in;
+layout(max_vertices = 3, triangle_strip) out;
+
+layout(location = 1) out vec4 outp1;
+layout(location = 1) in vec4 inp1[3];
+layout(location = 2) in u16vec4 inp2[3];
+layout(location = 2) out u16vec4 outp2;
+
+void main()
+{
+    outp2 = inp2[0];
+    gl_Position = gl_in[0].gl_Position;
+    outp1 = inp1[0];
+    EmitVertex();
+    gl_Position = gl_in[1].gl_Position;
+    outp1 = inp1[1];
+    EmitVertex();
+    gl_Position = gl_in[2].gl_Position;
+    outp1 = inp1[2];
+    EmitVertex();
+    EndPrimitive();
+}
+
+[GsInfo]
+entryPoint = main
+
+
+[FsGlsl]
+#version 450
+#extension GL_AMD_gpu_shader_int16 : require
+
+layout(location = 0) out vec4 outp0;
+layout(location = 1) in vec4 inp1;
+layout(location = 2) flat in u16vec4 inp2;
+layout(location = 1) out u16vec4 outp1;
+
+vec4 _91(vec4 _101)
+{
+    return _101;
+}
+
+void main()
+{
+    outp0 = inp1;
+    outp1 = inp2;
+}
+
+[FsInfo]
+entryPoint = main
+
+
+[ResourceMapping]
+userDataNode[0].visibility = 8
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 1
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 8
+
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+colorBuffer[1].format = VK_FORMAT_R16G16B16A16_UINT
+colorBuffer[1].channelWriteMask = 15
+colorBuffer[1].blendEnable = 0
+colorBuffer[1].blendSrcAlphaToColor = 0
+
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 32
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+binding[1].binding = 1
+binding[1].stride = 8
+binding[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+attribute[1].location = 1
+attribute[1].binding = 0
+attribute[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[1].offset = 16
+attribute[2].location = 2
+attribute[2].binding = 1
+attribute[2].format = VK_FORMAT_R16G16B16A16_UINT
+attribute[2].offset = 0

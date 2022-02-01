@@ -2535,7 +2535,9 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   }
 
   // LDS load/store copes with dword. For 8-bit/16-bit data type, we will extend them to 32-bit
-  const bool requireDword = isTcs || isGs || (isFs && m_pipelineState->hasShaderStage(ShaderStageGeometry));
+  bool partPipelineHasGs = m_pipelineState->isPartPipeline() && m_pipelineState->getPreRasterHasGs();
+  bool isFsAndHasGs = (isFs && (m_pipelineState->hasShaderStage(ShaderStageGeometry) || partPipelineHasGs));
+  bool requireDword = isTcs || isGs || isFsAndHasGs;
   // Create locationMap according to the packable calls
   m_locationInfoMapManager->createMap(packableCalls, m_shaderStage, requireDword);
 

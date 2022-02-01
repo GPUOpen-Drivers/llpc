@@ -132,6 +132,10 @@ public:
   // Set shader stage mask
   void setShaderStageMask(unsigned mask) override final { m_stageMask = mask; }
 
+  // Set whether pre-rasterization part has a geometry shader
+  // NOTE: Only applicable in the part pipeline compilation mode.
+  void setPreRasterHasGs(bool preRasterHasGs) override final { m_preRasterHasGs = preRasterHasGs; }
+
   // Set client name
   void setClient(llvm::StringRef client) override final { m_client = client.str(); }
 
@@ -218,6 +222,7 @@ public:
 
   // Accessors for shader stage mask
   unsigned getShaderStageMask() const { return m_stageMask; }
+  bool getPreRasterHasGs() const { return m_preRasterHasGs; }
   bool hasShaderStage(ShaderStage stage) const { return (getShaderStageMask() >> stage) & 1; }
   bool isGraphics() const;
   bool isComputeLibrary() const { return m_computeLibrary; }
@@ -475,6 +480,7 @@ private:
   // Whether generating pipeline or unlinked part-pipeline
   PipelineLink m_pipelineLink = PipelineLink::WholePipeline;
   unsigned m_stageMask = 0;                             // Mask of active shader stages
+  bool m_preRasterHasGs = false;                        // Whether pre-rasterization part has a geometry shader
   bool m_computeLibrary = false;                        // Whether pipeline is in fact a compute library
   std::string m_client;                                 // Client name for PAL metadata
   Options m_options = {};                               // Per-pipeline options
