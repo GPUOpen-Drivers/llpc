@@ -668,10 +668,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         // Distribute primitive ID
         auto vertexId0 = CreateUBfe(m_nggFactor.primData, 0, 9);
         writePerThreadDataToLds(gsPrimitiveId, vertexId0, LdsRegionDistribPrimId);
-        auto vertexId1 = CreateUBfe(m_nggFactor.primData, 10, 9);
-        writePerThreadDataToLds(gsPrimitiveId, vertexId1, LdsRegionDistribPrimId);
-        auto vertexId2 = CreateUBfe(m_nggFactor.primData, 20, 9);
-        writePerThreadDataToLds(gsPrimitiveId, vertexId2, LdsRegionDistribPrimId);
 
         BranchInst::Create(endWritePrimIdBlock, writePrimIdBlock);
       }
@@ -973,12 +969,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       //   ES_GS_OFFSET01[31:16] = vertexId1 (in dwords)
       //   ES_GS_OFFSET01[15:0]  = vertexId0 (in dwords)
 
+      // Use vertex0 as provoking vertex to distribute primitive ID
       auto vertexId0 = m_nggFactor.esGsOffset0;
       writePerThreadDataToLds(gsPrimitiveId, vertexId0, LdsRegionDistribPrimId);
-      auto vertexId1 = m_nggFactor.esGsOffset1;
-      writePerThreadDataToLds(gsPrimitiveId, vertexId1, LdsRegionDistribPrimId);
-      auto vertexId2 = m_nggFactor.esGsOffset2;
-      writePerThreadDataToLds(gsPrimitiveId, vertexId2, LdsRegionDistribPrimId);
 
       m_builder->CreateBr(endWritePrimIdBlock);
     }
