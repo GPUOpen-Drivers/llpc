@@ -26,6 +26,7 @@
 add_llpc_unittest(LlpcUtilTests
   testError.cpp
   testMetroHash.cpp
+  testPipelineDumper.cpp
   testThreading.cpp
   testUtil.cpp
 )
