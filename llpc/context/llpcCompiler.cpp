@@ -1933,20 +1933,14 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
 
   // Add additional pipeline state to final hasher
   if (stageMask & getLgcShaderStageMask(ShaderStageFragment)) {
-    // Add pipeline options to fragment hash
-    fragmentHasher.Update(pipelineOptions->includeDisassembly);
-    fragmentHasher.Update(pipelineOptions->scalarBlockLayout);
-    fragmentHasher.Update(pipelineOptions->reconfigWorkgroupLayout);
-    fragmentHasher.Update(pipelineOptions->includeIr);
-    fragmentHasher.Update(pipelineOptions->robustBufferAccess);
-    fragmentHasher.Update(pipelineOptions->extendedRobustness.robustBufferAccess);
-    fragmentHasher.Update(pipelineOptions->extendedRobustness.robustImageAccess);
-    fragmentHasher.Update(pipelineOptions->extendedRobustness.nullDescriptor);
+    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &fragmentHasher, true, false, UnlinkedStageFragment);
     PipelineDumper::updateHashForFragmentState(pipelineInfo, &fragmentHasher, false);
     fragmentHasher.Finalize(fragmentHash->bytes);
   }
 
   if (stageMask & ~getLgcShaderStageMask(ShaderStageFragment)) {
+    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &nonFragmentHasher, true, false,
+                                                 UnlinkedStageVertexProcess);
     PipelineDumper::updateHashForNonFragmentState(pipelineInfo, true, &nonFragmentHasher, false);
     nonFragmentHasher.Finalize(nonFragmentHash->bytes);
   }

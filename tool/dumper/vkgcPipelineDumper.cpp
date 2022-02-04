@@ -883,6 +883,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked || isRelocatableShader);
   hasher.Update(pipeline->enableEarlyCompile);
+  updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, isRelocatableShader, unlinkedShaderType);
 
   if (unlinkedShaderType != UnlinkedStageFragment) {
     if (!isRelocatableShader && !pipeline->enableUberFetchShader)
@@ -916,7 +917,7 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
 
   hasher.Update(pipeline->deviceIndex);
 
-  updateHashForPipelineOptions(&pipeline->options, &hasher, isRelocatableShader);
+  updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, isRelocatableShader, UnlinkedStageCompute);
 
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked || isRelocatableShader);
@@ -1027,8 +1028,6 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
       hasher->Update(nggState->primsPerSubgroup);
       hasher->Update(nggState->vertsPerSubgroup);
     }
-
-    updateHashForPipelineOptions(&pipeline->options, hasher, isRelocatableShader);
   }
 }
 
@@ -1068,13 +1067,21 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
 //
 // @param options: Pipeline options
 // @param [in/out] hasher : Hasher to generate hash code
-void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options, MetroHash64 *hasher,
-                                                  bool isRelocatableShader) {
+// @param isCacheHash : True if the hash will be used as a key for a cache lookup.
+// @param isRelocatableShader : TRUE if we are building a relocatable shader
+// @param stage : The unlinked shader stage that should be included in the hash.
+void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options, MetroHash64 *hasher, bool isCacheHash,
+                                                  bool isRelocatableShader, UnlinkedShaderStage stage) {
+  assert(options->reserved1f == false && "The reserved1f bit should be unused at this time.");
+
   hasher->Update(options->includeDisassembly);
   hasher->Update(options->scalarBlockLayout);
   hasher->Update(options->includeIr);
   hasher->Update(options->robustBufferAccess);
   hasher->Update(options->reconfigWorkgroupLayout);
+  hasher->Update(options->enableRelocatableShaderElf);
+  hasher->Update(options->disableImageResourceCheck);
+  hasher->Update(options->enableScratchAccessBoundsChecks);
 
   if (!isRelocatableShader) {
     hasher->Update(options->shadowDescriptorTableUsage);
@@ -1084,6 +1091,12 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->extendedRobustness.robustBufferAccess);
   hasher->Update(options->extendedRobustness.robustImageAccess);
   hasher->Update(options->extendedRobustness.nullDescriptor);
+
+  if (stage == UnlinkedStageFragment || stage == UnlinkedStageCount) {
+    hasher->Update(options->enableInterpModePatch);
+  }
+
+  hasher->Update(options->pageMigrationEnabled);
 }
 
 // =====================================================================================================================
