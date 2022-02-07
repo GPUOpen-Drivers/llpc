@@ -35,6 +35,7 @@
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/BuilderBase.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "lgc-patch-initialize-workgroup-memory"
 
