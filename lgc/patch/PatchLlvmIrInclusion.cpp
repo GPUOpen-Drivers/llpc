@@ -28,7 +28,7 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchLlvmIrInclusion.
  ***********************************************************************************************************************
  */
-#include "PatchLlvmIrInclusion.h"
+#include "lgc/patch/PatchLlvmIrInclusion.h"
 #include "lgc/state/Abi.h"
 #include "llvm/IR/Constants.h"
 
@@ -41,16 +41,36 @@ namespace lgc {
 
 // =====================================================================================================================
 // Initializes static members.
-char PatchLlvmIrInclusion::ID = 0;
+char LegacyPatchLlvmIrInclusion::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF.
-ModulePass *createPatchLlvmIrInclusion() {
-  return new PatchLlvmIrInclusion();
+ModulePass *createLegacyPatchLlvmIrInclusion() {
+  return new LegacyPatchLlvmIrInclusion();
 }
 
 // =====================================================================================================================
-PatchLlvmIrInclusion::PatchLlvmIrInclusion() : LegacyPatch(ID) {
+LegacyPatchLlvmIrInclusion::LegacyPatchLlvmIrInclusion() : LegacyPatch(ID) {
+}
+
+// =====================================================================================================================
+// Executes this patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchLlvmIrInclusion::runOnModule(Module &module) {
+  return m_impl.runImpl(module);
+}
+
+// =====================================================================================================================
+// Executes this patching pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchLlvmIrInclusion::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  runImpl(module);
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
@@ -60,8 +80,9 @@ PatchLlvmIrInclusion::PatchLlvmIrInclusion() : LegacyPatch(ID) {
 // section.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchLlvmIrInclusion::runOnModule(Module &module) {
-  LegacyPatch::init(&module);
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchLlvmIrInclusion::runImpl(Module &module) {
+  Patch::init(&module);
 
   std::string moduleStr;
   raw_string_ostream llvmIr(moduleStr);
@@ -84,5 +105,5 @@ bool PatchLlvmIrInclusion::runOnModule(Module &module) {
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF binary.
-INITIALIZE_PASS(PatchLlvmIrInclusion, DEBUG_TYPE, "Include LLVM IR as a separate section in the ELF binary", false,
-                false)
+INITIALIZE_PASS(LegacyPatchLlvmIrInclusion, DEBUG_TYPE, "Include LLVM IR as a separate section in the ELF binary",
+                false, false)

@@ -58,6 +58,10 @@ static cl::list<unsigned> DisablePassIndices("disable-pass-indices", cl::ZeroOrM
 
 } // namespace cl
 
+// A proxy from a ModuleAnalysisManager to a loop.
+using ModuleAnalysisManagerLoopProxy =
+    OuterAnalysisManagerProxy<ModuleAnalysisManager, Loop, LoopStandardAnalysisResults &>;
+
 } // namespace llvm
 
 using namespace lgc;
@@ -201,6 +205,7 @@ void PassManagerImpl::run(Module &module) {
     passBuilder.registerLoopAnalyses(loopAnalysisManager);
     passBuilder.crossRegisterProxies(loopAnalysisManager, m_functionAnalysisManager, cgsccAnalysisManager,
                                      m_moduleAnalysisManager);
+    loopAnalysisManager.registerPass([&] { return ModuleAnalysisManagerLoopProxy(m_moduleAnalysisManager); });
     initialized = true;
   }
   ModulePassManager::run(module, m_moduleAnalysisManager);

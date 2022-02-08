@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,31 +24,33 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  PatchLlvmIrInclusion.h
- * @brief LLPC header file: contains declaration of class lgc::PatchLlvmIrInclusion.
+ * @file  PatchSetupTargetFeatures.h
+ * @brief LLPC header file: contains declaration of class lgc::PatchSetupTargetFeatures.
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/util/BuilderBase.h"
 
 namespace lgc {
 
 // =====================================================================================================================
-// Represents the pass of LLVM patch operations of including LLVM IR as a separate section in the ELF binary.
-class PatchLlvmIrInclusion : public LegacyPatch {
+// Pass to set up target features on shader entry-points
+class PatchSetupTargetFeatures : public Patch, public llvm::PassInfoMixin<PatchSetupTargetFeatures> {
 public:
-  PatchLlvmIrInclusion();
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runOnModule(llvm::Module &module) override;
+  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
 
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override { analysisUsage.setPreservesAll(); }
-
-  static char ID; // ID of this pass
+  static llvm::StringRef name() { return "Patch LLVM to set up target features"; }
 
 private:
-  PatchLlvmIrInclusion(const PatchLlvmIrInclusion &) = delete;
-  PatchLlvmIrInclusion &operator=(const PatchLlvmIrInclusion &) = delete;
+  void setupTargetFeatures(llvm::Module *module);
+
+  PipelineState *m_pipelineState;
 };
 
 } // namespace lgc

@@ -34,17 +34,20 @@
 #include "lgc/PassManager.h"
 #include "lgc/builder/BuilderReplayer.h"
 #include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/PatchBufferOp.h"
 #include "lgc/patch/PatchCheckShaderCache.h"
 #include "lgc/patch/PatchCopyShader.h"
 #include "lgc/patch/PatchEntryPointMutate.h"
 #include "lgc/patch/PatchInOutImportExport.h"
 #include "lgc/patch/PatchInitializeWorkgroupMemory.h"
+#include "lgc/patch/PatchLlvmIrInclusion.h"
 #include "lgc/patch/PatchLoadScalarizer.h"
 #include "lgc/patch/PatchLoopMetadata.h"
 #include "lgc/patch/PatchPeepholeOpt.h"
 #include "lgc/patch/PatchPreparePipelineAbi.h"
 #include "lgc/patch/PatchReadFirstLane.h"
 #include "lgc/patch/PatchResourceCollect.h"
+#include "lgc/patch/PatchSetupTargetFeatures.h"
 #include "lgc/patch/PatchWaveSizeAdjust.h"
 #include "lgc/patch/PatchWorkarounds.h"
 #include "lgc/patch/VertexFetch.h"
@@ -85,6 +88,7 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Scalar/SpeculativeExecution.h"
 #include "llvm/Transforms/Utils.h"
+#include "llvm/Transforms/Utils/Mem2Reg.h"
 
 #define DEBUG_TYPE "lgc-patch"
 
@@ -180,8 +184,61 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
   }
 
-  // NOTE: The new pass manager is not fully implemented yet. We should add all
-  // the other patching passes here.
+  // Patch buffer operations (must be after optimizations)
+  FunctionPassManager fpm;
+  fpm.addPass(PatchBufferOp());
+  fpm.addPass(InstCombinePass(2));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
+
+  // Fully prepare the pipeline ABI (must be after optimizations)
+  passMgr.addPass(PatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
+
+  const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
+                         (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
+  if (canUseNgg) {
+    // Stop timer for patching passes and restart timer for optimization passes.
+    if (patchTimer) {
+      LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
+      LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
+    }
+
+    // Extra optimizations after NGG primitive shader creation
+    passMgr.addPass(AlwaysInlinerPass());
+    passMgr.addPass(GlobalDCEPass());
+    FunctionPassManager fpm2;
+    fpm2.addPass(PromotePass());
+    fpm2.addPass(ADCEPass());
+    fpm2.addPass(InstCombinePass());
+    fpm2.addPass(SimplifyCFGPass());
+    passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm2)));
+
+    // Stop timer for optimization passes and restart timer for patching passes.
+    if (patchTimer) {
+      LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
+      LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
+    }
+  }
+
+  // Set up target features in shader entry-points.
+  // NOTE: Needs to be done after post-NGG function inlining, because LLVM refuses to inline something
+  // with conflicting attributes. Attributes could conflict on GFX10 because PatchSetupTargetFeatures
+  // adds a target feature to determine wave32 or wave64.
+  passMgr.addPass(PatchSetupTargetFeatures());
+
+  // Include LLVM IR as a separate section in the ELF binary
+  if (pipelineState->getOptions().includeIr)
+    passMgr.addPass(PatchLlvmIrInclusion());
+
+  // Stop timer for patching passes.
+  if (patchTimer)
+    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
+
+  // Dump the result
+  if (raw_ostream *outs = getLgcOuts()) {
+    passMgr.addPass(PrintModulePass(*outs,
+                                    "===============================================================================\n"
+                                    "// LLPC pipeline patching results\n"));
+  }
 }
 
 // =====================================================================================================================
@@ -278,7 +335,7 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   }
 
   // Patch buffer operations (must be after optimizations)
-  passMgr.add(createPatchBufferOp());
+  passMgr.add(createLegacyPatchBufferOp());
   passMgr.add(createInstructionCombiningPass(2));
 
   // Fully prepare the pipeline ABI (must be after optimizations)
@@ -312,11 +369,11 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   // NOTE: Needs to be done after post-NGG function inlining, because LLVM refuses to inline something
   // with conflicting attributes. Attributes could conflict on GFX10 because PatchSetupTargetFeatures
   // adds a target feature to determine wave32 or wave64.
-  passMgr.add(createPatchSetupTargetFeatures());
+  passMgr.add(createLegacyPatchSetupTargetFeatures());
 
   // Include LLVM IR as a separate section in the ELF binary
   if (pipelineState->getOptions().includeIr)
-    passMgr.add(createPatchLlvmIrInclusion());
+    passMgr.add(createLegacyPatchLlvmIrInclusion());
 
   // Stop timer for patching passes.
   if (patchTimer)
@@ -340,50 +397,58 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   LLPC_OUTS("PassManager optimization level = " << optLevel << "\n");
 
   passMgr.addPass(ForceFunctionAttrsPass());
-  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(EarlyCSEPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(SpeculativeExecutionPass(/* OnlyIfDivergentTarget = */ true)));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(CorrelatedValuePropagationPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(AggressiveInstCombinePass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(PatchPeepholeOpt()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(ReassociatePass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopRotatePass())));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LICMPass())));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(IndVarSimplifyPass())));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopIdiomRecognizePass())));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopDeletionPass())));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(LoopUnrollPass(
-      LoopUnrollOptions(optLevel).setPartial(false).setRuntime(false).setPeeling(false).setUpperBound(false))));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(ScalarizerPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(PatchLoadScalarizer()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(InstSimplifyPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(NewGVNPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(BDCEPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(CorrelatedValuePropagationPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(ADCEPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(LoopRotatePass())));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass(SimplifyCFGOptions()
-                                                                        .bonusInstThreshold(1)
-                                                                        .forwardSwitchCondToPhi(true)
-                                                                        .convertSwitchToLookupTable(true)
-                                                                        .needCanonicalLoops(true)
-                                                                        .sinkCommonInsts(true))));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(LoopUnrollPass(
-      LoopUnrollOptions(optLevel).setPartial(true).setRuntime(true).setPeeling(true).setUpperBound(true))));
+  FunctionPassManager fpm;
+  fpm.addPass(InstCombinePass(1));
+  fpm.addPass(SimplifyCFGPass());
+  fpm.addPass(SROAPass());
+  fpm.addPass(EarlyCSEPass());
+  fpm.addPass(SpeculativeExecutionPass(/* OnlyIfDivergentTarget = */ true));
+  fpm.addPass(CorrelatedValuePropagationPass());
+  fpm.addPass(SimplifyCFGPass());
+  fpm.addPass(AggressiveInstCombinePass());
+  fpm.addPass(InstCombinePass(1));
+  fpm.addPass(PatchPeepholeOpt());
+  fpm.addPass(SimplifyCFGPass());
+  fpm.addPass(ReassociatePass());
+  LoopPassManager lpm;
+  lpm.addPass(LoopRotatePass());
+  lpm.addPass(LICMPass());
+  fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm), true));
+  fpm.addPass(SimplifyCFGPass());
+  fpm.addPass(InstCombinePass(1));
+  LoopPassManager lpm2;
+  lpm2.addPass(IndVarSimplifyPass());
+  lpm2.addPass(LoopIdiomRecognizePass());
+  lpm2.addPass(LoopDeletionPass());
+  fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm2), true));
+  fpm.addPass(LoopUnrollPass(
+      LoopUnrollOptions(optLevel).setPartial(false).setRuntime(false).setPeeling(false).setUpperBound(false)));
+  fpm.addPass(ScalarizerPass());
+  fpm.addPass(PatchLoadScalarizer());
+  fpm.addPass(InstSimplifyPass());
+  fpm.addPass(NewGVNPass());
+  fpm.addPass(BDCEPass());
+  fpm.addPass(InstCombinePass(1));
+  fpm.addPass(CorrelatedValuePropagationPass());
+  fpm.addPass(ADCEPass());
+  fpm.addPass(createFunctionToLoopPassAdaptor(LoopRotatePass()));
+  fpm.addPass(SimplifyCFGPass(SimplifyCFGOptions()
+                                  .bonusInstThreshold(1)
+                                  .forwardSwitchCondToPhi(true)
+                                  .convertSwitchToLookupTable(true)
+                                  .needCanonicalLoops(true)
+                                  .sinkCommonInsts(true)));
+  fpm.addPass(LoopUnrollPass(
+      LoopUnrollOptions(optLevel).setPartial(true).setRuntime(true).setPeeling(true).setUpperBound(true)));
   // uses DivergenceAnalysis
-  passMgr.addPass(createModuleToFunctionPassAdaptor(PatchReadFirstLane()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(1)));
+  fpm.addPass(PatchReadFirstLane());
+  fpm.addPass(InstCombinePass(1));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   passMgr.addPass(ConstantMergePass());
-  passMgr.addPass(createModuleToFunctionPassAdaptor(DivRemPairsPass()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
+  FunctionPassManager fpm2;
+  fpm2.addPass(DivRemPairsPass());
+  fpm2.addPass(SimplifyCFGPass());
+  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm2)));
 }
 
 // =====================================================================================================================
