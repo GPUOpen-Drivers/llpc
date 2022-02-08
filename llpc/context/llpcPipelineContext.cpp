@@ -588,7 +588,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
           node.type != ResourceMappingNodeType::DescriptorYCbCrSampler)
         break;
 
-      auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(destNode.set, destNode.binding));
+      auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(node.srdRange.set, node.srdRange.binding));
       if (it != immutableNodesMap.end()) {
         // This set/binding is (or contains) an immutable value. The value can only be a sampler, so we
         // can assume it is four dwords.
