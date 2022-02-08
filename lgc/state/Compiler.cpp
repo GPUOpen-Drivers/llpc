@@ -31,6 +31,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -198,11 +199,13 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
   unsigned passIndex = 1000;
   Timer *patchTimer = timers.size() >= 1 ? timers[0] : nullptr;
   Timer *optTimer = timers.size() >= 2 ? timers[1] : nullptr;
+  Timer *codeGenTimer = timers.size() >= 3 ? timers[2] : nullptr;
 
   // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
   std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create());
   passMgr->setPassIndex(&passIndex);
   passMgr->registerFunctionAnalysis([&] { return getLgcContext()->getTargetMachine()->getTargetIRAnalysis(); });
+  passMgr->registerModuleAnalysis([&] { return PipelineShaders(); });
 
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
   getLgcContext()->preparePassManager(*passMgr);
@@ -217,24 +220,29 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
     return PipelineStateWrapper(getLgcContext());
   });
 
-  if (m_emitLgc)
+  if (m_emitLgc) {
     // -emit-lgc: Just write the module.
     passMgr->addPass(PrintModulePass(outStream));
-  else {
+    // Run the "whole pipeline" passes.
+    passMgr->run(*pipelineModule);
+  } else {
     // Patching.
-    Patch::addPasses(this, *passMgr, m_noReplayer, patchTimer, optTimer, std::move(checkShaderCacheFunc),
+    Patch::addPasses(this, *passMgr, !m_noReplayer, patchTimer, optTimer, std::move(checkShaderCacheFunc),
                      getLgcContext()->getOptimizationLevel());
 
     // Add pass to clear pipeline state from IR
     passMgr->addPass(PipelineStateClearer());
 
-    // TODO: Add code generation passes
+    // Code generation.
+    std::unique_ptr<LegacyPassManager> codegenPassMgr(LegacyPassManager::Create());
+    unsigned passIndex = 2000;
+    codegenPassMgr->setPassIndex(&passIndex);
+    getLgcContext()->addTargetPasses(*codegenPassMgr, codeGenTimer, outStream);
+    // Run the pipeline passes until codegen.
+    passMgr->run(*pipelineModule);
+    // Run the codegen passes
+    codegenPassMgr->run(*pipelineModule);
   }
-
-  // Run the "whole pipeline" passes.
-  passMgr->run(*pipelineModule);
-
-  report_fatal_error("The new pass manager is not fully implemented yet.");
 }
 
 void PipelineState::generateWithLegacyPassManager(std::unique_ptr<Module> pipelineModule, raw_pwrite_stream &outStream,

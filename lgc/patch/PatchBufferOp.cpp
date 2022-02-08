@@ -28,13 +28,14 @@
  * @brief LLPC source file: contains implementation of class lgc::PatchBufferOp.
  ***********************************************************************************************************************
  */
-#include "PatchBufferOp.h"
+#include "lgc/patch/PatchBufferOp.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Analysis/DivergenceAnalysis.h"
 #include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
@@ -53,23 +54,23 @@ namespace lgc {
 
 // =====================================================================================================================
 // Initializes static members.
-char PatchBufferOp::ID = 0;
+char LegacyPatchBufferOp::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching for buffer operations
-FunctionPass *createPatchBufferOp() {
-  return new PatchBufferOp();
+FunctionPass *createLegacyPatchBufferOp() {
+  return new LegacyPatchBufferOp();
 }
 
 // =====================================================================================================================
-PatchBufferOp::PatchBufferOp() : FunctionPass(ID) {
+LegacyPatchBufferOp::LegacyPatchBufferOp() : FunctionPass(ID) {
 }
 
 // =====================================================================================================================
 // Get the analysis usage of this pass.
 //
 // @param [out] analysisUsage : The analysis usage.
-void PatchBufferOp::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
+void LegacyPatchBufferOp::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
   analysisUsage.addRequired<LegacyDivergenceAnalysis>();
   analysisUsage.addRequired<LegacyPipelineStateWrapper>();
   analysisUsage.addRequired<TargetTransformInfoWrapperPass>();
@@ -80,10 +81,44 @@ void PatchBufferOp::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
 // Executes this LLVM patching pass on the specified LLVM function.
 //
 // @param [in/out] function : LLVM function to be run on
-bool PatchBufferOp::runOnFunction(Function &function) {
+// @returns : True if the function was modified by the transformation and false otherwise
+bool LegacyPatchBufferOp::runOnFunction(Function &function) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
+  LegacyDivergenceAnalysis *divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
+  auto isDivergent = [divergenceAnalysis](const Value &value) { return divergenceAnalysis->isDivergent(&value); };
+  return m_impl.runImpl(function, pipelineState, isDivergent);
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM function.
+//
+// @param [in/out] function : LLVM function to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchBufferOp::run(Function &function, FunctionAnalysisManager &analysisManager) {
+  const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
+  PipelineState *pipelineState =
+      moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
+  DivergenceInfo &divergenceInfo = analysisManager.getResult<DivergenceAnalysis>(function);
+  auto isDivergent = [&](const Value &value) { return divergenceInfo.isDivergent(value); };
+  if (runImpl(function, pipelineState, isDivergent))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Executes this LLVM patching pass on the specified LLVM function.
+//
+// @param [in,out] function : LLVM function to be run on
+// @param pipelineState : Pipeline state
+// @param isDivergent : Function returning true if the given value is divergent
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchBufferOp::runImpl(Function &function, PipelineState *pipelineState,
+                            std::function<bool(const llvm::Value &)> isDivergent) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
 
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
+  m_pipelineState = pipelineState;
+  m_isDivergent = std::move(isDivergent);
   m_context = &function.getContext();
   m_builder = std::make_unique<IRBuilder<>>(*m_context);
 
@@ -93,8 +128,6 @@ bool PatchBufferOp::runOnFunction(Function &function) {
   if (lgc::getShaderStage(&function) == ShaderStageInvalid) {
     return false;
   }
-
-  m_divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
 
   // To replace the fat pointer uses correctly we need to walk the basic blocks strictly in domination order to avoid
   // visiting a use of a fat pointer before it was actually defined.
@@ -486,7 +519,7 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
       m_invariantSet.insert(callInst.getArgOperand(0));
 
     // If the incoming index to the fat pointer launder was divergent, remember it.
-    if (m_divergenceAnalysis->isDivergent(callInst.getArgOperand(0)))
+    if (m_isDivergent(*callInst.getArgOperand(0)))
       m_divergenceSet.insert(callInst.getArgOperand(0));
   } else if (callName.startswith(lgcName::LateBufferLength)) {
     Value *const pointer = getPointerOperandAsInst(callInst.getArgOperand(0));
@@ -677,7 +710,7 @@ void PatchBufferOp::visitLoadInst(LoadInst &loadInst) {
       m_invariantSet.insert(newLoad);
 
     // If the original load was divergent, it means we are using descriptor indexing and need to remember it.
-    if (m_divergenceAnalysis->isDivergent(&loadInst))
+    if (m_isDivergent(loadInst))
       m_divergenceSet.insert(newLoad);
   } else if (addrSpace == ADDR_SPACE_BUFFER_FAT_POINTER) {
     Value *const newLoad = replaceLoadStore(loadInst);
@@ -845,7 +878,7 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
       if (m_invariantSet.count(incomingBufferDesc) == 0)
         isInvariant = false;
 
-      if (m_divergenceSet.count(incomingBufferDesc) > 0 || m_divergenceAnalysis->isDivergent(&phiNode))
+      if (m_divergenceSet.count(incomingBufferDesc) > 0 || m_isDivergent(phiNode))
         isDivergent = true;
     }
 
@@ -933,7 +966,7 @@ void PatchBufferOp::visitSelectInst(SelectInst &selectInst) {
   // If either of the incoming buffer descriptors are divergent, mark the new buffer descriptor as divergent too.
   if (m_divergenceSet.count(bufferDesc1) > 0 || m_divergenceSet.count(bufferDesc2) > 0)
     m_divergenceSet.insert(bufferDesc);
-  else if (m_divergenceAnalysis->isDivergent(&selectInst) && bufferDesc1 != bufferDesc2) {
+  else if (m_isDivergent(selectInst) && bufferDesc1 != bufferDesc2) {
     // Otherwise is the selection is divergent and the buffer descriptors do not match, mark divergent.
     m_divergenceSet.insert(bufferDesc);
   }
@@ -1791,7 +1824,7 @@ void PatchBufferOp::fixIncompletePhis() {
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for buffer operations.
-INITIALIZE_PASS_BEGIN(PatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)
+INITIALIZE_PASS_BEGIN(LegacyPatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)
 INITIALIZE_PASS_DEPENDENCY(LegacyDivergenceAnalysis)
 INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
-INITIALIZE_PASS_END(PatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)
+INITIALIZE_PASS_END(LegacyPatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)

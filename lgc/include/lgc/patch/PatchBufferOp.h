@@ -35,22 +35,22 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 
-namespace llvm {
-class LegacyDivergenceAnalysis;
-} // namespace llvm
-
 namespace lgc {
 
 class PipelineState;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for buffer operations
-class PatchBufferOp final : public llvm::FunctionPass, public llvm::InstVisitor<PatchBufferOp> {
+class PatchBufferOp : public llvm::InstVisitor<PatchBufferOp>, public llvm::PassInfoMixin<PatchBufferOp> {
 public:
-  PatchBufferOp();
+  llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-  bool runOnFunction(llvm::Function &function) override;
+  // NOTE: Once the switch to the new pass manager is completed, the isDivergent argument can be removed and the
+  // divergent analysis can be put back as class attribute.
+  bool runImpl(llvm::Function &function, PipelineState *pipelineState,
+               std::function<bool(const llvm::Value &)> isDivergent);
+
+  static llvm::StringRef name() { return "Patch LLVM for buffer operations"; }
 
   // Visitors
   void visitAtomicCmpXchgInst(llvm::AtomicCmpXchgInst &atomicCmpXchgInst);
@@ -70,12 +70,7 @@ public:
   void visitICmpInst(llvm::ICmpInst &icmpInst);
   void visitPtrToIntInst(llvm::PtrToIntInst &ptrToIntInst);
 
-  static char ID; // ID of this pass
-
 private:
-  PatchBufferOp(const PatchBufferOp &) = delete;
-  PatchBufferOp &operator=(const PatchBufferOp &) = delete;
-
   llvm::Value *getPointerOperandAsInst(llvm::Value *const value);
   llvm::Value *getBaseAddressFromBufferDesc(llvm::Value *const bufferDesc) const;
   void copyMetadata(llvm::Value *const dest, const llvm::Value *const src) const;
@@ -95,13 +90,33 @@ private:
   llvm::DenseMap<PhiIncoming, llvm::Value *> m_incompletePhis; // The incomplete phi map.
   llvm::DenseSet<llvm::Value *> m_invariantSet;                // The invariant set.
   llvm::DenseSet<llvm::Value *> m_divergenceSet;               // The divergence set.
-  llvm::LegacyDivergenceAnalysis *m_divergenceAnalysis;        // The divergence analysis.
   llvm::SmallVector<llvm::Instruction *, 16> m_postVisitInsts; // The post process instruction set.
   std::unique_ptr<llvm::IRBuilder<>> m_builder;                // The IRBuilder.
   llvm::LLVMContext *m_context;                                // The LLVM context.
   PipelineState *m_pipelineState;                              // The pipeline state
 
+  std::function<bool(const llvm::Value &)> m_isDivergent;
+
   static constexpr unsigned MinMemOpLoopBytes = 256;
+};
+
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations for buffer operations
+class LegacyPatchBufferOp final : public llvm::FunctionPass, public llvm::InstVisitor<LegacyPatchBufferOp> {
+public:
+  LegacyPatchBufferOp();
+
+  bool runOnFunction(llvm::Function &function) override;
+
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
+
+  static char ID; // NOLINT
+
+private:
+  LegacyPatchBufferOp(const LegacyPatchBufferOp &) = delete;
+  LegacyPatchBufferOp &operator=(const LegacyPatchBufferOp &) = delete;
+
+  PatchBufferOp m_impl;
 };
 
 } // namespace lgc

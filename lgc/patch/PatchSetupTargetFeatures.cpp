@@ -28,6 +28,7 @@
 * @brief LLPC source file: contains declaration and implementation of class lgc::PatchSetupTargetFeatures.
 ***********************************************************************************************************************
 */
+#include "lgc/patch/PatchSetupTargetFeatures.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -43,10 +44,10 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to set up target features on shader entry-points
-class PatchSetupTargetFeatures : public LegacyPatch {
+class LegacyPatchSetupTargetFeatures : public LegacyPatch {
 public:
   static char ID;
-  PatchSetupTargetFeatures() : LegacyPatch(ID) {}
+  LegacyPatchSetupTargetFeatures() : LegacyPatch(ID) {}
 
   void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
     analysisUsage.addRequired<LegacyPipelineStateWrapper>();
@@ -54,35 +55,57 @@ public:
 
   bool runOnModule(Module &module) override;
 
-  PatchSetupTargetFeatures(const PatchSetupTargetFeatures &) = delete;
-  PatchSetupTargetFeatures &operator=(const PatchSetupTargetFeatures &) = delete;
+  LegacyPatchSetupTargetFeatures(const LegacyPatchSetupTargetFeatures &) = delete;
+  LegacyPatchSetupTargetFeatures &operator=(const LegacyPatchSetupTargetFeatures &) = delete;
 
 private:
-  void setupTargetFeatures(Module *module);
-
-  PipelineState *m_pipelineState;
+  PatchSetupTargetFeatures m_impl;
 };
 
-char PatchSetupTargetFeatures::ID = 0;
+char LegacyPatchSetupTargetFeatures::ID = 0;
 
 } // namespace lgc
 
 // =====================================================================================================================
 // Create pass to set up target features
-ModulePass *lgc::createPatchSetupTargetFeatures() {
-  return new PatchSetupTargetFeatures();
+ModulePass *lgc::createLegacyPatchSetupTargetFeatures() {
+  return new LegacyPatchSetupTargetFeatures();
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-bool PatchSetupTargetFeatures::runOnModule(Module &module) {
+// @returns : True if the module was modified by the transformation and false otherwise
+bool LegacyPatchSetupTargetFeatures::runOnModule(Module &module) {
+  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  return m_impl.runImpl(module, pipelineState);
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchSetupTargetFeatures::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  runImpl(module, pipelineState);
+  return PreservedAnalyses::none();
+}
+
+// =====================================================================================================================
+// Run the pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+// @param pipelineState : Pipeline state
+// @returns : True if the module was modified by the transformation and false otherwise
+bool PatchSetupTargetFeatures::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
 
-  LegacyPatch::init(&module);
+  Patch::init(&module);
 
-  m_pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
+  m_pipelineState = pipelineState;
   setupTargetFeatures(&module);
 
   return true; // Modified the module.
@@ -219,4 +242,4 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(PatchSetupTargetFeatures, DEBUG_TYPE, "Patch LLVM to set up target features", false, false)
+INITIALIZE_PASS(LegacyPatchSetupTargetFeatures, DEBUG_TYPE, "Patch LLVM to set up target features", false, false)
