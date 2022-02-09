@@ -1556,7 +1556,7 @@ Value *SpirvLowerGlobal::loadInOutMember(Type *inOutTy, unsigned addrSpace, cons
 }
 
 // =====================================================================================================================
-// Inserts instructions to store value to ouput member.
+// Inserts instructions to store value to output member.
 //
 // @param outputTy : Type of this output member
 // @param storeValue : Value stored to output member

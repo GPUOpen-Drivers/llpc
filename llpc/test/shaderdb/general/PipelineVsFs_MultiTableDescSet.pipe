@@ -6,7 +6,7 @@
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; First check that the buffer load in the vertex shader loads the correct
 ; descriptor.  The high half of the descriptor load should come from the PC.
-; The low half should come from the user data node at offet 0. The 0 offset if
+; The low half should come from the user data node at offset 0. The 0 offset if
 ; found in the PAL metadata.
 ; SHADERTEST-LABEL: _amdgpu_vs_main:
 ; SHADERTEST: s_getpc_b64 s{{\[}}[[VS_PC_LO:[0-9]*]]:[[VS_PC_HI:[0-9]*]]]
@@ -19,7 +19,7 @@
 ; SHADERTEST: s_buffer_load_dwordx8 s[8:15], s{{\[}}[[T0_DESC]]:{{[0-9]*}}], 0x20
 ; Now check that the image sample in the pixel shader uses the correct
 ; descriptors.  The high half of the descriptor load should come from the PC.
-; The low half should come from the user data node at offet 1 and 2.
+; The low half should come from the user data node at offset 1 and 2.
 ; SHADERTEST-LABEL: _amdgpu_ps_main:
 ; SHADERTEST: s_getpc_b64 s{{\[}}[[VS_PC_LO:[0-9]*]]:[[VS_PC_HI:[0-9]*]]]
 ; SHADERTEST: s_mov_b32 s[[T2_ADDR_LO:[0-9]*]], s[[table2:[0-9]*]]

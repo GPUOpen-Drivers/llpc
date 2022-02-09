@@ -99,7 +99,7 @@ The LocationMap deals in (location, component, half) tuples:
 // Represents the location info of input/output
 union InOutLocationInfo {
   struct {
-    uint16_t half : 1;      // High half in case of 16-bit attriburtes
+    uint16_t half : 1;      // High half in case of 16-bit attributes
     uint16_t component : 2; // The component index
     uint16_t location : 13; // The location
   };
@@ -156,7 +156,7 @@ private:
 ### 4.3 LocationSpans
 The LocationSpans structure tracks spans (or intervals) of contiguous components in the generic input space that:
 - Are used.
-- Can be allocated to the same attribute vec4 (i.e., they are have the same value of InOutCompatibilityInfo, When they are compatible on bitWidth, Smooth and linear interpolant mode can be packed together, flat and custom interpolant modes are packed seperately).
+- Can be allocated to the same attribute vec4 (i.e., they are have the same value of InOutCompatibilityInfo, When they are compatible on bitWidth, Smooth and linear interpolant mode can be packed together, flat and custom interpolant modes are packed separately).
 - Must be remapped contiguously and:
   - If the span is <= 4 components, cannot be moved to straddle a vec4 boundary.
   - If the span is > 4 components, can only be moved in a way that preserves the component and half parts of the triple.

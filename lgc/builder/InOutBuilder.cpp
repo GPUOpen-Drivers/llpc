@@ -1405,7 +1405,7 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySiz
       break;
     case BuiltInSamplePosition:
       usage.fs.samplePosition = true;
-      // NOTE: gl_SamplePostion is derived from gl_SampleID
+      // NOTE: gl_SamplePosition is derived from gl_SampleID
       usage.fs.sampleId = true;
       usage.fs.runAtSampleRate = true;
       break;
