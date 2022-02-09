@@ -5837,7 +5837,7 @@ void PatchInOutImportExport::doTessFactorBufferStore(ArrayRef<Value *> outerTess
         Value *tessFactorOffset = calcTessFactorOffset(isOuter, nullptr, insertPoint);
         storeTessFactorToBuffer(tessFactors, tessFactorOffset, insertPoint);
       } else {
-        // We have to store each element in tessFactors seperately because they may not be in memory order.
+        // We have to store each element in tessFactors separately because they may not be in memory order.
         for (unsigned idx = 0; idx < tessFactors.size(); ++idx) {
           auto insertPoint = insertPos ? insertPos : tessLevelInsts[idx];
           Value *elemIdx = tessLevelInsts[idx]->getOperand(1);

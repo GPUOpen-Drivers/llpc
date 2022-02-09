@@ -12,6 +12,8 @@ ANDed = "ANDed"
 ba = "ba"
 UE = "UE"
 OpBuildNDRange = "OpBuildNDRange"
+serDataNode = "serDataNode"
+begines = "begines" # TODO -> beginEs
 
 [default.extend-words]
 lod = "lod"
