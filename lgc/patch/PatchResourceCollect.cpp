@@ -3045,7 +3045,7 @@ void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStag
   else if (bitWidth == 8)
     bitWidth = 16;
   span.compatibilityInfo.halfComponentCount = bitWidth / 16;
-  // For VS/TES-FS, 32-bit and 16-bit are packed seperately; For VS-TCS, VS/TES-GS and GS-FS, they are packed together
+  // For VS/TES-FS, 32-bit and 16-bit are packed separately; For VS-TCS, VS/TES-GS and GS-FS, they are packed together
   span.compatibilityInfo.is16Bit = bitWidth == 16;
 
   if (isFs) {
@@ -3061,7 +3061,7 @@ void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStag
 }
 
 // =====================================================================================================================
-// Build the map between orignal InOutLocationInfo and packed InOutLocationInfo based on sorted location spans
+// Build the map between original InOutLocationInfo and packed InOutLocationInfo based on sorted location spans
 //
 // @param shaderStage : The shader stage to determine whether to check compatibility
 void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
@@ -3073,7 +3073,7 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
   m_locationInfoMap.clear();
 
   // Map original InOutLocationInfo to new InOutLocationInfo
-  unsigned consectiveLocation = 0;
+  unsigned consecutiveLocation = 0;
   unsigned compIdx = 0;
   bool isHighHalf = false;
   const bool isGs = shaderStage == ShaderStageGeometry;
@@ -3091,12 +3091,12 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
       if (checkCompatibility)
         compatible = isCompatible(prevSpan, *spanIt, isGs);
 
-      // If the current loactionSpan is compatible with previous one, increase component index with location unchanged
+      // If the current locationSpan is compatible with previous one, increase component index with location unchanged
       // until the component index is up to 4 and increase location index and reset component index to 0. Otherwise,
       // reset the location index for GS or increase location index, and reset component index to 0.
       if (compatible) {
         if (compIdx > 3) {
-          ++consectiveLocation;
+          ++consecutiveLocation;
           compIdx = 0;
           isHighHalf = false;
         } else {
@@ -3104,7 +3104,7 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
         }
       } else {
         // NOTE: For GS, the indexing of remapped location is zero-based in each stream
-        consectiveLocation = isGs ? 0 : consectiveLocation + 1;
+        consecutiveLocation = isGs ? 0 : consecutiveLocation + 1;
         compIdx = 0;
         isHighHalf = false;
       }
@@ -3112,7 +3112,7 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
 
     // Add a location map item
     InOutLocationInfo newLocInfo;
-    newLocInfo.setLocation(consectiveLocation);
+    newLocInfo.setLocation(consecutiveLocation);
     newLocInfo.setComponent(compIdx);
     newLocInfo.setHighHalf(isHighHalf);
     newLocInfo.setStreamId(spanIt->firstLocationInfo.getStreamId());
