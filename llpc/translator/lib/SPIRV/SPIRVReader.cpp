@@ -1079,6 +1079,18 @@ Instruction *SPIRVToLLVM::transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function 
   SPIRVType *bt = bc->getOperand(0)->getType();
   Instruction *inst = nullptr;
   auto op = bc->getOpCode();
+  if (op == OpPtrEqual || op == OpPtrNotEqual) {
+    // NOTE: The two compared operands have the same spirv type, but the IR type are different.
+    // for example: struct {
+    //                mat4 mat1;  // rowMajor
+    //                mat4 mat2;  // colMajor
+    //              };
+    auto lValue = transValue(bc->getOperand(0), f, bb);
+    auto rValue = transValue(bc->getOperand(1), f, bb);
+    if (lValue->getType() != rValue->getType())
+      return new ICmpInst(*bb, CmpMap::rmap(op), getBuilder()->getInt32(0), getBuilder()->getInt32(1));
+  }
+
   if (isLogicalOpCode(op))
     op = IntBoolOpMap::rmap(op);
   if (bt->isTypeVectorOrScalarInt() || bt->isTypeVectorOrScalarBool() || bt->isTypePointer())
