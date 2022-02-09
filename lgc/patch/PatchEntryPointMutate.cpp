@@ -965,9 +965,12 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
       *userDataArg.argIndex = argTys.size() + argOffset;
     unsigned dwordSize = userDataArg.argDwordSize;
     if (userDataArg.userDataValue != static_cast<unsigned>(UserDataMapping::Invalid)) {
+      // Most of user data metadata entries is 1 except root push descriptors
+      bool systemUserData = userDataArg.userDataValue >= static_cast<unsigned>(UserDataMapping::GlobalTable);
+      unsigned entriesNum = systemUserData ? 1 : dwordSize;
       m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, userDataArg.userDataValue,
-                                                          dwordSize);
-      if (userDataArg.userDataValue >= static_cast<unsigned>(UserDataMapping::GlobalTable)) {
+                                                          entriesNum);
+      if (systemUserData) {
         unsigned index = userDataArg.userDataValue - static_cast<unsigned>(UserDataMapping::GlobalTable);
         auto &specialUserData = getUserDataUsage(m_shaderStage)->specialUserData;
         if (index < specialUserData.size())

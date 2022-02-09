@@ -381,10 +381,6 @@ void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, un
   if (userDataValue < InterfaceData::MaxSpillTableSize && userDataValue + dwordCount > m_userDataLimit->getUInt())
     *m_userDataLimit = userDataValue + dwordCount;
 
-  // Although NumWorkgroupsPtr is a register pair, only the first word has a user data entry.
-  if (userDataValue == static_cast<unsigned>(UserDataMapping::Workgroup))
-    dwordCount = 1;
-
   // Write the register(s)
   userDataReg += userDataIndex;
   while (dwordCount--)
