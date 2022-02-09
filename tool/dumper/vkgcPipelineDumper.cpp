@@ -1006,6 +1006,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   if (updateHashFromRs) {
     auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
+    hasher->Update(rsState->provokingVertexMode);
   }
 
   if (isCacheHash) {

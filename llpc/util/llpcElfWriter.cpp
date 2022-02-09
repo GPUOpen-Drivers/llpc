@@ -325,10 +325,6 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
       0xC25F, // mmGE_STEREO_CNTL
       0xC262, // mmGE_USER_VGPR_EN
       0x2C06, // mmSPI_SHADER_PGM_CHKSUM_PS
-      0x2C32, // mmSPI_SHADER_USER_ACCUM_PS_0
-      0x2C33, // mmSPI_SHADER_USER_ACCUM_PS_1
-      0x2C34, // mmSPI_SHADER_USER_ACCUM_PS_2
-      0x2C35, // mmSPI_SHADER_USER_ACCUM_PS_3
   };
 
   // Merge fragment shader related registers. For each of the registers listed above, plus the input
