@@ -162,6 +162,15 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       targetFeatures += ",+cumode";
     }
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 414671
+    // Old version of the code
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    // Enable flat scratch for gfx10.3+
+    if (gfxIp.major == 10 && gfxIp.minor >= 3)
+      targetFeatures += ",+enable-flat-scratch";
+#endif
+
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportsXnack) {
       // Enable or disable xnack depending on whether page migration is enabled.
       if (m_pipelineState->getOptions().pageMigrationEnabled)
