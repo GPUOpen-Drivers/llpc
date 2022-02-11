@@ -78,13 +78,11 @@ void ConfigBuilder::buildPalMetadata() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-FS), or FS-only shader compilation.
 void ConfigBuilder::buildPipelineVsFsRegConfig() {
-  const unsigned stageMask = m_pipelineState->getShaderStageMask();
-
   PipelineVsFsRegConfig config;
 
   addApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
-  if (stageMask & shaderStageToMask(ShaderStageVertex)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageVertex)) {
     setPipelineType(Util::Abi::PipelineType::VsPs);
     addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderVs);
     buildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
@@ -102,7 +100,7 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
     SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageFragment)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsFsRegConfig>(ShaderStageFragment, &config);
 
     setShaderHash(ShaderStageFragment);
@@ -114,8 +112,6 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-TS-FS).
 void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
-  const unsigned stageMask = m_pipelineState->getShaderStageMask();
-
   PipelineVsTsFsRegConfig config;
 
   addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderLs);
@@ -125,7 +121,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
 
   setPipelineType(Util::Abi::PipelineType::Tess);
 
-  if (stageMask & shaderStageToMask(ShaderStageVertex)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageVertex)) {
     buildLsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageVertex, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
@@ -133,7 +129,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
     setShaderHash(ShaderStageVertex);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageTessControl)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
     buildHsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessControl, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
@@ -141,7 +137,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
     setShaderHash(ShaderStageTessControl);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageTessEval)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageTessEval)) {
     buildVsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageTessEval, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
@@ -149,7 +145,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
     setShaderHash(ShaderStageTessEval);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageFragment)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageFragment, &config);
 
     setShaderHash(ShaderStageFragment);
@@ -181,8 +177,6 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-GS-FS).
 void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
-  const unsigned stageMask = m_pipelineState->getShaderStageMask();
-
   PipelineVsGsFsRegConfig config;
 
   addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderEs);
@@ -191,7 +185,7 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
 
   setPipelineType(Util::Abi::PipelineType::Gs);
 
-  if (stageMask & shaderStageToMask(ShaderStageVertex)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageVertex)) {
     buildEsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageVertex, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
@@ -199,7 +193,7 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
     setShaderHash(ShaderStageVertex);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageGeometry)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageGeometry)) {
     buildGsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageGeometry, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
@@ -207,13 +201,13 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
     setShaderHash(ShaderStageGeometry);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageFragment)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageFragment, &config);
 
     setShaderHash(ShaderStageFragment);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageCopyShader)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageCopyShader)) {
     buildVsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
@@ -233,8 +227,6 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-TS-GS-FS).
 void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
-  const unsigned stageMask = m_pipelineState->getShaderStageMask();
-
   PipelineVsTsGsFsRegConfig config;
 
   addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderLs);
@@ -245,7 +237,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 
   setPipelineType(Util::Abi::PipelineType::GsTess);
 
-  if (stageMask & shaderStageToMask(ShaderStageVertex)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageVertex)) {
     buildLsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageVertex, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
@@ -253,7 +245,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
     setShaderHash(ShaderStageVertex);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageTessControl)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
     buildHsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageTessControl, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
@@ -261,7 +253,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
     setShaderHash(ShaderStageTessControl);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageTessEval)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageTessEval)) {
     buildEsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageTessEval, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
@@ -269,7 +261,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
     setShaderHash(ShaderStageTessEval);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageGeometry)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageGeometry)) {
     buildGsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageGeometry, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
@@ -277,13 +269,13 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
     setShaderHash(ShaderStageGeometry);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageFragment)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageFragment, &config);
 
     setShaderHash(ShaderStageFragment);
   }
 
-  if (stageMask & shaderStageToMask(ShaderStageCopyShader)) {
+  if (m_pipelineState->hasShaderStage(ShaderStageCopyShader)) {
     buildVsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageCopyShader, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
@@ -318,7 +310,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for compute pipeline.
 void ConfigBuilder::buildPipelineCsRegConfig() {
-  assert(m_pipelineState->getShaderStageMask() == shaderStageToMask(ShaderStageCompute));
+  assert(m_pipelineState->hasShaderStage(ShaderStageCompute));
 
   CsRegConfig config;
 
@@ -590,7 +582,7 @@ void ConfigBuilder::buildEsRegConfig(ShaderStage shaderStage, T *config) {
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
   const auto &builtInUsage = resUsage->builtInUsage;
 
-  assert((m_pipelineState->getShaderStageMask() & shaderStageToMask(ShaderStageGeometry)) != 0);
+  assert(m_pipelineState->hasShaderStage(ShaderStageGeometry));
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
   unsigned floatMode = setupFloatingPointMode(shaderStage);
