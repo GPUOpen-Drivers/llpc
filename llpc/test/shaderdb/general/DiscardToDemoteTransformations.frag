@@ -40,17 +40,17 @@
 // The hashes in the Elf note are currently expected to be the same.
 // RUN: cat %t.disabled %t.enabled | FileCheck %s --match-full-lines --check-prefix=HASH
 // HASH:      // LLPC calculated hash results (graphics pipeline)
-// HASH:      PIPE : 0x[[#%X,DIS_PIPE:]]
-// HASH-NEXT: FS   : 0x[[#%X,DIS_FS:]]
+// HASH:      PIPE : 0x[[#%.16X,DIS_PIPE:]]
+// HASH-NEXT: FS   : 0x[[#%.16X,DIS_FS:]]
 // HASH:      .xgl_cache_info: {
-// HASH-NEXT: .128_bit_cache_hash: [ 0x[[#%X,DIS_CACHE_1:]] 0x[[#%X,DIS_CACHE_2:]] ]
+// HASH-NEXT: .128_bit_cache_hash: [ 0x[[#%.16X,DIS_CACHE_1:]] 0x[[#%.16X,DIS_CACHE_2:]] ]
 // HASH:      ===== AMDLLPC SUCCESS =====
 //
 // HASH:      // LLPC calculated hash results (graphics pipeline)
 // HASH-NOT:  PIPE : 0x[[#DIS_PIPE]]
-// HASH:      PIPE : 0x[[#%X,EN_PIPE:]]
+// HASH:      PIPE : 0x[[#%.16X,EN_PIPE:]]
 // HASH-NOT:  FS   : 0x[[#DIS_FS]]
-// HASH-NEXT: FS   : 0x[[#%X,EN_FS:]]
+// HASH-NEXT: FS   : 0x[[#%.16X,EN_FS:]]
 // HASH:      .xgl_cache_info: {
 // HASH-NEXT: .128_bit_cache_hash: [ 0x[[#DIS_CACHE_1]] 0x[[#DIS_CACHE_2]] ]
 // HASH:      ===== AMDLLPC SUCCESS =====
