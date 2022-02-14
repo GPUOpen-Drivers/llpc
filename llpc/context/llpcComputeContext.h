@@ -65,8 +65,8 @@ public:
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const { return 1; }
 
-  // Check whether the pipeline uses features relevant to subgroup size
-  virtual bool usesSubgroupSize() const;
+  // Gets subgroup size usage
+  virtual unsigned getSubgroupSizeUsage() const;
 
   // Gets per pipeline options
   virtual const PipelineOptions *getPipelineOptions() const { return &m_pipelineInfo->options; }

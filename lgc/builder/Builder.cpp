@@ -121,6 +121,15 @@ void Builder::setComputeShaderMode(const ComputeShaderMode &computeShaderMode) {
 }
 
 // =====================================================================================================================
+// Set subgroup size usage
+//
+// @param stage : Shader stage
+// @param usage : Subgroup size usage
+void Builder::setSubgroupSizeUsage(ShaderStage stage, bool usage) {
+  getShaderModes()->setSubgroupSizeUsage(stage, usage);
+}
+
+// =====================================================================================================================
 // Get the compute shader mode (workgroup size)
 const ComputeShaderMode &Builder::getComputeShaderMode() {
   return getShaderModes()->getComputeShaderMode();

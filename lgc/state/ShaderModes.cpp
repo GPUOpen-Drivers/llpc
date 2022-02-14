@@ -160,6 +160,16 @@ const ComputeShaderMode &ShaderModes::getComputeShaderMode() {
 }
 
 // =====================================================================================================================
+// Set subgroup size usage
+//
+// @param stage : Shader stage
+// @param usage : Subgroup size usage
+void ShaderModes::setSubgroupSizeUsage(ShaderStage stage, bool usage) {
+  MutableArrayRef<CommonShaderMode> modes(m_commonShaderModes);
+  modes[stage].useSubgroupSize = usage;
+}
+
+// =====================================================================================================================
 // Record shader modes (common and specific) into IR metadata
 //
 // @param [in/out] module : Module to record the IR metadata in

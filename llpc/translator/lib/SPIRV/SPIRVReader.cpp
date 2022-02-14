@@ -6540,6 +6540,16 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
 
   shaderMode.useSubgroupSize = m_moduleUsage->useSubgroupSize;
 
+  // Shader modes contain also data for other modules (subgroup size usage), so query it in the pipeline context.
+  auto pipelineContext = (static_cast<Llpc::Context *>(m_context))->getPipelineContext();
+  unsigned subgroupSizeUsage = pipelineContext->getSubgroupSizeUsage();
+  if (pipelineContext->isGraphics() && subgroupSizeUsage) {
+    for (lgc::ShaderStage stage : lgc::enumRange<lgc::ShaderStage>()) {
+      if (subgroupSizeUsage & (1 << stage)) {
+        getBuilder()->setSubgroupSizeUsage(stage, true);
+      }
+    }
+  }
   getBuilder()->setCommonShaderMode(shaderMode);
 
   m_enableXfb = m_bm->getCapability().find(CapabilityTransformFeedback) != m_bm->getCapability().end();

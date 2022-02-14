@@ -1,0 +1,29 @@
+; Test that gl_SubgroupSize usage results in consistent wave size between stages.
+
+; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: LLPC final ELF info
+; SHADERTEST: VGT_SHADER_STAGES_EN 0x0000000000010000
+; SHADERTEST: AMDLLPC SUCCESS
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+void main() { }
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+#extension GL_KHR_shader_subgroup_basic : require
+
+layout(location = 0) out uint outp;
+void main() {
+	outp = gl_SubgroupSize;
+}
+[FsInfo]
+entryPoint = main
+

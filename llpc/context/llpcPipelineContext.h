@@ -103,8 +103,10 @@ public:
 
   // Checks whether the pipeline is graphics or compute
   virtual bool isGraphics() const = 0;
-  // Check whether the pipeline uses features relevant to subgroup size
-  virtual bool usesSubgroupSize() const = 0;
+
+  // Gets subgroup size usage denoting which stage uses features relevant to subgroup size.
+  // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage`.
+  virtual unsigned getSubgroupSizeUsage() const = 0;
 
   // Gets pipeline shader info of the specified shader stage
   virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const = 0;

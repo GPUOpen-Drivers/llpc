@@ -70,8 +70,8 @@ public:
   // Gets per pipeline options
   virtual const PipelineOptions *getPipelineOptions() const { return &m_pipelineInfo->options; }
 
-  // Check whether the pipeline uses features relevant to subgroup size
-  virtual bool usesSubgroupSize() const;
+  // Gets subgroup size usage
+  virtual unsigned getSubgroupSizeUsage() const;
 
 private:
   GraphicsContext() = delete;
