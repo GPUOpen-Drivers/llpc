@@ -91,7 +91,7 @@ void getTypeName(Type *ty, raw_ostream &nameStream) {
   for (;;) {
     if (auto pointerTy = dyn_cast<PointerType>(ty)) {
       nameStream << "p" << pointerTy->getAddressSpace();
-      ty = pointerTy->getElementType();
+      ty = pointerTy->getPointerElementType();
       continue;
     }
     if (auto arrayTy = dyn_cast<ArrayType>(ty)) {
