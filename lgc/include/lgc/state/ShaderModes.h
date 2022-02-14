@@ -74,6 +74,9 @@ public:
   // Get the compute shader mode (workgroup size)
   const ComputeShaderMode &getComputeShaderMode();
 
+  // Set subgroup size usage
+  void setSubgroupSizeUsage(ShaderStage stage, bool usage);
+
   // Clear all modes
   void clear();
 

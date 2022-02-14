@@ -188,6 +188,9 @@ public:
   // add more fields. A local struct variable can be zero-initialized with " = {}".
   void setComputeShaderMode(const ComputeShaderMode &computeShaderMode);
 
+  // Set subgroup size usage
+  void setSubgroupSizeUsage(ShaderStage stage, bool usage);
+
   // Get the compute shader mode (workgroup size)
   const ComputeShaderMode &getComputeShaderMode();
 

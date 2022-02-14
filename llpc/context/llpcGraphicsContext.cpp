@@ -118,8 +118,8 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
 }
 
 // =====================================================================================================================
-// Check whether the pipeline uses features relevant to subgroup size
-bool GraphicsContext::usesSubgroupSize() const {
+// Gets subgroup size usage
+unsigned GraphicsContext::getSubgroupSizeUsage() const {
   // clang-format off
   std::array<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfos = {
     &m_pipelineInfo->vs,
@@ -129,15 +129,16 @@ bool GraphicsContext::usesSubgroupSize() const {
     &m_pipelineInfo->fs,
   };
   // clang-format on
-  for (auto shaderInfo : shaderInfos) {
+  unsigned bitmask = 0;
+  for (unsigned shaderInfoIdx = 0, e = shaderInfos.size(); shaderInfoIdx != e; ++shaderInfoIdx) {
+    auto shaderInfo = shaderInfos[shaderInfoIdx];
     if (!shaderInfo->pModuleData)
       continue;
     auto *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
-    if (!moduleData->usage.useSubgroupSize)
-      continue;
-    return true;
+    if (moduleData->usage.useSubgroupSize)
+      bitmask |= (1 << shaderInfoIdx);
   }
-  return false;
+  return bitmask;
 }
 
 } // namespace Llpc
