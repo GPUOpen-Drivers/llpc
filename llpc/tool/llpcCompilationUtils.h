@@ -75,6 +75,11 @@ struct ShaderModuleData {
   bool disableDoAutoLayout;               // Indicates whether to disable auto layout of descriptors
 };
 
+enum PipelineType : unsigned {
+  PipelineTypeGraphics = 0, // Graphics pipeline type
+  PipelineTypeCompute,      // Compute pipeline type
+};
+
 // Represents a single compilation context of a pipeline or a group of shaders.
 // This is only used by the standalone compiler tool.
 struct CompileInfo {
@@ -95,6 +100,7 @@ struct CompileInfo {
   bool autoLayoutDesc;            // Whether to automatically create descriptor layout based on resource usages
   bool robustBufferAccess;        // Whether to enable robust buffer access
   bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
+  PipelineType pipelineType;      // Pipeline type;
 };
 
 // Callback function to allocate buffer for building shader module and building pipeline.
@@ -117,7 +123,8 @@ LLPC_NODISCARD Result decodePipelineBinary(const BinaryData *pipelineBin, Compil
 llvm::Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo);
 
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
-llvm::Error outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, llvm::StringRef firstInFile);
+llvm::Error outputElf(const BinaryData &pipelineBin, const std::string &suppliedOutFile, llvm::StringRef firstInFile,
+                      unsigned index);
 
 // Processes and compiles one pipeline input file.
 llvm::Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const InputSpec &inputSpec,

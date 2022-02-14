@@ -558,8 +558,8 @@ typedef void *VfxRenderStatePtr;
 #if VFX_SUPPORT_VK_PIPELINE
 // =====================================================================================================================
 // Represents the kind of vkgc pipeline
-enum VfxPipelineType {
-  VfxPipelineTypeGraphics,
+enum VfxPipelineType : unsigned {
+  VfxPipelineTypeGraphics = 0,
   VfxPipelineTypeCompute,
 };
 

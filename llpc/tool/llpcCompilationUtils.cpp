@@ -328,21 +328,22 @@ Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
 // =====================================================================================================================
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 //
-// @param compileInfo : Compilation info of LLPC standalone tool
+// @param pipelineBin : Output elf pipeline binary
 // @param suppliedOutFile : Name of the file to output ELF binary (specify "" to use base name of first input file with
 // appropriate extension; specify "-" to use stdout)
 // @param firstInFile : Name of first input file
 // @returns : `ErrorSuccess` on success, `ResultError` on failure
-Error outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, StringRef firstInFile) {
-  const BinaryData &pipelineBin = (compileInfo->stageMask & ShaderStageComputeBit)
-                                      ? compileInfo->compPipelineOut.pipelineBin
-                                      : compileInfo->gfxPipelineOut.pipelineBin;
+Error outputElf(const BinaryData &pipelineBin, const std::string &suppliedOutFile, StringRef firstInFile) {
   SmallString<64> outFileName(suppliedOutFile);
   if (outFileName.empty()) {
     // Detect the data type as we are unable to access the values of the options "-filetype" and "-emit-llvm".
     StringLiteral ext = fileExtFromBinary(pipelineBin);
     outFileName = sys::path::filename(firstInFile);
     sys::path::replace_extension(outFileName, ext);
+  }
+  if (outFileName != "-" && index > 0) {
+    outFileName.append(".");
+    outFileName.append(utostr(index));
   }
 
   return writeFile(pipelineBin, outFileName);
@@ -396,6 +397,9 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
   if (EnableOuts() && !InitSpvGen())
     LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
 
+  assert(PipelineTypeGraphics == VfxPipelineTypeGraphics);
+  assert(PipelineTypeCompute == VfxPipelineTypeCompute);
+  compileInfo.pipelineType = static_cast<PipelineType>(pipelineState->pipelineType);
   for (unsigned stage = 0; stage < pipelineState->numStages; ++stage) {
     if (pipelineState->stages[stage].dataSize > 0) {
       StandaloneCompiler::ShaderModuleData shaderModuleData = {};
@@ -418,7 +422,7 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
     }
   }
 
-  const bool isGraphics = isGraphicsPipeline(compileInfo.stageMask);
+  const bool isGraphics = compileInfo.pipelineType == PipelineTypeGraphics;
   assert(!(isGraphics && isComputePipeline(compileInfo.stageMask)) && "Bad stage mask");
 
   for (unsigned i = 0; i < compileInfo.shaderModuleDatas.size(); ++i) {
