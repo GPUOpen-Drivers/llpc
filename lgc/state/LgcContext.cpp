@@ -43,6 +43,7 @@
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CodeGen.h"
+#include "llvm/Support/CommandLine.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 401324
 // Old version
 #include "llvm/Support/TargetRegistry.h"
@@ -156,7 +157,7 @@ void LgcContext::initialize() {
   setOptionDefault("unroll-max-percent-threshold-boost", "1000");
   setOptionDefault("unroll-allow-partial", "1");
   // TODO: phi-of-ops optimization in NewGVN has some problems, we temporarily
-  // disable this to avoid mis-compile, see (https://github.com/GPUOpen-Drivers/llpc/issues/1206).
+  // disable this to avoid miscompilation, see (https://github.com/GPUOpen-Drivers/llpc/issues/1206).
   setOptionDefault("enable-phi-of-ops", "0");
   setOptionDefault("simplifycfg-sink-common", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8

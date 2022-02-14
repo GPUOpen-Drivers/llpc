@@ -1,0 +1,86 @@
+; Test OpPtrEqual
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; Normal comparison
+; SHADERTEST: [[CMP1:%[0-9]*]] = icmp eq float addrspace(7)* getelementptr inbounds ({{.*}}, i32 0, i32 2), getelementptr inbounds ({{.*}}, i32 0, i32 3)
+; SHADERTEST: [[Value1:%[0-9]*]] = select i1 [[CMP1]], i32 0, i32 1
+; SHADERTEST: store i32 [[Value1]], i32 addrspace(7)* {{.*}}, align 4
+; Comparing 4X4 ColMajor and RowMajor matrics, which have the same SPIR-V type "OpTypeMatrix %v4float 4", return false.
+; SHADERTEST: [[CMP2:%[0-9]*]] = icmp eq i32 0, 1
+; SHADERTEST: [[Value2:%[0-9]*]] = select i1 [[CMP2]], i32 0, i32 1
+; SHADERTEST: store i32 [[Value2]], i32 addrspace(7)* {{.*}}, align 4
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.4
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 59
+; Schema: 0
+               OpCapability Shader
+               OpCapability VariablePointersStorageBuffer
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %1 "main" %2 %4
+               OpExecutionMode %1 LocalSize 1 1 1
+               OpDecorate %_runtimearr_uint ArrayStride 4
+               OpDecorate %_struct_5 Block
+               OpDecorate %_struct_6 Block
+               OpMemberDecorate %_struct_5 0 ColMajor
+               OpMemberDecorate %_struct_5 0 Offset 0
+               OpMemberDecorate %_struct_5 0 MatrixStride 16
+               OpMemberDecorate %_struct_5 1 RowMajor
+               OpMemberDecorate %_struct_5 1 Offset 64
+               OpMemberDecorate %_struct_5 1 MatrixStride 16
+               OpMemberDecorate %_struct_5 2 Offset 128
+               OpMemberDecorate %_struct_5 3 Offset 132
+               OpMemberDecorate %_struct_6 0 Offset 0
+               OpDecorate %2 DescriptorSet 0
+               OpDecorate %2 Binding 0
+               OpDecorate %4 DescriptorSet 0
+               OpDecorate %4 Binding 2
+       %void = OpTypeVoid
+       %bool = OpTypeBool
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+     %uint_1 = OpConstant %uint 1
+     %uint_2 = OpConstant %uint 2
+     %uint_3 = OpConstant %uint 3
+      %float = OpTypeFloat 32
+%_runtimearr_uint = OpTypeRuntimeArray %uint
+    %v4float = OpTypeVector %float 4
+%mat4v4float = OpTypeMatrix %v4float 4
+  %_struct_5 = OpTypeStruct %mat4v4float %mat4v4float %float %float
+  %_struct_6 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_5 = OpTypePointer StorageBuffer %_struct_5
+%_ptr_StorageBuffer__struct_6 = OpTypePointer StorageBuffer %_struct_6
+%_ptr_StorageBuffer_mat4v4float = OpTypePointer StorageBuffer %mat4v4float
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
+%_ptr_StorageBuffer_v4float = OpTypePointer StorageBuffer %v4float
+          %2 = OpVariable %_ptr_StorageBuffer__struct_5 StorageBuffer
+          %4 = OpVariable %_ptr_StorageBuffer__struct_6 StorageBuffer
+         %24 = OpTypeFunction %void
+          %1 = OpFunction %void None %24
+         %25 = OpLabel
+         %26 = OpCopyObject %uint %uint_0
+         %27 = OpAccessChain %_ptr_StorageBuffer_float %2 %uint_2
+         %28 = OpAccessChain %_ptr_StorageBuffer_float %2 %uint_3
+         %31 = OpAccessChain %_ptr_StorageBuffer_mat4v4float %2 %uint_0
+         %32 = OpAccessChain %_ptr_StorageBuffer_mat4v4float %2 %uint_1
+         %33 = OpAccessChain %_ptr_StorageBuffer_v4float %2 %uint_0 %uint_0
+         %34 = OpAccessChain %_ptr_StorageBuffer_v4float %2 %uint_0 %uint_1
+         %35 = OpAccessChain %_ptr_StorageBuffer_float %2 %uint_0 %uint_0 %uint_0
+         %36 = OpPtrEqual %bool %27 %28
+         %37 = OpSelect %uint %36 %uint_0 %uint_1
+         %38 = OpAccessChain %_ptr_StorageBuffer_uint %4 %uint_0 %26
+         %39 = OpIAdd %uint %26 %uint_1
+               OpStore %38 %37
+         %55 = OpPtrEqual %bool %31 %32
+         %56 = OpSelect %uint %55 %uint_0 %uint_1
+         %57 = OpAccessChain %_ptr_StorageBuffer_uint %4 %uint_0 %39
+         %58 = OpIAdd %uint %39 %uint_1
+               OpStore %57 %56
+               OpReturn
+               OpFunctionEnd

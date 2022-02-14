@@ -818,7 +818,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   //       Accumulate per-wave and per-subgroup count of output vertices
   //     Barrier
   //
-  //     if (vertex compacted && vertex drawed) {
+  //     if (vertex compacted && vertex drawn) {
   //       Compact vertex thread ID (map: compacted -> uncompacted)
   //       Write vertex compaction info
   //     }
@@ -1602,7 +1602,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   //   Barrier
   //   Update vertCountInSubgroup
   //
-  //   if (vertex compacted && vertex drawed)
+  //   if (vertex compacted && vertex drawn)
   //     Compact vertex thread ID (map: compacted -> uncompacted)
   //
   //   if (waveId == 0)

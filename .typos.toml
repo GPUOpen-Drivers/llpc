@@ -12,6 +12,7 @@ ANDed = "ANDed"
 ba = "ba"
 UE = "UE"
 OpBuildNDRange = "OpBuildNDRange"
+serDataNode = "serDataNode"
 
 [default.extend-words]
 lod = "lod"

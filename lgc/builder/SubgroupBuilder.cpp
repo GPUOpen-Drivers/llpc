@@ -1219,7 +1219,7 @@ Value *SubgroupBuilder::createGroupArithmeticOperation(GroupArithOp groupArithOp
 }
 
 // =====================================================================================================================
-// Create an inline assembly call to cause a side effect (used to workaround mis-compiles with convergent).
+// Create an inline assembly call to cause a side effect (used to work around miscompiles with convergent).
 //
 // @param value : The value to ensure doesn't move in control flow.
 Value *SubgroupBuilder::createInlineAsmSideEffect(Value *const value) {

@@ -1079,6 +1079,18 @@ Instruction *SPIRVToLLVM::transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function 
   SPIRVType *bt = bc->getOperand(0)->getType();
   Instruction *inst = nullptr;
   auto op = bc->getOpCode();
+  if (op == OpPtrEqual || op == OpPtrNotEqual) {
+    // NOTE: The two compared operands have the same SPIR-V type, but the IR types are different.
+    // for example: struct {
+    //                mat4 mat1;  // rowMajor
+    //                mat4 mat2;  // colMajor
+    //              };
+    auto lValue = transValue(bc->getOperand(0), f, bb);
+    auto rValue = transValue(bc->getOperand(1), f, bb);
+    if (lValue->getType() != rValue->getType())
+      return new ICmpInst(*bb, CmpMap::rmap(op), getBuilder()->getInt32(0), getBuilder()->getInt32(1));
+  }
+
   if (isLogicalOpCode(op))
     op = IntBoolOpMap::rmap(op);
   if (bt->isTypeVectorOrScalarInt() || bt->isTypeVectorOrScalarBool() || bt->isTypePointer())
@@ -4889,8 +4901,9 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
         transValue(bi->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
     Value *const op2 =
         transValue(bi->getOpValue(1), getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+    Type *ty = transType(bi->getOpValue(0)->getType()->getPointerElementType());
 
-    Value *ptrDiff = getBuilder()->CreatePtrDiff(op1, op2);
+    Value *ptrDiff = getBuilder()->CreatePtrDiff(ty, op1, op2);
 
     auto destType = dyn_cast<IntegerType>(transType(bv->getType()));
     auto ptrDiffType = dyn_cast<IntegerType>(ptrDiff->getType());

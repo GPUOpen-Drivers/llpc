@@ -185,22 +185,22 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   //     %vgpr3 = select i1 %nullHs, i32 %vgpr3, i32 %vgpr5
   //
   //     %lsEnable = icmp ult i32 %threadId, %lsVertCount
-  //     br i1 %lsEnable, label %.beginls, label %.endls
+  //     br i1 %lsEnable, label %.beginLs, label %.endLs
   //
-  // .beginls:
+  // .beginLs:
   //     call void @lgc.shader.LS.main(%sgpr..., %userData..., %vgpr...)
-  //     br label %.endls
+  //     br label %.endLs
   //
-  // .endls:
+  // .endLs:
   //     call void @llvm.amdgcn.s.barrier()
   //     %hsEnable = icmp ult i32 %threadId, %hsVertCount
-  //     br i1 %hsEnable, label %.beginhs, label %.endhs
+  //     br i1 %hsEnable, label %.beginHs, label %.endHs
   //
-  // .beginhs:
+  // .beginHs:
   //     call void @lgc.shader.HS.main(%sgpr..., %userData..., %vgpr...)
-  //     br label %.endhs
+  //     br label %.endHs
   //
-  // .endhs:
+  // .endHs:
   //     ret void
   // }
 
@@ -218,10 +218,10 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   Value *userData = arg++;
 
   // Define basic blocks
-  auto endHsBlock = BasicBlock::Create(*m_context, ".endhs", entryPoint);
-  auto beginHsBlock = BasicBlock::Create(*m_context, ".beginhs", entryPoint, endHsBlock);
-  auto endLsBlock = BasicBlock::Create(*m_context, ".endls", entryPoint, beginHsBlock);
-  auto beginLsBlock = BasicBlock::Create(*m_context, ".beginls", entryPoint, endLsBlock);
+  auto endHsBlock = BasicBlock::Create(*m_context, ".endHs", entryPoint);
+  auto beginHsBlock = BasicBlock::Create(*m_context, ".beginHs", entryPoint, endHsBlock);
+  auto endLsBlock = BasicBlock::Create(*m_context, ".endLs", entryPoint, beginHsBlock);
+  auto beginLsBlock = BasicBlock::Create(*m_context, ".beginLs", entryPoint, endLsBlock);
   auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint, beginLsBlock);
 
   // Construct ".entry" block
@@ -292,7 +292,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto lsEnable = new ICmpInst(*entryBlock, ICmpInst::ICMP_ULT, threadId, lsVertCount, "");
   BranchInst::Create(beginLsBlock, endLsBlock, lsEnable, entryBlock);
 
-  // Construct ".beginls" block
+  // Construct ".beginLs" block
   if (m_hasVs) {
     // Call LS main function
     args.clear();
@@ -367,7 +367,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   }
   BranchInst::Create(endLsBlock, beginLsBlock);
 
-  // Construct ".endls" block
+  // Construct ".endLs" block
   args.clear();
   attribs.clear();
   attribs.push_back(Attribute::NoRecurse);
@@ -376,7 +376,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto hsEnable = new ICmpInst(*endLsBlock, ICmpInst::ICMP_ULT, threadId, hsVertCount, "");
   BranchInst::Create(beginHsBlock, endHsBlock, hsEnable, endLsBlock);
 
-  // Construct ".beginhs" block
+  // Construct ".beginHs" block
   if (m_hasTcs) {
     // Call HS main function
     args.clear();
@@ -454,7 +454,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   }
   BranchInst::Create(endHsBlock, beginHsBlock);
 
-  // Construct ".endhs" block
+  // Construct ".endHs" block
   ReturnInst::Create(*m_context, endHsBlock);
 
   return entryPoint;
@@ -596,22 +596,22 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   //     %gsPrimCount = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 8, i32 8)
   //
   //     %esEnable = icmp ult i32 %threadId, %esVertCount
-  //     br i1 %esEnable, label %.begines, label %.endes
+  //     br i1 %esEnable, label %.beginEs, label %.endEs
   //
-  // .begines:
+  // .beginEs:
   //     call void @lgc.shader.ES.main(%sgpr..., %userData..., %vgpr...)
-  //     br label %.endes
+  //     br label %.endEs
   //
-  // .endes:
+  // .endEs:
   //     call void @llvm.amdgcn.s.barrier()
   //     %gsEnable = icmp ult i32 %threadId, %gsPrimCount
-  //     br i1 %gsEnable, label %.begings, label %.endgs
+  //     br i1 %gsEnable, label %.beginGs, label %.endGs
   //
-  // .begings:
+  // .beginGs:
   //     call void @lgc.shader.GS.main(%sgpr..., %userData..., %vgpr...)
-  //     br label %.endgs
+  //     br label %.endGs
   //
-  // .endgs:
+  // .endGs:
   //     ret void
   // }
 
@@ -631,10 +631,10 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   Value *userData = arg++;
 
   // Define basic blocks
-  auto endGsBlock = BasicBlock::Create(*m_context, ".endgs", entryPoint);
-  auto beginGsBlock = BasicBlock::Create(*m_context, ".begings", entryPoint, endGsBlock);
-  auto endEsBlock = BasicBlock::Create(*m_context, ".endes", entryPoint, beginGsBlock);
-  auto beginEsBlock = BasicBlock::Create(*m_context, ".begines", entryPoint, endEsBlock);
+  auto endGsBlock = BasicBlock::Create(*m_context, ".endGs", entryPoint);
+  auto beginGsBlock = BasicBlock::Create(*m_context, ".beginGs", entryPoint, endGsBlock);
+  auto endEsBlock = BasicBlock::Create(*m_context, ".endEs", entryPoint, beginGsBlock);
+  auto beginEsBlock = BasicBlock::Create(*m_context, ".beginEs", entryPoint, endEsBlock);
   auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint, beginEsBlock);
 
   // Construct ".entry" block
@@ -731,7 +731,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   auto vertexFetchesStart = (arg + 9);
   auto vertexFetchesEnd = entryPoint->arg_end();
 
-  // Construct ".begines" block
+  // Construct ".beginEs" block
   unsigned spillTableIdx = 0;
   if ((hasTs && m_hasTes) || (!hasTs && m_hasVs)) {
     // Call ES main function
@@ -840,7 +840,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   }
   BranchInst::Create(endEsBlock, beginEsBlock);
 
-  // Construct ".endes" block
+  // Construct ".endEs" block
   args.clear();
   attribs.clear();
   attribs.push_back(Attribute::NoRecurse);
@@ -849,7 +849,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   auto gsEnable = new ICmpInst(*endEsBlock, ICmpInst::ICMP_ULT, threadId, gsPrimCount, "");
   BranchInst::Create(beginGsBlock, endGsBlock, gsEnable, endEsBlock);
 
-  // Construct ".begings" block
+  // Construct ".beginGs" block
   {
     attribs.clear();
     attribs.push_back(Attribute::ReadNone);
@@ -985,7 +985,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   }
   BranchInst::Create(endGsBlock, beginGsBlock);
 
-  // Construct ".endgs" block
+  // Construct ".endGs" block
   ReturnInst::Create(*m_context, endGsBlock);
 
   return entryPoint;
