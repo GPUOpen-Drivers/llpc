@@ -134,7 +134,11 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
       if (compBitWidth == 8 || compBitWidth == 16) {
         scalar = CreateTrunc(scalar, getInt32Ty());
         accumulator = CreateTrunc(accumulator, getInt32Ty());
-        scalar = CreateNamedCall("llvm.sadd.sat.i32", getInt32Ty(), {scalar, accumulator}, {}, instName);
+        if (isSigned) {
+          scalar = CreateNamedCall("llvm.sadd.sat.i32", getInt32Ty(), {scalar, accumulator}, {}, instName);
+        } else {
+          scalar = CreateNamedCall("llvm.uadd.sat.i32", getInt32Ty(), {scalar, accumulator}, {}, instName);
+        }
       } else {
         scalar = CreateAdd(scalar, accumulator);
       }
@@ -193,8 +197,13 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
               CreateIntrinsic(intrinsicDot2, {}, {input1, input2, intermediateRes, getInt1(false)}, nullptr, instName);
         }
         // Add a saturation add if required.
-        if (hasAccumulator)
-          scalar = CreateNamedCall("llvm.sadd.sat.i32", getInt32Ty(), {scalar, accumulator}, {}, instName);
+        if (hasAccumulator) {
+          if (isSigned) {
+            scalar = CreateNamedCall("llvm.sadd.sat.i32", getInt32Ty(), {scalar, accumulator}, {}, instName);
+          } else {
+            scalar = CreateNamedCall("llvm.uadd.sat.i32", getInt32Ty(), {scalar, accumulator}, {}, instName);
+          }
+        }
       }
     }
   }
