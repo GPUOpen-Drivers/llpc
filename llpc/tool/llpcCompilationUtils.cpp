@@ -361,6 +361,8 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
 
   compileInfo.compPipelineInfo = pipelineState->compPipelineInfo;
   compileInfo.gfxPipelineInfo = pipelineState->gfxPipelineInfo;
+  compileInfo.pipelineType = pipelineState->pipelineType;
+
   if (ignoreColorAttachmentFormats) {
     // NOTE: When this option is enabled, we set color attachment format to
     // R8G8B8A8_SRGB for color target 0. Also, for other color targets, if the
@@ -374,7 +376,6 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
   if (EnableOuts() && !InitSpvGen())
     LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
 
-  compileInfo.pipelineType = pipelineState->pipelineType;
   for (unsigned stage = 0; stage < pipelineState->numStages; ++stage) {
     if (pipelineState->stages[stage].dataSize > 0) {
       StandaloneCompiler::ShaderModuleData shaderModuleData = {};
