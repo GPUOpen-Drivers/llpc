@@ -5526,6 +5526,10 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
   if ((info->flags & lgc::Builder::ImageFlagNonUniformSampler) == 0)
     setEnforceReadFirstLaneFlag(samplerLoadSrc, false);
 
+  if (imageLoadSrc && (imageLoadSrc->getOpCode() == OpVariable || imageLoadSrc->getOpCode() == OpFunctionParameter) &&
+      !imageLoadSrc->hasDecorate(DecorationAliased))
+    info->flags |= lgc::Builder::ImageFlagNotAliased;
+
   // Get the IR value for the image/sampledimage.
   Value *desc = transValue(bImageInst, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
 
@@ -6207,6 +6211,12 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
   ExtractedImageInfo imageInfo = {bb};
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
+
+  // OpImageFetch fetches from an image whose Sampled operand is 1. Ops that modify an image (like OpImageWrite) work
+  // on an image whose Sampled operand is 0 or 2. So if the image is known not to alias any other memory object then
+  // nothing can modify it, so we can mark the load as invariant.
+  if (bi->getOpCode() == OpImageFetch && (imageInfo.flags & lgc::Builder::ImageFlagNotAliased))
+    imageInfo.flags |= lgc::Builder::ImageFlagInvariant;
 
   // Determine the return type we want from the builder call. For a sparse
   // fetch, the struct is {texel,TFE} in the builder call (to reflect

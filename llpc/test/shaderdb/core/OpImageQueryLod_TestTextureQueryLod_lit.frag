@@ -31,7 +31,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
 ; SHADERTEST: <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 0, i32 0)
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 0, i32 0, {{.*}}, {{.*}}, float 1.000000e+00)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 0, i32 512, {{.*}}, {{.*}}, float 1.000000e+00)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.derivative.f32(float 1.000000e+00, i1 false, i1 false)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.derivative.f32(float 1.000000e+00, i1 true, i1 false)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float @llvm.fabs.f32(
@@ -43,7 +43,7 @@ void main()
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> @llvm.fabs.v2f32(
 ; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 1)
 ; SHADERTEST: <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 0, i32 1)
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 1, i32 0, {{.*}}, {{.*}}, <2 x float> <float 0x3FD99999A0000000, float 0x3FD99999A0000000>)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 1, i32 512, {{.*}}, {{.*}}, <2 x float> <float 0x3FD99999A0000000, float 0x3FD99999A0000000>)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.derivative.v2f32(<2 x float> <float 0x3FD99999A0000000, float 0x3FD99999A0000000>, i1 false, i1 false)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.derivative.v2f32(<2 x float> <float 0x3FD99999A0000000, float 0x3FD99999A0000000>, i1 true, i1 false)
 ; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 2, i32 0)
@@ -54,7 +54,7 @@ void main()
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <3 x float> @llvm.fabs.v3f32(
 ; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 3, i32 0)
 ; SHADERTEST: <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 3, i32 1)
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 2, i32 0, {{.*}}, {{.*}}, <3 x float> <float 0x3FE6666660000000, float 0x3FE6666660000000, float 0x3FE6666660000000>)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 2, i32 512, {{.*}}, {{.*}}, <3 x float> <float 0x3FE6666660000000, float 0x3FE6666660000000, float 0x3FE6666660000000>)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.derivative.v3f32(<3 x float> <float 0x3FE6666660000000, float 0x3FE6666660000000, float 0x3FE6666660000000>, i1 false, i1 false)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.derivative.v3f32(<3 x float> <float 0x3FE6666660000000, float 0x3FE6666660000000, float 0x3FE6666660000000>, i1 true, i1 false)
 

@@ -843,7 +843,9 @@ public:
     ImageFlagCheckMultiView = 0x40,              // If pipeline state enables multiview, use ViewIndex as coordinate z.
                                                  // Otherwise, acts the same as ImageFlagAddFragCoord
     ImageFlagEnforceReadFirstLaneImage = 0x80,   // Whether enabling readfirstlane on the image descriptor
-    ImageFlagEnforceReadFirstLaneSampler = 0x100 // Whether enabling readfirstlane on the sampler descriptor
+    ImageFlagEnforceReadFirstLaneSampler = 0x100,// Whether enabling readfirstlane on the sampler descriptor
+    ImageFlagNotAliased = 0x200,                 // Whether the image is known not to alias any other memory object
+    ImageFlagInvariant = 0x400,                  // Invariant load
   };
 
   // Address array indices for image sample and gather methods. Where an optional entry is missing (either
