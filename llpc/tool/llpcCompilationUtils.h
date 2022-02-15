@@ -56,6 +56,7 @@
 
 #include "llpc.h"
 #include "llpcInputUtils.h"
+#include "vfx.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -73,11 +74,6 @@ struct ShaderModuleData {
   Llpc::ShaderModuleBuildOut shaderOut;   // Output of building shader modules
   void *shaderBuf;                        // Allocation buffer of building shader modules
   bool disableDoAutoLayout;               // Indicates whether to disable auto layout of descriptors
-};
-
-enum PipelineType : unsigned {
-  PipelineTypeGraphics = 0, // Graphics pipeline type
-  PipelineTypeCompute,      // Compute pipeline type
 };
 
 // Represents a single compilation context of a pipeline or a group of shaders.
@@ -100,7 +96,7 @@ struct CompileInfo {
   bool autoLayoutDesc;            // Whether to automatically create descriptor layout based on resource usages
   bool robustBufferAccess;        // Whether to enable robust buffer access
   bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
-  PipelineType pipelineType;      // Pipeline type;
+  VfxPipelineType pipelineType;   // Pipeline type;
 };
 
 // Callback function to allocate buffer for building shader module and building pipeline.

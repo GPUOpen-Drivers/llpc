@@ -444,7 +444,8 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   } else {
     if (Error err = processInputStages(compileInfo, inputSpecs, ValidateSpirv, NumThreads))
       return err;
-    compileInfo.pipelineType = isComputePipeline(compileInfo.stageMask) ? PipelineTypeCompute : PipelineTypeGraphics;
+    compileInfo.pipelineType =
+        isComputePipeline(compileInfo.stageMask) ? VfxPipelineTypeCompute : VfxPipelineTypeGraphics;
   }
 
   //
@@ -474,11 +475,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   if (Error err = builder->build())
     return err;
 
-  if (compileInfo.pipelineType == PipelineTypeGraphics) {
-    return outputElf(compileInfo.gfxPipelineOut.pipelineBin, OutFile, firstInput.filename, 0);
-  } else {
-    return outputElf(compileInfo.compPipelineOut.pipelineBin, OutFile, firstInput.filename, 0);
-  }
+  return builder->outputElfs(OutFile, firstInput.filename);
 }
 
 #ifdef WIN_OS

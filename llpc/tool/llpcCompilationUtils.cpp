@@ -397,9 +397,7 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
   if (EnableOuts() && !InitSpvGen())
     LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
 
-  assert(PipelineTypeGraphics == VfxPipelineTypeGraphics);
-  assert(PipelineTypeCompute == VfxPipelineTypeCompute);
-  compileInfo.pipelineType = static_cast<PipelineType>(pipelineState->pipelineType);
+  compileInfo.pipelineType = pipelineState->pipelineType;
   for (unsigned stage = 0; stage < pipelineState->numStages; ++stage) {
     if (pipelineState->stages[stage].dataSize > 0) {
       StandaloneCompiler::ShaderModuleData shaderModuleData = {};
@@ -422,7 +420,7 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
     }
   }
 
-  const bool isGraphics = compileInfo.pipelineType == PipelineTypeGraphics;
+  const bool isGraphics = compileInfo.pipelineType == VfxPipelineTypeGraphics;
   assert(!(isGraphics && isComputePipeline(compileInfo.stageMask)) && "Bad stage mask");
 
   for (unsigned i = 0; i < compileInfo.shaderModuleDatas.size(); ++i) {

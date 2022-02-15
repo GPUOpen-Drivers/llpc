@@ -72,6 +72,12 @@ public:
   // @returns : Calculated pipeline hash.
   virtual llvm::Error build() = 0;
 
+  // Output LLPC resulting binaries
+  //
+  // @param suppliedOutFile : Name of the file to output ELF binary
+  // @param firstInFile : Name of first input file
+  virtual llvm::Error outputElfs(const std::string &suppliedOutFile, llvm::StringRef firstInFile) = 0;
+
   // Calculates the hash of the compiled pipeline. This is used by `printPipelineInfo` to produce verbose logs.
   //
   // @param buildInfo : Pipeline build information.
