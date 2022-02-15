@@ -112,8 +112,8 @@ public:
   // Prints pipeline dump hash code and filenames.
   void printPipelineInfo(Vkgc::PipelineBuildInfo buildInfo);
 
-protected:
-  // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
+  // Output LLPC single one elf ((ELF binary, ISA assembly text, or LLVM bitcode)) of pipeline binaries to the specified
+  // target file.
   llvm::Error outputElf(const BinaryData &pipelineBin, const llvm::StringRef suppliedOutFile,
                         llvm::StringRef firstInFile, unsigned index);
 

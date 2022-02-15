@@ -145,13 +145,14 @@ void PipelineBuilder::printPipelineInfo(PipelineBuildInfo buildInfo) {
 }
 
 // =====================================================================================================================
-// Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
+// Output LLPC single one elf ((ELF binary, ISA assembly text, or LLVM bitcode)) of pipeline binaries to the specified
+// target file.
 //
 // @param pipelineBin : Output elf pipeline binary
-// @param suppliedOutFile : Name of the file to output ELF binary (specify "" to use base name of first input file with
-// appropriate extension; specify "-" to use stdout)
+// @param suppliedOutFile : Name of the file to output ELF binary (specify "" to use the base name of first input file
+// with appropriate extension; specify "-" to use stdout)
 // @param firstInFile : Name of first input file
-// @param index : index of elf binaries
+// @param index : index of elf from pipeline binaries
 // @returns : `ErrorSuccess` on success, `ResultError` on failure
 Error PipelineBuilder::outputElf(const BinaryData &pipelineBin, const StringRef suppliedOutFile, StringRef firstInFile,
                                  unsigned index) {
