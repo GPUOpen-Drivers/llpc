@@ -115,7 +115,7 @@ public:
   // Output LLPC single one elf ((ELF binary, ISA assembly text, or LLVM bitcode)) of pipeline binaries to the specified
   // target file.
   llvm::Error outputElf(const BinaryData &pipelineBin, const llvm::StringRef suppliedOutFile,
-                        llvm::StringRef firstInFile, unsigned index);
+                        llvm::StringRef firstInFile);
 
 private:
   ICompiler &m_compiler;

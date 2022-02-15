@@ -162,7 +162,7 @@ uint64_t ComputePipelineBuilder::getPipelineHash(Vkgc::PipelineBuildInfo buildIn
 Error ComputePipelineBuilder::outputElfs(const StringRef suppliedOutFile) {
   CompileInfo &compileInfo = getCompileInfo();
   const InputSpec &firstInput = compileInfo.inputSpecs.front();
-  return outputElf(compileInfo.compPipelineOut.pipelineBin, suppliedOutFile, firstInput.filename, 0);
+  return outputElf(compileInfo.compPipelineOut.pipelineBin, suppliedOutFile, firstInput.filename);
 }
 
 } // namespace StandaloneCompiler

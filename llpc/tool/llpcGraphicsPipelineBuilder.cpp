@@ -175,7 +175,7 @@ uint64_t GraphicsPipelineBuilder::getPipelineHash(Vkgc::PipelineBuildInfo buildI
 Error GraphicsPipelineBuilder::outputElfs(const StringRef suppliedOutFile) {
   CompileInfo &compileInfo = getCompileInfo();
   const InputSpec &firstInput = compileInfo.inputSpecs.front();
-  return outputElf(compileInfo.gfxPipelineOut.pipelineBin, suppliedOutFile, firstInput.filename, 0);
+  return outputElf(compileInfo.gfxPipelineOut.pipelineBin, suppliedOutFile, firstInput.filename);
 }
 
 } // namespace StandaloneCompiler
