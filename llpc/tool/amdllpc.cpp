@@ -475,7 +475,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   if (Error err = builder->build())
     return err;
 
-  return builder->outputElfs(OutFile, firstInput.filename);
+  return builder->outputElfs(OutFile);
 }
 
 #ifdef WIN_OS

@@ -171,11 +171,11 @@ uint64_t GraphicsPipelineBuilder::getPipelineHash(Vkgc::PipelineBuildInfo buildI
 // Output LLPC resulting binaries
 //
 // @param suppliedOutFile : Name of the file to output ELF binary
-// @param firstInFile : Name of first input file
 // @returns : `llvm::ErrorSuccess` on success, `llpc::ResultError` on failure.
-Error GraphicsPipelineBuilder::outputElfs(const std::string &suppliedOutFile, StringRef firstInFile) {
+Error GraphicsPipelineBuilder::outputElfs(const StringRef suppliedOutFile) {
   CompileInfo &compileInfo = getCompileInfo();
-  return outputElf(compileInfo.gfxPipelineOut.pipelineBin, suppliedOutFile, firstInFile, 0);
+  const InputSpec &firstInput = compileInfo.inputSpecs.front();
+  return outputElf(compileInfo.gfxPipelineOut.pipelineBin, suppliedOutFile, firstInput.filename, 0);
 }
 
 } // namespace StandaloneCompiler

@@ -45,7 +45,7 @@ public:
 
   // Builds compute pipeline and does linking. Returns the pipeline Elf.
   llvm::Expected<Vkgc::BinaryData> buildComputePipeline();
-  llvm::Error outputElfs(const std::string &suppliedOutFile, llvm::StringRef firstInFile);
+  llvm::Error outputElfs(const llvm::StringRef suppliedOutFile);
 };
 
 } // namespace StandaloneCompiler

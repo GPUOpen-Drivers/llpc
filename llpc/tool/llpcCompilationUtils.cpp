@@ -325,29 +325,6 @@ Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
   return Error::success();
 }
 
-// =====================================================================================================================
-// Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
-//
-// @param pipelineBin : Output elf pipeline binary
-// @param suppliedOutFile : Name of the file to output ELF binary (specify "" to use base name of first input file with
-// appropriate extension; specify "-" to use stdout)
-// @param firstInFile : Name of first input file
-// @returns : `ErrorSuccess` on success, `ResultError` on failure
-Error outputElf(const BinaryData &pipelineBin, const std::string &suppliedOutFile, StringRef firstInFile) {
-  SmallString<64> outFileName(suppliedOutFile);
-  if (outFileName.empty()) {
-    // Detect the data type as we are unable to access the values of the options "-filetype" and "-emit-llvm".
-    StringLiteral ext = fileExtFromBinary(pipelineBin);
-    outFileName = sys::path::filename(firstInFile);
-    sys::path::replace_extension(outFileName, ext);
-  }
-  if (outFileName != "-" && index > 0) {
-    outFileName.append(".");
-    outFileName.append(utostr(index));
-  }
-
-  return writeFile(pipelineBin, outFileName);
-}
 
 // =====================================================================================================================
 // Process one pipeline input file.

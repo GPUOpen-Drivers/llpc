@@ -75,8 +75,7 @@ public:
   // Output LLPC resulting binaries
   //
   // @param suppliedOutFile : Name of the file to output ELF binary
-  // @param firstInFile : Name of first input file
-  virtual llvm::Error outputElfs(const std::string &suppliedOutFile, llvm::StringRef firstInFile) = 0;
+  virtual llvm::Error outputElfs(const llvm::StringRef suppliedOutFile) = 0;
 
   // Calculates the hash of the compiled pipeline. This is used by `printPipelineInfo` to produce verbose logs.
   //
@@ -112,6 +111,11 @@ public:
 
   // Prints pipeline dump hash code and filenames.
   void printPipelineInfo(Vkgc::PipelineBuildInfo buildInfo);
+
+protected:
+  // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
+  llvm::Error outputElf(const BinaryData &pipelineBin, const llvm::StringRef suppliedOutFile,
+                        llvm::StringRef firstInFile, unsigned index);
 
 private:
   ICompiler &m_compiler;
