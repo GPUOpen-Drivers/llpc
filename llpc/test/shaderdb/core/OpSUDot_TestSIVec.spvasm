@@ -1,0 +1,56 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: %{{[0-9]+}} = call i32 (...) @lgc.create.integer.dot.product.i32(<4 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, i32 0, i32 1)
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 58
+; Schema: 0
+               OpCapability Shader
+               OpCapability DotProductKHR
+               OpExtension "SPV_KHR_integer_dot_product"
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %a0 %b0 %color
+               OpExecutionMode %main OriginUpperLeft
+               OpName %main "main"
+               OpName %c "c"
+               OpName %a0 "a0"
+               OpName %b0 "b0"
+               OpName %color "color"
+               OpDecorate %a0 Location 0
+               OpDecorate %b0 Location 10
+               OpDecorate %color Location 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+        %int2 = OpTypeInt 32 0
+      %v4int = OpTypeVector %int 4
+      %v4int2 = OpTypeVector %int2 4
+%_ptr_Function_v4int = OpTypePointer Function %v4int
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+         %a0 = OpVariable %_ptr_Input_v4float Input
+         %b0 = OpVariable %_ptr_Input_v4float Input
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+      %color = OpVariable %_ptr_Output_v4float Output
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+          %c = OpVariable %_ptr_Function_v4int Function
+         %15 = OpLoad %v4float %a0
+         %16 = OpConvertFToS %v4int %15
+         %18 = OpLoad %v4float %b0
+         %19 = OpConvertFToU %v4int2 %18
+         %20 = OpSUDotKHR %int %16 %19
+         %21 = OpCompositeConstruct %v4int %20 %20 %20 %20
+               OpStore %c %21
+         %23 = OpLoad %v4int %c
+         %24 = OpConvertSToF %v4float %23
+               OpStore %color %24
+               OpReturn
+               OpFunctionEnd
