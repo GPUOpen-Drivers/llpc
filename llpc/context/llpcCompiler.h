@@ -48,6 +48,8 @@ namespace lgc {
 
 class LegacyPassManager;
 class PassManager;
+class Pipeline;
+enum class PipelineLink : unsigned;
 
 } // namespace lgc
 
@@ -113,6 +115,10 @@ public:
                                        bool buildingRelocatableElf, ElfPackage *pipelineElf,
                                        llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
 
+  Result buildGraphicsPipelineWithPartPipelines(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
+                                                ElfPackage *pipelineElf,
+                                                llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
+
   Result buildComputePipelineInternal(ComputeContext *computeContext, const ComputePipelineBuildInfo *pipelineInfo,
                                       bool buildingRelocatableElf, ElfPackage *pipelineElf,
                                       CacheAccessInfo *stageCacheAccess);
@@ -121,7 +127,8 @@ public:
                                          ElfPackage *pipelineElf,
                                          llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
 
-  Result buildPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
+  Result buildPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
+                               lgc::PipelineLink pipelineLink, lgc::Pipeline *otherPartPipeline,
                                ElfPackage *pipelineElf, llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
 
   // Gets the count of compiler instance.
