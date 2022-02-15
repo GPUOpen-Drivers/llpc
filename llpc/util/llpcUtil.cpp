@@ -167,4 +167,20 @@ const char *getUnlinkedShaderStageName(Vkgc::UnlinkedShaderStage type) {
   return Names[type];
 }
 
+// =====================================================================================================================
+// Returns the name of the given part-pipeline stage.
+//
+// @param type : The part-pipeline stage type.
+const char *getPartPipelineStageName(Vkgc::PartPipelineStage type) {
+  switch (type) {
+  case PartPipelineStageFragment:
+    return "fragment";
+  case PartPipelineStagePreRasterization:
+    return "pre-rasterization";
+  default:
+    llvm_unreachable("Unknown part-pipeline stage.");
+    return "unknown";
+  }
+}
+
 } // namespace Llpc

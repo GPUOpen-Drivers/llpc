@@ -127,6 +127,9 @@ unsigned getShaderStageMaskForType(Vkgc::UnlinkedShaderStage type);
 // Returns the name of the given unlinked shader stage.
 const char *getUnlinkedShaderStageName(Vkgc::UnlinkedShaderStage type);
 
+// Returns the name of the given part-pipeline stage.
+const char *getPartPipelineStageName(Vkgc::PartPipelineStage type);
+
 inline bool doesShaderStageExist(llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, ShaderStage stage) {
   return stage < shaderInfo.size() && shaderInfo[stage] && shaderInfo[stage]->pModuleData;
 }
@@ -176,8 +179,11 @@ namespace llvm {
 // Make Vkgc::UnlinkedShaderStage iterable using `lgc::enumRange<Vkgc::ShaderStage>()`.
 LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(Vkgc::ShaderStage, Vkgc::ShaderStageCountInternal);
 
-// Make Vkgc::UnlinkedShaderStage iterable using `lgc::enumRange<Vkgc::UnlinedShaderStage>()`.
+// Make Vkgc::UnlinkedShaderStage iterable using `lgc::enumRange<Vkgc::UnlinkedShaderStage>()`.
 LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(Vkgc::UnlinkedShaderStage, Vkgc::UnlinkedStageCount);
+
+// Make Vkgc::PartPipelineStage iterable using `lgc::enumRange<Vkgc::PartPipelineStage>()`.
+LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(Vkgc::PartPipelineStage, Vkgc::PartPipelineStageCount);
 } // namespace llvm
 
 namespace Llpc {

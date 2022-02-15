@@ -165,6 +165,9 @@ opt<unsigned> NewPassManager("new-pass-manager",
                                       "front-end and middle-end (experimental)"),
                              init(1));
 
+// -enable-part-pipeline: Use part pipeline compilation scheme (experimental)
+opt<bool> EnablePartPipeline("enable-part-pipeline", cl::desc("Enable part pipeline compilation scheme"), init(false));
+
 extern opt<bool> EnableOuts;
 
 extern opt<bool> EnableErrs;
@@ -647,7 +650,8 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
       singleStageShaderInfo[stage] = shaderInfo[stage];
 
     Vkgc::ElfPackage &stageElf = elf[stage];
-    result = buildPipelineInternal(context, singleStageShaderInfo, /*unlinked=*/true, &stageElf, stageCacheAccesses);
+    result = buildPipelineInternal(context, singleStageShaderInfo, PipelineLink::Unlinked, nullptr, &stageElf,
+                                   stageCacheAccesses);
     if (result != Result::Success)
       break;
 
@@ -816,11 +820,14 @@ bool Compiler::canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo 
 //
 // @param context : Acquired context
 // @param shaderInfo : Shader info of this pipeline
-// @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs
+// @param pipelineLink : WholePipeline = whole pipeline compile
+//                       Unlinked = shader or part-pipeline compiled without pipeline state such as vertex fetch
+// @param otherPartPipeline : Nullptr or the other Pipeline object containing FS input mappings for a part-pipeline
+//                            compilation of the pre-rasterization stages
 // @param [out] pipelineElf : Output Elf package
 // @param [out] pipelineElf : Stage cache access info.
-Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
-                                       ElfPackage *pipelineElf,
+Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const PipelineShaderInfo *> shaderInfo,
+                                       PipelineLink pipelineLink, Pipeline *otherPartPipeline, ElfPackage *pipelineElf,
                                        llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
   Result result = Result::Success;
   unsigned passIndex = 0;
@@ -839,7 +846,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   // Set up middle-end objects.
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
-  context->getPipelineContext()->setPipelineState(&*pipeline, unlinked);
+  context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr,
+                                                  pipelineLink == PipelineLink::Unlinked);
   context->setBuilder(builderContext->createBuilder(&*pipeline, UseBuilderRecorder));
 
   std::unique_ptr<Module> pipelineModule;
@@ -984,10 +992,14 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       modulesToLink.push_back(modules[shaderIndex]);
     }
 
+    // If this is a part-pipeline compile of the pre-rasterization stages, give the "other" pipeline object
+    // containing the FS input mappings to our pipeline object.
+    if (otherPartPipeline)
+      pipeline->setOtherPartPipeline(*otherPartPipeline);
+
     // Link the shader modules into a single pipeline module.
-    pipelineModule.reset(pipeline->irLink(modulesToLink, context->getPipelineContext()->isUnlinked()
-                                                             ? PipelineLink::Unlinked
-                                                             : PipelineLink::WholePipeline));
+    pipelineModule.reset(pipeline->irLink(
+        modulesToLink, context->getPipelineContext()->isUnlinked() ? PipelineLink::Unlinked : pipelineLink));
     if (!pipelineModule) {
       LLPC_ERRS("Failed to link shader modules into pipeline module\n");
       result = Result::ErrorInvalidShader;
@@ -1008,7 +1020,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       };
 
   // Only enable per stage cache for full graphic pipeline
-  bool checkPerStageCache = cl::EnablePerStageCache && context->isGraphics() && !buildingRelocatableElf &&
+  bool checkPerStageCache = cl::EnablePerStageCache && !cl::EnablePartPipeline && context->isGraphics() &&
+                            !buildingRelocatableElf &&
                             (context->getShaderStageMask() & (ShaderStageVertexBit | ShaderStageFragmentBit));
   if (!checkPerStageCache)
     checkShaderCacheFunc = nullptr;
@@ -1229,9 +1242,145 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
   }
 
   if (result != Result::Success) {
-    result = buildPipelineInternal(context, shaderInfo, /*unlinked=*/false, pipelineElf, stageCacheAccesses);
+    // See if we want to use part-pipeline compilation, if there is an FS and at least one pre-rasterization
+    // shader stage.
+    unsigned stageMask = context->getShaderStageMask();
+    bool buildPartPipeline = (cl::EnablePartPipeline && isShaderStageInMask(ShaderStageFragment, stageMask) &&
+                              (stageMask & ~shaderStageToMask(ShaderStageFragment)));
+    if (buildPartPipeline)
+      result = buildGraphicsPipelineWithPartPipelines(context, shaderInfo, pipelineElf, stageCacheAccesses);
+    else
+      result = buildPipelineInternal(context, shaderInfo, PipelineLink::WholePipeline, nullptr, pipelineElf,
+                                     stageCacheAccesses);
   }
   releaseContext(context);
+  return result;
+}
+
+// =====================================================================================================================
+// Build graphics pipeline using part-pipeline compilation
+//
+// @param graphicsContext : Graphics context this graphics pipeline
+// @param shaderInfo : Shader info of this graphics pipeline
+// @param [out] pipelineElf : Output Elf package. If an error occurs, the content is undefined.
+// @param [out] stageCacheAccesses : Stage cache access result. All elements must be initialized in the caller as
+//                                   CacheAccessInfo::CacheNotChecked
+Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
+                                                        ArrayRef<const PipelineShaderInfo *> shaderInfo,
+                                                        ElfPackage *pipelineElf,
+                                                        MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
+  unsigned wholeStageMask = context->getShaderStageMask();
+  ElfPackage partPipelineBuffers[enumCount<PartPipelineStage>()];
+
+  // Create the linker and its pipeline object.
+  std::unique_ptr<Pipeline> elfLinkerPipeline(context->getLgcContext()->createPipeline());
+  std::unique_ptr<ElfLinker> elfLinker(elfLinkerPipeline->createElfLinker({}));
+
+  // Give selected pipeline state to the linker's pipeline object, required to complete the ELF link.
+  // We pass unlinked=true as we do not need to pass user data layout into the ELF link.
+  context->getPipelineContext()->setPipelineState(&*elfLinkerPipeline, /*hasher=*/nullptr, /*unlinked=*/true);
+
+  // For each of the two part pipelines (fragment first, then pre-rasterization)...
+  for (auto partPipelineStage : lgc::enumRange<PartPipelineStage>()) {
+    // Compile the part pipelines, or find it in the cache.
+    llvm::StringRef partPipelineElf;
+    unsigned partStageMask = partPipelineStage == PartPipelineStageFragment
+                                 ? shaderStageToMask(ShaderStageFragment)
+                                 : wholeStageMask & ~shaderStageToMask(ShaderStageFragment);
+    context->getPipelineContext()->setShaderStageMask(partStageMask);
+
+    // Hash the selected shaders and the pipeline state applicable to them.
+    Util::MetroHash64 hasher;
+    for (const PipelineShaderInfo *shaderInfoEntry : shaderInfo) {
+      if (shaderInfoEntry) {
+        ShaderStage stage = shaderInfoEntry->entryStage;
+        if (shaderInfoEntry->pModuleData && isShaderStageInMask(stage, partStageMask)) {
+          // This is a shader to include in this part pipeline. Add the shader code and options to the hash.
+          PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfoEntry, /*isCacheHash=*/true, &hasher,
+                                                          /*isRelocatableShader=*/false);
+        }
+      }
+    }
+    // Add applicable pipeline state to the hash. (This uses getShaderStageMask() to decide which parts of the
+    // state are applicable.)
+    context->getPipelineContext()->setPipelineState(/*pipeline=*/nullptr, /*hasher=*/&hasher, /*unlinked=*/false);
+
+    // If we are doing the pre-rasterization part pipeline, the linker's pipeline object contains the FS input mapping
+    // state. We need to include that state in the hash.
+    if (partPipelineStage == PartPipelineStagePreRasterization) {
+      assert(elfLinker);
+      StringRef fsInputMappings = elfLinker->getFsInputMappings();
+      hasher.Update(reinterpret_cast<const uint8_t *>(fsInputMappings.data()), fsInputMappings.size());
+    }
+
+    // Finalize the hash, and look it up in the cache.
+    MetroHash::Hash partPipelineHash = {};
+    hasher.Finalize(partPipelineHash.bytes);
+    CacheAccessor cacheAccessor(context, partPipelineHash, getInternalCaches());
+    if (cacheAccessor.isInCache()) {
+      LLPC_OUTS("Cache hit for stage " << getPartPipelineStageName(partPipelineStage) << ".\n");
+
+      // Mark the applicable entries in stageCacheAccesses.
+      for (ShaderStage shaderStage : maskToShaderStages(partStageMask)) {
+        stageCacheAccesses[shaderStage] =
+            cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+      }
+      // Get the ELF from the cache.
+      partPipelineElf = llvm::StringRef(static_cast<const char *>(cacheAccessor.getElfFromCache().pCode),
+                                        cacheAccessor.getElfFromCache().codeSize);
+    } else {
+      LLPC_OUTS("Cache miss for stage " << getPartPipelineStageName(partPipelineStage) << ".\n");
+
+      // Compile the part pipeline.
+      // Keep the PipelineShaderInfo structs for the shaders we are including.
+      llvm::SmallVector<const PipelineShaderInfo *, 4> partPipelineShaderInfo;
+      for (const PipelineShaderInfo *oneShaderInfo : shaderInfo) {
+        if (oneShaderInfo && isShaderStageInMask(oneShaderInfo->entryStage, partStageMask))
+          partPipelineShaderInfo.push_back(oneShaderInfo);
+      }
+      auto otherPartPipeline = (partPipelineStage == PartPipelineStagePreRasterization) ? &*elfLinkerPipeline : nullptr;
+      Result result =
+          buildPipelineInternal(context, partPipelineShaderInfo, PipelineLink::PartPipeline, otherPartPipeline,
+                                &partPipelineBuffers[partPipelineStage], stageCacheAccesses);
+      if (result != Result::Success)
+        return result;
+      partPipelineElf = partPipelineBuffers[partPipelineStage];
+
+      // If the "ELF" does not look like ELF, then it must be textual output from -emit-lgc, -emit-llvm, -filetype=asm.
+      // We can't link that, so just concatenate it on to the output.
+      if (partPipelineElf.size() < 4 || !partPipelineElf.startswith("\177ELF")) {
+        *pipelineElf += partPipelineElf;
+        continue;
+      }
+
+      // Store the part-pipeline ELF in the cache.
+      cacheAccessor.setElfInCache(BinaryData({partPipelineElf.size(), partPipelineElf.data()}));
+    }
+
+    if (Llpc::EnableOuts()) {
+      ElfReader<Elf64> reader(m_gfxIp);
+      size_t readSize = 0;
+      if (reader.ReadFromBuffer(partPipelineElf.data(), &readSize) == Result::Success) {
+        LLPC_OUTS("===============================================================================\n");
+        LLPC_OUTS("// LLPC part-pipeline ELF (from cache or just compiled)\n");
+        LLPC_OUTS(reader);
+      }
+    }
+
+    // Add the ELF to the linker.
+    elfLinker->addInputElf(llvm::MemoryBufferRef(partPipelineElf, ""));
+  }
+
+  Result result = Result::Success;
+  // Link the two part-pipelines.
+  raw_svector_ostream elfStream(*pipelineElf);
+  bool ok = elfLinker->link(elfStream);
+  if (!ok) {
+    errs() << elfLinkerPipeline->getLastError() << "\n";
+    result = Result::ErrorUnavailable;
+    pipelineElf->clear();
+  }
+
   return result;
 }
 
@@ -1379,9 +1528,9 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
     *stageCacheAccess = stageCacheAccesses[ShaderStageCompute];
   }
 
-  if (result != Result::Success) {
-    result = buildPipelineInternal(context, shadersInfo, /*unlinked=*/false, pipelineElf, stageCacheAccesses);
-  }
+  if (result != Result::Success)
+    result = buildPipelineInternal(context, shadersInfo, PipelineLink::WholePipeline, nullptr, pipelineElf,
+                                   stageCacheAccesses);
   releaseContext(context);
   return result;
 }
@@ -1770,7 +1919,7 @@ bool Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
   // Set up middle-end objects, including setting up pipeline state.
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
-  context->getPipelineContext()->setPipelineState(&*pipeline, /*unlinked=*/false);
+  context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr, /*unlinked=*/false);
 
   // Create linker, passing ELFs to it.
   SmallVector<MemoryBufferRef, 3> elfs;

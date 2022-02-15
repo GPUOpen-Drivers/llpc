@@ -33,6 +33,7 @@
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcUtil.h"
+#include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/Pipeline.h"
@@ -56,6 +57,7 @@ extern opt<bool> EnablePipelineDump;
 
 using namespace lgc;
 using namespace llvm;
+using namespace Vkgc;
 
 // -include-llvm-ir: include LLVM IR as a separate section in the ELF binary
 static cl::opt<bool> IncludeLlvmIr("include-llvm-ir",
@@ -191,55 +193,70 @@ ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
 }
 
 // =====================================================================================================================
-// Set pipeline state in Pipeline object for middle-end
+// Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
+// Doing both these things in the same code ensures that we hash and use the same pipeline state in all situations.
+// For graphics, we use the shader stage mask to decide which parts of graphics state to use, omitting
+// pre-rasterization state if there are no pre-rasterization shaders, and omitting fragment state if there is
+// no FS.
 //
-// @param [in/out] pipeline : Middle-end pipeline object
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing pipeline state
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
 // @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs, and a fetch shader
 //                   is needed
-void PipelineContext::setPipelineState(Pipeline *pipeline, bool unlinked) const {
+void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
   // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
   // to lgc::ShaderStage bit numbers. We only process native shader stages, ignoring the CopyShader stage.
   unsigned stageMask = getShaderStageMask();
   unsigned lgcStageMask = 0;
   const auto stages = maskToShaderStages(stageMask);
-  for (ShaderStage stage : make_filter_range(stages, isNativeStage))
-    lgcStageMask |= 1 << getLgcShaderStage(stage);
+  for (ShaderStage stage : make_filter_range(stages, isNativeStage)) {
+    if (isShaderStageInMask(stage, stageMask))
+      lgcStageMask |= 1 << getLgcShaderStage(stage);
+  }
+  if (pipeline) {
+    pipeline->setShaderStageMask(lgcStageMask);
+    pipeline->set128BitCacheHash(get128BitCacheHashCode(),
+                                 VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION));
+    pipeline->setClient("Vulkan");
+  }
 
-  pipeline->setShaderStageMask(lgcStageMask);
-  pipeline->set128BitCacheHash(get128BitCacheHashCode(),
-                               VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION));
-
-  // Give the client name and pipeline options to the middle-end.
-  pipeline->setClient("Vulkan");
-  setOptionsInPipeline(pipeline);
+  // Give the pipeline options to the middle-end, and/or hash them.
+  setOptionsInPipeline(pipeline, hasher);
 
   if (!unlinked) {
-    // Give the user data nodes to the middle-end.
-    setUserDataInPipeline(pipeline);
+    // Give the user data nodes to the middle-end, and/or hash them.
+    setUserDataInPipeline(pipeline, hasher, stageMask);
   }
 
   if (isGraphics()) {
-    if (!unlinked || DisableFetchShader) {
+    if ((stageMask & ~shaderStageToMask(ShaderStageFragment)) && (!unlinked || DisableFetchShader)) {
       // Set vertex input descriptions to the middle-end.
-      setVertexInputDescriptions(pipeline);
+      setVertexInputDescriptions(pipeline, hasher);
     }
 
-    if (!unlinked || DisableColorExportShader) {
+    if (isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) {
       // Give the color export state to the middle-end.
-      setColorExportState(pipeline);
+      setColorExportState(pipeline, hasher);
     }
 
     // Give the graphics pipeline state to the middle-end.
-    setGraphicsStateInPipeline(pipeline);
-  } else
-    pipeline->setDeviceIndex(static_cast<const ComputePipelineBuildInfo *>(getPipelineBuildInfo())->deviceIndex);
+    setGraphicsStateInPipeline(pipeline, hasher, stageMask);
+  } else {
+    unsigned deviceIndex = static_cast<const ComputePipelineBuildInfo *>(getPipelineBuildInfo())->deviceIndex;
+    if (pipeline)
+      pipeline->setDeviceIndex(deviceIndex);
+    if (hasher)
+      hasher->Update(deviceIndex);
+  }
 }
 
 // =====================================================================================================================
-// Give the pipeline options to the middle-end.
+// Give the pipeline options to the middle-end and/or hash them. Shader options are not added to the hash, as they
+// are hashed elsewhere.
 //
-// @param [in/out] pipeline : Middle-end pipeline object
-void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
   Options options = {};
   options.hash[0] = getPipelineHashCode();
   options.hash[1] = get64BitCacheHashCode();
@@ -318,7 +335,13 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;
-  pipeline->setOptions(options);
+  if (pipeline)
+    pipeline->setOptions(options);
+  if (hasher)
+    hasher->Update(options);
+
+  if (!pipeline)
+    return; // Not hashing shader options.
 
   // Give the shader options (including the hash) to the middle-end.
   const unsigned stageMask = getShaderStageMask();
@@ -420,9 +443,24 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline) const {
 // The user data nodes have been merged so they are the same in each shader stage. Get them from
 // the first active stage.
 //
-// @param [in/out] pipeline : Middle-end pipeline object
-void PipelineContext::setUserDataInPipeline(Pipeline *pipeline) const {
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+// @param stageMask : Bitmap of shader stages
+void PipelineContext::setUserDataInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const {
   auto resourceMapping = getResourceMapping();
+
+  if (hasher) {
+    // If there is only a single shader in stageMask (the common cases of just FS and just VS), then specify that
+    // single shader to updateHashForResourceMappingInfo. Otherwise, tell it to use all shader stages
+    // (ShaderStageInvalid).
+    // TODO: Improve the API here to let us pass the mask.
+    const auto shaderStages = maskToShaderStages(stageMask);
+    ShaderStage userDataStage = shaderStages.size() == 1 ? shaderStages[0] : ShaderStageInvalid;
+    PipelineDumper::updateHashForResourceMappingInfo(resourceMapping, hasher, userDataStage);
+  }
+  if (!pipeline)
+    return; // Only hashing
+
   auto allocNodes = std::make_unique<ResourceMappingNode[]>(resourceMapping->userDataNodeCount);
 
   for (unsigned idx = 0; idx < resourceMapping->userDataNodeCount; ++idx)
@@ -615,10 +653,14 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
 }
 
 // =====================================================================================================================
-// Give the graphics pipeline state to the middle-end.
+// Give the graphics pipeline state to the middle-end, and/or hash it. If stageMask has no pre-rasterization shader
+// stages, do not consider pre-rasterization pipeline state. If stageMask has no FS, do not consider FS state.
 //
-// @param [in/out] pipeline : Middle-end pipeline object
-void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+// @param stageMask : Bitmap of shader stages
+void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher,
+                                                 unsigned stageMask) const {
   const auto &inputIaState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->iaState;
   pipeline->setDeviceIndex(inputIaState.deviceIndex);
 
@@ -690,13 +732,22 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline) const {
 }
 
 // =====================================================================================================================
-// Set vertex input descriptions in middle-end Pipeline object
+// Set vertex input descriptions in middle-end Pipeline object, or hash them.
 //
-// @param pipeline : Pipeline object
-void PipelineContext::setVertexInputDescriptions(Pipeline *pipeline) const {
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+void PipelineContext::setVertexInputDescriptions(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
   auto vertexInput = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->pVertexInput;
   if (!vertexInput)
     return;
+
+  if (hasher) {
+    PipelineDumper::updateHashForVertexInputState(
+        vertexInput, static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride,
+        hasher);
+  }
+  if (!pipeline)
+    return; // Only hashing.
 
   // Gather the bindings.
   SmallVector<VertexInputDescription, 8> bindings;
@@ -764,11 +815,17 @@ void PipelineContext::setVertexInputDescriptions(Pipeline *pipeline) const {
 }
 
 // =====================================================================================================================
-// Set color export state in middle-end Pipeline object
+// Set color export state in middle-end Pipeline object, and/or hash it.
 //
-// @param pipeline : Pipeline object
-void PipelineContext::setColorExportState(Pipeline *pipeline) const {
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+void PipelineContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
   const auto &cbState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->cbState;
+  if (hasher)
+    hasher->Update(cbState);
+  if (!pipeline)
+    return; // Only hashing.
+
   ColorExportState state = {};
   SmallVector<ColorExportFormat, MaxColorTargets> formats;
 

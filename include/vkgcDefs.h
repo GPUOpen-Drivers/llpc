@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 53
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -86,7 +86,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     53.0 | Add optimizationLevel to PipelineOptions
+//  |     53.1 | Add PartPipelineStage enum for part-pipeline mode                                                     |
+//  |     53.0 | Add optimizationLevel to PipelineOptions                                                              |
 //  |     52.3 | Add fastMathFlags to PipelineShaderOptions                                                            |
 //  |     52.2 | Add provokingVertexMode to rsState                                                                    |
 //  |     52.1 | Add pageMigrationEnabled to PipelineOptions                                                           |
@@ -274,6 +275,13 @@ enum class ResourceMappingNodeType : unsigned {
 #endif
 
   Count, ///< Count of resource mapping node types.
+};
+
+/// Enumerates part-pipeline stages of compilation.
+enum PartPipelineStage : unsigned {
+  PartPipelineStageFragment,         ///< Fragment stage
+  PartPipelineStagePreRasterization, ///< Pre-rasterization stage
+  PartPipelineStageCount             ///< Count of part-pipeline stages
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to

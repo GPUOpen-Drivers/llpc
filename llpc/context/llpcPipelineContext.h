@@ -47,6 +47,12 @@ class Pipeline;
 
 } // namespace lgc
 
+namespace Util {
+
+class MetroHash64;
+
+} // namespace Util
+
 namespace Llpc {
 
 // Enumerates types of descriptor.
@@ -149,8 +155,8 @@ public:
   // Gets per pipeline options
   virtual const PipelineOptions *getPipelineOptions() const = 0;
 
-  // Set pipeline state in lgc::Pipeline object for middle-end
-  void setPipelineState(lgc::Pipeline *pipeline, bool unlinked) const;
+  // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
+  void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const;
 
   // Get ShaderFpMode struct for the given shader stage
   ShaderFpMode &getShaderFpMode(ShaderStage stage) { return m_shaderFpModes[stage]; }
@@ -191,23 +197,23 @@ private:
   // Type of immutable nodes map used in SetUserDataNodesTable
   typedef std::map<std::pair<unsigned, unsigned>, const StaticDescriptorValue *> ImmutableNodesMap;
 
-  // Give the pipeline options to the middle-end.
-  void setOptionsInPipeline(lgc::Pipeline *pipeline) const;
+  // Give the pipeline options to the middle-end, and/or hash them.
+  void setOptionsInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
 
-  // Give the user data nodes and descriptor range values to the middle-end.
-  void setUserDataInPipeline(lgc::Pipeline *pipeline) const;
+  // Give the user data nodes and descriptor range values to the middle-end, and/or hash them.
+  void setUserDataInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
   void setUserDataNodesTable(lgc::Pipeline *pipeline, llvm::ArrayRef<ResourceMappingNode> nodes,
                              const ImmutableNodesMap &immutableNodesMap, bool isRoot, lgc::ResourceNode *destTable,
                              lgc::ResourceNode *&destInnerTable) const;
 
-  // Give the graphics pipeline state to the middle-end.
-  void setGraphicsStateInPipeline(lgc::Pipeline *pipeline) const;
+  // Give the graphics pipeline state to the middle-end, and/or hash it.
+  void setGraphicsStateInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
 
-  // Set vertex input descriptions in middle-end Pipeline
-  void setVertexInputDescriptions(lgc::Pipeline *pipeline) const;
+  // Set vertex input descriptions in middle-end Pipeline, and/or hash them.
+  void setVertexInputDescriptions(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
 
-  // Give the color export state to the middle-end.
-  void setColorExportState(lgc::Pipeline *pipeline) const;
+  // Give the color export state to the middle-end, and/or hash it.
+  void setColorExportState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
   bool m_unlinked = false; // Whether we are building an "unlinked" shader ELF
