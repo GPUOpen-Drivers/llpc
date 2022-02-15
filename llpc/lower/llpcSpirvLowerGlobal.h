@@ -85,17 +85,17 @@ private:
                                   llvm::Value *elemIdx, llvm::Value *vertexIdx, unsigned emitStreamId,
                                   llvm::Instruction *insertPos);
 
-  Value *loadDynamicIndexedMembers(Type *inOutTy, unsigned addrSpace, const std::vector<Value *> &indexOperands,
-                                   unsigned operandIdx, Constant *inOutMetaVal, Value *locOffset, unsigned interpLoc,
-                                   Value *auxInterpValue, Instruction *insertPos);
+  Value *loadDynamicIndexedMembers(Type *inOutTy, unsigned addrSpace, llvm::ArrayRef<llvm::Value *> indexOperands,
+                                   Constant *inOutMetaVal, Value *locOffset, unsigned interpLoc, Value *auxInterpValue,
+                                   Instruction *insertPos);
 
-  llvm::Value *loadInOutMember(llvm::Type *inOutTy, unsigned addrSpace, const std::vector<llvm::Value *> &indexOperands,
-                               unsigned operandIdx, unsigned maxLocOffset, llvm::Constant *inOutMeta,
-                               llvm::Value *locOffset, llvm::Value *vertexIdx, unsigned interpLoc,
-                               llvm::Value *interpInfo, llvm::Instruction *insertPos);
+  llvm::Value *loadInOutMember(llvm::Type *inOutTy, unsigned addrSpace, llvm::ArrayRef<llvm::Value *> indexOperands,
+                               unsigned maxLocOffset, llvm::Constant *inOutMeta, llvm::Value *locOffset,
+                               llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,
+                               llvm::Instruction *insertPos);
 
-  void storeOutputMember(llvm::Type *outputTy, llvm::Value *storeValue, const std::vector<llvm::Value *> &indexOperands,
-                         unsigned operandIdx, unsigned maxLocOffset, llvm::Constant *outputMeta, llvm::Value *locOffset,
+  void storeOutputMember(llvm::Type *outputTy, llvm::Value *storeValue, llvm::ArrayRef<llvm::Value *> indexOperands,
+                         unsigned maxLocOffset, llvm::Constant *outputMeta, llvm::Value *locOffset,
                          llvm::Value *vertexIdx, llvm::Instruction *insertPos);
 
   void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst);
