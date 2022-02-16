@@ -245,6 +245,7 @@ private:
   const Vkgc::PipelineShaderOptions *m_shaderOptions;
   unsigned m_spirvOpMetaKindId;
   unsigned m_execModule;
+  bool m_scratchBoundsChecksEnabled;
 
   enum class LlvmMemOpType : uint8_t { IS_LOAD, IS_STORE };
   struct ScratchBoundsCheckData {

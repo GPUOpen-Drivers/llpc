@@ -146,6 +146,7 @@ SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const 
   assert(m_m);
   m_context = &m_m->getContext();
   m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
+  m_scratchBoundsChecksEnabled = scratchBoundsChecksEnabled();
 }
 
 void SPIRVToLLVM::recordRemappedTypeElements(SPIRVType *bt, unsigned from, unsigned to) {
@@ -2340,7 +2341,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
       addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, isVolatile, isCoherent, isNonTemporal);
 
   // Record all load instructions inserted by addLoadInstRecursively.
-  if (scratchBoundsChecksEnabled()) {
+  if (m_scratchBoundsChecksEnabled) {
     gatherScratchBoundsChecksMemOps(spvLoad, baseNode, currentBlock, LlvmMemOpType::IS_LOAD, currentBlock->getParent());
   }
 
@@ -2586,7 +2587,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
   addStoreInstRecursively(pointerElementType, storePointer, storeValue, isVolatile, isCoherent, isNonTemporal);
 
   // Record all store instructions inserted by addStoreInstRecursively.
-  if (scratchBoundsChecksEnabled()) {
+  if (m_scratchBoundsChecksEnabled) {
     gatherScratchBoundsChecksMemOps(spvStore, baseNode, currentBlock, LlvmMemOpType::IS_STORE,
                                     currentBlock->getParent());
   }
@@ -6572,7 +6573,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
     }
   }
 
-  if (scratchBoundsChecksEnabled()) {
+  if (m_scratchBoundsChecksEnabled) {
     // Insert the scratch out of bounds checks for any feasible memory instruction. The SPIRV to LLVM memop mapping
     // gets filled while translating OpLoads and OpStores.
     for (Function &func : m_m->getFunctionList()) {
@@ -8448,6 +8449,7 @@ const Vkgc::PipelineOptions *SPIRVToLLVM::getPipelineOptions() const {
 }
 
 bool SPIRVToLLVM::scratchBoundsChecksEnabled() const {
+  assert(m_context && "Invalid context!");
   const Vkgc::GfxIpVersion gfxIp = static_cast<Llpc::Context *>(m_context)->getPipelineContext()->getGfxIpVersion();
   return gfxIp.major >= 9 || getPipelineOptions()->enableScratchAccessBoundsChecks;
 }
@@ -8461,8 +8463,7 @@ SPIRVAccessChainBase *SPIRVToLLVM::deriveAccessChain(SPIRVValue *memOp,
 }
 
 bool SPIRVToLLVM::shouldInsertScratchBoundsCheck(SPIRVValue *memOp, SPIRVToLLVM::LlvmMemOpType instructionType) const {
-  if (!scratchBoundsChecksEnabled())
-    return false;
+  assert(m_scratchBoundsChecksEnabled);
 
   const auto accessChain = deriveAccessChain(memOp, instructionType);
   if (!accessChain || accessChain->getOpCode() != OpAccessChain)
@@ -8493,6 +8494,7 @@ Instruction *SPIRVToLLVM::getLastInsertedValue() {
 void SPIRVToLLVM::gatherScratchBoundsChecksMemOps(SPIRVValue *spirvMemOp, Instruction *baseNode,
                                                   BasicBlock *baseNodeParent,
                                                   SPIRVToLLVM::LlvmMemOpType instructionType, Function *parent) {
+  assert(m_scratchBoundsChecksEnabled);
   if (!shouldInsertScratchBoundsCheck(spirvMemOp, instructionType))
     return;
 
