@@ -464,7 +464,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
     intrinsicDataTy = texelTy;
 
   SmallVector<Value *, 16> args;
-  Instruction *imageInst;
+  Instruction *imageInst = nullptr;
   unsigned imageDescArgIndex = 0;
   if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Not texel buffer; use image load instruction.
