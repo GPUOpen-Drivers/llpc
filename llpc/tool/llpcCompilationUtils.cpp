@@ -325,28 +325,6 @@ Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
   return Error::success();
 }
 
-// =====================================================================================================================
-// Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
-//
-// @param compileInfo : Compilation info of LLPC standalone tool
-// @param suppliedOutFile : Name of the file to output ELF binary (specify "" to use base name of first input file with
-// appropriate extension; specify "-" to use stdout)
-// @param firstInFile : Name of first input file
-// @returns : `ErrorSuccess` on success, `ResultError` on failure
-Error outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, StringRef firstInFile) {
-  const BinaryData &pipelineBin = (compileInfo->stageMask & ShaderStageComputeBit)
-                                      ? compileInfo->compPipelineOut.pipelineBin
-                                      : compileInfo->gfxPipelineOut.pipelineBin;
-  SmallString<64> outFileName(suppliedOutFile);
-  if (outFileName.empty()) {
-    // Detect the data type as we are unable to access the values of the options "-filetype" and "-emit-llvm".
-    StringLiteral ext = fileExtFromBinary(pipelineBin);
-    outFileName = sys::path::filename(firstInFile);
-    sys::path::replace_extension(outFileName, ext);
-  }
-
-  return writeFile(pipelineBin, outFileName);
-}
 
 // =====================================================================================================================
 // Process one pipeline input file.
@@ -383,6 +361,8 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
 
   compileInfo.compPipelineInfo = pipelineState->compPipelineInfo;
   compileInfo.gfxPipelineInfo = pipelineState->gfxPipelineInfo;
+  compileInfo.pipelineType = pipelineState->pipelineType;
+
   if (ignoreColorAttachmentFormats) {
     // NOTE: When this option is enabled, we set color attachment format to
     // R8G8B8A8_SRGB for color target 0. Also, for other color targets, if the
@@ -418,7 +398,7 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
     }
   }
 
-  const bool isGraphics = isGraphicsPipeline(compileInfo.stageMask);
+  const bool isGraphics = compileInfo.pipelineType == VfxPipelineTypeGraphics;
   assert(!(isGraphics && isComputePipeline(compileInfo.stageMask)) && "Bad stage mask");
 
   for (unsigned i = 0; i < compileInfo.shaderModuleDatas.size(); ++i) {

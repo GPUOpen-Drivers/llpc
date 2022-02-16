@@ -154,5 +154,16 @@ uint64_t ComputePipelineBuilder::getPipelineHash(Vkgc::PipelineBuildInfo buildIn
   return IPipelineDumper::GetPipelineHash(buildInfo.pComputeInfo);
 }
 
+// =====================================================================================================================
+// Output LLPC resulting binaries
+//
+// @param suppliedOutFile : Name of the file to output ELF binary
+// @returns : `llvm::ErrorSuccess` on success, `llpc::ResultError` on failure.
+Error ComputePipelineBuilder::outputElfs(const StringRef suppliedOutFile) {
+  CompileInfo &compileInfo = getCompileInfo();
+  const InputSpec &firstInput = compileInfo.inputSpecs.front();
+  return outputElf(compileInfo.compPipelineOut.pipelineBin, suppliedOutFile, firstInput.filename);
+}
+
 } // namespace StandaloneCompiler
 } // namespace Llpc

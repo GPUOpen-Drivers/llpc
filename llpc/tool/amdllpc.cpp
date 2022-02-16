@@ -444,6 +444,8 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   } else {
     if (Error err = processInputStages(compileInfo, inputSpecs, ValidateSpirv, NumThreads))
       return err;
+    compileInfo.pipelineType =
+        isComputePipeline(compileInfo.stageMask) ? VfxPipelineTypeCompute : VfxPipelineTypeGraphics;
   }
 
   //
@@ -473,7 +475,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   if (Error err = builder->build())
     return err;
 
-  return outputElf(&compileInfo, OutFile, firstInput.filename);
+  return builder->outputElfs(OutFile);
 }
 
 #ifdef WIN_OS

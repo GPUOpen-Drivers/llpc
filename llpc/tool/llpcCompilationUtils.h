@@ -56,6 +56,7 @@
 
 #include "llpc.h"
 #include "llpcInputUtils.h"
+#include "vfx.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -95,6 +96,7 @@ struct CompileInfo {
   bool autoLayoutDesc;            // Whether to automatically create descriptor layout based on resource usages
   bool robustBufferAccess;        // Whether to enable robust buffer access
   bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
+  VfxPipelineType pipelineType;   // Pipeline type
 };
 
 // Callback function to allocate buffer for building shader module and building pipeline.
@@ -115,9 +117,6 @@ LLPC_NODISCARD Result decodePipelineBinary(const BinaryData *pipelineBin, Compil
 
 // Builds shader module based on the specified SPIR-V binary.
 llvm::Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo);
-
-// Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
-llvm::Error outputElf(CompileInfo *compileInfo, const std::string &suppliedOutFile, llvm::StringRef firstInFile);
 
 // Processes and compiles one pipeline input file.
 llvm::Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const InputSpec &inputSpec,

@@ -46,6 +46,7 @@ public:
 
   // Builds graphics pipeline and does linking. Returns the pipeline Elf.
   llvm::Expected<Vkgc::BinaryData> buildGraphicsPipeline();
+  llvm::Error outputElfs(const llvm::StringRef suppliedOutFile) override;
 };
 
 } // namespace StandaloneCompiler

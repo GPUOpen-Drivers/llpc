@@ -167,5 +167,16 @@ uint64_t GraphicsPipelineBuilder::getPipelineHash(Vkgc::PipelineBuildInfo buildI
   return IPipelineDumper::GetPipelineHash(buildInfo.pGraphicsInfo);
 }
 
+// =====================================================================================================================
+// Output LLPC resulting binaries
+//
+// @param suppliedOutFile : Name of the file to output ELF binary
+// @returns : `llvm::ErrorSuccess` on success, `llpc::ResultError` on failure.
+Error GraphicsPipelineBuilder::outputElfs(const StringRef suppliedOutFile) {
+  CompileInfo &compileInfo = getCompileInfo();
+  const InputSpec &firstInput = compileInfo.inputSpecs.front();
+  return outputElf(compileInfo.gfxPipelineOut.pipelineBin, suppliedOutFile, firstInput.filename);
+}
+
 } // namespace StandaloneCompiler
 } // namespace Llpc
