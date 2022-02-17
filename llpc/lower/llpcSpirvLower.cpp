@@ -155,6 +155,26 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 }
 
 // =====================================================================================================================
+// Replace global variable with another global variable
+//
+// @param global : Replaced global variable
+// @param replaceGlobalglobal : Replacing global variable
+void SpirvLower::replaceGlobal(GlobalVariable *global, GlobalVariable *replaceGlobal) {
+  removeConstantExpr(m_context, global);
+  for (auto userIt = global->user_begin(); userIt != global->user_end();) {
+    User *user = *userIt++;
+    Instruction *inst = dyn_cast<Instruction>(user);
+    if (inst) {
+      m_builder->SetInsertPoint(inst);
+      Value *replacedValue = m_builder->CreateBitCast(replaceGlobal, global->getType());
+      user->replaceUsesOfWith(global, replacedValue);
+    }
+  }
+  global->dropAllReferences();
+  global->eraseFromParent();
+}
+
+// =====================================================================================================================
 // Add per-shader lowering passes to pass manager
 //
 // @param context : LLPC context
