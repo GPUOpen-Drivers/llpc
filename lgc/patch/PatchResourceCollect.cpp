@@ -1049,9 +1049,33 @@ void PatchResourceCollect::processMissingFs() {
   m_locationInfoMapManager->deserializeMap(fsInputMappings.locationInfo);
   for (std::pair<unsigned, unsigned> oneLocInfo : fsInputMappings.locationInfo)
     m_resUsage->inOutUsage.inputLocInfoMap[oneLocInfo.first] = oneLocInfo.second;
-  // Deserialize built-ins as generic inputs.
-  for (std::pair<unsigned, unsigned> oneLocInfo : fsInputMappings.builtInLocationInfo)
+  // Deserialize built-ins as generic inputs. We also need to set FS usage flags that are used by the last
+  // pre-rasterization stage.
+  for (std::pair<unsigned, unsigned> oneLocInfo : fsInputMappings.builtInLocationInfo) {
     m_resUsage->inOutUsage.builtInInputLocMap[oneLocInfo.first] = oneLocInfo.second;
+    switch (oneLocInfo.first) {
+    case BuiltInClipDistance:
+      m_resUsage->builtInUsage.fs.clipDistance = 1;
+      break;
+    case BuiltInCullDistance:
+      m_resUsage->builtInUsage.fs.cullDistance = 1;
+      break;
+    case BuiltInPrimitiveId:
+      m_resUsage->builtInUsage.fs.primitiveId = true;
+      break;
+    case BuiltInLayer:
+      m_resUsage->builtInUsage.fs.layer = true;
+      break;
+    case BuiltInViewIndex:
+      m_resUsage->builtInUsage.fs.viewIndex = true;
+      break;
+    case BuiltInViewportIndex:
+      m_resUsage->builtInUsage.fs.viewportIndex = true;
+      break;
+    default:
+      break;
+    }
+  }
 }
 
 // =====================================================================================================================
