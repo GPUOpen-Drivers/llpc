@@ -608,15 +608,12 @@ unsigned PalMetadata::getRegister(unsigned regNum) {
 
 // =====================================================================================================================
 // Set a register value in PAL metadata.
-// NOTE: If the register is already set, this ORs in the value.
 //
 // @param regNum : Register number
-// @param value : Value to OR in
-void PalMetadata::setRegister(unsigned regNum, unsigned value) {
+// @param value : Value to set
+void PalMetadata::setRegister(unsigned regNum, unsigned newValue) {
   msgpack::DocNode &node = m_registers[regNum];
-  if (node.getKind() == msgpack::Type::UInt)
-    value |= node.getUInt();
-  node = value;
+  node = newValue;
 }
 
 // =====================================================================================================================
