@@ -5175,6 +5175,8 @@ template <class SourceTy, class FuncTy> bool SPIRVToLLVM::foreachFuncCtlMask(Sou
   // Cancel those masks if they are both present
   if ((fcm & FunctionControlInlineMask) && (fcm & FunctionControlDontInlineMask))
     fcm &= ~(FunctionControlInlineMask | FunctionControlDontInlineMask);
+  // Ignore DontInline because we rely on inlining everything.
+  fcm &= ~FunctionControlDontInlineMask;
   SPIRSPIRVFuncCtlMaskMap::foreach ([&](Attribute::AttrKind attr, SPIRVFunctionControlMaskKind mask) {
     if (fcm & mask)
       func(attr);
