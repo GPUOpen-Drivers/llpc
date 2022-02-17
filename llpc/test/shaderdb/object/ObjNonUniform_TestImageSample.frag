@@ -28,8 +28,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 384
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 24

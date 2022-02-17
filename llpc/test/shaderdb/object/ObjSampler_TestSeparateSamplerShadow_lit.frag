@@ -14,7 +14,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.image.sample.f32(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.image.sample.f32(i32 1, i32 512, <8 x i32>
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 : SHADERTEST: call {{.*}} float @llvm.amdgcn.image.sample.c.lz.2d.f32.f32

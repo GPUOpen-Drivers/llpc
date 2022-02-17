@@ -464,7 +464,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
     intrinsicDataTy = texelTy;
 
   SmallVector<Value *, 16> args;
-  Value *result = nullptr;
+  Instruction *imageInst = nullptr;
   unsigned imageDescArgIndex = 0;
   if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Not texel buffer; use image load instruction.
@@ -490,7 +490,7 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
 
     // Get the intrinsic ID from the load intrinsic ID table and call it.
     auto table = mipLevel ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
-    result = CreateIntrinsic(table[dim], {intrinsicDataTy, coords[0]->getType()}, args, nullptr, instName);
+    imageInst = CreateIntrinsic(table[dim], {intrinsicDataTy, coords[0]->getType()}, args, nullptr, instName);
   } else {
     // Texel buffer descriptor. Use the buffer instruction.
     imageDescArgIndex = args.size();
@@ -499,11 +499,15 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
     args.push_back(getInt32(0));
     args.push_back(getInt32(0));
     args.push_back(getInt32(0));
-    result = CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, intrinsicDataTy, args, nullptr, instName);
+    imageInst = CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, intrinsicDataTy, args, nullptr, instName);
   }
 
+  // Mark it as an invariant load if possible.
+  if (flags & ImageFlagInvariant)
+    imageInst->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
+
   // Add a waterfall loop if needed.
-  Instruction *imageInst = cast<Instruction>(result);
+  Value *result = imageInst;
   if (flags & ImageFlagNonUniformImage)
     result = createWaterfallLoop(imageInst, imageDescArgIndex);
   else if (flags & ImageFlagEnforceReadFirstLaneImage)

@@ -27,11 +27,11 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0)
-; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 0, i32 0, <8 x {{.*}})
+; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 0, i32 512, <8 x {{.*}})
 ; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0)
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 128, <8 x {{.*}})
 ; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 1)
-; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 0, <8 x {{.*}})
+; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 512, <8 x {{.*}})
 ; SHADERTEST: <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 2, i32 0)
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 8, i32 128, <8 x {{.*}})
 

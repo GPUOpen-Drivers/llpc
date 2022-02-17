@@ -38,24 +38,24 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 0
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 0, {{.*}}, i32 6, i32 3)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 1536, {{.*}}, i32 6, i32 3)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 1, i32 128, {{.*}}, <2 x i32> <i32 12, i32 12>, i32 6)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 1
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 2, i32 0, {{.*}}, <3 x i32> <i32 4, i32 4, i32 4>, i32 2)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 2, i32 1536, {{.*}}, <3 x i32> <i32 4, i32 4, i32 4>, i32 2)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 2
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 1, i32 0, {{.*}}, <2 x i32> <i32 9, i32 9>)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 1, i32 1536, {{.*}}, <2 x i32> <i32 9, i32 9>)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 3
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 4, i32 0, {{.*}}, <2 x i32> <i32 12, i32 5>, i32 6)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 4, i32 1536, {{.*}}, <2 x i32> <i32 12, i32 5>, i32 6)
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 2, i32 0
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 5, i32 128, {{.*}}, <3 x i32> <i32 4, i32 4, i32 1>, i32 2)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.1d.v4f32.i32(i32 15, i32 6, i32 3,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.1d.v4f32.i32(i32 15, i32 6, i32 3,{{.*}}, i32 0, i32 0), !invariant.load
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.2d.v4f32.i32(i32 15, i32 12, i32 12, i32 6,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.3d.v4f32.i32(i32 15, i32 4, i32 4, i32 4, i32 2,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15, i32 9, i32 9,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.1darray.v4f32.i32(i32 15, i32 12, i32 5, i32 6,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.3d.v4f32.i32(i32 15, i32 4, i32 4, i32 4, i32 2,{{.*}}, i32 0, i32 0), !invariant.load
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15, i32 9, i32 9,{{.*}}, i32 0, i32 0), !invariant.load
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.1darray.v4f32.i32(i32 15, i32 12, i32 5, i32 6,{{.*}}, i32 0, i32 0), !invariant.load
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.2darray.v4f32.i32(i32 15, i32 4, i32 4, i32 1, i32 2,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
