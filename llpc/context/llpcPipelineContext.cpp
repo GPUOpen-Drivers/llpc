@@ -662,73 +662,95 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
 void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher,
                                                  unsigned stageMask) const {
   const auto &inputIaState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->iaState;
-  pipeline->setDeviceIndex(inputIaState.deviceIndex);
+  if (pipeline)
+    pipeline->setDeviceIndex(inputIaState.deviceIndex);
+  if (hasher)
+    hasher->Update(inputIaState.deviceIndex);
+  const auto &inputRsState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->rsState;
 
   InputAssemblyState inputAssemblyState = {};
-  switch (inputIaState.topology) {
-  case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
-    inputAssemblyState.primitiveType = PrimitiveType::Point;
-    break;
-  case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
-  case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
-    inputAssemblyState.primitiveType = PrimitiveType::Line_List;
-    break;
-  case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
-  case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
-    inputAssemblyState.primitiveType = PrimitiveType::Line_Strip;
-    break;
-  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
-    inputAssemblyState.primitiveType = PrimitiveType::Triangle_List;
-    break;
-  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
-    inputAssemblyState.primitiveType = PrimitiveType::Triangle_Strip;
-    break;
-  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
-    inputAssemblyState.primitiveType = PrimitiveType::Triangle_Fan;
-    break;
-  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
-    inputAssemblyState.primitiveType = PrimitiveType::Triangle_List_Adjacency;
-    break;
-  case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
-    inputAssemblyState.primitiveType = PrimitiveType::Triangle_Strip_Adjacency;
-    break;
-  case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
-    inputAssemblyState.primitiveType = PrimitiveType::Patch;
-    break;
-  default:
-    llvm_unreachable("");
-  }
-
-  inputAssemblyState.patchControlPoints = inputIaState.patchControlPoints;
-  inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
-  inputAssemblyState.switchWinding = inputIaState.switchWinding;
   inputAssemblyState.enableMultiView = inputIaState.enableMultiView;
-
-  const auto &inputRsState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->rsState;
   RasterizerState rasterizerState = {};
-  rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
-  rasterizerState.innerCoverage = inputRsState.innerCoverage;
-  rasterizerState.perSampleShading = inputRsState.perSampleShading;
-  rasterizerState.numSamples = inputRsState.numSamples;
-  rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
-  rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
-  rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
 
-  pipeline->setGraphicsState(inputAssemblyState, rasterizerState);
+  if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
+    // Pre-rasterization shader stages are present.
+    switch (inputIaState.topology) {
+    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+      inputAssemblyState.primitiveType = PrimitiveType::Point;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::Line_List;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::Line_Strip;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+      inputAssemblyState.primitiveType = PrimitiveType::Triangle_List;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
+      inputAssemblyState.primitiveType = PrimitiveType::Triangle_Strip;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
+      inputAssemblyState.primitiveType = PrimitiveType::Triangle_Fan;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::Triangle_List_Adjacency;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::Triangle_Strip_Adjacency;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
+      inputAssemblyState.primitiveType = PrimitiveType::Patch;
+      break;
+    default:
+      llvm_unreachable("");
+    }
 
-  const auto &inputDsState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dsState;
-  DepthStencilState depthStencilState = {};
-  if (inputDsState.depthTestEnable) {
-    depthStencilState.depthTestEnable = inputDsState.depthTestEnable;
-    depthStencilState.depthCompareOp = inputDsState.depthCompareOp;
+    inputAssemblyState.patchControlPoints = inputIaState.patchControlPoints;
+    inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
+    inputAssemblyState.switchWinding = inputIaState.switchWinding;
+
+    rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
+    rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
+    rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
   }
-  if (inputDsState.stencilTestEnable) {
-    depthStencilState.stencilTestEnable = inputDsState.stencilTestEnable;
-    depthStencilState.stencilCompareOpFront = inputDsState.front.compareOp;
-    depthStencilState.stencilCompareOpBack = inputDsState.back.compareOp;
+
+  if (isShaderStageInMask(ShaderStageFragment, stageMask)) {
+    rasterizerState.innerCoverage = inputRsState.innerCoverage;
+    rasterizerState.perSampleShading = inputRsState.perSampleShading;
+    rasterizerState.numSamples = inputRsState.numSamples;
+    rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
   }
 
-  pipeline->setDepthStencilState(depthStencilState);
+  if (pipeline)
+    pipeline->setGraphicsState(inputAssemblyState, rasterizerState);
+  if (hasher) {
+    hasher->Update(inputAssemblyState);
+    hasher->Update(rasterizerState);
+  }
+
+  if (isShaderStageInMask(ShaderStageFragment, stageMask)) {
+    // Fragment shader is present.
+    const VkPipelineDepthStencilStateCreateInfo &inputDsState =
+        static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dsState;
+    DepthStencilState depthStencilState = {};
+    if (inputDsState.depthTestEnable) {
+      depthStencilState.depthTestEnable = inputDsState.depthTestEnable;
+      depthStencilState.depthCompareOp = inputDsState.depthCompareOp;
+    }
+    if (inputDsState.stencilTestEnable) {
+      depthStencilState.stencilTestEnable = inputDsState.stencilTestEnable;
+      depthStencilState.stencilCompareOpFront = inputDsState.front.compareOp;
+      depthStencilState.stencilCompareOpBack = inputDsState.back.compareOp;
+    }
+
+    if (pipeline)
+      pipeline->setDepthStencilState(depthStencilState);
+    if (hasher)
+      hasher->Update(depthStencilState);
+  }
 }
 
 // =====================================================================================================================
