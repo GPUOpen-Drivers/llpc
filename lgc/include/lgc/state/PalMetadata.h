@@ -137,7 +137,7 @@ public:
   // Get a register value in PAL metadata.
   unsigned getRegister(unsigned regNum);
 
-  // Set a register value in PAL metadata. If the register is already set, this ORs in the value.
+  // Set a register value in PAL metadata. If the register has a value set already, it gets overwritten.
   void setRegister(unsigned regNum, unsigned value);
 
   // Store the vertex fetch in PAL metadata for a fetchless vertex shader with shader compilation.
