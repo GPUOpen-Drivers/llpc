@@ -490,21 +490,23 @@ void SPIRVModuleImpl::postProcessExecutionModeId() {
   for (auto ExecModeId : ExecModeIdVec) {
     SPIRVExecutionModeId *E = static_cast<SPIRVExecutionModeId *>(ExecModeId);
     auto M = E->getExecutionMode();
+    auto tid = E->getTargetId();
+    auto ops = E->getOperands();
+    SPIRVExecutionMode *execMode = nullptr;
     switch (M) {
     case ExecutionModeLocalSizeId: {
-      auto TId = E->getTargetId();
-      auto Ops = E->getOperands();
-      auto WorkGroupSizeX = static_cast<SPIRVConstant *>(getEntry(Ops[0]));
-      auto WorkGroupSizeY = static_cast<SPIRVConstant *>(getEntry(Ops[1]));
-      auto WorkGroupSizeZ = static_cast<SPIRVConstant *>(getEntry(Ops[2]));
-      auto ExecMode =
-          add(new SPIRVExecutionMode(getEntry(TId), ExecutionModeLocalSize, WorkGroupSizeX->getZExtIntValue(),
-                                     WorkGroupSizeY->getZExtIntValue(), WorkGroupSizeZ->getZExtIntValue()));
-      static_cast<SPIRVFunction *>(getEntry(TId))->addExecutionMode(ExecMode);
+      auto workGroupSizeX = static_cast<SPIRVConstant *>(getEntry(ops[0]));
+      auto workGroupSizeY = static_cast<SPIRVConstant *>(getEntry(ops[1]));
+      auto workGroupSizeZ = static_cast<SPIRVConstant *>(getEntry(ops[2]));
+      execMode = add(new SPIRVExecutionMode(getEntry(tid), ExecutionModeLocalSize, workGroupSizeX->getZExtIntValue(),
+                                            workGroupSizeY->getZExtIntValue(), workGroupSizeZ->getZExtIntValue()));
+      break;
     }
     default:
       break;
     }
+    if (execMode)
+      static_cast<SPIRVFunction *>(getEntry(tid))->addExecutionMode(execMode);
   }
 }
 

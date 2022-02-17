@@ -71,7 +71,7 @@ namespace Llpc {
 // Initialize passes for SPIR-V lowering
 //
 // @param passRegistry : Pass registry
-inline static void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
+inline void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
   initializeLegacySpirvLowerAccessChainPass(passRegistry);
   initializeLegacySpirvLowerConstImmediateStorePass(passRegistry);
   initializeLegacySpirvLowerMathConstFoldingPass(passRegistry);
@@ -112,7 +112,7 @@ public:
 
   static void removeConstantExpr(Context *context, llvm::GlobalVariable *global);
   static void replaceConstWithInsts(Context *context, llvm::Constant *const constVal);
-  void replaceGlobal(llvm::GlobalVariable *global, llvm::GlobalVariable *replaceGlobal);
+  static void replaceGlobal(Context *context, llvm::GlobalVariable *original, llvm::GlobalVariable *replacement);
 
 protected:
   void init(llvm::Module *module);
