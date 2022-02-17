@@ -155,26 +155,6 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 }
 
 // =====================================================================================================================
-// Replace global variable with another global variable
-//
-// @param global : Replaced global variable
-// @param replaceGlobalglobal : Replacing global variable
-void SpirvLower::replaceGlobal(GlobalVariable *global, GlobalVariable *replaceGlobal) {
-  removeConstantExpr(m_context, global);
-  for (auto userIt = global->user_begin(); userIt != global->user_end();) {
-    User *user = *userIt++;
-    Instruction *inst = dyn_cast<Instruction>(user);
-    if (inst) {
-      m_builder->SetInsertPoint(inst);
-      Value *replacedValue = m_builder->CreateBitCast(replaceGlobal, global->getType());
-      user->replaceUsesOfWith(global, replacedValue);
-    }
-  }
-  global->dropAllReferences();
-  global->eraseFromParent();
-}
-
-// =====================================================================================================================
 // Add per-shader lowering passes to pass manager
 //
 // @param context : LLPC context
@@ -252,6 +232,25 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 void SpirvLower::registerPasses(lgc::PassManager &passMgr) {
 #define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, decltype(CLASS)::name());
 #include "PassRegistry.def"
+}
+
+// =====================================================================================================================
+// Replace global variable with another global variable
+//
+// @param context : The context
+// @param original : Replaced global variable
+// @param replacement : Replacing global variable
+void SpirvLower::replaceGlobal(Context *context, GlobalVariable *original, GlobalVariable *replacement) {
+  removeConstantExpr(context, original);
+  Builder *builder = context->getBuilder();
+  for (User *user : original->users()) {
+    Instruction *inst = cast<Instruction>(user);
+    builder->SetInsertPoint(inst);
+    Value *replacedValue = builder->CreateBitCast(replacement, original->getType());
+    user->replaceUsesOfWith(original, replacedValue);
+  }
+  original->dropAllReferences();
+  original->eraseFromParent();
 }
 
 // =====================================================================================================================
