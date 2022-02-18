@@ -971,6 +971,30 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
 
   // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
   // flags on the handled instruction
+  if (const unsigned flags = m_shaderOptions->fastMathFlags) {
+    if (flags & FastMathFlags::AllowReassoc)
+      fmf.setAllowReassoc();
+
+    if (flags & FastMathFlags::NoNaNs)
+      fmf.setNoNaNs();
+
+    if (flags & FastMathFlags::NoInfs)
+      fmf.setNoInfs();
+
+    if (flags & FastMathFlags::NoSignedZeros)
+      fmf.setNoSignedZeros();
+
+    if (flags & FastMathFlags::AllowReciprocal)
+      fmf.setAllowReciprocal();
+
+    if (flags & FastMathFlags::AllowContract)
+      fmf.setAllowContract();
+
+    if (flags & FastMathFlags::ApproxFunc)
+      fmf.setApproxFunc();
+
+    return fmf;
+  }
   if (SPIRVGenFastMathFlags) {
     if (SPIRVGenFastMathFlags & FastMathFlags::AllowReassoc)
       fmf.setAllowReassoc();
