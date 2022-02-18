@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 52
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 2
+#define LLPC_INTERFACE_MINOR_VERSION 3
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -86,6 +86,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     52.3 | Add fastMathFlags to PipelineShaderOptions                                                            |
 //  |     52.2 | Add provokingVertexMode to rsState                                                                    |
 //  |     52.1 | Add pageMigrationEnabled to PipelineOptions                                                           |
 //  |     52.0 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
@@ -645,8 +646,11 @@ struct PipelineShaderOptions {
   /// Threshold to use for loops with "DontUnroll" hint (0 = use llvm.llop.unroll.disable).
   unsigned dontUnrollHintThreshold;
 
-  ///< Whether fastmath contract could be disabled
+  /// Whether fastmath contract could be disabled
   bool noContract;
+
+  /// The enabled fast math flags (0 = depends on input language).
+  unsigned fastMathFlags;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
