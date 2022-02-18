@@ -75,10 +75,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
-#ifndef LLPC_ENABLE_SPIRV_OPT
-#define SPVGEN_STATIC_LIB 1
-#endif
-
 #include "spvgen.h"
 #include "vfx.h"
 #include <cassert>

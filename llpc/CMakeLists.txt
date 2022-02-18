@@ -397,6 +397,8 @@ add_executable(amdllpc tool/amdllpc.cpp)
 add_dependencies(amdllpc llpc_standalone_compiler)
 target_link_libraries(amdllpc PRIVATE llpc_standalone_compiler)
 set_compiler_options(amdllpc ${LLPC_ENABLE_WERROR})
+add_compile_definitions(amdllpc PRIVATE SH_EXPORTING)
+target_link_libraries(amdllpc PRIVATE spvgen_static)
 
 endif()
 ### Add Subdirectories #################################################################################################

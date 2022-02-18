@@ -542,6 +542,8 @@ int main(int argc, char *argv[]) {
 
   // Cleanup code that gets run automatically before returning.
   auto onExit = make_scope_exit([compiler, &result] {
+    FinalizeSpvgen();
+
     if (compiler)
       compiler->Destroy();
 
