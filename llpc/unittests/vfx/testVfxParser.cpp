@@ -30,9 +30,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#define SPVGEN_STATIC_LIB 1
-#include "spvgen.h"
-
 using namespace llvm;
 using ::testing::ElementsAre;
 using ::testing::ElementsAreArray;

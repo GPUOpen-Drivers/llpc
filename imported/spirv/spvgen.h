@@ -240,11 +240,9 @@ void SH_IMPORT_EXPORT vfxPrintDoc(
 }
 #endif
 
-static inline bool InitSpvGen(
-    const char* pSpvGenDir = nullptr)
-{
-    return true;
-}
+bool InitSpvGen(const char* pSpvGenDir = nullptr);
+
+void FinalizeSpvgen();
 
 #else
 
@@ -390,6 +388,8 @@ DECL_EXPORT_FUNC(vfxGetPipelineDoc);
 DECL_EXPORT_FUNC(vfxPrintDoc);
 
 bool SPVAPI InitSpvGen(const char* pSpvGenDir = nullptr);
+
+void SPVAPI FinalizeSpvgen();
 
 #endif
 
@@ -552,6 +552,10 @@ bool SPVAPI InitSpvGen(
     }
     return success;
 }
+
+// =====================================================================================================================
+// Finalize spvgen; Clean up resource
+void SPVAPI FinalizeSpvgen() {}
 
 #endif
 

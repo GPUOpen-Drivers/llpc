@@ -42,7 +42,7 @@ target_sources(vfx PRIVATE
     vfxVkSection.cpp
 )
 
-target_compile_definitions(vfx PRIVATE VFX_SUPPORT_VK_PIPELINE)
+target_compile_definitions(vfx PRIVATE VFX_SUPPORT_VK_PIPELINE SH_EXPORTING)
 
 target_include_directories(vfx
 PUBLIC
@@ -51,4 +51,4 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/../../imported/spirv
 )
 
-target_link_libraries(vfx PRIVATE vkgc_headers khronos_vulkan_interface khronos_spirv_interface)
+target_link_libraries(vfx PRIVATE spvgen_static vkgc_headers khronos_vulkan_interface khronos_spirv_interface)

@@ -74,7 +74,6 @@
 #include <unordered_set>
 
 #ifdef LLPC_ENABLE_SPIRV_OPT
-#define SPVGEN_STATIC_LIB 1
 #include "spvgen.h"
 #endif
 
