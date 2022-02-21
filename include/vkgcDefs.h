@@ -315,6 +315,8 @@ struct StaticDescriptorValue {
   ResourceMappingNodeType type; ///< Type of this resource mapping node (currently, only sampler is supported)
   unsigned set;                 ///< ID of descriptor set
   unsigned binding;             ///< ID of descriptor binding
+  unsigned reserv0;
+  unsigned reserv1;
   unsigned arraySize;           ///< Element count for arrayed binding
   const unsigned *pValue;       ///< Static SRDs
   unsigned visibility;          ///< Mask composed of ShaderStageBit values
@@ -795,6 +797,8 @@ struct GraphicsPipelineBuildInfo {
     bool perSampleShading;        ///< Enable per sample shading
     uint8_t usrClipPlaneMask;     ///< Mask to indicate the enabled user defined clip planes
     unsigned numSamples;          ///< Number of coverage samples used when rendering with this pipeline
+    unsigned pixelShaderSamples;  ///< Controls the pixel shader execution rate. Must be less than or equal to
+                                  ///  coverageSamples. Valid values are 1, 2, 4, and 8.
     unsigned samplePatternIdx;    ///< Index into the currently bound MSAA sample pattern table that
                                   ///  matches the sample pattern used by the rasterizer when rendering
                                   ///  with this pipeline.

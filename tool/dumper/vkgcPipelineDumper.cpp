@@ -739,6 +739,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "rasterizerDiscardEnable = " << pipelineInfo->rsState.rasterizerDiscardEnable << "\n";
   dumpFile << "perSampleShading = " << pipelineInfo->rsState.perSampleShading << "\n";
   dumpFile << "numSamples = " << pipelineInfo->rsState.numSamples << "\n";
+  dumpFile << "pixelShaderSamples = " << pipelineInfo->rsState.pixelShaderSamples << "\n";
   dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
   dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
@@ -1042,6 +1043,7 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
   auto rsState = &pipeline->rsState;
   hasher->Update(rsState->perSampleShading);
   hasher->Update(rsState->provokingVertexMode);
+  hasher->Update(rsState->pixelShaderSamples);
 
   if (!isRelocatableShader) {
     hasher->Update(rsState->innerCoverage);

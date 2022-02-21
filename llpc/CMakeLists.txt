@@ -143,8 +143,8 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
 
-if(VKI_SPIRV_1_6)
-  target_compile_definitions(llpc PRIVATE VKI_SPIRV_1_6)
+if(VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
+  target_compile_definitions(llpc PRIVATE VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
 endif()
 
 option(LLPC_ENABLE_SHADER_CACHE "Enable experimental shader cache" OFF)
@@ -346,8 +346,14 @@ target_include_directories(llpc_standalone_compiler PUBLIC
     ${LLVM_INCLUDE_DIRS}
 )
 
-if(VKI_SPIRV_1_6)
-  target_compile_definitions(llpc_standalone_compiler PUBLIC VKI_SPIRV_1_6)
+#if VKI_KHR_FRAGMENT_SHADER_BARYCENTRIC
+if(VKI_KHR_FRAGMENT_SHADER_BARYCENTRIC)
+  target_compile_definitions(llpc_standalone_compiler PUBLIC VKI_KHR_FRAGMENT_SHADER_BARYCENTRIC)
+endif()
+#endif
+
+if(VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
+  target_compile_definitions(llpc_standalone_compiler PUBLIC VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
 endif()
 
 llvm_map_components_to_libnames(llvm_libs

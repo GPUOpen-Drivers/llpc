@@ -539,7 +539,14 @@ union ShaderExecModeMetadata {
         unsigned DepthLess : 1;          // Layout "depth_less"
         unsigned DepthReplacing : 1;     // Layout "depth_any"
         unsigned PostDepthCoverage : 1;  // Layout "post_depth_coverage"
-        unsigned Unused : 24;
+        unsigned StencilReplacing : 1;   // Layout "stencil_any"
+        unsigned StencilUnchangedFront : 1; // Layout "stencil_unchange_front"
+        unsigned StencilGrenterFront : 1;   // Layout "stencil_greater_front"
+        unsigned StencilLessFront : 1;      // Layout "stencil_less_front"
+        unsigned StencilUnchangedBack : 1;  // Layout "stencil_unchange_back"
+        unsigned StencilGrenterBack : 1;    // Layout "stencil_greater_back"
+        unsigned StencilLessBack : 1;       // Layout "stencil_less_back"
+        unsigned Unused : 17;
       } fs;
 
       struct {

@@ -112,6 +112,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->rsState.rasterizerDiscardEnable = graphicState.rasterizerDiscardEnable != 0;
     gfxPipelineInfo->rsState.perSampleShading = graphicState.perSampleShading != 0;
     gfxPipelineInfo->rsState.numSamples = graphicState.numSamples;
+    gfxPipelineInfo->rsState.pixelShaderSamples = graphicState.pixelShaderSamples;
     gfxPipelineInfo->rsState.samplePatternIdx = graphicState.samplePatternIdx;
     gfxPipelineInfo->rsState.usrClipPlaneMask = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
 
