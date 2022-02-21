@@ -320,4 +320,21 @@ void SpirvLower::init(Module *module) {
   m_builder = m_context->getBuilder();
 }
 
+// =====================================================================================================================
+// Replace global variable with another global variable
+//
+// @param original : Replaced global variable
+// @param replacement : Replacing global variable
+void SpirvLower::replaceGlobal(GlobalVariable *original, GlobalVariable *replacement) {
+  removeConstantExpr(m_context, original);
+  for (User *user : original->users()) {
+    Instruction *inst = cast<Instruction>(user);
+    m_builder->SetInsertPoint(inst);
+    Value *replacedValue = m_builder->CreateBitCast(replacement, original->getType());
+    user->replaceUsesOfWith(original, replacedValue);
+  }
+  original->dropAllReferences();
+  original->eraseFromParent();
+}
+
 } // namespace Llpc

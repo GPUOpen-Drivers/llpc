@@ -112,6 +112,7 @@ public:
 
   static void removeConstantExpr(Context *context, llvm::GlobalVariable *global);
   static void replaceConstWithInsts(Context *context, llvm::Constant *const constVal);
+  void replaceGlobal(llvm::GlobalVariable *original, llvm::GlobalVariable *replacement);
 
 protected:
   void init(llvm::Module *module);
