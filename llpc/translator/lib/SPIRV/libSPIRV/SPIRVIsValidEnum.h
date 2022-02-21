@@ -150,6 +150,13 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeRoundingModeRTZ:
   case ExecutionModeSubgroupUniformControlFlowKHR:
   case ExecutionModeStencilRefReplacingEXT:
+  case ExecutionModeEarlyAndLateFragmentTestsAMD:
+  case ExecutionModeStencilRefUnchangedFrontAMD:
+  case ExecutionModeStencilRefGreaterFrontAMD:
+  case ExecutionModeStencilRefLessFrontAMD:
+  case ExecutionModeStencilRefUnchangedBackAMD:
+  case ExecutionModeStencilRefGreaterBackAMD:
+  case ExecutionModeStencilRefLessBackAMD:
     return true;
   default:
     return false;
@@ -322,6 +329,7 @@ inline bool isValid(spv::Decoration V) {
   case DecorationNoUnsignedWrap:
 #endif
   case DecorationExplicitInterpAMD:
+  case DecorationPerVertexKHR:
 #if SPV_VERSION >= 0x10500
   case DecorationNonUniform:
   case DecorationRestrictPointer:
@@ -395,6 +403,8 @@ inline bool isValid(spv::BuiltIn V) {
   case BuiltInBaryCoordSmoothCentroidAMD:
   case BuiltInBaryCoordSmoothSampleAMD:
   case BuiltInBaryCoordPullModelAMD:
+  case BuiltInBaryCoordKHR:
+  case BuiltInBaryCoordNoPerspKHR:
     return true;
   default:
     return false;
@@ -520,6 +530,9 @@ inline bool isValid(spv::Capability V) {
   case CapabilityVariablePointers:
   case CapabilityFragmentShadingRateKHR:
   case CapabilityInt64ImageEXT:
+#if VKI_KHR_FRAGMENT_SHADER_BARYCENTRIC
+  case CapabilityFragmentBarycentricKHR:
+#endif
 #if SPV_VERSION >= 0x10500
   case CapabilityShaderNonUniform:
   case CapabilityRuntimeDescriptorArray:

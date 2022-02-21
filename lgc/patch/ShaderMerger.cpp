@@ -537,7 +537,6 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
     appendVertexFetchTypes(argTys);
   }
 
-
   return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
 }
 

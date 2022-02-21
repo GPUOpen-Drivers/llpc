@@ -6777,6 +6777,30 @@ bool SPIRVToLLVM::transMetadata() {
           execModeMd.fs.PostDepthCoverage = true;
 
         bool enableEarlyAndLateTests = false;
+        if (bf->getExecutionMode(ExecutionModeStencilRefReplacingEXT))
+          execModeMd.fs.StencilReplacing = true;
+
+        if (bf->getExecutionMode(ExecutionModeEarlyAndLateFragmentTestsAMD)) {
+          enableEarlyAndLateTests = true;
+          if (execModeMd.fs.StencilReplacing) {
+            if (bf->getExecutionMode(ExecutionModeStencilRefUnchangedFrontAMD))
+              execModeMd.fs.StencilUnchangedFront = true;
+            else if (bf->getExecutionMode(ExecutionModeStencilRefGreaterFrontAMD))
+              execModeMd.fs.StencilGrenterFront = true;
+            else if (bf->getExecutionMode(ExecutionModeStencilRefLessFrontAMD))
+              execModeMd.fs.StencilLessFront = true;
+
+            if (bf->getExecutionMode(ExecutionModeStencilRefUnchangedBackAMD))
+              execModeMd.fs.StencilUnchangedBack = true;
+            else if (bf->getExecutionMode(ExecutionModeStencilRefGreaterBackAMD))
+              execModeMd.fs.StencilGrenterBack = true;
+            else if (bf->getExecutionMode(ExecutionModeStencilRefLessBackAMD))
+              execModeMd.fs.StencilLessBack = true;
+          } else if (execModeMd.fs.DepthReplacing) {
+            assert(execModeMd.fs.DepthUnchanged || execModeMd.fs.DepthGreater || execModeMd.fs.DepthLess);
+          } else
+            execModeMd.fs.EarlyFragmentTests = true;
+        }
         // Give the fragment mode to the middle-end.
         FragmentShaderMode fragmentMode = {};
         fragmentMode.pixelCenterInteger = execModeMd.fs.PixelCenterInteger;
@@ -6789,6 +6813,17 @@ bool SPIRVToLLVM::transMetadata() {
         else if (execModeMd.fs.DepthGreater)
           fragmentMode.conservativeDepth = ConservativeDepth::GreaterEqual;
 
+        fragmentMode.conservativeStencilFront = ConservativeDepth::Any;
+        if (execModeMd.fs.StencilLessFront)
+          fragmentMode.conservativeStencilFront = ConservativeDepth::LessEqual;
+        else if (execModeMd.fs.StencilGrenterFront)
+          fragmentMode.conservativeStencilFront = ConservativeDepth::GreaterEqual;
+
+        fragmentMode.conservativeStencilBack = ConservativeDepth::Any;
+        if (execModeMd.fs.StencilLessBack)
+          fragmentMode.conservativeStencilBack = ConservativeDepth::LessEqual;
+        else if (execModeMd.fs.StencilGrenterBack)
+          fragmentMode.conservativeStencilBack = ConservativeDepth::GreaterEqual;
         getBuilder()->setFragmentShaderMode(fragmentMode);
       } else if (execModel == ExecutionModelGLCompute) {
         // Set values of local sizes from execution model
@@ -6912,6 +6947,12 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       SPIRVWord component = SPIRVID_INVALID;
       if (bv->hasDecorate(DecorationComponent, 0, &component))
         inOutDec.Component = component;
+
+      if (bv->hasDecorate(DecorationPerVertexKHR)) {
+        inOutDec.Interp.Mode = InterpModeCustom;
+        inOutDec.Interp.Loc = InterpLocCustom;
+        inOutDec.PerVertexDimension = true;
+      }
 
       if (bv->hasDecorate(DecorationFlat))
         inOutDec.Interp.Mode = InterpModeFlat;

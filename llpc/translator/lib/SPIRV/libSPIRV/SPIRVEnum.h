@@ -204,6 +204,7 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityStorageTexelBufferArrayNonUniformIndexingEXT, { CapabilityImageBuffer });
   ADD_VEC_INIT(CapabilityInt64ImageEXT, {CapabilityShader});
   ADD_VEC_INIT(CapabilityDotProductInput4x8BitKHR, {CapabilityInt16});
+  ADD_VEC_INIT(CapabilityFragmentBarycentricKHR, {CapabilityShader});
 }
 
 template <> inline void SPIRVMap<SPIRVExecutionModelKind, SPIRVCapVec>::init() {
@@ -251,6 +252,13 @@ template <> inline void SPIRVMap<SPIRVExecutionModeKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(ExecutionModeSignedZeroInfNanPreserve, {CapabilitySignedZeroInfNanPreserve});
   ADD_VEC_INIT(ExecutionModeRoundingModeRTE, {CapabilityRoundingModeRTE});
   ADD_VEC_INIT(ExecutionModeRoundingModeRTZ, {CapabilityRoundingModeRTZ});
+  ADD_VEC_INIT(ExecutionModeEarlyAndLateFragmentTestsAMD, {CapabilityShader});
+  ADD_VEC_INIT(ExecutionModeStencilRefUnchangedFrontAMD, {CapabilityStencilExportEXT});
+  ADD_VEC_INIT(ExecutionModeStencilRefGreaterFrontAMD, {CapabilityStencilExportEXT});
+  ADD_VEC_INIT(ExecutionModeStencilRefLessFrontAMD, {CapabilityStencilExportEXT});
+  ADD_VEC_INIT(ExecutionModeStencilRefUnchangedBackAMD, {CapabilityStencilExportEXT});
+  ADD_VEC_INIT(ExecutionModeStencilRefGreaterBackAMD, {CapabilityStencilExportEXT});
+  ADD_VEC_INIT(ExecutionModeStencilRefLessBackAMD, {CapabilityStencilExportEXT});
 }
 
 template <> inline void SPIRVMap<SPIRVMemoryModelKind, SPIRVCapVec>::init() {
@@ -361,6 +369,7 @@ template <> inline void SPIRVMap<Decoration, SPIRVCapVec>::init() {
   ADD_VEC_INIT(DecorationNoContraction, {CapabilityShader});
   ADD_VEC_INIT(DecorationInputAttachmentIndex, {CapabilityInputAttachment});
   ADD_VEC_INIT(DecorationNonUniformEXT, { CapabilityShaderNonUniformEXT });
+  ADD_VEC_INIT(DecorationPerVertexKHR, {CapabilityFragmentBarycentricKHR});
 }
 
 template <> inline void SPIRVMap<BuiltIn, SPIRVCapVec>::init() {
@@ -409,6 +418,8 @@ template <> inline void SPIRVMap<BuiltIn, SPIRVCapVec>::init() {
   ADD_VEC_INIT(BuiltInViewIndex, { CapabilityMultiView });
   ADD_VEC_INIT(BuiltInPrimitiveShadingRateKHR, {CapabilityFragmentShadingRateKHR});
   ADD_VEC_INIT(BuiltInShadingRateKHR, {CapabilityFragmentShadingRateKHR});
+  ADD_VEC_INIT(BuiltInBaryCoordKHR, {CapabilityFragmentBarycentricKHR});
+  ADD_VEC_INIT(BuiltInBaryCoordNoPerspKHR, {CapabilityFragmentBarycentricKHR});
 }
 
 template <> inline void SPIRVMap<MemorySemanticsMask, SPIRVCapVec>::init() {

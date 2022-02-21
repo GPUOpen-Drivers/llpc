@@ -120,6 +120,13 @@ template <> inline void SPIRVMap<ExecutionMode, std::string>::init() {
   add(ExecutionModeRoundingModeRTE, "RoundingModeRTE");
   add(ExecutionModeRoundingModeRTZ, "RoundingModeRTZ");
   add(ExecutionModeSubgroupUniformControlFlowKHR, "SubgroupUniformControlFlowKHR");
+  add(ExecutionModeEarlyAndLateFragmentTestsAMD, "EarlyAndLateFragmentTestsAMD");
+  add(ExecutionModeStencilRefUnchangedFrontAMD, "StencilRefUnchangedFrontAMD");
+  add(ExecutionModeStencilRefGreaterFrontAMD, "StencilRefGreaterFrontAMD");
+  add(ExecutionModeStencilRefLessFrontAMD, "StencilRefLessFrontAMD");
+  add(ExecutionModeStencilRefUnchangedBackAMD, "StencilRefUnchangedBackAMD");
+  add(ExecutionModeStencilRefGreaterBackAMD, "StencilRefGreaterBackAMD");
+  add(ExecutionModeStencilRefLessBackAMD, "StencilRefLessBackAMD");
 }
 SPIRV_DEF_NAMEMAP(ExecutionMode, SPIRVExecutionModeNameMap)
 
@@ -259,6 +266,7 @@ template <> inline void SPIRVMap<Decoration, std::string>::init() {
   add(DecorationNoUnsignedWrap, "NoUnsignedWrap");
 #endif
   add(DecorationExplicitInterpAMD, "ExplicitInterpAMD");
+  add(DecorationPerVertexKHR, "PerVertexKHR");
   add(DecorationNonUniformEXT, "NonUniformEXT");
 #if SPV_VERSION >= 0x10400
   add(DecorationCounterBuffer, "CounterBuffer");
@@ -324,6 +332,8 @@ template <> inline void SPIRVMap<BuiltIn, std::string>::init() {
   add(BuiltInBaryCoordSmoothCentroidAMD, "BuiltInBaryCoordSmoothCentroidAMD");
   add(BuiltInBaryCoordSmoothSampleAMD, "BuiltInBaryCoordSmoothSampleAMD");
   add(BuiltInBaryCoordPullModelAMD, "BuiltInBaryCoordPullModelAMD");
+  add(BuiltInBaryCoordKHR, "BuiltInBaryCoordKHR");
+  add(BuiltInBaryCoordNoPerspKHR, "BuiltInBaryCoordNoPerspKHR");
 }
 SPIRV_DEF_NAMEMAP(BuiltIn, SPIRVBuiltInNameMap)
 
@@ -432,6 +442,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityVariablePointersStorageBuffer, "VariablePointersStorageBuffer");
   add(CapabilityVariablePointers, "VariablePointers");
   add(CapabilityFragmentShadingRateKHR, "FragmentShadingRateKHR");
+  add(CapabilityFragmentBarycentricKHR, "FragmentBarycentricKHR");
   add(CapabilityShaderNonUniformEXT, "ShaderNonUniformEXT");
   add(CapabilityRuntimeDescriptorArrayEXT, "RuntimeDescriptorArrayEXT");
   add(CapabilityInputAttachmentArrayDynamicIndexingEXT, "InputAttachmentArrayDynamicIndexingEXT");

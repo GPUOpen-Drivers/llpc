@@ -5,13 +5,13 @@
 ;
 ; Check stdout.
 ; CHECK:       {{^//}} Pipeline file info for [[INPUT:.+\.pipe]] {{$}}
-; CHECK:       {{^}}LLPC PipelineHash: 0x[[#%X,PIPE_HASH:]] Files: [[INPUT]]{{$}}
+; CHECK:       {{^}}LLPC PipelineHash: 0x[[#%.16X,PIPE_HASH:]] Files: [[INPUT]]{{$}}
 ;
 ; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; CHECK-LABEL: {{^}}===== AMDLLPC SUCCESS =====
 ;
 ; Check stderr.
-; CHECK:       {{^}} LLPC ShaderModule Phases 0x[[#%X,SHADER_HASH:]]{{$}}
+; CHECK:       {{^}} LLPC ShaderModule Phases 0x[[#%.16X,SHADER_HASH:]]{{$}}
 ; CHECK:       {{^}} LLPC ShaderModule 0x[[#SHADER_HASH]]
 ; CHECK-NOT:   {{^}} LLPC ShaderModule
 ;
