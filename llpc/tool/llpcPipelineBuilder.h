@@ -65,6 +65,7 @@ public:
 
   virtual ~PipelineBuilder() = default;
 
+  // Compiles the pipeline and performs linking.
   // The implementations should call `runPreBuildActions` before performing compilation with `m_compiler` and
   // call `runPostBuildActions` after.
   //
