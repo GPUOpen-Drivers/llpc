@@ -920,7 +920,7 @@ void OutputSection::addSymbol(const object::ELFSymbolRef &elfSymRef, unsigned in
   ELF::Elf64_Sym newSym = {};
   newSym.st_name = m_linker->getStringIndex(name);
   newSym.setBinding(elfSymRef.getBinding());
-  newSym.setType(cantFail(elfSymRef.getType()));
+  newSym.setType(cantFail(elfSymRef.getELFType()));
   newSym.st_shndx = getIndex();
   newSym.st_value = cantFail(elfSymRef.getValue()) + inputSection.offset;
   newSym.st_size = elfSymRef.getSize();
