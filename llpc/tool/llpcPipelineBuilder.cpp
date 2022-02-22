@@ -86,6 +86,7 @@ std::unique_ptr<PipelineBuilder> createPipelineBuilder(ICompiler &compiler, Comp
                                                        llvm::Optional<Vkgc::PipelineDumpOptions> dumpOptions,
                                                        bool printPipelineInfo) {
   const unsigned stageMask = compileInfo.stageMask;
+
   assert(!(isGraphicsPipeline(stageMask) && isComputePipeline(stageMask)) && "Invalid stage mask");
 
   if (isGraphicsPipeline(stageMask))

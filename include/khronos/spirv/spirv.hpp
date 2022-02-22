@@ -1067,7 +1067,7 @@ enum Capability {
     CapabilityDotProductInput4x8BitKHR = 6017,
     CapabilityDotProductInput4x8BitPacked = 6018,
     CapabilityDotProductInput4x8BitPackedKHR = 6018,
-     CapabilityDotProduct = 6019,
+    CapabilityDotProduct = 6019,
     CapabilityDotProductKHR = 6019,
     CapabilityBitInstructions = 6025,
     CapabilityAtomicFloat32AddEXT = 6033,

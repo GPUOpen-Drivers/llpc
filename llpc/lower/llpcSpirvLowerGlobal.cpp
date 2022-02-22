@@ -53,6 +53,10 @@ namespace Llpc {
 
 // The code here relies on the SPIR-V built-in kind being the same as the Builder built-in kind.
 
+static_assert(lgc::BuiltInBaryCoord == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordKHR),
+              "Built-in kind mismatch");
+static_assert(lgc::BuiltInBaryCoordNoPerspKHR == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordNoPerspKHR),
+              "Built-in kind mismatch");
 static_assert(lgc::BuiltInBaryCoordNoPersp == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordNoPerspAMD),
               "Built-in kind mismatch");
 static_assert(lgc::BuiltInBaryCoordNoPerspCentroid ==

@@ -132,22 +132,22 @@ to stand the test of time?
 
 New code requires new tests to be written that will exercise that code. This
 applies to bug fixes as well as new features. The tests serve two purposes:
-ensure that the new code does not regress if it needs to be changed and to give 
+ensure that the new code does not regress if it needs to be changed and to give
 an example of what the new code does.
 
-Test cases should be reduced as much as possible.  You can use 
+Test cases should be reduced as much as possible.  You can use
 [Spir-V reduce](https://github.com/KhronosGroup/SPIRV-Tools#reducer) to help
-reduce the size of test cases, or do it manually.  This helps other developers 
+reduce the size of test cases, or do it manually.  This helps other developers
 understand the tests better, and allows the tests to run faster.
 
 The tests must exist in the LLPC repository. They can be
 
-* a [shaderdb test](../llpc/test/shaderdb), 
+* a [shaderdb test](../llpc/test/shaderdb),
 * an [LGC test](../lgc/test),
 * an [LLPC unit test](../llpc/unittests), or
 * an [LGC unit test](../lgc/unittests).
 
-We do not want to rely on the Vulkan CTS. Running the Vulkan CTS takes a long 
+We do not want to rely on the Vulkan CTS. Running the Vulkan CTS takes a long
 time, putting a *time-to-test* burden on all developers. The Vulkan CTS tests
 are also harder to debug because more components are involved and require a GPU.
 
@@ -157,7 +157,7 @@ should only be merged if the new code is covered. Exceptions can be made if
 there is a good reason like the PR adds error handling code for an error that
 cannot be reproduced consistently. Note that this is just a minimum requirement
 and does not mean that the tests are effective.   If an existing test already
-covers the new code, that test should be updated to test for the new behaviour 
+covers the new code, that test should be updated to test for the new behaviour
 or a new test should be added.
 
 ## Useful things to know about Git

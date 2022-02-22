@@ -507,6 +507,7 @@ struct GraphicsPipelineState {
   unsigned rasterizerDiscardEnable;             // Kill all rasterized pixels
   unsigned perSampleShading;                    // Enable per sample shading
   unsigned numSamples;                          // Number of coverage samples used when rendering with this pipeline
+  unsigned pixelShaderSamples;                  // Controls the pixel shader execution rate
   unsigned samplePatternIdx;                    // Index into the currently bound MSAA sample pattern table
   unsigned usrClipPlaneMask;                    // Mask to indicate the enabled user defined clip planes
   unsigned alphaToCoverageEnable;               // Enable alpha to coverage

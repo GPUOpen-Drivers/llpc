@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2015-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021-2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -22,20 +22,23 @@
  *  SOFTWARE.
  *
  **********************************************************************************************************************/
-/**
- ***********************************************************************************************************************
- * @file  spirv.h
- * @brief SPIR-V header file: proxy to the real Khronos SPIR-V header.
- ***********************************************************************************************************************
- */
-
+ /**
+  **********************************************************************************************************************
+  * @file spv_amd_shader_early_and_late_fragment_tests.h
+  * @brief Export SPV_AMD_shader_early_and_late_fragment_tests before it is released for internal use
+  **********************************************************************************************************************
+  */
 #pragma once
 
-#if EXTERNAL_SPIRV_HEADERS
-#include "unified1/spirv.hpp"
-#else
-#include "spirv/spirv.hpp"
-#endif
+namespace spv {
 
-#include "devext/spv_amd_shader_early_and_late_fragment_tests.h"
+    enum ExecutionMode;
 
+    static const ExecutionMode ExecutionModeEarlyAndLateFragmentTestsAMD = static_cast<ExecutionMode>(5017);
+    static const ExecutionMode ExecutionModeStencilRefUnchangedFrontAMD  = static_cast<ExecutionMode>(5079);
+    static const ExecutionMode ExecutionModeStencilRefGreaterFrontAMD    = static_cast<ExecutionMode>(5080);
+    static const ExecutionMode ExecutionModeStencilRefLessFrontAMD       = static_cast<ExecutionMode>(5081);
+    static const ExecutionMode ExecutionModeStencilRefUnchangedBackAMD   = static_cast<ExecutionMode>(5082);
+    static const ExecutionMode ExecutionModeStencilRefGreaterBackAMD     = static_cast<ExecutionMode>(5083);
+    static const ExecutionMode ExecutionModeStencilRefLessBackAMD        = static_cast<ExecutionMode>(5084);
+}  // end namespace spv
