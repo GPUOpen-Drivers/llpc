@@ -1,7 +1,6 @@
 // This test case checks that descriptor offset and descriptor buffer pointer relocation works
 // for buffer descriptors in a vs/fs pipeline.
 // Also check that the user data limit is set correctly.
-; REQUIRES: do-not-run-me
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
@@ -14,11 +13,11 @@
 ; RUN: amdllpc -enable-relocatable-shader-elf -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST1 %s
 ; SHADERTEST1-LABEL: _amdgpu_ps_main
 ; SHADERTEST1: s_getpc_b64 s[0:1]
-; SHADERTEST1: s_mov_b32 s1, 0xffff
 ; SHADERTEST1: s_cmp_eq_u32 1, 0
-; SHADERTEST1: s_cselect_b64 [[addr:s\[[0-9]+:[0-9]+\]]],  s[{{[0-9]*:[0-9]*}}], s[0:1]
+; SHADERTEST1: s_cselect_b32 s[[addrhi:[0-9]+]], s1, 0xffff
+; SHADERTEST1: s_mov_b32 s[[addrlo:[0-9]+]], s2
 ; SHADERTEST1: s_mov_b32 [[offset:s[0-9]*]], 16
-; SHADERTEST1: s_load_dwordx8 s[{{[0-9]*:[0-9]*}}], [[addr]], [[offset]]
+; SHADERTEST1: s_load_dwordx8 s[{{[0-9]*:[0-9]*}}], s{{\[}}[[addrlo]]:[[addrhi]]], [[offset]]
 ; END_SHADERTEST
 
 
