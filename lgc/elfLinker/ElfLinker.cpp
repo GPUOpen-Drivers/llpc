@@ -943,7 +943,7 @@ void OutputSection::addRelocation(object::ELFRelocationRef relocRef, StringRef i
     ELF::Elf64_Sym newSym = {};
     newSym.st_name = m_linker->getStringIndex(rodataSymName);
     newSym.setBinding(ELF::STB_LOCAL);
-    newSym.setType(cantFail(object::SymbolRef::ST_Data));
+    newSym.setType(ELF::STT_OBJECT);
     newSym.st_shndx = getIndex();
     newSym.st_value = relocSectionOffset + cantFail(relocSymRef.getValue());
     newSym.st_size = relocSymRef.getSize();
