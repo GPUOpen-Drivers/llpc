@@ -10,6 +10,8 @@
 ; Both the VS and FS have a symbol "table" in .rodata referred to by relocs in code;
 ; the linker appends the source ELF filename to the symbols to distinguish them.
 
+; CHECK: .type	_amdgpu_gs_main,@function
+; CHECK: .type	_amdgpu_ps_main,@function
 ; CHECK-LABEL: _amdgpu_gs_main:
 ; CHECK: .reloc {{.*}}, R_AMDGPU_REL32_LO, table.{{.*}}.vs.elf
 ; CHECK: .reloc {{.*}}, R_AMDGPU_REL32_HI, table.{{.*}}.vs.elf
