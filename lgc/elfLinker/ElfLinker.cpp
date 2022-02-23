@@ -241,15 +241,6 @@ ElfLinker *createElfLinkerImpl(PipelineState *pipelineState, ArrayRef<MemoryBuff
 
 } // namespace lgc
 
-namespace llvm {
-// =====================================================================================================================
-// Temporary cantFail override to cope with a forthcoming change of the return type of ELFSymbolRef::getValue
-// from uint64_t to Expected<uint64_t>.
-inline uint64_t cantFail(uint64_t value, const char *Msg = nullptr) {
-  return value;
-}
-} // namespace llvm
-
 // =====================================================================================================================
 // Constructor given PipelineState and ELFs to link
 //
@@ -920,7 +911,7 @@ void OutputSection::addSymbol(const object::ELFSymbolRef &elfSymRef, unsigned in
   ELF::Elf64_Sym newSym = {};
   newSym.st_name = m_linker->getStringIndex(name);
   newSym.setBinding(elfSymRef.getBinding());
-  newSym.setType(cantFail(elfSymRef.getELFType()));
+  newSym.setType(elfSymRef.getELFType());
   newSym.st_shndx = getIndex();
   newSym.st_value = cantFail(elfSymRef.getValue()) + inputSection.offset;
   newSym.st_size = elfSymRef.getSize();
