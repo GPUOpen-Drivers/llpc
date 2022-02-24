@@ -58,7 +58,7 @@ add_library(khronos_spirv_interface INTERFACE)
 if(EXISTS ${SPIRV_HEADERS_PATH})
     target_include_directories(khronos_spirv_interface
         INTERFACE
-            ${SPIRV_HEADERS_PATH}/include/spirv
+            ${SPIRV_HEADERS_PATH}/include
             ${PROJECT_SOURCE_DIR}/include/khronos
     )
     if (NOT SPIRV_HEADERS_PATH_INTERNAL)
@@ -113,4 +113,3 @@ if(ICD_BUILD_LLPC)
 
     target_link_libraries(vkgc INTERFACE llpc)
 endif()
-

@@ -32,7 +32,7 @@
 #pragma once
 
 #if EXTERNAL_SPIRV_HEADERS
-#include "unified1/GLSL.std.450.h"
+#include "spirv/unified1/GLSL.std.450.h"
 #else
 #include "spirv/GLSL.std.450.h"
 #endif
