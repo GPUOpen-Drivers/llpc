@@ -543,12 +543,6 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   SmallVector<FsOutInfo, 4> fsOutInfos;
   std::map<unsigned, std::vector<ResourceNodeData>> entryResourceNodeDatas; // Map entry ID and resourceNodeData
 
-  ShaderEntryState cacheEntryState = ShaderEntryState::New;
-  CacheEntryHandle hEntry = nullptr;
-  Result cacheResult = Result::Unsupported;
-  EntryHandle cacheEntry;
-  bool allocateOnMiss = true;
-
   // Calculate the hash code of input data
   MetroHash::Hash hash = {};
   MetroHash64::Hash(reinterpret_cast<const uint8_t *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize,
@@ -593,7 +587,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     // Trim debug info
     if (trimDebugInfo) {
       trimmedCode.resize(moduleDataEx.common.binCode.codeSize);
-      ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, trimmedCode.data());
+      ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize,
+                                             trimmedCode.data());
       moduleDataEx.common.binCode.pCode = trimmedCode.data();
     } else {
       moduleDataEx.common.binCode.pCode = shaderInfo->shaderBin.pCode;
@@ -611,14 +606,11 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   unsigned totalNodeCount = 0;
   if (result == Result::Success) {
     if (shaderInfo->pfnOutputAlloc) {
-      if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
-        for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i)
-          totalNodeCount += moduleEntryDatas[i].resNodeDataCount;
-
-        allocSize = sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize +
-                    (moduleDataEx.extra.entryCount * (sizeof(ShaderModuleEntryData) + sizeof(ShaderModuleEntry))) +
-                    totalNodeCount * sizeof(ResourceNodeData) + fsOutInfos.size() * sizeof(FsOutInfo);
-      }
+      for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i)
+        totalNodeCount += moduleEntryDatas[i].resNodeDataCount;
+      allocSize = sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize +
+                  (moduleDataEx.extra.entryCount * (sizeof(ShaderModuleEntryData) + sizeof(ShaderModuleEntry))) +
+                  totalNodeCount * sizeof(ResourceNodeData) + fsOutInfos.size() * sizeof(FsOutInfo);
 
       allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
 
@@ -635,75 +627,47 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     ShaderModuleDataEx *moduleDataExCopy = reinterpret_cast<ShaderModuleDataEx *>(allocBuf);
 
     ShaderModuleEntryData *entryData = &moduleDataExCopy->extra.entryDatas[0];
-    if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
-      // Copy module data
-      memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
-      moduleDataExCopy->common.binCode.pCode = nullptr;
-
-      size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
-
-      entryOffset = sizeof(ShaderModuleDataEx) + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntryData);
-      codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
-      resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
-      fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
-      moduleDataExCopy->codeOffset = codeOffset;
-      moduleDataExCopy->entryOffset = entryOffset;
-      moduleDataExCopy->resNodeOffset = resNodeOffset;
-      moduleDataExCopy->fsOutInfoOffset = fsOutInfoOffset;
-    }
 
     ShaderModuleEntry *entry =
         reinterpret_cast<ShaderModuleEntry *>(voidPtrInc(allocBuf, moduleDataExCopy->entryOffset));
+    memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
+    moduleDataExCopy->common.binCode.pCode = nullptr;
+    size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
+    entryOffset = sizeof(ShaderModuleDataEx) + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntryData);
+    codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
+    resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
+    fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
+    moduleDataExCopy->codeOffset = codeOffset;
+    moduleDataExCopy->entryOffset = entryOffset;
+    moduleDataExCopy->resNodeOffset = resNodeOffset;
+    moduleDataExCopy->fsOutInfoOffset = fsOutInfoOffset;
     ResourceNodeData *resNodeData =
         reinterpret_cast<ResourceNodeData *>(voidPtrInc(allocBuf, moduleDataExCopy->resNodeOffset));
     FsOutInfo *fsOutInfo = reinterpret_cast<FsOutInfo *>(voidPtrInc(allocBuf, moduleDataExCopy->fsOutInfoOffset));
     void *code = voidPtrInc(allocBuf, moduleDataExCopy->codeOffset);
 
-    if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
-      // Copy entry info
-      for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i) {
-        entryData[i] = moduleEntryDatas[i];
-        // Set module entry pointer
-        entryData[i].pShaderEntry = &entry[i];
-        // Copy module entry
-        memcpy(entryData[i].pShaderEntry, &moduleEntries[i], sizeof(ShaderModuleEntry));
-        // Copy resourceNodeData and set resource node pointer
-        memcpy(resNodeData, &entryResourceNodeDatas[i][0],
-               moduleEntryDatas[i].resNodeDataCount * sizeof(ResourceNodeData));
-        entryData[i].pResNodeDatas = resNodeData;
-        entryData[i].resNodeDataCount = moduleEntryDatas[i].resNodeDataCount;
-        resNodeData += moduleEntryDatas[i].resNodeDataCount;
-      }
-
-      // Copy binary code
-      memcpy(code, moduleDataEx.common.binCode.pCode, moduleDataEx.common.binCode.codeSize);
-
-      // Copy fragment shader output variables
-      moduleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
-      if (fsOutInfos.size() > 0)
-        memcpy(fsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
-      if (m_cache && allocateOnMiss && cacheResult == Result::NotFound) {
-        mustSucceed(cacheEntry.SetValue(true, moduleDataExCopy, allocSize),
-                    "Failed to insert shader module into cache");
-      }
-      if (cacheEntryState == ShaderEntryState::Compiling) {
-        if (hEntry)
-          m_shaderCache->insertShader(hEntry, moduleDataExCopy, allocSize);
-      }
-    } else {
-      // Update the pointers
-      for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i) {
-        entryData[i].pShaderEntry = &entry[i];
-        entryData[i].pResNodeDatas = resNodeData;
-        resNodeData += entryData[i].resNodeDataCount;
-      }
-    }
+    // Copy entry info
     moduleDataExCopy->common.binCode.pCode = code;
+    for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i) {
+      entryData[i] = moduleEntryDatas[i];
+      // Set module entry pointer
+      entryData[i].pShaderEntry = &entry[i];
+      // Copy module entry
+      memcpy(entryData[i].pShaderEntry, &moduleEntries[i], sizeof(ShaderModuleEntry));
+      // Copy resourceNodeData and set resource node pointer
+      memcpy(resNodeData, &entryResourceNodeDatas[i][0],
+             moduleEntryDatas[i].resNodeDataCount * sizeof(ResourceNodeData));
+      entryData[i].pResNodeDatas = resNodeData;
+      entryData[i].resNodeDataCount = moduleEntryDatas[i].resNodeDataCount;
+      resNodeData += moduleEntryDatas[i].resNodeDataCount;
+    } // Copy binary code
     moduleDataExCopy->extra.pFsOutInfos = fsOutInfo;
+    memcpy(code, moduleDataEx.common.binCode.pCode,
+           moduleDataEx.common.binCode.codeSize); // Copy fragment shader output variables
     shaderOut->pModuleData = &moduleDataExCopy->common;
-  } else {
-    if (hEntry)
-      m_shaderCache->resetShader(hEntry);
+    moduleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
+    if (fsOutInfos.size() > 0)
+      memcpy(fsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
   }
 
   return result;
