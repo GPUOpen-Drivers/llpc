@@ -530,11 +530,10 @@ void Compiler::Destroy() {
 Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) {
   Result result = Result::Success;
   void *allocBuf = nullptr;
-  uint8_t *allocData = nullptr;
   size_t allocSize = 0;
   ShaderModuleDataEx moduleDataEx = {};
   // For trimming debug info
-  uint8_t *trimmedCode = nullptr;
+  SmallVector<uint8_t> trimmedCode;
 
   ElfPackage moduleBinary;
   raw_svector_ostream moduleBinaryStream(moduleBinary);
@@ -593,9 +592,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
     // Trim debug info
     if (trimDebugInfo) {
-      trimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
-      ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, trimmedCode);
-      moduleDataEx.common.binCode.pCode = trimmedCode;
+      trimmedCode.resize(moduleDataEx.common.binCode.codeSize);
+      ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, trimmedCode.data());
+      moduleDataEx.common.binCode.pCode = trimmedCode.data();
     } else {
       moduleDataEx.common.binCode.pCode = shaderInfo->shaderBin.pCode;
     }
@@ -678,12 +677,6 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
       // Copy binary code
       memcpy(code, moduleDataEx.common.binCode.pCode, moduleDataEx.common.binCode.codeSize);
-      // Destroy the temporary module code
-      if (trimmedCode) {
-        delete[] trimmedCode;
-        trimmedCode = nullptr;
-        moduleDataEx.common.binCode.pCode = nullptr;
-      }
 
       // Copy fragment shader output variables
       moduleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
@@ -712,7 +705,6 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     if (hEntry)
       m_shaderCache->resetShader(hEntry);
   }
-  delete[] allocData;
 
   return result;
 }
