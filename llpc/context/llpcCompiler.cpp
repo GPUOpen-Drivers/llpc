@@ -527,7 +527,6 @@ void Compiler::Destroy() {
 // @param shaderInfo : Info to build this shader module
 // @param [out] shaderOut : Output of building this shader module
 Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) {
-  Result result = Result::Success;
   void *allocBuf = nullptr;
   size_t allocSize = 0;
   ShaderModuleDataEx moduleDataEx = {};
@@ -554,12 +553,14 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     moduleDataEx.common.binType = BinaryType::Spirv;
     if (ShaderModuleHelper::verifySpirvBinary(&shaderInfo->shaderBin) != Result::Success) {
       LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
-      result = Result::Unsupported;
+      return Result::Unsupported;
     }
-    if (result == Result::Success) {
-      result = ShaderModuleHelper::collectInfoFromSpirvBinary(&shaderInfo->shaderBin, &moduleDataEx.common.usage,
-                                                              &debugInfoSize);
-    }
+
+    Result result = ShaderModuleHelper::collectInfoFromSpirvBinary(&shaderInfo->shaderBin, &moduleDataEx.common.usage,
+                                                                   &debugInfoSize);
+    if (result != Result::Success)
+      return result;
+
     moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
     if (trimDebugInfo)
       moduleDataEx.common.binCode.codeSize -= debugInfoSize;
@@ -567,7 +568,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     moduleDataEx.common.binType = BinaryType::LlvmBc;
     moduleDataEx.common.binCode = shaderInfo->shaderBin;
   } else
-    result = Result::ErrorInvalidShader;
+    return Result::ErrorInvalidShader;
 
   if (moduleDataEx.common.binType == BinaryType::Spirv) {
     // Dump SPIRV binary
@@ -595,47 +596,44 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
   // Allocate memory and copy output data
   unsigned totalNodeCount = 0;
-  if (result == Result::Success) {
-    if (shaderInfo->pfnOutputAlloc) {
-      allocSize =
-          sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize + totalNodeCount * sizeof(ResourceNodeData);
-      allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
+  if (shaderInfo->pfnOutputAlloc) {
+    allocSize =
+        sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize + totalNodeCount * sizeof(ResourceNodeData);
+    allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
 
-      result = allocBuf ? Result::Success : Result::ErrorOutOfMemory;
-    } else {
-      // Allocator is not specified
-      result = Result::ErrorInvalidPointer;
-    }
+    if (!allocBuf)
+      return Result::ErrorOutOfMemory;
+  } else {
+    // Allocator is not specified
+    return Result::ErrorInvalidPointer;
   }
 
-  if (result == Result::Success) {
-    // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode
-    //                             | Resource nodes | FsOutInfo
-    ShaderModuleDataEx *moduleDataExCopy = reinterpret_cast<ShaderModuleDataEx *>(allocBuf);
-    memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
-    moduleDataExCopy->common.binCode.pCode = nullptr;
-    size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
-    entryOffset = sizeof(ShaderModuleDataEx);
-    codeOffset = entryOffset;
-    resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
-    fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
-    moduleDataExCopy->codeOffset = codeOffset;
-    moduleDataExCopy->entryOffset = entryOffset;
-    moduleDataExCopy->resNodeOffset = resNodeOffset;
-    moduleDataExCopy->fsOutInfoOffset = fsOutInfoOffset;
-    FsOutInfo *fsOutInfo = reinterpret_cast<FsOutInfo *>(voidPtrInc(allocBuf, moduleDataExCopy->fsOutInfoOffset));
-    void *code = voidPtrInc(allocBuf, moduleDataExCopy->codeOffset);
+  // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode
+  //                             | Resource nodes | FsOutInfo
+  ShaderModuleDataEx *moduleDataExCopy = reinterpret_cast<ShaderModuleDataEx *>(allocBuf);
+  memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
+  moduleDataExCopy->common.binCode.pCode = nullptr;
+  size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
+  entryOffset = sizeof(ShaderModuleDataEx);
+  codeOffset = entryOffset;
+  resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
+  fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
+  moduleDataExCopy->codeOffset = codeOffset;
+  moduleDataExCopy->entryOffset = entryOffset;
+  moduleDataExCopy->resNodeOffset = resNodeOffset;
+  moduleDataExCopy->fsOutInfoOffset = fsOutInfoOffset;
+  FsOutInfo *fsOutInfo = reinterpret_cast<FsOutInfo *>(voidPtrInc(allocBuf, moduleDataExCopy->fsOutInfoOffset));
+  void *code = voidPtrInc(allocBuf, moduleDataExCopy->codeOffset);
 
-    // Copy entry info
-    moduleDataExCopy->common.binCode.pCode = code;
-    moduleDataExCopy->extra.pFsOutInfos = fsOutInfo;
-    memcpy(code, moduleDataEx.common.binCode.pCode,
-           moduleDataEx.common.binCode.codeSize); // Copy fragment shader output variables
-    shaderOut->pModuleData = &moduleDataExCopy->common;
-    moduleDataExCopy->extra.fsOutInfoCount = 0;
-  }
+  // Copy entry info
+  moduleDataExCopy->common.binCode.pCode = code;
+  moduleDataExCopy->extra.pFsOutInfos = fsOutInfo;
+  memcpy(code, moduleDataEx.common.binCode.pCode,
+         moduleDataEx.common.binCode.codeSize); // Copy fragment shader output variables
+  shaderOut->pModuleData = &moduleDataExCopy->common;
+  moduleDataExCopy->extra.fsOutInfoCount = 0;
 
-  return result;
+  return Result::Success;
 }
 
 // =====================================================================================================================
