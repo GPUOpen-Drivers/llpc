@@ -23,13 +23,9 @@ void main()
 ; SHADERTEST: = call i32 (...) @lgc.create.ssign.i32(i32
 ; SHADERTEST: = call <3 x i32> (...) @lgc.create.ssign.v3i32(<3 x i32>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: = icmp slt i32 %{{.*}}, 1
-; SHADERTEST: = select i1 %{{.*}}, i32 %{{.*}}, i32 1
-; SHADERTEST: = icmp slt i32 %{{.*}}, 1
-; SHADERTEST: = select i1 %{{.*}}, i32 %{{.*}}, i32 1
-; SHADERTEST: = icmp sgt i32 %{{.*}}, -1
-; SHADERTEST: = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
-; SHADERTEST: = icmp sgt i32 %{{.*}}, -1
+; SHADERTEST: = icmp {{slt i32 %.*, 1|sgt i32 %.*, 0}}
+; SHADERTEST: = select i1 %{{.*}}, {{i32 %.*, i32 1|i32 1, i32 %.*}}
+; SHADERTEST: = icmp {{sgt i32 %.*, -1|sge i32 %.*, 0}}
 ; SHADERTEST: = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
 ; SHADERTEST: AMDLLPC SUCCESS
 */
