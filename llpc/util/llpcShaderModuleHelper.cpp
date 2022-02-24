@@ -48,12 +48,9 @@ namespace Llpc {
 //
 // @param spvBinCode : SPIR-V binary data
 // @param [out] shaderModuleUsage : Shader module usage info
-// @param [out] shaderEntryNames : Entry names for this shader module
 // @param debugInfoSize : Debug info size
 Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCode,
-                                                      ShaderModuleUsage *shaderModuleUsage,
-                                                      std::vector<ShaderEntryName> &shaderEntryNames,
-                                                      unsigned *debugInfoSize) {
+                                                      ShaderModuleUsage *shaderModuleUsage, unsigned *debugInfoSize) {
   Result result = Result::Success;
 
   const unsigned *code = reinterpret_cast<const unsigned *>(spvBinCode->pCode);
@@ -136,14 +133,6 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
     }
     case OpIsNan: {
       shaderModuleUsage->useIsNan = true;
-      break;
-    }
-    case OpEntryPoint: {
-      ShaderEntryName entry = {};
-      // The fourth word is start of the name string of the entry-point
-      entry.name = reinterpret_cast<const char *>(&codePos[3]);
-      entry.stage = convertToShaderStage(codePos[1]);
-      shaderEntryNames.push_back(entry);
       break;
     }
     default: {

@@ -531,12 +531,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   void *allocBuf = nullptr;
   size_t allocSize = 0;
   ShaderModuleDataEx moduleDataEx = {};
-  // For trimming debug info
-  SmallVector<uint8_t> trimmedCode;
 
-  std::vector<ShaderEntryName> entryNames;
-  SmallVector<ShaderModuleEntry, 4> moduleEntries;
-  std::map<unsigned, std::vector<ResourceNodeData>> entryResourceNodeDatas; // Map entry ID and resourceNodeData
+  // A buffer for holding the Spir-v binary after the debug code has been removed.
+  SmallVector<uint8_t> trimmedCode;
 
   // Calculate the hash code of input data
   MetroHash::Hash hash = {};
@@ -561,7 +558,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     }
     if (result == Result::Success) {
       result = ShaderModuleHelper::collectInfoFromSpirvBinary(&shaderInfo->shaderBin, &moduleDataEx.common.usage,
-                                                              entryNames, &debugInfoSize);
+                                                              &debugInfoSize);
     }
     moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
     if (trimDebugInfo)

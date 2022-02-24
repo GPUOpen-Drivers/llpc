@@ -54,7 +54,7 @@ struct ShaderEntryName {
 class ShaderModuleHelper {
 public:
   static Result collectInfoFromSpirvBinary(const BinaryData *spvBinCode, ShaderModuleUsage *shaderModuleUsage,
-                                           std::vector<ShaderEntryName> &shaderEntryNames, unsigned *debugInfoSize);
+                                           unsigned *debugInfoSize);
 
   static void trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin);
 
