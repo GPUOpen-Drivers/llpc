@@ -67,6 +67,7 @@ public:
   static Result verifySpirvBinary(const BinaryData *spvBin);
 
   static bool isLlvmBitcode(const BinaryData *shaderBin);
+  static BinaryType getShaderBinaryType(BinaryData shaderBinary);
 };
 
 } // namespace Llpc

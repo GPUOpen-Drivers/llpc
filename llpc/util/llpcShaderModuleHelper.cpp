@@ -365,4 +365,17 @@ bool ShaderModuleHelper::isLlvmBitcode(const BinaryData *shaderBin) {
   return isLlvmBitcode;
 }
 
+// =====================================================================================================================
+// Returns the binary type for the given shader binary.
+//
+// @param shaderBin : Shader binary code
+// @return : The binary type for the shader or BinaryType::Unknown if it could not be determined.
+BinaryType ShaderModuleHelper::getShaderBinaryType(BinaryData shaderBinary) {
+  if (ShaderModuleHelper::isLlvmBitcode(&shaderBinary))
+    return BinaryType::LlvmBc;
+  if (Vkgc::isSpirvBinary(&shaderBinary))
+    return BinaryType::Spirv;
+  return BinaryType::Unknown;
+}
+
 } // namespace Llpc

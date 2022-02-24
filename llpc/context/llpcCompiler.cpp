@@ -546,11 +546,14 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
   bool trimDebugInfo = cl::TrimDebugInfo;
 
+  moduleDataEx.common.binType = ShaderModuleHelper::getShaderBinaryType(shaderInfo->shaderBin);
+  if (moduleDataEx.common.binType == BinaryType::Unknown)
+    return Result::ErrorInvalidShader;
+
   // Check the type of input shader binary
-  if (Vkgc::isSpirvBinary(&shaderInfo->shaderBin)) {
+  if (moduleDataEx.common.binType == BinaryType::Spirv) {
     unsigned debugInfoSize = 0;
 
-    moduleDataEx.common.binType = BinaryType::Spirv;
     if (ShaderModuleHelper::verifySpirvBinary(&shaderInfo->shaderBin) != Result::Success) {
       LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
       return Result::Unsupported;
@@ -564,11 +567,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
     if (trimDebugInfo)
       moduleDataEx.common.binCode.codeSize -= debugInfoSize;
-  } else if (ShaderModuleHelper::isLlvmBitcode(&shaderInfo->shaderBin)) {
-    moduleDataEx.common.binType = BinaryType::LlvmBc;
+  } else {
     moduleDataEx.common.binCode = shaderInfo->shaderBin;
-  } else
-    return Result::ErrorInvalidShader;
+  }
 
   if (moduleDataEx.common.binType == BinaryType::Spirv) {
     // Dump SPIRV binary
