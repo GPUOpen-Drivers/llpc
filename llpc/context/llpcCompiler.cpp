@@ -535,7 +535,6 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   SmallVector<uint8_t> trimmedCode;
 
   std::vector<ShaderEntryName> entryNames;
-  SmallVector<ShaderModuleEntryData, 4> moduleEntryDatas;
   SmallVector<ShaderModuleEntry, 4> moduleEntries;
   std::map<unsigned, std::vector<ResourceNodeData>> entryResourceNodeDatas; // Map entry ID and resourceNodeData
 
@@ -601,12 +600,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   unsigned totalNodeCount = 0;
   if (result == Result::Success) {
     if (shaderInfo->pfnOutputAlloc) {
-      for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i)
-        totalNodeCount += moduleEntryDatas[i].resNodeDataCount;
-      allocSize = sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize +
-                  (moduleDataEx.extra.entryCount * (sizeof(ShaderModuleEntryData) + sizeof(ShaderModuleEntry))) +
-                  totalNodeCount * sizeof(ResourceNodeData);
-
+      allocSize =
+          sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize + totalNodeCount * sizeof(ResourceNodeData);
       allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
 
       result = allocBuf ? Result::Success : Result::ErrorOutOfMemory;
@@ -620,42 +615,22 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode
     //                             | Resource nodes | FsOutInfo
     ShaderModuleDataEx *moduleDataExCopy = reinterpret_cast<ShaderModuleDataEx *>(allocBuf);
-
-    ShaderModuleEntryData *entryData = &moduleDataExCopy->extra.entryDatas[0];
-
-    ShaderModuleEntry *entry =
-        reinterpret_cast<ShaderModuleEntry *>(voidPtrInc(allocBuf, moduleDataExCopy->entryOffset));
     memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
     moduleDataExCopy->common.binCode.pCode = nullptr;
     size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
-    entryOffset = sizeof(ShaderModuleDataEx) + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntryData);
-    codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
+    entryOffset = sizeof(ShaderModuleDataEx);
+    codeOffset = entryOffset;
     resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
     fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
     moduleDataExCopy->codeOffset = codeOffset;
     moduleDataExCopy->entryOffset = entryOffset;
     moduleDataExCopy->resNodeOffset = resNodeOffset;
     moduleDataExCopy->fsOutInfoOffset = fsOutInfoOffset;
-    ResourceNodeData *resNodeData =
-        reinterpret_cast<ResourceNodeData *>(voidPtrInc(allocBuf, moduleDataExCopy->resNodeOffset));
     FsOutInfo *fsOutInfo = reinterpret_cast<FsOutInfo *>(voidPtrInc(allocBuf, moduleDataExCopy->fsOutInfoOffset));
     void *code = voidPtrInc(allocBuf, moduleDataExCopy->codeOffset);
 
     // Copy entry info
     moduleDataExCopy->common.binCode.pCode = code;
-    for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i) {
-      entryData[i] = moduleEntryDatas[i];
-      // Set module entry pointer
-      entryData[i].pShaderEntry = &entry[i];
-      // Copy module entry
-      memcpy(entryData[i].pShaderEntry, &moduleEntries[i], sizeof(ShaderModuleEntry));
-      // Copy resourceNodeData and set resource node pointer
-      memcpy(resNodeData, &entryResourceNodeDatas[i][0],
-             moduleEntryDatas[i].resNodeDataCount * sizeof(ResourceNodeData));
-      entryData[i].pResNodeDatas = resNodeData;
-      entryData[i].resNodeDataCount = moduleEntryDatas[i].resNodeDataCount;
-      resNodeData += moduleEntryDatas[i].resNodeDataCount;
-    } // Copy binary code
     moduleDataExCopy->extra.pFsOutInfos = fsOutInfo;
     memcpy(code, moduleDataEx.common.binCode.pCode,
            moduleDataEx.common.binCode.codeSize); // Copy fragment shader output variables
