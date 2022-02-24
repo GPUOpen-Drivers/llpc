@@ -411,8 +411,7 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(VkFormat format) {
 // @param cache : Pointer to ICache implemented in client
 Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash,
                    ICache *cache)
-    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0)
-{
+    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0) {
   for (unsigned i = 0; i < optionCount; ++i)
     m_options.push_back(options[i]);
 
@@ -535,12 +534,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   // For trimming debug info
   SmallVector<uint8_t> trimmedCode;
 
-  ElfPackage moduleBinary;
-  raw_svector_ostream moduleBinaryStream(moduleBinary);
   std::vector<ShaderEntryName> entryNames;
   SmallVector<ShaderModuleEntryData, 4> moduleEntryDatas;
   SmallVector<ShaderModuleEntry, 4> moduleEntries;
-  SmallVector<FsOutInfo, 4> fsOutInfos;
   std::map<unsigned, std::vector<ResourceNodeData>> entryResourceNodeDatas; // Map entry ID and resourceNodeData
 
   // Calculate the hash code of input data
@@ -553,8 +549,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   TimerProfiler timerProfiler(MetroHash::compact64(&hash), "LLPC ShaderModule",
                               TimerProfiler::ShaderModuleTimerEnableMask);
 
-  bool trimDebugInfo = cl::TrimDebugInfo
-      ;
+  bool trimDebugInfo = cl::TrimDebugInfo;
 
   // Check the type of input shader binary
   if (Vkgc::isSpirvBinary(&shaderInfo->shaderBin)) {
@@ -610,7 +605,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
         totalNodeCount += moduleEntryDatas[i].resNodeDataCount;
       allocSize = sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize +
                   (moduleDataEx.extra.entryCount * (sizeof(ShaderModuleEntryData) + sizeof(ShaderModuleEntry))) +
-                  totalNodeCount * sizeof(ResourceNodeData) + fsOutInfos.size() * sizeof(FsOutInfo);
+                  totalNodeCount * sizeof(ResourceNodeData);
 
       allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
 
@@ -665,9 +660,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     memcpy(code, moduleDataEx.common.binCode.pCode,
            moduleDataEx.common.binCode.codeSize); // Copy fragment shader output variables
     shaderOut->pModuleData = &moduleDataExCopy->common;
-    moduleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
-    if (fsOutInfos.size() > 0)
-      memcpy(fsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
+    moduleDataExCopy->extra.fsOutInfoCount = 0;
   }
 
   return result;
@@ -1107,16 +1100,14 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         lowerPassMgr->setPassIndex(&passIndex);
         SpirvLower::registerPasses(*lowerPassMgr);
 
-        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
-        );
+        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
         // Run the passes.
         success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       } else {
         std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
         lowerPassMgr->setPassIndex(&passIndex);
 
-        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
-      );
+        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
         // Run the passes.
         success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       }
