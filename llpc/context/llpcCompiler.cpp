@@ -544,36 +544,12 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   TimerProfiler timerProfiler(MetroHash::compact64(&hash), "LLPC ShaderModule",
                               TimerProfiler::ShaderModuleTimerEnableMask);
 
-  bool trimDebugInfo = cl::TrimDebugInfo;
-
-  moduleDataEx.common.binType = ShaderModuleHelper::getShaderBinaryType(shaderInfo->shaderBin);
-  if (moduleDataEx.common.binType == BinaryType::Unknown)
-    return Result::ErrorInvalidShader;
+  ShaderModuleHelper::getExtendedModuleData(shaderInfo->shaderBin, cl::TrimDebugInfo, trimmedCode, moduleDataEx);
 
   if (moduleDataEx.common.binType == BinaryType::Spirv) {
     if (cl::EnablePipelineDump) {
       PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
     }
-
-    moduleDataEx.common.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderInfo->shaderBin);
-
-    if (trimDebugInfo) {
-      trimmedCode.resize(shaderInfo->shaderBin.codeSize);
-      moduleDataEx.common.binCode.pCode = trimmedCode.data();
-      moduleDataEx.common.binCode.codeSize =
-          ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, trimmedCode.size(), trimmedCode.data());
-    } else {
-      moduleDataEx.common.binCode = shaderInfo->shaderBin;
-    }
-
-    // Calculate SPIR-V cache hash
-    MetroHash::Hash cacheHash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t *>(moduleDataEx.common.binCode.pCode),
-                      moduleDataEx.common.binCode.codeSize, cacheHash.bytes);
-    static_assert(sizeof(moduleDataEx.common.cacheHash) == sizeof(cacheHash), "Unexpected value!");
-    memcpy(moduleDataEx.common.cacheHash, cacheHash.dwords, sizeof(cacheHash));
-  } else {
-    moduleDataEx.common.binCode = shaderInfo->shaderBin;
   }
 
   // Allocate memory and copy output data

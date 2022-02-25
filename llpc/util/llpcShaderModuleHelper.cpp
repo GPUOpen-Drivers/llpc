@@ -36,9 +36,11 @@
 #include "llvm/Support/raw_ostream.h"
 #include <set>
 #include <unordered_set>
-using namespace llvm;
 
+using namespace llvm;
+using namespace MetroHash;
 using namespace spv;
+using namespace Util;
 
 using Vkgc::SpirvHeader;
 
@@ -363,6 +365,47 @@ BinaryType ShaderModuleHelper::getShaderBinaryType(BinaryData shaderBinary) {
     return BinaryType::Spirv;
   }
   return BinaryType::Unknown;
+}
+
+// =====================================================================================================================
+// Returns the extended module data for the given binary data.  If the code needs to be trimmed then the module data
+// will point to the data in trimmed code.  It should not be resized or deallocated while moduleData is still needed.
+//
+// @param moduleBinary : Shader binary code
+// @param trimDebugInfo : True if the debug info should be removed from the SPIR-V
+// @param trimmedCode [out] : A buffer to hold the trimmed code if it is needed.
+// @param moduleData [out] : If successful, the module data for the module.  Undefined if unsuccessful.
+// @return : Success if the data was read.  The appropriate error otherwise.
+Result ShaderModuleHelper::getExtendedModuleData(const BinaryData &moduleBinary, bool trimDebugInfo,
+                                                 llvm::SmallVector<uint8_t> &trimmedCode,
+                                                 Vkgc::ShaderModuleDataEx &moduleData) {
+  moduleData.common.binType = ShaderModuleHelper::getShaderBinaryType(moduleBinary);
+  if (moduleData.common.binType == BinaryType::Unknown)
+    return Result::ErrorInvalidShader;
+
+  if (moduleData.common.binType == BinaryType::Spirv) {
+    moduleData.common.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&moduleBinary);
+
+    if (trimDebugInfo) {
+      trimmedCode.resize(moduleBinary.codeSize);
+      moduleData.common.binCode.pCode = trimmedCode.data();
+      moduleData.common.binCode.codeSize =
+          ShaderModuleHelper::trimSpirvDebugInfo(&moduleBinary, trimmedCode.size(), trimmedCode.data());
+    } else {
+      moduleData.common.binCode = moduleBinary;
+    }
+
+    // Calculate SPIR-V cache hash
+    Hash cacheHash = {};
+    MetroHash64::Hash(reinterpret_cast<const uint8_t *>(moduleData.common.binCode.pCode),
+                      moduleData.common.binCode.codeSize, cacheHash.bytes);
+    static_assert(sizeof(moduleData.common.cacheHash) == sizeof(cacheHash), "Unexpected value!");
+    memcpy(moduleData.common.cacheHash, cacheHash.dwords, sizeof(cacheHash));
+  } else {
+    moduleData.common.binCode = moduleBinary;
+  }
+
+  return Result::Success;
 }
 
 } // namespace Llpc

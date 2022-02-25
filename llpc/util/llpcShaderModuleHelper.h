@@ -31,6 +31,7 @@
 
 #pragma once
 #include "llpc.h"
+#include <llvm/ADT/SmallVector.h>
 #include <vector>
 
 namespace Llpc {
@@ -67,6 +68,9 @@ public:
 
   static bool isLlvmBitcode(const BinaryData *shaderBin);
   static BinaryType getShaderBinaryType(BinaryData shaderBinary);
+  static Result getExtendedModuleData(const BinaryData &moduleBinary, bool trimDebugInfo,
+                                      llvm::SmallVector<uint8_t> &trimmedCode, Vkgc::ShaderModuleDataEx &moduleData);
+
 };
 
 } // namespace Llpc
