@@ -355,8 +355,13 @@ bool ShaderModuleHelper::isLlvmBitcode(const BinaryData *shaderBin) {
 BinaryType ShaderModuleHelper::getShaderBinaryType(BinaryData shaderBinary) {
   if (ShaderModuleHelper::isLlvmBitcode(&shaderBinary))
     return BinaryType::LlvmBc;
-  if (Vkgc::isSpirvBinary(&shaderBinary))
+  if (Vkgc::isSpirvBinary(&shaderBinary)) {
+    if (verifySpirvBinary(&shaderBinary) != Result::Success) {
+      LLPC_ERRS("Unsupported SPIR-V instructions found in the SPIR-V binary!\n");
+      return BinaryType::Unknown;
+    }
     return BinaryType::Spirv;
+  }
   return BinaryType::Unknown;
 }
 

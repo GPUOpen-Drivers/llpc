@@ -552,12 +552,6 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
   // Check the type of input shader binary
   if (moduleDataEx.common.binType == BinaryType::Spirv) {
-
-    if (ShaderModuleHelper::verifySpirvBinary(&shaderInfo->shaderBin) != Result::Success) {
-      LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
-      return Result::Unsupported;
-    }
-
     moduleDataEx.common.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderInfo->shaderBin);
     moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
   } else {
