@@ -53,10 +53,9 @@ struct ShaderEntryName {
 // Represents LLPC shader module helper class
 class ShaderModuleHelper {
 public:
-  static Result collectInfoFromSpirvBinary(const BinaryData *spvBinCode, ShaderModuleUsage *shaderModuleUsage,
-                                           unsigned *debugInfoSize);
+  static ShaderModuleUsage getShaderModuleUsageInfo(const BinaryData *spvBinCode);
 
-  static void trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin);
+  static unsigned trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin);
 
   static Result optimizeSpirv(const BinaryData *spirvBinIn, BinaryData *spirvBinOut);
 

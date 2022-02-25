@@ -552,21 +552,14 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
   // Check the type of input shader binary
   if (moduleDataEx.common.binType == BinaryType::Spirv) {
-    unsigned debugInfoSize = 0;
 
     if (ShaderModuleHelper::verifySpirvBinary(&shaderInfo->shaderBin) != Result::Success) {
       LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
       return Result::Unsupported;
     }
 
-    Result result = ShaderModuleHelper::collectInfoFromSpirvBinary(&shaderInfo->shaderBin, &moduleDataEx.common.usage,
-                                                                   &debugInfoSize);
-    if (result != Result::Success)
-      return result;
-
+    moduleDataEx.common.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderInfo->shaderBin);
     moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
-    if (trimDebugInfo)
-      moduleDataEx.common.binCode.codeSize -= debugInfoSize;
   } else {
     moduleDataEx.common.binCode = shaderInfo->shaderBin;
   }
@@ -580,8 +573,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     // Trim debug info
     if (trimDebugInfo) {
       trimmedCode.resize(moduleDataEx.common.binCode.codeSize);
-      ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize,
-                                             trimmedCode.data());
+      moduleDataEx.common.binCode.codeSize =
+          ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, trimmedCode.size(), trimmedCode.data());
       moduleDataEx.common.binCode.pCode = trimmedCode.data();
     } else {
       moduleDataEx.common.binCode.pCode = shaderInfo->shaderBin.pCode;

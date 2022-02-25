@@ -44,32 +44,23 @@ using Vkgc::SpirvHeader;
 
 namespace Llpc {
 // =====================================================================================================================
-// Collect information from SPIR-V binary
+// Returns the shader module usage for the given Spir-V binary.
 //
 // @param spvBinCode : SPIR-V binary data
-// @param [out] shaderModuleUsage : Shader module usage info
-// @param debugInfoSize : Debug info size
-Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCode,
-                                                      ShaderModuleUsage *shaderModuleUsage, unsigned *debugInfoSize) {
-  Result result = Result::Success;
-
+// @returns : Shader module usage info
+ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData *spvBinCode) {
   const unsigned *code = reinterpret_cast<const unsigned *>(spvBinCode->pCode);
   const unsigned *end = code + spvBinCode->codeSize / sizeof(unsigned);
-
   const unsigned *codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
 
+  ShaderModuleUsage shaderModuleUsage = {};
   // Parse SPIR-V instructions
   std::unordered_set<unsigned> capabilities;
 
   while (codePos < end) {
     unsigned opCode = (codePos[0] & OpCodeMask);
     unsigned wordCount = (codePos[0] >> WordCountShift);
-
-    if (wordCount == 0 || codePos + wordCount > end) {
-      LLPC_ERRS("Invalid SPIR-V binary\n");
-      result = Result::ErrorInvalidShader;
-      break;
-    }
+    assert(wordCount > 0 && codePos + wordCount <= end && "Invalid SPIR-V binary\n");
 
     // Parse each instruction and find those we are interested in
     switch (opCode) {
@@ -81,8 +72,8 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
     }
     case OpExtension: {
       StringRef extName = reinterpret_cast<const char *>(&codePos[1]);
-      if ((extName == "SPV_AMD_shader_ballot") && (!shaderModuleUsage->useSubgroupSize)) {
-        shaderModuleUsage->useSubgroupSize = true;
+      if (extName == "SPV_AMD_shader_ballot") {
+        shaderModuleUsage.useSubgroupSize = true;
       }
       break;
     }
@@ -91,7 +82,7 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
       auto decoration =
           (opCode == OpDecorate) ? static_cast<Decoration>(codePos[2]) : static_cast<Decoration>(codePos[3]);
       if (decoration == DecorationInvariant) {
-        shaderModuleUsage->useInvariant = true;
+        shaderModuleUsage.useInvariant = true;
       }
       break;
     }
@@ -108,19 +99,7 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
     case OpImageSparseSampleImplicitLod:
     case OpImageSparseSampleProjDrefImplicitLod:
     case OpImageSparseSampleProjImplicitLod: {
-      shaderModuleUsage->useHelpInvocation = true;
-      break;
-    }
-    case OpString:
-    case OpSource:
-    case OpSourceContinued:
-    case OpSourceExtension:
-    case OpMemberName:
-    case OpLine:
-    case OpNop:
-    case OpNoLine:
-    case OpModuleProcessed: {
-      *debugInfoSize += wordCount * sizeof(unsigned);
+      shaderModuleUsage.useHelpInvocation = true;
       break;
     }
     case OpSpecConstantTrue:
@@ -128,11 +107,11 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
     case OpSpecConstant:
     case OpSpecConstantComposite:
     case OpSpecConstantOp: {
-      shaderModuleUsage->useSpecConstant = true;
+      shaderModuleUsage.useSpecConstant = true;
       break;
     }
     case OpIsNan: {
-      shaderModuleUsage->useIsNan = true;
+      shaderModuleUsage.useIsNan = true;
       break;
     }
     default: {
@@ -143,12 +122,12 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
   }
 
   if (capabilities.find(CapabilityVariablePointersStorageBuffer) != capabilities.end())
-    shaderModuleUsage->enableVarPtrStorageBuf = true;
+    shaderModuleUsage.enableVarPtrStorageBuf = true;
 
   if (capabilities.find(CapabilityVariablePointers) != capabilities.end())
-    shaderModuleUsage->enableVarPtr = true;
+    shaderModuleUsage.enableVarPtr = true;
 
-  if ((!shaderModuleUsage->useSubgroupSize) &&
+  if ((!shaderModuleUsage.useSubgroupSize) &&
       ((capabilities.count(CapabilityGroupNonUniform) > 0) || (capabilities.count(CapabilityGroupNonUniformVote) > 0) ||
        (capabilities.count(CapabilityGroupNonUniformArithmetic) > 0) ||
        (capabilities.count(CapabilityGroupNonUniformBallot) > 0) ||
@@ -158,10 +137,10 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
        (capabilities.count(CapabilityGroupNonUniformQuad) > 0) ||
        (capabilities.count(CapabilitySubgroupBallotKHR) > 0) || (capabilities.count(CapabilitySubgroupVoteKHR) > 0) ||
        (capabilities.count(CapabilityGroups) > 0))) {
-    shaderModuleUsage->useSubgroupSize = true;
+    shaderModuleUsage.useSubgroupSize = true;
   }
 
-  return result;
+  return shaderModuleUsage;
 }
 
 // =====================================================================================================================
@@ -170,13 +149,15 @@ Result ShaderModuleHelper::collectInfoFromSpirvBinary(const BinaryData *spvBinCo
 // @param spvBin : SPIR-V binary code
 // @param bufferSize : Output buffer size in bytes
 // @param [out] trimSpvBin : Trimmed SPIR-V binary code
-void ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin) {
+// @returns : The number of bytes written to trimSpvBin
+unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin) {
   assert(bufferSize > sizeof(SpirvHeader));
 
   const unsigned *code = reinterpret_cast<const unsigned *>(spvBin->pCode);
   const unsigned *end = code + spvBin->codeSize / sizeof(unsigned);
   const unsigned *codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
 
+  unsigned *trimStart = reinterpret_cast<unsigned *>(trimSpvBin);
   unsigned *trimEnd = reinterpret_cast<unsigned *>(voidPtrInc(trimSpvBin, bufferSize));
   (void(trimEnd)); // unused
   unsigned *trimCodePos = reinterpret_cast<unsigned *>(voidPtrInc(trimSpvBin, sizeof(SpirvHeader)));
@@ -214,7 +195,8 @@ void ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsigned b
     codePos += wordCount;
   }
 
-  assert(trimCodePos == trimEnd);
+  assert(trimCodePos <= trimEnd);
+  return (trimCodePos - trimStart) * sizeof(*trimStart);
 }
 
 // =====================================================================================================================
