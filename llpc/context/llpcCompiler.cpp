@@ -550,28 +550,20 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   if (moduleDataEx.common.binType == BinaryType::Unknown)
     return Result::ErrorInvalidShader;
 
-  // Check the type of input shader binary
   if (moduleDataEx.common.binType == BinaryType::Spirv) {
-    moduleDataEx.common.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderInfo->shaderBin);
-    moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
-  } else {
-    moduleDataEx.common.binCode = shaderInfo->shaderBin;
-  }
-
-  if (moduleDataEx.common.binType == BinaryType::Spirv) {
-    // Dump SPIRV binary
     if (cl::EnablePipelineDump) {
       PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
     }
 
-    // Trim debug info
+    moduleDataEx.common.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderInfo->shaderBin);
+
     if (trimDebugInfo) {
-      trimmedCode.resize(moduleDataEx.common.binCode.codeSize);
+      trimmedCode.resize(shaderInfo->shaderBin.codeSize);
+      moduleDataEx.common.binCode.pCode = trimmedCode.data();
       moduleDataEx.common.binCode.codeSize =
           ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, trimmedCode.size(), trimmedCode.data());
-      moduleDataEx.common.binCode.pCode = trimmedCode.data();
     } else {
-      moduleDataEx.common.binCode.pCode = shaderInfo->shaderBin.pCode;
+      moduleDataEx.common.binCode = shaderInfo->shaderBin;
     }
 
     // Calculate SPIR-V cache hash
@@ -580,6 +572,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
                       moduleDataEx.common.binCode.codeSize, cacheHash.bytes);
     static_assert(sizeof(moduleDataEx.common.cacheHash) == sizeof(cacheHash), "Unexpected value!");
     memcpy(moduleDataEx.common.cacheHash, cacheHash.dwords, sizeof(cacheHash));
+  } else {
+    moduleDataEx.common.binCode = shaderInfo->shaderBin;
   }
 
   // Allocate memory and copy output data
