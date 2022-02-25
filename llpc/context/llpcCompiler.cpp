@@ -553,10 +553,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   }
 
   // Allocate memory and copy output data
-  unsigned totalNodeCount = 0;
   if (shaderInfo->pfnOutputAlloc) {
     allocSize =
-        sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize + totalNodeCount * sizeof(ResourceNodeData);
+        sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize;
     allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
 
     if (!allocBuf)
@@ -575,13 +574,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   entryOffset = sizeof(ShaderModuleDataEx);
   codeOffset = entryOffset;
   resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
-  fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
-  moduleDataExCopy->codeOffset = codeOffset;
-  moduleDataExCopy->entryOffset = entryOffset;
-  moduleDataExCopy->resNodeOffset = resNodeOffset;
-  moduleDataExCopy->fsOutInfoOffset = fsOutInfoOffset;
-  FsOutInfo *fsOutInfo = reinterpret_cast<FsOutInfo *>(voidPtrInc(allocBuf, moduleDataExCopy->fsOutInfoOffset));
-  void *code = voidPtrInc(allocBuf, moduleDataExCopy->codeOffset);
+  fsOutInfoOffset = resNodeOffset;
+  FsOutInfo *fsOutInfo = reinterpret_cast<FsOutInfo *>(voidPtrInc(allocBuf, fsOutInfoOffset));
+  void *code = voidPtrInc(allocBuf, codeOffset);
 
   // Copy entry info
   moduleDataExCopy->common.binCode.pCode = code;
