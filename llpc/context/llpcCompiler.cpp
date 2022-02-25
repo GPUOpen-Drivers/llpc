@@ -554,8 +554,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
   // Allocate memory and copy output data
   if (shaderInfo->pfnOutputAlloc) {
-    allocSize =
-        sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize;
+    allocSize = sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize;
     allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
 
     if (!allocBuf)
@@ -575,16 +574,13 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   codeOffset = entryOffset;
   resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
   fsOutInfoOffset = resNodeOffset;
-  FsOutInfo *fsOutInfo = reinterpret_cast<FsOutInfo *>(voidPtrInc(allocBuf, fsOutInfoOffset));
   void *code = voidPtrInc(allocBuf, codeOffset);
 
   // Copy entry info
   moduleDataExCopy->common.binCode.pCode = code;
-  moduleDataExCopy->extra.pFsOutInfos = fsOutInfo;
   memcpy(code, moduleDataEx.common.binCode.pCode,
          moduleDataEx.common.binCode.codeSize); // Copy fragment shader output variables
   shaderOut->pModuleData = &moduleDataExCopy->common;
-  moduleDataExCopy->extra.fsOutInfoCount = 0;
 
   return Result::Success;
 }
@@ -901,34 +897,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
       Module *module = nullptr;
       if (moduleDataEx->common.binType == BinaryType::MultiLlvmBc) {
-        timerProfiler.startStopTimer(TimerLoadBc, true);
-
-        MetroHash::Hash entryNameHash = {};
-
-        assert(shaderInfoEntry->pEntryTarget);
-        MetroHash64::Hash(reinterpret_cast<const uint8_t *>(shaderInfoEntry->pEntryTarget),
-                          strlen(shaderInfoEntry->pEntryTarget), entryNameHash.bytes);
-
-        BinaryData binCode = {};
-        for (unsigned i = 0; i < moduleDataEx->extra.entryCount; ++i) {
-          auto entryData = &moduleDataEx->extra.entryDatas[i];
-          auto shaderEntry = reinterpret_cast<ShaderModuleEntry *>(entryData->pShaderEntry);
-          if (entryData->stage == shaderInfoEntry->entryStage &&
-              memcmp(shaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0) {
-            // LLVM bitcode
-            binCode.codeSize = shaderEntry->entrySize;
-            binCode.pCode = voidPtrInc(moduleDataEx->common.binCode.pCode, shaderEntry->entryOffset);
-            break;
-          }
-        }
-
-        if (binCode.codeSize > 0) {
-          module = context->loadLibrary(&binCode).release();
-          stageSkipMask |= (1 << shaderIndex);
-        } else
-          result = Result::ErrorInvalidShader;
-
-        timerProfiler.startStopTimer(TimerLoadBc, false);
+        result = Result::ErrorInvalidShader;
       } else {
         module = new Module((Twine("llpc") + getShaderStageName(shaderInfoEntry->entryStage)).str() +
                                 std::to_string(getModuleIdByIndex(shaderIndex)),

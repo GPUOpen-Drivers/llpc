@@ -471,12 +471,6 @@ struct FsOutInfo {
 /// Represents extended output of building a shader module (taking extra data info)
 struct ShaderModuleDataEx {
   ShaderModuleData common;  ///< Shader module common data
-  struct {
-    unsigned fsOutInfoCount;             ///< Count of fragment shader output
-    const FsOutInfo *pFsOutInfos;        ///< Fragment output info array
-    unsigned entryCount;                 ///< Shader entry count in the module
-    ShaderModuleEntryData entryDatas[1]; ///< Array of all shader entries in this module
-  } extra;                               ///< Represents extra part of shader module data
 };
 
 /// Represents the options for pipeline dump.
