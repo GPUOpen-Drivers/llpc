@@ -978,8 +978,11 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   bool enableNgg = nggState->enableNgg;
 
   auto iaState = &pipeline->iaState;
-  if (enableNgg)
+  if (enableNgg) {
     hasher->Update(iaState->topology);
+    hasher->Update(pipeline->rsState.provokingVertexMode);
+  }
+
   if (pipeline->gs.pModuleData || pipeline->tcs.pModuleData || pipeline->tes.pModuleData)
     hasher->Update(iaState->patchControlPoints);
   hasher->Update(iaState->disableVertexReuse);
@@ -1008,7 +1011,6 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   if (updateHashFromRs) {
     auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
-    hasher->Update(rsState->provokingVertexMode);
   }
 
   if (isCacheHash) {
@@ -1044,6 +1046,9 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
   hasher->Update(rsState->perSampleShading);
   hasher->Update(rsState->provokingVertexMode);
   hasher->Update(rsState->pixelShaderSamples);
+
+  // Topology is required when BaryCoord is used
+  hasher->Update(pipeline->iaState.topology);
 
   if (!isRelocatableShader) {
     hasher->Update(rsState->innerCoverage);
