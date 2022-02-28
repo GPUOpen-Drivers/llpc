@@ -51,6 +51,8 @@ static const unsigned SiDrvTableTfBufferOffs = 9;
 static const unsigned SiDrvTableHsBuffeR0Offs = 10;
 static const unsigned SiDrvTableOffChipParamCache = 11;
 static const unsigned SiDrvTableSamplepos = 12;
+static const unsigned SiDrvTableTaskPayloadRingOffs = 13;
+static const unsigned SiDrvTableTaskDrawDataRingOffs = 14;
 
 static const unsigned SiStreamoutTableOffs = 0;
 

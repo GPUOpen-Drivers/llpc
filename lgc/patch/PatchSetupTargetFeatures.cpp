@@ -165,9 +165,8 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     }
     if (func->getCallingConv() == CallingConv::AMDGPU_CS || func->getCallingConv() == CallingConv::AMDGPU_Gfx) {
       // Set the work group size
-      const auto &csBuiltInUsage = m_pipelineState->getShaderModes()->getComputeShaderMode();
-      unsigned flatWorkGroupSize =
-          csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
+      const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+      unsigned flatWorkGroupSize = computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
       auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
       builder.addAttribute("amdgpu-flat-work-group-size", flatWorkGroupSizeString + "," + flatWorkGroupSizeString);
     }

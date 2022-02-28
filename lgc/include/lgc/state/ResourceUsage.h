@@ -458,6 +458,16 @@ struct InterfaceData {
   // Indices of the arguments in shader entry-point
   struct {
     union {
+      // Task shader
+      struct {
+        unsigned dispatchDims;       // Dispatch dimensions
+        unsigned baseRingEntryIndex; // Base entry index (first workgroup) of mesh/task shader ring for current dispatch
+        unsigned pipeStatsBuf;       // Pipeline statistics buffer
+        unsigned workgroupId;        // Workgroup ID
+        unsigned multiDispatchInfo;  // Multiple dispatch info
+        unsigned localInvocationId;  // Local invocation ID
+      } task;
+
       // Vertex shader
       struct {
         unsigned baseVertex;         // Base vertex

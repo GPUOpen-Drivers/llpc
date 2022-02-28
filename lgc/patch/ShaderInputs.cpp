@@ -364,6 +364,12 @@ struct ShaderInputDesc {
   bool always;           // True if this register is always added as an argument; false to check usage
 };
 
+// SGPRs: Task (identical to CS)
+static const ShaderInputDesc TaskSgprInputs[] = {
+    {ShaderInput::WorkgroupId, offsetof(InterfaceData, entryArgIdxs.task.workgroupId), true},
+    {ShaderInput::MultiDispatchInfo, offsetof(InterfaceData, entryArgIdxs.task.multiDispatchInfo), true},
+};
+
 // SGPRs: VS as hardware ES
 static const ShaderInputDesc VsAsEsSgprInputs[] = {
     {ShaderInput::EsGsOffset, offsetof(InterfaceData, entryArgIdxs.vs.esGsOffset), true},
@@ -418,6 +424,11 @@ static const ShaderInputDesc FsSgprInputs[] = {
 static const ShaderInputDesc CsSgprInputs[] = {
     {ShaderInput::WorkgroupId, 0, true},
     {ShaderInput::MultiDispatchInfo, 0, true},
+};
+
+// VGPRs: Task (identical to CS)
+static const ShaderInputDesc TaskVgprInputs[] = {
+    {ShaderInput::LocalInvocationId, offsetof(InterfaceData, entryArgIdxs.task.localInvocationId), true},
 };
 
 // VGPRs: VS
@@ -556,6 +567,10 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
   ArrayRef<ShaderInputDesc> vgprInputDescs;
 
   switch (shaderStage) {
+  case ShaderStageTask:
+    sgprInputDescs = TaskSgprInputs;
+    vgprInputDescs = TaskVgprInputs;
+    break;
   case ShaderStageVertex:
     if (!hasTs) {
       if (hasGs)

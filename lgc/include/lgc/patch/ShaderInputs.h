@@ -61,7 +61,7 @@ class PipelineState;
 // =====================================================================================================================
 // Internal numbering for shader inputs
 enum class ShaderInput : unsigned {
-  // CS SGPRs
+  // TasK/CS SGPRs
   WorkgroupId,       // WorkgroupId (v3i32)
   MultiDispatchInfo, // Multiple dispatch info, include TG_SIZE and etc.
 
@@ -134,7 +134,7 @@ enum class ShaderInput : unsigned {
   SampleCoverage,       // Sample coverage
   FixedXY,              // Fixed X/Y
 
-  // CS VGPRs
+  // Task/CS VGPRs
   LocalInvocationId, // LocalInvocationId (v3i32)
 
   Count
