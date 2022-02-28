@@ -1647,29 +1647,30 @@ void InOutBuilder::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySiz
 unsigned InOutBuilder::getBuiltInValidMask(BuiltInKind builtIn, bool isOutput) {
   // See BuiltInDefs.h for an explanation of the letter codes.
   enum class StageValidMask : unsigned {
-    C = (1 << ShaderStageCompute),
-    D = (1 << ShaderStageTessEval),
-    H = (1 << ShaderStageTessControl),
-    HD = (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval),
-    HDG = (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
-    HDGP = (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry) |
-           (1 << ShaderStageFragment),
-    HG = (1 << ShaderStageTessControl) | (1 << ShaderStageGeometry),
-    MG = (1 << ShaderStageGeometry),
-    MVG = (1 << ShaderStageVertex) | (1 << ShaderStageGeometry),
-    MVDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
-    MVHDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) |
-            (1 << ShaderStageGeometry),
+    C = shaderStageToMask(ShaderStageCompute),
+    D = shaderStageToMask(ShaderStageTessEval),
+    H = shaderStageToMask(ShaderStageTessControl),
+    HD = shaderStageToMask(ShaderStageTessControl, ShaderStageTessEval),
+    HDG = shaderStageToMask(ShaderStageTessControl, ShaderStageTessEval, ShaderStageGeometry),
+    HDGP = shaderStageToMask(ShaderStageTessControl, ShaderStageTessEval, ShaderStageGeometry, ShaderStageFragment),
+    HG = shaderStageToMask(ShaderStageTessControl, ShaderStageGeometry),
+    M = shaderStageToMask(ShaderStageMesh),
+    MG = shaderStageToMask(ShaderStageMesh, ShaderStageGeometry),
+    MVG = shaderStageToMask(ShaderStageMesh, ShaderStageVertex, ShaderStageGeometry),
+    MVDG = shaderStageToMask(ShaderStageMesh, ShaderStageVertex, ShaderStageTessEval, ShaderStageGeometry),
+    MVHDG = shaderStageToMask(ShaderStageMesh, ShaderStageVertex, ShaderStageTessControl, ShaderStageTessEval,
+                              ShaderStageGeometry),
     N = 0,
-    P = (1 << ShaderStageFragment),
-    TMC = (1 << ShaderStageCompute),
-    TMV = (1 << ShaderStageVertex),
-    TMVHDGPC = (1 << ShaderStageVertex) | (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) |
-               (1 << ShaderStageGeometry) | (1 << ShaderStageFragment) | (1 << ShaderStageCompute),
-    V = (1 << ShaderStageVertex),
-    VDG = (1 << ShaderStageVertex) | (1 << ShaderStageTessEval) | (1 << ShaderStageGeometry),
-    VHDGP = (1 << ShaderStageVertex) | (1 << ShaderStageTessControl) | (1 << ShaderStageTessEval) |
-            (1 << ShaderStageGeometry) | (1 << ShaderStageFragment),
+    P = shaderStageToMask(ShaderStageFragment),
+    T = shaderStageToMask(ShaderStageTask),
+    TMC = shaderStageToMask(ShaderStageTask, ShaderStageMesh, ShaderStageCompute),
+    TMV = shaderStageToMask(ShaderStageTask, ShaderStageMesh, ShaderStageVertex),
+    TMVHDGPC = shaderStageToMask(ShaderStageTask, ShaderStageMesh, ShaderStageVertex, ShaderStageTessControl,
+                                 ShaderStageTessEval, ShaderStageGeometry, ShaderStageFragment, ShaderStageCompute),
+    V = shaderStageToMask(ShaderStageVertex),
+    VDG = shaderStageToMask(ShaderStageVertex, ShaderStageTessEval, ShaderStageGeometry),
+    VHDGP = shaderStageToMask(ShaderStageVertex, ShaderStageTessControl, ShaderStageTessEval, ShaderStageGeometry,
+                              ShaderStageFragment),
   };
 
   unsigned validMask = 0;

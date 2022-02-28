@@ -42,8 +42,14 @@ class Type;
 namespace lgc {
 
 // Translates shader stage to corresponding stage mask.
-static inline unsigned shaderStageToMask(ShaderStage stage) {
-  return 1U << static_cast<unsigned>(stage);
+constexpr unsigned shaderStageToMask() {
+  return 0; // To end the recursive call
+}
+
+template <typename Stage, typename... Stages>
+constexpr unsigned shaderStageToMask(Stage theStage, Stages... otherStages) {
+  static_assert(std::is_enum<Stage>::value, "Can only be used with ShaderStage enums");
+  return (1U << static_cast<unsigned>(theStage)) | shaderStageToMask(otherStages...);
 }
 
 // Set shader stage metadata on every defined function in a module
