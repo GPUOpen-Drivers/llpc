@@ -39,8 +39,8 @@
 // 5. the type of the built-in.
 //
 // A valid string in (3) and (4) is one or more characters from the following, in this order:
-//  T   task shader (placeholder; not implemented)
-//  M   mesh shader (placeholder; not implemented)
+//  T   task shader
+//  M   mesh shader
 //  V   vertex shader
 //  H   tessellation control (hull) shader
 //  D   tessellation evaluation (domain) shader
@@ -104,4 +104,4 @@ BUILTIN(VertexIndex, 42, N, V, i32)                      // Index of current ver
 BUILTIN(ViewIndex, 4440, N, VHDGP, i32)                  // View index
 BUILTIN(ViewportIndex, 10, MVDG, P, i32)                 // Viewport index
 BUILTIN(WorkgroupId, 26, N, TMC, v3i32)                  // ID of global workgroup
-BUILTIN(WorkgroupSize, 25, N, C, v3i32)                  // Size of global workgroup
+BUILTIN(WorkgroupSize, 25, N, TMC, v3i32)                // Size of global workgroup
