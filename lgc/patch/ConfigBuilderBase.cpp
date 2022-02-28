@@ -243,6 +243,12 @@ void ConfigBuilderBase::setPipelineType(Util::Abi::PipelineType value) {
   case Util::Abi::NggTess:
     typeStr = "NggTess";
     break;
+  case Util::Abi::Mesh:
+    typeStr = "Mesh";
+    break;
+  case Util::Abi::TaskMesh:
+    typeStr = "TaskMesh";
+    break;
   default:
     break;
   }
