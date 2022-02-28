@@ -99,6 +99,32 @@ Value *ShaderSystemValues::getTessFactorBufDesc() {
 }
 
 // =====================================================================================================================
+// Get the descriptor for task payload ring buffer (for task and mesh shader)
+Value *ShaderSystemValues::getTaskPayloadRingBufDesc() {
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+  assert(m_shaderStage == ShaderStageTask || m_shaderStage == ShaderStageMesh);
+  if (!m_taskPayloadRingBufDesc) {
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
+    m_taskPayloadRingBufDesc = loadDescFromDriverTable(SiDrvTableTaskPayloadRingOffs, builder);
+  }
+  return m_taskPayloadRingBufDesc;
+}
+
+// =====================================================================================================================
+// Get the descriptor for task draw data ring buffer (for task and mesh shader)
+Value *ShaderSystemValues::getTaskDrawDataRingBufDesc() {
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+  assert(m_shaderStage == ShaderStageTask || m_shaderStage == ShaderStageMesh);
+  if (!m_taskDrawDataRingBufDesc) {
+    // Ensure we have got the global table pointer first, and insert new code after that.
+    BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
+    m_taskDrawDataRingBufDesc = loadDescFromDriverTable(SiDrvTableTaskDrawDataRingOffs, builder);
+  }
+  return m_taskDrawDataRingBufDesc;
+}
+
+// =====================================================================================================================
 // Extract value of primitive ID (TCS)
 Value *ShaderSystemValues::getPrimitiveId() {
   assert(m_shaderStage == ShaderStageTessControl);
@@ -311,6 +337,36 @@ Value *ShaderSystemValues::getInternalPerShaderTablePtr() {
         makePointer(getFunctionArgument(m_entryPoint, 1, "perShaderTable"), ptrTy, InvalidValue);
   }
   return m_internalPerShaderTablePtr;
+}
+
+// =====================================================================================================================
+// Get the mesh pipeline statistics buffer pointer as pointer to i8
+Value *ShaderSystemValues::getMeshPipeStatsBufPtr() {
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+  assert(m_shaderStage == ShaderStageTask || m_shaderStage == ShaderStageMesh);
+  if (!m_meshPipeStatsBufPtr) {
+    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
+    unsigned entryArgIdx = 0;
+
+    // Get the SGPR number of the mesh pipeline statistics buffer pointer.
+    switch (m_shaderStage) {
+    case ShaderStageTask:
+      entryArgIdx = intfData->entryArgIdxs.task.pipeStatsBuf;
+      break;
+    case ShaderStageMesh:
+      llvm_unreachable("Not implemented!");
+      break;
+    default:
+      llvm_unreachable("Should never be called!");
+      break;
+    }
+    assert(entryArgIdx != 0);
+
+    auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_GLOBAL);
+    m_meshPipeStatsBufPtr =
+        makePointer(getFunctionArgument(m_entryPoint, entryArgIdx, "meshPipeStatsBuf"), ptrTy, InvalidValue);
+  }
+  return m_meshPipeStatsBufPtr;
 }
 
 // =====================================================================================================================
