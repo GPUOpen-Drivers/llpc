@@ -378,31 +378,31 @@ BinaryType ShaderModuleHelper::getShaderBinaryType(BinaryData shaderBinary) {
 // @return : Success if the data was read.  The appropriate error otherwise.
 Result ShaderModuleHelper::getExtendedModuleData(const BinaryData &moduleBinary, bool trimDebugInfo,
                                                  llvm::SmallVector<uint8_t> &trimmedCode,
-                                                 Vkgc::ShaderModuleDataEx &moduleData) {
-  moduleData.common.binType = ShaderModuleHelper::getShaderBinaryType(moduleBinary);
-  if (moduleData.common.binType == BinaryType::Unknown)
+                                                 Vkgc::ShaderModuleData &moduleData) {
+  moduleData.binType = ShaderModuleHelper::getShaderBinaryType(moduleBinary);
+  if (moduleData.binType == BinaryType::Unknown)
     return Result::ErrorInvalidShader;
 
-  if (moduleData.common.binType == BinaryType::Spirv) {
-    moduleData.common.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&moduleBinary);
+  if (moduleData.binType == BinaryType::Spirv) {
+    moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&moduleBinary);
 
     if (trimDebugInfo) {
       trimmedCode.resize(moduleBinary.codeSize);
-      moduleData.common.binCode.pCode = trimmedCode.data();
-      moduleData.common.binCode.codeSize =
+      moduleData.binCode.pCode = trimmedCode.data();
+      moduleData.binCode.codeSize =
           ShaderModuleHelper::trimSpirvDebugInfo(&moduleBinary, trimmedCode.size(), trimmedCode.data());
     } else {
-      moduleData.common.binCode = moduleBinary;
+      moduleData.binCode = moduleBinary;
     }
 
     // Calculate SPIR-V cache hash
     Hash cacheHash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t *>(moduleData.common.binCode.pCode),
-                      moduleData.common.binCode.codeSize, cacheHash.bytes);
-    static_assert(sizeof(moduleData.common.cacheHash) == sizeof(cacheHash), "Unexpected value!");
-    memcpy(moduleData.common.cacheHash, cacheHash.dwords, sizeof(cacheHash));
+    MetroHash64::Hash(reinterpret_cast<const uint8_t *>(moduleData.binCode.pCode), moduleData.binCode.codeSize,
+                      cacheHash.bytes);
+    static_assert(sizeof(moduleData.cacheHash) == sizeof(cacheHash), "Unexpected value!");
+    memcpy(moduleData.cacheHash, cacheHash.dwords, sizeof(cacheHash));
   } else {
-    moduleData.common.binCode = moduleBinary;
+    moduleData.binCode = moduleBinary;
   }
 
   return Result::Success;

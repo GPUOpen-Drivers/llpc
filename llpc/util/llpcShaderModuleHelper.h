@@ -69,8 +69,7 @@ public:
   static bool isLlvmBitcode(const BinaryData *shaderBin);
   static BinaryType getShaderBinaryType(BinaryData shaderBinary);
   static Result getExtendedModuleData(const BinaryData &moduleBinary, bool trimDebugInfo,
-                                      llvm::SmallVector<uint8_t> &trimmedCode, Vkgc::ShaderModuleDataEx &moduleData);
-
+                                      llvm::SmallVector<uint8_t> &trimmedCode, Vkgc::ShaderModuleData &moduleData);
 };
 
 } // namespace Llpc

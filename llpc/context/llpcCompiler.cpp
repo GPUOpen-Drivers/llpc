@@ -529,7 +529,7 @@ void Compiler::Destroy() {
 Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) {
   void *allocBuf = nullptr;
   size_t allocSize = 0;
-  ShaderModuleDataEx moduleDataEx = {};
+  ShaderModuleData moduleDataEx = {};
 
   // A buffer for holding the Spir-v binary after the debug code has been removed.
   SmallVector<uint8_t> trimmedCode;
@@ -539,14 +539,14 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   MetroHash64::Hash(reinterpret_cast<const uint8_t *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize,
                     hash.bytes);
 
-  memcpy(moduleDataEx.common.hash, &hash, sizeof(hash));
+  memcpy(moduleDataEx.hash, &hash, sizeof(hash));
 
   TimerProfiler timerProfiler(MetroHash::compact64(&hash), "LLPC ShaderModule",
                               TimerProfiler::ShaderModuleTimerEnableMask);
 
   ShaderModuleHelper::getExtendedModuleData(shaderInfo->shaderBin, cl::TrimDebugInfo, trimmedCode, moduleDataEx);
 
-  if (moduleDataEx.common.binType == BinaryType::Spirv) {
+  if (moduleDataEx.binType == BinaryType::Spirv) {
     if (cl::EnablePipelineDump) {
       PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
     }
@@ -554,7 +554,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
   // Allocate memory and copy output data
   if (shaderInfo->pfnOutputAlloc) {
-    allocSize = sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize;
+    allocSize = sizeof(ShaderModuleData) + moduleDataEx.binCode.codeSize;
     allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
 
     if (!allocBuf)
@@ -564,23 +564,19 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     return Result::ErrorInvalidPointer;
   }
 
-  // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode
+  // Memory layout of pAllocBuf: ShaderModuleData | ShaderModuleEntryData | ShaderModuleEntry | binCode
   //                             | Resource nodes | FsOutInfo
-  ShaderModuleDataEx *moduleDataExCopy = reinterpret_cast<ShaderModuleDataEx *>(allocBuf);
+  ShaderModuleData *moduleDataExCopy = reinterpret_cast<ShaderModuleData *>(allocBuf);
   memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
-  moduleDataExCopy->common.binCode.pCode = nullptr;
-  size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
-  entryOffset = sizeof(ShaderModuleDataEx);
-  codeOffset = entryOffset;
-  resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
-  fsOutInfoOffset = resNodeOffset;
+  moduleDataExCopy->binCode.pCode = nullptr;
+  size_t codeOffset = sizeof(ShaderModuleData);
   void *code = voidPtrInc(allocBuf, codeOffset);
 
   // Copy entry info
-  moduleDataExCopy->common.binCode.pCode = code;
-  memcpy(code, moduleDataEx.common.binCode.pCode,
-         moduleDataEx.common.binCode.codeSize); // Copy fragment shader output variables
-  shaderOut->pModuleData = &moduleDataExCopy->common;
+  moduleDataExCopy->binCode.pCode = code;
+  memcpy(code, moduleDataEx.binCode.pCode,
+         moduleDataEx.binCode.codeSize); // Copy fragment shader output variables
+  shaderOut->pModuleData = moduleDataExCopy;
 
   return Result::Success;
 }
@@ -892,11 +888,10 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (!shaderInfoEntry || !shaderInfoEntry->pModuleData)
         continue;
 
-      const ShaderModuleDataEx *moduleDataEx =
-          reinterpret_cast<const ShaderModuleDataEx *>(shaderInfoEntry->pModuleData);
+      const ShaderModuleData *moduleDataEx = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
 
       Module *module = nullptr;
-      if (moduleDataEx->common.binType == BinaryType::MultiLlvmBc) {
+      if (moduleDataEx->binType == BinaryType::MultiLlvmBc) {
         result = Result::ErrorInvalidShader;
       } else {
         module = new Module((Twine("llpc") + getShaderStageName(shaderInfoEntry->entryStage)).str() +

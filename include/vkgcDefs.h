@@ -468,11 +468,6 @@ struct FsOutInfo {
   unsigned componentCount; ///< Count of components of output data
 };
 
-/// Represents extended output of building a shader module (taking extra data info)
-struct ShaderModuleDataEx {
-  ShaderModuleData common;  ///< Shader module common data
-};
-
 /// Represents the options for pipeline dump.
 struct PipelineDumpOptions {
   const char *pDumpDir;              ///< Pipeline dump directory
