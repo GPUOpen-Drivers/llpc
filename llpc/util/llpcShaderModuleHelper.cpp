@@ -154,8 +154,9 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
 // @param bufferSize : Output buffer size in bytes
 // @param [out] trimSpvBin : Trimmed SPIR-V binary code
 // @returns : The number of bytes written to trimSpvBin
-unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin) {
-  assert(!trimSpvBin || bufferSize > sizeof(SpirvHeader));
+unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, llvm::MutableArrayRef<unsigned> codeBuffer) {
+  bool writeCode = !codeBuffer.empty();
+  assert(codeBuffer.empty() || codeBuffer.size() > sizeof(SpirvHeader));
 
   constexpr unsigned wordSize = sizeof(unsigned);
   const unsigned *code = reinterpret_cast<const unsigned *>(spvBin->pCode);
@@ -165,13 +166,10 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsign
   unsigned totalSizeInWords = sizeof(Vkgc::SpirvHeader) / wordSize;
   static_assert(sizeof(Vkgc::SpirvHeader) % wordSize == 0);
 
-  unsigned *trimEnd = reinterpret_cast<unsigned *>(voidPtrInc(trimSpvBin, bufferSize));
-  (void(trimEnd)); // unused
-  unsigned *trimCodePos = reinterpret_cast<unsigned *>(voidPtrInc(trimSpvBin, sizeof(SpirvHeader)));
-
   // Copy SPIR-V header
-  if (trimSpvBin) {
-    memcpy(trimSpvBin, code, sizeof(SpirvHeader));
+  if (writeCode) {
+    memcpy(codeBuffer.data(), code, sizeof(SpirvHeader));
+    codeBuffer = codeBuffer.drop_front(sizeof(Vkgc::SpirvHeader) / wordSize);
   }
 
   // Copy SPIR-V instructions
@@ -193,11 +191,11 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsign
     }
     default: {
       // Copy other instructions
-      if (trimSpvBin) {
+      if (writeCode) {
         assert(codePos + wordCount <= end);
-        assert(trimCodePos + wordCount <= trimEnd);
-        memcpy(trimCodePos, codePos, wordCount * wordSize);
-        trimCodePos += wordCount;
+        assert(wordCount <= codeBuffer.size());
+        memcpy(codeBuffer.data(), codePos, wordCount * wordSize);
+        codeBuffer = codeBuffer.drop_front(wordCount);
       }
       totalSizeInWords += wordCount;
       break;
@@ -206,8 +204,6 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsign
 
     codePos += wordCount;
   }
-
-  assert(!trimSpvBin || trimCodePos <= trimEnd);
   return totalSizeInWords * wordSize;
 }
 
@@ -383,11 +379,11 @@ BinaryType ShaderModuleHelper::getShaderBinaryType(BinaryData shaderBinary) {
 //
 // @param moduleBinary : Shader binary code
 // @param trimDebugInfo : True if the debug info should be removed from the SPIR-V
-// @param trimmedCode [out] : A buffer to hold the trimmed code if it is needed.
+// @param codeBuffer [out] : A buffer to hold the trimmed code if it is needed.
 // @param moduleData [out] : If successful, the module data for the module.  Undefined if unsuccessful.
 // @return : Success if the data was read.  The appropriate error otherwise.
 Result ShaderModuleHelper::getExtendedModuleData(const BinaryData &moduleBinary, bool trimDebugInfo,
-                                                 llvm::SmallVector<uint8_t> &trimmedCode,
+                                                 llvm::MutableArrayRef<unsigned> codeBuffer,
                                                  Vkgc::ShaderModuleData &moduleData) {
   moduleData.binType = ShaderModuleHelper::getShaderBinaryType(moduleBinary);
   if (moduleData.binType == BinaryType::Unknown)
@@ -397,13 +393,13 @@ Result ShaderModuleHelper::getExtendedModuleData(const BinaryData &moduleBinary,
     moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&moduleBinary);
 
     if (trimDebugInfo) {
-      trimmedCode.resize(moduleBinary.codeSize);
-      moduleData.binCode.pCode = trimmedCode.data();
-      moduleData.binCode.codeSize =
-          ShaderModuleHelper::trimSpirvDebugInfo(&moduleBinary, trimmedCode.size(), trimmedCode.data());
+      moduleData.binCode.codeSize = ShaderModuleHelper::trimSpirvDebugInfo(&moduleBinary, codeBuffer);
     } else {
-      moduleData.binCode = moduleBinary;
+      assert(moduleBinary.codeSize <= codeBuffer.size() * sizeof(codeBuffer.front()));
+      memcpy(codeBuffer.data(), moduleBinary.pCode, moduleBinary.codeSize);
+      moduleData.binCode.codeSize = moduleBinary.codeSize;
     }
+    moduleData.binCode.pCode = codeBuffer.data();
 
     // Calculate SPIR-V cache hash
     Hash cacheHash = {};

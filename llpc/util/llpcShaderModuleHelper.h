@@ -31,7 +31,7 @@
 
 #pragma once
 #include "llpc.h"
-#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/ArrayRef.h>
 #include <vector>
 
 namespace Llpc {
@@ -56,7 +56,7 @@ class ShaderModuleHelper {
 public:
   static ShaderModuleUsage getShaderModuleUsageInfo(const BinaryData *spvBinCode);
 
-  static unsigned trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin);
+  static unsigned trimSpirvDebugInfo(const BinaryData *spvBin, llvm::MutableArrayRef<unsigned> codeBuffer);
 
   static Result optimizeSpirv(const BinaryData *spirvBinIn, BinaryData *spirvBinOut);
 
@@ -69,7 +69,7 @@ public:
   static bool isLlvmBitcode(const BinaryData *shaderBin);
   static BinaryType getShaderBinaryType(BinaryData shaderBinary);
   static Result getExtendedModuleData(const BinaryData &moduleBinary, bool trimDebugInfo,
-                                      llvm::SmallVector<uint8_t> &trimmedCode, Vkgc::ShaderModuleData &moduleData);
+                                      llvm::MutableArrayRef<unsigned> codeBuffer, Vkgc::ShaderModuleData &moduleData);
 };
 
 } // namespace Llpc

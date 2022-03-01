@@ -527,53 +527,36 @@ void Compiler::Destroy() {
 // @param shaderInfo : Info to build this shader module
 // @param [out] shaderOut : Output of building this shader module
 Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) {
+  MetroHash::Hash hash = {};
+  MetroHash64::Hash(reinterpret_cast<const uint8_t *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize,
+                    hash.bytes);
+  TimerProfiler timerProfiler(MetroHash::compact64(&hash), "LLPC ShaderModule",
+                              TimerProfiler::ShaderModuleTimerEnableMask);
+
   if (!shaderInfo->pfnOutputAlloc) {
     // Allocator is not specified
     return Result::ErrorInvalidPointer;
   }
 
-  unsigned codeSize = (cl::TrimDebugInfo ? ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, 0, nullptr)
+  unsigned codeSize = (cl::TrimDebugInfo ? ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, {})
                                          : shaderInfo->shaderBin.codeSize);
   size_t allocSize = sizeof(ShaderModuleData) + codeSize;
-  void *allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
+  unsigned *allocBuf =
+      static_cast<unsigned *>(shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize));
   if (!allocBuf)
     return Result::ErrorOutOfMemory;
 
-  ShaderModuleData moduleDataEx = {};
+  ShaderModuleData *moduleData = reinterpret_cast<ShaderModuleData *>(allocBuf);
+  *moduleData = {};
+  MutableArrayRef<unsigned> codeBuffer(allocBuf + sizeof(ShaderModuleData) / sizeof(*allocBuf),
+                                       codeSize / sizeof(*allocBuf));
 
-  // A buffer for holding the Spir-v binary after the debug code has been removed.
-  SmallVector<uint8_t> trimmedCode;
+  memcpy(moduleData->hash, &hash, sizeof(hash));
+  ShaderModuleHelper::getExtendedModuleData(shaderInfo->shaderBin, cl::TrimDebugInfo, codeBuffer, *moduleData);
+  shaderOut->pModuleData = moduleData;
 
-  // Calculate the hash code of input data
-  MetroHash::Hash hash = {};
-  MetroHash64::Hash(reinterpret_cast<const uint8_t *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize,
-                    hash.bytes);
-
-  memcpy(moduleDataEx.hash, &hash, sizeof(hash));
-
-  TimerProfiler timerProfiler(MetroHash::compact64(&hash), "LLPC ShaderModule",
-                              TimerProfiler::ShaderModuleTimerEnableMask);
-
-  ShaderModuleHelper::getExtendedModuleData(shaderInfo->shaderBin, cl::TrimDebugInfo, trimmedCode, moduleDataEx);
-
-  if (moduleDataEx.binType == BinaryType::Spirv) {
-    if (cl::EnablePipelineDump) {
-      PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
-    }
-  }
-
-  // Memory layout of pAllocBuf: ShaderModuleData | binCode
-  ShaderModuleData *moduleDataExCopy = reinterpret_cast<ShaderModuleData *>(allocBuf);
-  memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
-  moduleDataExCopy->binCode.pCode = nullptr;
-  size_t codeOffset = sizeof(ShaderModuleData);
-  void *code = voidPtrInc(allocBuf, codeOffset);
-
-  // Copy entry info
-  moduleDataExCopy->binCode.pCode = code;
-  memcpy(code, moduleDataEx.binCode.pCode,
-         moduleDataEx.binCode.codeSize); // Copy fragment shader output variables
-  shaderOut->pModuleData = moduleDataExCopy;
+  if (moduleData->binType == BinaryType::Spirv && cl::EnablePipelineDump)
+    PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
 
   return Result::Success;
 }
