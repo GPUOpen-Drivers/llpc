@@ -149,9 +149,6 @@ opt<bool> CacheFullPipelines("cache-full-pipelines", desc("Add full pipelines to
 static opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
                                        init("amdllpc"));
 
-// -trim-debug-info: Trim debug information in SPIR-V binary
-opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(true));
-
 // -enable-per-stage-cache: Enable shader cache per shader stage
 opt<bool> EnablePerStageCache("enable-per-stage-cache", cl::desc("Enable shader cache per shader stage"), init(true));
 
@@ -538,8 +535,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     return Result::ErrorInvalidPointer;
   }
 
-  unsigned codeSize = (cl::TrimDebugInfo ? ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, {})
-                                         : shaderInfo->shaderBin.codeSize);
+  unsigned codeSize = ShaderModuleHelper::getCodeSize(shaderInfo->shaderBin);
   size_t allocSize = sizeof(ShaderModuleData) + codeSize;
   unsigned *allocBuf =
       static_cast<unsigned *>(shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize));
@@ -552,7 +548,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
                                        codeSize / sizeof(*allocBuf));
 
   memcpy(moduleData->hash, &hash, sizeof(hash));
-  ShaderModuleHelper::getExtendedModuleData(shaderInfo->shaderBin, cl::TrimDebugInfo, codeBuffer, *moduleData);
+  ShaderModuleHelper::getModuleData(shaderInfo->shaderBin, codeBuffer, *moduleData);
   shaderOut->pModuleData = moduleData;
 
   if (moduleData->binType == BinaryType::Spirv && cl::EnablePipelineDump)
