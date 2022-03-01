@@ -71,6 +71,7 @@ public:
   static Result getModuleData(const BinaryData &shaderBinary, llvm::MutableArrayRef<unsigned> codeBuffer,
                               Vkgc::ShaderModuleData &moduleData);
   static unsigned getCodeSize(const BinaryData &shaderBin);
+  static BinaryData getShaderCode(const BinaryData &shaderBinary, llvm::MutableArrayRef<unsigned int> &codeBuffer);
 };
 
 } // namespace Llpc

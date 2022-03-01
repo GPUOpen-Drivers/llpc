@@ -398,27 +398,41 @@ Result ShaderModuleHelper::getModuleData(const BinaryData &shaderBinary, llvm::M
 
   if (moduleData.binType == BinaryType::Spirv) {
     moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderBinary);
-
-    if (cl::TrimDebugInfo) {
-      moduleData.binCode.codeSize = ShaderModuleHelper::trimSpirvDebugInfo(&shaderBinary, codeBuffer);
-    } else {
-      assert(shaderBinary.codeSize <= codeBuffer.size() * sizeof(codeBuffer.front()));
-      memcpy(codeBuffer.data(), shaderBinary.pCode, shaderBinary.codeSize);
-      moduleData.binCode.codeSize = shaderBinary.codeSize;
-    }
-    moduleData.binCode.pCode = codeBuffer.data();
+    moduleData.binCode = getShaderCode(shaderBinary, codeBuffer);
 
     // Calculate SPIR-V cache hash
     Hash cacheHash = {};
     MetroHash64::Hash(reinterpret_cast<const uint8_t *>(moduleData.binCode.pCode), moduleData.binCode.codeSize,
                       cacheHash.bytes);
-    static_assert(sizeof(moduleData.cacheHash) == sizeof(cacheHash), "Unexpected value!");
+    static_assert(sizeof(moduleData.cacheHash) == sizeof(cacheHash),
+                  "Expecting the cacheHash entry in the module data to be the same size as the MetroHash hash!");
     memcpy(moduleData.cacheHash, cacheHash.dwords, sizeof(cacheHash));
   } else {
     moduleData.binCode = shaderBinary;
   }
 
   return Result::Success;
+}
+
+// =====================================================================================================================
+// Copies the shader code that should go into the module data into the codeBuffer and returns the BinaryData for it.
+// The debug info will be removed if cl::TrimDebugInfo is set.
+//
+// @param shaderBinary : Shader binary code
+// @param codeBuffer [out] : A buffer to hold the shader code.
+// @return : The BinaryData for the shaderCode written to codeBuffer.
+BinaryData ShaderModuleHelper::getShaderCode(const BinaryData &shaderBinary,
+                                             MutableArrayRef<unsigned int> &codeBuffer) {
+  BinaryData code;
+  if (cl::TrimDebugInfo) {
+    code.codeSize = trimSpirvDebugInfo(&shaderBinary, codeBuffer);
+  } else {
+    assert(shaderBinary.codeSize <= codeBuffer.size() * sizeof(codeBuffer.front()));
+    memcpy(codeBuffer.data(), shaderBinary.pCode, shaderBinary.codeSize);
+    code.codeSize = shaderBinary.codeSize;
+  }
+  code.pCode = codeBuffer.data();
+  return code;
 }
 
 // =====================================================================================================================
