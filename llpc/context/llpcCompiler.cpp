@@ -527,8 +527,18 @@ void Compiler::Destroy() {
 // @param shaderInfo : Info to build this shader module
 // @param [out] shaderOut : Output of building this shader module
 Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) {
-  void *allocBuf = nullptr;
-  size_t allocSize = 0;
+  if (!shaderInfo->pfnOutputAlloc) {
+    // Allocator is not specified
+    return Result::ErrorInvalidPointer;
+  }
+
+  unsigned codeSize = (cl::TrimDebugInfo ? ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, 0, nullptr)
+                                         : shaderInfo->shaderBin.codeSize);
+  size_t allocSize = sizeof(ShaderModuleData) + codeSize;
+  void *allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
+  if (!allocBuf)
+    return Result::ErrorOutOfMemory;
+
   ShaderModuleData moduleDataEx = {};
 
   // A buffer for holding the Spir-v binary after the debug code has been removed.
@@ -552,20 +562,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     }
   }
 
-  // Allocate memory and copy output data
-  if (shaderInfo->pfnOutputAlloc) {
-    allocSize = sizeof(ShaderModuleData) + moduleDataEx.binCode.codeSize;
-    allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
-
-    if (!allocBuf)
-      return Result::ErrorOutOfMemory;
-  } else {
-    // Allocator is not specified
-    return Result::ErrorInvalidPointer;
-  }
-
-  // Memory layout of pAllocBuf: ShaderModuleData | ShaderModuleEntryData | ShaderModuleEntry | binCode
-  //                             | Resource nodes | FsOutInfo
+  // Memory layout of pAllocBuf: ShaderModuleData | binCode
   ShaderModuleData *moduleDataExCopy = reinterpret_cast<ShaderModuleData *>(allocBuf);
   memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
   moduleDataExCopy->binCode.pCode = nullptr;

@@ -146,26 +146,33 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
 }
 
 // =====================================================================================================================
-// Removes all debug instructions for SPIR-V binary.
+// Returns the number of bytes in the spir-v binary if the debug instructions are removed.  If trimSpvBin is not null,
+// then the spir-v binary without the debug options will be written to trimSpvBin.  The input bufferSize is the size in
+// bytes of the memory trimSpvBin.  It is assumed that bufferSize is large enough to hold the trimmed spir-v binary.
 //
 // @param spvBin : SPIR-V binary code
 // @param bufferSize : Output buffer size in bytes
 // @param [out] trimSpvBin : Trimmed SPIR-V binary code
 // @returns : The number of bytes written to trimSpvBin
 unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsigned bufferSize, void *trimSpvBin) {
-  assert(bufferSize > sizeof(SpirvHeader));
+  assert(!trimSpvBin || bufferSize > sizeof(SpirvHeader));
 
+  constexpr unsigned wordSize = sizeof(unsigned);
   const unsigned *code = reinterpret_cast<const unsigned *>(spvBin->pCode);
-  const unsigned *end = code + spvBin->codeSize / sizeof(unsigned);
-  const unsigned *codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
+  const unsigned *end = code + spvBin->codeSize / wordSize;
+  const unsigned *codePos = code + sizeof(SpirvHeader) / wordSize;
 
-  unsigned *trimStart = reinterpret_cast<unsigned *>(trimSpvBin);
+  unsigned totalSizeInWords = sizeof(Vkgc::SpirvHeader) / wordSize;
+  static_assert(sizeof(Vkgc::SpirvHeader) % wordSize == 0);
+
   unsigned *trimEnd = reinterpret_cast<unsigned *>(voidPtrInc(trimSpvBin, bufferSize));
   (void(trimEnd)); // unused
   unsigned *trimCodePos = reinterpret_cast<unsigned *>(voidPtrInc(trimSpvBin, sizeof(SpirvHeader)));
 
   // Copy SPIR-V header
-  memcpy(trimSpvBin, code, sizeof(SpirvHeader));
+  if (trimSpvBin) {
+    memcpy(trimSpvBin, code, sizeof(SpirvHeader));
+  }
 
   // Copy SPIR-V instructions
   while (codePos < end) {
@@ -186,10 +193,13 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsign
     }
     default: {
       // Copy other instructions
-      assert(codePos + wordCount <= end);
-      assert(trimCodePos + wordCount <= trimEnd);
-      memcpy(trimCodePos, codePos, wordCount * sizeof(unsigned));
-      trimCodePos += wordCount;
+      if (trimSpvBin) {
+        assert(codePos + wordCount <= end);
+        assert(trimCodePos + wordCount <= trimEnd);
+        memcpy(trimCodePos, codePos, wordCount * wordSize);
+        trimCodePos += wordCount;
+      }
+      totalSizeInWords += wordCount;
       break;
     }
     }
@@ -197,8 +207,8 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, unsign
     codePos += wordCount;
   }
 
-  assert(trimCodePos <= trimEnd);
-  return (trimCodePos - trimStart) * sizeof(*trimStart);
+  assert(!trimSpvBin || trimCodePos <= trimEnd);
+  return totalSizeInWords * wordSize;
 }
 
 // =====================================================================================================================
