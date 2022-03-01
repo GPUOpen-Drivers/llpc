@@ -173,7 +173,9 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, llvm::
   const unsigned *codePos = code + sizeof(SpirvHeader) / wordSize;
 
   unsigned totalSizeInWords = sizeof(Vkgc::SpirvHeader) / wordSize;
-  static_assert(sizeof(Vkgc::SpirvHeader) % wordSize == 0);
+  static_assert(sizeof(Vkgc::SpirvHeader) % wordSize == 0,
+                "The size of the spir-v header must be a multiple of the word size, otherwise later calculations will "
+                "be incorrect.");
 
   // Copy SPIR-V header
   if (writeCode) {
