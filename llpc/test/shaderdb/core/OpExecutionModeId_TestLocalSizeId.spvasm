@@ -1,0 +1,101 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
+; The workgroup sizes will be set to the values in the LocalSizeId instruction.  In this case,
+; we should use the default values for the spec constants %7, %8, and %9.
+; SHADERTEST: COMPUTE_NUM_THREAD_X 0x0000000000000002
+; SHADERTEST: COMPUTE_NUM_THREAD_Y 0x0000000000000008
+; SHADERTEST: COMPUTE_NUM_THREAD_Z 0x0000000000000020
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+
+; SPIR-V
+; Version: 1.4
+; Generator: Khronos Glslang Reference Front End; 10
+; Bound: 57
+; Schema: 0
+OpCapability Shader
+OpCapability GroupNonUniform
+%1 = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %4 "main" %14 %29 %43 %50
+OpExecutionModeId %4 LocalSizeId %7 %8 %9
+OpDecorate %7 SpecId 0
+OpDecorate %8 SpecId 1
+OpDecorate %9 SpecId 2
+OpDecorate %14 BuiltIn NumWorkgroups
+OpDecorate %16 SpecId 0
+OpDecorate %17 SpecId 1
+OpDecorate %18 SpecId 2
+OpDecorate %29 BuiltIn GlobalInvocationId
+OpDecorate %43 RelaxedPrecision
+OpDecorate %43 BuiltIn SubgroupSize
+OpDecorate %44 RelaxedPrecision
+OpDecorate %47 ArrayStride 4
+OpMemberDecorate %48 0 Offset 0
+OpDecorate %48 Block
+OpDecorate %50 DescriptorSet 0
+OpDecorate %50 Binding 0
+%2 = OpTypeVoid
+%3 = OpTypeFunction %2
+%6 = OpTypeInt 32 0
+%7 = OpSpecConstant %6 2
+%8 = OpSpecConstant %6 8
+%9 = OpSpecConstant %6 32
+%10 = OpTypeVector %6 3
+%11 = OpTypePointer Function %10
+%13 = OpTypePointer Input %10
+%14 = OpVariable %13 Input
+%16 = OpSpecConstant %6 1
+%17 = OpSpecConstant %6 1
+%18 = OpSpecConstant %6 1
+%19 = OpSpecConstantComposite %10 %16 %17 %18
+%21 = OpTypePointer Function %6
+%23 = OpConstant %6 0
+%26 = OpConstant %6 1
+%29 = OpVariable %13 Input
+%30 = OpConstant %6 2
+%31 = OpTypePointer Input %6
+%43 = OpVariable %31 Input
+%47 = OpTypeRuntimeArray %6
+%48 = OpTypeStruct %47
+%49 = OpTypePointer StorageBuffer %48
+%50 = OpVariable %49 StorageBuffer
+%51 = OpTypeInt 32 1
+%52 = OpConstant %51 0
+%55 = OpTypePointer StorageBuffer %6
+%4 = OpFunction %2 None %3
+%5 = OpLabel
+%12 = OpVariable %11 Function
+%22 = OpVariable %21 Function
+%42 = OpVariable %21 Function
+%45 = OpVariable %21 Function
+%15 = OpLoad %10 %14
+%20 = OpIMul %10 %15 %19
+OpStore %12 %20
+%24 = OpAccessChain %21 %12 %23
+%25 = OpLoad %6 %24
+%27 = OpAccessChain %21 %12 %26
+%28 = OpLoad %6 %27
+%32 = OpAccessChain %31 %29 %30
+%33 = OpLoad %6 %32
+%34 = OpIMul %6 %28 %33
+%35 = OpAccessChain %31 %29 %26
+%36 = OpLoad %6 %35
+%37 = OpIAdd %6 %34 %36
+%38 = OpIMul %6 %25 %37
+%39 = OpAccessChain %31 %29 %23
+%40 = OpLoad %6 %39
+%41 = OpIAdd %6 %38 %40
+OpStore %22 %41
+%44 = OpLoad %6 %43
+OpStore %42 %44
+%46 = OpLoad %6 %42
+OpStore %45 %46
+%53 = OpLoad %6 %22
+%54 = OpLoad %6 %45
+%56 = OpAccessChain %55 %50 %52 %53
+OpStore %56 %54
+OpReturn
+OpFunctionEnd

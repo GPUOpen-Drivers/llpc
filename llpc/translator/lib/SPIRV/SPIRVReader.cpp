@@ -6883,6 +6883,14 @@ bool SPIRVToLLVM::transMetadata() {
           execModeMd.cs.LocalSizeX = em->getLiterals()[0];
           execModeMd.cs.LocalSizeY = em->getLiterals()[1];
           execModeMd.cs.LocalSizeZ = em->getLiterals()[2];
+        } else if (em = bf->getExecutionMode(ExecutionModeLocalSizeId)) {
+          auto workGroupSizeX = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[0]));
+          auto workGroupSizeY = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[1]));
+          auto workGroupSizeZ = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[2]));
+
+          execModeMd.cs.LocalSizeX = workGroupSizeX->getZExtIntValue();
+          execModeMd.cs.LocalSizeY = workGroupSizeY->getZExtIntValue();
+          execModeMd.cs.LocalSizeZ = workGroupSizeZ->getZExtIntValue();
         }
 
         // Traverse the constant list to find gl_WorkGroupSize and use the

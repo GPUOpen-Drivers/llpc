@@ -495,11 +495,7 @@ void SPIRVModuleImpl::postProcessExecutionModeId() {
     SPIRVExecutionMode *execMode = nullptr;
     switch (M) {
     case ExecutionModeLocalSizeId: {
-      auto workGroupSizeX = static_cast<SPIRVConstant *>(getEntry(ops[0]));
-      auto workGroupSizeY = static_cast<SPIRVConstant *>(getEntry(ops[1]));
-      auto workGroupSizeZ = static_cast<SPIRVConstant *>(getEntry(ops[2]));
-      execMode = add(new SPIRVExecutionMode(getEntry(tid), ExecutionModeLocalSize, workGroupSizeX->getZExtIntValue(),
-                                            workGroupSizeY->getZExtIntValue(), workGroupSizeZ->getZExtIntValue()));
+      execMode = add(new SPIRVExecutionMode(getEntry(tid), ExecutionModeLocalSizeId, ops[0], ops[1], ops[2]));
       break;
     }
     default:
