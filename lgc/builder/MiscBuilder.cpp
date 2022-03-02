@@ -117,6 +117,22 @@ Value *MiscBuilder::CreateIsHelperInvocation(const Twine &instName) {
 }
 
 // =====================================================================================================================
+// In the task shader, emit the current values of all per-task output variables to the current task output by
+// specifying the group count XYZ of the launched child mesh tasks.
+//
+// @param groupCountX : X dimension of the launched child mesh tasks
+// @param groupCountY : Y dimension of the launched child mesh tasks
+// @param groupCountZ : Z dimension of the launched child mesh tasks
+// @param instName : Name to give final instruction
+// @returns Instruction to emit mesh tasks
+Instruction *MiscBuilder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
+                                              const llvm::Twine &instName) {
+  assert(m_shaderStage == ShaderStageTask); // Only valid for task shader
+  return emitCall(lgcName::MeshTaskEmitMeshTasks, getVoidTy(), {groupCountX, groupCountY, groupCountZ}, {},
+                  &*GetInsertPoint());
+}
+
+// =====================================================================================================================
 // Create a "readclock".
 //
 // @param realtime : Whether to read real-time clock counter

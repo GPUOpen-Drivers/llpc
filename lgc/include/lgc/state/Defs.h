@@ -67,6 +67,10 @@ const static char TfBufferStore[] = "lgc.tfbuffer.store.";
 const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 
+const static char MeshTaskReadTaskPayload[] = "lgc.mesh.task.read.task.payload";
+const static char MeshTaskWriteTaskPayload[] = "lgc.mesh.task.write.task.payload";
+const static char MeshTaskEmitMeshTasks[] = "lgc.mesh.task.emit.mesh.tasks";
+
 // Get pointer to spill table (as pointer to i8)
 const static char SpillTable[] = "lgc.spill.table";
 // Get pointer to push constant (as pointer type indicated by the return type)

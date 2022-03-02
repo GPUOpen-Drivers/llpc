@@ -686,6 +686,16 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
                                                isa<UndefValue>(args[4]) ? nullptr : &*args[4]); // Index
   }
 
+  case BuilderRecorder::Opcode::ReadTaskPayload: {
+    return m_builder->CreateReadTaskPayload(call->getType(), // Result type
+                                            args[0]);        // Byte offset within the payload structure
+  }
+
+  case BuilderRecorder::Opcode::WriteTaskPayload: {
+    return m_builder->CreateWriteTaskPayload(args[0],  // Value to write
+                                             args[1]); // Byte offset within the payload structure
+  }
+
   // Replayer implementations of MiscBuilder methods
   case BuilderRecorder::Opcode::EmitVertex: {
     return m_builder->CreateEmitVertex(cast<ConstantInt>(args[0])->getZExtValue());
@@ -711,6 +721,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderRecorder::Opcode::IsHelperInvocation: {
     return m_builder->CreateIsHelperInvocation();
+  }
+  case BuilderRecorder::Opcode::EmitMeshTasks: {
+    return m_builder->CreateEmitMeshTasks(args[0], args[1], args[2]);
   }
   case BuilderRecorder::Opcode::TransposeMatrix: {
     return m_builder->CreateTransposeMatrix(args[0]);

@@ -915,8 +915,8 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
   if (Value *result = readCommonBuiltIn(builtIn, resultTy, instName))
     return result;
 
-  if (m_shaderStage == ShaderStageCompute && !isOutput) {
-    // We handle compute shader inputs directly.
+  if ((m_shaderStage == ShaderStageCompute || m_shaderStage == ShaderStageTask) && !isOutput) {
+    // We handle compute shader or task shader inputs directly.
     return readCsBuiltIn(builtIn, instName);
   }
 
@@ -1228,6 +1228,37 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
   callName += PipelineState::getBuiltInName(builtIn);
   addTypeMangling(nullptr, args, callName);
   return cast<Instruction>(emitCall(callName, getVoidTy(), args, {}, &*GetInsertPoint()));
+}
+
+// =====================================================================================================================
+// Create a read from (part of) a task payload.
+// The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
+//
+// @param resultTy : Type of value to read
+// @param byteOffset : Byte offset within the payload structure
+// @param instName : Name to give instruction(s)
+// @returns Value read from the task payload
+Value *InOutBuilder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset, const Twine &instName) {
+  assert(m_shaderStage == ShaderStageTask || m_shaderStage == ShaderStageMesh); // Only valid for task/mesh shader
+
+  std::string callName = lgcName::MeshTaskReadTaskPayload;
+  addTypeMangling(resultTy, byteOffset, callName);
+  return emitCall(callName, resultTy, byteOffset, {}, &*GetInsertPoint());
+}
+
+// =====================================================================================================================
+// Create a write to (part of) a task payload.
+//
+// @param valueToWrite : Value to write
+// @param byteOffset : Byte offset within the payload structure
+// @param instName : Name to give instruction(s)
+// @returns Instruction to write value to task payload
+Instruction *InOutBuilder::CreateWriteTaskPayload(Value *valueToWrite, Value *byteOffset, const Twine &instName) {
+  assert(m_shaderStage == ShaderStageTask); // Only valid for task shader
+
+  std::string callName = lgcName::MeshTaskWriteTaskPayload;
+  addTypeMangling(nullptr, {byteOffset, valueToWrite}, callName);
+  return emitCall(callName, getVoidTy(), {byteOffset, valueToWrite}, {}, &*GetInsertPoint());
 }
 
 // =====================================================================================================================
