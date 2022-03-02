@@ -174,6 +174,10 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "read.builtin.output";
   case Opcode::WriteBuiltInOutput:
     return "write.builtin.output";
+  case Opcode::ReadTaskPayload:
+    return "read.task.payload";
+  case Opcode::WriteTaskPayload:
+    return "write.task.payload";
   case Opcode::TransposeMatrix:
     return "transpose.matrix";
   case Opcode::MatrixTimesScalar:
@@ -218,6 +222,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "demote.to.helper.invocation";
   case Opcode::IsHelperInvocation:
     return "is.helper.invocation";
+  case Opcode::EmitMeshTasks:
+    return "emit.mesh.tasks";
   case Opcode::ImageLoad:
     return "image.load";
   case Opcode::ImageLoadWithFmask:
@@ -899,6 +905,20 @@ Value *BuilderRecorder::CreateIsHelperInvocation(const Twine &instName) {
 }
 
 // =====================================================================================================================
+// In the task shader, emit the current values of all per-task output variables to the current task output by
+// specifying the group count XYZ of the launched child mesh tasks.
+//
+// @param groupCountX : X dimension of the launched child mesh tasks
+// @param groupCountY : Y dimension of the launched child mesh tasks
+// @param groupCountZ : Z dimension of the launched child mesh tasks
+// @param instName : Name to give final instruction
+// @returns Instruction to emit mesh tasks
+Instruction *BuilderRecorder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
+                                                  const llvm::Twine &instName) {
+  return record(Opcode::EmitMeshTasks, nullptr, {groupCountX, groupCountY, groupCountZ}, instName);
+}
+
+// =====================================================================================================================
 // Create "fclamp" operation.
 //
 // @param x : Value to clamp
@@ -1572,6 +1592,29 @@ Instruction *BuilderRecorder::CreateWriteBuiltInOutput(Value *valueToWrite, Buil
 }
 
 // =====================================================================================================================
+// Create a read from (part of) a task payload.
+// The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
+//
+// @param resultTy : Type of value to read
+// @param byteOffset : Byte offset within the payload structure
+// @param instName : Name to give instruction(s)
+// @returns Value read from the task payload
+Value *BuilderRecorder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset, const Twine &instName) {
+  return record(Opcode::ReadTaskPayload, resultTy, byteOffset, instName);
+}
+
+// =====================================================================================================================
+// Create a write to (part of) a task payload.
+//
+// @param valueToWrite : Value to write
+// @param byteOffset : Byte offset within the payload structure
+// @param instName : Name to give instruction(s)
+// @returns Instruction to write value to task payload
+Instruction *BuilderRecorder::CreateWriteTaskPayload(Value *valueToWrite, Value *byteOffset, const Twine &instName) {
+  return record(Opcode::WriteTaskPayload, nullptr, {valueToWrite, byteOffset}, instName);
+}
+
+// =====================================================================================================================
 // Create a get wave size query.
 //
 // @param instName : Name to give instruction(s)
@@ -2113,6 +2156,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ReadGenericInput:
     case Opcode::ReadGenericOutput:
     case Opcode::ReadPerVertexInput:
+    case Opcode::ReadTaskPayload:
       // Functions that only read memory.
       func->addFnAttr(Attribute::ReadOnly);
       // Must be marked as returning for DCE.
@@ -2125,6 +2169,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ImageAtomic:
     case Opcode::ImageAtomicCompareSwap:
     case Opcode::WriteXfbOutput:
+    case Opcode::WriteTaskPayload:
       // Functions that read and write memory.
       break;
     case Opcode::SubgroupAll:
@@ -2164,6 +2209,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ImageQuerySamples:
     case Opcode::ImageQuerySize:
     case Opcode::IsHelperInvocation:
+    case Opcode::EmitMeshTasks:
     case Opcode::Kill:
     case Opcode::ReadClock:
     case Opcode::WriteBuiltInOutput:

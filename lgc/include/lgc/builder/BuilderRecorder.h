@@ -162,6 +162,8 @@ public:
     ReadBuiltInInput,
     ReadBuiltInOutput,
     WriteBuiltInOutput,
+    ReadTaskPayload,
+    WriteTaskPayload,
 
     // Matrix
     TransposeMatrix,
@@ -190,6 +192,7 @@ public:
     Derivative,
     DemoteToHelperInvocation,
     IsHelperInvocation,
+    EmitMeshTasks,
     GetWaveSize,
 
     // Subgroup
@@ -476,6 +479,14 @@ public:
                                         llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
                                         llvm::Value *vertexIndex, const llvm::Twine &instName = "") override final;
 
+  // Create a read of (part of) a task payload.
+  llvm::Value *CreateReadTaskPayload(llvm::Type *resultTy, llvm::Value *byteOffset,
+                                     const llvm::Twine &instName = "") override final;
+
+  // Create a write of (part of) a task payload.
+  llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset,
+                                            const llvm::Twine &instName = "") override final;
+
   // -----------------------------------------------------------------------------------------------------------------
   // Miscellaneous operations
 
@@ -493,6 +504,8 @@ public:
   llvm::Instruction *CreateReadClock(bool realtime, const llvm::Twine &instName = "") override final;
   llvm::Instruction *CreateDemoteToHelperInvocation(const llvm::Twine &instName) override final;
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName) override final;
+  llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, llvm::Value *groupCountZ,
+                                         const llvm::Twine &instName) override final;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Builder methods implemented in MatrixBuilder

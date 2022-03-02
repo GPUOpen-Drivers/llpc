@@ -98,6 +98,9 @@ public:
   unsigned getArraySize() const { return m_data.bits.arraySize; }
   void setArraySize(unsigned arraySize) { m_data.bits.arraySize = arraySize; }
 
+  bool isPerPrimitive() const { return m_data.bits.perPrimitive; }
+  void setPerPrimitive(bool perPrimitive = true) { m_data.bits.perPrimitive = perPrimitive; }
+
 private:
   union {
     struct {
@@ -111,6 +114,7 @@ private:
       unsigned arraySize : 4;    // Built-in array input: shader-defined array size. Must be set for
                                  //    a read or write of ClipDistance or CullDistance that is of the
                                  //    whole array or of an element with a variable index.
+      unsigned perPrimitive : 1; // Mesh shader output: whether it is a per-primitive output
     } bits;
     unsigned u32All;
   } m_data;
@@ -1228,6 +1232,25 @@ public:
                                                       InOutInfo outputInfo, llvm::Value *vertexIndex,
                                                       llvm::Value *index) = 0;
 
+  // Create a read of (part of) a task payload.
+  // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
+  //
+  // @param resultTy : Type of value to read
+  // @param byteOffset : Byte offset within the payload structure
+  // @param instName : Name to give instruction(s)
+  // @returns Value read from the task payload
+  virtual llvm::Value *CreateReadTaskPayload(llvm::Type *resultTy, llvm::Value *byteOffset, // NOLINT
+                                             const llvm::Twine &instName = "") = 0;
+
+  // Create a write of (part of) a task payload.
+  //
+  // @param valueToWrite : Value to write
+  // @param byteOffset : Byte offset within the payload structure
+  // @param instName : Name to give instruction(s)
+  // @returns Instruction to write value to task payload
+  virtual llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset, // NOLINT
+                                                    const llvm::Twine &instName = "") = 0;
+
   // -----------------------------------------------------------------------------------------------------------------
   // Matrix operations
 
@@ -1396,6 +1419,17 @@ public:
   //
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName = "") = 0;
+
+  // In the task shader, emit the current values of all per-task output variables to the current task output by
+  // specifying the group count XYZ of the launched child mesh tasks.
+  //
+  // @param groupCountX : X dimension of the launched child mesh tasks
+  // @param groupCountY : Y dimension of the launched child mesh tasks
+  // @param groupCountZ : Z dimension of the launched child mesh tasks
+  // @param instName : Name to give final instruction
+  // @returns Instruction to emit mesh tasks
+  virtual llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, // NOLINT
+                                                 llvm::Value *groupCountZ, const llvm::Twine &instName = "") = 0;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Subgroup operations

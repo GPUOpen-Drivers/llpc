@@ -513,6 +513,14 @@ public:
   llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
                                               llvm::Value *vertexIndex, llvm::Value *index) override final;
 
+  // Create a read from (part of) a task payload.
+  llvm::Value *CreateReadTaskPayload(llvm::Type *resultTy, llvm::Value *byteOffset,
+                                     const llvm::Twine &instName = "") override final;
+
+  // Create a write to (part of) a task payload.
+  llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset,
+                                            const llvm::Twine &instName = "") override final;
+
 private:
   InOutBuilder() = delete;
   InOutBuilder(const InOutBuilder &) = delete;
@@ -691,6 +699,11 @@ public:
 
   // Create a helper invocation query. Only allowed in a fragment shader.
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName) override final;
+
+  // In the task shader, emit the current values of all per-task output variables to the current task output by
+  // specifying the group count XYZ of the launched child mesh tasks.
+  llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, llvm::Value *groupCountZ,
+                                         const llvm::Twine &instName) override final;
 
 private:
   MiscBuilder() = delete;
