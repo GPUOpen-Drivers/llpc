@@ -34,6 +34,7 @@
 #include "lgc/util/Internal.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Pass.h"
 
