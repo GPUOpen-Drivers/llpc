@@ -31,6 +31,7 @@
 #pragma once
 
 #include "lgc/patch/Patch.h"
+#include "llvm/IR/PassManager.h"
 
 namespace lgc {
 
