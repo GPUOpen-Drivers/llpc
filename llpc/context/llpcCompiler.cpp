@@ -149,9 +149,6 @@ opt<bool> CacheFullPipelines("cache-full-pipelines", desc("Add full pipelines to
 static opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
                                        init("amdllpc"));
 
-// -trim-debug-info: Trim debug information in SPIR-V binary
-opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(true));
-
 // -enable-per-stage-cache: Enable shader cache per shader stage
 opt<bool> EnablePerStageCache("enable-per-stage-cache", cl::desc("Enable shader cache per shader stage"), init(true));
 
@@ -411,8 +408,7 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(VkFormat format) {
 // @param cache : Pointer to ICache implemented in client
 Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash,
                    ICache *cache)
-    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0)
-{
+    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0) {
   for (unsigned i = 0; i < optionCount; ++i)
     m_options.push_back(options[i]);
 
@@ -528,193 +524,37 @@ void Compiler::Destroy() {
 // @param shaderInfo : Info to build this shader module
 // @param [out] shaderOut : Output of building this shader module
 Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut) {
-  Result result = Result::Success;
-  void *allocBuf = nullptr;
-  uint8_t *allocData = nullptr;
-  size_t allocSize = 0;
-  ShaderModuleDataEx moduleDataEx = {};
-  // For trimming debug info
-  uint8_t *trimmedCode = nullptr;
-
-  ElfPackage moduleBinary;
-  raw_svector_ostream moduleBinaryStream(moduleBinary);
-  std::vector<ShaderEntryName> entryNames;
-  SmallVector<ShaderModuleEntryData, 4> moduleEntryDatas;
-  SmallVector<ShaderModuleEntry, 4> moduleEntries;
-  SmallVector<FsOutInfo, 4> fsOutInfos;
-  std::map<unsigned, std::vector<ResourceNodeData>> entryResourceNodeDatas; // Map entry ID and resourceNodeData
-
-  ShaderEntryState cacheEntryState = ShaderEntryState::New;
-  CacheEntryHandle hEntry = nullptr;
-  Result cacheResult = Result::Unsupported;
-  EntryHandle cacheEntry;
-  bool allocateOnMiss = true;
-
-  // Calculate the hash code of input data
   MetroHash::Hash hash = {};
   MetroHash64::Hash(reinterpret_cast<const uint8_t *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize,
                     hash.bytes);
-
-  memcpy(moduleDataEx.common.hash, &hash, sizeof(hash));
-
   TimerProfiler timerProfiler(MetroHash::compact64(&hash), "LLPC ShaderModule",
                               TimerProfiler::ShaderModuleTimerEnableMask);
 
-  bool trimDebugInfo = cl::TrimDebugInfo
-      ;
-
-  // Check the type of input shader binary
-  if (Vkgc::isSpirvBinary(&shaderInfo->shaderBin)) {
-    unsigned debugInfoSize = 0;
-
-    moduleDataEx.common.binType = BinaryType::Spirv;
-    if (ShaderModuleHelper::verifySpirvBinary(&shaderInfo->shaderBin) != Result::Success) {
-      LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
-      result = Result::Unsupported;
-    }
-    if (result == Result::Success) {
-      result = ShaderModuleHelper::collectInfoFromSpirvBinary(&shaderInfo->shaderBin, &moduleDataEx.common.usage,
-                                                              entryNames, &debugInfoSize);
-    }
-    moduleDataEx.common.binCode.codeSize = shaderInfo->shaderBin.codeSize;
-    if (trimDebugInfo)
-      moduleDataEx.common.binCode.codeSize -= debugInfoSize;
-  } else if (ShaderModuleHelper::isLlvmBitcode(&shaderInfo->shaderBin)) {
-    moduleDataEx.common.binType = BinaryType::LlvmBc;
-    moduleDataEx.common.binCode = shaderInfo->shaderBin;
-  } else
-    result = Result::ErrorInvalidShader;
-
-  if (moduleDataEx.common.binType == BinaryType::Spirv) {
-    // Dump SPIRV binary
-    if (cl::EnablePipelineDump) {
-      PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
-    }
-
-    // Trim debug info
-    if (trimDebugInfo) {
-      trimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
-      ShaderModuleHelper::trimSpirvDebugInfo(&shaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, trimmedCode);
-      moduleDataEx.common.binCode.pCode = trimmedCode;
-    } else {
-      moduleDataEx.common.binCode.pCode = shaderInfo->shaderBin.pCode;
-    }
-
-    // Calculate SPIR-V cache hash
-    MetroHash::Hash cacheHash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t *>(moduleDataEx.common.binCode.pCode),
-                      moduleDataEx.common.binCode.codeSize, cacheHash.bytes);
-    static_assert(sizeof(moduleDataEx.common.cacheHash) == sizeof(cacheHash), "Unexpected value!");
-    memcpy(moduleDataEx.common.cacheHash, cacheHash.dwords, sizeof(cacheHash));
+  if (!shaderInfo->pfnOutputAlloc) {
+    // Allocator is not specified
+    return Result::ErrorInvalidPointer;
   }
 
-  // Allocate memory and copy output data
-  unsigned totalNodeCount = 0;
-  if (result == Result::Success) {
-    if (shaderInfo->pfnOutputAlloc) {
-      if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
-        for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i)
-          totalNodeCount += moduleEntryDatas[i].resNodeDataCount;
+  unsigned codeSize = ShaderModuleHelper::getCodeSize(shaderInfo->shaderBin);
+  size_t allocSize = sizeof(ShaderModuleData) + codeSize;
+  unsigned *allocBuf =
+      static_cast<unsigned *>(shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize));
+  if (!allocBuf)
+    return Result::ErrorOutOfMemory;
 
-        allocSize = sizeof(ShaderModuleDataEx) + moduleDataEx.common.binCode.codeSize +
-                    (moduleDataEx.extra.entryCount * (sizeof(ShaderModuleEntryData) + sizeof(ShaderModuleEntry))) +
-                    totalNodeCount * sizeof(ResourceNodeData) + fsOutInfos.size() * sizeof(FsOutInfo);
-      }
+  ShaderModuleData *moduleData = reinterpret_cast<ShaderModuleData *>(allocBuf);
+  *moduleData = {};
+  MutableArrayRef<unsigned> codeBuffer(allocBuf + sizeof(ShaderModuleData) / sizeof(*allocBuf),
+                                       codeSize / sizeof(*allocBuf));
 
-      allocBuf = shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize);
+  memcpy(moduleData->hash, &hash, sizeof(hash));
+  ShaderModuleHelper::getModuleData(shaderInfo->shaderBin, codeBuffer, *moduleData);
+  shaderOut->pModuleData = moduleData;
 
-      result = allocBuf ? Result::Success : Result::ErrorOutOfMemory;
-    } else {
-      // Allocator is not specified
-      result = Result::ErrorInvalidPointer;
-    }
-  }
+  if (moduleData->binType == BinaryType::Spirv && cl::EnablePipelineDump)
+    PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
 
-  if (result == Result::Success) {
-    // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode
-    //                             | Resource nodes | FsOutInfo
-    ShaderModuleDataEx *moduleDataExCopy = reinterpret_cast<ShaderModuleDataEx *>(allocBuf);
-
-    ShaderModuleEntryData *entryData = &moduleDataExCopy->extra.entryDatas[0];
-    if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
-      // Copy module data
-      memcpy(moduleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
-      moduleDataExCopy->common.binCode.pCode = nullptr;
-
-      size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
-
-      entryOffset = sizeof(ShaderModuleDataEx) + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntryData);
-      codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
-      resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
-      fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
-      moduleDataExCopy->codeOffset = codeOffset;
-      moduleDataExCopy->entryOffset = entryOffset;
-      moduleDataExCopy->resNodeOffset = resNodeOffset;
-      moduleDataExCopy->fsOutInfoOffset = fsOutInfoOffset;
-    }
-
-    ShaderModuleEntry *entry =
-        reinterpret_cast<ShaderModuleEntry *>(voidPtrInc(allocBuf, moduleDataExCopy->entryOffset));
-    ResourceNodeData *resNodeData =
-        reinterpret_cast<ResourceNodeData *>(voidPtrInc(allocBuf, moduleDataExCopy->resNodeOffset));
-    FsOutInfo *fsOutInfo = reinterpret_cast<FsOutInfo *>(voidPtrInc(allocBuf, moduleDataExCopy->fsOutInfoOffset));
-    void *code = voidPtrInc(allocBuf, moduleDataExCopy->codeOffset);
-
-    if (cacheResult != Result::Success && cacheEntryState != ShaderEntryState::Ready) {
-      // Copy entry info
-      for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i) {
-        entryData[i] = moduleEntryDatas[i];
-        // Set module entry pointer
-        entryData[i].pShaderEntry = &entry[i];
-        // Copy module entry
-        memcpy(entryData[i].pShaderEntry, &moduleEntries[i], sizeof(ShaderModuleEntry));
-        // Copy resourceNodeData and set resource node pointer
-        memcpy(resNodeData, &entryResourceNodeDatas[i][0],
-               moduleEntryDatas[i].resNodeDataCount * sizeof(ResourceNodeData));
-        entryData[i].pResNodeDatas = resNodeData;
-        entryData[i].resNodeDataCount = moduleEntryDatas[i].resNodeDataCount;
-        resNodeData += moduleEntryDatas[i].resNodeDataCount;
-      }
-
-      // Copy binary code
-      memcpy(code, moduleDataEx.common.binCode.pCode, moduleDataEx.common.binCode.codeSize);
-      // Destroy the temporary module code
-      if (trimmedCode) {
-        delete[] trimmedCode;
-        trimmedCode = nullptr;
-        moduleDataEx.common.binCode.pCode = nullptr;
-      }
-
-      // Copy fragment shader output variables
-      moduleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
-      if (fsOutInfos.size() > 0)
-        memcpy(fsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
-      if (m_cache && allocateOnMiss && cacheResult == Result::NotFound) {
-        mustSucceed(cacheEntry.SetValue(true, moduleDataExCopy, allocSize),
-                    "Failed to insert shader module into cache");
-      }
-      if (cacheEntryState == ShaderEntryState::Compiling) {
-        if (hEntry)
-          m_shaderCache->insertShader(hEntry, moduleDataExCopy, allocSize);
-      }
-    } else {
-      // Update the pointers
-      for (unsigned i = 0; i < moduleDataEx.extra.entryCount; ++i) {
-        entryData[i].pShaderEntry = &entry[i];
-        entryData[i].pResNodeDatas = resNodeData;
-        resNodeData += entryData[i].resNodeDataCount;
-      }
-    }
-    moduleDataExCopy->common.binCode.pCode = code;
-    moduleDataExCopy->extra.pFsOutInfos = fsOutInfo;
-    shaderOut->pModuleData = &moduleDataExCopy->common;
-  } else {
-    if (hEntry)
-      m_shaderCache->resetShader(hEntry);
-  }
-  delete[] allocData;
-
-  return result;
+  return Result::Success;
 }
 
 // =====================================================================================================================
@@ -1024,39 +864,11 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (!shaderInfoEntry || !shaderInfoEntry->pModuleData)
         continue;
 
-      const ShaderModuleDataEx *moduleDataEx =
-          reinterpret_cast<const ShaderModuleDataEx *>(shaderInfoEntry->pModuleData);
+      const ShaderModuleData *moduleDataEx = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
 
       Module *module = nullptr;
-      if (moduleDataEx->common.binType == BinaryType::MultiLlvmBc) {
-        timerProfiler.startStopTimer(TimerLoadBc, true);
-
-        MetroHash::Hash entryNameHash = {};
-
-        assert(shaderInfoEntry->pEntryTarget);
-        MetroHash64::Hash(reinterpret_cast<const uint8_t *>(shaderInfoEntry->pEntryTarget),
-                          strlen(shaderInfoEntry->pEntryTarget), entryNameHash.bytes);
-
-        BinaryData binCode = {};
-        for (unsigned i = 0; i < moduleDataEx->extra.entryCount; ++i) {
-          auto entryData = &moduleDataEx->extra.entryDatas[i];
-          auto shaderEntry = reinterpret_cast<ShaderModuleEntry *>(entryData->pShaderEntry);
-          if (entryData->stage == shaderInfoEntry->entryStage &&
-              memcmp(shaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0) {
-            // LLVM bitcode
-            binCode.codeSize = shaderEntry->entrySize;
-            binCode.pCode = voidPtrInc(moduleDataEx->common.binCode.pCode, shaderEntry->entryOffset);
-            break;
-          }
-        }
-
-        if (binCode.codeSize > 0) {
-          module = context->loadLibrary(&binCode).release();
-          stageSkipMask |= (1 << shaderIndex);
-        } else
-          result = Result::ErrorInvalidShader;
-
-        timerProfiler.startStopTimer(TimerLoadBc, false);
+      if (moduleDataEx->binType == BinaryType::MultiLlvmBc) {
+        result = Result::ErrorInvalidShader;
       } else {
         module = new Module((Twine("llpc") + getShaderStageName(shaderInfoEntry->entryStage)).str() +
                                 std::to_string(getModuleIdByIndex(shaderIndex)),
@@ -1151,16 +963,14 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         lowerPassMgr->setPassIndex(&passIndex);
         SpirvLower::registerPasses(*lowerPassMgr);
 
-        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
-        );
+        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
         // Run the passes.
         success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       } else {
         std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
         lowerPassMgr->setPassIndex(&passIndex);
 
-        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
-      );
+        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
         // Run the passes.
         success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       }

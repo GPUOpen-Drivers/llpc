@@ -468,21 +468,6 @@ struct FsOutInfo {
   unsigned componentCount; ///< Count of components of output data
 };
 
-/// Represents extended output of building a shader module (taking extra data info)
-struct ShaderModuleDataEx {
-  ShaderModuleData common;  ///< Shader module common data
-  unsigned codeOffset;      ///< Binary offset of binCode in ShaderModuleDataEx
-  unsigned entryOffset;     ///< Shader entry offset in ShaderModuleDataEx
-  unsigned resNodeOffset;   ///< Resource node offset in ShaderModuleDataEX
-  unsigned fsOutInfoOffset; ///< FsOutInfo offset in ShaderModuleDataEX
-  struct {
-    unsigned fsOutInfoCount;             ///< Count of fragment shader output
-    const FsOutInfo *pFsOutInfos;        ///< Fragment output info array
-    unsigned entryCount;                 ///< Shader entry count in the module
-    ShaderModuleEntryData entryDatas[1]; ///< Array of all shader entries in this module
-  } extra;                               ///< Represents extra part of shader module data
-};
-
 /// Represents the options for pipeline dump.
 struct PipelineDumpOptions {
   const char *pDumpDir;              ///< Pipeline dump directory
