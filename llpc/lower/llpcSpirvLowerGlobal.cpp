@@ -260,6 +260,7 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
 
   lowerBufferBlock();
   lowerPushConsts();
+  lowerAliasedVal();
 
   cleanupReturnBlock();
 
@@ -1913,6 +1914,43 @@ void SpirvLowerGlobal::lowerBufferBlock() {
   for (GlobalVariable *const global : globalsToRemove) {
     global->dropAllReferences();
     global->eraseFromParent();
+  }
+}
+
+// =====================================================================================================================
+// Lowers aliased variables.
+void SpirvLowerGlobal::lowerAliasedVal() {
+  // NOTE: When enable CapabilityWorkgroupMemoryExplicitLayoutKHR, Workgroup variables can be declared in blocks,
+  // and then use the same explicit layout decorations (e.g. Offset, ArrayStride) as other storage classes. All the
+  // Workgroup blocks share the same underlying storage, and either all or none of the variables must be explicitly
+  // laid out.
+  std::vector<GlobalVariable *> aliasedVals;
+  unsigned maxInBits = 0;
+  unsigned index = 0;
+  // Aliased variables can contain different byte size, we require the maximum size to be as base variable to replace
+  // the others.
+  for (GlobalVariable &global : m_module->globals()) {
+    auto addrSpace = global.getType()->getAddressSpace();
+    if (addrSpace == SPIRAS_Local) {
+      auto meta = global.getMetadata(gSPIRVMD::Lds);
+      if (!meta)
+        return;
+      const unsigned aliased = mdconst::dyn_extract<ConstantInt>(meta->getOperand(0))->getZExtValue();
+      if (aliased) {
+        unsigned inBits = static_cast<unsigned>(
+            m_module->getDataLayout().getTypeSizeInBits(global.getType()->getPointerElementType()));
+        if (inBits > maxInBits) {
+          maxInBits = inBits;
+          index = aliasedVals.size();
+        }
+        aliasedVals.push_back(&global);
+      }
+    }
+  }
+
+  for (uint32_t i = 0; i < aliasedVals.size(); i++) {
+    if (i != index)
+      replaceGlobal(m_context, aliasedVals[i], aliasedVals[index]);
   }
 }
 

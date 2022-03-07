@@ -465,6 +465,9 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityDotProductInputAllKHR, "DotProductInputAllKHR");
   add(CapabilityDotProductInput4x8BitKHR, "DotProductInput4x8BitKHR");
   add(CapabilityDotProductInput4x8BitPackedKHR, "DotProductInput4x8BitPackedKHR");
+  add(CapabilityWorkgroupMemoryExplicitLayoutKHR, "WorkgroupMemoryExplicitLayoutKHR");
+  add(CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR, "WorkgroupMemoryExplicitLayout8BitAccessKHR");
+  add(CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR, "WorkgroupMemoryExplicitLayout16BitAccessKHR");
 }
 SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
 

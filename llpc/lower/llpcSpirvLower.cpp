@@ -243,7 +243,8 @@ void SpirvLower::registerPasses(lgc::PassManager &passMgr) {
 void SpirvLower::replaceGlobal(Context *context, GlobalVariable *original, GlobalVariable *replacement) {
   removeConstantExpr(context, original);
   Builder *builder = context->getBuilder();
-  for (User *user : original->users()) {
+  SmallVector<User *> users(original->users());
+  for (User *user : users) {
     Instruction *inst = cast<Instruction>(user);
     builder->SetInsertPoint(inst);
     Value *replacedValue = builder->CreateBitCast(replacement, original->getType());
