@@ -468,9 +468,10 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
   }
 
   // Now non-image-related handling.
-  const bool explicitlyLaidOut = storageClass == StorageClassStorageBuffer || storageClass == StorageClassUniform ||
-                                 storageClass == StorageClassPushConstant ||
-                                 storageClass == StorageClassPhysicalStorageBufferEXT;
+  const bool explicitlyLaidOut =
+      storageClass == StorageClassStorageBuffer || storageClass == StorageClassUniform ||
+      storageClass == StorageClassPushConstant || storageClass == StorageClassPhysicalStorageBufferEXT ||
+      (storageClass == StorageClassWorkgroup && m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR));
 
   Type *const pointeeType =
       transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, explicitlyLaidOut);
@@ -2714,9 +2715,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
 
   const SPIRVStorageClassKind storageClass = spvBaseType->getPointerStorageClass();
 
-  const bool isBufferBlockPointer = storageClass == StorageClassStorageBuffer || storageClass == StorageClassUniform ||
-                                    storageClass == StorageClassPushConstant ||
-                                    storageClass == StorageClassPhysicalStorageBufferEXT;
+  const bool isBufferBlockPointer =
+      storageClass == StorageClassStorageBuffer || storageClass == StorageClassUniform ||
+      storageClass == StorageClassPushConstant || storageClass == StorageClassPhysicalStorageBufferEXT ||
+      (storageClass == StorageClassWorkgroup && m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR));
 
   // Run over the indices of the loop and investigate whether we need to add any additional indices so that we load
   // the correct data. We explicitly lay out our data in memory, which means because Vulkan has more powerful layout
@@ -7173,6 +7175,14 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, opaqueTy->getOpCode())));
       auto mdNode = MDNode::get(*m_context, mDs);
       gv->addMetadata(gSPIRVMD::Resource, *mdNode);
+    } else if (as == SPIRAS_Local) {
+      if (m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR)) {
+        std::vector<Metadata *> mDs;
+        mDs.push_back(ConstantAsMetadata::get(
+            ConstantInt::get(Type::getInt32Ty(*m_context), bv->hasDecorate(DecorationAliased))));
+        auto mdNode = MDNode::get(*m_context, mDs);
+        gv->addMetadata(gSPIRVMD::Lds, *mdNode);
+      }
     }
   } else {
     bool isNonUniform = bv->hasDecorate(DecorationNonUniformEXT);

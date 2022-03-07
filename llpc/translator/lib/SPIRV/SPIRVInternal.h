@@ -216,6 +216,7 @@ const static char PushConst[] = "spirv.PushConst";
 const static char Resource[] = "spirv.Resource";
 const static char ExecutionModel[] = "spirv.ExecutionModel";
 const static char NonUniform[] = "spirv.NonUniform";
+const static char Lds[] = "spirv.Lds";
 } // namespace gSPIRVMD
 
 namespace gSPIRVName {

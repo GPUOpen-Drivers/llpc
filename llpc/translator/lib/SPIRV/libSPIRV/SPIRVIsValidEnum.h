@@ -570,6 +570,9 @@ inline bool isValid(spv::Capability V) {
   case CapabilityDotProductInputAllKHR:
   case CapabilityDotProductInput4x8BitKHR:
   case CapabilityDotProductInput4x8BitPackedKHR:
+  case CapabilityWorkgroupMemoryExplicitLayoutKHR:
+  case CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR:
+  case CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR:
     return true;
   default:
     return false;
