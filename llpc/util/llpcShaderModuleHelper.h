@@ -68,10 +68,10 @@ public:
 
   static bool isLlvmBitcode(const BinaryData *shaderBin);
   static BinaryType getShaderBinaryType(BinaryData shaderBinary);
-  static Result getModuleData(const BinaryData &shaderBinary, llvm::MutableArrayRef<unsigned> codeBuffer,
+  static Result getModuleData(const ShaderModuleBuildInfo *shaderInfo, llvm::MutableArrayRef<unsigned> codeBuffer,
                               Vkgc::ShaderModuleData &moduleData);
-  static unsigned getCodeSize(const BinaryData &shaderBin);
-  static BinaryData getShaderCode(const BinaryData &shaderBinary, llvm::MutableArrayRef<unsigned int> &codeBuffer);
+  static unsigned getCodeSize(const ShaderModuleBuildInfo *shaderInfo);
+  static BinaryData getShaderCode(const ShaderModuleBuildInfo *shaderInfo, llvm::MutableArrayRef<unsigned int> &codeBuffer);
 };
 
 } // namespace Llpc

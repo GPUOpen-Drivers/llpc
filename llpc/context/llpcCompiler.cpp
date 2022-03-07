@@ -535,7 +535,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     return Result::ErrorInvalidPointer;
   }
 
-  unsigned codeSize = ShaderModuleHelper::getCodeSize(shaderInfo->shaderBin);
+  unsigned codeSize = ShaderModuleHelper::getCodeSize(shaderInfo);
   size_t allocSize = sizeof(ShaderModuleData) + codeSize;
   unsigned *allocBuf =
       static_cast<unsigned *>(shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize));
@@ -548,7 +548,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
                                        codeSize / sizeof(*allocBuf));
 
   memcpy(moduleData->hash, &hash, sizeof(hash));
-  ShaderModuleHelper::getModuleData(shaderInfo->shaderBin, codeBuffer, *moduleData);
+  ShaderModuleHelper::getModuleData(shaderInfo, codeBuffer, *moduleData);
   shaderOut->pModuleData = moduleData;
 
   if (moduleData->binType == BinaryType::Spirv && cl::EnablePipelineDump)
@@ -963,14 +963,16 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         lowerPassMgr->setPassIndex(&passIndex);
         SpirvLower::registerPasses(*lowerPassMgr);
 
-        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
+        SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
+        );
         // Run the passes.
         success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       } else {
         std::unique_ptr<lgc::LegacyPassManager> lowerPassMgr(lgc::LegacyPassManager::Create());
         lowerPassMgr->setPassIndex(&passIndex);
 
-        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower));
+        LegacySpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
+        );
         // Run the passes.
         success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       }
