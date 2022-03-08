@@ -446,7 +446,7 @@ BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shader
 unsigned ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo) {
   const BinaryData& shaderBinary = shaderInfo->shaderBin;
   bool trimDebugInfo = cl::TrimDebugInfo;
-  if (trimDebugInfo)
+  if (!trimDebugInfo)
     return shaderBinary.codeSize;
   return ShaderModuleHelper::trimSpirvDebugInfo(&shaderBinary, {});
 }
