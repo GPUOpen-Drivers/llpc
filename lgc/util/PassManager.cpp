@@ -94,12 +94,13 @@ private:
 // This is the implementation subclass of the PassManager class declared in PassManager.h
 class PassManagerImpl final : public lgc::PassManager {
 public:
-  PassManagerImpl();
+  PassManagerImpl(TargetMachine *targetMachine);
   void registerPass(StringRef passName, StringRef className) override;
   void run(Module &module) override;
   void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
 private:
   void registerCallbacks();
+  TargetMachine *m_targetMachine;
 
   // -----------------------------------------------------------------------------------------------------------------
 
@@ -147,8 +148,11 @@ lgc::LegacyPassManager *lgc::LegacyPassManager::Create() {
 
 // =====================================================================================================================
 // Create a PassManagerImpl
-lgc::PassManager *lgc::PassManager::Create() {
-  return new PassManagerImpl;
+//
+// @param targetMachine : Optional target machine argument. Must be provided if the AMDLLPC target specific alias
+// analysis pass needs to be registered.
+lgc::PassManager *lgc::PassManager::Create(TargetMachine *targetMachine) {
+  return new PassManagerImpl(targetMachine);
 }
 
 // =====================================================================================================================
@@ -161,7 +165,8 @@ LegacyPassManagerImpl::LegacyPassManagerImpl() : LegacyPassManager() {
 }
 
 // =====================================================================================================================
-PassManagerImpl::PassManagerImpl() : PassManager(), instrumentationVerify(getLgcOuts()) {
+PassManagerImpl::PassManagerImpl(TargetMachine *targetMachine)
+    : PassManager(), m_targetMachine(targetMachine), instrumentationVerify(getLgcOuts()) {
   if (!cl::DumpCfgAfter.empty()) {
     // TODO: We need to support m_dumpCfgAfter in a way that is similar to what
     // is done in the add() function of the legacy pass manager. We can use the
@@ -198,7 +203,7 @@ void PassManagerImpl::run(Module &module) {
   // We register LLVM's default analysis sets late to be sure our custom
   // analyses are added beforehand.
   if (!initialized) {
-    PassBuilder passBuilder(nullptr, PipelineTuningOptions(), None, &instrumentationCallbacks);
+    PassBuilder passBuilder(m_targetMachine, PipelineTuningOptions(), None, &instrumentationCallbacks);
     passBuilder.registerModuleAnalyses(m_moduleAnalysisManager);
     passBuilder.registerCGSCCAnalyses(cgsccAnalysisManager);
     passBuilder.registerFunctionAnalyses(m_functionAnalysisManager);

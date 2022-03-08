@@ -401,7 +401,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(InstCombinePass(1));
   fpm.addPass(SimplifyCFGPass());
   fpm.addPass(SROAPass());
-  fpm.addPass(EarlyCSEPass());
+  fpm.addPass(EarlyCSEPass(true));
   fpm.addPass(SpeculativeExecutionPass(/* OnlyIfDivergentTarget = */ true));
   fpm.addPass(CorrelatedValuePropagationPass());
   fpm.addPass(SimplifyCFGPass());
@@ -426,7 +426,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   lpm2.addPass(LoopDeletionPass());
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm2), true));
   fpm.addPass(LoopUnrollPass(
-      LoopUnrollOptions(optLevel).setPartial(false).setRuntime(false).setPeeling(false).setUpperBound(false)));
+      LoopUnrollOptions(optLevel).setPeeling(true).setRuntime(false).setUpperBound(false).setPartial(false)));
   fpm.addPass(ScalarizerPass());
   fpm.addPass(PatchLoadScalarizer());
   fpm.addPass(InstSimplifyPass());
@@ -442,8 +442,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
                                   .convertSwitchToLookupTable(true)
                                   .needCanonicalLoops(true)
                                   .sinkCommonInsts(true)));
-  fpm.addPass(LoopUnrollPass(
-      LoopUnrollOptions(optLevel).setPartial(true).setRuntime(true).setPeeling(true).setUpperBound(true)));
+  fpm.addPass(LoopUnrollPass(LoopUnrollOptions(optLevel)));
   // uses DivergenceAnalysis
   fpm.addPass(PatchReadFirstLane());
   fpm.addPass(InstCombinePass(1));

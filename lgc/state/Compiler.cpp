@@ -202,7 +202,7 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
   Timer *codeGenTimer = timers.size() >= 3 ? timers[2] : nullptr;
 
   // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
-  std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create());
+  std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(getLgcContext()->getTargetMachine()));
   passMgr->setPassIndex(&passIndex);
   passMgr->registerFunctionAnalysis([&] { return getLgcContext()->getTargetMachine()->getTargetIRAnalysis(); });
   passMgr->registerModuleAnalysis([&] { return PipelineShaders(); });
