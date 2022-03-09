@@ -105,6 +105,8 @@ bool PatchPreparePipelineAbi::runImpl(Module &module, PipelineShadersResult &pip
   m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
   m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
   m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+  m_hasTask = m_pipelineState->hasShaderStage(ShaderStageTask);
+  m_hasMesh = m_pipelineState->hasShaderStage(ShaderStageMesh);
 
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
@@ -138,6 +140,8 @@ void PatchPreparePipelineAbi::setCallingConvs(Module &module) {
   // depends on the pipeline type.
   setCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
   setCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
+  setCallingConv(ShaderStageTask, CallingConv::AMDGPU_CS);
+  setCallingConv(ShaderStageMesh, CallingConv::AMDGPU_GS);
 
   if (hasTs && m_hasGs) {
     // TS-GS pipeline
@@ -189,8 +193,15 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
   // depends on the pipeline type, and, for GFX9+, may involve merging shaders.
   setCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
   setCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
+  setCallingConv(ShaderStageTask, CallingConv::AMDGPU_CS);
+  setCallingConv(ShaderStageMesh, CallingConv::AMDGPU_GS);
 
   if (m_pipelineState->isGraphics()) {
+    if (m_hasTask || m_hasMesh) {
+      // TODO: Add task/mesh shader processing.
+      return;
+    }
+
     ShaderMerger shaderMerger(m_pipelineState, m_pipelineShaders);
     const bool enableNgg = m_pipelineState->getNggControl()->enableNgg;
 

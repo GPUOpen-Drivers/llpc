@@ -101,10 +101,12 @@ protected:
   PipelineState *m_pipelineState; // Pipeline state
   GfxIpVersion m_gfxIp;           // Graphics IP version info
 
-  bool m_hasVs;  // Whether the pipeline has vertex shader
-  bool m_hasTcs; // Whether the pipeline has tessellation control shader
-  bool m_hasTes; // Whether the pipeline has tessellation evaluation shader
-  bool m_hasGs;  // Whether the pipeline has geometry shader
+  bool m_hasVs;   // Whether the pipeline has vertex shader
+  bool m_hasTcs;  // Whether the pipeline has tessellation control shader
+  bool m_hasTes;  // Whether the pipeline has tessellation evaluation shader
+  bool m_hasGs;   // Whether the pipeline has geometry shader
+  bool m_hasTask; // Whether the pipeline has task shader
+  bool m_hasMesh; // Whether the pipeline has mesh shader
 
 private:
   // Get the MsgPack map node for the specified API shader in the ".shaders" map
