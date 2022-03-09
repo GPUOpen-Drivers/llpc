@@ -5,7 +5,7 @@
 // RUN:   | tee %t.disabled | FileCheck %s --check-prefix=DISABLED
 //
 // DISABLED-LABEL: {{^}}SPIR-V disassembly:
-// DISABLED:       {{^}} OpKill
+// DISABLED:       {{^}} {{OpKill|OpTerminateInvocation}}
 // DISABLED:             OpImageSampleImplicitLod
 // DISABLED-LABEL: {{^}}// LLPC SPIR-V lowering results
 // DISABLED:       call void (...) @lgc.create.kill()
@@ -23,7 +23,7 @@
 // RUN:   | tee %t.enabled | FileCheck %s --check-prefix=ENABLED
 //
 // ENABLED-LABEL: {{^}}SPIR-V disassembly:
-// ENABLED:       {{^}} OpKill
+// ENABLED:       {{^}} {{OpKill|OpTerminateInvocation}}
 // ENABLED:             OpImageSampleImplicitLod
 // ENABLED-LABEL: {{^}}// LLPC SPIR-V lowering results
 // ENABLED:       call void (...) @lgc.create.kill()
