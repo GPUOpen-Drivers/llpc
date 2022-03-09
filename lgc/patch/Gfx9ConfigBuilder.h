@@ -55,6 +55,9 @@ public:
   void buildPipelineNggVsGsFsRegConfig();
   void buildPipelineNggVsTsGsFsRegConfig();
 
+  void buildPipelineMeshFsConfig();
+  void buildPipelineTaskMeshFsConfig();
+
   void buildPipelineCsRegConfig();
 
 private:
@@ -71,6 +74,8 @@ private:
   template <typename T> void buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, T *config);
 
   template <typename T> void buildPsRegConfig(ShaderStage shaderStage, T *config);
+
+  template <typename T> void buildMeshRegConfig(ShaderStage shaderStage, T *config);
 
   void buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *config);
 

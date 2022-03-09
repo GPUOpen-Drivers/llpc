@@ -51,6 +51,8 @@ ConfigBuilderBase::ConfigBuilderBase(Module *module, PipelineState *pipelineStat
   m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
   m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
   m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+  m_hasTask = m_pipelineState->hasShaderStage(ShaderStageTask);
+  m_hasMesh = m_pipelineState->hasShaderStage(ShaderStageMesh);
 
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 

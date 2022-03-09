@@ -58,6 +58,12 @@ void ConfigBuilder::buildPalMetadata() {
     if (!m_pipelineState->isWholePipeline() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
       // FS-only shader or part-pipeline compilation
       buildPipelineVsFsRegConfig();
+    } else if (m_hasTask) {
+      // Task-Mesh-FS pipeline
+      buildPipelineTaskMeshFsConfig();
+    } else if (m_hasMesh) {
+      // Mesh-FS pipeline
+      buildPipelineMeshFsConfig();
     } else if (!hasTs && !m_hasGs) {
       // VS-FS pipeline
       if (m_gfxIp.major >= 10 && enableNgg)
@@ -724,6 +730,66 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
 
   // Set up VGT_TF_PARAM
   setupVgtTfParam(&config.lsHsRegs);
+
+  appendConfig(config);
+}
+
+// =====================================================================================================================
+// Builds register configuration for graphics pipeline (Mesh-FS).
+void ConfigBuilder::buildPipelineMeshFsConfig() {
+  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+
+  PipelineMeshFsRegConfig config(gfxIp);
+
+  addApiHwShaderMapping(ShaderStageMesh, Util::Abi::HwShaderGs);
+  addApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
+
+  setPipelineType(Util::Abi::PipelineType::Mesh);
+
+  // Must contain mesh shader
+  assert(m_pipelineState->hasShaderStage(ShaderStageMesh));
+  buildMeshRegConfig<PipelineMeshFsRegConfig>(ShaderStageMesh, &config);
+
+  if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
+    buildPsRegConfig<PipelineMeshFsRegConfig>(ShaderStageFragment, &config);
+
+    unsigned checksum = setShaderHash(ShaderStageFragment);
+    if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling)
+      SET_REG_FIELD(&config.psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
+  }
+
+  appendConfig(config);
+}
+
+// =====================================================================================================================
+// Builds register configuration for graphics pipeline (Task-Mesh-FS).
+void ConfigBuilder::buildPipelineTaskMeshFsConfig() {
+  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+
+  PipelineTaskMeshFsRegConfig config(gfxIp);
+
+  addApiHwShaderMapping(ShaderStageTask, Util::Abi::HwShaderCs);
+  addApiHwShaderMapping(ShaderStageMesh, Util::Abi::HwShaderGs);
+  addApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
+
+  setPipelineType(Util::Abi::PipelineType::TaskMesh);
+
+  // Must contain task shader
+  assert(m_pipelineState->hasShaderStage(ShaderStageTask));
+  buildCsRegConfig(ShaderStageTask, &config.taskRegs);
+
+  if (m_pipelineState->hasShaderStage(ShaderStageMesh))
+    buildMeshRegConfig<PipelineTaskMeshFsRegConfig>(ShaderStageMesh, &config);
+
+  if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
+    buildPsRegConfig<PipelineTaskMeshFsRegConfig>(ShaderStageFragment, &config);
+
+    unsigned checksum = setShaderHash(ShaderStageFragment);
+    if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling)
+      SET_REG_FIELD(&config.psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
+  }
 
   appendConfig(config);
 }
@@ -1862,12 +1928,54 @@ void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *config) {
 }
 
 // =====================================================================================================================
-// Builds register configuration for compute shader.
+// Builds register configuration for mesh shader.
+//
+// @param shaderStage : Current shader stage (from API side)
+// @param [out] config : Register configuration for mesh-shader-specific pipeline
+template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderStage, T *config) {
+  assert(shaderStage == ShaderStageMesh);
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
+
+  SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
+
+  SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
+  SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
+
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageMesh);
+  if (waveSize == 32)
+    SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
+
+  SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
+  SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
+  SET_REG_GFX09_1X_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_FAST_LAUNCH, true);
+
+  setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
+
+  setNumAvailSgprs(Util::Abi::HardwareStage::Gs, resUsage->numSgprsAvailable);
+  setNumAvailVgprs(Util::Abi::HardwareStage::Gs, resUsage->numVgprsAvailable);
+
+  const unsigned checksum = setShaderHash(ShaderStageMesh);
+  if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling)
+    SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
+
+  // Set up IA_MULTI_VGT_PARAM
+  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+
+  static constexpr unsigned PrimGroupSize = 128;
+  iaMultiVgtParam.bits.PRIMGROUP_SIZE = PrimGroupSize - 1;
+
+  SET_REG(&config->meshRegs, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
+}
+
+// =====================================================================================================================
+// Builds register configuration for compute/task shader.
 //
 // @param shaderStage : Current shader stage (from API side)
 // @param [out] config : Register configuration for compute
 void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *config) {
-  assert(shaderStage == ShaderStageCompute);
+  assert(shaderStage == ShaderStageCompute || shaderStage == ShaderStageTask);
 
   const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);
   const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
@@ -1875,21 +1983,29 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
 
   unsigned workgroupSizes[3] = {};
-  const auto &builtInUsage = resUsage->builtInUsage.cs;
-  switch (static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout)) {
-  case WorkgroupLayout::Unknown:
-  case WorkgroupLayout::Linear:
+  if (shaderStage == ShaderStageCompute) {
+    const auto &builtInUsage = resUsage->builtInUsage.cs;
+    switch (static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout)) {
+    case WorkgroupLayout::Unknown:
+    case WorkgroupLayout::Linear:
+      workgroupSizes[0] = computeMode.workgroupSizeX;
+      workgroupSizes[1] = computeMode.workgroupSizeY;
+      workgroupSizes[2] = computeMode.workgroupSizeZ;
+      break;
+    case WorkgroupLayout::Quads:
+    case WorkgroupLayout::SexagintiQuads:
+      workgroupSizes[0] = computeMode.workgroupSizeX * computeMode.workgroupSizeY;
+      workgroupSizes[1] = computeMode.workgroupSizeZ;
+      workgroupSizes[2] = 1;
+      break;
+    }
+  } else {
+    assert(shaderStage == ShaderStageTask);
     workgroupSizes[0] = computeMode.workgroupSizeX;
     workgroupSizes[1] = computeMode.workgroupSizeY;
     workgroupSizes[2] = computeMode.workgroupSizeZ;
-    break;
-  case WorkgroupLayout::Quads:
-  case WorkgroupLayout::SexagintiQuads:
-    workgroupSizes[0] = computeMode.workgroupSizeX * computeMode.workgroupSizeY;
-    workgroupSizes[1] = computeMode.workgroupSizeZ;
-    workgroupSizes[2] = 1;
-    break;
   }
+
   unsigned floatMode = setupFloatingPointMode(shaderStage);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC1, FLOAT_MODE, floatMode);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC1, DX10_CLAMP, true); // Follow PAL setting

@@ -293,6 +293,8 @@ unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
   // Set up ShaderStage -> user data register mapping.
   m_userDataRegMapping[ShaderStageCompute] = mmCOMPUTE_USER_DATA_0;
   m_userDataRegMapping[ShaderStageFragment] = mmSPI_SHADER_USER_DATA_PS_0;
+  m_userDataRegMapping[ShaderStageTask] = mmCOMPUTE_USER_DATA_0;
+  m_userDataRegMapping[ShaderStageMesh] = mmSPI_SHADER_USER_DATA_GS_0;
 
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9) {
     // <=GFX8: No merged shaders.

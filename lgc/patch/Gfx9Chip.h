@@ -173,6 +173,7 @@ using namespace Pal::Gfx9::Chip;
 
 // Sets GFX-dependent register field value
 #define SET_REG_GFX9_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx09._field = (_val);
+#define SET_REG_GFX09_1X_PLUS_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx09_1xPlus._field = (_val);
 #define SET_REG_GFX10_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx10._field = (_val);
 #define SET_REG_GFX9_10_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx09_10._field = (_val);
 #define SET_REG_GFX10_PLUS_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx10Plus._field = (_val);
@@ -498,6 +499,44 @@ struct CsRegConfig {
   DEF_REG(COMPUTE_SHADER_CHKSUM);
 
   CsRegConfig(GfxIpVersion gfxIp);
+};
+
+// =====================================================================================================================
+// Represents configuration of registers relevant to mesh shader.
+struct MeshRegConfig {
+  // TODO: Add mesh shader support.
+  DEF_REG(SPI_SHADER_PGM_CHKSUM_GS);
+
+  DEF_REG(VGT_SHADER_STAGES_EN);
+  DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+
+  MeshRegConfig(GfxIpVersion gfxIp);
+};
+
+// =====================================================================================================================
+// Represents configuration of registers relevant to graphics pipeline (Mesh-FS).
+struct PipelineMeshFsRegConfig {
+  static constexpr bool ContainsPalAbiMetadataOnly = true;
+
+  MeshRegConfig meshRegs; // Mesh -> hardware primitive shader (NGG, ES-GS)
+  PsRegConfig psRegs;     // FS   -> hardware PS
+
+  PipelineMeshFsRegConfig(GfxIpVersion gfxIp);
+};
+
+// =====================================================================================================================
+// Represents configuration of registers relevant to graphics pipeline (Task-Mesh-FS).
+struct PipelineTaskMeshFsRegConfig {
+  static constexpr bool ContainsPalAbiMetadataOnly = true;
+
+  CsRegConfig taskRegs;   // Task -> hardware CS
+  MeshRegConfig meshRegs; // Mesh -> hardware primitive shader (NGG, ES-GS)
+  PsRegConfig psRegs;     // FS   -> hardware PS
+
+  DEF_REG(VGT_SHADER_STAGES_EN);
+  DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+
+  PipelineTaskMeshFsRegConfig(GfxIpVersion gfxIp);
 };
 
 } // namespace Gfx9

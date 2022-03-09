@@ -5,7 +5,7 @@
 ; In this test case, we check if the arguments of an empty task shader is correctly generated. Three new
 ; arguments should be present in order: meshTaskDispatchDims, meshTaskRingIndex, meshPipeStatsBuf.
 ;
-; CHECK-LABEL: lgc.shader.TASK.main
+; CHECK-LABEL: _amdgpu_cs_main
 ; CHECK: <3 x i32> inreg %meshTaskDispatchDims, i32 inreg %meshTaskRingIndex, i32 inreg %meshPipeStatsBuf
 
 ; ModuleID = 'lgcPipeline'

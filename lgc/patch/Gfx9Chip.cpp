@@ -283,6 +283,35 @@ CsRegConfig::CsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_PGM_RSRC3);
 }
 
+// =====================================================================================================================
+// Initializer
+//
+// @param gfxIp : Graphics IP version info
+MeshRegConfig::MeshRegConfig(GfxIpVersion gfxIp) {
+  // TODO: Add mesh shader support.
+  INIT_REG_APU09_1X_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_GS);
+
+  INIT_REG(VGT_SHADER_STAGES_EN);
+  INIT_REG_GFX10(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+}
+
+// =====================================================================================================================
+// Initializer
+//
+// @param gfxIp : Graphics IP version info
+PipelineMeshFsRegConfig::PipelineMeshFsRegConfig(GfxIpVersion gfxIp) : meshRegs(gfxIp), psRegs(gfxIp) {
+}
+
+// =====================================================================================================================
+// Initializer
+//
+// @param gfxIp : Graphics IP version info
+PipelineTaskMeshFsRegConfig::PipelineTaskMeshFsRegConfig(GfxIpVersion gfxIp)
+    : taskRegs(gfxIp), meshRegs(gfxIp), psRegs(gfxIp) {
+  INIT_REG(VGT_SHADER_STAGES_EN);
+  INIT_REG_GFX10(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+}
+
 } // namespace Gfx9
 
 } // namespace lgc
