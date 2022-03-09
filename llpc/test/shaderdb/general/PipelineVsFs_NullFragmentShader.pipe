@@ -1,7 +1,7 @@
 ; Test that the null fragment shader is generated correctly for a graphics pipeline where the shader is not provided.
 
 ; BEGIN_GEN_RELOC
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -D -r %t.elf | FileCheck -check-prefix=GEN_RELOC %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -d -r %t.elf | FileCheck -check-prefix=GEN_RELOC %s
 ; Check that the PS is defined.  The body of the shader is not important since it should not be run.
 ; GEN_RELOC-LABEL: <_amdgpu_ps_main>:
 ; GEN_RELOC: s_endpgm
@@ -14,7 +14,7 @@
 ; BEGIN_PAL_RELOC
 
 ; BEGIN_GEN_FULL
-; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -D -r %t.elf | FileCheck -check-prefix=GEN_FULL %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -d -r %t.elf | FileCheck -check-prefix=GEN_FULL %s
 ; Check that the PS is defined.  The body of the shader is not important since it should not be run.
 ; GEN_FULL-LABEL: <_amdgpu_ps_main>:
 ; GEN_FULL: s_endpgm
