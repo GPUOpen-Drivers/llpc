@@ -226,5 +226,39 @@ TEST(PipelineDumperTest, TestShadowDescriptorTableUsageCompute) {
   HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return params.isRelocatableShader; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
+// =====================================================================================================================
+// Test the optimization level option.  The default value for the optimization level in the pipeline build info is 0.
+// All tess will be compared with that.
+
+TEST(PipelineDumperTest, TestOptimizationLevelGraphics) {
+
+  for (uint32_t optLevel = 1; optLevel <= 3; ++optLevel) {
+    ModifyGraphicsBuildInfo modifyBuildInfo = [optLevel](GraphicsPipelineBuildInfo *buildInfo) {
+      buildInfo->options.optimizationLevel = optLevel;
+    };
+
+    // Even if LGC will internally bump the optimization level to 1 if it is 0, that is not reflected in the hash
+    // because the hash is computed first.
+    HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
+    runGraphicsPipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+  }
+}
+
+TEST(PipelineDumperTest, TestOptimizationLevel1Compute) {
+  for (uint32_t optLevel = 1; optLevel <= 3; ++optLevel) {
+    ModifyComputeBuildInfo modifyBuildInfo = [optLevel](ComputePipelineBuildInfo *buildInfo) {
+      buildInfo->options.optimizationLevel = optLevel;
+    };
+
+    // Even if LGC will internally bump the optimization level to 1 if it is 0, that is not reflected in the hash
+    // because the hash is computed first.
+    HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
+    runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+  }
+}
+#endif
+
 } // namespace
 } // namespace Llpc

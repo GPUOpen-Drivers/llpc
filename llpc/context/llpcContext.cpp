@@ -85,11 +85,25 @@ LgcContext *Context::getLgcContext() {
     // First time: Create the LgcContext.
     std::string gpuName = LgcContext::getGpuNameString(m_gfxIp.major, m_gfxIp.minor, m_gfxIp.stepping);
     m_builderContext.reset(
-        LgcContext::create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION, CodeGenOpt::Level::Default));
+        LgcContext::create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION, getOptimizationLevel()));
     if (!m_builderContext)
       report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
   }
   return &*m_builderContext;
+}
+
+// =====================================================================================================================
+// @returns: the optimization level for the context.
+CodeGenOpt::Level Context::getOptimizationLevel() const {
+  uint32_t optLevel = CodeGenOpt::Level::Default;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
+  optLevel = getPipelineContext()->getPipelineOptions()->optimizationLevel;
+  if (optLevel > 3)
+    optLevel = 3;
+  else if (optLevel == 0) // Workaround for noopt bugs in the AMDGPU backend in LLVM.
+    optLevel = 1;
+#endif
+  return static_cast<CodeGenOpt::Level>(optLevel);
 }
 
 // =====================================================================================================================

@@ -80,6 +80,8 @@ public:
   // Get (create if necessary) LgcContext
   lgc::LgcContext *getLgcContext();
 
+  llvm::CodeGenOpt::Level getOptimizationLevel() const;
+
   // Set value of scalarBlockLayout option. This gets called with the value from PipelineOptions when
   // starting a pipeline compile.
   void setScalarBlockLayout(bool scalarBlockLayout) { m_scalarBlockLayout = scalarBlockLayout; }

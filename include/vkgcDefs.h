@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 52
+#define LLPC_INTERFACE_MAJOR_VERSION 53
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 3
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #if VFX_INSIDE_SPVGEN
@@ -86,6 +86,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     53.0 | Add optimizationLevel to PipelineOptions
 //  |     52.3 | Add fastMathFlags to PipelineShaderOptions                                                            |
 //  |     52.2 | Add provokingVertexMode to rsState                                                                    |
 //  |     52.1 | Add pageMigrationEnabled to PipelineOptions                                                           |
@@ -407,6 +408,10 @@ struct PipelineOptions {
   bool reserved1f;                                       /// Reserved for future functionality
   bool enableInterpModePatch; ///< If set, per-sample interpolation for nonperspective and smooth input is enabled
   bool pageMigrationEnabled;  ///< If set, page migration is enabled
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
+  uint32_t optimizationLevel; ///< The higher the number the more optimizations will be performed.  Valid values are
+                              ///< between 0 and 3.
+#endif
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

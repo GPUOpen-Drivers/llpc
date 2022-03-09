@@ -694,6 +694,10 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.extendedRobustness.robustImageAccess = " << options->extendedRobustness.robustImageAccess
            << "\n";
   dumpFile << "options.extendedRobustness.nullDescriptor = " << options->extendedRobustness.nullDescriptor << "\n";
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
+  dumpFile << "options.optimizationLevel = " << options->optimizationLevel << "\n";
+#endif
 }
 
 // =====================================================================================================================
@@ -1104,6 +1108,9 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   }
 
   hasher->Update(options->pageMigrationEnabled);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
+  hasher->Update(options->optimizationLevel);
+#endif
 }
 
 // =====================================================================================================================
