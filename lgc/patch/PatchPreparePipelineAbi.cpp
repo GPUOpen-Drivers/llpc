@@ -31,6 +31,7 @@
 #include "lgc/patch/PatchPreparePipelineAbi.h"
 #include "Gfx6ConfigBuilder.h"
 #include "Gfx9ConfigBuilder.h"
+#include "MeshTaskShader.h"
 #include "ShaderMerger.h"
 #include "lgc/state/PalMetadata.h"
 #include "llvm/Pass.h"
@@ -198,7 +199,10 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
 
   if (m_pipelineState->isGraphics()) {
     if (m_hasTask || m_hasMesh) {
-      // TODO: Add task/mesh shader processing.
+      auto taskEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTask);
+      auto meshEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageMesh);
+      MeshTaskShader meshTaskShader(m_pipelineState);
+      meshTaskShader.process(taskEntryPoint, meshEntryPoint);
       return;
     }
 
