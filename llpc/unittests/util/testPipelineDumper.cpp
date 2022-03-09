@@ -146,6 +146,28 @@ void runComputePipelineVariations(const ModifyComputeBuildInfo &modifyBuildInfo,
 }
 
 // =====================================================================================================================
+// Test the topology hash for fragment shader
+
+TEST(PipelineDumperTest, TestTopologyForFragmentState) {
+  auto buildInfo = std::make_unique<GraphicsPipelineBuildInfo>();
+  MetroHash::Hash originalHash;
+  MetroHash::Hash modifiedHash;
+  for (bool isRelocatableShader : {false, true}) {
+    for (uint32_t i = 0; i <= VK_PRIMITIVE_TOPOLOGY_PATCH_LIST; i++) {
+      buildInfo->iaState.topology = static_cast<VkPrimitiveTopology>(i);
+      originalHash = PipelineDumper::generateHashForGraphicsPipeline(buildInfo.get(), false, isRelocatableShader,
+                                                                     UnlinkedStageFragment);
+      for (uint32_t j = i + 1; j <= VK_PRIMITIVE_TOPOLOGY_PATCH_LIST; j++) {
+        buildInfo->iaState.topology = static_cast<VkPrimitiveTopology>(j);
+        modifiedHash = PipelineDumper::generateHashForGraphicsPipeline(buildInfo.get(), false, isRelocatableShader,
+                                                                       UnlinkedStageFragment);
+        EXPECT_NE(originalHash, modifiedHash);
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
 // Test the robustBufferAccess option.
 
 // cppcheck-suppress syntaxError
