@@ -148,6 +148,7 @@ void runComputePipelineVariations(const ModifyComputeBuildInfo &modifyBuildInfo,
 // =====================================================================================================================
 // Test the topology hash for fragment shader
 
+// cppcheck-suppress syntaxError
 TEST(PipelineDumperTest, TestTopologyForFragmentState) {
   auto buildInfo = std::make_unique<GraphicsPipelineBuildInfo>();
   MetroHash::Hash originalHash;
@@ -170,7 +171,6 @@ TEST(PipelineDumperTest, TestTopologyForFragmentState) {
 // =====================================================================================================================
 // Test the robustBufferAccess option.
 
-// cppcheck-suppress syntaxError
 TEST(PipelineDumperTest, TestRobustBufferAccessOptionGraphics) {
   ModifyGraphicsBuildInfo modifyBuildInfo = [](GraphicsPipelineBuildInfo *buildInfo) {
     buildInfo->options.robustBufferAccess = true;
