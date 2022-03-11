@@ -7083,21 +7083,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       if (!hasDescSet)
         descSet = 0;
 
-      // Determine block type based on corresponding decorations
-      SPIRVBlockTypeKind blockType = BlockTypeUnknown;
-
-      bool isUniformBlock = false;
-
-      if (bv->getType()->getPointerStorageClass() == StorageClassStorageBuffer)
-        blockType = BlockTypeShaderStorage;
-      else {
-        isUniformBlock = blockTy->hasDecorate(DecorationBlock);
-        bool isStorageBlock = blockTy->hasDecorate(DecorationBufferBlock);
-        if (isUniformBlock)
-          blockType = BlockTypeUniform;
-        else if (isStorageBlock)
-          blockType = BlockTypeShaderStorage;
-      }
       // Setup resource metadata
       auto int32Ty = Type::getInt32Ty(*m_context);
       std::vector<Metadata *> resMDs;
@@ -7108,6 +7093,9 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
 
       // Build block metadata
+      const bool isUniformBlock =
+          bv->getType()->getPointerStorageClass() != StorageClassStorageBuffer && blockTy->hasDecorate(DecorationBlock);
+
       ShaderBlockDecorate blockDec = {};
       blockDec.NonWritable = isUniformBlock;
       Type *blockMdTy = nullptr;
