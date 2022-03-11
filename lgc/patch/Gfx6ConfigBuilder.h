@@ -57,17 +57,11 @@ private:
   ConfigBuilder &operator=(const ConfigBuilder &) = delete;
 
   template <typename T> void buildVsRegConfig(ShaderStage shaderStage, T *config);
-
   template <typename T> void buildHsRegConfig(ShaderStage shaderStage, T *config);
-
   template <typename T> void buildEsRegConfig(ShaderStage shaderStage, T *config);
-
   template <typename T> void buildLsRegConfig(ShaderStage shaderStage, T *config);
-
   template <typename T> void buildGsRegConfig(ShaderStage shaderStage, T *config);
-
   template <typename T> void buildPsRegConfig(ShaderStage shaderStage, T *config);
-
   void buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *config);
 
   template <typename T> void setupVgtTfParam(T *config);
