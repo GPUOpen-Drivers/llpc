@@ -814,11 +814,10 @@ void ConfigBuilder::buildPipelineCsRegConfig() {
 
 // =====================================================================================================================
 // Builds register configuration for hardware vertex shader.
-template <typename T>
 //
 // @param shaderStage : Current shader stage (from API side)
 // @param [out] config : Register configuration for vertex-shader-specific pipeline
-void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *config) {
+template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *config) {
   assert(shaderStage == ShaderStageVertex || shaderStage == ShaderStageTessEval ||
          shaderStage == ShaderStageCopyShader);
 
@@ -1051,11 +1050,11 @@ void ConfigBuilder::buildVsRegConfig(ShaderStage shaderStage, T *config) {
 
 // =====================================================================================================================
 // Builds register configuration for hardware local-hull merged shader.
-template <typename T>
 //
 // @param shaderStage1 : Current first shader stage (from API side)
 // @param shaderStage2 : Current second shader stage (from API side)
 // @param [out] config : Register configuration for local-hull-shader-specific pipeline
+template <typename T>
 void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, T *config) {
   assert(shaderStage1 == ShaderStageVertex || shaderStage1 == ShaderStageInvalid);
   assert(shaderStage2 == ShaderStageTessControl || shaderStage2 == ShaderStageInvalid);
@@ -1137,11 +1136,11 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
 // =====================================================================================================================
 // Builds register configuration for hardware export-geometry merged shader.
-template <typename T>
 //
 // @param shaderStage1 : Current first shader stage (from API side)
 // @param shaderStage2 : Current second shader stage (from API side)
 // @param [out] config : Register configuration for export-geometry-shader-specific pipeline
+template <typename T>
 void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, T *config) {
   assert(shaderStage1 == ShaderStageVertex || shaderStage1 == ShaderStageTessEval ||
          shaderStage1 == ShaderStageInvalid);
@@ -1334,11 +1333,11 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
 // =====================================================================================================================
 // Builds register configuration for hardware primitive shader.
-template <typename T>
 //
 // @param shaderStage1 : Current first shader stage (from API side)
 // @param shaderStage2 : Current second shader stage (from API side)
 // @param [out] config : Register configuration for primitive-shader-specific pipeline
+template <typename T>
 void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderStage shaderStage2, T *config) {
   assert(shaderStage1 == ShaderStageVertex || shaderStage1 == ShaderStageTessEval ||
          shaderStage1 == ShaderStageInvalid);
@@ -1724,11 +1723,10 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
 
 // =====================================================================================================================
 // Builds register configuration for hardware pixel shader.
-template <typename T>
 //
 // @param shaderStage : Current shader stage (from API side)
 // @param [out] config : Register configuration for pixel-shader-specific pipeline
-void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *config) {
+template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderStage, T *config) {
   assert(shaderStage == ShaderStageFragment);
 
   const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);

@@ -56,11 +56,10 @@ namespace {
 
 // =====================================================================================================================
 // Stream each map key and value for later inclusion in a hash
-template <class MapType>
 //
 // @param map : Map to stream
 // @param [in/out] stream : Stream to output map entries to
-static void streamMapEntries(MapType &map, raw_ostream &stream) {
+template <class MapType> static void streamMapEntries(MapType &map, raw_ostream &stream) {
   size_t mapCount = map.size();
   stream << StringRef(reinterpret_cast<const char *>(&mapCount), sizeof(mapCount));
   for (auto mapIt : map) {
