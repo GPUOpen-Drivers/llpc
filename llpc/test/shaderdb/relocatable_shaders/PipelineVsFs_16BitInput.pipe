@@ -1,0 +1,63 @@
+; Test that a 16-bit input is correctly returned by the fetch shader, and then correctly read by the vertex shader.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% \
+; RUN:         -enable-relocatable-shader-elf \
+; RUN:         -o %t.elf %gfxip %s %s -v | FileCheck --match-full-lines -check-prefix=SHADERTEST %s
+
+; Make sure the vertex shader truncates the first 16-bits before using the input.
+; SHADERTEST: // LLPC pipeline patching results
+; SHADERTEST: define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless({{.*}}, float [[input:%[0-9]*]]) #0 !lgc.shaderstage !1 {
+; SHADERTEST:  [[cast:%[0-9]+]] = bitcast float [[input]] to <2 x half>
+; SHADERTEST:  [[value:%[.a-zA-Z0-9]+]] = extractelement <2 x half> [[cast]], i64 0
+
+; Make sure the vertex fetch shader zero-extends the values that was loaded before loading it.  This needs to
+; corresponds to the vertex shader.
+; SHADERTEST-LABEL: // LGC glue shader results
+; SHADERTEST: define amdgpu_vs {{.*}}
+; SHADERTEST: [[ld:%[0-9]+]] = call half @llvm.amdgcn.struct.tbuffer.load.f16({{.*}}) #1
+; SHADERTEST: [[cast:%[0-9]+]] = bitcast half [[ld]] to i16
+; SHADERTEST: [[zext:%[0-9]+]] = zext i16 [[cast]] to i32
+; SHADERTEST: [[result:%[0-9]+]] = bitcast i32 [[zext]] to float
+; SHADERTEST: [[ret:%[0-9]+]] = insertvalue { {{.*}} } {{%[0-9]+}}, float [[result]], 19
+; SHADERTEST: ret { {{.*}} } [[ret]]
+; SHADERTEST: =====  AMDLLPC SUCCESS  =====
+; END_SHADERTEST
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+#extension GL_AMD_gpu_shader_half_float : require
+
+layout(location = 2) in float16_t _8;
+layout(location = 2) out float _9;
+
+void main()
+{
+    _9 = float(_8);
+}
+
+
+[VsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 1
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 1
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 8
+
+[VertexInputState]
+binding[0].binding = 1
+binding[0].stride = 2
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 2
+attribute[0].binding = 1
+attribute[0].format = VK_FORMAT_R16_SFLOAT
+attribute[0].offset = 0

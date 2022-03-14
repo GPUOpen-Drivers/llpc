@@ -99,6 +99,19 @@ Module *FetchShader::generate() {
       // Fetch the vertex.
       Value *vertex = vertexFetch->fetchVertex(fetch.ty, description, fetch.location, fetch.component, builder);
       Type *ty = cast<StructType>(result->getType())->getElementType(structIdx);
+
+      if (fetch.ty->getPrimitiveSizeInBits() < ty->getPrimitiveSizeInBits()) {
+        // If the number of bits do not match, we should zero-extend the value so that we can do the bit cast.  We
+        // assume that the number of bits in ty is no larger than 64. If the scalar size of fetch.ty is 32 or larger,
+        // the total size is a multiple of 32, and the condition above will be false.  If the scalar size of fetch.ty is
+        // 8 or 16, the vector size cannot be larger than 4, so the maximum size is 16*4, which is 64.
+        assert(ty->getPrimitiveSizeInBits() <= 64);
+        Type *smallerIntType = Type::getIntNTy(ty->getContext(), fetch.ty->getPrimitiveSizeInBits());
+        Type *largerIntType = Type::getIntNTy(ty->getContext(), ty->getPrimitiveSizeInBits());
+        vertex = builder.CreateBitCast(vertex, smallerIntType);
+        vertex = builder.CreateZExt(vertex, largerIntType);
+      }
+
       vertex = builder.CreateBitCast(vertex, ty);
       result = builder.CreateInsertValue(result, vertex, structIdx);
     }
