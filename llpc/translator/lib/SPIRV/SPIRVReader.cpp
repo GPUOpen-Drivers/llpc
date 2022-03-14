@@ -6883,7 +6883,7 @@ bool SPIRVToLLVM::transMetadata() {
           execModeMd.cs.LocalSizeX = em->getLiterals()[0];
           execModeMd.cs.LocalSizeY = em->getLiterals()[1];
           execModeMd.cs.LocalSizeZ = em->getLiterals()[2];
-        } else if (em = bf->getExecutionMode(ExecutionModeLocalSizeId)) {
+        } else if ((em = bf->getExecutionMode(ExecutionModeLocalSizeId))) {
           auto workGroupSizeX = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[0]));
           auto workGroupSizeY = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[1]));
           auto workGroupSizeZ = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[2]));
