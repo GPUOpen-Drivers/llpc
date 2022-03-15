@@ -6409,9 +6409,9 @@ Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicB
   // Derivative operations are performed on the XY of UV coordinate respectively, if both of result
   // are zero, we will return -FLT_MAX for LOD.
   Value *absDpdx =
-      getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, getBuilder()->CreateDerivative(coord, false, false));
+      getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, getBuilder()->CreateDerivative(coord, false, true));
   Value *absDpdy =
-      getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, getBuilder()->CreateDerivative(coord, true, false));
+      getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, getBuilder()->CreateDerivative(coord, true, true));
   Value *absDdpxPlusDpdy = getBuilder()->CreateFAdd(absDpdx, absDpdy);
   Value *maybeZero = getBuilder()->CreateFCmpOEQ(absDdpxPlusDpdy, ConstantFP::get(coord->getType(), 0.0));
 
