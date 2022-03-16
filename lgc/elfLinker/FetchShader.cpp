@@ -43,6 +43,10 @@ using namespace llvm;
 // =====================================================================================================================
 // Constructor. This is where we store all the information needed to generate the fetch shader; other methods
 // do not need to look at PipelineState.
+//
+// @param pipelineState : The pipeline state for which the fetch shader will be generated.
+// @param fetches : The vertex fetch information for the vertex shader.
+// @param vsEntryRegInfo : The information about the contents of the parameters to the vertex shader.
 FetchShader::FetchShader(PipelineState *pipelineState, ArrayRef<VertexFetchInfo> fetches,
                          const VsEntryRegInfo &vsEntryRegInfo)
     : GlueShader(pipelineState->getLgcContext()), m_vsEntryRegInfo(vsEntryRegInfo) {
@@ -83,12 +87,20 @@ StringRef FetchShader::getMainShaderName() {
 Module *FetchShader::generate() {
   // Create the function.
   Function *fetchFunc = createFetchFunc();
+  generateFetchShaderBody(fetchFunc);
+  replaceShaderInputBuiltInFunctions(fetchFunc);
+  return fetchFunc->getParent();
+}
 
-  // Process each vertex input.
+// =====================================================================================================================
+// Generate the body of the fetch function using the shader input builtins to access the inputs to the shader.
+//
+// @param [in/out] fetchFunc : The function for the fetch shader.
+void FetchShader::generateFetchShaderBody(Function *fetchFunc) { // Process each vertex input.
   std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(m_lgcContext));
   auto ret = cast<ReturnInst>(fetchFunc->back().getTerminator());
-  Value *result = ret->getOperand(0);
   BuilderBase builder(ret);
+  Value *result = ret->getOperand(0);
 
   for (unsigned idx = 0; idx != m_fetches.size(); ++idx) {
     const auto &fetch = m_fetches[idx];
@@ -104,8 +116,18 @@ Module *FetchShader::generate() {
     }
   }
   ret->setOperand(0, result);
+}
 
-  // Hook up the inputs (vertex buffer, base vertex, base instance, vertex ID, instance ID). The fetchVertex calls
+// =====================================================================================================================
+// Replaces calls to the shader input builtins in fetchFunc with code that will get the appropriate values from the
+// arguments.
+//
+// @param [in/out] fetchFunc : The function for the fetch shader.
+void FetchShader::replaceShaderInputBuiltInFunctions(Function *fetchFunc) const {
+  auto ret = cast<ReturnInst>(fetchFunc->back().getTerminator());
+  BuilderBase builder(ret);
+  // Hook up the inputs (vertex buffer, base vertex, base instance,
+  // vertex ID, instance ID). The fetchVertex calls
   // left its uses of them as lgc.special.user.data and lgc.shader.input calls.
   for (Function &func : *fetchFunc->getParent()) {
     if (!func.isDeclaration())
@@ -114,42 +136,84 @@ Module *FetchShader::generate() {
       while (!func.use_empty()) {
         auto call = cast<CallInst>(func.use_begin()->getUser());
         Value *replacement = nullptr;
-        switch (cast<ConstantInt>(call->getArgOperand(0))->getZExtValue()) {
-        case static_cast<unsigned>(UserDataMapping::VertexBufferTable): {
-          // Need to extend 32-bit vertex buffer table address to 64 bits.
-          AddressExtender extender(fetchFunc);
-          Value *highAddr = call->getArgOperand(1);
-          builder.SetInsertPoint(&*fetchFunc->front().getFirstInsertionPt());
-          replacement = extender.extend(fetchFunc->getArg(m_vsEntryRegInfo.vertexBufferTable), highAddr,
-                                        call->getType(), builder);
-          break;
-        }
-        case static_cast<unsigned>(UserDataMapping::BaseVertex):
-          replacement = fetchFunc->getArg(m_vsEntryRegInfo.baseVertex);
-          break;
-        case static_cast<unsigned>(UserDataMapping::BaseInstance):
-          replacement = fetchFunc->getArg(m_vsEntryRegInfo.baseInstance);
-          break;
-        case static_cast<unsigned>(ShaderInput::VertexId):
-          builder.SetInsertPoint(&*fetchFunc->front().getFirstInsertionPt());
-          replacement = builder.CreateBitCast(fetchFunc->getArg(m_vsEntryRegInfo.sgprCount + m_vsEntryRegInfo.vertexId),
-                                              builder.getInt32Ty());
-          break;
-        case static_cast<unsigned>(ShaderInput::InstanceId):
-          builder.SetInsertPoint(&*fetchFunc->front().getFirstInsertionPt());
-          replacement = builder.CreateBitCast(
-              fetchFunc->getArg(m_vsEntryRegInfo.sgprCount + m_vsEntryRegInfo.instanceId), builder.getInt32Ty());
-          break;
-        default:
-          llvm_unreachable("Unexpected special user data or shader input");
-        }
+        replacement = getReplacementForInputBuiltIn(call);
         call->replaceAllUsesWith(replacement);
         call->eraseFromParent();
       }
     }
   }
+}
 
-  return fetchFunc->getParent();
+// =====================================================================================================================
+// Returns the value that is represented by |call|.  It will be in a position where in can be used in place of all
+// uses of |call|.
+//
+// @param call : A call to a shader input builtin that needs to be replaced.
+// @returns : The value that is represented by |call|.
+Value *FetchShader::getReplacementForInputBuiltIn(CallInst *call) const {
+  switch (cast<ConstantInt>(call->getArgOperand(0))->getZExtValue()) {
+  case static_cast<unsigned>(UserDataMapping::VertexBufferTable):
+    return getReplacementForVertexBufferTableBuiltIn(call);
+  case static_cast<unsigned>(UserDataMapping::BaseVertex):
+    return call->getFunction()->getArg(m_vsEntryRegInfo.baseVertex);
+  case static_cast<unsigned>(UserDataMapping::BaseInstance):
+    return call->getFunction()->getArg(m_vsEntryRegInfo.baseInstance);
+  case static_cast<unsigned>(ShaderInput::VertexId):
+    return getReplacementForVertexIdBuiltIn(call);
+  case static_cast<unsigned>(ShaderInput::InstanceId):
+    return getReplacementForInstanceIdBuiltIn(call);
+  default:
+    llvm_unreachable("Unexpected special user data or shader input");
+  }
+  return nullptr;
+}
+
+// =====================================================================================================================
+// Returns the value of the instance id.  All new code will be place at the start of the function containing call.
+//
+// @param call : A call to the InstanceId shader input builtin.
+// @returns : The value of the InstanceId.
+Value *FetchShader::getReplacementForInstanceIdBuiltIn(CallInst *call) const {
+  Function *callerFunction = call->getFunction();
+  return getVgprArgument(m_vsEntryRegInfo.instanceId, callerFunction);
+}
+
+// =====================================================================================================================
+// Returns the value of the vertex id.  All new code will be place at the start of the function containing call.
+//
+// @param call : A call to the VertexId shader input builtin.
+// @returns : The value of the VertexId.
+Value *FetchShader::getReplacementForVertexIdBuiltIn(CallInst *call) const {
+  Function *callerFunction = call->getFunction();
+  return getVgprArgument(m_vsEntryRegInfo.vertexId, callerFunction);
+}
+
+// =====================================================================================================================
+// Returns the value of the argument in the function that corresponds to the given VGPR.
+//
+// @param vgpr : The VGPR number from which the value should come.
+// @param function : The function from which to get the argument.
+// @returns : The value of the argument.
+Value *FetchShader::getVgprArgument(unsigned vgpr, Function *function) const {
+  BuilderBase builder(&*function->front().getFirstInsertionPt());
+  Argument *vertexId = function->getArg(m_vsEntryRegInfo.sgprCount + vgpr);
+  return builder.CreateBitCast(vertexId, builder.getInt32Ty());
+}
+
+// =====================================================================================================================
+// Returns the value of the address of the VertexBufferTable.  All new code will be place at the start of the
+// function containing call.
+//
+// @param call : A call to the VertexBufferTable shader input builtin.
+// @returns : The value of the address of the VertexBufferTable.
+Value *FetchShader::getReplacementForVertexBufferTableBuiltIn(CallInst *call) const {
+  // Need to extend 32-bit vertex buffer table address to 64 bits.
+  Function *callerFunction = call->getFunction();
+  AddressExtender extender(callerFunction);
+  Value *highAddr = call->getArgOperand(1);
+  BuilderBase builder(&*callerFunction->front().getFirstInsertionPt());
+  Argument *vertexBufferTable = callerFunction->getArg(m_vsEntryRegInfo.vertexBufferTable);
+  return extender.extend(vertexBufferTable, highAddr, call->getType(), builder);
 }
 
 // =====================================================================================================================

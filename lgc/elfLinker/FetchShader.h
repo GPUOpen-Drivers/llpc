@@ -34,6 +34,7 @@
 #include "GlueShader.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/util/BuilderBase.h"
 
 namespace lgc {
 
@@ -73,6 +74,14 @@ protected:
 
 private:
   llvm::Function *createFetchFunc();
+  void generateFetchShaderBody(llvm::Function *fetchFunc);
+
+  void replaceShaderInputBuiltInFunctions(llvm::Function *fetchFunc) const;
+  llvm::Value *getReplacementForVertexBufferTableBuiltIn(llvm::CallInst *call) const;
+  llvm::Value *getReplacementForInputBuiltIn(llvm::CallInst *call) const;
+  llvm::Value *getReplacementForVertexIdBuiltIn(llvm::CallInst *call) const;
+  llvm::Value *getReplacementForInstanceIdBuiltIn(llvm::CallInst *call) const;
+  llvm::Value *getVgprArgument(unsigned vgpr, llvm::Function *function) const;
 
   // The information stored here is all that is needed to generate the fetch shader. We deliberately do not
   // have access to PipelineState, so we can hash the information here and let the front-end use it as the
