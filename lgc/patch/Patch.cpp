@@ -242,6 +242,15 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
 }
 
 // =====================================================================================================================
+// Register all the patching passes into the given pass manager
+//
+// @param [in/out] passMgr : Pass manager
+void Patch::registerPasses(lgc::PassManager &passMgr) {
+#define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, decltype(CLASS)::name());
+#include "PassRegistry.def"
+}
+
+// =====================================================================================================================
 // Add whole-pipeline patch passes to pass manager
 //
 // @param pipelineState : Pipeline state

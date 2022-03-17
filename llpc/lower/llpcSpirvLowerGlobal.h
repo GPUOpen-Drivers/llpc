@@ -59,7 +59,7 @@ public:
   void handleStoreInstGlobal(StoreInst &storeInst);
   void handleStoreInstGEP(GetElementPtrInst *const getElemPtr, StoreInst &storeInst);
 
-  static llvm::StringRef name() { return "Lower SPIR-V globals (global variables, inputs, and outputs"; }
+  static llvm::StringRef name() { return "Lower SPIR-V globals (global variables, inputs, and outputs)"; }
 
 private:
   void mapGlobalVariableToProxy(llvm::GlobalVariable *globalVar);
