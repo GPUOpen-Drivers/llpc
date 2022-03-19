@@ -4,7 +4,7 @@ LLPC can be built into a standalone offline compiler (amdllpc). It supports GLSL
 
 ## Build instructions
 
-LLPC is normally built as part of the [AMD Open Source Driver for Vulkan](../AMDVLK/README.md). The build includes standalone `lgc` and `amdllpc`. You can build `lgc amdllpc` only or build `check-lgc check-lgc-units check-amdllpc check-amdllpc-units` to run local tests besides the build.
+LLPC is normally built as part of the [AMD Open Source Driver for Vulkan](https://github.com/GPUOpen-Drivers/AMDVLK/blob/dev/README.md). The build includes standalone `lgc` and `amdllpc`. You can build `lgc amdllpc` only or build `check-lgc check-lgc-units check-amdllpc check-amdllpc-units` to run local tests besides the build.
 ```
 cmake --build xgl/builds/Release64 --target lgc amdllpc
 ```
