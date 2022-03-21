@@ -966,8 +966,10 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     unsigned dwordSize = userDataArg.argDwordSize;
     if (userDataArg.userDataValue != static_cast<unsigned>(UserDataMapping::Invalid)) {
       // Most of user data metadata entries is 1 except for root push descriptors.
-      bool isSystemUserData = userDataArg.userDataValue >= static_cast<unsigned>(UserDataMapping::GlobalTable);
+      bool isSystemUserData = isSystemUserDataValue(userDataArg.userDataValue);
       unsigned numEntries = isSystemUserData ? 1 : dwordSize;
+      assert((!isUnlinkedDescriptorSetValue(userDataArg.userDataValue) || dwordSize == 1) &&
+             "Expecting descriptor set values to be one dword.  The linker cannot handle anything else.");
       m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, userDataArg.userDataValue,
                                                           numEntries);
       if (isSystemUserData) {
@@ -989,6 +991,26 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames, argOffset);
 
   return inRegMask;
+}
+
+// =====================================================================================================================
+// @param userDataValue : The value to be written into a user data entry.
+// @returns : True if the user data value corresponds to a special system user data value.
+bool PatchEntryPointMutate::isSystemUserDataValue(unsigned userDataValue) const {
+  if (userDataValue < static_cast<unsigned>(UserDataMapping::GlobalTable)) {
+    return false;
+  }
+  return userDataValue < static_cast<unsigned>(UserDataMapping::DescriptorSet0);
+}
+
+// =====================================================================================================================
+// @param userDataValue : The value to be written into a user data entry.
+// @returns : True if the user data value corresponds to an unlinked descriptor set.
+bool PatchEntryPointMutate::isUnlinkedDescriptorSetValue(unsigned userDataValue) const {
+  if (userDataValue < static_cast<unsigned>(UserDataMapping::DescriptorSet0)) {
+    return false;
+  }
+  return userDataValue <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax);
 }
 
 // =====================================================================================================================
