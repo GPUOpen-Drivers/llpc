@@ -412,7 +412,11 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(ReassociatePass());
   LoopPassManager lpm;
   lpm.addPass(LoopRotatePass());
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 418547
   lpm.addPass(LICMPass());
+#else
+  lpm.addPass(LICMPass(LICMOptions()));
+#endif
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm), true));
   fpm.addPass(SimplifyCFGPass());
   fpm.addPass(InstCombinePass(1));
