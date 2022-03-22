@@ -40,6 +40,8 @@
 using namespace lgc;
 using namespace llvm;
 
+constexpr uint32_t LsHsSysValueMergedWaveInfo = 3;
+
 // =====================================================================================================================
 // Constructor. This is where we store all the information needed to generate the fetch shader; other methods
 // do not need to look at PipelineState.
@@ -53,6 +55,7 @@ FetchShader::FetchShader(PipelineState *pipelineState, ArrayRef<VertexFetchInfo>
   m_fetches.append(fetches.begin(), fetches.end());
   for (const auto &fetch : m_fetches)
     m_fetchDescriptions.push_back(pipelineState->findVertexInputDescription(fetch.location));
+  m_fixLsVgprInput = pipelineState->getTargetInfo().getGpuWorkarounds().gfx9.fixLsVgprInput;
 }
 
 // =====================================================================================================================
@@ -72,6 +75,7 @@ StringRef FetchShader::getString() {
       else
         m_shaderString += StringRef(reinterpret_cast<const char *>(description), sizeof(*description));
     }
+    m_shaderString += m_fixLsVgprInput;
   }
   return m_shaderString;
 }
@@ -188,7 +192,7 @@ Value *FetchShader::getReplacementForInputBuiltIn(CallInst *call) const {
 // @returns : The value of the InstanceId.
 Value *FetchShader::getReplacementForInstanceIdBuiltIn(CallInst *call) const {
   Function *callerFunction = call->getFunction();
-  return getVgprArgument(m_vsEntryRegInfo.instanceId, callerFunction);
+  return getVgprArgumentAsAnInt32(m_vsEntryRegInfo.instanceId, callerFunction);
 }
 
 // =====================================================================================================================
@@ -198,24 +202,62 @@ Value *FetchShader::getReplacementForInstanceIdBuiltIn(CallInst *call) const {
 // @returns : The value of the VertexId.
 Value *FetchShader::getReplacementForVertexIdBuiltIn(CallInst *call) const {
   Function *callerFunction = call->getFunction();
-  return getVgprArgument(m_vsEntryRegInfo.vertexId, callerFunction);
+  return getVgprArgumentAsAnInt32(m_vsEntryRegInfo.vertexId, callerFunction);
 }
 
 // =====================================================================================================================
-// Returns the value of the argument in the function that corresponds to the given VGPR.
+// Returns the value of the argument in the function that corresponds to the given VGPR cast to a 32-bit integer.
 //
 // @param vgpr : The VGPR number from which the value should come.
 // @param function : The function from which to get the argument.
-// @returns : The value of the argument.
-Value *FetchShader::getVgprArgument(unsigned vgpr, Function *function) const {
+// @returns : The value of the argument as a 32-bit integer.
+Value *FetchShader::getVgprArgumentAsAnInt32(unsigned vgpr, Function *function) const {
   BuilderBase builder(&*function->front().getFirstInsertionPt());
-  Argument *vertexId = function->getArg(m_vsEntryRegInfo.sgprCount + vgpr);
+  Value *vertexId = getVpgrArgument(vgpr, builder);
   return builder.CreateBitCast(vertexId, builder.getInt32Ty());
 }
 
 // =====================================================================================================================
+// Returns the value of the argument in the function that corresponds to the given VGPR.  The function that is used will
+// be the same as the function that contains the insertion point of the builder. All new instructions will be added
+// using the builder.
+//
+// @param vgpr : The VGPR number from which the value should come.
+// @param builder : The builder to use if new instructions are needed.
+// @returns : The value of the argument in the function.
+Value *FetchShader::getVpgrArgument(unsigned vgpr, BuilderBase &builder) const {
+  Function *function = builder.GetInsertPoint()->getFunction();
+  if (!mustFixLsVgprInput())
+    return function->getArg(m_vsEntryRegInfo.sgprCount + vgpr);
+
+  // On GFX9, the hardware will shift the LS input vgprs by 2 when the HS is null (ie has vertex count 0).  The vertex
+  // count is not know ahead of time, so it must be checked at runtime.
+  constexpr unsigned offsetCorrection = 2;
+
+  Type *int32Type = builder.getInt32Ty();
+  Value *mergeWaveInfo = function->getArg(LsHsSysValueMergedWaveInfo);
+  Value *eight = builder.getInt32(8);
+  std::array<Value *, 3> args = {mergeWaveInfo, eight, eight};
+  std::array<Attribute::AttrKind, 1> attribs = {Attribute::ReadNone};
+  Value *hsVertexCount = builder.CreateNamedCall("llvm.amdgcn.ubfe.i32", int32Type, args, attribs, "HsVertCount");
+  Value *isNullHs = builder.CreateICmp(CmpInst::ICMP_EQ, hsVertexCount, builder.getInt32(0), "IsNullHs");
+
+  Value *valueForNonNullHs = function->getArg(m_vsEntryRegInfo.sgprCount + vgpr);
+  Value *valueForNullHs = function->getArg(m_vsEntryRegInfo.sgprCount + vgpr - offsetCorrection);
+  return builder.CreateSelect(isNullHs, valueForNullHs, valueForNonNullHs, "VgprArgument");
+}
+
+// =====================================================================================================================
+// Returns true if the fetch shader must fix up the VGPR input registers to account for the way GFX9 provides the LS
+// VGPR inputs.
+//
+// @returns : Returns true if the fetch shader must fix up the VGPR input registers.
+bool FetchShader::mustFixLsVgprInput() const {
+  return (m_fixLsVgprInput && m_vsEntryRegInfo.callingConv == CallingConv::AMDGPU_HS);
+}
+
+// =====================================================================================================================
 // Returns the value of the address of the VertexBufferTable.  All new code will be place at the start of the
-// function containing call.
 //
 // @param call : A call to the VertexBufferTable shader input builtin.
 // @returns : The value of the address of the VertexBufferTable.
@@ -258,6 +300,8 @@ Function *FetchShader::createFetchFunc() {
     func->getArg(i)->addAttr(Attribute::InReg);
 
   // Add mnemonic names to input args.
+  if (m_vsEntryRegInfo.callingConv == CallingConv::AMDGPU_HS)
+    func->getArg(LsHsSysValueMergedWaveInfo)->setName("MergedWaveInfo");
   func->getArg(m_vsEntryRegInfo.vertexBufferTable)->setName("VertexBufferTable");
   func->getArg(m_vsEntryRegInfo.baseVertex)->setName("BaseVertex");
   func->getArg(m_vsEntryRegInfo.baseInstance)->setName("BaseInstance");

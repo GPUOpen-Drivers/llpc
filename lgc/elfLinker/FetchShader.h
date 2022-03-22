@@ -81,7 +81,9 @@ private:
   llvm::Value *getReplacementForInputBuiltIn(llvm::CallInst *call) const;
   llvm::Value *getReplacementForVertexIdBuiltIn(llvm::CallInst *call) const;
   llvm::Value *getReplacementForInstanceIdBuiltIn(llvm::CallInst *call) const;
-  llvm::Value *getVgprArgument(unsigned vgpr, llvm::Function *function) const;
+  llvm::Value *getVgprArgumentAsAnInt32(unsigned vgpr, llvm::Function *function) const;
+  llvm::Value *getVpgrArgument(unsigned vgpr, BuilderBase &builder) const;
+  bool mustFixLsVgprInput() const;
 
   // The information stored here is all that is needed to generate the fetch shader. We deliberately do not
   // have access to PipelineState, so we can hash the information here and let the front-end use it as the
@@ -91,6 +93,9 @@ private:
   llvm::SmallVector<const VertexInputDescription *, 8> m_fetchDescriptions;
   // The encoded or hashed (in some way) single string version of the above.
   std::string m_shaderString;
+
+  // True if the fetch shader must work around the hardware sometimes shifting the vgpr inputs by two.
+  bool m_fixLsVgprInput = false;
 };
 
 } // namespace lgc
