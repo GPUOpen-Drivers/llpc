@@ -204,6 +204,7 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
   // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
   std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(getLgcContext()->getTargetMachine()));
   passMgr->setPassIndex(&passIndex);
+  Patch::registerPasses(*passMgr);
   passMgr->registerFunctionAnalysis([&] { return getLgcContext()->getTargetMachine()->getTargetIRAnalysis(); });
   passMgr->registerModuleAnalysis([&] { return PipelineShaders(); });
 

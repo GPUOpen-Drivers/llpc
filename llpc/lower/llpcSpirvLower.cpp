@@ -226,7 +226,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 }
 
 // =====================================================================================================================
-// Register a pass to identify it with a short name in the pass manager
+// Register all the lowering passes into the given pass manager
 //
 // @param [in/out] passMgr : Pass manager
 void SpirvLower::registerPasses(lgc::PassManager &passMgr) {

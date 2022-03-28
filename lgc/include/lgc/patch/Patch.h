@@ -129,6 +129,9 @@ public:
                         llvm::Timer *patchTimer, llvm::Timer *optTimer,
                         Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, llvm::CodeGenOpt::Level optLevel);
 
+  // Register all the patching passes into the given pass manager
+  static void registerPasses(lgc::PassManager &passMgr);
+
   static llvm::GlobalVariable *getLdsVariable(PipelineState *pipelineState, llvm::Module *module);
 
 protected:

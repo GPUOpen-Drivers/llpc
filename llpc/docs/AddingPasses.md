@@ -31,4 +31,4 @@ This `PassRegistry.def` file is included in `llpcSpirvLower.cpp`, so you may nee
 
 ## Register a middle-end pass
 
-TODO: The new pass manager is currently unused for the middle-end passes.
+The process to register a middle-end pass is the same. The middle-end pass registry file is `lgc/patch/PassRegistry.def`.
