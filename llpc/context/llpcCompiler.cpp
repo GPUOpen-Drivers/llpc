@@ -162,8 +162,8 @@ opt<bool> FatalLlvmErrors("fatal-llvm-errors", cl::desc("Make all LLVM errors fa
 // -new-pass-manager: Use LLVM's new pass manager (experimental)
 opt<unsigned> NewPassManager("new-pass-manager",
                              cl::desc("0 - Legacy pass manager, 1 - New pass manager front-end, 2 - New pass manager "
-                                      "front-end and middle-end (experimental)"),
-                             init(1));
+                                      "front-end and middle-end"),
+                             init(2));
 
 extern opt<bool> EnableOuts;
 
