@@ -45,6 +45,7 @@
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Support/AMDGPUMetadata.h"
+#include "llvm/Support/StringSaver.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 401324
 // Old version
 #include "llvm/Support/TargetRegistry.h"
@@ -64,6 +65,38 @@ const char *getPalMetadataRegName(unsigned regNumber);
 
 namespace {
 
+// Represents an operand of a disassembler instruction.
+struct InstOp {
+  Optional<int64_t> imm;
+  Optional<unsigned> sReg;
+};
+
+// Represents a disassembled instruction or directive.
+struct InstOrDirective {
+  MCDisassembler::DecodeStatus status = MCDisassembler::Fail;
+  uint64_t offset;
+  ArrayRef<uint8_t> bytes;
+  MCInst mcInst;
+
+  StringRef mnemonic;
+  StringRef comment;
+  InstOp op0;
+  InstOp op1;
+  InstOp op2;
+
+  const MCExpr *valueDirectiveExpr = nullptr;
+
+  uint64_t getEndOffset() const { return offset + bytes.size(); }
+};
+
+// Stores symbols.
+struct SymbolPool {
+  SectionSymbolsTy symbols;
+
+  // Translates (offset, symbol type) pairs to symbols.
+  DenseMap<std::pair<uint64_t, unsigned>, MCSymbol *> symbolMap;
+};
+
 // Class for the object file disassembler.
 class ObjDisassembler {
   MemoryBufferRef m_data;
@@ -75,8 +108,11 @@ class ObjDisassembler {
   std::unique_ptr<MCSubtargetInfo> m_subtargetInfo;
   std::unique_ptr<MCStreamer> m_streamer;
   std::unique_ptr<MCDisassembler> m_instDisassembler;
+  MCInstPrinter *m_instPrinter = nullptr;
   MCContext *m_context = nullptr;
   std::vector<object::RelocationRef> relocs;
+  BumpPtrAllocator m_stringsAlloc;
+  StringSaver m_strings{m_stringsAlloc};
 
 public:
   static void disassembleObject(MemoryBufferRef data, raw_ostream &ostream) {
@@ -89,15 +125,20 @@ private:
 
   void run();
   void processSection(ELFSectionRef sectionRef);
-  void gatherSectionSymbols(ELFSectionRef sectionRef, SectionSymbolsTy &symbols,
-                            std::vector<std::unique_ptr<std::string>> &synthesizedLabels);
+  void gatherSectionSymbols(ELFSectionRef sectionRef, SymbolPool &symbols);
   void gatherRelocs(ELFSectionRef sectionRef, std::vector<object::RelocationRef> &relocs);
   void tryDisassembleSection(ELFSectionRef sectionRef, unsigned sectType, unsigned sectFlags, bool outputting,
-                             ArrayRef<SymbolInfoTy> symbols, ArrayRef<object::RelocationRef> relocs);
+                             SymbolPool &symbols, ArrayRef<object::RelocationRef> relocs);
+  bool disasmInstSeq(SmallVectorImpl<InstOrDirective> &seq, uint64_t offset, bool outputting, StringRef contents,
+                     SymbolPool &symbols);
+  bool disasmTableJump(SmallVectorImpl<InstOrDirective> &seq, const InstOrDirective &inst, bool outputting,
+                       StringRef contents, SymbolPool &symbols);
+  InstOrDirective disasmInst(uint64_t offset, StringRef contents);
   void addBinaryEncodingComment(raw_ostream &stream, unsigned instAlignment, ArrayRef<uint8_t> instBytes);
   void outputData(bool outputting, uint64_t offset, StringRef data, ArrayRef<object::RelocationRef> &relocs);
   void outputRelocs(bool outputting, uint64_t offset, uint64_t size, ArrayRef<object::RelocationRef> &relocs);
   size_t decodeNote(StringRef data);
+  MCSymbol *getOrCreateSymbol(SymbolPool &symbols, uint64_t offset, Twine name = {}, unsigned type = ELF::STT_NOTYPE);
 
   support::endianness endian() { return m_objFile->isLittleEndian() ? support::little : support::big; }
 };
@@ -179,14 +220,13 @@ void ObjDisassembler::run() {
   m_instDisassembler.reset(m_target->createMCDisassembler(*m_subtargetInfo, *m_context));
   if (!m_instDisassembler)
     report_fatal_error(m_data.getBufferIdentifier() + ": No disassembler for target");
-  MCInstPrinter *instPrinter(
-      m_target->createMCInstPrinter(triple, asmInfo->getAssemblerDialect(), *asmInfo, *instrInfo, *regInfo));
-  if (!instPrinter)
+  m_instPrinter = m_target->createMCInstPrinter(triple, asmInfo->getAssemblerDialect(), *asmInfo, *instrInfo, *regInfo);
+  if (!m_instPrinter)
     report_fatal_error(m_data.getBufferIdentifier() + ": No instruction printer for target");
 
   auto fostream = std::make_unique<formatted_raw_ostream>(m_ostream);
-  m_streamer.reset(
-      m_target->createAsmStreamer(*m_context, std::move(fostream), true, false, instPrinter, nullptr, nullptr, false));
+  m_streamer.reset(m_target->createAsmStreamer(*m_context, std::move(fostream), true, false, m_instPrinter, nullptr,
+                                               nullptr, false));
 
   // Process each section.
   for (ELFSectionRef sectionRef : m_objFile->sections())
@@ -210,11 +250,10 @@ void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
   MCSection *sect = m_context->getELFSection(cantFail(sectionRef.getName()), sectType, sectFlags);
   m_streamer->SwitchSection(sect);
 
-  // Create an array of all symbols in this section. Also emit directives for symbol type and size,
+  // Create all symbols in this section. Also emit directives for symbol type and size,
   // adding a synthesized label for the end of the symbol.
-  SectionSymbolsTy symbols;
-  std::vector<std::unique_ptr<std::string>> synthesizedLabels;
-  gatherSectionSymbols(sectionRef, symbols, synthesizedLabels);
+  SymbolPool symbols;
+  gatherSectionSymbols(sectionRef, symbols);
 
   // Collect and sort the relocs for the section.
   std::vector<object::RelocationRef> relocs;
@@ -226,8 +265,6 @@ void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
   bool outputting = !(sectFlags & ELF::SHF_EXECINSTR);
   for (;;) {
     // One iteration of disassembling the section.
-    // Sort the symbols. (Stable sort as there may be duplicate addresses.)
-    stable_sort(symbols);
 
     // If AMDGPU, create a symbolizer, giving it the symbols.
     MCSymbolizer *symbolizerPtr = nullptr;
@@ -235,57 +272,48 @@ void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
       std::unique_ptr<MCRelocationInfo> relInfo(m_target->createMCRelocationInfo(m_tripleName, *m_context));
       if (relInfo) {
         std::unique_ptr<MCSymbolizer> symbolizer(
-            m_target->createMCSymbolizer(m_tripleName, nullptr, nullptr, &symbols, m_context, std::move(relInfo)));
+            m_target->createMCSymbolizer(m_tripleName, /* GetOpInfo= */ nullptr, /* SymbolLookUp= */ nullptr,
+                                         &symbols.symbols, m_context, std::move(relInfo)));
         symbolizerPtr = &*symbolizer;
         m_instDisassembler->setSymbolizer(std::move(symbolizer));
       }
     }
 
     // Disassemble the section contents.
+    size_t prevNumSymbols = symbols.symbols.size();
+    stable_sort(symbols.symbols); // Stable sort as there may be duplicate addresses.
     tryDisassembleSection(sectionRef, sectType, sectFlags, outputting, symbols, relocs);
     if (outputting)
       break; // Done final outputting pass.
 
-    // If we created a symbolizer, get the referenced addresses from it and synthesize labels, avoiding
-    // duplicates. If there were no new referenced addresses, then we can do the final output in the next
-    // pass (indicated by the setting of outputting).
-    outputting = true;
-    if (symbolizerPtr && !symbolizerPtr->getReferencedAddresses().empty()) {
-      outputting = false;
-      std::vector<uint64_t> referencedAddresses;
-      referencedAddresses.insert(referencedAddresses.begin(), symbolizerPtr->getReferencedAddresses().begin(),
-                                 symbolizerPtr->getReferencedAddresses().end());
-      llvm::sort(referencedAddresses.begin(), referencedAddresses.end());
-      uint64_t lastLabel = ~uint64_t(0);
-      for (uint64_t labelAddr : referencedAddresses) {
-        if (labelAddr == lastLabel)
-          continue;
-        lastLabel = labelAddr;
-        synthesizedLabels.push_back({});
-        synthesizedLabels.back().reset(new std::string((Twine("_L") + Twine::utohexstr(labelAddr)).str()));
-        symbols.push_back(SymbolInfoTy(labelAddr, *synthesizedLabels.back(), ELF::STT_NOTYPE));
-      }
+    if (symbolizerPtr) {
+      for (uint64_t offset : symbolizerPtr->getReferencedAddresses())
+        getOrCreateSymbol(symbols, offset);
     }
+
+    // If there were no new symbols, then we can do the final output in
+    // the next pass.
+    outputting = (symbols.symbols.size() == prevNumSymbols);
   }
 }
 
 // =====================================================================================================================
-// Create an array of all symbols in the given section. Also emit directives for symbol type and size.
+// Create all symbols in the given section. Also emit directives for symbol type and size.
 // The size is an expression endSym-sym where endSym is a synthesized label at the end of the function.
 //
 // @param sectionRef : The section being disassembled
-// @param [out] symbols : Vector of symbols to populate
-// @param [out] synthesizedLabels : Vector of names for synthesized labels
-void ObjDisassembler::gatherSectionSymbols(ELFSectionRef sectionRef, SectionSymbolsTy &symbols,
-                                           std::vector<std::unique_ptr<std::string>> &synthesizedLabels) {
+// @param [out] symbols : Symbols to populate
+void ObjDisassembler::gatherSectionSymbols(ELFSectionRef sectionRef, SymbolPool &symbols) {
   for (ELFSymbolRef symbolRef : m_objFile->symbols()) {
     if (cantFail(symbolRef.getSection()) != sectionRef)
       continue;
-    symbols.push_back(
-        SymbolInfoTy(cantFail(symbolRef.getValue()), cantFail(symbolRef.getName()), symbolRef.getELFType()));
 
-    MCSymbol *sym = m_context->getOrCreateSymbol(symbols.back().Name);
-    switch (symbols.back().Type) {
+    uint64_t offset = cantFail(symbolRef.getValue());
+    StringRef name = cantFail(symbolRef.getName());
+    unsigned type = symbolRef.getELFType();
+    MCSymbol *sym = getOrCreateSymbol(symbols, offset, name, type);
+
+    switch (type) {
     case ELF::STT_FUNC:
       m_streamer->emitSymbolAttribute(sym, MCSA_ELF_TypeFunction);
       break;
@@ -295,11 +323,9 @@ void ObjDisassembler::gatherSectionSymbols(ELFSectionRef sectionRef, SectionSymb
     }
 
     if (uint64_t size = symbolRef.getSize()) {
-      if (symbols.back().Addr + size <= cantFail(sectionRef.getContents()).size()) {
-        synthesizedLabels.push_back(std::make_unique<std::string>((Twine(symbols.back().Name) + "_symend").str()));
-        StringRef endName = *synthesizedLabels.back();
-        MCSymbol *endSym = m_context->getOrCreateSymbol(endName);
-        symbols.push_back(SymbolInfoTy(symbols.back().Addr + size, endName, ELF::STT_NOTYPE));
+      uint64_t endOffset = offset + size;
+      if (endOffset <= cantFail(sectionRef.getContents()).size()) {
+        MCSymbol *endSym = getOrCreateSymbol(symbols, endOffset, Twine(name) + "_symend");
         const MCExpr *sizeExpr = MCBinaryExpr::createSub(MCSymbolRefExpr::create(endSym, *m_context),
                                                          MCSymbolRefExpr::create(sym, *m_context), *m_context);
         m_streamer->emitELFSize(sym, sizeExpr);
@@ -336,7 +362,7 @@ void ObjDisassembler::gatherRelocs(ELFSectionRef sectionRef, std::vector<object:
 // @param symbols : Sorted array of symbols in the section
 // @param relocs : Sorted array of relocs in the section
 void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned sectType, unsigned sectFlags,
-                                            bool outputting, ArrayRef<SymbolInfoTy> symbols,
+                                            bool outputting, SymbolPool &symbols,
                                             ArrayRef<object::RelocationRef> relocs) {
 
   bool isCode = sectFlags & ELF::SHF_EXECINSTR;
@@ -348,12 +374,18 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
   // Get the section contents, and disassemble until nothing left.
   StringRef contents = cantFail(sectionRef.getContents());
   size_t offset = 0, lastOffset = 0;
-  auto nextSymbol = symbols.begin();
+  size_t nextSymbol = 0;
+
+  // The current sequence of instructions, if any.
+  // In the table-jump sequence, currently seen as the longest one, there
+  // are 8 instructions followed by likely more than 8 target offset
+  // entries, which suggests 32 be the suitable power of two for the size.
+  SmallVector<InstOrDirective, 32> instSeq;
 
   for (;;) {
     size_t endOffset = contents.size();
-    if (nextSymbol != symbols.end() && nextSymbol->Addr < endOffset)
-      endOffset = nextSymbol->Addr;
+    if (nextSymbol != symbols.symbols.size() && symbols.symbols[nextSymbol].Addr < endOffset)
+      endOffset = symbols.symbols[nextSymbol].Addr;
 
     if (offset == endOffset) {
       // We're about to emit a symbol or finish the section.
@@ -363,10 +395,10 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
         lastOffset = offset;
       }
 
-      if (nextSymbol != symbols.end() && nextSymbol->Addr == offset) {
+      if (nextSymbol != symbols.symbols.size() && symbols.symbols[nextSymbol].Addr == offset) {
         // Output a symbol or label here.
         if (outputting) {
-          MCSymbol *sym = m_context->getOrCreateSymbol(nextSymbol->Name);
+          MCSymbol *sym = m_context->getOrCreateSymbol(symbols.symbols[nextSymbol].Name);
           if (sym->isUndefined())
             m_streamer->emitLabel(sym);
         }
@@ -389,21 +421,20 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
       continue;
     }
 
-    // Try disassembling an instruction.
-    uint64_t instSize = 0;
-    MCInst inst;
-    ArrayRef<uint8_t> code(reinterpret_cast<const uint8_t *>(contents.data()) + offset, endOffset - offset);
-    std::string comment;
-    raw_string_ostream commentStream(comment);
-    MCDisassembler::DecodeStatus status = MCDisassembler::Fail;
-    if (isCode && (offset & instAlignment - 1) == 0)
-      status = m_instDisassembler->getInstruction(inst, instSize, code, offset, commentStream);
+    // Skip instructions that are at already disassembled offsets.
+    while (!instSeq.empty() && instSeq.front().offset < offset)
+      instSeq.erase(instSeq.begin());
 
-    if (status == MCDisassembler::Fail) {
+    // Try disassembling an instruction.
+    if (!isCode || (offset & instAlignment - 1) != 0 ||
+        (instSeq.empty() && !disasmInstSeq(instSeq, offset, outputting, contents, symbols))) {
       // No disassemblable instruction here. Try the next instruction unit.
       offset = std::min(size_t(alignTo(offset + 1, instAlignment)), endOffset);
       continue;
     }
+
+    InstOrDirective inst = instSeq[0];
+    instSeq.erase(instSeq.begin());
 
     // Got a disassemblable instruction.
     // First output any non-disassemblable data up to this point.
@@ -412,24 +443,191 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
       lastOffset = offset;
     }
     // Output reloc.
-    outputRelocs(outputting, offset, instSize, relocs);
+    outputRelocs(outputting, offset, inst.bytes.size(), relocs);
 
     if (outputting) {
       // Output the binary encoding as a comment.
-      if (status == MCDisassembler::SoftFail)
+      if (inst.status == MCDisassembler::SoftFail)
         m_streamer->AddComment("Illegal instruction encoding ");
+      std::string comment = inst.comment.str();
+      raw_string_ostream commentStream(comment);
       if (!comment.empty())
         commentStream << " ";
-      commentStream << format("%06x:", offset);
-      addBinaryEncodingComment(commentStream, instAlignment, code.slice(0, instSize));
+      commentStream << format("%06x:", inst.offset);
+      addBinaryEncodingComment(commentStream, instAlignment, inst.bytes);
       // Output the instruction to the streamer.
       if (!comment.empty())
         m_streamer->AddComment(comment);
-      m_streamer->emitInstruction(inst, *m_subtargetInfo);
+      if (const MCExpr *expr = inst.valueDirectiveExpr)
+        m_streamer->emitValue(expr, inst.bytes.size());
+      else
+        m_streamer->emitInstruction(inst.mcInst, *m_subtargetInfo);
     }
-    offset += instSize;
+    offset += inst.bytes.size();
     lastOffset = offset;
   }
+}
+
+// =====================================================================================================================
+// Try disassembling an instruction sequence.
+//
+// @param [out] seq : The sequence of instructions or directives
+// @param offset : The offset at which the sequence begins
+// @param outputting : True to actually stream the disassembly output
+// @param contents : The bytes of the section
+// @param symbols : The symbols of the section
+// @returns : Return true on success.
+bool ObjDisassembler::disasmInstSeq(SmallVectorImpl<InstOrDirective> &seq, uint64_t offset, bool outputting,
+                                    StringRef contents, SymbolPool &symbols) {
+  assert(seq.empty() && "Asked for a new instruction sequence while "
+                        "still having the previous one!");
+  InstOrDirective inst = disasmInst(offset, contents);
+  if (inst.status == MCDisassembler::Fail)
+    return false;
+
+  if (disasmTableJump(seq, inst, outputting, contents, symbols))
+    return true;
+
+  seq.emplace_back(inst);
+  return true;
+}
+
+// =====================================================================================================================
+// Try disassembling a table-jump sequence.
+//
+// @param [out] seq : The sequence of instructions or directives
+// @param inst : The first instruction of the potential sequence
+// @param outputting : True to actually stream the disassembly output
+// @param contents : The bytes of the section
+// @param symbols : The symbols of the section
+// @returns : Return true on success.
+bool ObjDisassembler::disasmTableJump(SmallVectorImpl<InstOrDirective> &seq, const InstOrDirective &inst,
+                                      bool outputting, StringRef contents, SymbolPool &symbols) {
+  InstOrDirective min = inst;
+  if (min.mnemonic != "s_min_u32" || !min.op2.imm)
+    return false;
+
+  InstOrDirective getpc = disasmInst(inst.getEndOffset(), contents);
+  if (getpc.mnemonic != "s_getpc_b64")
+    return false;
+
+  InstOrDirective lshl3Add = disasmInst(getpc.getEndOffset(), contents);
+  if (lshl3Add.mnemonic != "s_lshl3_add_u32" || !lshl3Add.op1.sReg || *lshl3Add.op1.sReg != *min.op0.sReg ||
+      !lshl3Add.op2.imm) {
+    return false;
+  }
+
+  InstOrDirective load = disasmInst(lshl3Add.getEndOffset(), contents);
+  if (load.mnemonic != "s_load_dwordx2" || *load.op1.sReg != *getpc.op0.sReg || !load.op2.sReg ||
+      *load.op2.sReg != *lshl3Add.op0.sReg)
+    return false;
+
+  InstOrDirective waitcnt = disasmInst(load.getEndOffset(), contents);
+  if (waitcnt.mnemonic != "s_waitcnt")
+    return false;
+
+  InstOrDirective add = disasmInst(waitcnt.getEndOffset(), contents);
+  if (add.mnemonic != "s_add_u32" || *add.op1.sReg != *load.op0.sReg || *add.op2.sReg != *getpc.op0.sReg)
+    return false;
+
+  InstOrDirective addc = disasmInst(add.getEndOffset(), contents);
+  if (addc.mnemonic != "s_addc_u32" || *addc.op0.sReg != *add.op0.sReg + 1 || *addc.op1.sReg != *load.op0.sReg + 1 ||
+      *addc.op2.sReg != *getpc.op0.sReg + 1)
+    return false;
+
+  InstOrDirective setpc = disasmInst(addc.getEndOffset(), contents);
+  if (setpc.mnemonic != "s_setpc_b64" || *setpc.op0.sReg != *add.op0.sReg)
+    return false;
+
+  MCSymbol *getpcLabel = getOrCreateSymbol(symbols, getpc.getEndOffset());
+  MCSymbol *tableLabel = getOrCreateSymbol(symbols, getpc.getEndOffset() + *lshl3Add.op2.imm);
+  if (outputting) {
+    const MCExpr *tableSize = MCBinaryExpr::createSub(MCSymbolRefExpr::create(tableLabel, *m_context),
+                                                      MCSymbolRefExpr::create(getpcLabel, *m_context), *m_context);
+    lshl3Add.mcInst.getOperand(2) = MCOperand::createExpr(tableSize);
+  }
+
+  for (const InstOrDirective &inst : {min, getpc, lshl3Add, load, waitcnt, add, addc, setpc})
+    seq.emplace_back(inst);
+
+  unsigned numEntries = *min.op2.imm + 1;
+  for (unsigned i = 0; i != numEntries; ++i) {
+    InstOrDirective quad;
+    quad.offset = getpc.getEndOffset() + *lshl3Add.op2.imm + i * 8;
+    quad.bytes = {reinterpret_cast<const uint8_t *>(contents.data()) + quad.offset, 8};
+    uint64_t targetOffset = getpc.getEndOffset() + support::endian::read64le(quad.bytes.data());
+    const MCSymbol *targetLabel = getOrCreateSymbol(symbols, targetOffset);
+    if (outputting) {
+      quad.valueDirectiveExpr = MCBinaryExpr::createSub(MCSymbolRefExpr::create(targetLabel, *m_context),
+                                                        MCSymbolRefExpr::create(getpcLabel, *m_context), *m_context);
+    }
+    seq.emplace_back(quad);
+  }
+
+  return true;
+}
+
+static InstOp parseInstOp(StringRef op) {
+  InstOp res;
+  int64_t imm;
+  if (!op.getAsInteger(/* Radix= */ 0, imm)) {
+    res.imm = imm;
+    return res;
+  }
+
+  if (op.startswith("s")) {
+    StringRef s = op.drop_front(1);
+    s.consume_front("[");
+    unsigned n;
+    if (!s.consumeInteger(/* Radix= */ 10, n)) {
+      res.sReg = n;
+      return res;
+    }
+  }
+
+  return res;
+}
+
+// =====================================================================================================================
+// Disassembles instruction at a given offset.
+//
+// @param offset : The offset of the instruction.
+// @param contents : The bytes of the section
+// @returns : The instruction.
+InstOrDirective ObjDisassembler::disasmInst(uint64_t offset, StringRef contents) {
+  InstOrDirective inst;
+  inst.offset = offset;
+  uint64_t size = 0;
+  ArrayRef<uint8_t> bytes(reinterpret_cast<const uint8_t *>(contents.data()), contents.size());
+  bytes = bytes.slice(offset);
+  std::string comment;
+  raw_string_ostream commentStream(comment);
+  inst.status = m_instDisassembler->getInstruction(inst.mcInst, size, bytes, offset, commentStream);
+  inst.bytes = bytes.take_front(size);
+
+  if (inst.status == MCDisassembler::Fail)
+    return inst;
+
+  std::string instStr;
+  raw_string_ostream os(instStr);
+  m_instPrinter->printInst(&inst.mcInst, /* Address= */ 0, /* Annot= */ "", *m_subtargetInfo, os);
+
+  StringRef s = instStr;
+  StringRef mnemonic;
+  std::tie(mnemonic, s) = s.ltrim().split(' ');
+  inst.mnemonic = m_strings.save(mnemonic);
+
+  inst.comment = m_strings.save(comment);
+
+  StringRef op0, op1, op2;
+  std::tie(op0, s) = s.ltrim().split(',');
+  std::tie(op1, s) = s.ltrim().split(',');
+  std::tie(op2, s) = s.ltrim().split(',');
+
+  inst.op0 = parseInstOp(op0);
+  inst.op1 = parseInstOp(op1);
+  inst.op2 = parseInstOp(op2);
+  return inst;
 }
 
 // =====================================================================================================================
@@ -580,4 +778,22 @@ size_t ObjDisassembler::decodeNote(StringRef data) {
   m_streamer->AddComment(Twine(".note name ") + name + " type " + Twine(type));
   m_streamer->emitBinaryData(data.slice(0, totalSize));
   return totalSize;
+}
+
+// =====================================================================================================================
+// Lookup the symbol of the specified offset and type. Create a new one if not exists.
+//
+// @param symbols : The symbols of the section
+// @param offset : The offset in section the symbol refers to
+// @param name : The name of the new symbol or empty twine for a default name
+// @param type : The ELF type of the symbol
+// @returns : Returns the existing or new symbol.
+MCSymbol *ObjDisassembler::getOrCreateSymbol(SymbolPool &symbols, uint64_t offset, Twine name, unsigned type) {
+  MCSymbol *&sym = symbols.symbolMap[std::make_pair(offset, type)];
+  if (!sym) {
+    StringRef savedName = m_strings.save(name.isTriviallyEmpty() ? "_L" + Twine::utohexstr(offset) : name);
+    symbols.symbols.emplace_back(SymbolInfoTy(offset, savedName, type));
+    sym = m_context->getOrCreateSymbol(savedName);
+  }
+  return sym;
 }
