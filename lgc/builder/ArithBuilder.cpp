@@ -99,16 +99,27 @@ Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, unsig
 
   assert(value->getType()->getScalarType()->isFloatTy() && destTy->getScalarType()->isHalfTy());
 
-  // RTZ: Use cvt_pkrtz instruction.
-  // TODO: We also use this for RTP and RTN for now.
   // TODO: Using a hard-coded value for rmToNearest due to flux in LLVM over
   // the namespace for this value - this will be removed once it has settled
   // if (roundingMode != fp::rmToNearest)
-  if (roundingMode != 1 /* rmToNearest */) {
+  if (roundingMode == 4 /* rmTowardZero */) {
+    // RTZ: Use cvt_pkrtz instruction.
     Value *result = scalarizeInPairs(value, [this](Value *inVec2) {
       Value *inVal0 = CreateExtractElement(inVec2, uint64_t(0));
       Value *inVal1 = CreateExtractElement(inVec2, 1);
       return CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, {inVal0, inVal1});
+    });
+    result->setName(instName);
+    return result;
+  } else if ((roundingMode == 2 /* rmDownward */) || (roundingMode == 3 /* rmUpward */)) {
+    // RTN/RTP: Use fptrunc_round intrinsic.
+    StringRef roundingModeStr =
+        convertRoundingModeToStr((roundingMode == 2) ? RoundingMode::TowardNegative : RoundingMode::TowardPositive)
+            .getValue();
+    Value *roundingMode = MetadataAsValue::get(getContext(), MDString::get(getContext(), roundingModeStr));
+    Value *result = scalarize(value, [=](Value *inValue) {
+      return CreateIntrinsic(Intrinsic::fptrunc_round, {getHalfTy(), inValue->getType(), roundingMode->getType()},
+                             {inValue, roundingMode});
     });
     result->setName(instName);
     return result;
