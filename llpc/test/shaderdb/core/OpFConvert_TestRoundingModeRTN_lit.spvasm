@@ -1,0 +1,60 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching
+; SHADERTEST: %{{.*}} = call {{.*}} @llvm.fptrunc.round.f16.f32.Metadata(float %{{.*}}, metadata !"round.downward")
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 22
+; Schema: 0
+               OpCapability Shader
+               OpCapability StorageBuffer16BitAccess
+               OpExtension "SPV_KHR_16bit_storage"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %2 "main"
+               OpExecutionMode %2 LocalSize 1 1 1
+               OpSource GLSL 450
+               OpSourceExtension "GL_EXT_shader_explicit_arithmetic_types"
+               OpName %2 "main"
+               OpName %3 "Buffer"
+               OpMemberName %3 0 "f16"
+               OpName %4 ""
+               OpName %5 "Uniform"
+               OpMemberName %5 0 "f32"
+               OpName %6 ""
+               OpMemberDecorate %3 0 Offset 0
+               OpDecorate %3 BufferBlock
+               OpDecorate %4 DescriptorSet 0
+               OpDecorate %4 Binding 1
+               OpMemberDecorate %5 0 Offset 0
+               OpDecorate %5 Block
+               OpDecorate %6 DescriptorSet 0
+               OpDecorate %6 Binding 0
+               OpDecorate %7 FPRoundingMode RTN
+          %8 = OpTypeVoid
+          %9 = OpTypeFunction %8
+         %10 = OpTypeFloat 16
+          %3 = OpTypeStruct %10
+         %11 = OpTypePointer Uniform %3
+          %4 = OpVariable %11 Uniform
+         %12 = OpTypeInt 32 1
+         %13 = OpConstant %12 0
+         %14 = OpTypeFloat 32
+          %5 = OpTypeStruct %14
+         %15 = OpTypePointer Uniform %5
+          %6 = OpVariable %15 Uniform
+         %16 = OpTypePointer Uniform %14
+         %17 = OpTypePointer Uniform %10
+          %2 = OpFunction %8 None %9
+         %18 = OpLabel
+         %19 = OpAccessChain %16 %6 %13
+         %20 = OpLoad %14 %19
+          %7 = OpFConvert %10 %20
+         %21 = OpAccessChain %17 %4 %13
+               OpStore %21 %7
+               OpReturn
+               OpFunctionEnd
