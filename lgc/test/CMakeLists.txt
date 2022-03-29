@@ -23,7 +23,7 @@
  #
  #######################################################################################################################
 
-set(LGC_TEST_DEPENDS lgc lgcdis FileCheck count not)
+set(LGC_TEST_DEPENDS lgc lgcdis FileCheck count not llvm-mc)
 add_custom_target(lgc-test-depends DEPENDS ${LGC_TEST_DEPENDS})
 set_target_properties(lgc-test-depends PROPERTIES FOLDER "Tests")
 
@@ -48,5 +48,5 @@ set_target_properties(check-lgc PROPERTIES FOLDER "Tests")
 
 add_lit_testsuites(LLVM ${CMAKE_CURRENT_SOURCE_DIR}
   ${exclude_from_check_all}
-  DEPENDS ${LLVM_TEST_DEPENDS}
+  DEPENDS ${LLVM_TEST_DEPENDS} llvm-mc
 )

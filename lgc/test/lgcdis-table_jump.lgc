@@ -1,0 +1,50 @@
+; RUN: llvm-mc -triple=amdgcn--amdpal -mcpu=gfx1030 -filetype=obj %s | \
+; RUN:   lgcdis - | FileCheck %s
+
+    .text
+
+; CHECK-LABEL:  foo:
+; CHECK:            s_getpc
+; CHECK-NEXT:   getpc:
+; CHECK:            s_lshl3_add_u32 {{.*}}, {{.*}}, table-getpc
+;
+; CHECK:        table:
+; CHECK-NEXT:       .quad case1-getpc
+; CHECK-NEXT:       .quad case2-getpc
+; CHECK-NEXT:       .quad case3-getpc
+;
+; CHECK-NEXT:   case1:
+; CHECK:        case2:
+; CHECK:        case3:
+; CHECK:        done:
+
+    .p2align 8
+    .type foo, @function
+foo:
+    s_min_u32 s23, s26, 2
+    s_getpc_b64 s[26:27]
+getpc:
+    s_lshl3_add_u32 s24, s23, table - getpc
+    s_load_dwordx2 s[24:25], s[26:27], s24
+    s_waitcnt lgkmcnt(0)
+    s_add_u32 s24, s24, s26
+    s_addc_u32 s25, s25, s27
+    s_setpc_b64 s[24:25]
+
+table:
+    .quad case1 - getpc
+    .quad case2 - getpc
+    .quad case3 - getpc
+
+case1:
+    s_branch done
+
+case2:
+    s_branch done
+
+case3:
+    s_branch done
+
+done:
+    s_endpgm
+    s_code_end
