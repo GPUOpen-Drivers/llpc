@@ -231,7 +231,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 // @param [in/out] passMgr : Pass manager
 void SpirvLower::registerPasses(lgc::PassManager &passMgr) {
 #define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, decltype(CLASS)::name());
-#include "PassRegistry.def"
+#include "PassRegistry.inc"
 }
 
 // =====================================================================================================================

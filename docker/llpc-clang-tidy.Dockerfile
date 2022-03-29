@@ -44,7 +44,7 @@ WORKDIR /vulkandriver/drivers/llpc
 RUN ln -s /vulkandriver/builds/ci-build/compile_commands.json \
     && git diff "origin/$LLPC_BASE_REF" -U0 \
          | /vulkandriver/drivers/llvm-project/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py \
-             -p1 -j$(nproc) >not-tidy.diff \
+             -p1 -j$(nproc) -iregex '.*\\.(cpp|cc|c\\+\\+|cxx|c|cl|h|hpp|m|mm)' >not-tidy.diff \
     && if ! grep -q : not-tidy.diff ; then \
         echo "Clean code. Success."; \
     else \
