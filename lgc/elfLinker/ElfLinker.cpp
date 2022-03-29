@@ -202,6 +202,12 @@ private:
   // Read PAL metadata from an ELF file and merge it in to the PAL metadata that we already have
   void mergePalMetadataFromElf(object::ObjectFile &objectFile, bool isGlueCode);
 
+  // Read ISA name string from an ELF file if not already done
+  void readIsaName(object::ObjectFile &objectFile);
+
+  // Write ISA name into the .note section.
+  void writeIsaName();
+
   // Write the PAL metadata out into the .note section.
   void writePalMetadata();
 
@@ -228,6 +234,7 @@ private:
   StringMap<unsigned> m_stringMap;                           // Map from string to string table index
   std::string m_notes;                                       // Notes to go in .note section
   bool m_doneInputs = false;                                 // Set when caller has done adding inputs
+  StringRef m_isaName;                                       // ISA name to include in the .note section
 };
 
 } // anonymous namespace
@@ -269,6 +276,7 @@ void ElfLinkerImpl::addInputElf(MemoryBufferRef inputElf, bool addAtStart) {
   if (m_elfInputs.empty())
     memcpy(&m_ehdr, inputElf.getBuffer().data(), sizeof(ELF::Elf64_Ehdr));
   // Add the ELF.
+  readIsaName(*elfInput.objectFile);
   mergePalMetadataFromElf(*elfInput.objectFile, false);
   m_elfInputs.insert(addAtStart ? m_elfInputs.begin() : m_elfInputs.end(), std::move(elfInput));
 }
@@ -403,13 +411,20 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
   m_outputSections.push_back(OutputSection(this, ".text"));
   unsigned noteSectionIdx = m_outputSections.size();
   m_outputSections.push_back(OutputSection(this, ".note", ELF::SHT_NOTE));
-  m_outputSections.push_back(OutputSection(this, ".rel.text", ELF::SHT_REL));
+  // The creation of the relocation section is delayed below so we can create it only if there is at least one
+  // relocation.
+  bool relSectionCreated = false;
 
   // Allocate input sections to output sections.
   for (auto &elfInput : m_elfInputs) {
     for (const object::SectionRef &section : elfInput.objectFile->sections()) {
-      object::ELFSectionRef elfSection(section);
-      if (elfSection.getType() == ELF::SHT_PROGBITS) {
+      unsigned sectType = object::ELFSectionRef(section).getType();
+      if (sectType == ELF::SHT_REL || sectType == ELF::SHT_RELA) {
+        if (!relSectionCreated && section.relocation_begin() != section.relocation_end()) {
+          m_outputSections.push_back(OutputSection(this, ".rel.text", ELF::SHT_REL));
+          relSectionCreated = true;
+        }
+      } else if (sectType == ELF::SHT_PROGBITS) {
         // Put same-named sections together (excluding symbol table, string table, reloc sections).
         StringRef name = cantFail(section.getName());
         bool reduceAlign = false;
@@ -572,6 +587,9 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
     }
   }
 
+  // Write ISA name into the .note section.
+  writeIsaName();
+
   // Write the PAL metadata out into the .note section.  The relocations can change the metadata, so we cannot write the
   // PAL metadata any earlier.
   writePalMetadata();
@@ -690,6 +708,48 @@ void ElfLinkerImpl::mergePalMetadataFromElf(object::ObjectFile &objectFile, bool
       }
     }
   }
+}
+
+// =====================================================================================================================
+// Read ISA name string from an ELF file if not already done
+//
+// @param objectFile : The ELF input
+void ElfLinkerImpl::readIsaName(object::ObjectFile &objectFile) {
+  if (!m_isaName.empty())
+    return;
+  for (const object::SectionRef &section : objectFile.sections()) {
+    object::ELFSectionRef elfSection(section);
+    if (elfSection.getType() == ELF::SHT_NOTE) {
+      Error err = ErrorSuccess();
+      auto &elfFile = cast<object::ELFObjectFile<object::ELF64LE>>(&objectFile)->getELFFile();
+      auto shdr = cantFail(elfFile.getSection(elfSection.getIndex()));
+      for (auto note : elfFile.notes(*shdr, err)) {
+        if (note.getName() == Util::Abi::AmdGpuVendorName && note.getType() == ELF::NT_AMD_HSA_ISA_NAME) {
+          ArrayRef<uint8_t> desc = note.getDesc();
+          m_isaName = StringRef(reinterpret_cast<const char *>(desc.data()), desc.size());
+          return;
+        }
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
+// Write ISA name into the .note section.
+void ElfLinkerImpl::writeIsaName() {
+  StringRef noteName = Util::Abi::AmdGpuVendorName;
+  typedef object::Elf_Nhdr_Impl<object::ELF64LE> NoteHeader;
+  NoteHeader noteHeader;
+  noteHeader.n_namesz = noteName.size() + 1;
+  noteHeader.n_descsz = m_isaName.size();
+  noteHeader.n_type = ELF::NT_AMD_HSA_ISA_NAME;
+  m_notes.append(reinterpret_cast<const char *>(&noteHeader), sizeof(noteHeader));
+  // Write the note name, followed by 1-4 zero bytes to terminate and align.
+  m_notes += noteName;
+  m_notes.append(NoteHeader::Align - (m_notes.size() & NoteHeader::Align - 1), '\0');
+  // Write ISA name, followed by 0-3 zero bytes to align.
+  m_notes += m_isaName;
+  m_notes.append(-m_notes.size() & NoteHeader::Align - 1, '\0');
 }
 
 // =====================================================================================================================
