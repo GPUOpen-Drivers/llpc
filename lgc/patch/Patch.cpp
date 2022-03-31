@@ -38,6 +38,7 @@
 #include "lgc/patch/PatchCheckShaderCache.h"
 #include "lgc/patch/PatchCopyShader.h"
 #include "lgc/patch/PatchEntryPointMutate.h"
+#include "lgc/patch/PatchImageOpCollect.h"
 #include "lgc/patch/PatchInOutImportExport.h"
 #include "lgc/patch/PatchInitializeWorkgroupMemory.h"
 #include "lgc/patch/PatchLlvmIrInclusion.h"

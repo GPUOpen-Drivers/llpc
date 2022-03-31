@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,19 +24,46 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuiltIns.h
- * @brief LLPC header file: declaration of BuiltIns supported by the Builder interface
+ * @file  PatchImageOpCollect.h
+ * @brief LLPC header file: contains declaration of class lgc::PatchImageOpCollect.
  ***********************************************************************************************************************
  */
-
 #pragma once
 
+#include "lgc/state/PipelineState.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
+
 namespace lgc {
-// Define built-in kind enum.
-enum BuiltInKind : unsigned {
-#define BUILTIN(name, number, out, in, type) BuiltIn##name = number,
-#include "lgc/BuiltInDefs.h"
-#undef BUILTIN
+
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations for image operations
+class PatchImageOpCollect : public llvm::PassInfoMixin<PatchImageOpCollect> {
+public:
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+
+  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
+
+  static llvm::StringRef name() { return "Patch LLVM for image operation collecting"; }
+};
+
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations for image operations
+class LegacyPatchImageOpCollect : public llvm::ModulePass {
+public:
+  LegacyPatchImageOpCollect();
+
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
+
+  bool runOnModule(llvm::Module &module) override;
+
+  static char ID; // ID of this pass
+
+private:
+  LegacyPatchImageOpCollect(const LegacyPatchImageOpCollect &) = delete;
+  LegacyPatchImageOpCollect &operator=(const LegacyPatchImageOpCollect &) = delete;
+
+  PatchImageOpCollect m_impl;
 };
 
 } // namespace lgc

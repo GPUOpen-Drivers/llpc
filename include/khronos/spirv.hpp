@@ -38,3 +38,4 @@
 #endif
 
 #include "devext/spv_amd_shader_early_and_late_fragment_tests.h"
+

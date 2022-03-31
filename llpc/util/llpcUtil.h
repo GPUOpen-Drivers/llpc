@@ -169,6 +169,7 @@ inline bool isGraphicsPipeline(unsigned stageMask) {
   return (stageMask & Vkgc::ShaderStageBit::ShaderStageAllGraphicsBit) != 0 &&
          (stageMask & Vkgc::ShaderStageBit::ShaderStageComputeBit) == 0;
 }
+
 } // namespace Llpc
 
 namespace llvm {

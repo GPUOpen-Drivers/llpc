@@ -77,10 +77,10 @@ if(ICD_BUILD_LLPC)
     endif()
 #endif
 
-    if(EXISTS ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm)
-        set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
-    elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm)
+    if(EXISTS ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm)
         set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
+    elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm)
+        set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
     endif()
 
     add_subdirectory(${XGL_LLVM_SRC_PATH} ${PROJECT_BINARY_DIR}/llvm)
@@ -308,6 +308,7 @@ add_library(llpc_standalone_compiler
     tool/llpcInputUtils.cpp
     tool/llpcPipelineBuilder.cpp
 )
+
 add_dependencies(llpc_standalone_compiler llpc)
 
 target_compile_definitions(llpc_standalone_compiler PUBLIC

@@ -17,3 +17,6 @@ The [amber readme](https://github.com/google/amber) has instructions and
 examples on how to write amber scripts. It also contains a
 [specification](https://github.com/google/amber/blob/main/docs/amber_script.md)
 of the script format.
+
+# Third Party Software
+* [Amber](https://github.com/google/amber) is distributed under the Apache License v2.0.

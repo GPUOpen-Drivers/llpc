@@ -112,6 +112,7 @@ static constexpr char NggSubgroupSize[] = ".nggSubgroupSize";
 static constexpr char NumInterpolants[] = ".num_interpolants";
 static constexpr char Api[] = ".api";
 static constexpr char ApiCreateInfo[] = ".api_create_info";
+static constexpr char PsSampleMask[] = ".ps_sample_mask";
 }; // namespace PipelineMetadataKey
 
 namespace HardwareStageMetadataKey {
@@ -174,6 +175,7 @@ enum class UserDataMapping : unsigned {
                                      //  Mesh/Task shader rings for the shader to consume.
   MeshPipeStatsBuf = 0x10000014,     // 32-bit GPU virtual address of a buffer storing the shader-emulated mesh
                                      //  pipeline stats query.
+
   // Values used in a user data PAL metadata register to be resolved at link time.
   // This is part of the "unlinked" ABI, so should arguably be in AbiUnlinked.h.
   DescriptorSet0 = 0x80000000,   // 32-bit pointer to the descriptor table for descriptor set 0: add N to this value

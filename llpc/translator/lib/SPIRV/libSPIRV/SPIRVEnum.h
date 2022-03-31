@@ -190,6 +190,9 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityFloat16ImageAMD, { CapabilityShader });
   ADD_VEC_INIT(CapabilityVariablePointersStorageBuffer, { CapabilityShader });
   ADD_VEC_INIT(CapabilityVariablePointers, { CapabilityVariablePointersStorageBuffer });
+#if VK_AMD_SHADER_ENQUEUE
+  ADD_VEC_INIT(CapabilityShaderEnqueueAMD, {CapabilityShader});
+#endif
   ADD_VEC_INIT(CapabilityShaderNonUniformEXT, { CapabilityShader });
   ADD_VEC_INIT(CapabilityRuntimeDescriptorArrayEXT, { CapabilityShader });
   ADD_VEC_INIT(CapabilityInputAttachmentArrayDynamicIndexingEXT, { CapabilityInputAttachment });

@@ -325,7 +325,6 @@ Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
   return Error::success();
 }
 
-
 // =====================================================================================================================
 // Process one pipeline input file.
 //

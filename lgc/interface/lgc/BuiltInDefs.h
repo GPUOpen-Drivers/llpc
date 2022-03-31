@@ -105,3 +105,5 @@ BUILTIN(ViewIndex, 4440, N, VHDGP, i32)                  // View index
 BUILTIN(ViewportIndex, 10, MVDG, P, i32)                 // Viewport index
 BUILTIN(WorkgroupId, 26, N, TMC, v3i32)                  // ID of global workgroup
 BUILTIN(WorkgroupSize, 25, N, TMC, v3i32)                // Size of global workgroup
+
+// Reserved LGC internal built-ins

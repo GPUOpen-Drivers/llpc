@@ -86,13 +86,15 @@ TEST(UtilTest, IsStageInMaskAllGraphicsBit) {
 }
 
 TEST(UtilTest, IsStageInMaskMultiple) {
-  const unsigned mask = ShaderStageBit::ShaderStageVertexBit | ShaderStageBit::ShaderStageTessEvalBit |
-                        ShaderStageBit::ShaderStageFragmentBit;
-  EXPECT_TRUE(isShaderStageInMask(ShaderStage::ShaderStageVertex, mask));
-  EXPECT_FALSE(isShaderStageInMask(ShaderStage::ShaderStageTessControl, mask));
-  EXPECT_TRUE(isShaderStageInMask(ShaderStage::ShaderStageTessEval, mask));
-  EXPECT_TRUE(isShaderStageInMask(ShaderStage::ShaderStageFragment, mask));
-  EXPECT_FALSE(isShaderStageInMask(ShaderStage::ShaderStageCompute, mask));
+  {
+    const unsigned mask = ShaderStageBit::ShaderStageVertexBit | ShaderStageBit::ShaderStageTessEvalBit |
+                          ShaderStageBit::ShaderStageFragmentBit;
+    EXPECT_TRUE(isShaderStageInMask(ShaderStage::ShaderStageVertex, mask));
+    EXPECT_FALSE(isShaderStageInMask(ShaderStage::ShaderStageTessControl, mask));
+    EXPECT_TRUE(isShaderStageInMask(ShaderStage::ShaderStageTessEval, mask));
+    EXPECT_TRUE(isShaderStageInMask(ShaderStage::ShaderStageFragment, mask));
+    EXPECT_FALSE(isShaderStageInMask(ShaderStage::ShaderStageCompute, mask));
+  }
 }
 
 TEST(UtilTest, IsNativeStage) {
@@ -122,11 +124,13 @@ TEST(UtilTest, IsGraphicsPipelineAllGraphics) {
 }
 
 TEST(UtilTest, IsGraphicsPipelineMultiple) {
-  const unsigned mask = ShaderStageBit::ShaderStageVertexBit | ShaderStageBit::ShaderStageTessEvalBit |
-                        ShaderStageBit::ShaderStageFragmentBit;
-  EXPECT_TRUE(isGraphicsPipeline(mask));
+  {
+    const unsigned mask = ShaderStageBit::ShaderStageVertexBit | ShaderStageBit::ShaderStageTessEvalBit |
+                          ShaderStageBit::ShaderStageFragmentBit;
+    EXPECT_TRUE(isGraphicsPipeline(mask));
 
-  EXPECT_FALSE(isGraphicsPipeline(mask | ShaderStageBit::ShaderStageComputeBit));
+    EXPECT_FALSE(isGraphicsPipeline(mask | ShaderStageBit::ShaderStageComputeBit));
+  }
 }
 
 TEST(UtilTest, IsComputePipelineEmptyMask) {
@@ -179,11 +183,13 @@ TEST(UtilTest, MaskToShaderStagesAllGraphics) {
 }
 
 TEST(UtilTest, MaskToShaderStagesMultiple) {
-  const unsigned mask = ShaderStageBit::ShaderStageVertexBit | ShaderStageBit::ShaderStageTessEvalBit |
-                        ShaderStageBit::ShaderStageFragmentBit;
-  const auto stages = maskToShaderStages(mask);
-  EXPECT_THAT(stages, ElementsAre(ShaderStage::ShaderStageVertex, ShaderStage::ShaderStageTessEval,
-                                  ShaderStage::ShaderStageFragment));
+  {
+    const unsigned mask = ShaderStageBit::ShaderStageVertexBit | ShaderStageBit::ShaderStageTessEvalBit |
+                          ShaderStageBit::ShaderStageFragmentBit;
+    const auto stages = maskToShaderStages(mask);
+    EXPECT_THAT(stages, ElementsAre(ShaderStage::ShaderStageVertex, ShaderStage::ShaderStageTessEval,
+                                    ShaderStage::ShaderStageFragment));
+  }
 }
 
 } // namespace

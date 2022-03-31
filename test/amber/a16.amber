@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Modifications Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+
 # TODO Remove the not once this is fixed in LLVM
 # RUN: not run_amber_test.py --icd %icd %s | FileCheck %s
 # REQUIRES: gfx10+

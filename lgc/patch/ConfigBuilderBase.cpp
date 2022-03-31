@@ -190,6 +190,17 @@ void ConfigBuilderBase::setPsWritesDepth(bool value) {
 }
 
 // =====================================================================================================================
+// Set SampleMask
+//
+// @param value : Value to set
+void ConfigBuilderBase::setPsSampleMask(bool value) {
+  if (!value)
+    return; // Optional
+
+  m_pipelineNode[Util::Abi::PipelineMetadataKey::PsSampleMask] = value;
+}
+
+// =====================================================================================================================
 // Set ES_GS_LDS_BYTE_SIZE
 //
 // @param value : Value to set

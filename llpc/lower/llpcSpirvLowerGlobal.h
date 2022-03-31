@@ -32,6 +32,7 @@
 
 #include "SPIRVInternal.h"
 #include "llpcSpirvLower.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
 #include <list>
