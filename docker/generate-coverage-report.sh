@@ -12,5 +12,8 @@ rm *.profraw
 # Create HTML report. Ignore reporting coverage for files coming from LLVM as we are only interested in LLPC
 # and would otherwise make the report very large.
 llvm-cov show -format=html -ignore-filename-regex='.*llvm.*' \
-         -instr-profile=code_coverage_profile.profdata builds/ci-build/compiler/llpc/amdllpc \
+         -instr-profile=code_coverage_profile.profdata \
+         -object builds/ci-build/compiler/llpc/amdllpc \
+         -object builds/ci-build/compiler/llpc/llvm/bin/lgcdis \
+         -object builds/ci-build/compiler/llpc/llvm/bin/lgc \
          -o coverage_report
