@@ -65,7 +65,7 @@
          %16 = OpVectorShuffle %15 %25 %14 5 4
          %17 = OpLoad %8 %10
 
-; Change relates with swaping the operands of OpVectorShuffle instruction below.
+; Change relates with swapping the operands of OpVectorShuffle instruction below.
 ; In this test SPIR-V::ShuffleVector is taking two vectors as input parameters.
 ; We want to see if newly created llvm::shuffle_vector instruction contains proper
 ; mask if first vector is smaller.
