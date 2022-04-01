@@ -298,8 +298,9 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
 
 // =====================================================================================================================
 // Get pointers to emit counters (GS)
-ArrayRef<Value *> ShaderSystemValues::getEmitCounterPtr() {
+std::pair<Type *, ArrayRef<Value *>> ShaderSystemValues::getEmitCounterPtr() {
   assert(m_shaderStage == ShaderStageGeometry);
+  auto *emitCounterTy = Type::getInt32Ty(*m_context);
   if (m_emitCounterPtrs.empty()) {
     // TODO: We should only insert those offsets required by the specified input primitive.
 
@@ -307,13 +308,12 @@ ArrayRef<Value *> ShaderSystemValues::getEmitCounterPtr() {
     auto &dataLayout = m_entryPoint->getParent()->getDataLayout();
     auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
     for (int i = 0; i < MaxGsStreams; ++i) {
-      auto emitCounterPtr =
-          new AllocaInst(Type::getInt32Ty(*m_context), dataLayout.getAllocaAddrSpace(), "", insertPos);
-      new StoreInst(ConstantInt::get(Type::getInt32Ty(*m_context), 0), emitCounterPtr, insertPos);
+      auto emitCounterPtr = new AllocaInst(emitCounterTy, dataLayout.getAllocaAddrSpace(), "", insertPos);
+      new StoreInst(ConstantInt::get(emitCounterTy, 0), emitCounterPtr, insertPos);
       m_emitCounterPtrs.push_back(emitCounterPtr);
     }
   }
-  return m_emitCounterPtrs;
+  return std::make_pair(emitCounterTy, m_emitCounterPtrs);
 }
 
 // =====================================================================================================================
@@ -379,13 +379,14 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
     m_streamOutBufDescs.resize(xfbBuffer + 1);
 
   if (!m_streamOutBufDescs[xfbBuffer]) {
-    auto streamOutTablePtr = getStreamOutTablePtr();
+    auto streamOutTablePair = getStreamOutTablePtr();
+    auto streamOutTablePtr = streamOutTablePair.second;
     auto insertPos = streamOutTablePtr->getNextNode();
 
     Value *idxs[] = {ConstantInt::get(Type::getInt64Ty(*m_context), 0),
                      ConstantInt::get(Type::getInt64Ty(*m_context), xfbBuffer)};
 
-    auto streamOutTableType = streamOutTablePtr->getType()->getPointerElementType();
+    auto streamOutTableType = streamOutTablePair.first;
     auto streamOutBufDescPtr = GetElementPtrInst::Create(streamOutTableType, streamOutTablePtr, idxs, "", insertPos);
     streamOutBufDescPtr->setMetadata(MetaNameUniform, MDNode::get(streamOutBufDescPtr->getContext(), {}));
     auto streamOutBufDescTy = streamOutBufDescPtr->getType()->getPointerElementType();
@@ -400,10 +401,12 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
 
 // =====================================================================================================================
 // Get stream-out buffer table pointer
-Instruction *ShaderSystemValues::getStreamOutTablePtr() {
+std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
   assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
          m_shaderStage == ShaderStageCopyShader);
 
+  auto *streamOutTableTy =
+      ArrayType::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 4), MaxTransformFeedbackBuffers);
   if (!m_streamOutTablePtr) {
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
     unsigned entryArgIdx = 0;
@@ -427,12 +430,10 @@ Instruction *ShaderSystemValues::getStreamOutTablePtr() {
 
     // Get the 64-bit extended node value.
     auto streamOutTablePtrLow = getFunctionArgument(m_entryPoint, entryArgIdx, "streamOutTable");
-    auto streamOutTablePtrTy = PointerType::get(
-        ArrayType::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 4), MaxTransformFeedbackBuffers),
-        ADDR_SPACE_CONST);
+    auto streamOutTablePtrTy = PointerType::get(streamOutTableTy, ADDR_SPACE_CONST);
     m_streamOutTablePtr = makePointer(streamOutTablePtrLow, streamOutTablePtrTy, InvalidValue);
   }
-  return m_streamOutTablePtr;
+  return std::make_pair(streamOutTableTy, m_streamOutTablePtr);
 }
 
 // =====================================================================================================================

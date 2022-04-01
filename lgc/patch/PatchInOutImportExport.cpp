@@ -1036,8 +1036,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
       if (emitStream != InvalidValue) {
         // Increment emit vertex counter
-        auto emitCounterPtr = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr()[emitStream];
-        auto emitCounterTy = emitCounterPtr->getType()->getPointerElementType();
+        auto emitCounterPair = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr();
+        auto emitCounterTy = emitCounterPair.first;
+        auto emitCounterPtr = emitCounterPair.second[emitStream];
         Value *emitCounter = new LoadInst(emitCounterTy, emitCounterPtr, "", &callInst);
         emitCounter =
             BinaryOperator::CreateAdd(emitCounter, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", &callInst);
@@ -4112,8 +4113,9 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
     const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs;
     Value *gsVsOffset = getFunctionArgument(m_entryPoint, entryArgIdxs.gs.gsVsOffset);
 
-    auto emitCounterPtr = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr()[streamId];
-    auto emitCounterTy = emitCounterPtr->getType()->getPointerElementType();
+    auto emitCounterPair = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr();
+    auto emitCounterTy = emitCounterPair.first;
+    auto emitCounterPtr = emitCounterPair.second[streamId];
     auto emitCounter = new LoadInst(emitCounterTy, emitCounterPtr, "", insertPos);
 
     auto ringOffset = calcGsVsRingOffsetForOutput(location, compIdx, streamId, emitCounter, gsVsOffset, insertPos);
