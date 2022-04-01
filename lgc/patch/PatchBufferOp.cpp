@@ -613,8 +613,8 @@ void PatchBufferOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
   SmallVector<Value *, 8> indices(getElemPtrInst.idx_begin(), getElemPtrInst.idx_end());
 
   Value *newGetElemPtr = nullptr;
-  auto getElemPtrPtr = m_replacementMap[pointer].second;
-  auto getElemPtrEltTy = getElemPtrPtr->getType()->getScalarType()->getPointerElementType();
+  auto getElemPtrPtr = cast<GetElementPtrInst>(m_replacementMap[pointer].second);
+  auto getElemPtrEltTy = getElemPtrPtr->getResultElementType();
 
   if (getElemPtrInst.isInBounds())
     newGetElemPtr = m_builder->CreateInBoundsGEP(getElemPtrEltTy, getElemPtrPtr, indices);
@@ -1212,20 +1212,20 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
     Type *castDestType = nullptr;
 
     if (stride == 16)
-      castDestType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(destAddrSpace);
+      castDestType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
     else {
       assert(stride < 8);
-      castDestType = m_builder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
+      castDestType = m_builder->getIntNTy(stride * 8);
     }
 
     Value *newValue = nullptr;
 
     if (Constant *const constVal = dyn_cast<Constant>(value)) {
       newValue = ConstantVector::getSplat(ElementCount::get(stride, false), constVal);
-      newValue = m_builder->CreateBitCast(newValue, castDestType->getPointerElementType());
+      newValue = m_builder->CreateBitCast(newValue, castDestType);
       copyMetadata(newValue, &memSetInst);
     } else {
-      Value *const memoryPointer = m_builder->CreateAlloca(castDestType->getPointerElementType());
+      Value *const memoryPointer = m_builder->CreateAlloca(castDestType);
       copyMetadata(memoryPointer, &memSetInst);
 
       Type *const int8PtrTy = m_builder->getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE);
@@ -1235,7 +1235,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
       Value *const memSet = m_builder->CreateMemSet(castMemoryPointer, value, stride, Align());
       copyMetadata(memSet, &memSetInst);
 
-      newValue = m_builder->CreateLoad(castDestType->getPointerElementType(), memoryPointer);
+      newValue = m_builder->CreateLoad(castDestType, memoryPointer);
       copyMetadata(newValue, &memSetInst);
     }
 
@@ -1250,7 +1250,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
     Value *const destPtr = m_builder->CreateGEP(dest->getType()->getScalarType()->getPointerElementType(), dest, index);
     copyMetadata(destPtr, &memSetInst);
 
-    Value *const castDest = m_builder->CreateBitCast(destPtr, castDestType);
+    Value *const castDest = m_builder->CreateBitCast(destPtr, castDestType->getPointerTo(destAddrSpace));
     copyMetadata(castDest, &memSetInst);
 
     // And perform a store for the value at this byte.
@@ -1385,8 +1385,7 @@ void PatchBufferOp::copyMetadata(Value *const dest, const Value *const src) cons
 //
 // @param type : The type to remap.
 PointerType *PatchBufferOp::getRemappedType(Type *const type) const {
-  assert(type->isPointerTy());
-  return type->getPointerElementType()->getPointerTo(ADDR_SPACE_CONST_32BIT);
+  return PointerType::getWithSamePointeeType(cast<PointerType>(type), ADDR_SPACE_CONST_32BIT);
 }
 
 // =====================================================================================================================

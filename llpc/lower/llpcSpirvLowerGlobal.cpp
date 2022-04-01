@@ -1694,8 +1694,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
     SmallVector<ReplaceInstsInfo> instructionsToReplace;
     for (Function *const func : funcsUsedIn) {
       // Check if our block is an array of blocks.
-      if (global.getType()->getPointerElementType()->isArrayTy()) {
-        Type *const elementType = global.getType()->getPointerElementType()->getArrayElementType();
+      if (global.getValueType()->isArrayTy()) {
+        Type *const elementType = global.getValueType()->getArrayElementType();
         Type *const blockType = elementType->getPointerTo(global.getAddressSpace());
 
         // We need to run over the users of the global, find the GEPs, and add a load for each.
@@ -1937,8 +1937,7 @@ void SpirvLowerGlobal::lowerAliasedVal() {
         return;
       const unsigned aliased = mdconst::dyn_extract<ConstantInt>(meta->getOperand(0))->getZExtValue();
       if (aliased) {
-        unsigned inBits = static_cast<unsigned>(
-            m_module->getDataLayout().getTypeSizeInBits(global.getType()->getPointerElementType()));
+        unsigned inBits = static_cast<unsigned>(m_module->getDataLayout().getTypeSizeInBits(global.getValueType()));
         if (inBits > maxInBits) {
           maxInBits = inBits;
           index = aliasedVals.size();
@@ -1994,7 +1993,7 @@ void SpirvLowerGlobal::lowerPushConsts() {
       Value *pushConstants = m_builder->CreateLoadPushConstantsPtr(pushConstantsType);
 
       auto addrSpace = pushConstants->getType()->getPointerAddressSpace();
-      Type *const castType = global.getType()->getPointerElementType()->getPointerTo(addrSpace);
+      Type *const castType = global.getValueType()->getPointerTo(addrSpace);
       pushConstants = m_builder->CreateBitCast(pushConstants, castType);
 
       SmallVector<Instruction *, 8> usesToReplace;
@@ -2078,7 +2077,7 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
     new StoreInst(loadValue, interpPtr, &callInst);
 
     auto interpElemPtr = GetElementPtrInst::Create(inputTy, interpPtr, indexOperands, "", &callInst);
-    auto interpElemTy = interpElemPtr->getType()->getPointerElementType();
+    auto interpElemTy = interpElemPtr->getResultElementType();
 
     // Only get the value that the original getElemPtr points to
     auto interpElemValue = new LoadInst(interpElemTy, interpElemPtr, "", &callInst);

@@ -3926,7 +3926,7 @@ void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned lo
     if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9) // ES -> GS ring is always on-chip on GFX9+
     {
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
-      auto ldsType = m_lds->getType()->getPointerElementType();
+      auto ldsType = m_lds->getValueType();
       Value *storePtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
       new StoreInst(storeValue, storePtr, false, m_lds->getAlign().getValue(), insertPos);
     } else {
@@ -3995,10 +3995,10 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
     if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9) // ES -> GS ring is always on-chip on GFX9
     {
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
-      auto ldsType = m_lds->getType()->getPointerElementType();
-      Value *loadPtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
-      auto loadInst = new LoadInst(loadPtr->getType()->getPointerElementType(), loadPtr, "", false,
-                                   m_lds->getAlign().getValue(), insertPos);
+      auto ldsType = m_lds->getValueType();
+      auto *loadPtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
+      auto loadInst =
+          new LoadInst(loadPtr->getResultElementType(), loadPtr, "", false, m_lds->getAlign().getValue(), insertPos);
       loadValue = loadInst;
 
       if (bitWidth == 8)
@@ -4118,7 +4118,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
 
     if (m_pipelineState->isGsOnChip()) {
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
-      auto ldsType = m_lds->getType()->getPointerElementType();
+      auto ldsType = m_lds->getValueType();
       Value *storePtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
       new StoreInst(storeValue, storePtr, false, m_lds->getAlign().getValue(), insertPos);
     } else {
@@ -4357,9 +4357,9 @@ Value *PatchInOutImportExport::readValueFromLds(bool isOutput, Type *readTy, Val
   {
     for (unsigned i = 0; i < numChannels; ++i) {
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ldsOffset};
-      auto ldsType = m_lds->getType()->getPointerElementType();
-      Value *loadPtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
-      auto loadTy = loadPtr->getType()->getPointerElementType();
+      auto ldsType = m_lds->getValueType();
+      auto *loadPtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
+      auto loadTy = loadPtr->getResultElementType();
       auto loadInst = new LoadInst(loadTy, loadPtr, "", false, m_lds->getAlign().getValue(), insertPos);
       loadValues[i] = loadInst;
 
@@ -4455,7 +4455,7 @@ void PatchInOutImportExport::writeValueToLds(Value *writeValue, Value *ldsOffset
   {
     for (unsigned i = 0; i < numChannels; ++i) {
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ldsOffset};
-      auto ldsType = m_lds->getType()->getPointerElementType();
+      auto ldsType = m_lds->getValueType();
       Value *storePtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
       new StoreInst(storeValues[i], storePtr, false, m_lds->getAlign().getValue(), insertPos);
 

@@ -125,7 +125,7 @@ bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResu
   // Fill the map of each variable with zeroinitializer and calculate its corresponding offset on LDS
   unsigned offset = 0;
   for (auto global : workgroupGlobals) {
-    unsigned varSize = getTypeSizeInDwords(global->getType()->getPointerElementType());
+    unsigned varSize = getTypeSizeInDwords(global->getValueType());
     m_globalLdsOffsetMap.insert({global, builder.getInt32(offset)});
     offset += varSize;
   }
@@ -142,7 +142,7 @@ bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResu
     GlobalVariable *global = globalOffsetPair.first;
     Value *offset = globalOffsetPair.second;
 
-    Value *pointer = builder.CreateGEP(lds->getType()->getPointerElementType(), lds, {builder.getInt32(0), offset});
+    Value *pointer = builder.CreateGEP(lds->getValueType(), lds, {builder.getInt32(0), offset});
     pointer = builder.CreateBitCast(pointer, global->getType());
 
     global->replaceAllUsesWith(pointer);
@@ -198,7 +198,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
   //  }
 
   PHINode *loopIdxPhi = nullptr;
-  const unsigned requiredNumThreads = lds->getType()->getPointerElementType()->getArrayNumElements();
+  const unsigned requiredNumThreads = lds->getValueType()->getArrayNumElements();
   Value *loopCount = builder.getInt32((requiredNumThreads + actualNumThreads - 1) / actualNumThreads);
 
   // Construct ".for.Header" block
@@ -227,8 +227,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
       // ldsOffset = (threadId * loopCount) + loopIdx
       Value *ldsOffset = builder.CreateMul(threadId, loopCount);
       ldsOffset = builder.CreateAdd(ldsOffset, loopIdxPhi);
-      Value *writePtr =
-          builder.CreateGEP(lds->getType()->getPointerElementType(), lds, {builder.getInt32(0), ldsOffset});
+      Value *writePtr = builder.CreateGEP(lds->getValueType(), lds, {builder.getInt32(0), ldsOffset});
       builder.CreateAlignedStore(builder.getInt32(0), writePtr, Align(4));
 
       // Update loop index

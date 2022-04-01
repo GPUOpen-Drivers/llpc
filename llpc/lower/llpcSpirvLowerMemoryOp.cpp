@@ -140,7 +140,7 @@ void SpirvLowerMemoryOp::visitExtractElementInst(ExtractElementInst &extractElem
       auto castPtr = new BitCastInst(loadPtr, castPtrTy, "", &extractElementInst);
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), extractElementInst.getOperand(1)};
       auto elementPtr = GetElementPtrInst::Create(castTy, castPtr, idxs, "", &extractElementInst);
-      auto elementTy = elementPtr->getType()->getPointerElementType();
+      auto elementTy = elementPtr->getResultElementType();
       auto newLoad = new LoadInst(elementTy, elementPtr, "", &extractElementInst);
       extractElementInst.replaceAllUsesWith(newLoad);
 
@@ -225,7 +225,7 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(GetElementPtrInst *getElemPtr, u
         operandIndex = i;
         needExpand = true;
 
-        auto indexedTy = getElemPtr->getIndexedType(ptrVal->getType()->getPointerElementType(), idxs);
+        auto indexedTy = getElemPtr->getIndexedType(getElemPtr->getSourceElementType(), idxs);
         if (indexedTy) {
           // Check the upper bound of dynamic index
           if (isa<ArrayType>(indexedTy)) {
