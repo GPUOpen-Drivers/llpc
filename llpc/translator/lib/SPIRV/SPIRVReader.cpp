@@ -5834,6 +5834,7 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *bi, BasicB
 // =============================================================================
 // Translate OpFragmentMaskFetchAMD to LLVM IR
 Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
+  Value *result = nullptr;
 
   if (getPipelineOptions()->shadowDescriptorTableUsage != Vkgc::ShadowDescriptorTableUsage::Disable) {
     // Get image type descriptor and fmask descriptor.
@@ -5862,7 +5863,7 @@ Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *bi, Ba
     // Create the image load.
     Value *result =
         getBuilder()->CreateImageLoad(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.fmaskDesc, coord, nullptr);
-    return getBuilder()->CreateExtractElement(result, uint64_t(0));
+    result = getBuilder()->CreateExtractElement(result, uint64_t(0));
   } else {
     // Fmask is unavailable. This is a no-op for cases where the shadow descriptor table cannot be used
     // and fmask descriptors aren't present.
@@ -5870,8 +5871,10 @@ Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *bi, Ba
     // Output independent fragment pointers for each sample. Each 4 bits correspond to each sample index.
     // Always use 8 fragment pointers, which is the max fragment count where fmask is actually supported.
     static constexpr unsigned UncompressedFmaskValue = 0x76543210;
-    return getBuilder()->getInt32(UncompressedFmaskValue);
+    result = getBuilder()->getInt32(UncompressedFmaskValue);
   }
+
+  return result;
 }
 
 // =============================================================================
