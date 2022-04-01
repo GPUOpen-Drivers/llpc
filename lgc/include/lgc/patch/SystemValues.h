@@ -87,7 +87,7 @@ public:
   llvm::Value *getGsVsRingBufDesc(unsigned streamId);
 
   // Get pointers to emit counters (GS)
-  llvm::ArrayRef<llvm::Value *> getEmitCounterPtr();
+  std::pair<llvm::Type *, llvm::ArrayRef<llvm::Value *>> getEmitCounterPtr();
 
   // Get global internal table pointer as pointer to i8.
   llvm::Instruction *getInternalGlobalTablePtr();
@@ -109,7 +109,7 @@ public:
 
 private:
   // Get stream-out buffer table pointer
-  llvm::Instruction *getStreamOutTablePtr();
+  std::pair<llvm::Type *, llvm::Instruction *> getStreamOutTablePtr();
 
   // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
   llvm::Instruction *makePointer(llvm::Value *lowValue, llvm::Type *ptrTy, unsigned highValue);

@@ -613,8 +613,8 @@ void PatchBufferOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
   SmallVector<Value *, 8> indices(getElemPtrInst.idx_begin(), getElemPtrInst.idx_end());
 
   Value *newGetElemPtr = nullptr;
-  auto getElemPtrPtr = cast<GetElementPtrInst>(m_replacementMap[pointer].second);
-  auto getElemPtrEltTy = getElemPtrPtr->getResultElementType();
+  auto getElemPtrPtr = m_replacementMap[pointer].second;
+  auto getElemPtrEltTy = getElemPtrPtr->getType()->getScalarType()->getPointerElementType();
 
   if (getElemPtrInst.isInBounds())
     newGetElemPtr = m_builder->CreateInBoundsGEP(getElemPtrEltTy, getElemPtrPtr, indices);
