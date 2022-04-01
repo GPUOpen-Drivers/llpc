@@ -369,8 +369,7 @@ void NggLdsManager::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomic
   // from byte offset.
   ldsOffset = m_builder->CreateLShr(ldsOffset, 2);
 
-  Value *atomicPtr = m_builder->CreateGEP(m_lds->getType()->getScalarType()->getPointerElementType(), m_lds,
-                                          {m_builder->getInt32(0), ldsOffset});
+  Value *atomicPtr = m_builder->CreateGEP(m_lds->getValueType(), m_lds, {m_builder->getInt32(0), ldsOffset});
 
   auto atomicInst = m_builder->CreateAtomicRMW(atomicOp, atomicPtr, atomicValue, MaybeAlign(),
                                                AtomicOrdering::SequentiallyConsistent, SyncScope::System);
