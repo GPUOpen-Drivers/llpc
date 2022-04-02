@@ -860,6 +860,7 @@ void SpirvLowerGlobal::lowerOutput() {
 // Does inplace lowering operations for SPIR-V inputs/outputs, replaces "load" instructions with import calls and
 // "store" instructions with export calls.
 void SpirvLowerGlobal::lowerInOutInPlace() {
+  assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval);
 
   // Invoke handling of "load" and "store" instruction
   handleLoadInst();

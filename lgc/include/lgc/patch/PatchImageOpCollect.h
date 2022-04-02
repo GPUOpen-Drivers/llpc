@@ -57,7 +57,7 @@ public:
 
   bool runOnModule(llvm::Module &module) override;
 
-  static char ID; // ID of this pass
+  static char ID; // NOLINT: ID of this pass
 
 private:
   LegacyPatchImageOpCollect(const LegacyPatchImageOpCollect &) = delete;
