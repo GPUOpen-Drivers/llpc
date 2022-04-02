@@ -408,8 +408,7 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(VkFormat format) {
 // @param cache : Pointer to ICache implemented in client
 Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash,
                    ICache *cache)
-    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0)
-{
+    : m_optionHash(optionHash), m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0) {
   for (unsigned i = 0; i < optionCount; ++i)
     m_options.push_back(options[i]);
 
