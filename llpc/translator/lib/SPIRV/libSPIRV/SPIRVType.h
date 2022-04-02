@@ -67,9 +67,9 @@ public:
   uint64_t getArrayLength() const;
   unsigned getDerivedArrayStride() const;
   unsigned getBitWidth() const;
+  unsigned getSizeInBytes() const;
   unsigned getFloatBitWidth() const;
   unsigned getIntegerBitWidth() const;
-  unsigned getSizeInBytes() const;
   SPIRVType *getFunctionReturnType() const;
   SPIRVType *getPointerElementType() const;
   SPIRVStorageClassKind getPointerStorageClass() const;

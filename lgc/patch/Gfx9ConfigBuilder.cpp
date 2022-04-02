@@ -1910,6 +1910,8 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   } else
     setPsUsesUavs(static_cast<unsigned>(resUsage->resourceWrite));
 
+  setPsSampleMask(builtInUsage.sampleMaskIn | builtInUsage.sampleMask);
+
   const unsigned loadCollisionWaveId = GET_REG_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC2_PS, LOAD_COLLISION_WAVEID);
   const unsigned loadIntrawaveCollision =
       GET_REG_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC2_PS, LOAD_INTRAWAVE_COLLISION);

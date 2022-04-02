@@ -70,7 +70,6 @@ if config.llpc_enable_shader_cache == 'ON' or config.llpc_enable_shader_cache ==
 if (not config.llpc_client_interface_version.isdigit()) or (int(config.llpc_client_interface_version) > 52):
     config.available_features.add('llpc-client-interface-53')
 
-
 llvm_config.use_default_substitutions()
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))

@@ -74,6 +74,7 @@ protected:
   void setPsUsesUavs(bool value);
   void setPsWritesUavs(bool value);
   void setPsWritesDepth(bool value);
+  void setPsSampleMask(bool value);
   void setEsGsLdsByteSize(unsigned value);
   void setWaveFrontSize(Util::Abi::HardwareStage hwStage, unsigned value);
   void setApiName(const char *value);

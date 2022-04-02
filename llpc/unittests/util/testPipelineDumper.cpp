@@ -29,7 +29,6 @@
 #include <memory>
 
 using namespace Vkgc;
-using namespace llvm;
 
 namespace Llpc {
 namespace {

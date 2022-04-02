@@ -392,9 +392,10 @@ BinaryType ShaderModuleHelper::getShaderBinaryType(BinaryData shaderBinary) {
 // @param codeBuffer [out] : A buffer to hold the trimmed code if it is needed.
 // @param moduleData [out] : If successful, the module data for the module.  Undefined if unsuccessful.
 // @return : Success if the data was read.  The appropriate error otherwise.
-Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo, llvm::MutableArrayRef<unsigned> codeBuffer,
+Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo,
+                                         llvm::MutableArrayRef<unsigned> codeBuffer,
                                          Vkgc::ShaderModuleData &moduleData) {
-  const BinaryData& shaderBinary = shaderInfo->shaderBin;
+  const BinaryData &shaderBinary = shaderInfo->shaderBin;
   moduleData.binType = ShaderModuleHelper::getShaderBinaryType(shaderBinary);
   if (moduleData.binType == BinaryType::Unknown)
     return Result::ErrorInvalidShader;
@@ -402,7 +403,6 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
   if (moduleData.binType == BinaryType::Spirv) {
     moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderBinary);
     moduleData.binCode = getShaderCode(shaderInfo, codeBuffer);
-
     // Calculate SPIR-V cache hash
     Hash cacheHash = {};
     MetroHash64::Hash(reinterpret_cast<const uint8_t *>(moduleData.binCode.pCode), moduleData.binCode.codeSize,
@@ -427,7 +427,7 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
 BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shaderInfo,
                                              MutableArrayRef<unsigned int> &codeBuffer) {
   BinaryData code;
-  const BinaryData& shaderBinary = shaderInfo->shaderBin;
+  const BinaryData &shaderBinary = shaderInfo->shaderBin;
   bool trimDebugInfo = cl::TrimDebugInfo;
   if (trimDebugInfo) {
     code.codeSize = trimSpirvDebugInfo(&shaderBinary, codeBuffer);
@@ -444,7 +444,7 @@ BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shader
 // @param shaderInfo : Shader module build info
 // @return : The number of bytes need to hold the code for this shader module.
 unsigned ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo) {
-  const BinaryData& shaderBinary = shaderInfo->shaderBin;
+  const BinaryData &shaderBinary = shaderInfo->shaderBin;
   bool trimDebugInfo = cl::TrimDebugInfo;
   if (!trimDebugInfo)
     return shaderBinary.codeSize;

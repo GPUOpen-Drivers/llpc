@@ -44,24 +44,35 @@ using namespace llvm;
 //
 // @param kind : The kind of special user data, a UserDataMapping enum value
 const char *ShaderInputs::getSpecialUserDataName(unsigned kind) {
-  static const char *names[] = {"GlobalTable",
-                                "PerShaderTable",
-                                "SpillTable",
-                                "BaseVertex",
-                                "BaseInstance",
-                                "DrawIndex",
-                                "Workgroup",
-                                "",
-                                "",
-                                "",
-                                "EsGsLdsSize",
-                                "ViewId",
-                                "StreamOutTable",
-                                "",
-                                "",
-                                "VertexBufferTable",
-                                "",
-                                "NggCullingData"};
+  static const char *names[] = {
+      "GlobalTable",
+      "PerShaderTable",
+      "SpillTable",
+      "BaseVertex",
+      "BaseInstance",
+      "DrawIndex",
+      "Workgroup",
+      "",
+      "",
+      "",
+      "EsGsLdsSize",
+      "ViewId",
+      "StreamOutTable",
+      "",
+      "",
+      "VertexBufferTable",
+      "",
+      "NggCullingData",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+  };
   unsigned idx = kind - static_cast<unsigned>(UserDataMapping::GlobalTable);
   return ArrayRef<const char *>(names)[idx];
 }

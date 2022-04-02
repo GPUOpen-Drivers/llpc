@@ -108,6 +108,7 @@ public:
 
   virtual Result BuildComputePipeline(const ComputePipelineBuildInfo *pipelineInfo,
                                       ComputePipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr);
+
   Result buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                        llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
                                        bool buildingRelocatableElf, ElfPackage *pipelineElf,
