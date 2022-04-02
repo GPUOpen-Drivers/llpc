@@ -161,9 +161,8 @@ private:
                                            llvm::Value *vertexIdx, llvm::Value *gsVsOffset,
                                            llvm::Instruction *insertPos);
 
-  llvm::Value *readValueFromLds(bool isOutput, llvm::Type *readTy, llvm::Value *ldsOffset,
-                                llvm::Instruction *insertPos);
-  void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, llvm::Instruction *insertPos);
+  llvm::Value *readValueFromLds(bool offChip, llvm::Type *readTy, llvm::Value *ldsOffset, llvm::Instruction *insertPos);
+  void writeValueToLds(bool offChip, llvm::Value *writeValue, llvm::Value *ldsOffset, llvm::Instruction *insertPos);
 
   llvm::Value *calcTessFactorOffset(bool isOuter, llvm::Value *elemIdx, llvm::Instruction *insertPos);
 
