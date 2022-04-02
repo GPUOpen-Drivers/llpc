@@ -655,10 +655,15 @@ template <typename T> void ConfigBuilder::buildLsRegConfig(ShaderStage shaderSta
 
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
 
-  unsigned ldsSizeInDwords =
-      calcFactor.onChip.patchConstStart + calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup;
-  if (m_pipelineState->isTessOffChip())
+  unsigned ldsSizeInDwords = 0;
+  if (m_pipelineState->isTessOffChip()) {
+    // LDS usage: input patches
     ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
+  } else {
+    // LDS usage: input patches, output patches, and patch constants
+    ldsSizeInDwords =
+        calcFactor.onChip.patchConstStart + calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup;
+  }
 
   auto gpuWorkarounds = &m_pipelineState->getTargetInfo().getGpuWorkarounds();
 

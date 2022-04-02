@@ -186,6 +186,9 @@ constexpr unsigned GsPrimsPerEsThread = 256;
 // Preferred number of GS threads per VS thread.
 constexpr unsigned GsThreadsPerVsThread = 2;
 
+// Preferred number of HS threads per subgroup.
+constexpr unsigned MaxHsThreadsPerSubgroup = 256;
+
 // Preferred number of GS threads per subgroup.
 constexpr unsigned MaxGsThreadsPerSubgroup = 256;
 

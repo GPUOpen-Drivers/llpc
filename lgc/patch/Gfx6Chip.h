@@ -80,6 +80,9 @@ constexpr unsigned GsPrimsPerEsThread = 256;
 // Preferred number of GS threads per VS thread.
 constexpr unsigned GsThreadsPerVsThread = 2;
 
+// Preferred number of HS threads per subgroup.
+constexpr unsigned MaxHsThreadsPerSubgroup = 256;
+
 // Max size of primitives per subgroup for adjacency primitives or when GS instancing is used. This restriction is
 // applicable only when GS on-chip mode is used.
 constexpr unsigned GsOnChipMaxPrimsPerSubgroup = 128;

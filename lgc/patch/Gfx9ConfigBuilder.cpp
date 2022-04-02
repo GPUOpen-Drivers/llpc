@@ -1096,10 +1096,8 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   // NOTE: On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K
   // dwords.
   const auto &calcFactor = tcsResUsage->inOutUsage.tcs.calcFactor;
-  unsigned ldsSizeInDwords =
-      calcFactor.onChip.patchConstStart + calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup;
-  if (m_pipelineState->isTessOffChip())
-    ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
+  assert(m_pipelineState->isTessOffChip()); // Must be off-chip on GFX9+
+  unsigned ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
 
   const unsigned ldsSizeDwordGranularity = 128u;
   const unsigned ldsSizeDwordGranularityShift = 7u;
