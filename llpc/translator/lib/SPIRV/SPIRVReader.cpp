@@ -4595,24 +4595,24 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto vec1CompCount = vs->getVector1ComponentCount();
     auto vec2CompCount = vs->getVector2ComponentCount();
 
-    llvm::SmallVector<int, 4> mask(vs->getComponents().begin(), vs->getComponents().end());
+    auto mask = to_vector<4>(vs->getComponents());
 
     // If vectors are not the same size then extend smaller one
-    // to be the same as bigger. This is required by llvm::shufflevector.
+    // to be the same as bigger. This is required by shufflevector from llvm.
     if (v1->getType() != v2->getType()) {
 
       auto smallerVec = std::min(vec1CompCount, vec2CompCount);
       auto biggerVec = std::max(vec1CompCount, vec2CompCount);
 
       // Create temporary mask used to extend size of smaller vector.
-      llvm::SmallVector<int> extendedVecMask = llvm::createSequentialMask(0, smallerVec, (biggerVec - smallerVec));
+      SmallVector<int> extendedVecMask = createSequentialMask(0, smallerVec, (biggerVec - smallerVec));
 
       // Find smaller vector and extend its size.
       if (vec1CompCount < vec2CompCount) {
         v1 = getBuilder()->CreateShuffleVector(v1, extendedVecMask);
 
         // Adjust mask since v1 was smaller vector and needs to be extended with undefs.
-        for (size_t i = 0; i < newVecCompCount; i++) {
+        for (size_t i = 0; i != newVecCompCount; ++i) {
           if (mask[i] >= vec1CompCount)
             mask[i] += (biggerVec - smallerVec);
         }
