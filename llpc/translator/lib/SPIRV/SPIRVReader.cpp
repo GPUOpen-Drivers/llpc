@@ -7667,8 +7667,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     } else if (bt->isTypePointer()) {
       blockDec.IsMatrix = false;
       SPIRVWord arrayStride = 0;
-      if (!bt->hasDecorate(DecorationArrayStride, 0, &arrayStride))
-        llvm_unreachable("Missing array stride decoration");
+      bt->hasDecorate(DecorationArrayStride, 0, &arrayStride);
       stride = arrayStride;
       elemTy = bt->getPointerElementType();
       blockMd.IsPointer = true;
