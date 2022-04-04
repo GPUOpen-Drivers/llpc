@@ -1280,6 +1280,7 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
   // We pass unlinked=true as we do not need to pass user data layout into the ELF link.
   context->getPipelineContext()->setPipelineState(&*elfLinkerPipeline, /*hasher=*/nullptr, /*unlinked=*/true);
 
+  bool textualOutput = false;
   // For each of the two part pipelines (fragment first, then pre-rasterization)...
   for (auto partPipelineStage : lgc::enumRange<PartPipelineStage>()) {
     // Compile the part pipelines, or find it in the cache.
@@ -1310,7 +1311,7 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
 
     // If we are doing the pre-rasterization part pipeline, the linker's pipeline object contains the FS input mapping
     // state. We need to include that state in the hash.
-    if (partPipelineStage == PartPipelineStagePreRasterization) {
+    if (partPipelineStage == PartPipelineStagePreRasterization && elfLinker->haveFsInputMappings()) {
       assert(elfLinker);
       StringRef fsInputMappings = elfLinker->getFsInputMappings();
       hasher.Update(reinterpret_cast<const uint8_t *>(fsInputMappings.data()), fsInputMappings.size());
@@ -1341,7 +1342,8 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
         if (oneShaderInfo && isShaderStageInMask(oneShaderInfo->entryStage, partStageMask))
           partPipelineShaderInfo.push_back(oneShaderInfo);
       }
-      auto otherPartPipeline = (partPipelineStage == PartPipelineStagePreRasterization) ? &*elfLinkerPipeline : nullptr;
+      auto otherPartPipeline =
+          (!textualOutput && partPipelineStage == PartPipelineStagePreRasterization) ? &*elfLinkerPipeline : nullptr;
       Result result =
           buildPipelineInternal(context, partPipelineShaderInfo, PipelineLink::PartPipeline, otherPartPipeline,
                                 &partPipelineBuffers[partPipelineStage], stageCacheAccesses);
@@ -1352,7 +1354,13 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
       // If the "ELF" does not look like ELF, then it must be textual output from -emit-lgc, -emit-llvm, -filetype=asm.
       // We can't link that, so just concatenate it on to the output.
       if (partPipelineElf.size() < 4 || !partPipelineElf.startswith("\177ELF")) {
+        const unsigned char magic[] = {'B', 'C', 0xC0, 0xDE};
+        if (partPipelineElf.size() > 4 && memcmp(partPipelineElf.data(), magic, sizeof(magic)) == 0)
+          report_fatal_error("Cannot emit llvm bitcode with part pipeline compilation.");
+        if (textualOutput)
+          *pipelineElf += "Part Pipeline:\n";
         *pipelineElf += partPipelineElf;
+        textualOutput = true;
         continue;
       }
 
@@ -1375,7 +1383,9 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
   }
 
   Result result = Result::Success;
-  // Link the two part-pipelines.
+  // Link the two part-pipelines if the output is not textual.
+  if (textualOutput)
+    return result;
   raw_svector_ostream elfStream(*pipelineElf);
   bool ok = elfLinker->link(elfStream);
   if (!ok) {
