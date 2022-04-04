@@ -933,7 +933,9 @@ protected:
     assert(getTrueLabel()->isForward() || getTrueLabel()->isLabel());
     assert(getFalseLabel()->isForward() || getFalseLabel()->isLabel());
 #if SPV_VERSION >= 0x10600
-    assert(TrueLabelId != FalseLabelId);
+    // This requirement was added in 1.6, but we also need to accept SPIR-V
+    // from before that, so ignore violations.
+    // assert(TrueLabelId != FalseLabelId);
 #endif
   }
   SPIRVId ConditionId;
