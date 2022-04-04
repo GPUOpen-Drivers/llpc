@@ -4595,7 +4595,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto vec1CompCount = vs->getVector1ComponentCount();
     auto vec2CompCount = vs->getVector2ComponentCount();
 
-    auto mask = to_vector<4>(vs->getComponents());
+    SmallVector<int, 4> mask(vs->getComponents().begin(), vs->getComponents().end());
 
     // If vectors are not the same size then extend smaller one
     // to be the same as bigger. This is required by shufflevector from llvm.
