@@ -42,34 +42,26 @@ public:
                  MetroHash::Hash *cacheHash);
   virtual ~ComputeContext() {}
 
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const;
-
-  // Checks whether the pipeline is graphics or compute
-  virtual bool isGraphics() const { return false; }
+  // Gets pipeline shader info of the specified shader stage
+  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const override;
 
   // Gets pipeline build info
-  virtual const void *getPipelineBuildInfo() const { return m_pipelineInfo; }
+  virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
 
   // Gets the mask of active shader stages bound to this pipeline
-  virtual unsigned getShaderStageMask() const { return ShaderStageComputeBit; }
+  virtual unsigned getShaderStageMask() const override { return ShaderStageComputeBit; }
 
   // Sets the mask of active shader stages bound to this pipeline
-  void setShaderStageMask(unsigned mask) { assert(mask == getShaderStageMask()); }
-
-  // Sets whether pre-rasterization part has a geometry shader
-  void setPreRasterHasGs(bool /*preRasterHasGs*/) { llvm_unreachable("Should never be called!"); }
-
-  // Gets whether pre-rasterization part has a geometry shader
-  bool getPreRasterHasGs() const { return false; };
+  void setShaderStageMask(unsigned mask) override { assert(mask == ShaderStageComputeBit); }
 
   // Gets the count of active shader stages
-  virtual unsigned getActiveShaderStageCount() const { return 1; }
-
-  // Gets subgroup size usage
-  virtual unsigned getSubgroupSizeUsage() const;
+  virtual unsigned getActiveShaderStageCount() const override { return 1; }
 
   // Gets per pipeline options
-  virtual const PipelineOptions *getPipelineOptions() const { return &m_pipelineInfo->options; }
+  virtual const PipelineOptions *getPipelineOptions() const override { return &m_pipelineInfo->options; }
+
+  // Gets subgroup size usage
+  virtual unsigned getSubgroupSizeUsage() const override;
 
 private:
   ComputeContext() = delete;

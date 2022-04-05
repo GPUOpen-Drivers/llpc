@@ -119,6 +119,8 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
 
 // =====================================================================================================================
 // Gets subgroup size usage
+//
+// @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage`.
 unsigned GraphicsContext::getSubgroupSizeUsage() const {
   // clang-format off
   std::array<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfos = {
