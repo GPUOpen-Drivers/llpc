@@ -4595,6 +4595,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto vec1CompCount = vs->getVector1ComponentCount();
     auto vec2CompCount = vs->getVector2ComponentCount();
 
+    // Converting vector of uint32_t types (vs->getComponents()) to vector of int types.
+    // This is required by CreateShuffleVector which is not accepting uint32_t vectors.
     SmallVector<int, 4> mask(vs->getComponents().begin(), vs->getComponents().end());
 
     // If vectors are not the same size then extend smaller one
