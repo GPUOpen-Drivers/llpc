@@ -44,34 +44,35 @@ public:
                   MetroHash::Hash *cacheHash);
   virtual ~GraphicsContext();
 
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const;
-
   // Checks whether the pipeline is graphics or compute
-  virtual bool isGraphics() const { return true; }
+  virtual bool isGraphics() const override { return true; }
+
+  // Gets pipeline shader info of the specified shader stage
+  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const override;
 
   // Gets pipeline build info
-  virtual const void *getPipelineBuildInfo() const { return m_pipelineInfo; }
+  virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
 
   // Gets the mask of active shader stages bound to this pipeline
-  virtual unsigned getShaderStageMask() const { return m_stageMask; }
+  virtual unsigned getShaderStageMask() const override { return m_stageMask; }
 
   // Sets the mask of active shader stages bound to this pipeline
-  void setShaderStageMask(unsigned mask) { m_stageMask = mask; }
+  virtual void setShaderStageMask(unsigned mask) override { m_stageMask = mask; }
 
   // Sets whether pre-rasterization part has a geometry shader
-  void setPreRasterHasGs(bool preRasterHasGs) { m_preRasterHasGs = preRasterHasGs; }
+  virtual void setPreRasterHasGs(bool preRasterHasGs) override { m_preRasterHasGs = preRasterHasGs; }
 
   // Gets whether pre-rasterization part has a geometry shader
-  bool getPreRasterHasGs() const { return m_preRasterHasGs; };
+  virtual bool getPreRasterHasGs() const override { return m_preRasterHasGs; };
 
   // Gets the count of active shader stages
-  virtual unsigned getActiveShaderStageCount() const { return m_activeStageCount; }
+  virtual unsigned getActiveShaderStageCount() const override { return m_activeStageCount; }
 
   // Gets per pipeline options
-  virtual const PipelineOptions *getPipelineOptions() const { return &m_pipelineInfo->options; }
+  virtual const PipelineOptions *getPipelineOptions() const override { return &m_pipelineInfo->options; }
 
   // Gets subgroup size usage
-  virtual unsigned getSubgroupSizeUsage() const;
+  virtual unsigned getSubgroupSizeUsage() const override;
 
 private:
   GraphicsContext() = delete;

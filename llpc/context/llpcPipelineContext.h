@@ -102,11 +102,7 @@ public:
   virtual ~PipelineContext();
 
   // Checks whether the pipeline is graphics or compute
-  virtual bool isGraphics() const = 0;
-
-  // Gets subgroup size usage denoting which stage uses features relevant to subgroup size.
-  // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage`.
-  virtual unsigned getSubgroupSizeUsage() const = 0;
+  virtual bool isGraphics() const { return false; }
 
   // Gets pipeline shader info of the specified shader stage
   virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const = 0;
@@ -122,14 +118,21 @@ public:
 
   // Sets whether pre-rasterization part has a geometry shader.
   // NOTE: Only applicable in the part pipeline compilation mode.
-  virtual void setPreRasterHasGs(bool preRasterHasGs) = 0;
+  virtual void setPreRasterHasGs(bool preRasterHasGs) { llvm_unreachable("Should never be called!"); }
 
   // Gets whether pre-rasterization part has a geometry shader.
   // NOTE: Only applicable in the part pipeline compilation mode.
-  virtual bool getPreRasterHasGs() const = 0;
+  virtual bool getPreRasterHasGs() const { return false; }
 
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const = 0;
+
+  // Gets per pipeline options
+  virtual const PipelineOptions *getPipelineOptions() const = 0;
+
+  // Gets subgroup size usage denoting which stage uses features relevant to subgroup size.
+  // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage`.
+  virtual unsigned getSubgroupSizeUsage() const = 0;
 
   static const char *getGpuNameAbbreviation(GfxIpVersion gfxIp);
 
@@ -160,10 +163,7 @@ public:
   // Sets the cache hash for the pipeline.  This is the hash that is used to do cache lookups.
   void setHashForCacheLookUp(MetroHash::Hash hash) { m_cacheHash = hash; }
 
-  virtual ShaderHash getShaderHashCode(ShaderStage stage) const;
-
-  // Gets per pipeline options
-  virtual const PipelineOptions *getPipelineOptions() const = 0;
+  ShaderHash getShaderHashCode(ShaderStage stage) const;
 
   // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
   void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const;
