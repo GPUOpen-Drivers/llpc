@@ -62,9 +62,11 @@ const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(ShaderStage shad
 
 // =====================================================================================================================
 // Gets subgroup size usage
+//
+// @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage`.
 unsigned ComputeContext::getSubgroupSizeUsage() const {
   const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(m_pipelineInfo->cs.pModuleData);
-  return moduleData->usage.useSubgroupSize << ShaderStageCompute;
+  return moduleData->usage.useSubgroupSize ? ShaderStageComputeBit : 0;
 }
 
 } // namespace Llpc
