@@ -5835,33 +5835,43 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *bi, BasicB
 // Translate OpFragmentMaskFetchAMD to LLVM IR
 Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
 
-  // Get image type descriptor and fmask descriptor.
-  ExtractedImageInfo imageInfo = {bb};
-  auto bii = static_cast<SPIRVInstTemplateBase *>(bi);
-  getImageDesc(bii->getOpValue(0), &imageInfo);
+  if (getPipelineOptions()->shadowDescriptorTableUsage != Vkgc::ShadowDescriptorTableUsage::Disable) {
+    // Get image type descriptor and fmask descriptor.
+    ExtractedImageInfo imageInfo = {bb};
+    auto bii = static_cast<SPIRVInstTemplateBase *>(bi);
+    getImageDesc(bii->getOpValue(0), &imageInfo);
 
-  assert(imageInfo.desc->Dim == Dim2D || imageInfo.desc->Dim == DimSubpassData);
-  imageInfo.dim = !imageInfo.desc->Arrayed ? lgc::Builder::Dim2D : lgc::Builder::Dim3D;
+    assert(imageInfo.desc->Dim == Dim2D || imageInfo.desc->Dim == DimSubpassData);
+    imageInfo.dim = !imageInfo.desc->Arrayed ? lgc::Builder::Dim2D : lgc::Builder::Dim3D;
 
-  // Set up address arguments.
-  Value *coord = transValue(bii->getOpValue(1), bb->getParent(), bb);
+    // Set up address arguments.
+    Value *coord = transValue(bii->getOpValue(1), bb->getParent(), bb);
 
-  // Handle fetch/read/write/atomic aspects of coordinate. (This converts to
-  // signed i32 and adds on the FragCoord if DimSubpassData.)
-  Value *addr[lgc::Builder::ImageAddressCount] = {};
-  addr[lgc::Builder::ImageAddressIdxCoordinate] = coord;
-  handleImageFetchReadWriteCoord(bi, &imageInfo, addr,
-                                 /*EnableMultiView=*/false);
-  coord = addr[lgc::Builder::ImageAddressIdxCoordinate];
+    // Handle fetch/read/write/atomic aspects of coordinate. (This converts to
+    // signed i32 and adds on the FragCoord if DimSubpassData.)
+    Value *addr[lgc::Builder::ImageAddressCount] = {};
+    addr[lgc::Builder::ImageAddressIdxCoordinate] = coord;
+    handleImageFetchReadWriteCoord(bi, &imageInfo, addr,
+                                   /*EnableMultiView=*/false);
+    coord = addr[lgc::Builder::ImageAddressIdxCoordinate];
 
-  // Get the return type for the Builder method. It returns v4f32, then we
-  // extract just the R channel.
-  Type *resultTy = FixedVectorType::get(transType(bi->getType()), 4);
+    // Get the return type for the Builder method. It returns v4i32, then we
+    // extract just the R channel.
+    Type *resultTy = FixedVectorType::get(transType(bi->getType()), 4);
 
-  // Create the image load.
-  Value *result =
-      getBuilder()->CreateImageLoad(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.fmaskDesc, coord, nullptr);
-  return getBuilder()->CreateExtractElement(result, uint64_t(0));
+    // Create the image load.
+    Value *result =
+        getBuilder()->CreateImageLoad(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.fmaskDesc, coord, nullptr);
+    return getBuilder()->CreateExtractElement(result, uint64_t(0));
+  }
+
+  // Fmask is unavailable. This is a no-op for cases where the shadow descriptor table cannot be used
+  // and fmask descriptors aren't present.
+
+  // Output independent fragment pointers for each sample. Each 4 bits correspond to each sample index.
+  // Always use 8 fragment pointers, which is the max fragment count where fmask is actually supported.
+  static constexpr unsigned UncompressedFmaskValue = 0x76543210;
+  return getBuilder()->getInt32(UncompressedFmaskValue);
 }
 
 // =============================================================================
