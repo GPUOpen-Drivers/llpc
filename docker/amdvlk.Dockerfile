@@ -34,7 +34,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && apt-get install -yqq --no-install-recommends \
        build-essential pkg-config ninja-build \
        gcc g++ binutils-gold \
-       llvm-11 clang-11 clang-tidy-11 libclang-common-11-dev lld-11 \
+       llvm-12 clang-12 clang-tidy-12 libclang-common-12-dev lld-12 \
        python python3 python3-distutils python3-pip \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
@@ -44,7 +44,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir --upgrade cmake \
     && for tool in clang clang++ clang-tidy llvm-cov llvm-profdata llvm-symbolizer lld ld.lld ; do \
-         update-alternatives --install /usr/bin/"$tool" "$tool" /usr/bin/"$tool"-11 10 ; \
+         update-alternatives --install /usr/bin/"$tool" "$tool" /usr/bin/"$tool"-12 10 ; \
         done \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
 
