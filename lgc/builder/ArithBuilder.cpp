@@ -89,7 +89,7 @@ Value *ArithBuilder::CreateCubeFaceIndex(Value *coord, const Twine &instName) {
 // @param destTy : Type to convert to
 // @param roundingMode : Rounding mode
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, unsigned roundingMode,
+Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, RoundingMode roundingMode,
                                                const Twine &instName) {
   if (value->getType()->getScalarType()->isDoubleTy())
     value = CreateFPTrunc(value, getConditionallyVectorizedTy(getFloatTy(), destTy));
@@ -99,10 +99,7 @@ Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, unsig
 
   assert(value->getType()->getScalarType()->isFloatTy() && destTy->getScalarType()->isHalfTy());
 
-  // TODO: Using a hard-coded value for rmToNearest due to flux in LLVM over
-  // the namespace for this value - this will be removed once it has settled
-  // if (roundingMode != fp::rmToNearest)
-  if (roundingMode == 4 /* rmTowardZero */) {
+  if (roundingMode == RoundingMode::TowardZero) {
     // RTZ: Use cvt_pkrtz instruction.
     Value *result = scalarizeInPairs(value, [this](Value *inVec2) {
       Value *inVal0 = CreateExtractElement(inVec2, uint64_t(0));
@@ -111,11 +108,11 @@ Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, unsig
     });
     result->setName(instName);
     return result;
-  } else if ((roundingMode == 2 /* rmDownward */) || (roundingMode == 3 /* rmUpward */)) {
+  }
+
+  if ((roundingMode == RoundingMode::TowardNegative) || (roundingMode == RoundingMode::TowardPositive)) {
     // RTN/RTP: Use fptrunc_round intrinsic.
-    StringRef roundingModeStr =
-        convertRoundingModeToStr((roundingMode == 2) ? RoundingMode::TowardNegative : RoundingMode::TowardPositive)
-            .getValue();
+    StringRef roundingModeStr = convertRoundingModeToStr(roundingMode).getValue();
     Value *roundingMode = MetadataAsValue::get(getContext(), MDString::get(getContext(), roundingModeStr));
     Value *result = scalarize(value, [=](Value *inValue) {
       return CreateIntrinsic(Intrinsic::fptrunc_round, {getHalfTy(), inValue->getType(), roundingMode->getType()},
@@ -126,6 +123,8 @@ Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, unsig
   }
 
   // RTE.
+  assert(roundingMode == RoundingMode::NearestTiesToEven);
+
   // float32: sign = [31], exponent = [30:23], mantissa = [22:0]
   // float16: sign = [15], exponent = [14:10], mantissa = [9:0]
   Value *bits32 = CreateBitCast(value, getConditionallyVectorizedTy(getInt32Ty(), value->getType()));

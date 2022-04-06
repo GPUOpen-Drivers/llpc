@@ -305,8 +305,8 @@ public:
   // @param destTy : Type to convert to
   // @param roundingMode : Rounding mode
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFpTruncWithRounding(llvm::Value *value, llvm::Type *destTy, unsigned roundingMode,
-                                                 const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateFpTruncWithRounding(llvm::Value *value, llvm::Type *destTy,
+                                                 llvm::RoundingMode roundingMode, const llvm::Twine &instName = "") = 0;
 
   // Create quantize operation: truncates float (or vector) value to a value that is representable by a half.
   //

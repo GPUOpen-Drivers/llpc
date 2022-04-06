@@ -244,7 +244,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
 
   case BuilderRecorder::FpTruncWithRounding: {
-    auto roundingMode = static_cast<unsigned>(cast<ConstantInt>(args[1])->getZExtValue());
+    auto roundingMode = static_cast<RoundingMode>(cast<ConstantInt>(args[1])->getZExtValue());
     return m_builder->CreateFpTruncWithRounding(args[0], call->getType(), roundingMode);
   }
 

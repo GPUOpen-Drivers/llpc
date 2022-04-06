@@ -268,7 +268,7 @@ public:
   llvm::Value *CreateCubeFaceIndex(llvm::Value *coord, const llvm::Twine &instName = "") override final;
 
   // Create scalar or vector FP truncate operation with rounding mode.
-  llvm::Value *CreateFpTruncWithRounding(llvm::Value *value, llvm::Type *destTy, unsigned roundingMode,
+  llvm::Value *CreateFpTruncWithRounding(llvm::Value *value, llvm::Type *destTy, llvm::RoundingMode roundingMode,
                                          const llvm::Twine &instName = "") override final;
 
   // Create quantize operation.
