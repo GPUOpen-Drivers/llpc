@@ -830,9 +830,9 @@ Value *BuilderRecorder::CreateRefract(Value *i, Value *n, Value *eta, const Twin
 // @param destTy : Type to convert to
 // @param roundingMode : Rounding mode
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateFpTruncWithRounding(Value *value, Type *destTy, unsigned roundingMode,
+Value *BuilderRecorder::CreateFpTruncWithRounding(Value *value, Type *destTy, RoundingMode roundingMode,
                                                   const Twine &instName) {
-  return record(Opcode::FpTruncWithRounding, destTy, {value, getInt32(roundingMode)}, instName);
+  return record(Opcode::FpTruncWithRounding, destTy, {value, getInt32(static_cast<unsigned>(roundingMode))}, instName);
 }
 
 // =====================================================================================================================

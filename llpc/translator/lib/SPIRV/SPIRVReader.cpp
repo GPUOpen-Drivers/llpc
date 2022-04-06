@@ -4683,28 +4683,21 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     if (val->getType()->getScalarType()->getPrimitiveSizeInBits() <= destTy->getScalarType()->getPrimitiveSizeInBits())
       return mapValue(bv, getBuilder()->CreateFPExt(val, destTy));
 
-    // TODO: use hardcoded values during namespace flux for llvm
-    // fp::RoundingMode RM = fp::rmDynamic;
-    unsigned rm = 0; // fp::rmDynamic
+    RoundingMode rm = RoundingMode::Dynamic;
     SPIRVFPRoundingModeKind rounding;
     if (bc->hasFPRoundingMode(&rounding)) {
       switch (rounding) {
       case FPRoundingModeRTE:
-        // TODO: use hardcoded values during namespace flux for llvm
-        // RM = fp::rmToNearest;
-        rm = 1;
+        rm = RoundingMode::NearestTiesToEven;
         break;
       case FPRoundingModeRTZ:
-        // RM = fp::rmTowardZero;
-        rm = 4;
+        rm = RoundingMode::TowardZero;
         break;
       case FPRoundingModeRTP:
-        // RM = fp::rmUpward;
-        rm = 3;
+        rm = RoundingMode::TowardPositive;
         break;
       case FPRoundingModeRTN:
-        // RM = fp::rmDownward;
-        rm = 2;
+        rm = RoundingMode::TowardNegative;
         break;
       default:
         llvm_unreachable("Should never be called!");
