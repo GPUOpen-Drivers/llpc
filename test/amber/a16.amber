@@ -15,8 +15,7 @@
 
 # Modifications Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
 
-# TODO Remove the not once this is fixed in LLVM
-# RUN: not run_amber_test.py --icd %icd %s | FileCheck %s
+# RUN: run_amber_test.py --icd %icd %s | FileCheck %s
 # REQUIRES: gfx10+
 
 # Test a16 image samples with bias. The bias needs to be converted to 16 bit.
