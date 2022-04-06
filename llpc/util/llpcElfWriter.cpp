@@ -303,6 +303,15 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   pipelineHash[0] = destDocument.getNode(pContext->getPipelineHashCode());
   pipelineHash[1] = destDocument.getNode(pContext->getPipelineHashCode());
 
+  // Update .ps_sample_mask
+  // NOTE: We need to erase the node if the cached ELF has it but we actually don't need it.
+  auto srcPsSampleMask = srcPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
+  auto destPsSampleMask = destPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
+  if (srcPsSampleMask != srcPipeline.getMap(true).end())
+    destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::PsSampleMask] = srcPsSampleMask->second;
+  else if (destPsSampleMask != destPipeline.getMap(true).end())
+    destPipeline.getMap(true).erase(destPsSampleMask);
+
   // List of fragment shader related registers.
   static const unsigned PsRegNumbers[] = {
       0x2C0A, // mmSPI_SHADER_PGM_RSRC1_PS
