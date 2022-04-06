@@ -106,6 +106,7 @@ public:
                                      bool deriveStride = false);
   unsigned calcShaderBlockSize(SPIRVType *bt, unsigned blockSize, unsigned matrixStride, bool isRowMajor);
   Value *transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb);
+  Value *transDebugPrintf(SPIRVExtInst *spvExtInst);
   Value *flushDenorm(Value *val);
   Value *transTrinaryMinMaxExtInst(SPIRVExtInst *extInst, BasicBlock *bb);
   Value *transGLSLBuiltinFromExtInst(SPIRVExtInst *bc, BasicBlock *bb);
