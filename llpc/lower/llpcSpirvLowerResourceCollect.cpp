@@ -73,7 +73,7 @@ SpirvLowerResourceCollect::SpirvLowerResourceCollect(bool collectDetailUsage)
 //
 // @param global : Global variable to collect resource node data
 void SpirvLowerResourceCollect::collectResourceNodeData(const GlobalVariable *global) {
-  auto globalTy = global->getType()->getContainedType(0);
+  auto globalTy = global->getValueType();
 
   MDNode *metaNode = global->getMetadata(gSPIRVMD::Resource);
   auto descSet = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
@@ -186,7 +186,7 @@ bool SpirvLowerResourceCollect::runOnModule(Module &module) {
     }
     case SPIRAS_Output: {
       // Only collect FS out info when requested.
-      Type *globalTy = global->getType()->getContainedType(0);
+      Type *globalTy = global->getValueType();
       if (!m_collectDetailUsage || !globalTy->isSingleValueType())
         break;
 

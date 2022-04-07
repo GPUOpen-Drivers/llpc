@@ -339,7 +339,7 @@ void SpirvLowerGlobal::handleCallInst(bool checkEmitCall, bool checkInterpCall) 
             assert(isa<GlobalVariable>(loadSrc));
 
             auto input = cast<GlobalVariable>(loadSrc);
-            auto inputTy = input->getType()->getContainedType(0);
+            auto inputTy = input->getValueType();
 
             MDNode *metaNode = input->getMetadata(gSPIRVMD::InOut);
             assert(metaNode);
@@ -386,7 +386,7 @@ static bool hasVertexIdx(const Constant &metaVal) {
 void SpirvLowerGlobal::handleLoadInstGlobal(LoadInst &loadInst, const unsigned addrSpace) {
   Value *loadSrc = loadInst.getOperand(0);
   auto inOut = cast<GlobalVariable>(loadSrc);
-  auto inOutTy = inOut->getType()->getContainedType(0);
+  auto inOutTy = inOut->getValueType();
 
   MDNode *metaNode = inOut->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);
@@ -434,7 +434,7 @@ void SpirvLowerGlobal::handleLoadInstGEP(GetElementPtrInst *const getElemPtr, Lo
     indexOperands.push_back(toInt32Value(index, &loadInst));
 
   Value *vertexIdx = nullptr;
-  auto inOutTy = inOut->getType()->getContainedType(0);
+  auto inOutTy = inOut->getValueType();
 
   MDNode *metaNode = inOut->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);
@@ -498,7 +498,7 @@ void SpirvLowerGlobal::handleStoreInstGlobal(StoreInst &storeInst) {
   Value *storeValue = storeInst.getOperand(0);
 
   auto output = cast<GlobalVariable>(storeDest);
-  auto outputy = output->getType()->getContainedType(0);
+  auto outputy = output->getValueType();
 
   MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);
@@ -543,7 +543,7 @@ void SpirvLowerGlobal::handleStoreInstGEP(GetElementPtrInst *const getElemPtr, S
     indexOperands.push_back(toInt32Value(index, &storeInst));
 
   Value *vertexIdx = nullptr;
-  auto outputTy = output->getType()->getContainedType(0);
+  auto outputTy = output->getValueType();
 
   MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);
@@ -597,7 +597,7 @@ void SpirvLowerGlobal::handleStoreInst() {
 // @param globalVar : Global variable to be mapped
 void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   const auto &dataLayout = m_module->getDataLayout();
-  Type *globalVarTy = globalVar->getType()->getContainedType(0);
+  Type *globalVarTy = globalVar->getValueType();
   auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
   auto proxy = new AllocaInst(globalVarTy, dataLayout.getAllocaAddrSpace(),
@@ -625,7 +625,7 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
   }
 
   const auto &dataLayout = m_module->getDataLayout();
-  Type *inputTy = input->getType()->getContainedType(0);
+  Type *inputTy = input->getValueType();
   if (inputTy->isPointerTy())
     inputTy = m_builder->getInt64Ty();
   auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
@@ -659,13 +659,13 @@ void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
       auto initializer = output->getInitializer();
       new StoreInst(initializer, output, &*insertPos);
     }
-    m_outputProxyMap.push_back(std::pair<Value *, Value *>(output, nullptr));
+    m_outputProxyMap.emplace_back(output, nullptr);
     m_lowerOutputInPlace = true;
     return;
   }
 
   const auto &dataLayout = m_module->getDataLayout();
-  Type *outputTy = output->getType()->getContainedType(0);
+  Type *outputTy = output->getValueType();
   if (outputTy->isPointerTy())
     outputTy = m_builder->getInt64Ty();
 
@@ -677,7 +677,7 @@ void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
     new StoreInst(initializer, proxy, &*insertPos);
   }
 
-  m_outputProxyMap.push_back(std::pair<Value *, Value *>(output, proxy));
+  m_outputProxyMap.emplace_back(output, proxy);
 }
 
 // =====================================================================================================================
@@ -749,7 +749,7 @@ void SpirvLowerGlobal::lowerInput() {
         Type *instTy = inst->getType();
         if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Input) {
           assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
-          Type *newInstTy = PointerType::get(instTy->getContainedType(0), SPIRAS_Private);
+          Type *newInstTy = PointerType::getWithSamePointeeType(cast<PointerType>(instTy), SPIRAS_Private);
           inst->mutateType(newInstTy);
         }
       }
@@ -795,7 +795,7 @@ void SpirvLowerGlobal::lowerOutput() {
   for (auto outputMap : m_outputProxyMap) {
     auto output = cast<GlobalVariable>(outputMap.first);
     auto proxy = outputMap.second;
-    auto proxyTy = proxy->getType()->getPointerElementType();
+    auto proxyTy = proxy->getAllocatedType();
 
     MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
     assert(metaNode);
@@ -843,7 +843,7 @@ void SpirvLowerGlobal::lowerOutput() {
         Type *instTy = inst->getType();
         if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Output) {
           assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
-          Type *newInstTy = PointerType::get(instTy->getContainedType(0), SPIRAS_Private);
+          Type *newInstTy = PointerType::getWithSamePointeeType(cast<PointerType>(instTy), SPIRAS_Private);
           inst->mutateType(newInstTy);
         }
       }
@@ -2054,7 +2054,7 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
     indexOperands.push_back(toInt32Value(index, &callInst));
 
   auto input = cast<GlobalVariable>(getElemPtr->getPointerOperand());
-  auto inputTy = input->getType()->getContainedType(0);
+  auto inputTy = input->getValueType();
 
   MDNode *metaNode = input->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);

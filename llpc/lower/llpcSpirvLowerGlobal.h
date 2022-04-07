@@ -109,7 +109,7 @@ private:
 
   // NOTE: Here we use list to store pairs of output proxy mappings. This is because we want output patching to be
   // "ordered" (resulting LLVM IR for the patching always be consistent).
-  std::list<std::pair<llvm::Value *, llvm::Value *>> m_outputProxyMap; // Proxy list for lowering outputs
+  std::list<std::pair<llvm::Value *, llvm::AllocaInst *>> m_outputProxyMap; // Proxy list for lowering outputs
 
   llvm::BasicBlock *m_retBlock; // The return block of entry point
 

@@ -88,6 +88,11 @@ CallInst *emitCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args, Arra
 // @param ty : Type to get mangle name
 // @param [in/out] nameStream : Stream to write the type name into
 void getTypeName(Type *ty, raw_ostream &nameStream) {
+  if (ty->isOpaquePointerTy()) {
+    nameStream << "p" << ty->getPointerAddressSpace();
+    return;
+  }
+
   for (;;) {
     if (auto pointerTy = dyn_cast<PointerType>(ty)) {
       nameStream << "p" << pointerTy->getAddressSpace();

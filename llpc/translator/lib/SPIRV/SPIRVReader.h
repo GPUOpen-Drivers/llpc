@@ -176,7 +176,7 @@ public:
   // Translate integer dot product to LLVM IR
   Value *transSPIRVIntegerDotProductFromInst(SPIRVInstruction *bi, BasicBlock *bb);
 
-  Value *createLaunderRowMajorMatrix(Value *const);
+  std::pair<Type *, Value *> createLaunderRowMajorMatrix(Type *const, Value *const);
   Value *addLoadInstRecursively(SPIRVType *const, Value *const, bool, bool, bool);
   void addStoreInstRecursively(SPIRVType *const, Value *const, Value *const, bool, bool, bool);
   Constant *buildConstStoreRecursively(SPIRVType *const, Type *const, Constant *const);

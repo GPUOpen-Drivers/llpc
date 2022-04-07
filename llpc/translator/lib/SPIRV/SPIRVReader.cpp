@@ -1467,10 +1467,10 @@ void SPIRVToLLVM::updateDebugLoc(SPIRVValue *bv, Function *f) {
 // Create a call to launder a row major matrix.
 //
 // @param pointerToMatrix : The pointer to matrix to launder.
-Value *SPIRVToLLVM::createLaunderRowMajorMatrix(Value *const pointerToMatrix) {
+std::pair<Type *, Value *> SPIRVToLLVM::createLaunderRowMajorMatrix(Type *const matrixType,
+                                                                    Value *const pointerToMatrix) {
   Type *const matrixPointerType = pointerToMatrix->getType();
 
-  Type *const matrixType = matrixPointerType->getPointerElementType();
   assert(matrixType->isArrayTy() && matrixType->getArrayElementType()->isStructTy());
 
   Type *const columnVectorType = matrixType->getArrayElementType()->getStructElementType(0);
@@ -1485,7 +1485,7 @@ Value *SPIRVToLLVM::createLaunderRowMajorMatrix(Value *const pointerToMatrix) {
   FunctionType *const rowMajorFuncType = FunctionType::get(newMatrixPointerType, matrixPointerType, false);
   Function *const rowMajorFunc =
       Function::Create(rowMajorFuncType, GlobalValue::ExternalLinkage, SpirvLaunderRowMajor, m_m);
-  return getBuilder()->CreateCall(rowMajorFunc, pointerToMatrix);
+  return std::make_pair(newMatrixType, getBuilder()->CreateCall(rowMajorFunc, pointerToMatrix));
 }
 
 // =====================================================================================================================
@@ -1504,8 +1504,9 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
   Type *loadType = loadPointer->getType()->getPointerElementType();
 
   if (isTypeWithPadRowMajorMatrix(loadType)) {
-    loadPointer = createLaunderRowMajorMatrix(loadPointer);
-    loadType = loadPointer->getType()->getPointerElementType();
+    auto loadPair = createLaunderRowMajorMatrix(loadType, loadPointer);
+    loadType = loadPair.first;
+    loadPointer = loadPair.second;
   }
 
   Constant *const zero = getBuilder()->getInt32(0);
@@ -1596,7 +1597,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       Type *const vectorType = transType(spvType, 0, false, true, false);
       Type *const castType = vectorType->getPointerTo(loadPointer->getType()->getPointerAddressSpace());
       loadPointer = getBuilder()->CreateBitCast(loadPointer, castType);
-      loadType = loadPointer->getType()->getPointerElementType();
+      loadType = vectorType;
 
       const bool scalarBlockLayout = static_cast<Llpc::Context &>(getBuilder()->getContext()).getScalarBlockLayout();
 
@@ -1638,7 +1639,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
   Type *storeType = storePointer->getType()->getPointerElementType();
 
   if (isTypeWithPadRowMajorMatrix(storeType)) {
-    storePointer = createLaunderRowMajorMatrix(storePointer);
+    auto storePair = createLaunderRowMajorMatrix(storeType, storePointer);
+    storePointer = storePair.second;
     storeType = storePointer->getType()->getPointerElementType();
   }
 
@@ -1927,7 +1929,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(SPIRVValue *c
 
   Value *const loadPointer = transValue(spvAtomicLoad->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                         getBuilder()->GetInsertBlock());
-  Type *const loadType = loadPointer->getType()->getPointerElementType();
+  Type *const loadType = transType(spvAtomicLoad->getType());
 
   const unsigned loadAlignment = static_cast<unsigned>(m_m->getDataLayout().getTypeSizeInBits(loadType) / 8);
   LoadInst *const load = getBuilder()->CreateAlignedLoad(loadType, loadPointer, Align(loadAlignment));
@@ -2155,7 +2157,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicIIncrement>(SPIRVVa
   Value *const atomicPointer = transValue(spvAtomicInst->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                           getBuilder()->GetInsertBlock());
 
-  Value *const one = ConstantInt::get(atomicPointer->getType()->getPointerElementType(), 1);
+  Value *const one = ConstantInt::get(transType(spvAtomicInst->getOpValue(0)->getType()->getPointerElementType()), 1);
 
   return getBuilder()->CreateAtomicRMW(AtomicRMWInst::Add, atomicPointer, one, MaybeAlign(), ordering, scope);
 }
@@ -2179,7 +2181,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicIDecrement>(SPIRVVa
   Value *const atomicPointer = transValue(spvAtomicInst->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                           getBuilder()->GetInsertBlock());
 
-  Value *const one = ConstantInt::get(atomicPointer->getType()->getPointerElementType(), 1);
+  Value *const one = ConstantInt::get(transType(spvAtomicInst->getOpValue(0)->getType()->getPointerElementType()), 1);
 
   return getBuilder()->CreateAtomicRMW(AtomicRMWInst::Sub, atomicPointer, one, MaybeAlign(), ordering, scope);
 }
@@ -2651,7 +2653,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
 
   Value *const pStruct =
       transValue(spvStruct, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-  assert(pStruct->getType()->isPointerTy() && pStruct->getType()->getPointerElementType()->isStructTy());
+  assert(pStruct->getType()->isPointerTy() &&
+         (pStruct->getType()->isOpaquePointerTy() || pStruct->getType()->getPointerElementType()->isStructTy()));
 
   const unsigned memberIndex = spvArrayLength->getMemberIndex();
   const unsigned remappedMemberIndex =
@@ -2835,9 +2838,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
         newBase = getBuilder()->CreateGEP(newBaseEltType, newBase, frontIndices);
 
       // Matrix splits are identified by having a nullptr as the .second of the pair.
-      if (!split.second)
-        newBase = createLaunderRowMajorMatrix(newBase);
-      else {
+      if (!split.second) {
+        auto newPair = createLaunderRowMajorMatrix(newBase->getType()->getPointerElementType(), newBase);
+        newBase = newPair.second;
+      } else {
         Type *const bitCastType = split.second->getPointerTo(newBase->getType()->getPointerAddressSpace());
         newBase = getBuilder()->CreateBitCast(newBase, bitCastType);
       }
