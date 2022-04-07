@@ -258,7 +258,7 @@ unsigned PatchInitializeWorkgroupMemory::getTypeSizeInDwords(Type *inputTy) {
     return dwordCount;
   }
   if (inputTy->isArrayTy()) {
-    const unsigned elemSize = getTypeSizeInDwords(inputTy->getContainedType(0));
+    const unsigned elemSize = getTypeSizeInDwords(inputTy->getArrayElementType());
     return inputTy->getArrayNumElements() * elemSize;
   } else {
     assert(inputTy->isStructTy());
