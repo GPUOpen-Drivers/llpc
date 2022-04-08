@@ -1,14 +1,18 @@
+; This test is based on OpVectorShuffle_TestDvec4UndefVariable_lit.spvasm with single change in OpShuffleVector instruction.
+; Please see comment in SPIR-V below.
+
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{.*}} = shufflevector <4 x double> undef, <4 x double> %1, <2 x i32> <i32 7, i32 6>
 ; SHADERTEST: [[TEMP_VEC:%[0-9]+]] = shufflevector <2 x double> %{{.*}}, <2 x double> poison, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
-; SHADERTEST: %{{.*}} = shufflevector <4 x double> %{{.*}}, <4 x double> [[TEMP_VEC]], <4 x i32> <i32 4, i32 5, i32 2, i32 3>
+; SHADERTEST: %{{.*}} = shufflevector <4 x double> [[TEMP_VEC]], <4 x double> %{{.*}}, <4 x i32> <i32 0, i32 1, i32 4, i32 5>
+
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{.*}} = shufflevector <4 x double> %{{.*}}, <4 x double> undef, <2 x i32> <i32 3, i32 2>
 ; SHADERTEST: [[TEMP_VEC:%[0-9]+]] = shufflevector <2 x double> %{{.*}}, <2 x double> poison, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
-; SHADERTEST: %{{.*}} = shufflevector <4 x double> [[TEMP_VEC]], <4 x double> %{{.*}}, <4 x i32> <i32 0, i32 1, i32 6, i32 7>
+; SHADERTEST: %{{.*}} = shufflevector <4 x double> [[TEMP_VEC]], <4 x double> %{{.*}}, <4 x i32> <i32 0, i32 1, i32 4, i32 5>
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
@@ -60,7 +64,13 @@
          %14 = OpLoad %8 %10
          %16 = OpVectorShuffle %15 %25 %14 5 4
          %17 = OpLoad %8 %10
-         %18 = OpVectorShuffle %8 %17 %16 4 5 2 3
+
+; Change relates with swapping the operands of OpVectorShuffle instruction below.
+; In this test SPIR-V::ShuffleVector is taking two vectors as input parameters.
+; We want to see if newly created llvm::shuffle_vector instruction contains proper
+; mask if first vector is smaller.
+         %18 = OpVectorShuffle %8 %16 %17 0 1 2 3
+
                OpStore %10 %18
          %23 = OpLoad %8 %10
          %24 = OpFConvert %20 %23

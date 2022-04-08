@@ -2,20 +2,12 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{.*}} = extractelement <4 x float> %{{.*}}, i32 -5
-; SHADERTEST: %{{.*}} = insertelement <2 x float> undef, float %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = extractelement <4 x float> %{{.*}}, i32 2
-; SHADERTEST: %{{.*}} = insertelement <2 x float> %{{.*}}, float %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = extractelement <2 x float> %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = insertelement <4 x float> undef, float %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = extractelement <2 x float> %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = insertelement <4 x float> %{{.*}}, float %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = extractelement <4 x float> %{{.*}}, i32 2
-; SHADERTEST: %{{.*}} = insertelement <4 x float> %{{.*}}, float %{{.*}}, i32 2
-; SHADERTEST: %{{.*}} = extractelement <4 x float> %{{.*}}, i32 3
-; SHADERTEST: %{{.*}} = insertelement <4 x float> %{{.*}}, float %{{.*}}, i32 3
+; SHADERTEST: %{{.*}} = shufflevector <4 x float> %{{.*}}, <4 x float> %{{.*}}, <2 x i32> <i32 undef, i32 2>
+; SHADERTEST: [[TEMP_VEC:%[0-9]+]] = shufflevector <2 x float> %{{.*}}, <2 x float> poison, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
+; SHADERTEST: %{{.*}} = shufflevector <4 x float> %{{.*}}, <4 x float> [[TEMP_VEC]], <4 x i32> <i32 4, i32 5, i32 2, i32 3>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{.*}} = shufflevector <4 x float> %{{.*}}, <4 x float> undef, <4 x i32> <i32 undef, i32 2, i32 2, i32 3>
+; SHADERTEST: [[TEMP_VEC:%[0-9]+]] = shufflevector <4 x float> %{{.*}}, <4 x float> poison, <4 x i32> <i32 undef, i32 2, i32 undef, i32 undef>
+; SHADERTEST: %{{.*}} = shufflevector <4 x float> [[TEMP_VEC]], <4 x float> %{{.*}}, <4 x i32> <i32 undef, i32 1, i32 6, i32 7>
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

@@ -51,6 +51,7 @@
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Analysis/VectorUtils.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
@@ -4585,32 +4586,44 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   }
 
   case OpVectorShuffle: {
-    // NOTE: LLVM backend compiler does not well handle "shufflevector"
-    // instruction. So we avoid generating "shufflevector" and use the
-    // combination of "extractelement" and "insertelement" as a substitute.
     auto vs = static_cast<SPIRVVectorShuffle *>(bv);
 
     auto v1 = transValue(vs->getVector1(), f, bb);
     auto v2 = transValue(vs->getVector2(), f, bb);
 
-    auto vec1CompCount = vs->getVector1ComponentCount();
     auto newVecCompCount = vs->getComponents().size();
+    auto vec1CompCount = vs->getVector1ComponentCount();
+    auto vec2CompCount = vs->getVector2ComponentCount();
 
-    IntegerType *int32Ty = IntegerType::get(*m_context, 32);
-    Type *newVecTy = FixedVectorType::get(cast<VectorType>(v1->getType())->getElementType(), newVecCompCount);
-    Value *newVec = UndefValue::get(newVecTy);
+    // Converting vector of uint32_t types (vs->getComponents()) to vector of int types.
+    // This is required by CreateShuffleVector which is not accepting uint32_t vectors.
+    SmallVector<int, 4> mask(vs->getComponents().begin(), vs->getComponents().end());
 
-    for (size_t i = 0; i < newVecCompCount; ++i) {
-      auto comp = vs->getComponents()[i];
-      if (comp < vec1CompCount) {
-        auto newVecComp = ExtractElementInst::Create(v1, ConstantInt::get(int32Ty, comp), "", bb);
-        newVec = InsertElementInst::Create(newVec, newVecComp, ConstantInt::get(int32Ty, i), "", bb);
+    // If vectors are not the same size then extend smaller one
+    // to be the same as bigger. This is required by shufflevector from llvm.
+    if (v1->getType() != v2->getType()) {
+
+      auto smallerVec = std::min(vec1CompCount, vec2CompCount);
+      auto biggerVec = std::max(vec1CompCount, vec2CompCount);
+
+      // Create temporary mask used to extend size of smaller vector.
+      SmallVector<int> extendedVecMask = createSequentialMask(0, smallerVec, (biggerVec - smallerVec));
+
+      // Find smaller vector and extend its size.
+      if (vec1CompCount < vec2CompCount) {
+        v1 = getBuilder()->CreateShuffleVector(v1, extendedVecMask);
+
+        // Adjust mask since v1 was smaller vector and needs to be extended with undefs.
+        for (size_t i = 0; i != newVecCompCount; ++i) {
+          if (mask[i] >= vec1CompCount)
+            mask[i] += (biggerVec - smallerVec);
+        }
       } else {
-        auto newVecComp = ExtractElementInst::Create(v2, ConstantInt::get(int32Ty, comp - vec1CompCount), "", bb);
-
-        newVec = InsertElementInst::Create(newVec, newVecComp, ConstantInt::get(int32Ty, i), "", bb);
+        v2 = getBuilder()->CreateShuffleVector(v2, extendedVecMask);
       }
     }
+
+    auto *newVec = getBuilder()->CreateShuffleVector(v1, v2, mask);
 
     return mapValue(bv, newVec);
   }
