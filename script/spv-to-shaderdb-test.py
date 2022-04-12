@@ -24,7 +24,7 @@ import urllib.request
 from argparse import ArgumentParser
 
 shadertest_prefix = r'''; BEGIN_SHADERTEST
-; RUN: amdllpc --verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc --verify-ir -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 {lit_constraints}
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
 ; SHADERTEST: AMDLLPC SUCCESS

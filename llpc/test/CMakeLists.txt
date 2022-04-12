@@ -29,7 +29,7 @@ find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
 list(APPEND CMAKE_MODULE_PATH "${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm")
 include(LLVMConfig)
 
-set(AMDLLPC_TEST_DEPS amdllpc spvgen FileCheck llvm-objdump llvm-readelf count not)
+set(AMDLLPC_TEST_DEPS amdllpc FileCheck llvm-objdump llvm-readelf count not)
 
 # required by lit.site.cfg.py.in.
 set(AMDLLPC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
