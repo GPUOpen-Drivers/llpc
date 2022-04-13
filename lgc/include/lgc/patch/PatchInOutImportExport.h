@@ -164,8 +164,6 @@ private:
   llvm::Value *readValueFromLds(bool offChip, llvm::Type *readTy, llvm::Value *ldsOffset, llvm::Instruction *insertPos);
   void writeValueToLds(bool offChip, llvm::Value *writeValue, llvm::Value *ldsOffset, llvm::Instruction *insertPos);
 
-  llvm::Value *calcTessFactorOffset(bool isOuter, llvm::Value *elemIdx, llvm::Instruction *insertPos);
-
   void storeTessFactorToBuffer(llvm::ArrayRef<llvm::Value *> tessFactors, llvm::Value *tessFactorOffset,
                                llvm::Instruction *insertPos);
 
@@ -240,8 +238,8 @@ private:
   std::set<unsigned> m_expLocs; // The locations that already have an export instruction for the vertex shader.
   const std::array<unsigned char, 4> *m_buffFormats; // The format of MTBUF instructions for specified GFX
 
-  llvm::SmallVector<llvm::Instruction *, 4> m_tessLevelOuterInsts; // Collect the instructions of TessLevelOuter
-  llvm::SmallVector<llvm::Instruction *, 2> m_tessLevelInnerInsts; // Collect the instructions of TessLevelInner
+  llvm::Value *m_tessLevelOuterPtr = nullptr; // Correspond to "out float gl_TessLevelOuter[4]"
+  llvm::Value *m_tessLevelInnerPtr = nullptr; // Correspond to "out float gl_TessLevelInner[2]"
 };
 
 // =====================================================================================================================
