@@ -1790,9 +1790,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelOuter];
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = mapLoc;
         availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
-      } else if (builtInUsage.tcs.tessLevelOuter && m_importedOutputBuiltIns.count(BuiltInTessLevelOuter) > 0) {
-        // NOTE: We have to map gl_TessLevelOuter to generic per-patch output if it is used for output import.
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
       }
 
       if (nextBuiltInUsage.tessLevelInner) {
@@ -1801,9 +1798,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelInner];
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = mapLoc;
         availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
-      } else if (builtInUsage.tcs.tessLevelInner && m_importedOutputBuiltIns.count(BuiltInTessLevelInner) > 0) {
-        // NOTE: We have to map gl_TessLevelInner to generic per-patch output if it is used for output import.
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
       }
 
       // Revisit built-in outputs and map those unmapped to generic ones
@@ -1842,10 +1836,10 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
           ++availOutMapLoc;
       }
 
-      if (builtInUsage.tcs.tessLevelOuter && m_importedOutputBuiltIns.count(BuiltInTessLevelOuter) > 0)
+      if (builtInUsage.tcs.tessLevelOuter)
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
 
-      if (builtInUsage.tcs.tessLevelInner && m_importedOutputBuiltIns.count(BuiltInTessLevelInner) > 0)
+      if (builtInUsage.tcs.tessLevelInner)
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
     }
 
