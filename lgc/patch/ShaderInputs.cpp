@@ -43,38 +43,35 @@ using namespace llvm;
 // Get name of a special user data value, one of the UserDataMapping values
 //
 // @param kind : The kind of special user data, a UserDataMapping enum value
-const char *ShaderInputs::getSpecialUserDataName(unsigned kind) {
-  static const char *names[] = {
-      "GlobalTable",
-      "PerShaderTable",
-      "SpillTable",
-      "BaseVertex",
-      "BaseInstance",
-      "DrawIndex",
-      "Workgroup",
-      "",
-      "",
-      "",
-      "EsGsLdsSize",
-      "ViewId",
-      "StreamOutTable",
-      "",
-      "",
-      "VertexBufferTable",
-      "",
-      "NggCullingData",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-  };
-  unsigned idx = kind - static_cast<unsigned>(UserDataMapping::GlobalTable);
-  return ArrayRef<const char *>(names)[idx];
+const char *ShaderInputs::getSpecialUserDataName(UserDataMapping kind) {
+  switch (kind) {
+  case UserDataMapping::GlobalTable:
+    return "GlobalTable";
+  case UserDataMapping::PerShaderTable:
+    return "PerShaderTable";
+  case UserDataMapping::SpillTable:
+    return "SpillTable";
+  case UserDataMapping::BaseVertex:
+    return "BaseVertex";
+  case UserDataMapping::BaseInstance:
+    return "BaseInstance";
+  case UserDataMapping::DrawIndex:
+    return "DrawIndex";
+  case UserDataMapping::Workgroup:
+    return "Workgroup";
+  case UserDataMapping::EsGsLdsSize:
+    return "EsGsLdsSize";
+  case UserDataMapping::ViewId:
+    return "ViewId";
+  case UserDataMapping::StreamOutTable:
+    return "StreamOutTable";
+  case UserDataMapping::VertexBufferTable:
+    return "VertexBufferTable";
+  case UserDataMapping::NggCullingData:
+    return "NggCullingData";
+  default:
+    return "";
+  }
 }
 
 // =====================================================================================================================
