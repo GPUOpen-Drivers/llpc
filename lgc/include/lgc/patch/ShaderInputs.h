@@ -159,10 +159,10 @@ public:
   // Static methods called any time
 
   // Get name of a special user data value, one of the UserDataMapping values
-  static const char *getSpecialUserDataName(unsigned kind);
-  static const char *getSpecialUserDataName(UserDataMapping kind) {
-    return getSpecialUserDataName(static_cast<unsigned>(kind));
+  static const char *getSpecialUserDataName(unsigned kind) {
+    return getSpecialUserDataName(static_cast<UserDataMapping>(kind));
   }
+  static const char *getSpecialUserDataName(UserDataMapping kind);
 
   // Get IR type of a particular shader input
   static llvm::Type *getInputType(ShaderInput inputKind, const LgcContext &lgcContext);
