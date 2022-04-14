@@ -841,7 +841,6 @@ private:
   unsigned getShaderWaveSize();
   llvm::Value *createGroupArithmeticIdentity(GroupArithOp groupArithOp, llvm::Type *const type);
   llvm::Value *createGroupArithmeticOperation(GroupArithOp groupArithOp, llvm::Value *const x, llvm::Value *const y);
-  llvm::Value *createInlineAsmSideEffect(llvm::Value *const value);
   llvm::Value *createDppMov(llvm::Value *const value, DppCtrl dppCtrl, unsigned rowMask, unsigned bankMask,
                             bool boundCtrl);
   llvm::Value *createDppUpdate(llvm::Value *const origValue, llvm::Value *const updateValue, DppCtrl dppCtrl,
@@ -855,7 +854,6 @@ private:
 
   llvm::Value *createDsSwizzle(llvm::Value *const value, uint16_t dsPattern);
   llvm::Value *createWwm(llvm::Value *const value);
-  llvm::Value *createSetInactive(llvm::Value *const active, llvm::Value *const inactive);
   llvm::Value *createThreadMask();
   llvm::Value *createThreadMaskedSelect(llvm::Value *const threadMask, uint64_t andMask, llvm::Value *const value1,
                                         llvm::Value *const value2);

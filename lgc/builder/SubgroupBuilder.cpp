@@ -31,7 +31,6 @@
 #include "BuilderImpl.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/Internal.h"
-#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -188,7 +187,7 @@ Value *SubgroupBuilder::CreateSubgroupBroadcastFirst(Value *const value, const T
     return builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, mappedArgs[0]);
   };
 
-  return CreateMapToInt32(mapFunc, {createInlineAsmSideEffect(value)}, {});
+  return CreateMapToInt32(mapFunc, {BuilderBase::get(*this).CreateInlineAsmSideEffect(value)}, {});
 }
 
 // =====================================================================================================================
@@ -488,7 +487,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
   if (supportDpp()) {
     // Start the WWM section by setting the inactive lanes.
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
-    Value *result = createSetInactive(value, identity);
+    Value *result = BuilderBase::get(*this).CreateSetInactive(value, identity);
 
     // Perform The group arithmetic operation between adjacent lanes in the subgroup, with all masks and rows enabled
     // (0xF).
@@ -571,7 +570,8 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
     return createWwm(result);
   } else {
     // Start the WWM section by setting the inactive lanes.
-    Value *result = createSetInactive(value, createGroupArithmeticIdentity(groupArithOp, value->getType()));
+    Value *result =
+        BuilderBase::get(*this).CreateSetInactive(value, createGroupArithmeticIdentity(groupArithOp, value->getType()));
 
     // The DS swizzle mode is doing a xor of 0x1 to swap values between N <-> N+1, and the and mask of 0x1f means
     // all lanes do the same swap.
@@ -642,7 +642,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArith
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
     // Start the WWM section by setting the inactive invocations.
-    Value *const setInactive = createSetInactive(value, identity);
+    Value *const setInactive = BuilderBase::get(*this).CreateSetInactive(value, identity);
 
     // The DPP operation has all rows active and all banks in the rows active (0xF).
     Value *result = CreateSelect(
@@ -723,7 +723,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArith
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
     // Start the WWM section by setting the inactive invocations.
-    Value *const setInactive = createSetInactive(value, identity);
+    Value *const setInactive = BuilderBase::get(*this).CreateSetInactive(value, identity);
     Value *result = setInactive;
 
     // The DS swizzle is or'ing by 0x0 with an and mask of 0x1E, which swaps from N <-> N+1. We don't want the N's
@@ -791,7 +791,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArith
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
     // Start the WWM section by setting the inactive invocations.
-    Value *const setInactive = createSetInactive(value, identity);
+    Value *const setInactive = BuilderBase::get(*this).CreateSetInactive(value, identity);
 
     Value *shiftRight = nullptr;
 
@@ -902,7 +902,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArith
     Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
     // Start the WWM section by setting the inactive invocations.
-    Value *const setInactive = createSetInactive(value, identity);
+    Value *const setInactive = BuilderBase::get(*this).CreateSetInactive(value, identity);
     Value *result = identity;
 
     // The DS swizzle is or'ing by 0x0 with an and mask of 0x1E, which swaps from N <-> N+1. We don't want the N's
@@ -1219,22 +1219,6 @@ Value *SubgroupBuilder::createGroupArithmeticOperation(GroupArithOp groupArithOp
 }
 
 // =====================================================================================================================
-// Create an inline assembly call to cause a side effect (used to work around miscompiles with convergent).
-//
-// @param value : The value to ensure doesn't move in control flow.
-Value *SubgroupBuilder::createInlineAsmSideEffect(Value *const value) {
-  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
-    Value *const value = mappedArgs[0];
-    Type *const type = value->getType();
-    FunctionType *const funcType = FunctionType::get(type, type, false);
-    InlineAsm *const inlineAsm = InlineAsm::get(funcType, "; %1", "=v,0", true);
-    return builder.CreateCall(inlineAsm, value);
-  };
-
-  return CreateMapToInt32(mapFunc, value, {});
-}
-
-// =====================================================================================================================
 // Create a call to dpp mov.
 //
 // @param value : The value to DPP mov.
@@ -1375,21 +1359,6 @@ Value *SubgroupBuilder::createWwm(Value *const value) {
 }
 
 // =====================================================================================================================
-// Create a call to set inactive. Both active and inactive should have the same type.
-//
-// @param active : The value active invocations should take.
-// @param inactive : The value inactive invocations should take.
-Value *SubgroupBuilder::createSetInactive(Value *active, Value *inactive) {
-  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
-    Value *const active = mappedArgs[0];
-    Value *const inactive = mappedArgs[1];
-    return builder.CreateIntrinsic(Intrinsic::amdgcn_set_inactive, active->getType(), {active, inactive});
-  };
-
-  return CreateMapToInt32(mapFunc, {createInlineAsmSideEffect(active), inactive}, {});
-}
-
-// =====================================================================================================================
 // Create a ds_swizzle bit mode pattern.
 //
 // @param xorMask : The xor mask (bits 10..14).
@@ -1452,7 +1421,7 @@ Value *SubgroupBuilder::createGroupBallot(Value *const value) {
 
   // TODO: There is a longstanding bug with LLVM's convergent that forces us to use inline assembly with side effects to
   // stop any hoisting out of control flow.
-  valueAsInt32 = createInlineAsmSideEffect(valueAsInt32);
+  valueAsInt32 = BuilderBase::get(*this).CreateInlineAsmSideEffect(valueAsInt32);
 
   // The not equal predicate for the icmp intrinsic is 33.
   Constant *const predicateNe = getInt32(33);
