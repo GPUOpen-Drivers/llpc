@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/util/BuilderBase.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 using namespace lgc;
@@ -202,4 +203,35 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
     llvm_unreachable("Should never be called!");
     return nullptr;
   }
+}
+
+// =====================================================================================================================
+// Create an inline assembly call to cause a side effect (used to work around miscompiles with convergent).
+//
+// @param value : The value to ensure doesn't move in control flow.
+Value *BuilderBase::CreateInlineAsmSideEffect(Value *const value) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
+    Value *const value = mappedArgs[0];
+    Type *const type = value->getType();
+    FunctionType *const funcType = FunctionType::get(type, type, false);
+    InlineAsm *const inlineAsm = InlineAsm::get(funcType, "; %1", "=v,0", true);
+    return builder.CreateCall(inlineAsm, value);
+  };
+
+  return CreateMapToInt32(mapFunc, value, {});
+}
+
+// =====================================================================================================================
+// Create a call to set inactive. Both active and inactive should have the same type.
+//
+// @param active : The value active invocations should take.
+// @param inactive : The value inactive invocations should take.
+Value *BuilderBase::CreateSetInactive(Value *active, Value *inactive) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
+    Value *const active = mappedArgs[0];
+    Value *const inactive = mappedArgs[1];
+    return builder.CreateIntrinsic(Intrinsic::amdgcn_set_inactive, active->getType(), {active, inactive});
+  };
+
+  return CreateMapToInt32(mapFunc, {CreateInlineAsmSideEffect(active), inactive}, {});
 }
