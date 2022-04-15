@@ -479,9 +479,9 @@ void ObjDisassembler::outputData(bool outputting, uint64_t offset, StringRef dat
           ++asciiCount;
       }
       if (asciiCount * 10 >= size * 9)
-        m_streamer->emitBytes(data);
+        m_streamer->emitBytes(data.take_front(size));
       else
-        m_streamer->emitBinaryData(data);
+        m_streamer->emitBinaryData(data.take_front(size));
     }
     offset += size;
     data = data.drop_front(size);
