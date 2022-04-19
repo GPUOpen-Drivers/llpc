@@ -148,6 +148,10 @@ public:
   void addInputElf(MemoryBufferRef inputElf) override final { addInputElf(inputElf, /*addAtStart=*/true); }
   void addInputElf(MemoryBufferRef inputElf, bool addAtStart);
 
+  // Check whether we have FS input mappings, and thus whether we're doing part-pipeline compilation of the
+  // pre-FS part of the pipeline.
+  bool haveFsInputMappings() override final;
+
   // Get a representation of the fragment shader input mappings from the PAL metadata of ELF input(s) added so far.
   // This is used by the caller in a part-pipeline compilation scheme to include the FS input mappings in the
   // hash for the non-FS part of the pipeline.
@@ -279,6 +283,13 @@ void ElfLinkerImpl::addInputElf(MemoryBufferRef inputElf, bool addAtStart) {
   readIsaName(*elfInput.objectFile);
   mergePalMetadataFromElf(*elfInput.objectFile, false);
   m_elfInputs.insert(addAtStart ? m_elfInputs.begin() : m_elfInputs.end(), std::move(elfInput));
+}
+
+// =====================================================================================================================
+// Check whether we have FS input mappings, and thus whether we're doing part-pipeline compilation of the
+// pre-FS part of the pipeline.
+bool ElfLinkerImpl::haveFsInputMappings() {
+  return m_pipelineState->getPalMetadata()->haveFsInputMappings();
 }
 
 // =====================================================================================================================

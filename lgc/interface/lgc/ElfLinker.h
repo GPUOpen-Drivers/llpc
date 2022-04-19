@@ -53,6 +53,10 @@ public:
   // Add another input ELF to the link, in addition to the ones that were added when the ElfLinker was constructed.
   virtual void addInputElf(llvm::MemoryBufferRef inputElf) = 0;
 
+  // Check whether we have FS input mappings, and thus whether we're doing part-pipeline compilation of the
+  // pre-FS part of the pipeline.
+  virtual bool haveFsInputMappings() = 0;
+
   // Get a representation of the fragment shader input mappings from the PAL metadata of ELF input(s) added so far.
   // This is used by the caller in a part-pipeline compilation scheme to include the FS input mappings in the
   // hash for the non-FS part of the pipeline.
