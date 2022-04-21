@@ -39,9 +39,8 @@
 #ifndef SPIRVEXT_H
 #define SPIRVEXT_H
 
-#include "GLSL.std.450.h"
-#include "NonSemanticDebugPrintf.h"
 #include "spirv.hpp"
+#include "GLSL.std.450.h"
 
 namespace spv
 {
