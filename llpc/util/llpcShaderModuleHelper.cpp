@@ -188,6 +188,7 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, llvm::
     unsigned opCode = (codePos[0] & OpCodeMask);
     unsigned wordCount = (codePos[0] >> WordCountShift);
     switch (opCode) {
+    case OpString:
     case OpSource:
     case OpSourceContinued:
     case OpSourceExtension:

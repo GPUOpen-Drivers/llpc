@@ -57,9 +57,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -3781,15 +3779,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupFMaxNonUniformAMD>(S
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *const spvValue) {
   SPIRVExtInst *const spvExtInst = static_cast<SPIRVExtInst *>(spvValue);
 
-  if (m_bm->getBuiltinSet(spvExtInst->getExtSetId()) == SPIRVEIS_NonSemanticInfo) {
-    switch (spvExtInst->getExtOp()) {
-    case NonSemanticDebugPrintfDebugPrintf:
-      return transDebugPrintf(spvExtInst);
-    default:
-      // Just ignore this set of extended instructions
-      return nullptr;
-    }
-  }
+  // Just ignore this set of extended instructions
+  if (m_bm->getBuiltinSet(spvExtInst->getExtSetId()) == SPIRVEIS_NonSemanticInfo)
+    return nullptr;
 
   std::vector<SPIRVValue *> spvArgValues = spvExtInst->getArgumentValues();
 
@@ -8295,108 +8287,6 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
   default:
     llvm_unreachable("Unrecognized GLSLstd450 extended instruction");
   }
-}
-
-// =============================================================================
-// Translate DebugPrintf extended instruction
-Value *SPIRVToLLVM::transDebugPrintf(SPIRVExtInst *spvExtInst) {
-  auto &spvArgs = spvExtInst->getArguments();
-  assert(spvArgs.size() >= 1 && "printf must have at least one argument");
-  auto &formatString = m_bm->get<SPIRVString>(spvArgs[0])->getStr();
-  // Ignore printfs that don't have a matching format specifiers
-  if (formatString.find("%r") == std::string::npos)
-    return nullptr;
-
-  if (formatString.find("%ra") != std::string::npos) {
-    auto *builder = getBuilder();
-    BasicBlock *const block = builder->GetInsertBlock();
-    Function *const func = block->getParent();
-
-    if (spvArgs.size() < 2) {
-      m_context->diagnose(DiagnosticInfoUnsupported(
-          *func,
-          Twine("Not enough arguments for inline assembly in printf with format string '") + formatString + "'"));
-      return nullptr;
-    }
-
-    // Handle %ra (radeon-assembly) format specifier:
-    // The first non-format string argument is a string for the inline assembly.
-    // The second argument is a string for the constraints.
-    // The third argument (optional if there are no more arguments) is either a variable to write the output to or the
-    // string "no output".
-    // The rest of the arguments are passed as arguments to the inline assembly.
-    //
-    // In GLSL, inline assembly can be added like this:
-    //
-    //   // Enable printf extension
-    //   #extension GL_EXT_debug_printf : enable
-    //
-    //   // In code:
-    //   float x = 0.0;
-    //   debugPrintfEXT(
-    //     "%ra",                   // format string containing %ra
-    //     "v_mul_f32 $0, $1, 2.0", // inline assembly string
-    //     "=v,r",                  // constraints for each variable
-    //     x,                       // Variable (OpLoad in SPIR-V) ($0) or "no output"
-    //     x                        // Second argument ($1)
-    //   );
-    //
-    // The format of the inline assembly and constraint strings is explained in the LLVM language reference:
-    // https://llvm.org/docs/LangRef.html#inline-assembler-expressions
-
-    SmallVector<Type *> argumentTypes;
-    SmallVector<Value *> arguments;
-    Type *returnType = builder->getVoidTy();
-    Value *returnValue = nullptr;
-
-    if (spvArgs.size() > 3) {
-      auto *returnEntry = m_bm->getEntry(spvArgs[3]);
-      if (returnEntry->getOpCode() == OpString) {
-        auto &returnEntryStr = static_cast<SPIRVString *>(returnEntry)->getStr();
-        if (returnEntryStr != "no output") {
-          m_context->diagnose(DiagnosticInfoUnsupported(
-              *func, Twine("Unexpected string '") + returnEntryStr +
-                         "' for return argument in inline assembly. Expected a variable or 'no output'"));
-          return nullptr;
-        }
-      } else {
-        auto *returnSpvValue = static_cast<SPIRVValue *>(returnEntry);
-        // Look through OpLoad and store the return value there
-        if (returnSpvValue->getOpCode() != OpLoad) {
-          m_context->diagnose(DiagnosticInfoUnsupported(
-              *func, Twine("Unexpected value '") + returnSpvValue->getName() +
-                         "' for return argument in inline assembly. Expected a variable (OpLoad) or 'no output'"));
-          return nullptr;
-        }
-        auto *loadInst = static_cast<SPIRVLoad *>(returnSpvValue);
-        returnValue = transValue(loadInst->getSrc(), func, block);
-        returnType = transType(returnSpvValue->getType());
-      }
-    }
-
-    for (unsigned i = 4; i < spvArgs.size(); i++) {
-      auto *argVal = transValue(m_bm->getValue(spvArgs[i]), func, block);
-      argumentTypes.push_back(argVal->getType());
-      arguments.push_back(argVal);
-    }
-
-    auto &asmString = m_bm->get<SPIRVString>(spvArgs[1])->getStr();
-    auto &constraints = m_bm->get<SPIRVString>(spvArgs[2])->getStr();
-    auto *functionTy = FunctionType::get(returnType, argumentTypes, false);
-    auto *inlineAsm = InlineAsm::get(functionTy, asmString, constraints, true);
-
-    Value *lastInst = builder->CreateCall(inlineAsm, arguments);
-    // Store return value to given variable
-    if (returnValue)
-      lastInst = builder->CreateStore(lastInst, returnValue);
-
-    return lastInst;
-  }
-
-  m_context->diagnose(DiagnosticInfoUnsupported(*getBuilder()->GetInsertBlock()->getParent(),
-                                                Twine("Unknown printf %r format specifier in string '") + formatString +
-                                                    "'. Possible values are %ra for assembly."));
-  return nullptr;
 }
 
 // =============================================================================
