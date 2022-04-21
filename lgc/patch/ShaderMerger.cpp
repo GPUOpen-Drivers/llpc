@@ -192,6 +192,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   //     br label %.endLs
   //
   // .endLs:
+  //     fence
   //     call void @llvm.amdgcn.s.barrier()
   //     %hsEnable = icmp ult i32 %threadId, %hsVertCount
   //     br i1 %hsEnable, label %.beginHs, label %.endHs
@@ -371,6 +372,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   args.clear();
   attribs.clear();
   attribs.push_back(Attribute::NoRecurse);
+  new FenceInst(*m_context, AtomicOrdering::Release, SyncScope::System, endLsBlock);
   emitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_context), args, attribs, endLsBlock);
 
   auto hsEnable = new ICmpInst(*endLsBlock, ICmpInst::ICMP_ULT, threadId, hsVertCount, "");
@@ -602,6 +604,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   //     br label %.endEs
   //
   // .endEs:
+  //     fence
   //     call void @llvm.amdgcn.s.barrier()
   //     %gsEnable = icmp ult i32 %threadId, %gsPrimCount
   //     br i1 %gsEnable, label %.beginGs, label %.endGs
@@ -843,6 +846,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   args.clear();
   attribs.clear();
   attribs.push_back(Attribute::NoRecurse);
+  new FenceInst(*m_context, AtomicOrdering::Release, SyncScope::System, endEsBlock);
   emitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_context), args, attribs, endEsBlock);
 
   auto gsEnable = new ICmpInst(*endEsBlock, ICmpInst::ICMP_ULT, threadId, gsPrimCount, "");
