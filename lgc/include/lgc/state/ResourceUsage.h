@@ -343,6 +343,7 @@ struct ResourceUsage {
                                     // (in dword, correspond to "hsOutputBase")
           unsigned patchConstStart; // Offset into LDS where patch constants start (in dword,
                                     // correspond to "patchConstBase")
+          unsigned tessFactorStart; // Offset into LDS where tess factor start (in dword)
         } onChip;
 
         // Off-chip calculation factors
@@ -360,6 +361,8 @@ struct ResourceUsage {
 
         unsigned patchConstSize;   // Size of an output patch constants (in dword)
         unsigned tessFactorStride; // Size of tess factor stride (in dword)
+
+        unsigned tessOnChipLdsSize; // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
 
       } calcFactor;
     } tcs = {};

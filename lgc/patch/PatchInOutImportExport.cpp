@@ -324,19 +324,25 @@ void PatchInOutImportExport::processShader() {
     if (calcFactor.inVertexStride == InvalidValue && calcFactor.outVertexStride == InvalidValue &&
         calcFactor.patchCountPerThreadGroup == InvalidValue && calcFactor.outPatchSize == InvalidValue &&
         calcFactor.patchConstSize == InvalidValue) {
-      // NOTE: The LDS space is divided to three parts:
       //
-      //              +----------------------------------------+
-      //            / | TCS Vertex (Control Point) In (VS Out) |
-      //           /  +----------------------------------------+
-      //   LDS Space  | TCS Vertex (Control Point) Out         |
-      //           \  +----------------------------------------+
-      //            \ | TCS Patch Constant                     |
-      //              +----------------------------------------+
+      // NOTE: The LDS for tessellation is as follow:
+      //
+      //          +-------------+--------------+-------------+-------------+
+      // On-chip  | Input Patch | Output Patch | Patch Const | Tess Factor | (LDS)
+      //          +-------------+--------------+-------------+-------------+
+      //
+      //          +-------------+-------------+
+      // Off-chip | Input Patch | Tess Factor | (LDS)
+      //          +-------------+-------------+
+      //          +--------------+-------------+
+      //          | Output Patch | Patch Const | (LDS Buffer)
+      //          +--------------+-------------+
+      //
       // inPatchTotalSize = inVertexCount * inVertexStride * patchCountPerThreadGroup
       // outPatchTotalSize = outVertexCount * outVertexStride * patchCountPerThreadGroup
       // patchConstTotalSize = patchConstCount * 4 * patchCountPerThreadGroup
-
+      // tessFactorTotalSize = 6 * patchCountPerThreadGroup
+      //
       const auto &tcsInOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage;
       const auto &tesInOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->inOutUsage;
 
@@ -381,18 +387,28 @@ void PatchInOutImportExport::processShader() {
       const unsigned outPatchSize = outVertexCount * calcFactor.outVertexStride;
       const unsigned outPatchTotalSize = calcFactor.patchCountPerThreadGroup * outPatchSize;
 
+      const unsigned patchConstTotalSize = calcFactor.patchCountPerThreadGroup * calcFactor.patchConstSize;
+      const unsigned tessFactorTotalSize = calcFactor.patchCountPerThreadGroup * MaxTessFactorsPerPatch;
+
       calcFactor.outPatchSize = outPatchSize;
       calcFactor.inPatchSize = inPatchSize;
 
+      // NOTE: Tess factors are always stored to on-chip LDS first. Then, they are store to TF buffer and on-chip LDS
+      // or off-chip LDS buffer (which will be loaded by TES).
       if (m_pipelineState->isTessOffChip()) {
         calcFactor.offChip.outPatchStart = 0;
         calcFactor.offChip.patchConstStart = calcFactor.offChip.outPatchStart + outPatchTotalSize;
+
+        calcFactor.onChip.tessFactorStart = inPatchTotalSize;
       } else {
         calcFactor.onChip.outPatchStart = inPatchTotalSize;
         calcFactor.onChip.patchConstStart = calcFactor.onChip.outPatchStart + outPatchTotalSize;
+        calcFactor.onChip.tessFactorStart = calcFactor.onChip.patchConstStart + patchConstTotalSize;
       }
 
       calcFactor.tessFactorStride = tessFactorStride;
+
+      calcFactor.tessOnChipLdsSize = calcFactor.onChip.tessFactorStart + tessFactorTotalSize;
 
       LLPC_OUTS("===============================================================================\n");
       LLPC_OUTS("// LLPC tessellation calculation factor results\n\n");
@@ -401,19 +417,28 @@ void PatchInOutImportExport::processShader() {
       LLPC_OUTS("Input vertex count: " << inVertexCount << "\n");
       LLPC_OUTS("Input vertex stride: " << calcFactor.inVertexStride << "\n");
       LLPC_OUTS("Input patch size: " << inPatchSize << "\n");
+      LLPC_OUTS("Input patch start: 0 (LDS)\n");
       LLPC_OUTS("Input patch total size: " << inPatchTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("Output vertex count: " << outVertexCount << "\n");
       LLPC_OUTS("Output vertex stride: " << calcFactor.outVertexStride << "\n");
       LLPC_OUTS("Output patch size: " << outPatchSize << "\n");
+      LLPC_OUTS("Output patch start: " << (m_pipelineState->isTessOffChip() ? calcFactor.offChip.outPatchStart
+                                                                            : calcFactor.onChip.outPatchStart)
+                                       << (m_pipelineState->isTessOffChip() ? " (LDS buffer)" : "(LDS)") << "\n");
       LLPC_OUTS("Output patch total size: " << outPatchTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("Patch constant count: " << patchConstCount << "\n");
       LLPC_OUTS("Patch constant size: " << calcFactor.patchConstSize << "\n");
-      LLPC_OUTS("Patch constant total size: " << calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup
-                                              << "\n");
+      LLPC_OUTS("Patch constant start: " << (m_pipelineState->isTessOffChip() ? calcFactor.offChip.patchConstStart
+                                                                              : calcFactor.onChip.patchConstStart)
+                                         << (m_pipelineState->isTessOffChip() ? " (LDS buffer)" : "(LDS)") << "\n");
+      LLPC_OUTS("Patch constant total size: " << patchConstTotalSize << "\n");
       LLPC_OUTS("\n");
-      LLPC_OUTS("Tessellation factor stride: " << tessFactorStride << " (");
+      LLPC_OUTS("Tess factor start: " << calcFactor.onChip.tessFactorStart << " (LDS)\n");
+      LLPC_OUTS("Tess factor total size: " << tessFactorTotalSize << "\n");
+      LLPC_OUTS("\n");
+      LLPC_OUTS("Tess factor stride: " << tessFactorStride << " (");
       switch (m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode) {
       case PrimitiveMode::Triangles:
         LLPC_OUTS("triangles");
@@ -431,6 +456,7 @@ void PatchInOutImportExport::processShader() {
         break;
       }
       LLPC_OUTS(")\n\n");
+      LLPC_OUTS("Tess on-chip LDS total size: " << calcFactor.tessOnChipLdsSize << "\n\n");
     }
   }
 
@@ -2816,20 +2842,30 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
     assert(builtInUsage.tessLevelOuter);
     (void(builtInUsage)); // Unused
 
-    if (m_tessLevelOuterPtr) {
-      IRBuilder<> builder(*m_context);
-      builder.SetInsertPoint(insertPos);
+    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
-      auto tessLevelOuterTy = ArrayType::get(builder.getFloatTy(), 4);
-      if (outputTy->isArrayTy()) {
-        // Import the whole tessLevelOuter array
-        assert(outputTy == tessLevelOuterTy);
-        output = builder.CreateLoad(tessLevelOuterTy, m_tessLevelOuterPtr);
-      } else {
-        // Import a single element of tessLevelOuter array
-        auto loadPtr = builder.CreateGEP(tessLevelOuterTy, m_tessLevelOuterPtr, {builder.getInt32(0), elemIdx});
-        output = builder.CreateLoad(builder.getFloatTy(), loadPtr);
+    // tessLevelOuter (float[4]) + tessLevelInner (float[2])
+    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + elemIdx
+    if (outputTy->isArrayTy()) {
+      // Import the whole tessLevelOuter array
+      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
+        Value *ldsOffset = BinaryOperator::CreateMul(
+            relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
+        ldsOffset = BinaryOperator::CreateAdd(
+            ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart + i), ldsOffset, "",
+            insertPos);
+        auto elem = readValueFromLds(false, Type::getFloatTy(*m_context), ldsOffset, insertPos);
+        output = InsertValueInst::Create(output, elem, {i}, "", insertPos);
       }
+    } else {
+      // Import a single element of tessLevelOuter array
+      Value *ldsOffset = BinaryOperator::CreateMul(
+          relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
+      ldsOffset = BinaryOperator::CreateAdd(
+          ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart), "", insertPos);
+      ldsOffset = BinaryOperator::CreateAdd(ldsOffset, elemIdx, "", insertPos);
+      output = readValueFromLds(false, outputTy, ldsOffset, insertPos);
     }
 
     break;
@@ -2838,20 +2874,31 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
     assert(builtInUsage.tessLevelInner);
     (void(builtInUsage)); // Unused
 
-    if (m_tessLevelInnerPtr) {
-      IRBuilder<> builder(*m_context);
-      builder.SetInsertPoint(insertPos);
+    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
-      auto tessLevelInnerTy = ArrayType::get(builder.getFloatTy(), 2);
-      if (outputTy->isArrayTy()) {
-        // Import the whole tessLevelInner array
-        assert(outputTy == tessLevelInnerTy);
-        output = builder.CreateLoad(tessLevelInnerTy, m_tessLevelInnerPtr);
-      } else {
-        // Import a single element of tessLevelInner array
-        auto loadPtr = builder.CreateGEP(tessLevelInnerTy, m_tessLevelInnerPtr, {builder.getInt32(0), elemIdx});
-        output = builder.CreateLoad(builder.getFloatTy(), loadPtr);
+    // tessLevelOuter (float[4]) + tessLevelInner (float[2])
+    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + 4 + elemIdx
+    if (outputTy->isArrayTy()) {
+      // Import the whole tessLevelInner array
+      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
+        Value *ldsOffset = BinaryOperator::CreateMul(
+            relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
+        ldsOffset = BinaryOperator::CreateAdd(
+            ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart + 4 + i), ldsOffset, "",
+            insertPos);
+        auto elem = readValueFromLds(false, Type::getFloatTy(*m_context), ldsOffset, insertPos);
+        output = InsertValueInst::Create(output, elem, {i}, "", insertPos);
       }
+    } else {
+      // Import a single element of tessLevelInner array
+      Value *ldsOffset = BinaryOperator::CreateMul(
+          relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
+      ldsOffset = BinaryOperator::CreateAdd(
+          ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart + 4), "",
+          insertPos);
+      ldsOffset = BinaryOperator::CreateAdd(ldsOffset, elemIdx, "", insertPos);
+      output = readValueFromLds(false, outputTy, ldsOffset, insertPos);
     }
 
     break;
@@ -3125,49 +3172,60 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
     break;
   }
   case BuiltInTessLevelOuter: {
-    IRBuilder<> builder(*m_context);
+    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
-    auto tessLevelOuterTy = ArrayType::get(builder.getFloatTy(), 4);
-    if (!m_tessLevelOuterPtr) {
-      builder.SetInsertPoint(&*m_entryPoint->getEntryBlock().getFirstInsertionPt());
-      m_tessLevelOuterPtr = builder.CreateAlloca(tessLevelOuterTy);
-    }
-
-    builder.SetInsertPoint(insertPos);
-
+    // tessLevelOuter (float[4]) + tessLevelInner (float[2])
+    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + elemIdx
     if (outputTy->isArrayTy()) {
       // Export the whole tessLevelOuter array
-      assert(outputTy == tessLevelOuterTy);
-      builder.CreateStore(output, m_tessLevelOuterPtr);
+      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
+        Value *ldsOffset = BinaryOperator::CreateMul(
+            relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
+        ldsOffset = BinaryOperator::CreateAdd(
+            ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart + i), ldsOffset, "",
+            insertPos);
+        auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
+        writeValueToLds(false, elem, ldsOffset, insertPos);
+      }
     } else {
       // Export a single element of tessLevelOuter array
-      assert(outputTy->isFloatTy());
-      auto storePtr = builder.CreateGEP(tessLevelOuterTy, m_tessLevelOuterPtr, {builder.getInt32(0), elemIdx});
-      builder.CreateStore(output, storePtr);
+      Value *ldsOffset = BinaryOperator::CreateMul(
+          relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
+      ldsOffset = BinaryOperator::CreateAdd(
+          ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart), "", insertPos);
+      ldsOffset = BinaryOperator::CreateAdd(ldsOffset, elemIdx, "", insertPos);
+      writeValueToLds(false, output, ldsOffset, insertPos);
     }
 
     break;
   }
   case BuiltInTessLevelInner: {
-    IRBuilder<> builder(*m_context);
+    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
-    auto tessLevelInnerTy = ArrayType::get(builder.getFloatTy(), 2);
-    if (!m_tessLevelInnerPtr) {
-      builder.SetInsertPoint(&*m_entryPoint->getEntryBlock().getFirstInsertionPt());
-      m_tessLevelInnerPtr = builder.CreateAlloca(tessLevelInnerTy);
-    }
-
-    builder.SetInsertPoint(insertPos);
-
+    // tessLevelOuter (float[4]) + tessLevelInner (float[2])
+    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + 4 + elemIdx
     if (outputTy->isArrayTy()) {
       // Export the whole tessLevelInner array
-      assert(outputTy == tessLevelInnerTy);
-      builder.CreateStore(output, m_tessLevelInnerPtr);
+      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
+        Value *ldsOffset = BinaryOperator::CreateMul(
+            relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
+        ldsOffset = BinaryOperator::CreateAdd(
+            ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart + 4 + i), ldsOffset, "",
+            insertPos);
+        auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
+        writeValueToLds(false, elem, ldsOffset, insertPos);
+      }
     } else {
       // Export a single element of tessLevelInner array
-      assert(outputTy->isFloatTy());
-      auto storePtr = builder.CreateGEP(tessLevelInnerTy, m_tessLevelInnerPtr, {builder.getInt32(0), elemIdx});
-      builder.CreateStore(output, storePtr);
+      Value *ldsOffset = BinaryOperator::CreateMul(
+          relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
+      ldsOffset = BinaryOperator::CreateAdd(
+          ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart + 4), "",
+          insertPos);
+      ldsOffset = BinaryOperator::CreateAdd(ldsOffset, elemIdx, "", insertPos);
+      writeValueToLds(false, output, ldsOffset, insertPos);
     }
 
     break;
@@ -4952,8 +5010,9 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
   const unsigned outPatchSize = (outVertexCount * outVertexStride);
   const unsigned patchConstSize = patchConstCount * 4;
 
-  // Compute the required LDS size per patch, always include the space for VS vertex out
-  unsigned ldsSizePerPatch = inPatchSize;
+  // Compute the required LDS size per patch, always include the space for input patch and tess factor
+  unsigned ldsSizePerPatch = inPatchSize + MaxTessFactorsPerPatch;
+
   unsigned patchCountLimitedByLds =
       (m_pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup / ldsSizePerPatch);
 
@@ -5710,14 +5769,11 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
 
 // =====================================================================================================================
 // Handle the store of tessellation factors.
-//   1. Collect outer and inner tessellation factors.
-//   2. Write tessellation factors to LDS if they are read as inputs by TES or read back by TCS.
+//   1. Collect outer and inner tessellation factors;
+//   2. Write tessellation factors to LDS if they are read as inputs by TES;
 //   3. Write tessellation factors to TF buffer.
 void PatchInOutImportExport::storeTessFactors() {
   assert(m_shaderStage == ShaderStageTessControl); // Must be tessellation control shader
-
-  if (!m_tessLevelOuterPtr && !m_tessLevelInnerPtr)
-    return;
 
   //
   // Find the ret instruction as the insert position
@@ -5730,12 +5786,13 @@ void PatchInOutImportExport::storeTessFactors() {
       insertPos = retInst;
     }
   }
+  assert(insertPos); // Must have ret instruction
 
   IRBuilder<> builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
   //
-  // Collect tessellation factors
+  // Collect tessellation factors from on-chip LDS
   //
   unsigned outerTessFactorCount = 0;
   unsigned innerTessFactorCount = 0;
@@ -5759,24 +5816,34 @@ void PatchInOutImportExport::storeTessFactors() {
     break;
   }
 
-  SmallVector<Value *> outerTessFactors, innerTessFactors;
-  if (m_tessLevelOuterPtr) {
-    auto tessLevelOuterTy = ArrayType::get(builder.getFloatTy(), 4);
-    auto tessLevelOuter = builder.CreateLoad(tessLevelOuterTy, m_tessLevelOuterPtr);
-    for (unsigned i = 0; i < outerTessFactorCount; ++i)
-      outerTessFactors.push_back(builder.CreateExtractValue(tessLevelOuter, i));
-  }
+  auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+  auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
-  if (m_tessLevelInnerPtr) {
-    auto tessLevelInnerTy = ArrayType::get(builder.getFloatTy(), 2);
-    auto tessLevelInner = builder.CreateLoad(tessLevelInnerTy, m_tessLevelInnerPtr);
+  SmallVector<Value *> outerTessFactors, innerTessFactors;
+
+  assert(outerTessFactorCount >= 2 && outerTessFactorCount <= 4);
+  // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch
+  Value *ldsOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
+  ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(calcFactor.onChip.tessFactorStart));
+  auto outerTessFactorVec =
+      readValueFromLds(false, FixedVectorType::get(builder.getFloatTy(), outerTessFactorCount), ldsOffset, insertPos);
+  for (unsigned i = 0; i < outerTessFactorCount; ++i)
+    outerTessFactors.push_back(builder.CreateExtractElement(outerTessFactorVec, i));
+
+  assert(innerTessFactorCount <= 2);
+  if (innerTessFactorCount) {
+    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + 4
+    Value *ldsOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
+    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(calcFactor.onChip.tessFactorStart + 4));
+    auto innerTessFactorVec =
+        readValueFromLds(false, FixedVectorType::get(builder.getFloatTy(), innerTessFactorCount), ldsOffset, insertPos);
     for (unsigned i = 0; i < innerTessFactorCount; ++i)
-      innerTessFactors.push_back(builder.CreateExtractValue(tessLevelInner, i));
+      innerTessFactors.push_back(builder.CreateExtractElement(innerTessFactorVec, i));
   }
 
   {
     //
-    // Write tessellation factors to LDS if they are read as inputs by TES or read back by TCS
+    // Write tessellation factors to LDS if they are read as inputs by TES
     //
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
     auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
