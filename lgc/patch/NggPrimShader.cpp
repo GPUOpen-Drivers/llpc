@@ -282,7 +282,7 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
   std::vector<Type *> argTys;
 
   // First 8 system values (SGPRs)
-  for (unsigned i = 0; i < EsGsSpecialSysValueCount; ++i) {
+  for (unsigned i = 0; i < NumSpecialSgprInputs; ++i) {
     argTys.push_back(m_builder->getInt32Ty());
     *inRegMask |= (1ull << i);
   }
@@ -332,7 +332,7 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
 
   assert(userDataCount > 0);
   argTys.push_back(FixedVectorType::get(m_builder->getInt32Ty(), userDataCount));
-  *inRegMask |= (1ull << EsGsSpecialSysValueCount);
+  *inRegMask |= (1ull << NumSpecialSgprInputs);
 
   // Other system values (VGPRs)
   argTys.push_back(m_builder->getInt32Ty()); // ES to GS offsets (vertex 0 and 1)
@@ -394,17 +394,7 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   }
 
   auto arg = entryPoint->arg_begin();
-
-  Value *userDataAddrLow = (arg + EsGsSysValueUserDataAddrLow);
-  Value *userDataAddrHigh = (arg + EsGsSysValueUserDataAddrHigh);
-  Value *mergedGroupInfo = (arg + EsGsSysValueMergedGroupInfo);
-  Value *mergedWaveInfo = (arg + EsGsSysValueMergedWaveInfo);
-  Value *offChipLdsBase = (arg + EsGsSysValueOffChipLdsBase);
-  Value *sharedScratchOffset = m_gfxIp.major <= 10 ? (arg + EsGsSysValueSharedScratchOffset) : nullptr;
-  Value *primShaderTableAddrLow = (arg + EsGsSysValuePrimShaderTableAddrLow);
-  Value *primShaderTableAddrHigh = (arg + EsGsSysValuePrimShaderTableAddrHigh);
-
-  arg += EsGsSpecialSysValueCount;
+  arg += NumSpecialSgprInputs;
 
   Value *userData = arg++;
 
@@ -423,18 +413,6 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   Value *relVertexId = (arg + 6);
   Value *vsPrimitiveId = (arg + 7);
   Value *instanceId = (arg + 8);
-
-  userDataAddrLow->setName("userDataAddrLow");
-  userDataAddrHigh->setName("userDataAddrHigh");
-  mergedGroupInfo->setName("mergedGroupInfo");
-  mergedWaveInfo->setName("mergedWaveInfo");
-  offChipLdsBase->setName("offChipLdsBase");
-  if (m_gfxIp.major <= 10) {
-    assert(sharedScratchOffset);
-    sharedScratchOffset->setName("sharedScratchOffset");
-  }
-  primShaderTableAddrLow->setName("primShaderTableAddrLow");
-  primShaderTableAddrHigh->setName("primShaderTableAddrHigh");
 
   userData->setName("userData");
   esGsOffsets01->setName("esGsOffsets01");
@@ -530,12 +508,20 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
   auto arg = entryPoint->arg_begin();
 
-  Value *mergedGroupInfo = (arg + EsGsSysValueMergedGroupInfo);
-  Value *mergedWaveInfo = (arg + EsGsSysValueMergedWaveInfo);
-  Value *primShaderTableAddrLow = (arg + EsGsSysValuePrimShaderTableAddrLow);
-  Value *primShaderTableAddrHigh = (arg + EsGsSysValuePrimShaderTableAddrHigh);
+  Value *mergedGroupInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo));
+  mergedGroupInfo->setName("mergedGroupInfo");
 
-  arg += (EsGsSpecialSysValueCount + 1);
+  Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
+  mergedWaveInfo->setName("mergedWaveInfo");
+
+  // GS shader address is reused as primitive shader table address for NGG culling
+  Value *primShaderTableAddrLow = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow));
+  primShaderTableAddrLow->setName("primShaderTableAddrLow");
+
+  Value *primShaderTableAddrHigh = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrHigh));
+  primShaderTableAddrHigh->setName("primShaderTableAddrHigh");
+
+  arg += (NumSpecialSgprInputs + 1);
 
   Value *esGsOffsets01 = arg;
   Value *esGsOffsets23 = (arg + 1);
@@ -1553,12 +1539,20 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
   auto arg = entryPoint->arg_begin();
 
-  Value *mergedGroupInfo = (arg + EsGsSysValueMergedGroupInfo);
-  Value *mergedWaveInfo = (arg + EsGsSysValueMergedWaveInfo);
-  Value *primShaderTableAddrLow = (arg + EsGsSysValuePrimShaderTableAddrLow);
-  Value *primShaderTableAddrHigh = (arg + EsGsSysValuePrimShaderTableAddrHigh);
+  Value *mergedGroupInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo));
+  mergedGroupInfo->setName("mergedGroupInfo");
 
-  arg += (EsGsSpecialSysValueCount + 1);
+  Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
+  mergedWaveInfo->setName("mergedWaveInfo");
+
+  // GS shader address is reused as primitive shader table address for NGG culling
+  Value *primShaderTableAddrLow = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow));
+  primShaderTableAddrLow->setName("primShaderTableAddrLow");
+
+  Value *primShaderTableAddrHigh = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrHigh));
+  primShaderTableAddrHigh->setName("primShaderTableAddrHigh");
+
+  arg += (NumSpecialSgprInputs + 1);
 
   Value *esGsOffsets01 = arg;
   Value *esGsOffsets23 = (arg + 1);
@@ -2498,10 +2492,12 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
     esGsOffset = m_builder->CreateMul(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(esGsBytesPerWave));
   }
 
-  Value *offChipLdsBase = (arg + EsGsSysValueOffChipLdsBase);
+  Value *offChipLdsBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase));
+  offChipLdsBase->setName("offChipLdsBase");
+
   Value *isOffChip = UndefValue::get(m_builder->getInt32Ty()); // NOTE: This flag is unused.
 
-  arg += EsGsSpecialSysValueCount;
+  arg += NumSpecialSgprInputs;
 
   Value *userData = arg++;
 
@@ -2624,10 +2620,12 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
   // Call ES-partial entry
   Argument *arg = sysValueStart;
 
-  Value *offChipLdsBase = (arg + EsGsSysValueOffChipLdsBase);
+  Value *offChipLdsBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase));
+  offChipLdsBase->setName("offChipLdsBase");
+
   Value *isOffChip = UndefValue::get(m_builder->getInt32Ty()); // NOTE: This flag is unused.
 
-  arg += EsGsSpecialSysValueCount;
+  arg += NumSpecialSgprInputs;
 
   Value *userData = arg++;
 
@@ -3063,7 +3061,7 @@ void NggPrimShader::runGs(Module *module, Argument *sysValueStart) {
   // handling of such messages. Instead, wave ID in sub-group is required as the substitute.
   auto waveId = m_nggFactor.waveIdInSubgroup;
 
-  arg += EsGsSpecialSysValueCount;
+  arg += NumSpecialSgprInputs;
 
   Value *userData = arg++;
 

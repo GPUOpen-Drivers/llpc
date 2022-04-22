@@ -61,6 +61,74 @@ ShaderMerger::ShaderMerger(PipelineState *pipelineState, PipelineShadersResult *
 }
 
 // =====================================================================================================================
+// Get the index of the specified special SGPR input according to graphics IP version (LS-HS merged shader).
+//
+// @param gfxIp : Graphics IP version
+// @param sgprInput : Special SGPR input
+// @returns : Index of the specified special SGPR input
+unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, LsHs::SpecialSgprInput sgprInput) {
+  // Index map of special SGPR inputs of LS-HS merged shader
+  static const std::unordered_map<LsHs::SpecialSgprInput, unsigned> LsHsSpecialSgprInputMapGfx9 = {
+      {LsHs::UserDataAddrLow, 0},     // s0
+      {LsHs::UserDataAddrHigh, 1},    // s1
+      {LsHs::OffChipLdsBase, 2},      // s2
+      {LsHs::MergedWaveInfo, 3},      // s3
+      {LsHs::TfBufferBase, 4},        // s4
+      {LsHs::SharedScratchOffset, 5}, // s5
+      {LsHs::HsShaderAddrLow, 6},     // s6
+      {LsHs::HsShaderAddrHigh, 7},    // s7
+  };
+
+  assert(gfxIp.major >= 9); // Must be GFX9+
+
+  assert(LsHsSpecialSgprInputMapGfx9.count(sgprInput) > 0);
+  return LsHsSpecialSgprInputMapGfx9.at(sgprInput);
+}
+
+// =====================================================================================================================
+// Get the index of the specified special SGPR input according to graphics IP version (ES-GS merged shader).
+//
+// @param gfxIp : Graphics IP version
+// @param sgprInput : Special SGPR input
+// @returns : Index of the specified special SGPR input
+unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, EsGs::SpecialSgprInput sgprInput, bool useNgg) {
+  // Index map of special SGPR inputs of ES-GS merged shader
+  static const std::unordered_map<EsGs::SpecialSgprInput, unsigned> EsGsSpecialSgprInputMapGfx9 = {
+      {EsGs::UserDataAddrLow, 0},     // s0
+      {EsGs::UserDataAddrHigh, 1},    // s1
+      {EsGs::GsVsOffset, 2},          // s2
+      {EsGs::MergedWaveInfo, 3},      // s3
+      {EsGs::OffChipLdsBase, 4},      // s4
+      {EsGs::SharedScratchOffset, 5}, // s5
+      {EsGs::GsShaderAddrLow, 6},     // s6
+      {EsGs::GsShaderAddrHigh, 7},    // s7
+  };
+
+  static const std::unordered_map<EsGs::SpecialSgprInput, unsigned> EsGsSpecialSgprInputMapGfx10 = {
+      {EsGs::UserDataAddrLow, 0},     // s0
+      {EsGs::UserDataAddrHigh, 1},    // s1
+      {EsGs::MergedGroupInfo, 2},     // s2
+      {EsGs::MergedWaveInfo, 3},      // s3
+      {EsGs::OffChipLdsBase, 4},      // s4
+      {EsGs::SharedScratchOffset, 5}, // s5
+      {EsGs::GsShaderAddrLow, 6},     // s6
+      {EsGs::GsShaderAddrHigh, 7},    // s7
+  };
+
+  assert(gfxIp.major >= 9); // Must be GFX9+
+
+  if (gfxIp.major >= 10) {
+    if (useNgg) {
+      assert(EsGsSpecialSgprInputMapGfx10.count(sgprInput) > 0);
+      return EsGsSpecialSgprInputMapGfx10.at(sgprInput);
+    }
+  }
+
+  assert(EsGsSpecialSgprInputMapGfx9.count(sgprInput) > 0);
+  return EsGsSpecialSgprInputMapGfx9.at(sgprInput);
+}
+
+// =====================================================================================================================
 // Builds LLVM function for hardware primitive shader (NGG).
 //
 // @param esEntryPoint : Entry-point of hardware export shader (ES) (could be null)
@@ -82,7 +150,7 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
   std::vector<Type *> argTys;
 
   // First 8 system values (SGPRs)
-  for (unsigned i = 0; i < LsHsSpecialSysValueCount; ++i) {
+  for (unsigned i = 0; i < NumSpecialSgprInputs; ++i) {
     argTys.push_back(Type::getInt32Ty(*m_context));
     *inRegMask |= (1ull << i);
   }
@@ -112,7 +180,7 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
 
   assert(userDataCount > 0);
   argTys.push_back(FixedVectorType::get(Type::getInt32Ty(*m_context), userDataCount));
-  *inRegMask |= (1ull << LsHsSpecialSysValueCount);
+  *inRegMask |= (1ull << NumSpecialSgprInputs);
 
   // Other system values (VGPRs)
   argTys.push_back(Type::getInt32Ty(*m_context)); // Patch ID
@@ -209,11 +277,16 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   auto arg = entryPoint->arg_begin();
 
-  Value *offChipLdsBase = (arg + LsHsSysValueOffChipLdsBase);
-  Value *mergeWaveInfo = (arg + LsHsSysValueMergedWaveInfo);
-  Value *tfBufferBase = (arg + LsHsSysValueTfBufferBase);
+  Value *offChipLdsBase = (arg + getSpecialSgprInputIndex(m_gfxIp, LsHs::OffChipLdsBase));
+  offChipLdsBase->setName("offChipLdsBase");
 
-  arg += LsHsSpecialSysValueCount;
+  Value *mergeWaveInfo = (arg + getSpecialSgprInputIndex(m_gfxIp, LsHs::MergedWaveInfo));
+  mergeWaveInfo->setName("mergeWaveInfo");
+
+  Value *tfBufferBase = (arg + getSpecialSgprInputIndex(m_gfxIp, LsHs::TfBufferBase));
+  tfBufferBase->setName("tfBufferBase");
+
+  arg += NumSpecialSgprInputs;
 
   Value *userData = arg++;
 
@@ -470,7 +543,7 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
   std::vector<Type *> argTys;
 
   // First 8 system values (SGPRs)
-  for (unsigned i = 0; i < EsGsSpecialSysValueCount; ++i) {
+  for (unsigned i = 0; i < NumSpecialSgprInputs; ++i) {
     argTys.push_back(Type::getInt32Ty(*m_context));
     *inRegMask |= (1ull << i);
   }
@@ -515,7 +588,7 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
 
   assert(userDataCount > 0);
   argTys.push_back(FixedVectorType::get(Type::getInt32Ty(*m_context), userDataCount));
-  *inRegMask |= (1ull << EsGsSpecialSysValueCount);
+  *inRegMask |= (1ull << NumSpecialSgprInputs);
 
   // Other system values (VGPRs)
   argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offsets (vertex 0 and 1)
@@ -621,11 +694,16 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   auto arg = entryPoint->arg_begin();
 
-  Value *gsVsOffset = (arg + EsGsSysValueGsVsOffset);
-  Value *mergedWaveInfo = (arg + EsGsSysValueMergedWaveInfo);
-  Value *offChipLdsBase = (arg + EsGsSysValueOffChipLdsBase);
+  Value *gsVsOffset = (arg + getSpecialSgprInputIndex(m_gfxIp, EsGs::GsVsOffset, false));
+  gsVsOffset->setName("gsVsOffset");
 
-  arg += EsGsSpecialSysValueCount;
+  Value *mergedWaveInfo = (arg + getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo, false));
+  mergedWaveInfo->setName("mergedWaveInfo");
+
+  Value *offChipLdsBase = (arg + getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase, false));
+  offChipLdsBase->setName("offChipLdsBase");
+
+  arg += NumSpecialSgprInputs;
 
   Value *userData = arg++;
 
