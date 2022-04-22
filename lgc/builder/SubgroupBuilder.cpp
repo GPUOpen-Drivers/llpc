@@ -980,16 +980,16 @@ Value *SubgroupBuilder::CreateSubgroupQuadBroadcast(Value *const value, Value *c
 
   if (supportDpp()) {
     Value *compare = CreateICmpEQ(index, getIntN(indexBits, 0));
-    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm0000, 0xF, 0xF, false), result);
+    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm0000, 0xF, 0xF, true), result);
 
     compare = CreateICmpEQ(index, getIntN(indexBits, 1));
-    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm1111, 0xF, 0xF, false), result);
+    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm1111, 0xF, 0xF, true), result);
 
     compare = CreateICmpEQ(index, getIntN(indexBits, 2));
-    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm2222, 0xF, 0xF, false), result);
+    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm2222, 0xF, 0xF, true), result);
 
     compare = CreateICmpEQ(index, getIntN(indexBits, 3));
-    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm3333, 0xF, 0xF, false), result);
+    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm3333, 0xF, 0xF, true), result);
   } else {
     Value *compare = CreateICmpEQ(index, getIntN(indexBits, 0));
     result = CreateSelect(compare, createDsSwizzle(value, getDsSwizzleQuadMode(0, 0, 0, 0)), result);
@@ -1014,7 +1014,7 @@ Value *SubgroupBuilder::CreateSubgroupQuadBroadcast(Value *const value, Value *c
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupQuadSwapHorizontal(Value *const value, const Twine &instName) {
   if (supportDpp())
-    return createDppMov(value, DppCtrl::DppQuadPerm1032, 0xF, 0xF, false);
+    return createDppMov(value, DppCtrl::DppQuadPerm1032, 0xF, 0xF, true);
   else
     return createDsSwizzle(value, getDsSwizzleQuadMode(1, 0, 3, 2));
 }
@@ -1026,7 +1026,7 @@ Value *SubgroupBuilder::CreateSubgroupQuadSwapHorizontal(Value *const value, con
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupQuadSwapVertical(Value *const value, const Twine &instName) {
   if (supportDpp())
-    return createDppMov(value, DppCtrl::DppQuadPerm2301, 0xF, 0xF, false);
+    return createDppMov(value, DppCtrl::DppQuadPerm2301, 0xF, 0xF, true);
   else
     return createDsSwizzle(value, getDsSwizzleQuadMode(2, 3, 0, 1));
 }
@@ -1038,7 +1038,7 @@ Value *SubgroupBuilder::CreateSubgroupQuadSwapVertical(Value *const value, const
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupQuadSwapDiagonal(Value *const value, const Twine &instName) {
   if (supportDpp())
-    return createDppMov(value, DppCtrl::DppQuadPerm3210, 0xF, 0xF, false);
+    return createDppMov(value, DppCtrl::DppQuadPerm3210, 0xF, 0xF, true);
   else
     return createDsSwizzle(value, getDsSwizzleQuadMode(3, 2, 1, 0));
 }

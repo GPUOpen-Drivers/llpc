@@ -1,0 +1,19 @@
+// RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck %s
+
+// CHECK-LABEL: {{^}}// LLPC final ELF info
+// CHECK: v_max_f32_dpp {{.*}} quad_perm:[1,0,3,2] row_mask:0xf bank_mask:0xf bound_ctrl:1
+// CHECK: v_min_f32_dpp {{.*}} quad_perm:[2,3,0,1] row_mask:0xf bank_mask:0xf bound_ctrl:1
+
+#version 450
+#extension GL_KHR_shader_subgroup_quad : require
+
+layout(set=0, binding=0) buffer Buf {
+  float h[32];
+} data;
+
+void main() {
+  float val = data.h[gl_SubgroupInvocationID];
+  val = max(val, subgroupQuadSwapHorizontal(val));
+  val = min(val, subgroupQuadSwapVertical(val));
+  data.h[gl_SubgroupInvocationID] = val;
+}
