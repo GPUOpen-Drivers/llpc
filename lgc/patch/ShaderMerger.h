@@ -40,44 +40,51 @@ namespace lgc {
 
 class PipelineState;
 
-// Enumerates special system values for the LS-HS merged shader (the assigned numeric values are identical to SGPR
-// numbers defined by hardware).
-enum LsHsSpecialSysValue {
-  LsHsSysValueUserDataAddrLow = 0,
-  LsHsSysValueUserDataAddrHigh = 1,
-  LsHsSysValueOffChipLdsBase = 2,
-  LsHsSysValueMergedWaveInfo = 3,
-  LsHsSysValueTfBufferBase = 4,
-  LsHsSysValueSharedScratchOffset = 5,
-  LsHsSysValueLsShaderAddrLow = 6,
-  LsHsSysValueLsShaderAddrHigh = 7,
+// Enumerates first 8 SGPRs (always loaded) for the LS-HS merged shader
+namespace LsHs {
+enum SpecialSgprInput : unsigned {
+  UserDataAddrLow = 0,
+  UserDataAddrHigh,
+  OffChipLdsBase,
+  MergedWaveInfo,
+  TfBufferBase,
+  HsShaderAddrLow,
+  HsShaderAddrHigh,
 
-  LsHsSpecialSysValueCount,
+  // GFX9~GFX10
+  SharedScratchOffset,
 };
+} // namespace LsHs
 
-// Enumerates special system values for the ES-GS merged shader (the assigned numeric values are identical to SGPR
-// numbers defined by hardware).
-enum EsGsSpecialSysValue {
-  EsGsSysValueUserDataAddrLow = 0,
-  EsGsSysValueUserDataAddrHigh = 1,
-  EsGsSysValueGsVsOffset = 2,
-  EsGsSysValueMergedGroupInfo = 2,
-  EsGsSysValueMergedWaveInfo = 3,
-  EsGsSysValueOffChipLdsBase = 4,
-  EsGsSysValueSharedScratchOffset = 5,
-  EsGsSysValueGsShaderAddrLow = 6,
-  EsGsSysValueGsShaderAddrHigh = 7,
-  EsGsSysValuePrimShaderTableAddrLow = 6,
-  EsGsSysValuePrimShaderTableAddrHigh = 7,
+// Enumerates first 8 SGPRs (always loaded) for the ES-GS merged shader
+namespace EsGs {
+enum SpecialSgprInput : unsigned {
+  UserDataAddrLow = 0,
+  UserDataAddrHigh,
+  MergedWaveInfo,
+  OffChipLdsBase,
+  GsShaderAddrLow,
+  GsShaderAddrHigh,
 
-  EsGsSpecialSysValueCount,
+  // GFX9~GFX10
+  GsVsOffset, // Non-NGG
+  SharedScratchOffset,
+
+  // GFX10+
+  MergedGroupInfo, // NGG
 };
+} // namespace EsGs
+
+static constexpr unsigned NumSpecialSgprInputs = 8; // First 8 SGPRs are defined or reserved by HW
 
 // =====================================================================================================================
 // Represents the manager doing shader merge operations.
 class ShaderMerger {
 public:
   ShaderMerger(PipelineState *pipelineState, PipelineShadersResult *pipelineShaders);
+
+  static unsigned getSpecialSgprInputIndex(GfxIpVersion gfxIp, LsHs::SpecialSgprInput sgprInput);
+  static unsigned getSpecialSgprInputIndex(GfxIpVersion gfxIp, EsGs::SpecialSgprInput sgprInput, bool useNgg = true);
 
   llvm::Function *generateLsHsEntryPoint(llvm::Function *lsEntryPoint, llvm::Function *hsEntryPoint);
   llvm::Function *generateEsGsEntryPoint(llvm::Function *esEntryPoint, llvm::Function *gsEntryPoint);
