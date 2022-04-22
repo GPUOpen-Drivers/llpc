@@ -52,6 +52,7 @@ ResourceUsage::ResourceUsage(ShaderStage shaderStage) {
     calcFactor.offChip.patchConstStart = InvalidValue;
     calcFactor.onChip.outPatchStart = InvalidValue;
     calcFactor.onChip.patchConstStart = InvalidValue;
+    calcFactor.onChip.tessFactorStart = InvalidValue;
     calcFactor.outPatchSize = InvalidValue;
     calcFactor.patchConstSize = InvalidValue;
   } else if (shaderStage == ShaderStageGeometry) {

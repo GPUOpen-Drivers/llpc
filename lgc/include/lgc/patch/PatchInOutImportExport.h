@@ -237,9 +237,6 @@ private:
 
   std::set<unsigned> m_expLocs; // The locations that already have an export instruction for the vertex shader.
   const std::array<unsigned char, 4> *m_buffFormats; // The format of MTBUF instructions for specified GFX
-
-  llvm::Value *m_tessLevelOuterPtr = nullptr; // Correspond to "out float gl_TessLevelOuter[4]"
-  llvm::Value *m_tessLevelInnerPtr = nullptr; // Correspond to "out float gl_TessLevelInner[2]"
 };
 
 // =====================================================================================================================

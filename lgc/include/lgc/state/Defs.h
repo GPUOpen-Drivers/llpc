@@ -147,6 +147,9 @@ static const unsigned MaxTransformFeedbackBuffers = 4;
 static const unsigned MaxGsStreams = 4;
 static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
 
+// Maximum tess factors per patch
+static const unsigned MaxTessFactorsPerPatch = 6; // 4 outer factors + 2 inner factors
+
 // Internal resource table's virtual descriptor sets
 static const unsigned InternalResourceTable = 0x10000000;
 static const unsigned InternalPerShaderTable = 0x10000001;

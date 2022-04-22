@@ -31,10 +31,7 @@ declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.TCS.VkMain() local_unnamed_addr #0 !lgc.shaderstage !10 {
 .entry:
-  br label %0, !llvm.loop !11
-
-0:                                                ; preds = %0, %.entry
-  br label %0, !llvm.loop !12
+  ret void
 }
 
 ; Function Attrs: nounwind

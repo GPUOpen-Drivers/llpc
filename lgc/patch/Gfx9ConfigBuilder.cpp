@@ -1097,7 +1097,7 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   // dwords.
   const auto &calcFactor = tcsResUsage->inOutUsage.tcs.calcFactor;
   assert(m_pipelineState->isTessOffChip()); // Must be off-chip on GFX9+
-  unsigned ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
+  unsigned ldsSizeInDwords = calcFactor.tessOnChipLdsSize;
 
   const unsigned ldsSizeDwordGranularity = 128u;
   const unsigned ldsSizeDwordGranularityShift = 7u;
