@@ -334,6 +334,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
   options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
   options.pageMigrationEnabled = getPipelineOptions()->pageMigrationEnabled;
+  options.resourceLayoutScheme = static_cast<lgc::ResourceLayoutScheme>(getPipelineOptions()->resourceLayoutScheme);
 
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;

@@ -1,0 +1,69 @@
+; Check the resource layout mode. In "Indirect" mode, "PushConst" resource is not in root node.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: call [16 x i8] addrspace(4)* (...) @lgc.create.load.push.constants.ptr.p4a16i8()
+; SHADERTEST-LABEL: define dllexport spir_func void @lgc.shader.FS.main()
+; SHADERTEST: call i8 addrspace(4)* @lgc.descriptor.table.addr(i32 9, i32 -1, i32 0, i32 -1)
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 52
+
+[VsGlsl]
+#version 450
+
+layout( location = 0 ) in vec4 app_position;
+
+void main() {
+  gl_Position = app_position;
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+
+layout( location = 0 ) out vec4 frag_color;
+
+layout( push_constant ) uniform ColorBlock {
+  vec4 Color;
+} PushConstant;
+
+void main() {
+   frag_color = PushConstant.Color;
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 2
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 4
+userDataNode[1].visibility = 66
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].next[0].type = PushConst
+userDataNode[1].next[0].offsetInDwords = 0
+userDataNode[1].next[0].sizeInDwords = 4
+userDataNode[1].next[0].set = 0xFFFFFFFF
+userDataNode[1].next[0].binding = 0
+
+[GraphicsPipelineState]
+options.resourceLayoutScheme = Indirect
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 12
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32_SFLOAT
+attribute[0].offset = 0

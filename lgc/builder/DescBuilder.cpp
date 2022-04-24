@@ -221,13 +221,27 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet
 // @param pushConstantsTy : Type of the push constants table that the returned pointer will point to
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const Twine &instName) {
-  // Get the push const pointer. If subsequent code only uses this with constant GEPs and loads,
-  // then PatchEntryPointMutate might be able to "unspill" it so the code uses shader entry SGPRs
-  // directly instead of loading from the spill table.
   Type *returnTy = pushConstantsTy->getPointerTo(ADDR_SPACE_CONST);
-  std::string callName = lgcName::PushConst;
-  addTypeMangling(returnTy, {}, callName);
-  return CreateNamedCall(callName, returnTy, {}, Attribute::ReadOnly, instName);
+  bool isIndirect = getPipelineState()->getOptions().resourceLayoutScheme == ResourceLayoutScheme::Indirect;
+  if (isIndirect) {
+    // Push const is the sub node of DescriptorTableVaPtr.
+    const ResourceNode *topNode = m_pipelineState->findPushConstantResourceNode();
+    assert(topNode);
+    const ResourceNode subNode = topNode->innerTable[0];
+    Value *highHalf = getInt32(HighAddrPc);
+    Value *descPtr = CreateNamedCall(
+        lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
+        {getInt32(unsigned(ResourceNodeType::PushConst)), getInt32(subNode.set), getInt32(subNode.binding), highHalf},
+        Attribute::ReadNone);
+    return CreateBitCast(descPtr, returnTy);
+  } else {
+    // Get the push const pointer. If subsequent code only uses this with constant GEPs and loads,
+    // then PatchEntryPointMutate might be able to "unspill" it so the code uses shader entry SGPRs
+    // directly instead of loading from the spill table.
+    std::string callName = lgcName::PushConst;
+    addTypeMangling(returnTy, {}, callName);
+    return CreateNamedCall(callName, returnTy, {}, Attribute::ReadOnly, instName);
+  }
 }
 
 // =====================================================================================================================
