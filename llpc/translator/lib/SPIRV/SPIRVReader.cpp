@@ -6702,221 +6702,107 @@ bool SPIRVToLLVM::transMetadata() {
 
     if (!entryPoint)
       continue;
+
     SPIRVExecutionModelKind execModel = entryPoint->getExecModel();
-
     if (execModel >= ExecutionModelVertex && execModel <= ExecutionModelGLCompute) {
-
-      // Generate metadata for execution modes
-      ShaderExecModeMetadata execModeMd = {};
-      execModeMd.common.FpControlFlags = m_fpControlFlags;
-
+      // Give the shader modes to middle-end
       if (execModel == ExecutionModelVertex) {
-        if (bf->getExecutionMode(ExecutionModeXfb))
-          execModeMd.vs.Xfb = true;
-
+        // Currently, nothing to set
       } else if (execModel == ExecutionModelTessellationControl || execModel == ExecutionModelTessellationEvaluation) {
-        if (bf->getExecutionMode(ExecutionModeSpacingEqual))
-          execModeMd.ts.SpacingEqual = true;
-        if (bf->getExecutionMode(ExecutionModeSpacingFractionalEven))
-          execModeMd.ts.SpacingFractionalEven = true;
-        if (bf->getExecutionMode(ExecutionModeSpacingFractionalOdd))
-          execModeMd.ts.SpacingFractionalOdd = true;
-
-        if (bf->getExecutionMode(ExecutionModeVertexOrderCw))
-          execModeMd.ts.VertexOrderCw = true;
-        if (bf->getExecutionMode(ExecutionModeVertexOrderCcw))
-          execModeMd.ts.VertexOrderCcw = true;
-
-        if (bf->getExecutionMode(ExecutionModePointMode))
-          execModeMd.ts.PointMode = true;
-
-        if (bf->getExecutionMode(ExecutionModeTriangles))
-          execModeMd.ts.Triangles = true;
-        if (bf->getExecutionMode(ExecutionModeQuads))
-          execModeMd.ts.Quads = true;
-        if (bf->getExecutionMode(ExecutionModeIsolines))
-          execModeMd.ts.Isolines = true;
-
-        if (bf->getExecutionMode(ExecutionModeXfb))
-          execModeMd.ts.Xfb = true;
-
-        if (auto em = bf->getExecutionMode(ExecutionModeOutputVertices))
-          execModeMd.ts.OutputVertices = em->getLiterals()[0];
-
-        // Give the tessellation mode to the middle-end.
         TessellationMode tessellationMode = {};
-        tessellationMode.outputVertices = execModeMd.ts.OutputVertices;
 
         tessellationMode.vertexSpacing = VertexSpacing::Unknown;
-        if (execModeMd.ts.SpacingEqual)
+        if (bf->getExecutionMode(ExecutionModeSpacingEqual))
           tessellationMode.vertexSpacing = VertexSpacing::Equal;
-        else if (execModeMd.ts.SpacingFractionalEven)
+        else if (bf->getExecutionMode(ExecutionModeSpacingFractionalEven))
           tessellationMode.vertexSpacing = VertexSpacing::FractionalEven;
-        else if (execModeMd.ts.SpacingFractionalOdd)
+        else if (bf->getExecutionMode(ExecutionModeSpacingFractionalOdd))
           tessellationMode.vertexSpacing = VertexSpacing::FractionalOdd;
 
         tessellationMode.vertexOrder = VertexOrder::Unknown;
-        if (execModeMd.ts.VertexOrderCw)
+        if (bf->getExecutionMode(ExecutionModeVertexOrderCw))
           tessellationMode.vertexOrder = VertexOrder::Cw;
-        else if (execModeMd.ts.VertexOrderCcw)
+        else if (bf->getExecutionMode(ExecutionModeVertexOrderCcw))
           tessellationMode.vertexOrder = VertexOrder::Ccw;
 
         tessellationMode.primitiveMode = PrimitiveMode::Unknown;
-        if (execModeMd.ts.Triangles)
+        if (bf->getExecutionMode(ExecutionModeTriangles))
           tessellationMode.primitiveMode = PrimitiveMode::Triangles;
-        else if (execModeMd.ts.Quads)
+        else if (bf->getExecutionMode(ExecutionModeQuads))
           tessellationMode.primitiveMode = PrimitiveMode::Quads;
-        else if (execModeMd.ts.Isolines)
+        else if (bf->getExecutionMode(ExecutionModeIsolines))
           tessellationMode.primitiveMode = PrimitiveMode::Isolines;
 
-        tessellationMode.pointMode = false;
-        if (execModeMd.ts.PointMode)
+        if (bf->getExecutionMode(ExecutionModePointMode))
           tessellationMode.pointMode = true;
+
+        if (auto em = bf->getExecutionMode(ExecutionModeOutputVertices))
+          tessellationMode.outputVertices = em->getLiterals()[0];
 
         getBuilder()->setTessellationMode(tessellationMode);
 
       } else if (execModel == ExecutionModelGeometry) {
-        if (bf->getExecutionMode(ExecutionModeInputPoints))
-          execModeMd.gs.InputPoints = true;
-        if (bf->getExecutionMode(ExecutionModeInputLines))
-          execModeMd.gs.InputLines = true;
-        if (bf->getExecutionMode(ExecutionModeInputLinesAdjacency))
-          execModeMd.gs.InputLinesAdjacency = true;
-        if (bf->getExecutionMode(ExecutionModeTriangles))
-          execModeMd.gs.Triangles = true;
-        if (bf->getExecutionMode(ExecutionModeInputTrianglesAdjacency))
-          execModeMd.gs.InputTrianglesAdjacency = true;
-
-        if (bf->getExecutionMode(ExecutionModeOutputPoints))
-          execModeMd.gs.OutputPoints = true;
-        if (bf->getExecutionMode(ExecutionModeOutputLineStrip))
-          execModeMd.gs.OutputLineStrip = true;
-        if (bf->getExecutionMode(ExecutionModeOutputTriangleStrip))
-          execModeMd.gs.OutputTriangleStrip = true;
-
-        if (bf->getExecutionMode(ExecutionModeXfb))
-          execModeMd.gs.Xfb = true;
-
-        if (auto em = bf->getExecutionMode(ExecutionModeInvocations))
-          execModeMd.gs.Invocations = em->getLiterals()[0];
-
-        if (auto em = bf->getExecutionMode(ExecutionModeOutputVertices))
-          execModeMd.gs.OutputVertices = em->getLiterals()[0];
-
-        // Give the geometry mode to the middle-end.
         GeometryShaderMode geometryMode = {};
-        geometryMode.invocations = 1;
-        if (execModeMd.gs.Invocations > 0)
-          geometryMode.invocations = execModeMd.gs.Invocations;
-        geometryMode.outputVertices = execModeMd.gs.OutputVertices;
 
-        if (execModeMd.gs.InputPoints)
+        if (bf->getExecutionMode(ExecutionModeInputPoints))
           geometryMode.inputPrimitive = InputPrimitives::Points;
-        else if (execModeMd.gs.InputLines)
+        else if (bf->getExecutionMode(ExecutionModeInputLines))
           geometryMode.inputPrimitive = InputPrimitives::Lines;
-        else if (execModeMd.gs.InputLinesAdjacency)
+        else if (bf->getExecutionMode(ExecutionModeInputLinesAdjacency))
           geometryMode.inputPrimitive = InputPrimitives::LinesAdjacency;
-        else if (execModeMd.gs.Triangles)
+        else if (bf->getExecutionMode(ExecutionModeTriangles))
           geometryMode.inputPrimitive = InputPrimitives::Triangles;
-        else if (execModeMd.gs.InputTrianglesAdjacency)
+        else if (bf->getExecutionMode(ExecutionModeInputTrianglesAdjacency))
           geometryMode.inputPrimitive = InputPrimitives::TrianglesAdjacency;
 
-        if (execModeMd.gs.OutputPoints)
+        if (bf->getExecutionMode(ExecutionModeOutputPoints))
           geometryMode.outputPrimitive = OutputPrimitives::Points;
-        else if (execModeMd.gs.OutputLineStrip)
+        else if (bf->getExecutionMode(ExecutionModeOutputLineStrip))
           geometryMode.outputPrimitive = OutputPrimitives::LineStrip;
-        else if (execModeMd.gs.OutputTriangleStrip)
+        else if (bf->getExecutionMode(ExecutionModeOutputTriangleStrip))
           geometryMode.outputPrimitive = OutputPrimitives::TriangleStrip;
+
+        if (auto em = bf->getExecutionMode(ExecutionModeInvocations))
+          geometryMode.invocations = em->getLiterals()[0];
+        geometryMode.invocations = std::max(1U, geometryMode.invocations);
+
+        if (auto em = bf->getExecutionMode(ExecutionModeOutputVertices))
+          geometryMode.outputVertices = em->getLiterals()[0];
 
         getBuilder()->setGeometryShaderMode(geometryMode);
 
       } else if (execModel == ExecutionModelFragment) {
-        if (bf->getExecutionMode(ExecutionModeOriginUpperLeft))
-          execModeMd.fs.OriginUpperLeft = true;
-        else if (bf->getExecutionMode(ExecutionModeOriginLowerLeft))
-          execModeMd.fs.OriginUpperLeft = false;
+        FragmentShaderMode fragmentMode = {};
 
         if (bf->getExecutionMode(ExecutionModePixelCenterInteger))
-          execModeMd.fs.PixelCenterInteger = true;
+          fragmentMode.pixelCenterInteger = true;
 
         if (bf->getExecutionMode(ExecutionModeEarlyFragmentTests))
-          execModeMd.fs.EarlyFragmentTests = true;
-
-        if (bf->getExecutionMode(ExecutionModeDepthUnchanged))
-          execModeMd.fs.DepthUnchanged = true;
-        if (bf->getExecutionMode(ExecutionModeDepthGreater))
-          execModeMd.fs.DepthGreater = true;
-        if (bf->getExecutionMode(ExecutionModeDepthLess))
-          execModeMd.fs.DepthLess = true;
-        if (bf->getExecutionMode(ExecutionModeDepthReplacing))
-          execModeMd.fs.DepthReplacing = true;
+          fragmentMode.earlyFragmentTests = true;
 
         if (bf->getExecutionMode(ExecutionModePostDepthCoverage))
-          execModeMd.fs.PostDepthCoverage = true;
+          fragmentMode.postDepthCoverage = true;
 
-        bool enableEarlyAndLateTests = false;
-        if (bf->getExecutionMode(ExecutionModeStencilRefReplacingEXT))
-          execModeMd.fs.StencilReplacing = true;
-
-        if (bf->getExecutionMode(ExecutionModeEarlyAndLateFragmentTestsAMD)) {
-          enableEarlyAndLateTests = true;
-          if (execModeMd.fs.StencilReplacing) {
-            if (bf->getExecutionMode(ExecutionModeStencilRefUnchangedFrontAMD))
-              execModeMd.fs.StencilUnchangedFront = true;
-            else if (bf->getExecutionMode(ExecutionModeStencilRefGreaterFrontAMD))
-              execModeMd.fs.StencilGrenterFront = true;
-            else if (bf->getExecutionMode(ExecutionModeStencilRefLessFrontAMD))
-              execModeMd.fs.StencilLessFront = true;
-
-            if (bf->getExecutionMode(ExecutionModeStencilRefUnchangedBackAMD))
-              execModeMd.fs.StencilUnchangedBack = true;
-            else if (bf->getExecutionMode(ExecutionModeStencilRefGreaterBackAMD))
-              execModeMd.fs.StencilGrenterBack = true;
-            else if (bf->getExecutionMode(ExecutionModeStencilRefLessBackAMD))
-              execModeMd.fs.StencilLessBack = true;
-          } else if (execModeMd.fs.DepthReplacing) {
-            assert(execModeMd.fs.DepthUnchanged || execModeMd.fs.DepthGreater || execModeMd.fs.DepthLess);
-          } else
-            execModeMd.fs.EarlyFragmentTests = true;
-        }
-        // Give the fragment mode to the middle-end.
-        FragmentShaderMode fragmentMode = {};
-        fragmentMode.pixelCenterInteger = execModeMd.fs.PixelCenterInteger;
-        fragmentMode.earlyFragmentTests = execModeMd.fs.EarlyFragmentTests;
-        fragmentMode.postDepthCoverage = execModeMd.fs.PostDepthCoverage;
-        fragmentMode.earlyAndLatFragmentTests = enableEarlyAndLateTests;
-        fragmentMode.conservativeDepth = ConservativeDepth::Any;
-        if (execModeMd.fs.DepthLess)
+        if (bf->getExecutionMode(ExecutionModeDepthLess))
           fragmentMode.conservativeDepth = ConservativeDepth::LessEqual;
-        else if (execModeMd.fs.DepthGreater)
+        else if (bf->getExecutionMode(ExecutionModeDepthGreater))
           fragmentMode.conservativeDepth = ConservativeDepth::GreaterEqual;
 
-        fragmentMode.conservativeStencilFront = ConservativeDepth::Any;
-        if (execModeMd.fs.StencilLessFront)
-          fragmentMode.conservativeStencilFront = ConservativeDepth::LessEqual;
-        else if (execModeMd.fs.StencilGrenterFront)
-          fragmentMode.conservativeStencilFront = ConservativeDepth::GreaterEqual;
-
-        fragmentMode.conservativeStencilBack = ConservativeDepth::Any;
-        if (execModeMd.fs.StencilLessBack)
-          fragmentMode.conservativeStencilBack = ConservativeDepth::LessEqual;
-        else if (execModeMd.fs.StencilGrenterBack)
-          fragmentMode.conservativeStencilBack = ConservativeDepth::GreaterEqual;
         getBuilder()->setFragmentShaderMode(fragmentMode);
-      } else if (execModel == ExecutionModelGLCompute) {
-        // Set values of local sizes from execution model
-        if (auto em = bf->getExecutionMode(ExecutionModeLocalSize)) {
-          execModeMd.cs.LocalSizeX = em->getLiterals()[0];
-          execModeMd.cs.LocalSizeY = em->getLiterals()[1];
-          execModeMd.cs.LocalSizeZ = em->getLiterals()[2];
-        } else if ((em = bf->getExecutionMode(ExecutionModeLocalSizeId))) {
-          auto workGroupSizeX = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[0]));
-          auto workGroupSizeY = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[1]));
-          auto workGroupSizeZ = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[2]));
 
-          execModeMd.cs.LocalSizeX = workGroupSizeX->getZExtIntValue();
-          execModeMd.cs.LocalSizeY = workGroupSizeY->getZExtIntValue();
-          execModeMd.cs.LocalSizeZ = workGroupSizeZ->getZExtIntValue();
+      } else if (execModel == ExecutionModelGLCompute) {
+        unsigned workgroupSizeX = 0;
+        unsigned workgroupSizeY = 0;
+        unsigned workgroupSizeZ = 0;
+
+        if (auto em = bf->getExecutionMode(ExecutionModeLocalSize)) {
+          workgroupSizeX = em->getLiterals()[0];
+          workgroupSizeY = em->getLiterals()[1];
+          workgroupSizeZ = em->getLiterals()[2];
+        } else if ((em = bf->getExecutionMode(ExecutionModeLocalSizeId))) {
+          workgroupSizeX = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[0]))->getZExtIntValue();
+          workgroupSizeY = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[1]))->getZExtIntValue();
+          workgroupSizeZ = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[2]))->getZExtIntValue();
         }
 
         // Traverse the constant list to find gl_WorkGroupSize and use the
@@ -6935,13 +6821,9 @@ bool SPIRVToLLVM::transMetadata() {
 
               // Declared: const uvec3 gl_WorkGroupSize
               assert(workGroupSize->getElements().size() == 3);
-              auto workGroupSizeX = static_cast<SPIRVConstant *>(workGroupSize->getElements()[0]);
-              auto workGroupSizeY = static_cast<SPIRVConstant *>(workGroupSize->getElements()[1]);
-              auto workGroupSizeZ = static_cast<SPIRVConstant *>(workGroupSize->getElements()[2]);
-
-              execModeMd.cs.LocalSizeX = workGroupSizeX->getZExtIntValue();
-              execModeMd.cs.LocalSizeY = workGroupSizeY->getZExtIntValue();
-              execModeMd.cs.LocalSizeZ = workGroupSizeZ->getZExtIntValue();
+              workgroupSizeX = static_cast<SPIRVConstant *>(workGroupSize->getElements()[0])->getZExtIntValue();
+              workgroupSizeY = static_cast<SPIRVConstant *>(workGroupSize->getElements()[1])->getZExtIntValue();
+              workgroupSizeZ = static_cast<SPIRVConstant *>(workGroupSize->getElements()[2])->getZExtIntValue();
 
               break;
             }
@@ -6949,13 +6831,12 @@ bool SPIRVToLLVM::transMetadata() {
         }
 
         // clang-format off
-          // Give the workgroup size to the middle-end.
           ComputeShaderMode computeMode = {};
-          computeMode.workgroupSizeX = execModeMd.cs.LocalSizeX;
-          computeMode.workgroupSizeY = execModeMd.cs.LocalSizeY;
-          computeMode.workgroupSizeZ = execModeMd.cs.LocalSizeZ;
+          computeMode.workgroupSizeX = workgroupSizeX;
+          computeMode.workgroupSizeY = workgroupSizeY;
+          computeMode.workgroupSizeZ = workgroupSizeZ;
           getBuilder()->setComputeShaderMode(computeMode);
-	// clang-format on
+          // clang-format on
       } else
         llvm_unreachable("Invalid execution model");
 
