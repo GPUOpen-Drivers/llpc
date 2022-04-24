@@ -728,8 +728,13 @@ void PipelineState::readUserDataNodes(Module *module) {
 // Returns the resource node for the push constant.
 const ResourceNode *PipelineState::findPushConstantResourceNode() const {
   for (const ResourceNode &node : getUserDataNodes()) {
-    if (node.type == ResourceNodeType::PushConst) {
+    if (node.type == ResourceNodeType::PushConst)
       return &node;
+    if (node.type == ResourceNodeType::DescriptorTableVaPtr) {
+      if (!node.innerTable.empty() && node.innerTable[0].type == ResourceNodeType::PushConst) {
+        assert(ResourceLayoutScheme::Indirect == m_options.resourceLayoutScheme);
+        return &node;
+      }
     }
   }
   return nullptr;

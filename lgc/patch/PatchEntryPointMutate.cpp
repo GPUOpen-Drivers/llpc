@@ -360,10 +360,20 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
         auto &descriptorTable = getUserDataUsage(stage)->descriptorTables;
 
         if (m_pipelineState->isUnlinked() && m_pipelineState->getUserDataNodes().empty()) {
-          // The user data nodes are not available, so we use the set as the
-          // index.
-          descriptorTable.resize(std::max(descriptorTable.size(), size_t(set + 1)));
-          descriptorTable[set].users.push_back(call);
+          if (m_pipelineState->getOptions().resourceLayoutScheme == ResourceLayoutScheme::Indirect) {
+            // If the type is pushconst, the index is set 0, others are set + 1.
+            if (resType == ResourceNodeType::PushConst) {
+              descriptorTable.resize(std::max(descriptorTable.size(), size_t(1)));
+              descriptorTable[0].users.push_back(call);
+            } else {
+              descriptorTable.resize(std::max(descriptorTable.size(), size_t(set + 2)));
+              descriptorTable[set + 1].users.push_back(call);
+            }
+          } else {
+            // The user data nodes are not available, so we use the set as the index.
+            descriptorTable.resize(std::max(descriptorTable.size(), size_t(set + 1)));
+            descriptorTable[set].users.push_back(call);
+          }
         } else {
           // The user data nodes are available, so we use the offset of the node as the
           // index.
