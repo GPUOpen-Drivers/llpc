@@ -94,6 +94,9 @@ public:
     ADD_CLASS_ENUM_MAP(DenormalMode, Auto)
     ADD_CLASS_ENUM_MAP(DenormalMode, FlushToZero)
     ADD_CLASS_ENUM_MAP(DenormalMode, Preserve)
+
+    ADD_CLASS_ENUM_MAP(ResourceLayoutScheme, Compact)
+    ADD_CLASS_ENUM_MAP(ResourceLayoutScheme, Indirect)
   }
 };
 

@@ -89,6 +89,12 @@ enum class ResourceNodeType : unsigned {
   DescriptorReserved16,
   Count, ///< Count of resource mapping node types.
 };
+
+// Represents mapping layout of the resources used in shaders
+enum class ResourceLayoutScheme : unsigned {
+  Compact = 0, ///< Compact scheme make full use of all the user data registers.
+  Indirect     ///< Fixed layout, push constant will be the sub node of DescriptorTableVaPtr
+};
 } // namespace lgc
 
 namespace llvm {

@@ -64,6 +64,7 @@ std::ostream &operator<<(std::ostream &out, DenormalMode denormalMode);
 std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize);
 std::ostream &operator<<(std::ostream &out, ShadowDescriptorTableUsage shadowDescriptorTableUsage);
 std::ostream &operator<<(std::ostream &out, VkProvokingVertexModeEXT provokingVertexMode);
+std::ostream &operator<<(std::ostream &out, ResourceLayoutScheme layout);
 
 template std::ostream &operator<<(std::ostream &out, ElfReader<Elf64> &reader);
 template raw_ostream &operator<<(raw_ostream &out, ElfReader<Elf64> &reader);
@@ -684,6 +685,7 @@ void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipeli
 void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::ostream &dumpFile) {
   dumpFile << "options.includeDisassembly = " << options->includeDisassembly << "\n";
   dumpFile << "options.scalarBlockLayout = " << options->scalarBlockLayout << "\n";
+  dumpFile << "options.resourceLayoutScheme = " << options->resourceLayoutScheme << "\n";
   dumpFile << "options.includeIr = " << options->includeIr << "\n";
   dumpFile << "options.robustBufferAccess = " << options->robustBufferAccess << "\n";
   dumpFile << "options.reconfigWorkgroupLayout = " << options->reconfigWorkgroupLayout << "\n";
@@ -1093,6 +1095,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->enableRelocatableShaderElf);
   hasher->Update(options->disableImageResourceCheck);
   hasher->Update(options->enableScratchAccessBoundsChecks);
+  hasher->Update(options->resourceLayoutScheme);
 
   if (!isRelocatableShader) {
     hasher->Update(options->shadowDescriptorTableUsage);
@@ -2027,6 +2030,25 @@ std::ostream &operator<<(std::ostream &out, VkProvokingVertexModeEXT provokingVe
     llvm_unreachable("Should never be called!");
     break;
   }
+  return out << string;
+}
+
+// =====================================================================================================================
+// Translates enum "ResourceLayoutScheme" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param ResourceLayoutScheme : Resource layout scheme
+std::ostream &operator<<(std::ostream &out, ResourceLayoutScheme layout) {
+  const char *string = nullptr;
+  switch (layout) {
+    CASE_CLASSENUM_TO_STRING(ResourceLayoutScheme, Compact)
+    CASE_CLASSENUM_TO_STRING(ResourceLayoutScheme, Indirect)
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+
   return out << string;
 }
 

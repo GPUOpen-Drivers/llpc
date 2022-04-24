@@ -261,6 +261,12 @@ cl::opt<CodeGenOpt::Level> LlpcOptLevel("llpc-opt", cl::desc("The optimization l
                                                clEnumValN(CodeGenOpt::Default, "default", "default optimizations"),
                                                clEnumValN(CodeGenOpt::Aggressive, "fast", "fast execution time")));
 
+// -resource-layout-scheme: specifies the layout scheme of the resource
+cl::opt<ResourceLayoutScheme> LayoutScheme("resource-layout-scheme", cl::desc("The resource layout scheme:"),
+                                           cl::init(ResourceLayoutScheme::Compact),
+                                           values(clEnumValN(ResourceLayoutScheme::Compact, "compact", "make full use of user data registers"),
+                                                  clEnumValN(ResourceLayoutScheme::Indirect, "indirect", "fixed user data registers")));
+
 #ifdef WIN_OS
 // -assert-to-msgbox: pop message box when an assert is hit, only valid in Windows
 cl::opt<bool> AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when assert is hit"));
@@ -420,6 +426,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->gfxPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
   compileInfo->compPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
 #endif
+  compileInfo->gfxPipelineInfo.options.resourceLayoutScheme = LayoutScheme;
 
   // Set NGG control settings
   if (ParsedGfxIp.major >= 10) {

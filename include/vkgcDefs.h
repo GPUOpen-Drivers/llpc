@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 53
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     53.2 | Add resourceLayoutScheme to PipelineOptions                                                           |
 //  |     53.1 | Add PartPipelineStage enum for part-pipeline mode                                                     |
 //  |     53.0 | Add optimizationLevel to PipelineOptions                                                              |
 //  |     52.3 | Add fastMathFlags to PipelineShaderOptions                                                            |
@@ -389,6 +390,16 @@ enum class ThreadGroupSwizzleMode : unsigned {
   Count
 };
 
+/// Represents mapping layout of the resources used in shaders
+enum class ResourceLayoutScheme : unsigned {
+  Compact = 0, ///< Compact scheme make full use of all the user data registers.
+  Indirect     ///< Fixed layout, push constant will be the sub node of DescriptorTableVaPtr
+               ///  In indirect scheme, The order of resources is like this:
+               ///  1. one user data entry for vertex buffer
+               ///  2. one user data entry for the push constant buffer
+               ///  3. descriptor set index for each set
+};
+
 /// Represents per pipeline options.
 struct PipelineOptions {
   bool includeDisassembly;         ///< If set, the disassembly for all compiled shaders will be included in
@@ -416,6 +427,7 @@ struct PipelineOptions {
   uint32_t optimizationLevel; ///< The higher the number the more optimizations will be performed.  Valid values are
                               ///< between 0 and 3.
 #endif
+  ResourceLayoutScheme resourceLayoutScheme; ///< Resource layout scheme
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
