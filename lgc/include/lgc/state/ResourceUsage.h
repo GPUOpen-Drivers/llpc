@@ -169,13 +169,12 @@ struct ResourceUsage {
         unsigned primitiveId : 1;   // Whether an implicit gl_PrimitiveID is required
         unsigned viewIndex : 1;     // Whether gl_ViewIndex is used
         // Output
-        unsigned pointSize : 1;     // Whether gl_PointSize is used
-        unsigned position : 1;      // Whether gl_Position is used
-        unsigned clipDistance : 4;  // Array size of gl_ClipDistance[] (0 means unused)
-        unsigned cullDistance : 4;  // Array size of gl_CullDistance[] (0 means unused)
-        unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
-        unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned : 1; // Reserved
+        unsigned pointSize : 1;            // Whether gl_PointSize is used
+        unsigned position : 1;             // Whether gl_Position is used
+        unsigned clipDistance : 4;         // Array size of gl_ClipDistance[] (0 means unused)
+        unsigned cullDistance : 4;         // Array size of gl_CullDistance[] (0 means unused)
+        unsigned viewportIndex : 1;        // Whether gl_ViewportIndex is used
+        unsigned layer : 1;                // Whether gl_Layer is used
         unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
       } vs;
 
@@ -219,7 +218,6 @@ struct ResourceUsage {
         unsigned cullDistance : 4;  // Array size gl_CullDistance[] (0 means unused)
         unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
         unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned : 1; // Reserved
       } tes;
 
       // Geometry shader
@@ -233,14 +231,13 @@ struct ResourceUsage {
         unsigned invocationId : 1;   // Whether gl_InvocationID is used
         unsigned viewIndex : 1;      // Whether gl_ViewIndex is used
         // Output
-        unsigned pointSize : 1;     // Whether gl_PointSize is used
-        unsigned position : 1;      // Whether gl_Position is used
-        unsigned clipDistance : 4;  // Array size gl_ClipDistance[] (0 means unused)
-        unsigned cullDistance : 4;  // Array size gl_CullDistance[] (0 means unused)
-        unsigned primitiveId : 1;   // Whether gl_PrimitiveID is used
-        unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
-        unsigned layer : 1;         // Whether gl_Layer is used
-        unsigned : 1; // Reserved
+        unsigned pointSize : 1;            // Whether gl_PointSize is used
+        unsigned position : 1;             // Whether gl_Position is used
+        unsigned clipDistance : 4;         // Array size gl_ClipDistance[] (0 means unused)
+        unsigned cullDistance : 4;         // Array size gl_CullDistance[] (0 means unused)
+        unsigned primitiveId : 1;          // Whether gl_PrimitiveID is used
+        unsigned viewportIndex : 1;        // Whether gl_ViewportIndex is used
+        unsigned layer : 1;                // Whether gl_Layer is used
         unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
       } gs;
 
