@@ -102,6 +102,13 @@ public:
 
   virtual Result BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, ShaderModuleBuildOut *shaderOut);
 
+  virtual Result buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipelineInfo,
+                                          GraphicsPipelineBuildOut *pipelineOut, Vkgc::UnlinkedShaderStage stage,
+                                          void *pipelineDumpFile = nullptr);
+
+  virtual Result buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *pipelineInfo,
+                                              GraphicsPipelineBuildOut *pipelineOut, const BinaryData *elfPackage);
+
   virtual unsigned ConvertColorBufferFormatToExportFormat(const ColorTarget *target,
                                                           const bool enableAlphaToCoverage) const;
 
@@ -166,6 +173,11 @@ private:
   bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo,
                                           const GraphicsPipelineBuildInfo *pipelineInfo);
   bool canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo);
+  Result buildUnlinkedShaderInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
+                                     Vkgc::UnlinkedShaderStage stage, ElfPackage &elfPackage,
+                                     llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
+  void dumpCompilerOptions(void *pipelineDumpFile);
+
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options
   GfxIpVersion m_gfxIp;                         // Graphics IP version info
