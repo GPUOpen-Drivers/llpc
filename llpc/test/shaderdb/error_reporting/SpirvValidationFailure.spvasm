@@ -1,7 +1,7 @@
 ; Check that an error is produced when invalid SPIR-V is passed and validation is enabled.
 
 ; BEGIN_SHADERTEST
-; RUN: not amdllpc -validate-spirv=true -spvgen-dir=%spvgendir% -v %gfxip %s \
+; RUN: not amdllpc -validate-spirv=true -v %gfxip %s \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST %s
 ;
 ; SHADERTEST-LABEL: {{^}}ERROR: Result::ErrorInvalidShader: Failed to validate SPIR-V:

@@ -2,7 +2,7 @@
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: _amdgpu_vs_main_fetchless:
 ; SHADERTEST: s_cmp_eq_u32 dusespill_0_0@abs32@lo, 0
 ; SHADERTEST: s_cselect_b32 s[[RELOCCOND:[0-9]+]], s[[ds0:[0-9]*]], s[[spill:[0-9]*]]

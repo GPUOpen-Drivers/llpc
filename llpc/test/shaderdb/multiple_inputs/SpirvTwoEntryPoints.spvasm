@@ -2,7 +2,7 @@
 ; Check that amdllpc can compile them separately and together.
 
 ; BEGIN_SHADERTEST_VS
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s,main_vs \
+; RUN: amdllpc -v %gfxip %s,main_vs \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_VS %s
 ;
 ; SHADERTEST_VS-LABEL: {{^//}} LLPC pipeline before-patching results
@@ -12,7 +12,7 @@
 ; END_SHADERTEST_VS
 
 ; BEGIN_SHADERTEST_FS
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s,main_fs \
+; RUN: amdllpc -v %gfxip %s,main_fs \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_FS %s
 ;
 ; SHADERTEST_FS-LABEL: {{^//}} LLPC pipeline before-patching results
@@ -22,7 +22,7 @@
 ; END_SHADERTEST_FS
 
 ; BEGIN_SHADERTEST_BOTH_ST_PP0
-; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s,main_vs %s,main_fs \
+; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s,main_vs %s,main_fs \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_ST_PP0 %s
 ;
 ; SHADERTEST_BOTH_ST_PP0-LABEL: {{^//}} LLPC final pipeline module info
@@ -35,7 +35,7 @@
 ; END_SHADERTEST_BOTH_ST_PP0
 
 ; BEGIN_SHADERTEST_BOTH_ST_PP1
-; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s,main_vs %s,main_fs \
+; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s,main_vs %s,main_fs \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_ST_PP1 %s
 ;
 ; SHADERTEST_BOTH_ST_PP1-LABEL: {{^//}} LLPC final pipeline module info
@@ -52,7 +52,7 @@
 ; This test uses llvm-objdump instead of verbose output, as it is not allowed to mix multi-threaded
 ; compilation with verbose output.
 ;
-; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip %s,main_vs %s,main_fs --num-threads=2 -o %t.both.elf
+; RUN: amdllpc %gfxip %s,main_vs %s,main_fs --num-threads=2 -o %t.both.elf
 ; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.both.elf \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_MT %s
 ;

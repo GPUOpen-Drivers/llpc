@@ -1,7 +1,7 @@
 ; Check that an error is produced when bad SPIR-V is passed and it is not possible to assemble it.
 
 ; BEGIN_SHADERTEST
-; RUN: not amdllpc -validate-spirv=false -spvgen-dir=%spvgendir% -v %gfxip %s \
+; RUN: not amdllpc -validate-spirv=false -v %gfxip %s \
 ; RUN:   | FileCheck %s --check-prefix=SHADERTEST
 ;
 ; SHADERTEST-LABEL: {{^}}ERROR: Result::ErrorInvalidShader: Failed to assemble SPIR-V:

@@ -22,7 +22,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIRV-to-LLVM translation results
 ; 1D
 ; SHADERTEST: [[LOD1:%[0-9]*]] = call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 0, i32 512, {{.*}}, {{.*}}, float 1.000000e+00)

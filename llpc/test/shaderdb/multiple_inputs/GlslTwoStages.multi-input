@@ -1,7 +1,7 @@
 ; Check that two GLSL input shaders can be compiled into a single pipeline.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v \
+; RUN: amdllpc -v \
 ; RUN:      -enable-part-pipeline=0 \
 ; RUN:      %S/test_inputs/Vs1.vert \
 ; RUN:      %S/test_inputs/Fs1.frag \
@@ -17,7 +17,7 @@
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v \
+; RUN: amdllpc -v \
 ; RUN:      -enable-part-pipeline=1 \
 ; RUN:      %S/test_inputs/Vs1.vert \
 ; RUN:      %S/test_inputs/Fs1.frag \

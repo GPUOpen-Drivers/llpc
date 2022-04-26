@@ -1,7 +1,7 @@
 // Tests that a double vertex input is pass in two vgprs
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: {{^}}// LLPC pipeline patching results
 ; Check that the last input parameter is a float2.
 ; SHADERTEST: define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless({{.*}}, <2 x float> %0)

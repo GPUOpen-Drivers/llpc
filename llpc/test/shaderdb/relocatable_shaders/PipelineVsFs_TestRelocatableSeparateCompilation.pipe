@@ -2,7 +2,7 @@
 ; It shows that the shaders were compiled individually and then linked.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-EMPTY:
 ; SHADERTEST-NEXT: ; ModuleID = 'lgcPipeline'

@@ -1,5 +1,5 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
 ; The workgroup sizes will be set to the values in the LocalSizeId instruction.  In this case,
 ; we should use the default values for the spec constants %7, %8, and %9.

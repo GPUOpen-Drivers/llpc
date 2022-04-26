@@ -1,7 +1,7 @@
 ; Check that we can compile Vertex and Geometry stages together, without having to provide a .pipe file.
 
 ; BEGIN_SHADERTEST_ST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf %gfxip %s,main_vs %s,main_gs -v \
+; RUN: amdllpc -enable-relocatable-shader-elf %gfxip %s,main_vs %s,main_gs -v \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST_ST %s
 ;
 ; SHADERTEST_ST:       {{^}}Building pipeline with relocatable shader elf.
@@ -22,7 +22,7 @@
 ; This test uses llvm-objdump instead of verbose output, as it is not allowed to mix multi-threaded
 ; compilation with verbose output.
 ;
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf %gfxip %s,main_vs %s,main_gs \
+; RUN: amdllpc -enable-relocatable-shader-elf %gfxip %s,main_vs %s,main_gs \
 ; RUN:   --num-threads=2 -o %t.mt.elf
 ; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.mt.elf \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST_MT %s

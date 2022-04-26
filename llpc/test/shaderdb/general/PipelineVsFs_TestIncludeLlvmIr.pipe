@@ -1,7 +1,7 @@
 ; Test that AMDGPU.comment.llvmir is included in elf and contains module data.
 
-; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s -include-llvm-ir -o %t.pp0_pipe.elf
-; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s -include-llvm-ir -o %t.pp1_pipe.elf
+; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s -include-llvm-ir -o %t.pp0_pipe.elf
+; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s -include-llvm-ir -o %t.pp1_pipe.elf
 ; RUN: llvm-readelf %t.pp0_pipe.elf --sections --section-data --elf-output-style=LLVM | FileCheck -check-prefix=CHECK_PP0 %s
 ; RUN: llvm-readelf %t.pp1_pipe.elf --sections --section-data --elf-output-style=LLVM | FileCheck -check-prefix=CHECK_PP1 %s
 

@@ -1,6 +1,6 @@
 ; Test that constant data in the vertex shader is handled correctly.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t_0.elf %gfxip %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t_0.elf %gfxip %s
 ; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 --section=.text --section=.rodata -D -r %t_0.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
@@ -24,7 +24,7 @@
 
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -o %t_01.elf %gfxip %s
+; RUN: amdllpc -enable-part-pipeline=0 -o %t_01.elf %gfxip %s
 ; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 --section=.text --section=.rodata -D -r %t_01.elf | FileCheck -check-prefix=SHADERTEST2_PP0 %s
 ; SHADERTEST2_PP0-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST2_PP0: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
@@ -48,7 +48,7 @@
 
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -o %t_01.elf %gfxip %s
+; RUN: amdllpc -enable-part-pipeline=1 -o %t_01.elf %gfxip %s
 ; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 --section=.text --section=.rodata -D -r %t_01.elf | FileCheck -check-prefix=SHADERTEST2_PP1 %s
 ; SHADERTEST2_PP1-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST2_PP1: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4

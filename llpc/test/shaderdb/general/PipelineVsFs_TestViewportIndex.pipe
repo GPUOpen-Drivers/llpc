@@ -1,7 +1,7 @@
 ; Test that the value of SPI_PS_INPUT_CNTL_0 is set correctly.
 
-; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: LLPC final ELF info
 ; SHADERTEST: SPI_PS_INPUT_CNTL_0                           0x0000000000000400
 ; SHADERTEST: AMDLLPC SUCCESS

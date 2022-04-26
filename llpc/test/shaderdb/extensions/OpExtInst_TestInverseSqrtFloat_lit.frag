@@ -18,7 +18,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %[[SQRT:[^ ,]*]] = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.sqrt.f32(float
 ; SHADERTEST: = fdiv reassoc nnan nsz arcp contract afn float 1.000000e+00, %[[SQRT]]

@@ -1,5 +1,5 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -trim-debug-info=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: {{![0-9]*}} = !{i32 7, !"Dwarf Version", i32 4}
 ; SHADERTEST: {{![0-9]*}} = !{i32 2, !"Debug Info Version", i32 3}

@@ -4,7 +4,7 @@
 // Based on PipelineVsFS_RelocConst.pipe.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_vs_main>:
 ; SHADERTEST: s_cmp_eq_u32 1, 0 //{{.*}}
 ; SHADERTEST: s_cselect_b32 s[[RELOCCOND:[0-9]+]], s{{[0-9]+}}, s{{[0-9]+}} //{{.*}}

@@ -1,13 +1,13 @@
 ; This test case checks that descriptor offset relocation works for buffer descriptors in a compute pipeline.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
 ; SHADERTEST: s_mov_b32 s[[RELOREG:[0-9]+]], 16 {{.*}}
 ; SHADERTEST: s_load_dwordx4 s[{{.*}}:{{.*}}], s[{{.*}}:{{.*}}], s[[RELOREG]] //{{.*}}
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
+; RUN: amdllpc -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
 ; SHADERTEST1-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST1-DAG: ![[METADATANODE:[0-9]+]] = !{!"doff_0_0_b"}
 ; SHADERTEST1-DAG: %[[RELOCONST:[0-9]+]] = call i32 @llvm.amdgcn.reloc.constant(metadata ![[METADATANODE]])

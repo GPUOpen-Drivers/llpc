@@ -1,7 +1,7 @@
 // Check that amdllpc does not enable discard-to-demote transforms by default and that
 // they can be enabled on demand. This should affect the generated code and cache hash.
 
-// RUN: amdllpc %gfxip --spvgen-dir=%spvgendir% -v %s \
+// RUN: amdllpc %gfxip --v %s \
 // RUN:   | tee %t.disabled | FileCheck %s --check-prefix=DISABLED
 //
 // DISABLED-LABEL: {{^}}SPIR-V disassembly:
@@ -17,7 +17,7 @@
 // DISABLED-NOT:   s_wqm_b64
 // DISABLED-LABEL: {{^}}===== AMDLLPC SUCCESS =====
 
-// RUN: amdllpc %gfxip --spvgen-dir=%spvgendir% -v %s \
+// RUN: amdllpc %gfxip --v %s \
 // RUN:   --amdgpu-conditional-discard-transformations \
 // RUN:   --amdgpu-transform-discard-to-demote \
 // RUN:   | tee %t.enabled | FileCheck %s --check-prefix=ENABLED

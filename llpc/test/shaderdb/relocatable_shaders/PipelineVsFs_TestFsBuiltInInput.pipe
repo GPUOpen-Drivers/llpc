@@ -3,7 +3,7 @@
 ; the FS would try to read it from channel 0.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: Failed to link relocatable shaders because FS uses builtin inputs.
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

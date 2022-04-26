@@ -1,7 +1,7 @@
 // This test case checks that the PS_IN_CONTROL has the correct value for GFX10.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf -gfxip=10.1.2 %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf -gfxip=10.1.2 %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: SPI_PS_IN_CONTROL                             0x0000000000000000
 ; END_SHADERTEST
 

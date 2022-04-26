@@ -20,7 +20,7 @@ vec4 func(inout int i1)
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -trim-debug-info=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -trim-debug-info=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{.*}} <4 x float> @"func
 ; SHADERTEST: define internal {{.*}} <4 x float> @"func({{.*}}"(i32 {{.*}} %i1)

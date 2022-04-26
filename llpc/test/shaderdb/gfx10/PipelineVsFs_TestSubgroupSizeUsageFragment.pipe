@@ -1,7 +1,7 @@
 ; Test that gl_SubgroupSize usage results in consistent wave size between stages.
 
-; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: LLPC final ELF info
 ; SHADERTEST: VGT_SHADER_STAGES_EN 0x0000000000010000
 ; SHADERTEST: AMDLLPC SUCCESS

@@ -1,7 +1,7 @@
 // Test primitiveID when provoking vertex mode is FIRST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v --gfxip=10.1.0 %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v --gfxip=10.1.0 %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: @[[LDS:[^ ]*]] = external addrspace(3) global [{{[0-9]*}} x i32], align 4
 ; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main({{.*}}, i32 %esGsOffsets01, i32 %esGsOffsets23, i32 %gsPrimitiveId,

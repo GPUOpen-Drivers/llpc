@@ -20,7 +20,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; Make sure that the begin indices chosen are the non-uniform offsets rather than the whole resource desc
 ; Make sure that there's a waterfall.readfirstlane for both the image resource desc and sample desc
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results

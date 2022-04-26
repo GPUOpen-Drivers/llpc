@@ -1,7 +1,7 @@
 ; Test that the descriptor stride relocation is correctly used and replaced.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL:  _amdgpu_vs_main:
 ; SHADERTEST: s_lshl_b32 [[offset:s[0-9]*]], dstride_3_14@abs32@lo, 2
 ; SHADERTEST: s_ashr_i32 [[sign:s[0-9]*]], [[offset]], 31
@@ -12,7 +12,7 @@
 
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST1 %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST1 %s
 ; SHADERTEST1-LABEL: 0000000000000100 <_amdgpu_ps_main>:
 ; SHADERTEST1: s_lshl_b32 [[offset:s[0-9]*]], 32, 2
 ; SHADERTEST1: s_ashr_i32 [[sign:s[0-9]*]], [[offset]], 31

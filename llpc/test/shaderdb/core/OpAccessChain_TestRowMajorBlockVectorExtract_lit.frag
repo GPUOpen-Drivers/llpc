@@ -40,7 +40,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: insertelement <4 x [4 x %{{[a-z0-9.]*}}] addrspace(7)*> undef, [4 x %{{[a-z0-9.]*}}] addrspace(7)* %{{[0-9]*}}, i{{32|64}} 0

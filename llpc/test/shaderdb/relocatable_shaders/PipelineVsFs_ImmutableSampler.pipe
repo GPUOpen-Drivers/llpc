@@ -2,7 +2,7 @@
 // are present (descriptorRangeValue entry exists).
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} calculated hash results (graphics pipeline)
 ; SHADERTEST-LABEL: Building pipeline with relocatable shader elf.
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
@@ -19,7 +19,7 @@
 
 ; Run amdllpc on the two versions of the file an make sure the hashes for
 ; vertex and fragment shader stages are the same for both.
-; RUN: amdllpc -spvgen-dir=%spvgendir% \
+; RUN: amdllpc \
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -v %gfxip %s %t.pipe | FileCheck -check-prefix=HASHTEST %s
 ; HASHTEST-LABEL: {{^// LLPC}} calculated hash results (graphics pipeline)

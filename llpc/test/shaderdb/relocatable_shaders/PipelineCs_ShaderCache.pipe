@@ -2,7 +2,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: rm -rf %t_dir && \
 ; RUN: mkdir -p %t_dir && \
-; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip \
+; RUN: amdllpc %gfxip \
 ; RUN:         -shader-cache-mode=2 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
 ; RUN:         -enable-relocatable-shader-elf \
@@ -25,7 +25,7 @@
 ; Now, attempt to load the shader cache from the previous run in the read-only mode.
 ; No new cache entries should be added.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip \
+; RUN: amdllpc %gfxip \
 ; RUN:         -shader-cache-mode=4 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \
 ; RUN:         -enable-relocatable-shader-elf \
@@ -41,7 +41,7 @@
 ; Lastly, attempt to load the shader cache from the previous run in the read/write mode and modify it.
 ; Add a dummy compilation flag to force a different shader hash and a cache miss.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip \
+; RUN: amdllpc %gfxip \
 ; RUN:         -vgpr-limit=64 \
 ; RUN:         -shader-cache-mode=3 \
 ; RUN:         -shader-cache-filename=cache.bin -shader-cache-file-dir=%t_dir \

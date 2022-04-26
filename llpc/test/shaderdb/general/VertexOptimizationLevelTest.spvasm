@@ -6,14 +6,14 @@
 ; RUN: mkdir -p %t/dump
 
 ; Do a compilation with the fast optimization level.
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -o %t.orig.elf -llpc-opt=quick \
+; RUN: amdllpc -v %gfxip %s -o %t.orig.elf -llpc-opt=quick \
 ; RUN:   --enable-pipeline-dump --pipeline-dump-dir=%t/dump \
 ; RUN:   | tee %t/dump/fast.log | FileCheck -check-prefix=COMPILE %s
 ; COMPILE-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; COMPILE-LABEL: ==== AMDLLPC SUCCESS ====
 
 ; Do a compilation with the default optimization level.
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -o %t.orig.elf -llpc-opt=default \
+; RUN: amdllpc -v %gfxip %s -o %t.orig.elf -llpc-opt=default \
 ; RUN:   --enable-pipeline-dump --pipeline-dump-dir=%t/dump \
 ; RUN:   | tee %t/dump/default.log | FileCheck -check-prefix=COMPILE %s
 
@@ -24,7 +24,7 @@
 
 ; Check that we can compile with the pipeline dump as input and get the same optimization level
 ; RUN: grep -l "options.optimizationLevel = 1" %t/dump/PipelineVsFs_0x*.pipe \
-; RUN:   | xargs amdllpc -spvgen-dir=%spvgendir% -v %gfxip -o %t.recompile.elf \
+; RUN:   | xargs amdllpc -v %gfxip -o %t.recompile.elf \
 ; RUN:   | FileCheck --match-full-lines -check-prefix=RECOMPILE %s
 ; RECOMPILE-LABEL: TargetMachine optimization level = 1
 ; RECOMPILE-LABEL: PassManager optimization level = 1

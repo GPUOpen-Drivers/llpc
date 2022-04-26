@@ -3,7 +3,7 @@
 ; Create a fresh directory for pipeline dump files.
 ; RUN: mkdir -p %t/dump
 
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s -o %t.orig.elf \
+; RUN: amdllpc -v %gfxip %s -o %t.orig.elf \
 ; RUN:   --enable-pipeline-dump --pipeline-dump-dir=%t/dump \
 ; RUN:   | FileCheck -check-prefix=COMPILE %s
 ; COMPILE-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
@@ -45,7 +45,7 @@
 ; PIPE-LABEL: {{^}} PalMetadata
 
 ; Check that we can compile with the pipeline dump as input.
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %t/dump/PipelineVsFs_0x*.pipe -o %t.recompile.elf \
+; RUN: amdllpc -v %gfxip %t/dump/PipelineVsFs_0x*.pipe -o %t.recompile.elf \
 ; RUN:   | FileCheck -check-prefix=RECOMPILE %s
 ; RECOMPILE-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; RECOMPILE-LABEL: ==== AMDLLPC SUCCESS ====

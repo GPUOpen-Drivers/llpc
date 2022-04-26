@@ -8,7 +8,7 @@
 ;   2.	Give all 3 pipelines to amdllpc with shader cache enabled, and the stage access will be,
 ;           miss, miss, hit, miss, miss, hit
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v -shader-cache-mode=1   \
+; RUN: amdllpc -enable-part-pipeline=0 -v -shader-cache-mode=1   \
 ; RUN:      %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe   \
 ; RUN:      %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs2.pipe   \
 ; RUN:      %S/test_inputs/PipelineVsFs_ConstantData_Vs2Fs1.pipe   \

@@ -2,7 +2,7 @@
 
 ; Check that mixing .pipe and shader inputs is not allowed.
 ; BEGIN_SHADERTEST_1
-; RUN: not amdllpc -spvgen-dir=%spvgendir% -v \
+; RUN: not amdllpc -v \
 ; RUN:      %S/test_inputs/PipelineVsFs_ConstantData_Vs1Fs1.pipe \
 ; RUN:      %S/test_inputs/Fs1.frag \
 ; RUN: | FileCheck -check-prefix=SHADERTEST_1 %s

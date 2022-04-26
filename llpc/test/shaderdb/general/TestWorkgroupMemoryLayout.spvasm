@@ -3,7 +3,7 @@
 ; the same underlying storage and either all or none of the variables must be explicitly laid out.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[LDS0:[^ ]*]] = addrspace(3) global <{ [8 x i32] }> undef, align 16
 ; SHADERTEST: @[[LDS1:[^ ]*]] = addrspace(3) global <{ [4 x i32] }> undef, align 16

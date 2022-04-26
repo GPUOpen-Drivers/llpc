@@ -2,7 +2,7 @@
 ; This may be a fragile test because the conditions in which the push constants are spilled might change.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s
 ; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
 ; This tries to match the sequence that loads the vector from the push constant.  This is the only 2 element load in the

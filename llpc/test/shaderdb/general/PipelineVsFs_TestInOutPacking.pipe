@@ -1,5 +1,5 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
+; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
 ; SHADERTEST_PP0-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST_PP0-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST_PP0: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}15, float {{.*}}, float {{.*}}, float {{.*}}, float {{.*}}, i1 {{.*}}false, i1 {{.*}}false)
@@ -59,7 +59,7 @@
 
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP1 %s
+; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP1 %s
 ; Fragment shader part-pipeline:
 ; SHADERTEST_PP1-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST_PP1-LABEL: {{^// LLPC}} pipeline patching results

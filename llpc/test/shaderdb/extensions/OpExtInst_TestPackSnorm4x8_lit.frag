@@ -15,7 +15,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %[[CLAMP:.*]] = call <4 x float> (...) @lgc.create.fclamp.v4f32(<4 x float> %{{.*}}, <4 x float> <float -1.000000e+00, float -1.000000e+00, float -1.000000e+00, float -1.000000e+00>, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>)
 ; SHADERTEST: %[[SCALE:.*]] = fmul <4 x float> %[[CLAMP]], <float 1.270000e+02, float 1.270000e+02, float 1.270000e+02, float 1.270000e+02>

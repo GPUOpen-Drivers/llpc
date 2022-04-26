@@ -15,7 +15,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: {{fsub|fneg}} reassoc nnan nsz arcp contract <3 x double> {{(<double -0.000000e\+00, double -0.000000e\+00, double -0.000000e\+00>, )?}}%
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

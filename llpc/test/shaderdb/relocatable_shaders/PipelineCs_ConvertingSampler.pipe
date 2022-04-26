@@ -1,7 +1,7 @@
 ; Check that a warning is printed when relocatable compilation is requested but not possible because of a DescriptorYCbCrSampler.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -spvgen-dir=%spvgendir% -v %gfxip %s \
+; RUN: amdllpc -enable-relocatable-shader-elf -v %gfxip %s \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} calculated hash results (compute pipeline)
 ; SHADERTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible

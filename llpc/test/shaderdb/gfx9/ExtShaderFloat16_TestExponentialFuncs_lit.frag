@@ -30,7 +30,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-COUNT-3: = call reassoc nnan nsz arcp contract afn half (...) @lgc.create.power.f16(half
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.power.v3f16(<3 x half>

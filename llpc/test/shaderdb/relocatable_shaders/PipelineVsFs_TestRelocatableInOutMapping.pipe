@@ -2,7 +2,7 @@
 ; match the mapping for the inputs of the fragment shader.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s \
+; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -v %gfxip %s \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^//}} LLPC location input/output mapping results (VS shader){{$}}
 ;

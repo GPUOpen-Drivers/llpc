@@ -8,7 +8,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST_DAG: call i32 @lgc.special.user.data.BaseInstance(i32 268435460)
 ; SHADERTEST_DAG: call i32 @lgc.shader.input.VertexId(i32 15)

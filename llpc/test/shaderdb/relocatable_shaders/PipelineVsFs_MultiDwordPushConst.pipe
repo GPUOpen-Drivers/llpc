@@ -1,7 +1,7 @@
 ; Test that the offset to the push constant area is correct when there are is a multi-dword load.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | \
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | \
 ; RUN: FileCheck -check-prefix=SHADERTEST %s
 
 ; Check that the llvm-ir gets the push constant values from as a parameter.

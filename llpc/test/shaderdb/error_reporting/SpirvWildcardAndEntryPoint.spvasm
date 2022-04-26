@@ -1,7 +1,7 @@
 ; Check that an error is produced when wildcards and entrypoint are specified
 
 ; BEGIN_SHADERTEST
-; RUN: not amdllpc -spvgen-dir=%spvgendir% -v %gfxip "%s*,bar" \
+; RUN: not amdllpc -v %gfxip "%s*,bar" \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST %s
 ;
 ; SHADERTEST-LABEL: {{^}}ERROR: Can't use wildcards as well as entrypoint
