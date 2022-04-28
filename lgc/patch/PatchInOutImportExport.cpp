@@ -1224,6 +1224,16 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
     useLayer = enableMultiView || useLayer;
 
+    const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+    if (nextStage == ShaderStageFragment) {
+      useLayer |= nextBuiltInUsage.layer || nextBuiltInUsage.viewIndex;
+      if (useLayer && !m_layer) {
+        // Multi-view is disabled and vertex process stages don't use gl_ViewIndex/gl_Layer,
+        // but FS uses them, the value will be zero.
+        m_layer = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
+      }
+    }
+
     // NOTE: If gl_Position is not present in this shader stage, we have to export a dummy one.
     if (!usePosition) {
       Value *args[] = {
@@ -1309,8 +1319,6 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
       bool hasClipCullExport = true;
       if (nextStage == ShaderStageFragment) {
-        const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-
         hasClipCullExport = (nextBuiltInUsage.clipDistance > 0 || nextBuiltInUsage.cullDistance > 0);
 
         if (hasClipCullExport) {
@@ -1373,8 +1381,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     if (usePrimitiveId) {
       bool hasPrimitiveIdExport = false;
       if (nextStage == ShaderStageFragment) {
-        hasPrimitiveIdExport =
-            m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.primitiveId;
+        hasPrimitiveIdExport = nextBuiltInUsage.primitiveId;
       } else if (nextStage == ShaderStageInvalid) {
         if (m_shaderStage == ShaderStageCopyShader) {
           hasPrimitiveIdExport =
@@ -1438,8 +1445,6 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       if (useViewportIndex) {
         bool hasViewportIndexExport = true;
         if (nextStage == ShaderStageFragment) {
-          const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-
           hasViewportIndexExport = nextBuiltInUsage.viewportIndex;
         } else if (nextStage == ShaderStageInvalid) {
           hasViewportIndexExport = false;
@@ -1463,34 +1468,36 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
       // NOTE: We have to export gl_Layer via generic outputs as well.
       if (useLayer) {
-        bool hasLayerExport = true;
         if (nextStage == ShaderStageFragment) {
-          const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-
-          hasLayerExport = nextBuiltInUsage.layer || nextBuiltInUsage.viewIndex;
-        } else if (nextStage == ShaderStageInvalid) {
-          hasLayerExport = false;
-        }
-
-        if (hasLayerExport) {
           unsigned loc = InvalidValue;
-          if (m_shaderStage == ShaderStageCopyShader) {
-            assert(inOutUsage.gs.builtInOutLocs.find(BuiltInLayer) != inOutUsage.gs.builtInOutLocs.end() ||
-                   inOutUsage.gs.builtInOutLocs.find(BuiltInViewIndex) != inOutUsage.gs.builtInOutLocs.end());
+          Value *layer = nullptr;
 
-            loc = enableMultiView ? inOutUsage.gs.builtInOutLocs[BuiltInViewIndex]
-                                  : inOutUsage.gs.builtInOutLocs[BuiltInLayer];
-          } else {
-            assert(inOutUsage.builtInOutputLocMap.find(BuiltInLayer) != inOutUsage.builtInOutputLocMap.end() ||
-                   inOutUsage.builtInOutputLocMap.find(BuiltInViewIndex) != inOutUsage.builtInOutputLocMap.end());
-
-            loc = enableMultiView ? inOutUsage.builtInOutputLocMap[BuiltInViewIndex]
-                                  : inOutUsage.builtInOutputLocMap[BuiltInLayer];
+          if (nextBuiltInUsage.layer) {
+            if (m_shaderStage == ShaderStageCopyShader) {
+              assert(inOutUsage.gs.builtInOutLocs.find(BuiltInLayer) != inOutUsage.gs.builtInOutLocs.end());
+              loc = inOutUsage.gs.builtInOutLocs[BuiltInLayer];
+            } else {
+              assert(inOutUsage.builtInOutputLocMap.find(BuiltInLayer) != inOutUsage.builtInOutputLocMap.end());
+              loc = inOutUsage.builtInOutputLocMap[BuiltInLayer];
+            }
+            layer = new BitCastInst(m_layer, Type::getFloatTy(*m_context), "", insertPos);
           }
 
-          Value *layer = new BitCastInst(m_layer, Type::getFloatTy(*m_context), "", insertPos);
-
-          recordVertexAttribExport(loc, {layer, undef, undef, undef});
+          if (nextBuiltInUsage.viewIndex) {
+            if (m_shaderStage == ShaderStageCopyShader) {
+              assert(inOutUsage.gs.builtInOutLocs.find(BuiltInViewIndex) != inOutUsage.gs.builtInOutLocs.end());
+              loc = inOutUsage.gs.builtInOutLocs[BuiltInViewIndex];
+            } else {
+              assert(inOutUsage.builtInOutputLocMap.find(BuiltInViewIndex) != inOutUsage.builtInOutputLocMap.end());
+              loc = inOutUsage.builtInOutputLocMap[BuiltInViewIndex];
+            }
+            if (enableMultiView)
+              layer = new BitCastInst(m_layer, Type::getFloatTy(*m_context), "", insertPos);
+            else
+              layer = ConstantFP::get(Type::getFloatTy(*m_context), 0.0f);
+          }
+          if (layer)
+            recordVertexAttribExport(loc, {layer, undef, undef, undef});
         }
       }
     }
