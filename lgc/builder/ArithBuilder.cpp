@@ -115,8 +115,7 @@ Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, Round
     StringRef roundingModeStr = convertRoundingModeToStr(roundingMode).getValue();
     Value *roundingMode = MetadataAsValue::get(getContext(), MDString::get(getContext(), roundingModeStr));
     Value *result = scalarize(value, [=](Value *inValue) {
-      return CreateIntrinsic(Intrinsic::fptrunc_round, {getHalfTy(), inValue->getType(), roundingMode->getType()},
-                             {inValue, roundingMode});
+      return CreateIntrinsic(Intrinsic::fptrunc_round, {getHalfTy(), inValue->getType()}, {inValue, roundingMode});
     });
     result->setName(instName);
     return result;
