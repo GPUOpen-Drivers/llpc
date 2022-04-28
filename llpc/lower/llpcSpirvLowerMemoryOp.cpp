@@ -122,24 +122,19 @@ void SpirvLowerMemoryOp::visitExtractElementInst(ExtractElementInst &extractElem
   if (src->getType()->isVectorTy() && isa<LoadInst>(src) && src->hasOneUse()) {
     // NOTE: Optimize loading vector component for local variable and memory block
     // Original pattern:
-    // %1 = load <4 x float> addrspace(7)* %2
+    // %1 = load <4 x float> addrspace(7)* %0
     // %2 = extractelement <4 x float> %1, i32 0
     // after transform:
-    // %1 = bitcast <4 x float> addrspace(7)* %2 to[4 x float] addrspace(7)*
-    // %3 = getelementptr[4 x float] addrspace(7)* %2, i32 0, i32 0
-    // %4 = load float addrspace(7)* %3
+    // %1 = getelementptr <4 x float>, <4 x float> addrspace(7)* %0, i32 0, i32 0
+    // %2 = load float addrspace(7)* %1
 
     auto loadInst = cast<LoadInst>(src);
     auto loadPtr = loadInst->getOperand(0);
     auto addrSpace = loadPtr->getType()->getPointerAddressSpace();
 
     if (addrSpace == SPIRAS_Local || addrSpace == SPIRAS_Uniform) {
-      auto srcTy = cast<FixedVectorType>(src->getType());
-      auto castTy = ArrayType::get(srcTy->getElementType(), srcTy->getNumElements());
-      auto castPtrTy = castTy->getPointerTo(addrSpace);
-      auto castPtr = new BitCastInst(loadPtr, castPtrTy, "", &extractElementInst);
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), extractElementInst.getOperand(1)};
-      auto elementPtr = GetElementPtrInst::Create(castTy, castPtr, idxs, "", &extractElementInst);
+      auto elementPtr = GetElementPtrInst::Create(src->getType(), loadPtr, idxs, "", &extractElementInst);
       auto elementTy = elementPtr->getResultElementType();
       auto newLoad = new LoadInst(elementTy, elementPtr, "", &extractElementInst);
       extractElementInst.replaceAllUsesWith(newLoad);
