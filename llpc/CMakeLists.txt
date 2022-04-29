@@ -136,20 +136,12 @@ endif()
 target_compile_definitions(llpc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 target_compile_definitions(llpc PRIVATE _SPIRV_LLVM_API)
 target_compile_definitions(llpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
-if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
-    target_compile_definitions(llpc PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
-endif()
 if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
 
 if(VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
   target_compile_definitions(llpc PRIVATE VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
-endif()
-
-option(LLPC_ENABLE_SHADER_CACHE "Enable experimental shader cache" OFF)
-if(LLPC_ENABLE_SHADER_CACHE)
-    target_compile_definitions(llpc PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
 endif()
 
 if(ICD_BUILD_LLPC)
@@ -172,7 +164,6 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/../lgc/interface
     PRIVATE
         ${PROJECT_SOURCE_DIR}/context
-        ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/lower
         ${PROJECT_SOURCE_DIR}/translator/include
         ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
@@ -282,6 +273,7 @@ endif()
 target_link_libraries(llpc PRIVATE dumper)
 target_link_libraries(llpc PRIVATE cwpack)
 target_link_libraries(llpc PRIVATE metrohash)
+target_link_libraries(llpc PRIVATE vkgc_headers)
 target_link_libraries(llpc PUBLIC
     khronos_vulkan_interface
     khronos_spirv_interface
@@ -318,7 +310,6 @@ target_compile_definitions(llpc_standalone_compiler PUBLIC
 )
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(llpc_standalone_compiler PUBLIC
-        LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION}
         PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION}
     )
 endif()
@@ -329,7 +320,6 @@ endif()
 
 target_include_directories(llpc_standalone_compiler PUBLIC
     ${PROJECT_SOURCE_DIR}/../imported/spirv
-    ${PROJECT_SOURCE_DIR}/../include
     ${PROJECT_SOURCE_DIR}/../tool/dumper
     ${PROJECT_SOURCE_DIR}/../util
     ${PROJECT_SOURCE_DIR}/context
@@ -386,6 +376,7 @@ target_link_libraries(llpc_standalone_compiler PUBLIC
     ${llvm_libs}
     metrohash
     vfx
+    vkgc_headers
 )
 if(UNIX)
     target_link_libraries(llpc_standalone_compiler PUBLIC dl)

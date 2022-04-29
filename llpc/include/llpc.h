@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "../../include/vkgcDefs.h"
+#include "vkgcDefs.h"
 
 namespace Llpc {
 
