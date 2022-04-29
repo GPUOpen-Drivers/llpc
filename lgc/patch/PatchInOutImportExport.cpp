@@ -1818,7 +1818,7 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   if (compIdx)
     startChannel = cast<ConstantInt>(compIdx)->getZExtValue();
 
-  Value *loc;
+  Value *loc = nullptr;
   if (locOffset) {
     loc = ConstantInt::get(Type::getInt32Ty(*m_context), location + cast<ConstantInt>(locOffset)->getZExtValue());
     assert((startChannel + numChannels) <= 4);
