@@ -34,13 +34,11 @@
 #include "vfxParser.h"
 #include <inttypes.h>
 
-#ifndef VFX_DISABLE_SPVGEN
 #if VFX_INSIDE_SPVGEN
 #define SH_EXPORTING
 #endif
 
 #include "spvgen.h"
-#endif
 
 namespace Vfx {
 
@@ -61,7 +59,6 @@ StrToMemberAddr SectionVertexInput::m_addrTable[SectionVertexInput::MemberCount]
 StrToMemberAddr SectionSpecEntryItem::m_addrTable[SectionSpecEntryItem::MemberCount];
 StrToMemberAddr SectionSpecInfo::m_addrTable[SectionSpecInfo::MemberCount];
 
-#ifndef VFX_DISABLE_SPVGEN
 // =====================================================================================================================
 // A helper method to convert ShaderStage enumerant to corresponding SpvGenStage enumerant.
 //
@@ -85,7 +82,6 @@ static SpvGenStage shaderStageToSpvGenStage(ShaderStage shaderStage) {
     return SpvGenStageInvalid;
   }
 }
-#endif
 
 // =====================================================================================================================
 // Dummy class used to initialize all static variables
@@ -546,7 +542,6 @@ bool Section::readFile(const std::string &docFilename, const std::string &fileNa
 // @param [out] errorMsg : Error message
 bool SectionShader::compileGlsl(const char *entryPoint, std::string *errorMsg) {
   bool result = true;
-#ifndef VFX_DISABLE_SPVGEN
   int sourceStringCount = 1;
   const char *const *sourceList[1] = {};
   const char *const *fileList[1] = {};
@@ -582,10 +577,6 @@ bool SectionShader::compileGlsl(const char *entryPoint, std::string *errorMsg) {
 
   if (program)
     spvDestroyProgram(program);
-#else
-  m_spvBin.resize(m_shaderSource.length() + 1);
-  memcpy(m_spvBin.data(), m_shaderSource.c_str(), m_shaderSource.length() + 1);
-#endif
   return result;
 }
 
@@ -595,7 +586,6 @@ bool SectionShader::compileGlsl(const char *entryPoint, std::string *errorMsg) {
 // @param [out] errorMsg : Error message
 bool SectionShader::assembleSpirv(std::string *errorMsg) {
   bool result = true;
-#ifndef VFX_DISABLE_SPVGEN
   const char *text = m_shaderSource.c_str();
 
   if (!InitSpvGen()) {
@@ -618,10 +608,6 @@ bool SectionShader::assembleSpirv(std::string *errorMsg) {
   }
 
   delete[] buffer;
-#else
-  m_spvBin.resize(m_shaderSource.length() + 1);
-  memcpy(m_spvBin.data(), m_shaderSource.c_str(), m_shaderSource.length() + 1);
-#endif
   return result;
 }
 
