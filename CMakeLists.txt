@@ -36,8 +36,23 @@ endif()
 ### Top-level VKGC Interface ###
 add_library(vkgc INTERFACE)
 
+### VKGC header-only library ###
+add_library(vkgc_headers INTERFACE)
+
+### Options that affect the headers ####################################################################################
+option(LLPC_ENABLE_SHADER_CACHE "Enable experimental shader cache" OFF)
+if(LLPC_ENABLE_SHADER_CACHE)
+    target_compile_definitions(vkgc_headers INTERFACE LLPC_ENABLE_SHADER_CACHE=1)
+endif()
+if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
+    target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
+endif()
+
+
+target_link_libraries(vkgc INTERFACE vkgc_headers)
+
 ### Expose header files ################################################################################################
-target_include_directories(vkgc
+target_include_directories(vkgc_headers
     INTERFACE
         ${PROJECT_SOURCE_DIR}/include
 )
@@ -86,6 +101,7 @@ endif()
 if(EXISTS ${XGL_SPVGEN_PATH})
     set(XGL_SPVGEN_BUILD_PATH ${CMAKE_BINARY_DIR}/spvgen)
     add_subdirectory(${XGL_SPVGEN_PATH} ${XGL_SPVGEN_BUILD_PATH} EXCLUDE_FROM_ALL)
+    target_link_libraries(spvgen_base vkgc_headers) # TODO Remove after added in spvgen
 endif()
 
 ### VKGC build LLPC ################################################################

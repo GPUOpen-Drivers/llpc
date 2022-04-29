@@ -38,15 +38,13 @@ set_compiler_options(dumper ${DUMPER_ENABLE_WERROR})
 ### Defines/Includes/Sources ###########################################################################################
 target_compile_definitions(dumper PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 target_compile_definitions(dumper PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
-if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
-    target_compile_definitions(dumper PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
-endif()
 if(ICD_BUILD_LLPC)
     target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
 endif()
 
 target_link_libraries(dumper PUBLIC metrohash)
 target_link_libraries(dumper PRIVATE cwpack)
+target_link_libraries(dumper PRIVATE vkgc_headers)
 target_link_libraries(dumper PRIVATE
     khronos_vulkan_interface
     khronos_spirv_interface
@@ -60,7 +58,6 @@ target_include_directories(dumper
     PUBLIC
         ${XGL_VKGC_PATH}/include
     PRIVATE
-        ${XGL_VKGC_PATH}/include
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}

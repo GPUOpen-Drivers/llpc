@@ -33,15 +33,6 @@ option(VFX_ENABLE_WERROR "Build ${PROJECT_NAME} with more errors" OFF)
 
 target_compile_definitions(vfx PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 
-if(LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
-    target_compile_definitions(vfx PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
-    target_compile_definitions(vfx PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
-endif()
-
-if(LLPC_ENABLE_SHADER_CACHE)
-    target_compile_definitions(vfx PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
-endif()
-
 target_sources(vfx PRIVATE
     vfxParser.cpp
     vfxPipelineDoc.cpp
@@ -58,8 +49,6 @@ PUBLIC
     ${PROJECT_SOURCE_DIR}
 PRIVATE
     ${PROJECT_SOURCE_DIR}/../../imported/spirv
-    ${PROJECT_SOURCE_DIR}/../../include
 )
 
-target_link_libraries(vfx PRIVATE khronos_vulkan_interface)
-target_link_libraries(vfx PRIVATE khronos_spirv_interface)
+target_link_libraries(vfx PRIVATE vkgc_headers khronos_vulkan_interface khronos_spirv_interface)
