@@ -5819,6 +5819,9 @@ void PatchInOutImportExport::storeTessFactors() {
   auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
   auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
+  // NOTE: We are going to read back tess factors from on-chip LDS. Make sure they have been stored already.
+  builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
   SmallVector<Value *> outerTessFactors, innerTessFactors;
 
   assert(outerTessFactorCount >= 2 && outerTessFactorCount <= 4);
@@ -5831,7 +5834,7 @@ void PatchInOutImportExport::storeTessFactors() {
     outerTessFactors.push_back(builder.CreateExtractElement(outerTessFactorVec, i));
 
   assert(innerTessFactorCount <= 2);
-  if (innerTessFactorCount) {
+  if (innerTessFactorCount > 0) {
     // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + 4
     Value *ldsOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
     ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(calcFactor.onChip.tessFactorStart + 4));
