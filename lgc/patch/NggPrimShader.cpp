@@ -3209,6 +3209,9 @@ Function *NggPrimShader::mutateGs(Module *module) {
         assert(call);
         m_builder->SetInsertPoint(call);
 
+        if (getShaderStage(call->getParent()->getParent()) != ShaderStageGeometry)
+          continue; // Not belong to GS messages
+
         uint64_t message = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
         if (message == GsEmitStreaM0 || message == GsEmitStreaM1 || message == GsEmitStreaM2 ||
             message == GsEmitStreaM3) {
