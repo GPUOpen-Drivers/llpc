@@ -1,6 +1,6 @@
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
 ; SHADERTEST: call i1 (...) @lgc.create.is.helper.invocation.i1()
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results

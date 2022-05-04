@@ -1,5 +1,5 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -trim-debug-info=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: [[D1:![0-9]*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "struct VS_OUTPUT", scope: [[D2:![0-9]*]], file: !{{[0-9]*}}, line: 1, size: 32, elements: !{{[0-9]*}}, identifier: "struct VS_OUTPUT")
 ; SHADERTEST: [[D2]] = !DINamespace(name: "namespace_name", scope: null)

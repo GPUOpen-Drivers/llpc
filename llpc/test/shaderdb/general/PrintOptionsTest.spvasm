@@ -1,7 +1,7 @@
 ; Check that we can print LLVM CLI options overridden by LLPC.
 
 ; 1. Check that only the overridden options gets printed with `--print-options`.
-; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip %s --robust-buffer-access --print-options \
+; RUN: amdllpc %gfxip %s --robust-buffer-access --print-options \
 ; RUN:   | FileCheck %s --check-prefix=OVERRIDDEN --match-full-lines
 ;
 ; OVERRIDDEN-LABEL: --robust-buffer-access = 1 (default: 0)
@@ -9,7 +9,7 @@
 ; OVERRIDDEN-LABEL: --use-gpu-divergence-analysis = 1 (default: 0)
 
 ; 2. Check that all options gets printed with `--print-all-options`.
-; RUN: amdllpc -spvgen-dir=%spvgendir% %gfxip %s --robust-buffer-access --print-all-options \
+; RUN: amdllpc %gfxip %s --robust-buffer-access --print-all-options \
 ; RUN:   | FileCheck %s --check-prefix=ALL --match-full-lines
 ;
 ; ALL-LABEL: --robust-buffer-access = 1 (default: 0)

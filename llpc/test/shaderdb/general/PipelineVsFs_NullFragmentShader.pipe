@@ -1,27 +1,27 @@
 ; Test that the null fragment shader is generated correctly for a graphics pipeline where the shader is not provided.
 
 ; BEGIN_GEN_RELOC
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -d -r %t.elf | FileCheck -check-prefix=GEN_RELOC %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -d -r %t.elf | FileCheck -check-prefix=GEN_RELOC %s
 ; Check that the PS is defined.  The body of the shader is not important since it should not be run.
 ; GEN_RELOC-LABEL: <_amdgpu_ps_main>:
 ; GEN_RELOC: s_endpgm
 ; END_GEN_RELOC
 
 ; BEGIN_PAL_RELOC
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=PAL_RELOC %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=PAL_RELOC %s
 ; Make sure the DX_RASTERIZATION_KILL is set in the PAL_RELOC metadata.
 ; PAL_RELOC: PA_CL_CLIP_CNTL 0x0000000001400000
 ; BEGIN_PAL_RELOC
 
 ; BEGIN_GEN_FULL
-; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -d -r %t.elf | FileCheck -check-prefix=GEN_FULL %s
+; RUN: amdllpc -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=%gfxip -d -r %t.elf | FileCheck -check-prefix=GEN_FULL %s
 ; Check that the PS is defined.  The body of the shader is not important since it should not be run.
 ; GEN_FULL-LABEL: <_amdgpu_ps_main>:
 ; GEN_FULL: s_endpgm
 ; END_GEN_FULL
 
 ; BEGIN_PAL_FULL
-; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s -v | FileCheck -check-prefix=PAL_FULL %s
+; RUN: amdllpc -o %t.elf %gfxip %s -v | FileCheck -check-prefix=PAL_FULL %s
 ; Make sure the DX_RASTERIZATION_KILL is set in the PAL_FULL metadata.
 ; PAL_FULL: PA_CL_CLIP_CNTL 0x0000000001400000
 ; BEGIN_PAL_FULL

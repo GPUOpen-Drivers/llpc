@@ -1,7 +1,7 @@
 // Check that an error is produced when the same shader stage is provided twice.
 /*
 ; BEGIN_SHADERTEST
-; RUN: not amdllpc -v %gfxip -spvgen-dir=%spvgendir% %s %s \
+; RUN: not amdllpc -v %gfxip %s %s \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST %s
 ;
 ; SHADERTEST-LABEL: {{^}}ERROR: Result::ErrorInvalidShader: Duplicate shader stage (fragment)

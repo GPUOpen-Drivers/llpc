@@ -5,11 +5,11 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc               -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_DEFAULT %s
-; RUN: amdllpc --opt=none    -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_NONE %s
-; RUN: amdllpc --opt=quick   -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_QUICK %s
-; RUN: amdllpc --opt=default -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_DEFAULT %s
-; RUN: amdllpc --opt=fast    -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_FAST %s
+; RUN: amdllpc               -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_DEFAULT %s
+; RUN: amdllpc --opt=none    -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_NONE %s
+; RUN: amdllpc --opt=quick   -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_QUICK %s
+; RUN: amdllpc --opt=default -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_DEFAULT %s
+; RUN: amdllpc --opt=fast    -v %gfxip %s | FileCheck --check-prefixes=SHADERTEST,OPT_FAST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} calculated hash results (graphics pipeline)
 ; OPT_NONE:  TargetMachine optimization level = 0
 ; OPT_QUICK:  TargetMachine optimization level = 1

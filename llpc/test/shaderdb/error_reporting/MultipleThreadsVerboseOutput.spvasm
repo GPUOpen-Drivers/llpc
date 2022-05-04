@@ -1,7 +1,7 @@
 ; Check that an error is produced when we request to use multiple threads and verbose output.
 
 ; BEGIN_SHADERTEST
-; RUN: not amdllpc -spvgen-dir=%spvgendir% %gfxip --num-threads=2 -v %s \
+; RUN: not amdllpc %gfxip --num-threads=2 -v %s \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST %s
 ;
 ; SHADERTEST-LABEL: {{^}}ERROR: Verbose output is not available when compiling with multiple threads

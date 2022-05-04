@@ -2,7 +2,7 @@
 ; when they do not start at 0 or there is a gap.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: PalMetadata
 ; SHADERTEST: SPI_PS_INPUT_CNTL_0
 ; SHADERTEST-NEXT: SPI_PS_INPUT_CNTL_1

@@ -3,7 +3,7 @@
 // Also check that the user data limit is set correctly.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_vs_main>:
 ; SHADERTEST: s_cmp_eq_u32 0, 0 //{{.*}}
 ; SHADERTEST: s_cselect_b32 s[[RELOCCOND:[0-9]+]], s{{[0-9]+}}, s{{[0-9]+}} //{{.*}}
@@ -17,7 +17,7 @@
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
+; RUN: amdllpc -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
 ; SHADERTEST1-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST1-LABEL: _amdgpu_vs_main_fetchless
 ; SHADERTEST1: %[[SPILLCONST:.+]] = call i32 @llvm.amdgcn.reloc.constant(metadata ![[SPILLNODE:[0-9]+]])

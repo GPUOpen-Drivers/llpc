@@ -23,7 +23,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: getelementptr { <4 x float> }, { <4 x float> } addrspace({{.*}})* %{{[a-z0-9]*}}, i32 0, i32 0
 ; SHADERTEST: getelementptr inbounds (<{ [3 x float], [4 x i8], <{ [4 x float] }> }>, <{ [3 x float], [4 x i8], <{ [4 x float] }> }> addrspace({{.*}})* @{{.*}}, i32 0, i32 2

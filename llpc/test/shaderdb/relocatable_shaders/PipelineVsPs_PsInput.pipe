@@ -1,5 +1,5 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v \
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: SPI_PS_INPUT_CNTL_0                           0x0000000000000000
 ; SHADERTEST: SPI_PS_INPUT_ENA                              0x0000000000000002

@@ -3,7 +3,7 @@
 ; `--relocatable-shader-elf-limit` dev flag.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -relocatable-shader-elf-limit=0 -spvgen-dir=%spvgendir% -v %gfxip %s \
+; RUN: amdllpc -enable-relocatable-shader-elf -relocatable-shader-elf-limit=0 -v %gfxip %s \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} calculated hash results (compute pipeline)
 ; SHADERTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible

@@ -1,7 +1,7 @@
 ; Test a relocatable shader compilation with every shader stage and a vertex input.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf -gfxip=9 %s -v | \
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf -gfxip=9 %s -v | \
 ; RUN: FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: Building pipeline with relocatable shader elf.
 ; SHADERTEST: {{^//}} LLPC pipeline patching results
@@ -40,7 +40,7 @@
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf -gfxip=10.1 %s -v | \
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf -gfxip=10.1 %s -v | \
 ; RUN: FileCheck -check-prefix=SHADERTEST_GFX10 %s
 
 ; Test that the vertex input is correctly loaded.  GFX10 does not have to issue mentioned above.  Make sure that %VertexId is used.

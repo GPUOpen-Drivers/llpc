@@ -1,8 +1,8 @@
 ; Test that GS outputs get extended from 16-bit to 32-bit during in/out packing.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-part-pipeline=0 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; RUN: amdllpc -enable-part-pipeline=1 -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: LLPC location input/output mapping results (GS shader)
 ; SHADERTEST: (GS) Output: stream = 0,  loc = 1, comp = 0  =>  Mapped = 0, 0
 ; SHADERTEST: (GS) Output: stream = 0,  loc = 1, comp = 1  =>  Mapped = 0, 1

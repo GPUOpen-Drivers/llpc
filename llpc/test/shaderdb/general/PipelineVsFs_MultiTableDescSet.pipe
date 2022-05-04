@@ -3,7 +3,7 @@
 
 // This first part checks that the PAL metadata is as expected.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; First check that the buffer load in the vertex shader loads the correct
 ; descriptor.  The high half of the descriptor load should come from the PC.
 ; The low half should come from the user data node at offset 0. The 0 offset if

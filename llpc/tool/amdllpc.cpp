@@ -210,9 +210,6 @@ cl::opt<unsigned>
                         cl::desc("Preferred number of vertices consumed by a primitive shader sub-group (NGG)"),
                         cl::value_desc("verts"), cl::init(256));
 
-// -spvgen-dir: load SPVGEN from specified directory
-cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load SPVGEN library from"));
-
 cl::opt<bool> RobustBufferAccess("robust-buffer-access", cl::desc("Validate if the index is out of bounds"),
                                  cl::init(false));
 
@@ -377,9 +374,8 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
   // We call this after compiler initialization to account for any flags overridden by LLPC.
   cl::PrintOptionValues();
 
-  if (SpvGenDir != "" && !InitSpvGen(SpvGenDir.c_str())) {
-    // -spvgen-dir option: preload spvgen from the given directory
-    LLPC_ERRS("Failed to load SPVGEN from specified directory\n");
+  if (!InitSpvGen(nullptr)) {
+    LLPC_ERRS("Failed to initialize SPVGEN\n");
     return Result::ErrorUnavailable;
   }
 
@@ -562,6 +558,8 @@ int main(int argc, char *argv[]) {
 
   // Cleanup code that gets run automatically before returning.
   auto onExit = make_scope_exit([compiler, &result] {
+    FinalizeSpvgen();
+
     if (compiler)
       compiler->Destroy();
 

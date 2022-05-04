@@ -1,5 +1,5 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -trim-debug-info=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: [[D1:![0-9]*]] = !DICompositeType(tag: DW_TAG_array_type, baseType: [[D2:![0-9]*]], size: 128, flags: DIFlagVector, elements: [[D3:![0-9]*]])
 ; SHADERTEST: [[D2]] = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)

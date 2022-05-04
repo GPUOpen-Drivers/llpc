@@ -1,7 +1,7 @@
 ; Test that a fetch shader for 1 input is handled correctly.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -use-relocatable-shader-elf -auto-layout-desc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -use-relocatable-shader-elf -auto-layout-desc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; Skip to the patching results for the fetch shader
 ; SHADERTEST-LABEL: LLPC pipeline patching results
 ; Check the inputs to the vertex shader.  This should be all of the regular inputs.  There is one vertex attribute being passed in: The vector at the end.
@@ -28,7 +28,7 @@
 
 ; BEGIN_SHADERTEST
 ; Check that the fetch shader loads the inputs into the correct registers.
-; RUN: amdllpc -spvgen-dir=%spvgendir% -use-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST2 %s
+; RUN: amdllpc -use-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST2 %s
 ; SHADERTEST2: Disassembly of section .text:
 ; SHADERTEST2: 0000000000000000 <_amdgpu_vs_main>
 ; SHADERTEST2-DAG: v_mov_b32_e32 v7, 1.0

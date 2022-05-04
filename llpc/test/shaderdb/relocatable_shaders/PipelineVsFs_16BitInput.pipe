@@ -1,7 +1,7 @@
 ; Test that a 16-bit input is correctly returned by the fetch shader, and then correctly read by the vertex shader.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% \
+; RUN: amdllpc \
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %gfxip %s %s -v | FileCheck --match-full-lines -check-prefix=SHADERTEST %s
 

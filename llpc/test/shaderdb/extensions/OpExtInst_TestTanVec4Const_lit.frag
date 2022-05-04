@@ -11,7 +11,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.tan.v4f32(<4 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results

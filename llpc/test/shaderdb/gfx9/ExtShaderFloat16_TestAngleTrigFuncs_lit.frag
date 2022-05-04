@@ -34,7 +34,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = fmul reassoc nnan nsz arcp contract afn <3 x half> %{{.*}}, <half 0xH2478, half 0xH2478, half 0xH2478>
 ; SHADERTEST: = fmul reassoc nnan nsz arcp contract afn <3 x half> %{{.*}}, <half 0xH5329, half 0xH5329, half 0xH5329>

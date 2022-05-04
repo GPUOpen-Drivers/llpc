@@ -1,4 +1,4 @@
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --spirv-convert-non-uniform-broadcast-to-shuffle | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s --spirv-convert-non-uniform-broadcast-to-shuffle | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.shuffle.i32(
 ; SHADERTEST-NOT: call i32 (...) @lgc.create.subgroup.broadcast.i32(

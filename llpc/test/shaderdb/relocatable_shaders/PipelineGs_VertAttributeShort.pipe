@@ -1,7 +1,7 @@
 ; Test that code that merges the VS and GS generates valid code when there is a vertex fetch of a short int.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: {{^//}} LLPC pipeline patching results
 
 ; The i16vec4 fetch comes in as a <2 x float>, and passed on to the vertex shader.

@@ -1,5 +1,5 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-load-scalarizer=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-load-scalarizer=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
@@ -21,7 +21,7 @@
 ; Test the use of InlineBuffer with relocatable shaders.  This is currently not supported, and we
 ; should fall back to full pipeline compilation.
 ; BEGIN_RELOCTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% --enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=RELOCTEST %s
+; RUN: amdllpc --enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=RELOCTEST %s
 ; RELOCTEST-LABEL: {{^// LLPC}} calculated hash results (compute pipeline)
 ; RELOCTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible
 ; RELOCTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results

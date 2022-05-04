@@ -1,5 +1,5 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -trim-debug-info=false -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -trim-debug-info=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: [[D2:![0-9]*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "Foo", file: !{{[0-9]*}}, line: 1, baseType: [[D3:![0-9]*]])
 ; SHADERTEST: [[D3]] = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)

@@ -26,7 +26,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{.*}} = shufflevector <3 x double> %{{.*}}, <3 x double> %{{.*}}, <2 x i32> <i32 1, i32 0>
 ; SHADERTEST: %{{.*}} = shufflevector <3 x double> %{{.*}}, <3 x double> %{{.*}}, <2 x i32> <i32 2, i32 2>

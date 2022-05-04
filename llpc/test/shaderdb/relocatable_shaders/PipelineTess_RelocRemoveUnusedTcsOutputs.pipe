@@ -1,6 +1,6 @@
 ; Test that the TCS output at location 0 is removed, and that the mapping of the TES inputs and TCS outputs match.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% \
+; RUN: amdllpc \
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: {{^}}Building pipeline with relocatable shader elf.

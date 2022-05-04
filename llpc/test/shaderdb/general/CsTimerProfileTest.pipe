@@ -1,6 +1,6 @@
 ; Check that timer profile and pipeline info printing works for pipe inputs.
 
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --enable-timer-profile >%t.stdout 2>%t.stderr \
+; RUN: amdllpc -v %gfxip %s --enable-timer-profile >%t.stdout 2>%t.stderr \
 ; RUN:   && cat %t.stdout %t.stderr | FileCheck %s
 ;
 ; Check stdout.

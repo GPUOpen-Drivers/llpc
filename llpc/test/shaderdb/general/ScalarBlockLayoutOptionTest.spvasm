@@ -5,7 +5,7 @@
 ; Create a fresh directory for pipeline dump files.
 ; RUN: mkdir -p %t/dump
 ;
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --scalar-block-layout --enable-pipeline-dump --pipeline-dump-dir=%t/dump
+; RUN: amdllpc -v %gfxip %s --scalar-block-layout --enable-pipeline-dump --pipeline-dump-dir=%t/dump
 ; RUN: FileCheck -check-prefix=SHADERTEST %s < %t/dump/*.pipe
 ; SHADERTEST:     options.scalarBlockLayout = 1
 ; SHADERTEST-NOT: options.scalarBlockLayout = 0
@@ -18,7 +18,7 @@
 ; Create a fresh directory for pipeline dump files.
 ; RUN: mkdir -p %t/dump1
 ;
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s --scalar-block-layout=false --enable-pipeline-dump --pipeline-dump-dir=%t/dump1
+; RUN: amdllpc -v %gfxip %s --scalar-block-layout=false --enable-pipeline-dump --pipeline-dump-dir=%t/dump1
 ; RUN: FileCheck -check-prefix=SHADERTEST1 %s < %t/dump1/*.pipe
 ; SHADERTEST1:     options.scalarBlockLayout = 0
 ; SHADERTEST1-NOT: options.scalarBlockLayout = 1

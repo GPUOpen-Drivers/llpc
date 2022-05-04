@@ -18,7 +18,7 @@ void main ( )
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{[a-zA-Z_]+}} void @EmitVertex()
 ; SHADERTEST: call void (...) @lgc.create.end.primitive(i32 0)

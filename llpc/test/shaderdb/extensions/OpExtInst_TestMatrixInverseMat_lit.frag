@@ -21,7 +21,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call {{.*}}[2 x <2 x float>] (...) @lgc.create.matrix.inverse.a2v2f32([2 x <2 x float>] %
 ; SHADERTEST: = call {{.*}}[3 x <3 x float>] (...) @lgc.create.matrix.inverse.a3v3f32([3 x <3 x float>] %

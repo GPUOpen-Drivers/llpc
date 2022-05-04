@@ -1,7 +1,7 @@
 // Tests that the 16-bit vertex inputs are correctly loaded in the fetch shader.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -enable-relocatable-shader-elf -o %t.elf %gfxip %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s
 ; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST: tbuffer_load_format_d16_x {{v[0-9]*}}, [[vert_offset:v[0-9]*]], [[vert_base:s\[.*\]]], 0 format:[BUF_DATA_FORMAT_16,BUF_NUM_FORMAT_SINT] idxen

@@ -2,7 +2,7 @@
 ; This is how the PS knows which channel from which to read the value.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: _amdgpu_vs_main_fetchless:
 ; SHADERTEST: v_mov_b32_e32 [[zero:v[0-9]*]], 0
 ; SHADERTEST: v_mov_b32_e32 [[one:v[0-9]*]], 1.0
