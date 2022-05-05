@@ -161,7 +161,6 @@ endif()
 target_include_directories(llpc
     PUBLIC
         ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_SOURCE_DIR}/../lgc/interface
     PRIVATE
         ${PROJECT_SOURCE_DIR}/context
         ${PROJECT_SOURCE_DIR}/lower
@@ -170,7 +169,6 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
         ${PROJECT_SOURCE_DIR}/util
         ${PROJECT_SOURCE_DIR}/../util
-        ${PROJECT_SOURCE_DIR}/../tool/dumper
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
@@ -314,13 +312,7 @@ if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     )
 endif()
 
-if(LLPC_ENABLE_SHADER_CACHE)
-    target_compile_definitions(llpc_standalone_compiler PUBLIC LLPC_ENABLE_SHADER_CACHE=1)
-endif()
-
 target_include_directories(llpc_standalone_compiler PUBLIC
-    ${PROJECT_SOURCE_DIR}/../imported/spirv
-    ${PROJECT_SOURCE_DIR}/../tool/dumper
     ${PROJECT_SOURCE_DIR}/../util
     ${PROJECT_SOURCE_DIR}/context
     ${PROJECT_SOURCE_DIR}/include
@@ -375,6 +367,7 @@ target_link_libraries(llpc_standalone_compiler PUBLIC
     llpc
     ${llvm_libs}
     metrohash
+    spvgen_static
     vfx
     vkgc_headers
 )
@@ -390,7 +383,6 @@ add_dependencies(amdllpc llpc_standalone_compiler)
 target_link_libraries(amdllpc PRIVATE llpc_standalone_compiler)
 set_compiler_options(amdllpc ${LLPC_ENABLE_WERROR})
 add_compile_definitions(amdllpc PRIVATE SH_EXPORTING)
-target_link_libraries(amdllpc PRIVATE spvgen_static)
 
 endif()
 ### Add Subdirectories #################################################################################################
