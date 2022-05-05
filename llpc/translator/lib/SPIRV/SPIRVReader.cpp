@@ -6788,6 +6788,25 @@ bool SPIRVToLLVM::transMetadata() {
         else if (bf->getExecutionMode(ExecutionModeDepthGreater))
           fragmentMode.conservativeDepth = ConservativeDepth::GreaterEqual;
 
+        if (bf->getExecutionMode(ExecutionModeEarlyAndLateFragmentTestsAMD)) {
+          fragmentMode.earlyAndLatFragmentTests = true;
+          if (bf->getExecutionMode(ExecutionModeStencilRefReplacingEXT)) {
+            if (bf->getExecutionMode(ExecutionModeStencilRefGreaterFrontAMD))
+              fragmentMode.conservativeStencilFront = ConservativeDepth::GreaterEqual;
+            else if (bf->getExecutionMode(ExecutionModeStencilRefLessFrontAMD))
+              fragmentMode.conservativeStencilFront = ConservativeDepth::LessEqual;
+
+            if (bf->getExecutionMode(ExecutionModeStencilRefGreaterBackAMD))
+              fragmentMode.conservativeStencilBack = ConservativeDepth::GreaterEqual;
+            else if (bf->getExecutionMode(ExecutionModeStencilRefLessBackAMD))
+              fragmentMode.conservativeStencilBack = ConservativeDepth::LessEqual;
+          } else if (bf->getExecutionMode(ExecutionModeDepthReplacing)) {
+            assert(bf->getExecutionMode(ExecutionModeDepthUnchanged) ||
+                   bf->getExecutionMode(ExecutionModeDepthGreater) || bf->getExecutionMode(ExecutionModeDepthLess));
+          } else
+            fragmentMode.earlyFragmentTests = true;
+        }
+
         getBuilder()->setFragmentShaderMode(fragmentMode);
 
       } else if (execModel == ExecutionModelGLCompute) {
