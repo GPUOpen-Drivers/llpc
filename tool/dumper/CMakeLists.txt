@@ -50,13 +50,9 @@ target_link_libraries(dumper PRIVATE
     khronos_spirv_interface
 )
 
-if(LLPC_ENABLE_SHADER_CACHE)
-    target_compile_definitions(dumper PRIVATE LLPC_ENABLE_SHADER_CACHE=1)
-endif()
-
 target_include_directories(dumper
     PUBLIC
-        ${XGL_VKGC_PATH}/include
+        .
     PRIVATE
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util

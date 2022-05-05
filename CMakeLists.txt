@@ -101,7 +101,6 @@ endif()
 if(EXISTS ${XGL_SPVGEN_PATH})
     set(XGL_SPVGEN_BUILD_PATH ${CMAKE_BINARY_DIR}/spvgen)
     add_subdirectory(${XGL_SPVGEN_PATH} ${XGL_SPVGEN_BUILD_PATH} EXCLUDE_FROM_ALL)
-    target_link_libraries(spvgen_base vkgc_headers) # TODO Remove after added in spvgen
 endif()
 
 ### VKGC build LLPC ################################################################

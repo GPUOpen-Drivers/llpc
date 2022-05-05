@@ -29,5 +29,6 @@ add_lgc_unittest(LgcUtilTests
 )
 
 target_link_libraries(LgcUtilTests PRIVATE
+  LLVMCore
   LLVMlgc
 )

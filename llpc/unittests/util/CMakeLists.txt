@@ -30,3 +30,7 @@ add_llpc_unittest(LlpcUtilTests
   testThreading.cpp
   testUtil.cpp
 )
+
+target_link_libraries(LlpcUtilTests PRIVATE
+  dumper
+)
