@@ -381,15 +381,13 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
       compileInfo.shaderModuleDatas.push_back(shaderModuleData);
       compileInfo.stageMask |= shaderStageToMask(pipelineState->stages[stage].stage);
 
-      if (spvDisassembleSpirv) {
-        unsigned binSize = pipelineState->stages[stage].dataSize;
-        unsigned textSize = binSize * 10 + 1024;
-        LLPC_OUTS("\nSPIR-V disassembly for " << getShaderStageName(pipelineState->stages[stage].stage)
-                                              << " shader module:\n");
-        std::vector<char> spvText(textSize);
-        spvDisassembleSpirv(binSize, shaderModuleData.spirvBin.pCode, textSize, spvText.data());
-        LLPC_OUTS(spvText.data() << "\n");
-      }
+      unsigned binSize = pipelineState->stages[stage].dataSize;
+      unsigned textSize = binSize * 10 + 1024;
+      LLPC_OUTS("\nSPIR-V disassembly for " << getShaderStageName(pipelineState->stages[stage].stage)
+                                            << " shader module:\n");
+      std::vector<char> spvText(textSize);
+      spvDisassembleSpirv(binSize, shaderModuleData.spirvBin.pCode, textSize, spvText.data());
+      LLPC_OUTS(spvText.data() << "\n");
     }
   }
 
