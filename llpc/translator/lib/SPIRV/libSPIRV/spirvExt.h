@@ -39,8 +39,8 @@
 #ifndef SPIRVEXT_H
 #define SPIRVEXT_H
 
-#include "spirv.hpp"
 #include "GLSL.std.450.h"
+#include "khronos/spirv.hpp"
 
 namespace spv
 {
