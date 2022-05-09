@@ -133,6 +133,13 @@ static void dumpLLVM(Module *m, const std::string &fName) {
   }
 }
 
+static bool isStorageClassExplicitlyLaidOut(SPIRVModule *m_bm, SPIRVStorageClassKind storageClass) {
+  return llvm::is_contained({StorageClassStorageBuffer, StorageClassUniform, StorageClassPushConstant,
+                             StorageClassPhysicalStorageBufferEXT},
+                            storageClass) ||
+         (storageClass == StorageClassWorkgroup && m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR));
+}
+
 SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
                          ArrayRef<ConvertingSampler> convertingSamplers, lgc::Builder *builder,
                          const Vkgc::ShaderModuleUsage *moduleUsage, const Vkgc::PipelineShaderOptions *shaderOptions)
@@ -328,6 +335,18 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const sp
 
   pointeeType->setBody(structType->elements(), structType->isPacked());
 
+  // TODO: Workaround for opaque pointers.
+  // Because of the way of creating type for OpTypeForwardPointer (creating new structure and filling
+  // it with elements) we are not able to repeat this later and get the same address of created structure.
+  // This function creates type which looks more or less like: %"type 0x7670800" = type <{ i32 }>
+  // Using transType we are able to create type which will be: <{ i32 }>
+  // Later this is causing asserts while creating GEP instructions. After transition is completed, GEP will remove
+  // validation and this map can be removed.
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  auto loc = m_forwardPointerWorkaroundMap.find(spvType->getPointerElementType());
+  if (loc == m_forwardPointerWorkaroundMap.end())
+    m_forwardPointerWorkaroundMap[spvType->getPointerElementType()] = pointeeType;
+
   return type;
 }
 
@@ -463,14 +482,8 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
     }
   }
 
-  // Now non-image-related handling.
-  const bool explicitlyLaidOut =
-      storageClass == StorageClassStorageBuffer || storageClass == StorageClassUniform ||
-      storageClass == StorageClassPushConstant || storageClass == StorageClassPhysicalStorageBufferEXT ||
-      (storageClass == StorageClassWorkgroup && m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR));
-
-  Type *const pointeeType =
-      transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, explicitlyLaidOut);
+  Type *const pointeeType = transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true,
+                                      isStorageClassExplicitlyLaidOut(m_bm, storageClass));
 
   return PointerType::get(pointeeType, SPIRSPIRVAddrSpaceMap::rmap(storageClass));
 }
@@ -664,6 +677,45 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
   if (isExplicitlyLaidOut)
     return ArrayType::get(compType, spvType->getVectorComponentCount());
   return FixedVectorType::get(compType, spvType->getVectorComponentCount());
+}
+
+// =====================================================================================================================
+// Get pointee type from SPIRV Value.
+//
+// @param v : SPIRV Value
+Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v) {
+  // TODO: Workaround for forward pointers and opaque pointers.
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  auto loc = m_forwardPointerWorkaroundMap.find(v->getType()->getPointerElementType());
+  if (loc != m_forwardPointerWorkaroundMap.end())
+    return loc->second;
+
+  auto opCode = v->getOpCode();
+  if (isAccessChainOpCode(opCode)) {
+    // If the Base of the AccessChain is a structure then additional padding may be added (depending on the structure
+    // elements). This additional padding is changing the return type of GetElementPointer (created from
+    // OpAccessChain). Right now the easiest way is to store this type (type with padding) in the HashMap (while
+    // creating GEP) and get this type here.
+    //
+    // Example which is showing why this is needed:
+    //
+    // %Uniforms = OpTypeStruct %v3double %mat2v3double %v2double
+    // %_ptr_Uniform_Uniforms = OpTypePointer Uniform %Uniforms
+    // %_ = OpVariable %_ptr_Uniform_Uniforms Uniform
+    // %1 = OpAccessChain %_ptr_Uniform_mat2v3double %_ %int_1
+    //
+    // Created GetElementPointer (from %1 = OpAccessChain) will have a dereferenced return type = [2 x
+    // %llpc.matrix.column], where %llpc.matrix.column = type <{ [3 x double], [8 x i8] }>  (8 x i8) is an additional
+    // padding. If we just do a transType on the OpAccessChain->getType()->getPointerElementType() then we will get
+    // 'only' type = [2x[3xdouble]] (without padding).
+    //
+    Type *pointeeType = tryGetAccessChainRetType(v);
+    if (pointeeType)
+      return pointeeType;
+  }
+
+  return transType(v->getType()->getPointerElementType(), 0, true, true,
+                   isStorageClassExplicitlyLaidOut(m_bm, v->getType()->getPointerStorageClass()));
 }
 
 Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
@@ -1114,6 +1166,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
     // Remember to remove the function later.
     valuesToRemove.push_back(&func);
 
+    Value *const zero = getBuilder()->getInt32(0);
     for (User *const user : func.users()) {
       CallInst *const call = dyn_cast<CallInst>(user);
 
@@ -1255,10 +1308,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
             // If we are loading a full row major matrix, need to load the rows and then transpose.
             for (unsigned i = 0; i < rowCount; i++) {
-              Value *pointerElem = getBuilder()->CreateGEP(
-                  pointerElemType, pointer,
-                  {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
-              Type *castType = pointerElem->getType()->getPointerElementType();
+              Value *indices[] = {zero, getBuilder()->getInt32(i), zero};
+              Value *pointerElem = getBuilder()->CreateGEP(pointerElemType, pointer, indices);
+              Type *castType = GetElementPtrInst::getIndexedType(pointerElemType, indices);
+              // TODO: Remove this when LLPC will switch fully to opaque pointers.
+              assert(castType == pointerElem->getType()->getNonOpaquePointerElementType());
               assert(castType->isArrayTy());
               castType = FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
               const unsigned addrSpace = pointerElem->getType()->getPointerAddressSpace();
@@ -1356,10 +1410,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
             // If we are storing a full row major matrix, need to transpose then store the rows.
             for (unsigned i = 0; i < rowCount; i++) {
-              Value *pointerElem = getBuilder()->CreateGEP(
-                  pointerElemType, pointer,
-                  {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
-              Type *castType = pointerElem->getType()->getPointerElementType();
+              Value *indices[] = {zero, getBuilder()->getInt32(i), zero};
+              Value *pointerElem = getBuilder()->CreateGEP(pointerElemType, pointer, indices);
+              Type *castType = GetElementPtrInst::getIndexedType(pointerElemType, indices);
+              // TODO: Remove this when LLPC will switch fully to opaque pointers.
+              assert(castType == pointerElem->getType()->getNonOpaquePointerElementType());
               assert(castType->isArrayTy());
               castType = FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
               const unsigned addrSpace = pointerElem->getType()->getPointerAddressSpace();
@@ -1465,14 +1520,16 @@ std::pair<Type *, Value *> SPIRVToLLVM::createLaunderRowMajorMatrix(Type *const 
 //
 // @param spvType : The SPIR-V type of the load.
 // @param loadPointer : The LLVM pointer to load from.
+// @param loadType : The LLVM load type.
 // @param isVolatile : Is the load volatile?
 // @param isCoherent : Is the load coherent?
 // @param isNonTemporal : Is the load non-temporal?
-Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *loadPointer, bool isVolatile,
-                                           bool isCoherent, bool isNonTemporal) {
+Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *loadPointer, Type *loadType,
+                                           bool isVolatile, bool isCoherent, bool isNonTemporal) {
   assert(loadPointer->getType()->isPointerTy());
 
-  Type *loadType = loadPointer->getType()->getPointerElementType();
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(loadPointer->getType()->getNonOpaquePointerElementType() == loadType);
 
   if (isTypeWithPadRowMajorMatrix(loadType)) {
     auto loadPair = createLaunderRowMajorMatrix(loadType, loadPointer);
@@ -1494,20 +1551,26 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++) {
       const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(spvType, i) : i;
 
-      Value *memberLoadPointer =
-          getBuilder()->CreateGEP(loadType, loadPointer, {zero, getBuilder()->getInt32(memberIndex)});
+      SmallVector<Value *, 2> indices = {zero, getBuilder()->getInt32(memberIndex)};
+
+      Value *memberLoadPointer = getBuilder()->CreateGEP(loadType, loadPointer, indices);
+
+      Type *memberLoadType = nullptr;
 
       // If the struct member was one which overlapped another member (as is common with HLSL cbuffer layout), we
       // need to handle the struct member carefully.
       auto pair = std::make_pair(spvType, i);
       if (m_overlappingStructTypeWorkaroundMap.count(pair) > 0) {
-        Type *const type = m_overlappingStructTypeWorkaroundMap[pair]->getPointerTo(
-            memberLoadPointer->getType()->getPointerAddressSpace());
+        memberLoadType = m_overlappingStructTypeWorkaroundMap[pair];
+        Type *const type = memberLoadType->getPointerTo(memberLoadPointer->getType()->getPointerAddressSpace());
         memberLoadPointer = getBuilder()->CreateBitCast(memberLoadPointer, type);
       }
 
-      Value *const memberLoad = addLoadInstRecursively(spvType->getStructMemberType(i), memberLoadPointer, isVolatile,
-                                                       isCoherent, isNonTemporal);
+      if (!memberLoadType)
+        memberLoadType = GetElementPtrInst::getIndexedType(loadType, indices);
+
+      Value *const memberLoad = addLoadInstRecursively(spvType->getStructMemberType(i), memberLoadPointer,
+                                                       memberLoadType, isVolatile, isCoherent, isNonTemporal);
 
       memberLoads.push_back(memberLoad);
       memberTypes.push_back(memberLoad->getType());
@@ -1540,9 +1603,10 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
         indices.push_back(zero);
 
       Value *elementLoadPointer = getBuilder()->CreateGEP(loadType, loadPointer, indices);
+      Type *const elementLoadType = GetElementPtrInst::getIndexedType(loadType, indices);
 
-      Value *const elementLoad =
-          addLoadInstRecursively(spvElementType, elementLoadPointer, isVolatile, isCoherent, isNonTemporal);
+      Value *const elementLoad = addLoadInstRecursively(spvElementType, elementLoadPointer, elementLoadType, isVolatile,
+                                                        isCoherent, isNonTemporal);
       load = getBuilder()->CreateInsertValue(load, elementLoad, i);
     }
 
@@ -1556,8 +1620,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
       Value *const elementLoadPointer =
           getBuilder()->CreateGEP(loadType, loadPointer, {zero, getBuilder()->getInt32(i)});
-      Value *const elementLoad =
-          addLoadInstRecursively(spvElementType, elementLoadPointer, isVolatile, isCoherent, isNonTemporal);
+      Value *const elementLoad = addLoadInstRecursively(spvElementType, elementLoadPointer, elementType, isVolatile,
+                                                        isCoherent, isNonTemporal);
       load = getBuilder()->CreateInsertElement(load, elementLoad, i);
     }
 
@@ -1599,15 +1663,17 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 //
 // @param spvType : The SPIR-V type of the store.
 // @param storePointer : The LLVM pointer to store to.
+// @param storeType : The LLVM type of the store.
 // @param storeValue : The LLVM value to store into the pointer.
 // @param isVolatile : Is the store volatile?
 // @param isCoherent : Is the store coherent?
 // @param isNonTemporal : Is the store non-temporal?
-void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *storePointer, Value *storeValue,
-                                          bool isVolatile, bool isCoherent, bool isNonTemporal) {
+void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *storePointer, Type *storeType,
+                                          Value *storeValue, bool isVolatile, bool isCoherent, bool isNonTemporal) {
   assert(storePointer->getType()->isPointerTy());
 
-  Type *storeType = storePointer->getType()->getPointerElementType();
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(storePointer->getType()->getNonOpaquePointerElementType() == storeType);
 
   if (isTypeWithPadRowMajorMatrix(storeType)) {
     auto storePair = createLaunderRowMajorMatrix(storeType, storePointer);
@@ -1623,7 +1689,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
   // that causes problems with the load/store vectorizer and DAG combining).
   if (isa<Constant>(storeValue) && alignment > 1) {
     Constant *const constStoreValue =
-        buildConstStoreRecursively(spvType, storePointer->getType(), cast<Constant>(storeValue));
+        buildConstStoreRecursively(spvType, storePointer->getType(), storeType, cast<Constant>(storeValue));
 
     StoreInst *const store = getBuilder()->CreateAlignedStore(constStoreValue, storePointer, alignment, isVolatile);
 
@@ -1636,7 +1702,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
     return;
   }
 
-  Constant *const zero = getBuilder()->getInt32(0);
+  Value *const zero = getBuilder()->getInt32(0);
   // clang-format off
   if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
   ) {
@@ -1646,11 +1712,12 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
     for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++) {
       const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(spvType, i) : i;
-      Value *const memberStorePointer =
-          getBuilder()->CreateGEP(storeType, storePointer, {zero, getBuilder()->getInt32(memberIndex)});
+      Value *indices[] = {zero, getBuilder()->getInt32(memberIndex)};
+      Value *const memberStorePointer = getBuilder()->CreateGEP(storeType, storePointer, indices);
+      Type *const memberStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
       Value *const memberStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
-      addStoreInstRecursively(spvType->getStructMemberType(i), memberStorePointer, memberStoreValue, isVolatile,
-                              isCoherent, isNonTemporal);
+      addStoreInstRecursively(spvType->getStructMemberType(i), memberStorePointer, memberStoreType, memberStoreValue,
+                              isVolatile, isCoherent, isNonTemporal);
     }
   } else if (storeType->isArrayTy() && !spvType->isTypeVector()) {
     // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
@@ -1668,29 +1735,34 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
         indices.push_back(zero);
 
       Value *const elementStorePointer = getBuilder()->CreateGEP(storeType, storePointer, indices);
+      Type *const elementStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
       Value *const elementStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
-      addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreValue, isVolatile, isCoherent,
-                              isNonTemporal);
+      addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreType, elementStoreValue, isVolatile,
+                              isCoherent, isNonTemporal);
     }
   } else if (spvType->isTypeVector() && isCoherent) {
     // Coherent store operand must be integer, pointer, or floating point type, so need to spilte vector.
     SPIRVType *spvElementType = spvType->getVectorComponentType();
 
     for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
-      Value *const elementStorePointer =
-          getBuilder()->CreateGEP(storeType, storePointer, {zero, getBuilder()->getInt32(i)});
+      Value *indices[] = {zero, getBuilder()->getInt32(i)};
+      Value *const elementStorePointer = getBuilder()->CreateGEP(storeType, storePointer, indices);
+      Type *const elementStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
       Value *const elementStoreValue = getBuilder()->CreateExtractElement(storeValue, i);
-      addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreValue, isVolatile, isCoherent,
-                              isNonTemporal);
+      addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreType, elementStoreValue, isVolatile,
+                              isCoherent, isNonTemporal);
     }
   } else {
     Type *alignmentType = storeType;
 
     Type *storeType = nullptr;
 
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(alignmentType == storePointer->getType()->getNonOpaquePointerElementType());
+
     // If the store was a bool or vector of bool, need to zext the storing value.
     if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool())) {
-      storeValue = getBuilder()->CreateZExtOrBitCast(storeValue, storePointer->getType()->getPointerElementType());
+      storeValue = getBuilder()->CreateZExtOrBitCast(storeValue, alignmentType);
       storeType = storeValue->getType();
     } else
       storeType = transType(spvType);
@@ -1722,11 +1794,14 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 //
 // @param spvType : The SPIR-V type of the store.
 // @param storePointerType : The LLVM pointer to store to.
+// @param storeType : The LLVM type of store.
 // @param constStoreValue : The LLVM constant to store into the pointer.
 Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type *const storePointerType,
-                                                  Constant *constStoreValue) {
+                                                  Type *const storeType, Constant *constStoreValue) {
   assert(storePointerType->isPointerTy());
-  Type *const storeType = storePointerType->getPointerElementType();
+
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(storePointerType->getNonOpaquePointerElementType() == storeType);
 
   const unsigned addrSpace = storePointerType->getPointerAddressSpace();
 
@@ -1749,7 +1824,7 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
       Type *const memberStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
       constMembers[memberIndex] =
           buildConstStoreRecursively(spvType->getStructMemberType(i), memberStoreType->getPointerTo(addrSpace),
-                                     constStoreValue->getAggregateElement(i));
+                                     memberStoreType, constStoreValue->getAggregateElement(i));
     }
 
     return ConstantStruct::get(cast<StructType>(storeType), constMembers);
@@ -1773,8 +1848,9 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
         indices.push_back(zero);
 
       Type *const elementStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
-      Constant *const constElement = buildConstStoreRecursively(
-          spvElementType, elementStoreType->getPointerTo(addrSpace), constStoreValue->getAggregateElement(i));
+      Constant *const constElement =
+          buildConstStoreRecursively(spvElementType, elementStoreType->getPointerTo(addrSpace), elementStoreType,
+                                     constStoreValue->getAggregateElement(i));
 
       if (needsPad)
         constElements[i] = ConstantExpr::getInsertValue(constElements[i], constElement, 0);
@@ -2259,17 +2335,22 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
 
   SPIRVType *const spvLoadType = spvCopyMemory->getSource()->getType();
 
-  Value *const load = addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, isSrcVolatile,
+  Type *const loadType = transType(spvLoadType->getPointerElementType(), 0, true, true,
+                                   isStorageClassExplicitlyLaidOut(m_bm, spvLoadType->getPointerStorageClass()));
+
+  Value *const load = addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, loadType, isSrcVolatile,
                                              isCoherent, isNonTemporal);
 
   Value *const storePointer = transValue(spvCopyMemory->getTarget(), getBuilder()->GetInsertBlock()->getParent(),
                                          getBuilder()->GetInsertBlock());
 
   SPIRVType *const spvStoreType = spvCopyMemory->getTarget()->getType();
+  Type *const storeType = transType(spvStoreType->getPointerElementType(), 0, true, true,
+                                    isStorageClassExplicitlyLaidOut(m_bm, spvStoreType->getPointerStorageClass()));
   isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(false);
 
-  addStoreInstRecursively(spvStoreType->getPointerElementType(), storePointer, load, isDestVolatile, isCoherent,
-                          isNonTemporal);
+  addStoreInstRecursively(spvStoreType->getPointerElementType(), storePointer, storeType, load, isDestVolatile,
+                          isCoherent, isNonTemporal);
   return nullptr;
 }
 
@@ -2336,8 +2417,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   Instruction *baseNode = getLastInsertedValue();
   BasicBlock *currentBlock = getBuilder()->GetInsertBlock();
 
-  auto loadInst =
-      addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, isVolatile, isCoherent, isNonTemporal);
+  Type *loadType = getPointeeType(spvLoad->getSrc());
+
+  auto loadInst = addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, loadType, isVolatile,
+                                         isCoherent, isNonTemporal);
 
   // Record all load instructions inserted by addLoadInstRecursively.
   if (m_scratchBoundsChecksEnabled) {
@@ -2580,10 +2663,13 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
   SPIRVType *const spvStoreType = spvStore->getDst()->getType();
   SPIRVType *pointerElementType = spvStoreType->getPointerElementType();
 
+  Type *storeType = getPointeeType(spvStore->getDst());
+
   Instruction *baseNode = getLastInsertedValue();
   BasicBlock *currentBlock = getBuilder()->GetInsertBlock();
 
-  addStoreInstRecursively(pointerElementType, storePointer, storeValue, isVolatile, isCoherent, isNonTemporal);
+  addStoreInstRecursively(pointerElementType, storePointer, storeType, storeValue, isVolatile, isCoherent,
+                          isNonTemporal);
 
   // Record all store instructions inserted by addStoreInstRecursively.
   if (m_scratchBoundsChecksEnabled) {
@@ -2680,7 +2766,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     indices.insert(indices.begin(), getBuilder()->getInt32(0));
 
   SPIRVType *const spvBaseType = spvAccessChain->getBase()->getType();
-  Type *const basePointeeType = base->getType()->getPointerElementType();
+
+  Type *basePointeeType = getPointeeType(spvAccessChain->getBase());
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(basePointeeType == base->getType()->getNonOpaquePointerElementType());
 
   SPIRVType *spvAccessType = spvBaseType;
 
@@ -2690,10 +2779,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
 
   const SPIRVStorageClassKind storageClass = spvBaseType->getPointerStorageClass();
 
-  const bool isBufferBlockPointer =
-      storageClass == StorageClassStorageBuffer || storageClass == StorageClassUniform ||
-      storageClass == StorageClassPushConstant || storageClass == StorageClassPhysicalStorageBufferEXT ||
-      (storageClass == StorageClassWorkgroup && m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR));
+  const bool isBufferBlockPointer = isStorageClassExplicitlyLaidOut(m_bm, storageClass);
 
   // Run over the indices of the loop and investigate whether we need to add any additional indices so that we load
   // the correct data. We explicitly lay out our data in memory, which means because Vulkan has more powerful layout
@@ -2794,27 +2880,42 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
       splits.push_back(std::make_pair(indices.size(), nullptr));
   }
 
+  Value *resultValue = nullptr;
+  Type *baseEltType = nullptr;
   if (splits.size() > 0) {
     Value *newBase = base;
+    Type *newBaseType = basePointeeType;
+
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(newBaseType == newBase->getType()->getScalarType()->getNonOpaquePointerElementType());
 
     for (auto split : splits) {
       const ArrayRef<Value *> indexArray(indices);
       const ArrayRef<Value *> frontIndices(indexArray.take_front(split.first));
 
       // Get the pointer to our row major matrix first.
-      Type *const newBaseEltType = newBase->getType()->getScalarType()->getPointerElementType();
+      Type *const newBaseEltType = newBaseType;
+      // TODO: Remove this when LLPC will switch fully to opaque pointers.
+      assert(newBaseEltType == newBase->getType()->getScalarType()->getNonOpaquePointerElementType());
       if (spvAccessChain->isInBounds())
         newBase = getBuilder()->CreateInBoundsGEP(newBaseEltType, newBase, frontIndices);
       else
         newBase = getBuilder()->CreateGEP(newBaseEltType, newBase, frontIndices);
+      newBaseType = GetElementPtrInst::getIndexedType(newBaseEltType, frontIndices);
+      // TODO: Remove this when LLPC will switch fully to opaque pointers.
+      assert(newBaseType == newBase->getType()->getNonOpaquePointerElementType());
 
       // Matrix splits are identified by having a nullptr as the .second of the pair.
       if (!split.second) {
-        auto newPair = createLaunderRowMajorMatrix(newBase->getType()->getPointerElementType(), newBase);
+        auto newPair = createLaunderRowMajorMatrix(newBaseType, newBase);
         newBase = newPair.second;
+        newBaseType = newPair.first;
       } else {
         Type *const bitCastType = split.second->getPointerTo(newBase->getType()->getPointerAddressSpace());
         newBase = getBuilder()->CreateBitCast(newBase, bitCastType);
+        newBaseType = split.second;
+        // TODO: Remove this when LLPC will switch fully to opaque pointers.
+        assert(newBaseType == newBase->getType()->getNonOpaquePointerElementType());
       }
 
       // Lastly we remove the indices that we have already processed from the list of indices.
@@ -2830,20 +2931,33 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     }
 
     // Do the final index if we have one.
-    Type *newBaseEltType = newBase->getType()->getScalarType()->getPointerElementType();
-    Value *resultValue = nullptr;
+    baseEltType = newBaseType;
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(baseEltType == newBase->getType()->getScalarType()->getNonOpaquePointerElementType());
     if (spvAccessChain->isInBounds()) {
-      resultValue = getBuilder()->CreateInBoundsGEP(newBaseEltType, newBase, indices);
+      resultValue = getBuilder()->CreateInBoundsGEP(baseEltType, newBase, indices);
     } else {
-      resultValue = getBuilder()->CreateGEP(newBaseEltType, newBase, indices);
+      resultValue = getBuilder()->CreateGEP(baseEltType, newBase, indices);
     }
+  } else {
+    baseEltType = basePointeeType;
 
-    return resultValue;
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(baseEltType == base->getType()->getScalarType()->getNonOpaquePointerElementType());
+
+    if (spvAccessChain->isInBounds())
+      resultValue = getBuilder()->CreateInBoundsGEP(baseEltType, base, indices);
+    else
+      resultValue = getBuilder()->CreateGEP(baseEltType, base, indices);
   }
-  Type *const baseEltType = base->getType()->getScalarType()->getPointerElementType();
-  if (spvAccessChain->isInBounds())
-    return getBuilder()->CreateInBoundsGEP(baseEltType, base, indices);
-  return getBuilder()->CreateGEP(baseEltType, base, indices);
+
+  // At this point we have to store correlation between SPIR-V AccessChain (SPIRVValue) and its dereferenced return type
+  // (llvm type). It is not possible to get this information later using transType(spvAccessChain->getType()) because if
+  // access chain is pointing to the structure of vectors/matrix then return type may contain some additional padding
+  // which will not be reflected when doing transType.
+  tryAddAccessChainRetType(spvAccessChain, GetElementPtrInst::getIndexedType(baseEltType, indices));
+
+  return resultValue;
 }
 
 // =====================================================================================================================
@@ -3911,8 +4025,12 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   }
 
   Type *const ptrType = transType(spvVar->getType());
-  Type *const varType = ptrType->getPointerElementType();
   unsigned addrSpace = ptrType->getPointerAddressSpace();
+
+  Type *const varType = transType(spvVar->getType()->getPointerElementType(), 0, true, true,
+                                  isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass()));
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(varType == ptrType->getNonOpaquePointerElementType());
 
   SPIRVValue *const spvInitializer = spvVar->getInitializer();
 

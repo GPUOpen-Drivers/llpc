@@ -177,9 +177,9 @@ public:
   Value *transSPIRVIntegerDotProductFromInst(SPIRVInstruction *bi, BasicBlock *bb);
 
   std::pair<Type *, Value *> createLaunderRowMajorMatrix(Type *const, Value *const);
-  Value *addLoadInstRecursively(SPIRVType *const, Value *const, bool, bool, bool);
-  void addStoreInstRecursively(SPIRVType *const, Value *const, Value *const, bool, bool, bool);
-  Constant *buildConstStoreRecursively(SPIRVType *const, Type *const, Constant *const);
+  Value *addLoadInstRecursively(SPIRVType *const, Value *const, Type *const, bool, bool, bool);
+  void addStoreInstRecursively(SPIRVType *const, Value *const, Type *, Value *const, bool, bool, bool);
+  Constant *buildConstStoreRecursively(SPIRVType *const, Type *const, Type *const, Constant *const);
 
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
@@ -211,11 +211,16 @@ private:
   typedef DenseMap<SPIRVFunction *, Function *> SPIRVToLLVMFunctionMap;
   typedef DenseMap<GlobalVariable *, SPIRVBuiltinVariableKind> BuiltinVarMap;
   typedef DenseMap<SPIRVType *, SmallVector<unsigned, 8>> RemappedTypeElementsMap;
+  typedef DenseMap<SPIRVValue *, Type *> SPIRVAccessChainValueToLLVMRetTypeMap;
 
   // A SPIRV value may be translated to a load instruction of a placeholder
   // global variable. This map records load instruction of these placeholders
   // which are supposed to be replaced by the real values later.
   typedef std::map<SPIRVValue *, LoadInst *> SPIRVToLLVMPlaceholderMap;
+
+  // TODO: Workaround to handle opaque pointers for OpTypeForwardPointer.
+  // This will be removed after opaque pointer transition is complete.
+  typedef DenseMap<SPIRVType *, Type *> SPIRVOpForwardPointerWorkaround;
 
   Module *m_m;
   BuiltinVarMap m_builtinGvMap;
@@ -235,6 +240,10 @@ private:
   SPIRVBlockToLLVMStructMap m_blockMap;
   SPIRVToLLVMPlaceholderMap m_placeholderMap;
   SPIRVToLLVMDbgTran m_dbgTran;
+
+  // Hash map with correlation between (SPIR-V) OpAccessChain and its returned (dereferenced) type.
+  // We have to store base type because opaque-pointers are removing information about dereferenced type.
+  SPIRVAccessChainValueToLLVMRetTypeMap m_accessChainRetTypeMap;
   std::map<std::string, unsigned> m_mangleNameToIndex;
   RemappedTypeElementsMap m_remappedTypeElements;
   DenseMap<Type *, bool> m_typesWithPadMap;
@@ -246,6 +255,10 @@ private:
   unsigned m_spirvOpMetaKindId;
   unsigned m_execModule;
   bool m_scratchBoundsChecksEnabled;
+
+  // TODO: Workaround to handle opaque pointers for OpTypeForwardPointer.
+  // This will be removed after opaque pointer transition is complete.
+  SPIRVOpForwardPointerWorkaround m_forwardPointerWorkaroundMap;
 
   enum class LlvmMemOpType : uint8_t { IS_LOAD, IS_STORE };
   struct ScratchBoundsCheckData {
@@ -270,6 +283,21 @@ private:
   Type *mapType(SPIRVType *bt, Type *t) {
     m_typeMap[bt] = t;
     return t;
+  }
+
+  Type *getPointeeType(SPIRVValue *v);
+
+  Type *tryGetAccessChainRetType(SPIRVValue *v) {
+    auto loc = m_accessChainRetTypeMap.find(v);
+    if (loc != m_accessChainRetTypeMap.end())
+      return loc->second;
+    return nullptr;
+  }
+
+  void tryAddAccessChainRetType(SPIRVValue *v, Type *t) {
+    auto loc = m_accessChainRetTypeMap.find(v);
+    if (loc == m_accessChainRetTypeMap.end())
+      m_accessChainRetTypeMap[v] = t;
   }
 
   void recordRemappedTypeElements(SPIRVType *bt, unsigned from, unsigned to);
