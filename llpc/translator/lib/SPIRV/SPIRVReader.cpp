@@ -500,25 +500,19 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(SPIRVType *const spvT
   SPIRVWord arrayStride = 0;
   const bool hasArrayStride = spvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
   assert(hasArrayStride ^ (arrayStride == 0));
-  (void(hasArrayStride)); // unused
 
   const uint64_t storeSize = getTypeStoreSize(elementType);
 
-  bool paddedArray = false;
+  // NOTE: Padding isn't allowed for a case that the array element is a structure with array-type member in HLSL.
+  bool paddedArray = arrayStride > storeSize;
 
-  if (isExplicitlyLaidOut && hasArrayStride) {
-    assert(arrayStride >= storeSize);
-
+  if (isExplicitlyLaidOut && hasArrayStride && paddedArray) {
     const unsigned padding = static_cast<unsigned>(arrayStride - storeSize);
 
-    paddedArray = padding > 0;
+    // Record that the array was remapped, even though we don't record a useful mapping for arrays.
+    recordRemappedTypeElements(spvType, 0, 0);
 
-    if (paddedArray) {
-      // Record that the array was remapped, even though we don't record a useful mapping for arrays.
-      recordRemappedTypeElements(spvType, 0, 0);
-
-      elementType = StructType::create({elementType, getPadType(padding)}, "llpc.runtime.array.element", true);
-    }
+    elementType = StructType::create({elementType, getPadType(padding)}, "llpc.runtime.array.element", true);
   }
 
   Type *const runtimeArrayType = ArrayType::get(elementType, SPIRVWORD_MAX);
