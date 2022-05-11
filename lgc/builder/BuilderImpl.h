@@ -688,13 +688,13 @@ public:
   llvm::Value *CreateSubgroupElect(const llvm::Twine &instName) override final;
 
   // Create a subgroup all.
-  llvm::Value *CreateSubgroupAll(llvm::Value *const value, bool wqm, const llvm::Twine &instName) override final;
+  llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName) override final;
 
   // Create a subgroup any
-  llvm::Value *CreateSubgroupAny(llvm::Value *const value, bool wqm, const llvm::Twine &instName) override final;
+  llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName) override final;
 
   // Create a subgroup all equal.
-  llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, bool wqm, const llvm::Twine &instName) override final;
+  llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName) override final;
 
   // Create a subgroup broadcast.
   llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
@@ -815,6 +815,7 @@ private:
 
   llvm::Value *createDsSwizzle(llvm::Value *const value, uint16_t dsPattern);
   llvm::Value *createWwm(llvm::Value *const value);
+  llvm::Value *createWqm(llvm::Value *const value);
   llvm::Value *createThreadMask();
   llvm::Value *createThreadMaskedSelect(llvm::Value *const threadMask, uint64_t andMask, llvm::Value *const value1,
                                         llvm::Value *const value2);

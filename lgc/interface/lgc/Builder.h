@@ -1392,26 +1392,20 @@ public:
   // Create a subgroup all.
   //
   // @param value : The value to compare
-  // @param wqm : Executed in WQM (whole quad mode)
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupAll(llvm::Value *const value, bool wqm = false,
-                                         const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
 
   // Create a subgroup any
   //
   // @param value : The value to compare
-  // @param wqm : Executed in WQM (whole quad mode)
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupAny(llvm::Value *const value, bool wqm = false,
-                                         const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
 
   // Create a subgroup all equal.
   //
   // @param value : The value to compare
-  // @param wqm : Executed in WQM (whole quad mode)
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, bool wqm = false,
-                                              const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
 
   // Create a subgroup broadcast.
   //

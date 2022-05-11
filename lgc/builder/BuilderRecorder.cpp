@@ -1630,30 +1630,27 @@ Value *BuilderRecorder::CreateSubgroupElect(const Twine &instName) {
 // Create a subgroup all.
 //
 // @param value : The value to compare
-// @param wqm : Executed in WQM (whole quad mode)
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateSubgroupAll(Value *const value, bool wqm, const Twine &instName) {
-  return record(Opcode::SubgroupAll, getInt1Ty(), {value, getInt1(wqm)}, instName);
+Value *BuilderRecorder::CreateSubgroupAll(Value *const value, const Twine &instName) {
+  return record(Opcode::SubgroupAll, getInt1Ty(), {value}, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup any
 //
 // @param value : The value to compare
-// @param wqm : Executed in WQM (whole quad mode)
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateSubgroupAny(Value *const value, bool wqm, const Twine &instName) {
-  return record(Opcode::SubgroupAny, getInt1Ty(), {value, getInt1(wqm)}, instName);
+Value *BuilderRecorder::CreateSubgroupAny(Value *const value, const Twine &instName) {
+  return record(Opcode::SubgroupAny, getInt1Ty(), {value}, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup all equal.
 //
 // @param value : The value to compare
-// @param wqm : Executed in WQM (whole quad mode)
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateSubgroupAllEqual(Value *const value, bool wqm, const Twine &instName) {
-  return record(Opcode::SubgroupAllEqual, getInt1Ty(), {value, getInt1(wqm)}, instName);
+Value *BuilderRecorder::CreateSubgroupAllEqual(Value *const value, const Twine &instName) {
+  return record(Opcode::SubgroupAllEqual, getInt1Ty(), {value}, instName);
 }
 
 // =====================================================================================================================

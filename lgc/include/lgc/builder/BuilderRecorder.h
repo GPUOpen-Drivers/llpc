@@ -520,9 +520,9 @@ public:
   llvm::Value *CreateGetWaveSize(const llvm::Twine &instName) override final;
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupElect(const llvm::Twine &instName) override final;
-  llvm::Value *CreateSubgroupAll(llvm::Value *const value, bool wqm, const llvm::Twine &instName) override final;
-  llvm::Value *CreateSubgroupAny(llvm::Value *const value, bool wqm, const llvm::Twine &instName) override final;
-  llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, bool wqm, const llvm::Twine &instName) override final;
+  llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName) override final;
+  llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName) override final;
+  llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
                                        const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupBroadcastWaterfall(llvm::Value *const value, llvm::Value *const index,

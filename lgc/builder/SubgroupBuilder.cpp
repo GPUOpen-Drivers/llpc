@@ -83,14 +83,13 @@ Value *SubgroupBuilder::CreateSubgroupElect(const Twine &instName) {
 // Create a subgroup all call.
 //
 // @param value : The value to compare across the subgroup. Must be an integer type.
-// @param wqm : Executed in WQM (whole quad mode)
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupAll(Value *const value, bool wqm, const Twine &instName) {
+Value *SubgroupBuilder::CreateSubgroupAll(Value *const value, const Twine &instName) {
   Value *result = CreateICmpEQ(createGroupBallot(value), createGroupBallot(getTrue()));
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
-  if (wqm) {
+  if (m_shaderStage == ShaderStageFragment) {
     result = CreateZExt(result, getInt32Ty());
     result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
     result = CreateTrunc(result, getInt1Ty());
@@ -102,14 +101,13 @@ Value *SubgroupBuilder::CreateSubgroupAll(Value *const value, bool wqm, const Tw
 // Create a subgroup any call.
 //
 // @param value : The value to compare across the subgroup. Must be an integer type.
-// @param wqm : Executed in WQM (whole quad mode)
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, bool wqm, const Twine &instName) {
+Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, const Twine &instName) {
   Value *result = CreateICmpNE(createGroupBallot(value), getInt64(0));
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
-  if (wqm) {
+  if (m_shaderStage == ShaderStageFragment) {
     result = CreateZExt(result, getInt32Ty());
     result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
     result = CreateTrunc(result, getInt1Ty());
@@ -121,9 +119,8 @@ Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, bool wqm, const Tw
 // Create a subgroup all equal call.
 //
 // @param value : The value to compare across the subgroup. Must be an integer type.
-// @param wqm : Executed in WQM (whole quad mode)
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, bool wqm, const Twine &instName) {
+Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, const Twine &instName) {
   Type *const type = value->getType();
 
   Value *compare = CreateSubgroupBroadcastFirst(value, instName);
@@ -141,9 +138,9 @@ Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, bool wqm, con
     for (unsigned i = 1, compCount = cast<FixedVectorType>(type)->getNumElements(); i < compCount; i++)
       result = CreateAnd(result, CreateExtractElement(compare, i));
 
-    return CreateSubgroupAll(result, wqm, instName);
+    return CreateSubgroupAll(result, instName);
   } else
-    return CreateSubgroupAll(compare, wqm, instName);
+    return CreateSubgroupAll(compare, instName);
 }
 
 // =====================================================================================================================
@@ -1004,7 +1001,7 @@ Value *SubgroupBuilder::CreateSubgroupQuadBroadcast(Value *const value, Value *c
     result = CreateSelect(compare, createDsSwizzle(value, getDsSwizzleQuadMode(3, 3, 3, 3)), result);
   }
 
-  return result;
+  return createWqm(result);
 }
 
 // =====================================================================================================================
@@ -1014,9 +1011,9 @@ Value *SubgroupBuilder::CreateSubgroupQuadBroadcast(Value *const value, Value *c
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupQuadSwapHorizontal(Value *const value, const Twine &instName) {
   if (supportDpp())
-    return createDppMov(value, DppCtrl::DppQuadPerm1032, 0xF, 0xF, true);
-  else
-    return createDsSwizzle(value, getDsSwizzleQuadMode(1, 0, 3, 2));
+    return createWqm(createDppMov(value, DppCtrl::DppQuadPerm1032, 0xF, 0xF, true));
+
+  return createWqm(createDsSwizzle(value, getDsSwizzleQuadMode(1, 0, 3, 2)));
 }
 
 // =====================================================================================================================
@@ -1026,9 +1023,9 @@ Value *SubgroupBuilder::CreateSubgroupQuadSwapHorizontal(Value *const value, con
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupQuadSwapVertical(Value *const value, const Twine &instName) {
   if (supportDpp())
-    return createDppMov(value, DppCtrl::DppQuadPerm2301, 0xF, 0xF, true);
-  else
-    return createDsSwizzle(value, getDsSwizzleQuadMode(2, 3, 0, 1));
+    return createWqm(createDppMov(value, DppCtrl::DppQuadPerm2301, 0xF, 0xF, true));
+
+  return createWqm(createDsSwizzle(value, getDsSwizzleQuadMode(2, 3, 0, 1)));
 }
 
 // =====================================================================================================================
@@ -1038,9 +1035,9 @@ Value *SubgroupBuilder::CreateSubgroupQuadSwapVertical(Value *const value, const
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupQuadSwapDiagonal(Value *const value, const Twine &instName) {
   if (supportDpp())
-    return createDppMov(value, DppCtrl::DppQuadPerm3210, 0xF, 0xF, true);
-  else
-    return createDsSwizzle(value, getDsSwizzleQuadMode(3, 2, 1, 0));
+    return createWqm(createDppMov(value, DppCtrl::DppQuadPerm3210, 0xF, 0xF, true));
+
+  return createWqm(createDsSwizzle(value, getDsSwizzleQuadMode(3, 2, 1, 0)));
 }
 
 // =====================================================================================================================
@@ -1356,6 +1353,22 @@ Value *SubgroupBuilder::createWwm(Value *const value) {
   };
 
   return CreateMapToInt32(mapFunc, value, {});
+}
+
+// =====================================================================================================================
+// Create a call to WQM (whole quad mode).
+// Only in fragment shader stage.
+//
+// @param value : The value to pass to the soft WQM call.
+Value *SubgroupBuilder::createWqm(Value *const value) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
+    return builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, mappedArgs[0]);
+  };
+
+  if (m_shaderStage == ShaderStageFragment)
+    return CreateMapToInt32(mapFunc, value, {});
+
+  return value;
 }
 
 // =====================================================================================================================
