@@ -3197,7 +3197,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(SPIRV
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAll(predicate, m_moduleUsage->useHelpInvocation);
+  return getBuilder()->CreateSubgroupAll(predicate);
 }
 
 // =====================================================================================================================
@@ -3212,7 +3212,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(SPIRV
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAny(predicate, m_moduleUsage->useHelpInvocation);
+  return getBuilder()->CreateSubgroupAny(predicate);
 }
 
 // =====================================================================================================================
@@ -3227,7 +3227,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAllEqual(value, m_moduleUsage->useHelpInvocation);
+  return getBuilder()->CreateSubgroupAllEqual(value);
 }
 
 // =====================================================================================================================
@@ -3666,7 +3666,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllKHR>(SPIRVValu
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[0], func, block);
-  return getBuilder()->CreateSubgroupAll(predicate, m_moduleUsage->useHelpInvocation);
+  return getBuilder()->CreateSubgroupAll(predicate);
 }
 
 // =====================================================================================================================
@@ -3680,7 +3680,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSubgroupAnyKHR>(SPIRVValu
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[0], func, block);
-  return getBuilder()->CreateSubgroupAny(predicate, m_moduleUsage->useHelpInvocation);
+  return getBuilder()->CreateSubgroupAny(predicate);
 }
 
 // =====================================================================================================================
@@ -3694,7 +3694,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllEqualKHR>(SPIR
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[0], func, block);
-  return getBuilder()->CreateSubgroupAllEqual(value, m_moduleUsage->useHelpInvocation);
+  return getBuilder()->CreateSubgroupAllEqual(value);
 }
 
 // =====================================================================================================================

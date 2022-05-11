@@ -98,22 +98,6 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       }
       break;
     }
-    case OpDPdx:
-    case OpDPdy:
-    case OpDPdxCoarse:
-    case OpDPdyCoarse:
-    case OpDPdxFine:
-    case OpDPdyFine:
-    case OpImageSampleImplicitLod:
-    case OpImageSampleDrefImplicitLod:
-    case OpImageSampleProjImplicitLod:
-    case OpImageSampleProjDrefImplicitLod:
-    case OpImageSparseSampleImplicitLod:
-    case OpImageSparseSampleProjDrefImplicitLod:
-    case OpImageSparseSampleProjImplicitLod: {
-      shaderModuleUsage.useHelpInvocation = true;
-      break;
-    }
     case OpSpecConstantTrue:
     case OpSpecConstantFalse:
     case OpSpecConstant:

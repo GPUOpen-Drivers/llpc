@@ -453,7 +453,6 @@ struct ShaderModuleUsage {
   bool enableVarPtrStorageBuf; ///< Whether to enable "VariablePointerStorageBuffer" capability
   bool enableVarPtr;           ///< Whether to enable "VariablePointer" capability
   bool useSubgroupSize;        ///< Whether gl_SubgroupSize is used
-  bool useHelpInvocation;      ///< Whether fragment shader has helper-invocation for subgroup
   bool useSpecConstant;        ///< Whether specialization constant is used
   bool keepUnusedFunctions;    ///< Whether to keep unused function
   bool useIsNan;               ///< Whether IsNan is used

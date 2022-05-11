@@ -790,13 +790,13 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateSubgroupElect();
   }
   case BuilderRecorder::Opcode::SubgroupAll: {
-    return m_builder->CreateSubgroupAll(args[0], cast<ConstantInt>(args[1])->getZExtValue() != 0);
+    return m_builder->CreateSubgroupAll(args[0]);
   }
   case BuilderRecorder::Opcode::SubgroupAny: {
-    return m_builder->CreateSubgroupAny(args[0], cast<ConstantInt>(args[1])->getZExtValue() != 0);
+    return m_builder->CreateSubgroupAny(args[0]);
   }
   case BuilderRecorder::Opcode::SubgroupAllEqual: {
-    return m_builder->CreateSubgroupAllEqual(args[0], cast<ConstantInt>(args[1])->getZExtValue() != 0);
+    return m_builder->CreateSubgroupAllEqual(args[0]);
   }
   case BuilderRecorder::Opcode::SubgroupBroadcast: {
     return m_builder->CreateSubgroupBroadcast(args[0], args[1]);
