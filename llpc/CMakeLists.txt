@@ -160,15 +160,15 @@ endif()
 
 target_include_directories(llpc
     PUBLIC
-        ${PROJECT_SOURCE_DIR}/include
+        include
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/context
-        ${PROJECT_SOURCE_DIR}/lower
-        ${PROJECT_SOURCE_DIR}/translator/include
-        ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
-        ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
-        ${PROJECT_SOURCE_DIR}/util
-        ${PROJECT_SOURCE_DIR}/../util
+        context
+        lower
+        translator/include
+        translator/lib/SPIRV
+        translator/lib/SPIRV/libSPIRV
+        util
+        ../util
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
