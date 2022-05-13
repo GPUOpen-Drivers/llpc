@@ -1818,10 +1818,12 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   if (compIdx)
     startChannel = cast<ConstantInt>(compIdx)->getZExtValue();
 
-  Value *loc = ConstantInt::get(Type::getInt32Ty(*m_context), location);
+  Value *loc = nullptr;
   if (locOffset) {
-    loc = BinaryOperator::CreateAdd(loc, locOffset, "", insertPos);
+    loc = ConstantInt::get(Type::getInt32Ty(*m_context), location + cast<ConstantInt>(locOffset)->getZExtValue());
     assert((startChannel + numChannels) <= 4);
+  } else {
+    loc = ConstantInt::get(Type::getInt32Ty(*m_context), location);
   }
 
   for (unsigned i = startChannel; i < startChannel + numChannels; ++i) {
