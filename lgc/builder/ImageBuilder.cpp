@@ -581,22 +581,26 @@ Value *ImageBuilder::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsi
     llvm_unreachable("Should never be called!");
     break;
   }
-  Value *fmaskTexel = CreateImageLoad(FixedVectorType::get(getInt32Ty(), 4), fmaskDim, flags, fmaskDesc, coord, nullptr,
-                                      instName + ".fmaskload");
 
-  // Calculate the sample number we would use if the F-mask descriptor format is valid.
-  Value *calcSampleNum = CreateExtractElement(fmaskTexel, uint64_t(0));
-  Value *shiftSampleNum = CreateShl(sampleNum, getInt32(2));
-  calcSampleNum = CreateLShr(calcSampleNum, shiftSampleNum);
-  calcSampleNum = CreateAnd(calcSampleNum, getInt32(15));
+  // When the shadow table is disabled, we don't need to load F-mask descriptor
+  if (m_pipelineState->getOptions().shadowDescriptorTable != ShadowDescriptorTableDisable) {
+    Value *fmaskTexel = CreateImageLoad(FixedVectorType::get(getInt32Ty(), 4), fmaskDim, flags, fmaskDesc, coord,
+                                        nullptr, instName + ".fmaskload");
 
-  // Check whether the F-mask descriptor has a BUF_DATA_FORMAT_INVALID (0) format (dword[1].bit[20-25]).
-  Value *fmaskFormat = CreateExtractElement(fmaskDesc, 1);
-  fmaskFormat = CreateAnd(fmaskFormat, getInt32(63 << 20));
-  Value *fmaskValidFormat = CreateICmpNE(fmaskFormat, getInt32(0));
+    // Calculate the sample number we would use if the F-mask descriptor format is valid.
+    Value *calcSampleNum = CreateExtractElement(fmaskTexel, uint64_t(0));
+    Value *shiftSampleNum = CreateShl(sampleNum, getInt32(2));
+    calcSampleNum = CreateLShr(calcSampleNum, shiftSampleNum);
+    calcSampleNum = CreateAnd(calcSampleNum, getInt32(15));
 
-  // Use that to select the calculated sample number or the provided one, then append that to the coordinates.
-  sampleNum = CreateSelect(fmaskValidFormat, calcSampleNum, sampleNum);
+    // Check whether the F-mask descriptor has a BUF_DATA_FORMAT_INVALID (0) format (dword[1].bit[20-25]).
+    Value *fmaskFormat = CreateExtractElement(fmaskDesc, 1);
+    fmaskFormat = CreateAnd(fmaskFormat, getInt32(63 << 20));
+    Value *fmaskValidFormat = CreateICmpNE(fmaskFormat, getInt32(0));
+
+    // Use that to select the calculated sample number or the provided one, then append that to the coordinates.
+    sampleNum = CreateSelect(fmaskValidFormat, calcSampleNum, sampleNum);
+  }
   sampleNum = CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
   static const int Idxs[] = {0, 1, 2, 3};
   coord = CreateShuffleVector(coord, sampleNum, ArrayRef<int>(Idxs).slice(0, dim == Dim2DArrayMsaa ? 4 : 3));
