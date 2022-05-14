@@ -431,42 +431,69 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
 bool PatchResourceCollect::checkGsOnChipValidity() {
   bool gsOnChip = true;
 
-  unsigned stageMask = m_pipelineState->getShaderStageMask();
   const bool hasTs =
-      ((stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0);
-  const bool hasGs = ((stageMask & shaderStageToMask(ShaderStageGeometry)) != 0);
+      m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
+  const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
 
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
   auto gsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
 
+  const GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+
   unsigned inVertsPerPrim = 0;
   bool useAdjacency = false;
-  switch (geometryMode.inputPrimitive) {
-  case InputPrimitives::Points:
-    inVertsPerPrim = 1;
-    break;
-  case InputPrimitives::Lines:
-    inVertsPerPrim = 2;
-    break;
-  case InputPrimitives::LinesAdjacency:
-    useAdjacency = true;
-    inVertsPerPrim = 4;
-    break;
-  case InputPrimitives::Triangles:
-    inVertsPerPrim = 3;
-    break;
-  case InputPrimitives::TrianglesAdjacency:
-    useAdjacency = true;
-    inVertsPerPrim = 6;
-    break;
-  default:
-    llvm_unreachable("Should never be called!");
-    break;
+
+  if (hasGs) {
+    switch (geometryMode.inputPrimitive) {
+    case InputPrimitives::Points:
+      inVertsPerPrim = 1;
+      break;
+    case InputPrimitives::Lines:
+      inVertsPerPrim = 2;
+      break;
+    case InputPrimitives::LinesAdjacency:
+      useAdjacency = true;
+      inVertsPerPrim = 4;
+      break;
+    case InputPrimitives::Triangles:
+      inVertsPerPrim = 3;
+      break;
+    case InputPrimitives::TrianglesAdjacency:
+      useAdjacency = true;
+      inVertsPerPrim = 6;
+      break;
+    default:
+      llvm_unreachable("Unexpected input primitive type!");
+      break;
+    }
+
+    gsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
+  } else if (hasTs) {
+    inVertsPerPrim = m_pipelineState->getInputAssemblyState().patchControlPoints;
+  } else {
+    const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
+    switch (primType) {
+    case PrimitiveType::Point:
+      inVertsPerPrim = 1;
+      break;
+    case PrimitiveType::Line_List:
+    case PrimitiveType::Line_Strip:
+      inVertsPerPrim = 2;
+      break;
+    case PrimitiveType::Triangle_List:
+    case PrimitiveType::Triangle_Strip:
+    case PrimitiveType::Triangle_Fan:
+    case PrimitiveType::Triangle_List_Adjacency:
+    case PrimitiveType::Triangle_Strip_Adjacency:
+      inVertsPerPrim = 3;
+      break;
+    default:
+      llvm_unreachable("Unexpected primitive type!");
+      break;
+    }
   }
 
-  gsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
-
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 8) {
+  if (gfxIp.major <= 8) {
     unsigned gsPrimsPerSubgroup = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultPrimsPerSubgroup;
 
     const unsigned esGsRingItemSize = 4 * std::max(1u, gsResUsage->inOutUsage.inputMapLocCount);
@@ -639,49 +666,43 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       bool enableMaxVertOut = false;
 
       if (hasGs) {
-        // User-GS NGG only supports triangles.
-        constexpr unsigned vertsPerPrimitive = 3;
-
-        // NOTE: If primitive amplification is active and the currently calculated gsPrimsPerSubgroup multiplied
-        // by the amplification factor is larger than the supported number of primitives within a subgroup, we
-        // need to shrimp the number of gsPrimsPerSubgroup down to a reasonable level to prevent
-        // over-allocating LDS.
         unsigned maxVertOut = geometryMode.outputVertices;
         assert(maxVertOut >= primAmpFactor);
-        gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup / maxVertOut);
-
-        const uint32_t gsMaxLdsSize =
-            m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup;
-
-        // The equation for required LDS is:
-        // LDS allocation = (esGsRingItemSize * esVertsPerSubgroup) +
-        //                  (gsVsRingItemSize * gsInstanceCount * gsPrimsPerSubgroup) +
-        //                  extraLdsSize
-        gsPrimsPerSubgroup = std::min(
-            gsPrimsPerSubgroup, (gsMaxLdsSize - esExtraLdsSize - gsExtraLdsSize) /
-                                    ((esGsRingItemSize * vertsPerPrimitive) + (gsVsRingItemSize * gsInstanceCount)));
-
-        // Let's take into consideration instancing:
         assert(gsInstanceCount >= 1);
-        if (gsPrimsPerSubgroup < gsInstanceCount) {
-          // NOTE: If supported number of GS primitives within a subgroup is too small to allow GS
-          // instancing, we enable maximum vertex output per GS instance. This will set the register field
-          // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
-          // primitive per subgroup and create 1 subgroup per GS instance.
+
+        // Each input GS primitive can generate at most maxVertOut vertices. Each output vertex will be emitted
+        // from a different thread. Note that maxVertOut does not account for additional amplification due
+        // to GS instancing.
+        gsPrimsPerSubgroup =
+            std::max(1u, std::min(gsPrimsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup / (maxVertOut * gsInstanceCount)));
+
+        // NOTE: If one input GS primitive generates too many vertices (consider GS instancing) and they couldn't be
+        // within a NGG subgroup, we enable maximum vertex output per GS instance. This will set the register field
+        // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
+        // primitive per subgroup and create 1 subgroup per GS instance.
+        if ((maxVertOut * gsInstanceCount) > Gfx9::NggMaxThreadsPerSubgroup) {
           enableMaxVertOut = true;
           gsInstanceCount = 1;
           gsPrimsPerSubgroup = 1;
-        } else {
-          gsPrimsPerSubgroup /= gsInstanceCount;
         }
 
-        esVertsPerSubgroup = gsPrimsPerSubgroup * vertsPerPrimitive;
+        esVertsPerSubgroup = std::min(gsPrimsPerSubgroup * inVertsPerPrim, Gfx9::NggMaxThreadsPerSubgroup);
+
         if (hasTs)
           esVertsPerSubgroup = std::min(esVertsPerSubgroup, OptimalVerticesPerPrimitiveForTess * gsPrimsPerSubgroup);
+
+        // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
+        if (gfxIp >= GfxIpVersion{10, 3})
+          esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
+        else if (gfxIp >= GfxIpVersion{10, 1})
+          esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
       } else {
         // If GS is not present, instance count must be 1
         assert(gsInstanceCount == 1);
       }
+
+      // Make sure that we have at least one primitive.
+      gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
 
       unsigned expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
       unsigned expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
@@ -692,7 +713,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
       const unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
 
-      // In exceedingly rare circumstances, an NGG subgroup might calculate its LDS space requirements and overallocate.
+      // In exceedingly rare circumstances, a NGG subgroup might calculate its LDS space requirements and overallocate.
       // In those cases we need to scale down our esVertsPerSubgroup/gsPrimsPerSubgroup so that they'll fit in LDS.
       // In the following NGG calculation, we'll attempt to set esVertsPerSubgroup/gsPrimsPerSubgroup first and
       // then scale down if we overallocate LDS.
@@ -704,18 +725,38 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         if (hasTs)
           esVertToGsPrimRatio = std::min(esVertToGsPrimRatio, OptimalVerticesPerPrimitiveForTess * 1.0f);
 
+        // The equation for required LDS is:
+        // LDS allocation = (esGsRingItemSize * esVertsPerSubgroup) +
+        //                  (gsVsRingItemSize * gsInstanceCount * gsPrimsPerSubgroup) +
+        //                  extraLdsSize
         gsPrimsPerSubgroup =
             std::min(gsPrimsPerSubgroup, (maxHwGsLdsSizeDwords - esExtraLdsSize - gsExtraLdsSize) /
                                              (static_cast<unsigned>(esGsRingItemSize * esVertToGsPrimRatio) +
-                                              (gsVsRingItemSize * gsInstanceCount)));
+                                              gsVsRingItemSize * gsInstanceCount));
+
+        // NOTE: If one input GS primitive generates too many vertices (consider GS instancing) and they couldn't be
+        // within a NGG subgroup, we enable maximum vertex output per GS instance. This will set the register field
+        // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
+        // primitive per subgroup and create 1 subgroup per GS instance.
+        if (gsPrimsPerSubgroup < gsInstanceCount) {
+          enableMaxVertOut = true;
+          gsInstanceCount = 1;
+          gsPrimsPerSubgroup = 1;
+        }
 
         // Make sure that we have at least one primitive.
         gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
 
-        // esVertsPerPrimitive is the minimum number of vertices we must have per subgroup.
-        esVertsPerSubgroup = std::max(
-            m_pipelineState->getVerticesPerPrimitive(),
-            std::min(static_cast<unsigned>(gsPrimsPerSubgroup * esVertToGsPrimRatio), Gfx9::NggMaxThreadsPerSubgroup));
+        // inVertsPerPrim is the minimum number of vertices we must have per subgroup.
+        esVertsPerSubgroup =
+            std::max(inVertsPerPrim, std::min(static_cast<unsigned>(gsPrimsPerSubgroup * esVertToGsPrimRatio),
+                                              Gfx9::NggMaxThreadsPerSubgroup));
+
+        // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
+        if (gfxIp >= GfxIpVersion{10, 3})
+          esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
+        else if (gfxIp >= GfxIpVersion{10, 1})
+          esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
 
         // And then recalculate our LDS usage.
         expectedEsLdsSize = (esVertsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
@@ -729,8 +770,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       // Make sure that we have at least one primitive
       assert(gsPrimsPerSubgroup >= 1);
 
-      // HW has restriction on NGG + Tessellation where gsPrimsPerSubgroup must be >= 3.
-      assert(!hasTs || gsPrimsPerSubgroup >= 3);
+      // HW has restriction on NGG + Tessellation where gsPrimsPerSubgroup must be >= 3 unless we enable
+      // EN_MAX_VERT_OUT_PER_GS_INSTANCE.
+      assert(!hasTs || enableMaxVertOut || gsPrimsPerSubgroup >= 3);
 
       gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
       gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
