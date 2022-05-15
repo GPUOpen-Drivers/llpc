@@ -125,74 +125,51 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
                                     "// LLPC pipeline before-patching results\n"));
   }
 
-  // Run IPSCCP before EntryPointMutate to avoid adding unnecessary arguments to an entry point.
   passMgr.addPass(IPSCCPPass());
 
-  // Build null fragment shader if necessary
   passMgr.addPass(PatchNullFragShader());
+  passMgr.addPass(PatchResourceCollect()); // also removes inactive/unused resources
 
-  // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
-  passMgr.addPass(PatchResourceCollect());
-
-  // Check shader cache
+  // PatchCheckShaderCache depends on PatchResourceCollect
   passMgr.addPass(PatchCheckShaderCache(std::move(checkShaderCacheFunc)));
 
-  // Patch wave size adjusting heuristic
+  // First part of lowering to "AMDGCN-style"
   passMgr.addPass(PatchWaveSizeAdjust());
-
-  // Patch workarounds
   passMgr.addPass(PatchWorkarounds());
-
-  // Generate copy shader if necessary.
   passMgr.addPass(PatchCopyShader());
-
-  // Lower vertex fetch operations.
   passMgr.addPass(LowerVertexFetch());
-
-  // Lower fragment export operations.
   passMgr.addPass(LowerFragColorExport());
-
-  // Patch entry-point mutation
   passMgr.addPass(PatchEntryPointMutate());
-
-  // Patch workgroup memory initializaion.
   passMgr.addPass(PatchInitializeWorkgroupMemory());
-
-  // Patch input import and output export operations
   passMgr.addPass(PatchInOutImportExport());
 
-  // Prior to general optimization, do function inlining and dead function removal
+  // Prior to general optimization, do function inlining and dead function removal to remove helper functions that
+  // were introduced during lowering (e.g. streamout stores).
   passMgr.addPass(AlwaysInlinerPass());
   passMgr.addPass(GlobalDCEPass());
 
-  // Patch loop metadata
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
 
-  // Stop timer for patching passes and start timer for optimization passes.
   if (patchTimer) {
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
     LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
   }
 
-  // Prepare pipeline ABI but only set the calling conventions to AMDGPU ones for now.
   passMgr.addPass(PatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
 
-  // Add some optimization passes
   addOptimizationPasses(passMgr, optLevel);
 
-  // Stop timer for optimization passes and restart timer for patching passes.
   if (patchTimer) {
     LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
   }
 
-  // Fully prepare the pipeline ABI (must be after optimizations)
+  // Second part of lowering to "AMDGCN-style"
   passMgr.addPass(PatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
   const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
                          (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
   if (canUseNgg) {
-    // Stop timer for patching passes and restart timer for optimization passes.
     if (patchTimer) {
       LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
       LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
@@ -210,7 +187,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
     fpm.addPass(SimplifyCFGPass());
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
 
-    // Stop timer for optimization passes and restart timer for patching passes.
     if (patchTimer) {
       LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
       LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
