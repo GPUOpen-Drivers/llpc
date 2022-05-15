@@ -131,6 +131,9 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
   passMgr.addPass(PatchResourceCollect());
 
+  // Check shader cache
+  passMgr.addPass(PatchCheckShaderCache(std::move(checkShaderCacheFunc)));
+
   // Patch wave size adjusting heuristic
   passMgr.addPass(PatchWaveSizeAdjust());
 
@@ -164,9 +167,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
 
   // Patch loop metadata
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
-
-  // Check shader cache
-  passMgr.addPass(PatchCheckShaderCache(std::move(checkShaderCacheFunc)));
 
   // Stop timer for patching passes and start timer for optimization passes.
   if (patchTimer) {
