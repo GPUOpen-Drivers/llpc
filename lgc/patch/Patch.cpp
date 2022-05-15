@@ -125,7 +125,20 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
                                     "// LLPC pipeline before-patching results\n"));
   }
 
+  // Optimization *before* lowering to AMDGCN-style.
+  if (patchTimer) {
+    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
+    LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
+  }
+
   passMgr.addPass(IPSCCPPass());
+  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
+  addOptimizationPasses(passMgr, optLevel);
+
+  if (patchTimer) {
+    LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
+    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
+  }
 
   passMgr.addPass(PatchNullFragShader());
   passMgr.addPass(PatchResourceCollect()); // also removes inactive/unused resources
@@ -133,7 +146,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   // PatchCheckShaderCache depends on PatchResourceCollect
   passMgr.addPass(PatchCheckShaderCache(std::move(checkShaderCacheFunc)));
 
-  // First part of lowering to "AMDGCN-style"
+  // Lower to "AMDGCN-style"
   passMgr.addPass(PatchWaveSizeAdjust());
   passMgr.addPass(PatchWorkarounds());
   passMgr.addPass(PatchCopyShader());
@@ -142,60 +155,38 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   passMgr.addPass(PatchEntryPointMutate());
   passMgr.addPass(PatchInitializeWorkgroupMemory());
   passMgr.addPass(PatchInOutImportExport());
+  passMgr.addPass(PatchPreparePipelineAbi());
 
-  // Prior to general optimization, do function inlining and dead function removal to remove helper functions that
-  // were introduced during lowering (e.g. streamout stores).
-  passMgr.addPass(AlwaysInlinerPass());
-  passMgr.addPass(GlobalDCEPass());
+  passMgr.addPass(createModuleToFunctionPassAdaptor(PatchBufferOp()));
 
-  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
-
+  // Post-lowering "cleanup" optimizations.
   if (patchTimer) {
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
     LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
   }
 
-  addOptimizationPasses(passMgr, optLevel);
+  // Eliminate helper functions that were introduced during lowering (e.g. for streamout store, and for NGG) and
+  // finalize shader merging (gfx9+).
+  passMgr.addPass(AlwaysInlinerPass());
+  passMgr.addPass(GlobalDCEPass());
+
+  FunctionPassManager fpm;
+  const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
+                         (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
+  if (canUseNgg) {
+    fpm.addPass(PromotePass());
+    fpm.addPass(ADCEPass());
+  }
+  fpm.addPass(InstCombinePass());
+  fpm.addPass(SimplifyCFGPass());
+  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
 
   if (patchTimer) {
     LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
   }
 
-  // Second part of lowering to "AMDGCN-style"
-  passMgr.addPass(PatchPreparePipelineAbi());
-
-  const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
-                         (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
-  if (canUseNgg) {
-    if (patchTimer) {
-      LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
-      LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
-    }
-
-    // Extra optimizations after NGG primitive shader creation
-    passMgr.addPass(AlwaysInlinerPass());
-    passMgr.addPass(GlobalDCEPass());
-    FunctionPassManager fpm;
-    fpm.addPass(PromotePass());
-    fpm.addPass(ADCEPass());
-    fpm.addPass(PatchBufferOp());
-    fpm.addPass(SinkingPass());
-    fpm.addPass(InstCombinePass());
-    fpm.addPass(SimplifyCFGPass());
-    passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
-
-    if (patchTimer) {
-      LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
-      LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
-    }
-  } else {
-    FunctionPassManager fpm;
-    fpm.addPass(PatchBufferOp());
-    fpm.addPass(SinkingPass());
-    fpm.addPass(InstCombinePass(2));
-    passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
-  }
+  // Final fixups:
 
   // Set up target features in shader entry-points.
   // NOTE: Needs to be done after post-NGG function inlining, because LLVM refuses to inline something
