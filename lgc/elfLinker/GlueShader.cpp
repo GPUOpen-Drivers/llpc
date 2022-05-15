@@ -34,7 +34,7 @@
 #include "FetchShader.h"
 #include "NullFragmentShader.h"
 #include "lgc/state/PassManagerCache.h"
-#include "llvm/IR/LegacyPassManager.h"
+#include "llvm-dialects/Dialect/Dialect.h"
 
 using namespace lgc;
 using namespace llvm;
@@ -44,6 +44,8 @@ using namespace llvm;
 //
 // @param [in/out] outStream : Stream to write ELF to
 void GlueShader::compile(raw_pwrite_stream &outStream) {
+  auto dialectGuard = llvm_dialects::withDialects(m_lgcContext->getDialectContext());
+
   // Generate the glue shader IR module.
   std::unique_ptr<Module> module(generate());
 

@@ -51,6 +51,8 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     Vectorize
 )
 
+target_link_libraries(LLVMlgc PUBLIC llvm_dialects)
+
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" OFF)
 #if VKI_BUILD_GFX11
@@ -64,6 +66,20 @@ option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 ### Compiler Options ###################################################################################################
 include(../cmake/CompilerFlags.cmake)
 set_compiler_options(LLVMlgc ${LLPC_ENABLE_WERROR})
+
+### TableGen for LGC dialect ###########################################################################################
+
+set(LGC_TABLEGEN_EXE llvm-dialects-tblgen)
+set(LGC_TABLEGEN_TARGET llvm-dialects-tblgen)
+set(LLVM_TARGET_DEFINITIONS interface/lgc/LgcDialect.td)
+
+tablegen(LGC interface/lgc/LgcDialect.h.inc -gen-dialect-decls --dialect lgc
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include)
+tablegen(LGC state/LgcDialect.cpp.inc -gen-dialect-defs --dialect lgc
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include)
+add_public_tablegen_target(LgcDialectTableGen)
+
+add_dependencies(LLVMlgc LgcDialectTableGen)
 
 ### Defines/Includes/Sources ###########################################################################################
 target_compile_definitions(LLVMlgc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
@@ -114,10 +130,12 @@ endif()
 target_include_directories(LLVMlgc
 PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/interface>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/interface>
     $<INSTALL_INTERFACE:interface>
 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/imported
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 #if VKI_RAY_TRACING
@@ -203,6 +221,7 @@ endif()
 target_sources(LLVMlgc PRIVATE
     state/Compiler.cpp
     state/LgcContext.cpp
+    state/LgcDialect.cpp
     state/PalMetadata.cpp
     state/PassManagerCache.cpp
     state/PipelineShaders.cpp

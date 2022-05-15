@@ -30,6 +30,7 @@
  */
 #include "lgc/LgcContext.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/PassManager.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PassManagerCache.h"
@@ -255,6 +256,7 @@ LgcContext *LgcContext::create(LLVMContext &context, StringRef gpuName, unsigned
 // @param context : LLVM context to give each Builder
 // @param palAbiVersion : PAL pipeline ABI version to compile for
 LgcContext::LgcContext(LLVMContext &context, unsigned palAbiVersion) : m_context(context) {
+  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect>(context);
 }
 
 // =====================================================================================================================

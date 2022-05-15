@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,38 +24,13 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  BuilderCommon.h
- * @brief LLPC header file: declaration of BuilderCommon
+ * @file  LgcDialect.cpp
+ * @brief Implementation of the LGC dialect definition
  ***********************************************************************************************************************
  */
-#pragma once
 
-#include "llvm-dialects/Dialect/Builder.h"
-#include "llvm/IR/IRBuilder.h"
+#include "lgc/LgcDialect.h"
 
-namespace lgc {
-
-// =====================================================================================================================
-// BuilderCommon extends llvm_dialects::Builder, which extends llvm::IRBuilder<>, and provides a few utility methods
-// used in both the LLPC front-end and in LGC (the LLPC middle-end).
-// This class is used directly by passes in LGC.
-class BuilderCommon : public llvm_dialects::Builder {
-public:
-  // Constructors
-  BuilderCommon(llvm::LLVMContext &context) : llvm_dialects::Builder(context) {}
-  BuilderCommon(llvm::BasicBlock *block) : llvm_dialects::Builder(block) {}
-  BuilderCommon(llvm::Instruction *inst) : llvm_dialects::Builder(inst) {}
-
-  // Create an LLVM function call to the named function. The callee is built automatically based on return
-  // type and its parameters.
-  //
-  // @param funcName : Name of the callee
-  // @param retTy : Return type of the callee
-  // @param args : Arguments to pass to the callee
-  // @param attribs : Function attributes
-  // @param instName : Name to give instruction
-  llvm::CallInst *CreateNamedCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
-                                  llvm::ArrayRef<llvm::Attribute::AttrKind> attribs, const llvm::Twine &instName = "");
-};
-
-} // namespace lgc
+#define GET_INCLUDES
+#define GET_DIALECT_DEFS
+#include "state/LgcDialect.cpp.inc"
