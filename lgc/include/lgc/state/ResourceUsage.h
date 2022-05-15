@@ -371,7 +371,7 @@ struct ResourceUsage {
     struct {
       // Map from IDs of built-in outputs to locations of generic outputs (used by copy shader to export built-in
       // outputs to fragment shader, always from vertex stream 0)
-      std::unordered_map<unsigned, unsigned> builtInOutLocs;
+      std::map<unsigned, unsigned> builtInOutLocs;
 
       // Map from tightly packed locations to byte sizes of generic outputs (used by copy shader to
       // export generic outputs to fragment shader, always from vertex stream 0):

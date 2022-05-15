@@ -1059,10 +1059,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         auto viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
 
         auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-        auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+        const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
         assert(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
-        unsigned loc = builtInOutLocMap[BuiltInViewIndex];
+        unsigned loc = builtInOutLocMap.find(BuiltInViewIndex)->second;
 
         auto rasterStream = resUsage->inOutUsage.gs.rasterStream;
         storeValueToGsVsRing(viewIndex, loc, 0, rasterStream, &callInst);
@@ -1241,6 +1241,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
     useLayer = enableMultiView || useLayer;
 
+    const auto &builtInOutLocs =
+        m_shaderStage == ShaderStageCopyShader ? inOutUsage.gs.builtInOutLocs : inOutUsage.builtInOutputLocMap;
     const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
     if (nextStage == ShaderStageFragment) {
       useLayer |= nextBuiltInUsage.layer || nextBuiltInUsage.viewIndex;
@@ -1367,22 +1369,11 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       }
 
       if (hasClipCullExport) {
-        unsigned loc = InvalidValue;
-        if (m_shaderStage == ShaderStageCopyShader) {
-          if (inOutUsage.gs.builtInOutLocs.find(BuiltInClipDistance) != inOutUsage.gs.builtInOutLocs.end())
-            loc = inOutUsage.gs.builtInOutLocs[BuiltInClipDistance];
-          else {
-            assert(inOutUsage.gs.builtInOutLocs.find(BuiltInCullDistance) != inOutUsage.gs.builtInOutLocs.end());
-            loc = inOutUsage.gs.builtInOutLocs[BuiltInCullDistance];
-          }
-        } else {
-          if (inOutUsage.builtInOutputLocMap.find(BuiltInClipDistance) != inOutUsage.builtInOutputLocMap.end())
-            loc = inOutUsage.builtInOutputLocMap[BuiltInClipDistance];
-          else {
-            assert(inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end());
-            loc = inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
-          }
-        }
+        auto it = builtInOutLocs.find(BuiltInClipDistance);
+        if (it == builtInOutLocs.end())
+          it = builtInOutLocs.find(BuiltInCullDistance);
+        assert(it != builtInOutLocs.end());
+        const unsigned loc = it->second;
 
         recordVertexAttribExport(loc,
                                  {clipCullDistance[0], clipCullDistance[1], clipCullDistance[2], clipCullDistance[3]});
@@ -1408,14 +1399,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       }
 
       if (hasPrimitiveIdExport) {
-        unsigned loc = InvalidValue;
-        if (m_shaderStage == ShaderStageCopyShader) {
-          assert(inOutUsage.gs.builtInOutLocs.find(BuiltInPrimitiveId) != inOutUsage.gs.builtInOutLocs.end());
-          loc = inOutUsage.gs.builtInOutLocs[BuiltInPrimitiveId];
-        } else {
-          assert(inOutUsage.builtInOutputLocMap.find(BuiltInPrimitiveId) != inOutUsage.builtInOutputLocMap.end());
-          loc = inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId];
-        }
+        assert(builtInOutLocs.find(BuiltInPrimitiveId) != inOutUsage.gs.builtInOutLocs.end());
+        const unsigned loc = builtInOutLocs.find(BuiltInPrimitiveId)->second;
 
         assert(m_primitiveId);
         Value *primitiveId = new BitCastInst(m_primitiveId, Type::getFloatTy(*m_context), "", insertPos);
@@ -1469,14 +1454,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         }
 
         if (hasViewportIndexExport) {
-          unsigned loc = InvalidValue;
-          if (m_shaderStage == ShaderStageCopyShader) {
-            assert(inOutUsage.gs.builtInOutLocs.find(BuiltInViewportIndex) != inOutUsage.gs.builtInOutLocs.end());
-            loc = inOutUsage.gs.builtInOutLocs[BuiltInViewportIndex];
-          } else {
-            assert(inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) != inOutUsage.builtInOutputLocMap.end());
-            loc = inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
-          }
+          assert(builtInOutLocs.find(BuiltInViewportIndex) != builtInOutLocs.end());
+          const unsigned loc = builtInOutLocs.find(BuiltInViewportIndex)->second;
 
           Value *viewportIndex = new BitCastInst(m_viewportIndex, Type::getFloatTy(*m_context), "", insertPos);
 
@@ -1491,24 +1470,16 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           Value *layer = nullptr;
 
           if (nextBuiltInUsage.layer) {
-            if (m_shaderStage == ShaderStageCopyShader) {
-              assert(inOutUsage.gs.builtInOutLocs.find(BuiltInLayer) != inOutUsage.gs.builtInOutLocs.end());
-              loc = inOutUsage.gs.builtInOutLocs[BuiltInLayer];
-            } else {
-              assert(inOutUsage.builtInOutputLocMap.find(BuiltInLayer) != inOutUsage.builtInOutputLocMap.end());
-              loc = inOutUsage.builtInOutputLocMap[BuiltInLayer];
-            }
+            assert(builtInOutLocs.find(BuiltInLayer) != builtInOutLocs.end());
+            loc = builtInOutLocs.find(BuiltInLayer)->second;
+
             layer = new BitCastInst(m_layer, Type::getFloatTy(*m_context), "", insertPos);
           }
 
           if (nextBuiltInUsage.viewIndex) {
-            if (m_shaderStage == ShaderStageCopyShader) {
-              assert(inOutUsage.gs.builtInOutLocs.find(BuiltInViewIndex) != inOutUsage.gs.builtInOutLocs.end());
-              loc = inOutUsage.gs.builtInOutLocs[BuiltInViewIndex];
-            } else {
-              assert(inOutUsage.builtInOutputLocMap.find(BuiltInViewIndex) != inOutUsage.builtInOutputLocMap.end());
-              loc = inOutUsage.builtInOutputLocMap[BuiltInViewIndex];
-            }
+            assert(builtInOutLocs.find(BuiltInViewIndex) != builtInOutLocs.end());
+            loc = builtInOutLocs.find(BuiltInViewIndex)->second;
+
             if (enableMultiView)
               layer = new BitCastInst(m_layer, Type::getFloatTy(*m_context), "", insertPos);
             else
@@ -2084,13 +2055,13 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl)->entryArgIdxs.tcs;
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
-  auto &inoutUsage = resUsage->inOutUsage;
-  auto &builtInInLocMap = inoutUsage.builtInInputLocMap;
+  const auto &inoutUsage = resUsage->inOutUsage;
+  const auto &builtInInLocMap = inoutUsage.builtInInputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition: {
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
-    const unsigned loc = builtInInLocMap[builtInId];
+    const unsigned loc = builtInInLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsInput(inputTy, loc, nullptr, elemIdx, vertexIdx, insertPos);
     input = readValueFromLds(false, inputTy, ldsOffset, insertPos);
@@ -2100,7 +2071,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
   case BuiltInPointSize: {
     assert(!elemIdx);
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
-    const unsigned loc = builtInInLocMap[builtInId];
+    const unsigned loc = builtInInLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsInput(inputTy, loc, nullptr, nullptr, vertexIdx, insertPos);
     input = readValueFromLds(false, inputTy, ldsOffset, insertPos);
@@ -2110,7 +2081,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
   case BuiltInClipDistance:
   case BuiltInCullDistance: {
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
-    const unsigned loc = builtInInLocMap[builtInId];
+    const unsigned loc = builtInInLocMap.find(builtInId)->second;
 
     if (!elemIdx) {
       // gl_ClipDistanceIn[]/gl_CullDistanceIn[] is treated as 2 x vec4
@@ -2170,14 +2141,14 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes;
 
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
-  auto &inOutUsage = resUsage->inOutUsage;
-  auto &builtInInLocMap = inOutUsage.builtInInputLocMap;
-  auto &perPatchBuiltInInLocMap = inOutUsage.perPatchBuiltInInputLocMap;
+  const auto &inOutUsage = resUsage->inOutUsage;
+  const auto &builtInInLocMap = inOutUsage.builtInInputLocMap;
+  const auto &perPatchBuiltInInLocMap = inOutUsage.perPatchBuiltInInputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition: {
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
-    const unsigned loc = builtInInLocMap[builtInId];
+    const unsigned loc = builtInInLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, elemIdx, vertexIdx, insertPos);
     input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, insertPos);
@@ -2187,7 +2158,7 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
   case BuiltInPointSize: {
     assert(!elemIdx);
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
-    const unsigned loc = builtInInLocMap[builtInId];
+    const unsigned loc = builtInInLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, nullptr, vertexIdx, insertPos);
     input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, insertPos);
@@ -2197,7 +2168,7 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
   case BuiltInClipDistance:
   case BuiltInCullDistance: {
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
-    const unsigned loc = builtInInLocMap[builtInId];
+    const unsigned loc = builtInInLocMap.find(builtInId)->second;
 
     if (!elemIdx) {
       // gl_ClipDistanceIn[]/gl_CullDistanceIn[] is treated as 2 x vec4
@@ -2244,7 +2215,7 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
   case BuiltInTessLevelOuter:
   case BuiltInTessLevelInner: {
     assert(perPatchBuiltInInLocMap.find(builtInId) != perPatchBuiltInInLocMap.end());
-    unsigned loc = perPatchBuiltInInLocMap[builtInId];
+    unsigned loc = perPatchBuiltInInLocMap.find(builtInId)->second;
 
     if (!elemIdx) {
       // gl_TessLevelOuter[4] is treated as vec4
@@ -2290,16 +2261,16 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
   Value *input = nullptr;
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
-
-  unsigned loc = inOutUsage.builtInInputLocMap[builtInId];
-  assert(loc != InvalidValue);
+  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
 
   switch (builtInId) {
   case BuiltInPosition:
   case BuiltInPointSize:
   case BuiltInClipDistance:
   case BuiltInCullDistance: {
+    assert(inOutUsage.builtInInputLocMap.find(builtInId) != inOutUsage.builtInInputLocMap.end());
+    const unsigned loc = inOutUsage.builtInInputLocMap.find(builtInId)->second;
+    assert(loc != InvalidValue);
     input = loadValueFromEsGsRing(inputTy, loc, 0, vertexIdx, insertPos);
     break;
   }
@@ -2340,8 +2311,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
                                                          Instruction *insertPos) {
   Value *input = UndefValue::get(inputTy);
 
-  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
-  auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+  const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
+  const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->inOutUsage;
 
   Attribute::AttrKind attribs[] = {Attribute::ReadNone};
@@ -2818,9 +2789,9 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
                                                            Value *vertexIdx, Instruction *insertPos) {
   Value *output = UndefValue::get(outputTy);
 
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
-  auto &builtInUsage = resUsage->builtInUsage.tcs;
-  auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
+  const auto &builtInUsage = resUsage->builtInUsage.tcs;
+  const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition: {
@@ -2828,7 +2799,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
     (void(builtInUsage)); // unused
 
     assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-    unsigned loc = builtInOutLocMap[builtInId];
+    unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, insertPos);
     output = readValueFromLds(m_pipelineState->isTessOffChip(), outputTy, ldsOffset, insertPos);
@@ -2841,7 +2812,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
 
     assert(!elemIdx);
     assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-    unsigned loc = builtInOutLocMap[builtInId];
+    unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, nullptr, vertexIdx, insertPos);
     output = readValueFromLds(m_pipelineState->isTessOffChip(), outputTy, ldsOffset, insertPos);
@@ -2860,7 +2831,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
     }
 
     assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-    unsigned loc = builtInOutLocMap[builtInId];
+    unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     if (!elemIdx) {
       // gl_ClipDistance[]/gl_CullDistance[] is treated as 2 x vec4
@@ -2884,7 +2855,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
     assert(builtInUsage.tessLevelOuter);
     (void(builtInUsage)); // Unused
 
-    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
     auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
     // tessLevelOuter (float[4]) + tessLevelInner (float[2])
@@ -2916,7 +2887,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
     assert(builtInUsage.tessLevelInner);
     (void(builtInUsage)); // Unused
 
-    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
     auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
     // tessLevelOuter (float[4]) + tessLevelInner (float[2])
@@ -2963,9 +2934,9 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
 void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned builtInId, Instruction *insertPos) {
   auto outputTy = output->getType();
 
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
   auto &builtInUsage = resUsage->builtInUsage.vs;
-  auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+  const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition: {
@@ -2973,13 +2944,14 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
       return;
 
     if (m_hasTs) {
-      unsigned loc = builtInOutLocMap[builtInId];
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
       auto ldsOffset = calcLdsOffsetForVsOutput(outputTy, loc, 0, insertPos);
       writeValueToLds(false, output, ldsOffset, insertPos);
     } else {
       if (m_hasGs) {
         assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-        unsigned loc = builtInOutLocMap[builtInId];
+        unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
         storeValueToEsGsRing(output, loc, 0, insertPos);
       } else
@@ -3000,13 +2972,14 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     }
 
     if (m_hasTs) {
-      unsigned loc = builtInOutLocMap[builtInId];
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
       auto ldsOffset = calcLdsOffsetForVsOutput(outputTy, loc, 0, insertPos);
       writeValueToLds(false, output, ldsOffset, insertPos);
     } else {
       if (m_hasGs) {
         assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-        unsigned loc = builtInOutLocMap[builtInId];
+        unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
         storeValueToEsGsRing(output, loc, 0, insertPos);
       } else
@@ -3029,7 +3002,8 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     if (m_hasTs) {
       assert(outputTy->isArrayTy());
 
-      unsigned loc = builtInOutLocMap[builtInId];
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
       auto ldsOffset = calcLdsOffsetForVsOutput(outputTy->getArrayElementType(), loc, 0, insertPos);
 
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
@@ -3042,7 +3016,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     } else {
       if (m_hasGs) {
         assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-        unsigned loc = builtInOutLocMap[builtInId];
+        unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
         storeValueToEsGsRing(output, loc, 0, insertPos);
       } else {
@@ -3067,7 +3041,8 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     if (m_hasTs) {
       assert(outputTy->isArrayTy());
 
-      unsigned loc = builtInOutLocMap[builtInId];
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
       auto ldsOffset = calcLdsOffsetForVsOutput(outputTy->getArrayElementType(), loc, 0, insertPos);
 
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
@@ -3080,7 +3055,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     } else {
       if (m_hasGs) {
         assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-        unsigned loc = builtInOutLocMap[builtInId];
+        unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
         storeValueToEsGsRing(output, loc, 0, insertPos);
       } else {
@@ -3157,9 +3132,9 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
                                                          Value *vertexIdx, Instruction *insertPos) {
   auto outputTy = output->getType();
 
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
-  auto &builtInUsage = resUsage->builtInUsage.tcs;
-  auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
+  const auto &builtInUsage = resUsage->builtInUsage.tcs;
+  const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition: {
@@ -3167,7 +3142,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
       return;
 
     assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-    unsigned loc = builtInOutLocMap[builtInId];
+    unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, insertPos);
     writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, insertPos);
@@ -3180,7 +3155,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
 
     assert(!elemIdx);
     assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-    unsigned loc = builtInOutLocMap[builtInId];
+    unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, nullptr, vertexIdx, insertPos);
     writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, insertPos);
@@ -3194,7 +3169,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
       return;
 
     assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-    unsigned loc = builtInOutLocMap[builtInId];
+    unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     if (!elemIdx) {
       // gl_ClipDistance[]/gl_CullDistance[] is treated as 2 x vec4
@@ -3214,7 +3189,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
     break;
   }
   case BuiltInTessLevelOuter: {
-    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
     auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
     // tessLevelOuter (float[4]) + tessLevelInner (float[2])
@@ -3243,7 +3218,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
     break;
   }
   case BuiltInTessLevelInner: {
-    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
     auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
     // tessLevelOuter (float[4]) + tessLevelInner (float[2])
@@ -3286,9 +3261,9 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
 // @param builtInId : ID of the built-in variable
 // @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned builtInId, Instruction *insertPos) {
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
   auto &builtInUsage = resUsage->builtInUsage.tes;
-  auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+  const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition: {
@@ -3297,7 +3272,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 
     if (m_hasGs) {
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-      unsigned loc = builtInOutLocMap[builtInId];
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
       storeValueToEsGsRing(output, loc, 0, insertPos);
     } else
@@ -3318,7 +3293,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 
     if (m_hasGs) {
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-      unsigned loc = builtInOutLocMap[builtInId];
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
       storeValueToEsGsRing(output, loc, 0, insertPos);
     } else
@@ -3339,7 +3314,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 
     if (m_hasGs) {
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-      unsigned loc = builtInOutLocMap[builtInId];
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
       storeValueToEsGsRing(output, loc, 0, insertPos);
     } else {
@@ -3362,7 +3337,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 
     if (m_hasGs) {
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-      unsigned loc = builtInOutLocMap[builtInId];
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
       storeValueToEsGsRing(output, loc, 0, insertPos);
     } else {
@@ -3422,12 +3397,12 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 // @param insertPos : Where to insert the patch instruction
 void PatchInOutImportExport::patchGsBuiltInOutputExport(Value *output, unsigned builtInId, unsigned streamId,
                                                         Instruction *insertPos) {
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-  auto &builtInUsage = resUsage->builtInUsage.gs;
-  auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+  const auto &builtInUsage = resUsage->builtInUsage.gs;
+  const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-  unsigned loc = builtInOutLocMap[builtInId];
+  const unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
   switch (builtInId) {
   case BuiltInPosition:
@@ -3979,7 +3954,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
     writeIndex = CopyShaderUserSgprIdxWriteIndex;
     streamInfo = CopyShaderUserSgprIdxStreamInfo;
 
-    auto &inoutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+    const auto &inoutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
     unsigned streamOffset = CopyShaderUserSgprIdxStreamOffset;
 
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
@@ -5071,7 +5046,9 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
   assert(useExpInst);
   (void(useExpInst)); // unused
 
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  const auto &builtInOutLocs =
+      m_shaderStage == ShaderStageCopyShader ? inOutUsage.gs.builtInOutLocs : inOutUsage.builtInOutputLocMap;
 
   const auto undef = UndefValue::get(Type::getFloatTy(*m_context));
 
@@ -5142,19 +5119,9 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
     }
 
     if (hasLayerExport) {
-      unsigned loc = InvalidValue;
-      if (m_shaderStage == ShaderStageCopyShader) {
-        assert(inOutUsage.gs.builtInOutLocs.find(BuiltInLayer) != inOutUsage.gs.builtInOutLocs.end() ||
-               inOutUsage.gs.builtInOutLocs.find(BuiltInViewIndex) != inOutUsage.gs.builtInOutLocs.end());
-        loc = enableMultiView ? inOutUsage.gs.builtInOutLocs[BuiltInViewIndex]
-                              : inOutUsage.gs.builtInOutLocs[BuiltInLayer];
-      } else {
-        assert(inOutUsage.builtInOutputLocMap.find(BuiltInLayer) != inOutUsage.builtInOutputLocMap.end() ||
-               inOutUsage.builtInOutputLocMap.find(BuiltInViewIndex) != inOutUsage.builtInOutputLocMap.end());
-
-        loc = enableMultiView ? inOutUsage.builtInOutputLocMap[BuiltInViewIndex]
-                              : inOutUsage.builtInOutputLocMap[BuiltInLayer];
-      }
+      BuiltInKind exportBuiltInId = enableMultiView ? BuiltInViewIndex : BuiltInLayer;
+      assert(builtInOutLocs.find(exportBuiltInId) != builtInOutLocs.end());
+      const unsigned loc = builtInOutLocs.find(exportBuiltInId)->second;
 
       recordVertexAttribExport(loc, {layer, undef, undef, undef});
     }
@@ -5188,14 +5155,8 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
     }
 
     if (hasViewportIndexExport) {
-      unsigned loc = InvalidValue;
-      if (m_shaderStage == ShaderStageCopyShader) {
-        assert(inOutUsage.gs.builtInOutLocs.find(BuiltInViewportIndex) != inOutUsage.gs.builtInOutLocs.end());
-        loc = inOutUsage.gs.builtInOutLocs[BuiltInViewportIndex];
-      } else {
-        assert(inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) != inOutUsage.builtInOutputLocMap.end());
-        loc = inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
-      }
+      assert(builtInOutLocs.find(BuiltInViewportIndex) != builtInOutLocs.end());
+      const unsigned loc = builtInOutLocs.find(BuiltInViewportIndex)->second;
 
       recordVertexAttribExport(loc, {viewportIndex, undef, undef, undef});
     }
@@ -6081,7 +6042,7 @@ void PatchInOutImportExport::storeTessFactors() {
     break;
   }
 
-  auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
   auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
   // NOTE: We are going to read back tess factors from on-chip LDS. Make sure they have been stored already.
@@ -6116,12 +6077,12 @@ void PatchInOutImportExport::storeTessFactors() {
     //
     // Write tessellation factors to LDS if they are read as inputs by TES
     //
-    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
-    auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
+    const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
+    const auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
 
-    bool writeTessFactorToLds = perPatchBuiltInOutLocMap.count(BuiltInTessLevelOuter) > 0;
-    if (writeTessFactorToLds) {
-      const unsigned loc = perPatchBuiltInOutLocMap[BuiltInTessLevelOuter];
+    auto tessLevelOuterLocIt = perPatchBuiltInOutLocMap.find(BuiltInTessLevelOuter);
+    if (tessLevelOuterLocIt != perPatchBuiltInOutLocMap.end()) {
+      const unsigned loc = tessLevelOuterLocIt->second;
 
       for (unsigned i = 0; i < outerTessFactorCount; ++i) {
         auto ldsOffset =
@@ -6130,9 +6091,9 @@ void PatchInOutImportExport::storeTessFactors() {
       }
     }
 
-    writeTessFactorToLds = perPatchBuiltInOutLocMap.count(BuiltInTessLevelInner) > 0;
-    if (writeTessFactorToLds) {
-      const unsigned loc = perPatchBuiltInOutLocMap[BuiltInTessLevelInner];
+    auto tessLevelInnerLocIt = perPatchBuiltInOutLocMap.find(BuiltInTessLevelInner);
+    if (tessLevelInnerLocIt != perPatchBuiltInOutLocMap.end()) {
+      const unsigned loc = tessLevelInnerLocIt->second;
 
       for (unsigned i = 0; i < innerTessFactorCount; ++i) {
         auto ldsOffset =
