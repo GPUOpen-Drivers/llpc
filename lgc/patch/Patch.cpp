@@ -148,7 +148,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   // Run IPSCCP before EntryPointMutate to avoid adding unnecessary arguments to an entry point.
   passMgr.addPass(IPSCCPPass());
 
-  // Patch entry-point mutation (should be done before external library link)
+  // Patch entry-point mutation
   passMgr.addPass(PatchEntryPointMutate());
 
   // Patch workgroup memory initializaion.
