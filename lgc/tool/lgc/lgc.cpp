@@ -36,6 +36,7 @@
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/BinaryFormat/ELF.h"
@@ -251,6 +252,8 @@ int main(int argc, char **argv) {
     errs() << progName << ": GPU type '" << gpuName << "' not recognized\n";
     return 1;
   }
+
+  auto dialectGuard = llvm_dialects::withDialects(lgcContext->getDialectContext());
 
   if (VerboseOutput)
     lgcContext->setLlpcOuts(&outs());

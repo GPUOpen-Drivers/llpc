@@ -60,6 +60,7 @@
 #include "lgc/ElfLinker.h"
 #include "lgc/EnumIterator.h"
 #include "lgc/PassManager.h"
+#include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
@@ -1056,6 +1057,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   // Set up middle-end objects.
   LgcContext *builderContext = context->getLgcContext();
+  auto dialectGuard = llvm_dialects::withDialects(builderContext->getDialectContext());
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr,
                                                   pipelineLink == PipelineLink::Unlinked);
@@ -2315,6 +2317,7 @@ Result Compiler::buildRayTracingPipelineInternal(Context *context, ArrayRef<cons
 
   // Set up middle-end objects.
   LgcContext *builderContext = context->getLgcContext();
+  auto dialectGuard = llvm_dialects::withDialects(builderContext->getDialectContext());
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, unlinked);
   context->setBuilder(builderContext->createBuilder(&*pipeline));

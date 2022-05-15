@@ -45,7 +45,8 @@ endif()
 if(ICD_BUILD_LLPC)
     # Set LLVM options and build LLVM
     # Add LGC as an LLVM external project, but only if its CMakeLists.txt exists.
-    set(LLVM_EXTERNAL_PROJECTS lgc)
+    set(LLVM_EXTERNAL_PROJECTS llvm-dialects lgc)
+    set(LLVM_EXTERNAL_LLVM_DIALECTS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../imported/llvm-dialects)
     set(LLVM_EXTERNAL_LGC_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../lgc)
 
     # Set other LLVM settings.
