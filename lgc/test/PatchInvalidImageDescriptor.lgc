@@ -97,3 +97,5 @@ attributes #1 = { nounwind readonly }
 attributes #2 = { nounwind writeonly }
 
 !0 = !{i32 1}
+
+!lgc.unlinked = !{!0}
