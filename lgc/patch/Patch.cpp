@@ -125,6 +125,9 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
                                     "// LLPC pipeline before-patching results\n"));
   }
 
+  // Run IPSCCP before EntryPointMutate to avoid adding unnecessary arguments to an entry point.
+  passMgr.addPass(IPSCCPPass());
+
   // Build null fragment shader if necessary
   passMgr.addPass(PatchNullFragShader());
 
@@ -148,9 +151,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
 
   // Lower fragment export operations.
   passMgr.addPass(LowerFragColorExport());
-
-  // Run IPSCCP before EntryPointMutate to avoid adding unnecessary arguments to an entry point.
-  passMgr.addPass(IPSCCPPass());
 
   // Patch entry-point mutation
   passMgr.addPass(PatchEntryPointMutate());
