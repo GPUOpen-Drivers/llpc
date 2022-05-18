@@ -278,13 +278,8 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto arg = entryPoint->arg_begin();
 
   Value *offChipLdsBase = (arg + getSpecialSgprInputIndex(m_gfxIp, LsHs::OffChipLdsBase));
-  offChipLdsBase->setName("offChipLdsBase");
-
   Value *mergeWaveInfo = (arg + getSpecialSgprInputIndex(m_gfxIp, LsHs::MergedWaveInfo));
-  mergeWaveInfo->setName("mergeWaveInfo");
-
   Value *tfBufferBase = (arg + getSpecialSgprInputIndex(m_gfxIp, LsHs::TfBufferBase));
-  tfBufferBase->setName("tfBufferBase");
 
   arg += NumSpecialSgprInputs;
 
@@ -695,13 +690,8 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   auto arg = entryPoint->arg_begin();
 
   Value *gsVsOffset = (arg + getSpecialSgprInputIndex(m_gfxIp, EsGs::GsVsOffset, false));
-  gsVsOffset->setName("gsVsOffset");
-
   Value *mergedWaveInfo = (arg + getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo, false));
-  mergedWaveInfo->setName("mergedWaveInfo");
-
   Value *offChipLdsBase = (arg + getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase, false));
-  offChipLdsBase->setName("offChipLdsBase");
 
   arg += NumSpecialSgprInputs;
 

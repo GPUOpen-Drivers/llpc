@@ -82,7 +82,6 @@ public:
   unsigned getDerivedMatrixStride() const;
   SPIRVType *getCompositeElementType(size_t) const;
   SPIRVWord getCompositeElementCount() const;
-
   bool isTypeVoid() const;
   bool isTypeArray() const;
   bool isTypeRuntimeArray() const;

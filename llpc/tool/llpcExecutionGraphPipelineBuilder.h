@@ -24,46 +24,30 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  PatchImageOpCollect.h
- * @brief LLPC header file: contains declaration of class lgc::PatchImageOpCollect.
+ * @file  llpcExecutionGraphPipelineBuilder.h
+ * @brief LLPC header file: execution graph pipeline compilation logic for standalone LLPC compilers.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/state/PipelineState.h"
-#include "llvm/IR/PassManager.h"
-#include "llvm/Pass.h"
+#include "llpcPipelineBuilder.h"
 
-namespace lgc {
+namespace Llpc {
+namespace StandaloneCompiler {
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for image operations
-class PatchImageOpCollect : public llvm::PassInfoMixin<PatchImageOpCollect> {
+// Pipeline builder implementation for execution graph pipelines.
+class ExecutionGraphPipelineBuilder : public PipelineBuilder {
 public:
-  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  using PipelineBuilder::PipelineBuilder;
 
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
+  llvm::Error build() override;
 
-  static llvm::StringRef name() { return "Patch LLVM for image operation collecting"; }
+  uint64_t getPipelineHash(Vkgc::PipelineBuildInfo buildInfo) override;
+
+  // Builds execution graph pipeline and does linking. Returns the pipeline Elf.
+  llvm::Expected<llvm::SmallVector<Vkgc::BinaryData>> buildExeGraphPipeline();
+  llvm::Error outputElfs(const llvm::StringRef suppliedOutFile) override;
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for image operations
-class LegacyPatchImageOpCollect : public llvm::ModulePass {
-public:
-  LegacyPatchImageOpCollect();
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-
-  bool runOnModule(llvm::Module &module) override;
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchImageOpCollect(const LegacyPatchImageOpCollect &) = delete;
-  LegacyPatchImageOpCollect &operator=(const LegacyPatchImageOpCollect &) = delete;
-
-  PatchImageOpCollect m_impl;
-};
-
-} // namespace lgc
+} // namespace StandaloneCompiler
+} // namespace Llpc

@@ -332,4 +332,5 @@ void SPIRVTypeForwardPointer::decode(std::istream &I) {
   auto Decoder = getDecoder(I);
   Decoder >> Id >> SC;
 }
+
 } // namespace SPIRV

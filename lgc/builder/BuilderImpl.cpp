@@ -159,8 +159,8 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
       // Cast <4xi8> to i32
       input1 = CreateBitCast(input1, getInt32Ty());
       input2 = CreateBitCast(input2, getInt32Ty());
+      auto intrinsicDot4 = isSigned ? Intrinsic::amdgcn_sdot4 : Intrinsic::amdgcn_udot4;
       {
-        auto intrinsicDot4 = isSigned ? Intrinsic::amdgcn_sdot4 : Intrinsic::amdgcn_udot4;
         scalar = CreateIntrinsic(intrinsicDot4, {}, {input1, input2, accumulator, clamp}, nullptr, instName);
       }
     } else {

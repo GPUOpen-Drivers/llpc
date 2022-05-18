@@ -51,6 +51,7 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
                                  MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
     : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_stageMask(0),
       m_preRasterHasGs(false), m_activeStageCount(0) {
+
   setUnlinked(pipelineInfo->unlinked);
   // clang-format off
   const PipelineShaderInfo *shaderInfo[ShaderStageGfxCount] = {
