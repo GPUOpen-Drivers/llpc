@@ -160,6 +160,19 @@ and does not mean that the tests are effective.   If an existing test already
 covers the new code, that test should be updated to test for the new behaviour
 or a new test should be added.
 
+## Avoid binary data
+
+Git does not handle binary files well. Binary data is difficult to review,
+modify, and may mask licensing issues. For these reasons, we avoid adding
+binary data to the repository. We also prefer textual data representations
+over arrays of raw bytes/words in the source code.
+
+If your test requires binary inputs, replace them with textual inputs, or
+explain why the binary form is absolutely necessary. For example, you can
+store `.spvasm` inputs and assemble them at runtime instead of `.spv`
+binaries. Similarly, `msgpack` document inputs can stored as YAML strings
+and converted to `msgpack` objects at runtime.
+
 ## Useful things to know about Git
 
 Not all projects that use Git aim for commits as the logical unit of change,
