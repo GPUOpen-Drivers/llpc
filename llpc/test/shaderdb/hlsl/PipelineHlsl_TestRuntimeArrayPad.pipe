@@ -1,0 +1,337 @@
+; Check that the corner case that HLSL-derived shader that has a variable-sized array with struct-type element whose last member is variable-sized array.
+; The case can work well by not padding the outmost variable-sized array.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: @0 = external addrspace(7) global <{ [4294967295 x <{ i32, [4294967295 x float] }>] }>
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 53
+
+[VsSpirv]
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %4 "main"
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+          %8 = OpFunctionCall %void %6
+               OpReturn
+               OpFunctionEnd
+          %6 = OpFunction %void None %3
+          %7 = OpLabel
+               OpReturn
+               OpFunctionEnd
+
+[VsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[TcsSpirv]
+               OpCapability Tessellation
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationControl %4 "main" %gl_InvocationID %gl_TessLevelOuter %48
+               OpExecutionMode %4 OutputVertices 1
+               OpExecutionMode %4 Isolines
+               OpExecutionMode %4 SpacingFractionalOdd
+               OpExecutionMode %4 PointMode
+               OpDecorate %gl_InvocationID BuiltIn InvocationId
+               OpDecorate %gl_TessLevelOuter Patch
+               OpDecorate %gl_TessLevelOuter BuiltIn TessLevelOuter
+               OpMemberDecorate %_struct_46 0 NonWritable
+               OpMemberDecorate %_struct_46 0 Offset 0
+               OpDecorate %_struct_46 BufferBlock
+               OpDecorate %48 DescriptorSet 0
+               OpDecorate %48 Binding 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %uint_2 = OpConstant %uint 2
+%_arr_float_uint_2 = OpTypeArray %float %uint_2
+ %_struct_12 = OpTypeStruct %_arr_float_uint_2
+         %13 = OpTypeFunction %_struct_12
+     %uint_4 = OpConstant %uint 4
+     %uint_0 = OpConstant %uint 0
+%_ptr_Input_uint = OpTypePointer Input %uint
+%gl_InvocationID = OpVariable %_ptr_Input_uint Input
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+       %bool = OpTypeBool
+%_ptr_Function__struct_12 = OpTypePointer Function %_struct_12
+%_arr_float_uint_4 = OpTypeArray %float %uint_4
+%_ptr_Output__arr_float_uint_4 = OpTypePointer Output %_arr_float_uint_4
+%gl_TessLevelOuter = OpVariable %_ptr_Output__arr_float_uint_4 Output
+%_ptr_Function_float = OpTypePointer Function %float
+%_ptr_Output_float = OpTypePointer Output %float
+      %int_1 = OpConstant %int 1
+    %float_1 = OpConstant %float 1
+ %_struct_46 = OpTypeStruct %float
+%_ptr_Uniform__struct_46 = OpTypePointer Uniform %_struct_46
+         %48 = OpVariable %_ptr_Uniform__struct_46 Uniform
+%_ptr_Uniform_float = OpTypePointer Uniform %float
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+         %29 = OpVariable %_ptr_Function__struct_12 Function
+         %16 = OpFunctionCall %void %6
+               OpControlBarrier %uint_2 %uint_4 %uint_0
+         %21 = OpLoad %uint %gl_InvocationID
+         %25 = OpIEqual %bool %21 %int_0
+               OpSelectionMerge %27 None
+               OpBranchConditional %25 %26 %27
+         %26 = OpLabel
+         %30 = OpFunctionCall %_struct_12 %14
+               OpStore %29 %30
+         %35 = OpAccessChain %_ptr_Function_float %29 %int_0 %int_0
+         %36 = OpLoad %float %35
+         %38 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_0
+               OpStore %38 %36
+         %40 = OpAccessChain %_ptr_Function_float %29 %int_0 %int_1
+         %41 = OpLoad %float %40
+         %42 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_1
+               OpStore %42 %41
+               OpBranch %27
+         %27 = OpLabel
+               OpReturn
+               OpFunctionEnd
+          %6 = OpFunction %void None %3
+          %7 = OpLabel
+               OpReturn
+               OpFunctionEnd
+         %14 = OpFunction %_struct_12 None %13
+         %15 = OpLabel
+         %43 = OpVariable %_ptr_Function__struct_12 Function
+         %45 = OpAccessChain %_ptr_Function_float %43 %int_0 %int_0
+               OpStore %45 %float_1
+         %50 = OpAccessChain %_ptr_Uniform_float %48 %int_0
+         %51 = OpLoad %float %50
+         %52 = OpAccessChain %_ptr_Function_float %43 %int_0 %int_1
+               OpStore %52 %51
+         %53 = OpLoad %_struct_12 %43
+               OpReturnValue %53
+               OpFunctionEnd
+
+[TcsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[TesSpirv]
+               OpCapability Tessellation
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationEvaluation %4 "main" %21 %gl_TessCoord
+               OpDecorate %_runtimearr_float ArrayStride 4
+               OpMemberDecorate %_struct_17 0 Offset 0
+               OpMemberDecorate %_struct_17 1 Offset 4
+               OpDecorate %_runtimearr__struct_17 ArrayStride 8
+               OpMemberDecorate %_struct_19 0 Coherent
+               OpMemberDecorate %_struct_19 0 Offset 0
+               OpDecorate %_struct_19 BufferBlock
+               OpDecorate %21 DescriptorSet 0
+               OpDecorate %21 Binding 1
+               OpDecorate %gl_TessCoord Patch
+               OpDecorate %gl_TessCoord BuiltIn TessCoord
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v2float = OpTypeVector %float 2
+%_ptr_Function_v2float = OpTypePointer Function %v2float
+          %9 = OpTypeFunction %void %_ptr_Function_v2float
+        %int = OpTypeInt 32 1
+%_ptr_Function_int = OpTypePointer Function %int
+%_runtimearr_float = OpTypeRuntimeArray %float
+ %_struct_17 = OpTypeStruct %int %_runtimearr_float
+%_runtimearr__struct_17 = OpTypeRuntimeArray %_struct_17
+ %_struct_19 = OpTypeStruct %_runtimearr__struct_17
+%_ptr_Uniform__struct_19 = OpTypePointer Uniform %_struct_19
+         %21 = OpVariable %_ptr_Uniform__struct_19 Uniform
+      %int_0 = OpConstant %int 0
+%_ptr_Uniform_int = OpTypePointer Uniform %int
+      %int_1 = OpConstant %int 1
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+     %uint_0 = OpConstant %uint 0
+%_ptr_Function_float = OpTypePointer Function %float
+%_ptr_Uniform_float = OpTypePointer Uniform %float
+    %v3float = OpTypeVector %float 3
+%_ptr_Input_v3float = OpTypePointer Input %v3float
+%gl_TessCoord = OpVariable %_ptr_Input_v3float Input
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+         %36 = OpVariable %_ptr_Function_v2float Function
+         %44 = OpVariable %_ptr_Function_v2float Function
+         %40 = OpLoad %v3float %gl_TessCoord
+         %41 = OpCompositeExtract %float %40 0
+         %42 = OpCompositeExtract %float %40 1
+         %43 = OpCompositeConstruct %v2float %41 %42
+               OpStore %36 %43
+         %45 = OpLoad %v2float %36
+               OpStore %44 %45
+         %46 = OpFunctionCall %void %11 %44
+               OpReturn
+               OpFunctionEnd
+         %11 = OpFunction %void None %9
+         %10 = OpFunctionParameter %_ptr_Function_v2float
+         %12 = OpLabel
+         %15 = OpVariable %_ptr_Function_int Function
+         %24 = OpAccessChain %_ptr_Uniform_int %21 %int_0 %int_0 %int_0
+         %29 = OpAtomicIAdd %int %24 %uint_1 %uint_0 %int_1
+               OpStore %15 %29
+         %30 = OpLoad %int %15
+         %32 = OpAccessChain %_ptr_Function_float %10 %uint_0
+         %33 = OpLoad %float %32
+         %35 = OpAccessChain %_ptr_Uniform_float %21 %int_0 %int_0 %int_1 %30
+               OpStore %35 %33
+               OpReturn
+               OpFunctionEnd
+
+[TesInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[ResourceMapping]
+userDataNode[0].visibility = 2
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 0
+userDataNode[1].visibility = 16
+userDataNode[1].type = StreamOutTableVaPtr
+userDataNode[1].offsetInDwords = 2
+userDataNode[1].sizeInDwords = 1
+userDataNode[2].visibility = 12
+userDataNode[2].type = DescriptorTableVaPtr
+userDataNode[2].offsetInDwords = 4
+userDataNode[2].sizeInDwords = 1
+userDataNode[2].next[0].type = DescriptorBuffer
+userDataNode[2].next[0].offsetInDwords = 0
+userDataNode[2].next[0].sizeInDwords = 4
+userDataNode[2].next[0].set = 0x00000000
+userDataNode[2].next[0].binding = 0
+userDataNode[2].next[1].type = DescriptorBuffer
+userDataNode[2].next[1].offsetInDwords = 4
+userDataNode[2].next[1].sizeInDwords = 4
+userDataNode[2].next[1].set = 0x00000000
+userDataNode[2].next[1].binding = 1
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+patchControlPoints = 1
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 1
+rasterizerDiscardEnable = 1
+perSampleShading = 0
+numSamples = 1
+pixelShaderSamples = 0
+samplePatternIdx = 0
+usrClipPlaneMask = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+nggState.enableNgg = 1
+nggState.enableGsUse = 0
+nggState.forceCullingMode = 0
+nggState.compactMode = NggCompactDisable
+nggState.enableVertexReuse = 0
+nggState.enableBackfaceCulling = 1
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 1
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 256
+nggState.vertsPerSubgroup = 256
+dynamicVertexStride = 0
+enableUberFetchShader = 0
+enableEarlyCompile = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 1
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+options.shadowDescriptorTableUsage = Disable
+options.shadowDescriptorTablePtrHigh = 2
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 0
+options.extendedRobustness.nullDescriptor = 0
+options.optimizeTessFactor = 0
