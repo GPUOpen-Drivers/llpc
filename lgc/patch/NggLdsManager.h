@@ -107,7 +107,7 @@ private:
   PipelineState *m_pipelineState; // Pipeline state
   llvm::LLVMContext *m_context;   // LLVM context
 
-  llvm::GlobalValue *m_lds; // Global variable to model NGG LDS
+  llvm::Constant *m_ldsBasePtr; // The pointer to base of NGG LDS
 
   unsigned m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in bytes)
 

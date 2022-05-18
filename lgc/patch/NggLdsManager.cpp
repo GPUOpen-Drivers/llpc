@@ -124,8 +124,14 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
   //
   // Create global variable modeling LDS
   //
-  m_lds = LegacyPatch::getLdsVariable(m_pipelineState, module);
+  auto lds = LegacyPatch::getLdsVariable(m_pipelineState, module);
 
+  // Calculate LDS start offset
+  unsigned ldsStart = 0;
+
+  // Get the LDS pointer with the start offset
+  m_ldsBasePtr = ConstantExpr::getGetElementPtr(
+      lds->getValueType(), lds, ArrayRef<Constant *>({builder->getInt32(0), builder->getInt32(ldsStart)}));
   memset(&m_ldsRegionStart, InvalidValue, sizeof(m_ldsRegionStart)); // Initialized to invalid value (0xFFFFFFFF)
 
   //
@@ -319,9 +325,9 @@ Value *NggLdsManager::readValueFromLds(Type *readTy, Value *ldsOffset, bool useD
   }
 
   // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
-  assert(m_lds);
+  assert(m_ldsBasePtr);
   auto lds = ConstantExpr::getBitCast(
-      m_lds, PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
+      m_ldsBasePtr, PointerType::get(Type::getInt8Ty(*m_context), m_ldsBasePtr->getType()->getPointerAddressSpace()));
 
   Value *readPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), lds, ldsOffset);
   readPtr = m_builder->CreateBitCast(readPtr, PointerType::get(readTy, ADDR_SPACE_LOCAL));
@@ -346,9 +352,9 @@ void NggLdsManager::writeValueToLds(Value *writeValue, Value *ldsOffset, bool us
   }
 
   // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
-  assert(m_lds != nullptr);
+  assert(m_ldsBasePtr != nullptr);
   auto lds = ConstantExpr::getBitCast(
-      m_lds, PointerType::get(Type::getInt8Ty(*m_context), m_lds->getType()->getPointerAddressSpace()));
+      m_ldsBasePtr, PointerType::get(Type::getInt8Ty(*m_context), m_ldsBasePtr->getType()->getPointerAddressSpace()));
 
   Value *writePtr = m_builder->CreateGEP(m_builder->getInt8Ty(), lds, ldsOffset);
   writePtr = m_builder->CreateBitCast(writePtr, PointerType::get(writeTy, ADDR_SPACE_LOCAL));
@@ -369,7 +375,7 @@ void NggLdsManager::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomic
   // from byte offset.
   ldsOffset = m_builder->CreateLShr(ldsOffset, 2);
 
-  Value *atomicPtr = m_builder->CreateGEP(m_lds->getValueType(), m_lds, {m_builder->getInt32(0), ldsOffset});
+  Value *atomicPtr = m_builder->CreateGEP(m_builder->getInt32Ty(), m_ldsBasePtr, ldsOffset);
 
   auto atomicInst = m_builder->CreateAtomicRMW(atomicOp, atomicPtr, atomicValue, MaybeAlign(),
                                                AtomicOrdering::SequentiallyConsistent, SyncScope::System);

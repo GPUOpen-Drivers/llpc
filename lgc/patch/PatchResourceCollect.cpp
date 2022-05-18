@@ -41,6 +41,7 @@
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/BuilderBase.h"
 #include "lgc/util/Debug.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -711,7 +712,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
       unsigned ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
 
-      const unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
+      unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
 
       // In exceedingly rare circumstances, a NGG subgroup might calculate its LDS space requirements and overallocate.
       // In those cases we need to scale down our esVertsPerSubgroup/gsPrimsPerSubgroup so that they'll fit in LDS.

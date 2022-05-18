@@ -44,7 +44,6 @@ public:
                   MetroHash::Hash *cacheHash);
   virtual ~GraphicsContext();
 
-  // Checks whether the pipeline is graphics or compute
   virtual bool isGraphics() const override { return true; }
 
   // Gets pipeline shader info of the specified shader stage

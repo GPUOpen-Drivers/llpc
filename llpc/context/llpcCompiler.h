@@ -150,6 +150,9 @@ public:
 
   CachePair getInternalCaches() { return {m_cache, m_shaderCache.get()}; }
 
+  Context *acquireContext() const;
+  void releaseContext(Context *context) const;
+
 private:
   Compiler() = delete;
   Compiler(const Compiler &) = delete;
@@ -157,16 +160,12 @@ private:
 
   Result validatePipelineShaderInfo(const PipelineShaderInfo *shaderInfo) const;
 
-  Context *acquireContext() const;
-  void releaseContext(Context *context) const;
-
   bool runPasses(lgc::LegacyPassManager *passMgr, llvm::Module *module) const;
   bool runPasses(lgc::PassManager *passMgr, llvm::Module *module) const;
   bool linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context);
   bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo,
                                           const GraphicsPipelineBuildInfo *pipelineInfo);
   bool canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo);
-
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options
   GfxIpVersion m_gfxIp;                         // Graphics IP version info

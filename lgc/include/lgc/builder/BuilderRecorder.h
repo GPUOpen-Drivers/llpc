@@ -175,14 +175,6 @@ public:
     Determinant,
     MatrixInverse,
 
-    // Cooperative Matrix
-    CooperativeMatrixLoad,
-    CooperativeMatrixStore,
-    CooperativeMatrixConvert,
-    CooperativeMatrixBinaryOp,
-    CooperativeMatrixExtract,
-    CooperativeMatrixConstruct,
-
     // Misc.
     EmitVertex,
     EndPrimitive,
@@ -522,22 +514,6 @@ public:
                                   const llvm::Twine &instName = "") override final;
   llvm::Value *CreateDeterminant(llvm::Value *const matrix, const llvm::Twine &instName = "") override final;
   llvm::Value *CreateMatrixInverse(llvm::Value *const matrix, const llvm::Twine &instName = "") override final;
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Cooperative matrix operations
-  llvm::Value *CreateCooperativeMatrixLoad(llvm::Value *pointer, llvm::Value *stride, llvm::Value *colMajor,
-                                           llvm::Value *alignment, const llvm::Twine &instName = "") override final;
-  llvm::Value *CreateCooperativeMatrixStore(llvm::Value *pointer, llvm::Value *object, llvm::Value *stride,
-                                            llvm::Value *colMajor, llvm::Value *alignment,
-                                            const llvm::Twine &instName = "") override final;
-  llvm::Value *CreateCooperativeMatrixConvert(llvm::Value *source, llvm::Value *dest,
-                                              const llvm::Twine &instName = "") override final;
-  llvm::Value *CreateCooperativeMatrixBinaryOp(CooperativeMatrixArithOp coopMatArithOp, llvm::Value *operand1,
-                                               llvm::Value *operand2, const llvm::Twine &instName = "") override final;
-  llvm::Value *CreateCooperativeMatrixExtract(llvm::Value *coopMatRow, llvm::Value *index,
-                                              const llvm::Twine &instName = "") override final;
-  llvm::Value *CreateCooperativeMatrixConstruct(llvm::Value *coopMatRow, llvm::Value *constVal,
-                                                const llvm::Twine &instName = "") override final;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Subgroup operations

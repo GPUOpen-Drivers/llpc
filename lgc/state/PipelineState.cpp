@@ -258,7 +258,7 @@ void PipelineState::clearPalMetadata() {
 //
 // @param blob : MsgPack PAL metadata to merge
 // @param isGlueCode : True if the blob was generated for glue code.
-void PipelineState::mergePalMetadataFromBlob(llvm::StringRef blob, bool isGlueCode) {
+void PipelineState::mergePalMetadataFromBlob(StringRef blob, bool isGlueCode) {
   if (!m_palMetadata)
     m_palMetadata = new PalMetadata(this, blob);
   else
@@ -463,7 +463,7 @@ const ShaderOptions &PipelineState::getShaderOptions(ShaderStage stage) {
 void PipelineState::recordOptions(Module *module) {
   auto clientNamedMeta = module->getOrInsertNamedMetadata(ClientMetadataName);
   clientNamedMeta->clearOperands();
-  clientNamedMeta->addOperand(llvm::MDNode::get(module->getContext(), MDString::get(module->getContext(), m_client)));
+  clientNamedMeta->addOperand(MDNode::get(module->getContext(), MDString::get(module->getContext(), m_client)));
 
   if (unsigned unlinkedAsInt = unsigned(m_pipelineLink))
     setNamedMetadataToArrayOfInt32(module, unlinkedAsInt, UnlinkedMetadataName);

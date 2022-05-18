@@ -53,6 +53,7 @@ enum SpecialSgprInput : unsigned {
 
   // GFX9~GFX10
   SharedScratchOffset,
+
 };
 } // namespace LsHs
 
@@ -72,6 +73,7 @@ enum SpecialSgprInput : unsigned {
 
   // GFX10+
   MergedGroupInfo, // NGG
+
 };
 } // namespace EsGs
 
