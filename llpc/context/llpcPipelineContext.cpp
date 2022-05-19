@@ -244,11 +244,13 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
     // Give the graphics pipeline state to the middle-end.
     setGraphicsStateInPipeline(pipeline, hasher, stageMask);
   } else {
-    unsigned deviceIndex = static_cast<const ComputePipelineBuildInfo *>(getPipelineBuildInfo())->deviceIndex;
-    if (pipeline)
-      pipeline->setDeviceIndex(deviceIndex);
-    if (hasher)
-      hasher->Update(deviceIndex);
+    {
+      unsigned deviceIndex = static_cast<const ComputePipelineBuildInfo *>(getPipelineBuildInfo())->deviceIndex;
+      if (pipeline)
+        pipeline->setDeviceIndex(deviceIndex);
+      if (hasher)
+        hasher->Update(deviceIndex);
+    }
   }
 }
 

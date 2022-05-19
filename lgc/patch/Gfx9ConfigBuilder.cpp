@@ -49,9 +49,9 @@ using namespace Pal::Gfx9::Chip;
 // =====================================================================================================================
 // Builds PAL metadata for pipeline.
 void ConfigBuilder::buildPalMetadata() {
-  if (!m_pipelineState->isGraphics())
+  if (!m_pipelineState->isGraphics()) {
     buildPipelineCsRegConfig();
-  else {
+  } else {
     const bool hasTs = (m_hasTcs || m_hasTes);
     const bool enableNgg = m_pipelineState->getNggControl()->enableNgg;
 
@@ -1062,7 +1062,8 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   const auto tcsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
-  const auto &vsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+  const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+  const auto &vsBuiltInUsage = vsResUsage->builtInUsage.vs;
 
   unsigned floatMode = setupFloatingPointMode(shaderStage2 != ShaderStageInvalid ? shaderStage2 : shaderStage1);
   SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, floatMode);
@@ -1429,9 +1430,11 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   const auto ldsSizeDwordGranularityShift =
       m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
 
+  unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
+
   SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE,
-                calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
-  setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, calcFactor.gsOnChipLdsSize * 4);
+                ldsSizeInDwords >> ldsSizeDwordGranularityShift);
+  setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
   setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
   unsigned maxVertOut = std::max(1u, static_cast<unsigned>(geometryMode.outputVertices));

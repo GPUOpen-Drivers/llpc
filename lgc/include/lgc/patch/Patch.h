@@ -63,7 +63,6 @@ void initializeLegacyPatchWorkaroundsPass(PassRegistry &);
 void initializeLegacyPatchReadFirstLanePass(PassRegistry &);
 void initializeLegacyPatchWaveSizeAdjustPass(PassRegistry &);
 void initializeLegacyPatchInitializeWorkgroupMemoryPass(PassRegistry &);
-
 } // namespace llvm
 
 namespace lgc {
@@ -114,7 +113,6 @@ llvm::ModulePass *createLegacyPatchWorkarounds();
 llvm::FunctionPass *createLegacyPatchReadFirstLane();
 llvm::ModulePass *createLegacyPatchWaveSizeAdjust();
 llvm::ModulePass *createLegacyPatchInitializeWorkgroupMemory();
-
 class PipelineState;
 class PassManager;
 
