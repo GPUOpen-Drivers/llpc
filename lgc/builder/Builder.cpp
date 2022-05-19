@@ -220,6 +220,8 @@ Type *Builder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
     a4f32,
     af32,
     ai32,
+    av2i32,
+    av3i32,
     f32,
     i1,
     i32,
@@ -255,9 +257,15 @@ Type *Builder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
   // For ClipDistance and CullDistance, the shader determines the array size.
   case TypeCode::af32:
     return ArrayType::get(getFloatTy(), arraySize);
-  // For SampleMask, the shader determines the array size.
+  // For SampleMask and PrimitivePointIndices, the shader determines the array size.
   case TypeCode::ai32:
     return ArrayType::get(getInt32Ty(), arraySize);
+  // For PrimitiveLineIndices, the shader determines the array size.
+  case TypeCode::av2i32:
+    return ArrayType::get(FixedVectorType::get(getInt32Ty(), 2), arraySize);
+  // For PrimitiveTriangleIndices, the shader determines the array size.
+  case TypeCode::av3i32:
+    return ArrayType::get(FixedVectorType::get(getInt32Ty(), 3), arraySize);
   case TypeCode::f32:
     return getFloatTy();
   case TypeCode::i1:

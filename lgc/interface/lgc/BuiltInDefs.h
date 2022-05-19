@@ -105,5 +105,9 @@ BUILTIN(ViewIndex, 4440, N, VHDGP, i32)                  // View index
 BUILTIN(ViewportIndex, 10, MVDG, P, i32)                 // Viewport index
 BUILTIN(WorkgroupId, 26, N, TMC, v3i32)                  // ID of global workgroup
 BUILTIN(WorkgroupSize, 25, N, TMC, v3i32)                // Size of global workgroup
+BUILTIN(CullPrimitive, 5299, N, M, i1)                   // Whether primitive should be culled
+BUILTIN(PrimitivePointIndices, 5294, N, M, ai32)         // Array of indices of the vertices making up the points
+BUILTIN(PrimitiveLineIndices, 5295, N, M, av2i32)        // Array of indices of the vertices making up the lines
+BUILTIN(PrimitiveTriangleIndices, 5296, N, M, av3i32)    // Array of indices of the vertices making up the triangles
 
 // Reserved LGC internal built-ins
