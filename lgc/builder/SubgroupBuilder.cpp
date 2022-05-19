@@ -1195,15 +1195,15 @@ Value *SubgroupBuilder::createGroupArithmeticOperation(GroupArithOp groupArithOp
   case GroupArithOp::FMul:
     return CreateFMul(x, y);
   case GroupArithOp::SMin:
-    return CreateSelect(CreateICmpSLT(x, y), x, y);
+    return CreateBinaryIntrinsic(Intrinsic::smin, x, y);
   case GroupArithOp::UMin:
-    return CreateSelect(CreateICmpULT(x, y), x, y);
+    return CreateBinaryIntrinsic(Intrinsic::umin, x, y);
   case GroupArithOp::FMin:
     return CreateMinNum(x, y);
   case GroupArithOp::SMax:
-    return CreateSelect(CreateICmpSGT(x, y), x, y);
+    return CreateBinaryIntrinsic(Intrinsic::smax, x, y);
   case GroupArithOp::UMax:
-    return CreateSelect(CreateICmpUGT(x, y), x, y);
+    return CreateBinaryIntrinsic(Intrinsic::umax, x, y);
   case GroupArithOp::FMax:
     return CreateMaxNum(x, y);
   case GroupArithOp::And:
