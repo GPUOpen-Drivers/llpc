@@ -7,7 +7,7 @@
 ; SHADERTEST-LABEL: {{^//}} LLPC final ELF info
 ; SHADERTEST: {{^_amdgpu_cs_main:}}
 ; SHADERTEST-NEXT: BB0_0:
-; SHADERTEST-NEXT: s_mov_b32 {{s[0-9]*}}, descset_14@abs32@lo
+; SHADERTEST-NEXT: s_ashr_i32 {{s[0-9]*}}, descset_14@abs32@lo, 31
 ; The spill threshold in this case is 0 because it will have to load the descriptor from the root table.
 ; SHADERTEST: .spill_threshold: 0x0000000000000000
 ; END_SHADERTEST
@@ -17,7 +17,7 @@
 ; BEGIN_SHADERTEST2
 ; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST2 %s
 ; SHADERTEST2: 0000000000000000 <_amdgpu_cs_main>:
-; SHADERTEST2-NEXT: s_mov_b32 {{s[0-9]*}}, 0 // 000000000000
+; SHADERTEST2-NEXT: s_ashr_i32 {{s[0-9]*}}, 0, 31 // 000000000000
 ; END_SHADERTEST2
 
 [Version]
