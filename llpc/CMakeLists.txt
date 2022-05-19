@@ -75,6 +75,10 @@ if(ICD_BUILD_LLPC)
     set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
 #if _WIN32
     endif()
+
+    # This will greatly speed up debug builds because we won't be listing all the symbols with llvm-nm.
+    # Not supported on Linux so we can keep it inside Windows ifdef.
+    set(LLVM_BUILD_LLVM_C_DYLIB OFF CACHE BOOL Force)
 #endif
 
     if(EXISTS ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm)

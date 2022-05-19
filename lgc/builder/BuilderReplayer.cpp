@@ -762,26 +762,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderRecorder::Opcode::GetWaveSize: {
     return m_builder->CreateGetWaveSize();
   }
-  case BuilderRecorder::Opcode::CooperativeMatrixLoad: {
-    return m_builder->CreateCooperativeMatrixLoad(args[0], args[1], args[2], args[3]);
-  }
-  case BuilderRecorder::Opcode::CooperativeMatrixStore: {
-    return m_builder->CreateCooperativeMatrixStore(args[0], args[1], args[2], args[3], args[4]);
-  }
-  case BuilderRecorder::Opcode::CooperativeMatrixConvert: {
-    return m_builder->CreateCooperativeMatrixConvert(args[0], args[1]);
-  }
-  case BuilderRecorder::Opcode::CooperativeMatrixBinaryOp: {
-    Builder::CooperativeMatrixArithOp coopMatArithOp =
-        static_cast<Builder::CooperativeMatrixArithOp>(cast<ConstantInt>(args[0])->getZExtValue());
-    return m_builder->CreateCooperativeMatrixBinaryOp(coopMatArithOp, args[1], args[2]);
-  }
-  case BuilderRecorder::Opcode::CooperativeMatrixExtract: {
-    return m_builder->CreateCooperativeMatrixExtract(args[0], args[1]);
-  }
-  case BuilderRecorder::Opcode::CooperativeMatrixConstruct: {
-    return m_builder->CreateCooperativeMatrixConstruct(args[0], args[1]);
-  }
   // Replayer implementations of SubgroupBuilder methods
   case BuilderRecorder::Opcode::GetSubgroupSize: {
     return m_builder->CreateGetSubgroupSize();
