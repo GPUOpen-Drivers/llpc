@@ -49,7 +49,7 @@ Instruction *MiscBuilder::CreateEmitVertex(unsigned streamId) {
   // Get GsWaveId
   std::string callName = lgcName::InputImportBuiltIn;
   callName += "GsWaveId.i32.i32";
-  Value *gsWaveId = emitCall(callName, getInt32Ty(), getInt32(BuiltInWaveId), {}, &*GetInsertPoint());
+  Value *gsWaveId = emitCall(callName, getInt32Ty(), getInt32(BuiltInGsWaveId), {}, &*GetInsertPoint());
 
   // Do the sendmsg.
   // [9:8] = stream, [5:4] = 2 (emit), [3:0] = 2 (GS)
@@ -67,7 +67,7 @@ Instruction *MiscBuilder::CreateEndPrimitive(unsigned streamId) {
   // Get GsWaveId
   std::string callName = lgcName::InputImportBuiltIn;
   callName += "GsWaveId.i32.i32";
-  Value *gsWaveId = emitCall(callName, getInt32Ty(), getInt32(BuiltInWaveId), {}, &*GetInsertPoint());
+  Value *gsWaveId = emitCall(callName, getInt32Ty(), getInt32(BuiltInGsWaveId), {}, &*GetInsertPoint());
 
   // Do the sendmsg.
   // [9:8] = stream, [5:4] = 1 (cut), [3:0] = 2 (GS)
