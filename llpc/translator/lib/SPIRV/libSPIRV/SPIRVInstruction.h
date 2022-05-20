@@ -1449,12 +1449,12 @@ protected:
     if (getValue(Op)->isForward())
       return;
     if (isGenericNegateOpCode(OpCode)) {
-      SPIRVType *ResTy =
-          Type->isTypeVector() ? Type->getVectorComponentType() : Type;
-      SPIRVType *OpTy = Type->isTypeVector()
-                            ? getValueType(Op)->getVectorComponentType()
-                            : getValueType(Op);
-
+      SPIRVType *ResTy = nullptr;
+      SPIRVType *OpTy = nullptr;
+      {
+        ResTy = Type->isTypeVector() ? Type->getVectorComponentType() : Type;
+        OpTy = Type->isTypeVector() ? getValueType(Op)->getVectorComponentType() : getValueType(Op);
+      }
       (void)ResTy;
       (void)OpTy;
       // NOTE: SPIR-V spec only request OpFNegate to match the type between Operand and Result.
@@ -2635,8 +2635,8 @@ _SPIRV_OP(SUDotAccSatKHR, true, 6, true, 3)
 
 SPIRVSpecConstantOp *createSpecConstantOpInst(SPIRVInstruction *Inst);
 SPIRVInstruction *createInstFromSpecConstantOp(SPIRVSpecConstantOp *C);
-SPIRVValue *createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
-  uint32_t RoundingTypeMask);
+SPIRVValue *createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst, uint32_t RoundingTypeMask);
+
 } // namespace SPIRV
 
 #endif

@@ -338,7 +338,7 @@ private:
   FastMathFlags getFastMathFlags(SPIRVValue *bv);
   void setFastMathFlags(SPIRVValue *bv);
   void setFastMathFlags(Value *val);
-  BinaryOperator *transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
+  llvm::Value *transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
   Instruction *transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
 
   void setName(llvm::Value *v, SPIRVValue *bv);
@@ -355,7 +355,6 @@ private:
                                              std::function<Value *(Value *)> createImageOp);
 
   Function *createLibraryEntryFunc();
-
   // ========================================================================================================================
   // Wrapper method for easier access to pipeline options.
   // @returns : Pointer to the pipeline options of the current LLPC context.

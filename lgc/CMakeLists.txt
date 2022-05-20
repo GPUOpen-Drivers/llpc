@@ -56,7 +56,6 @@ option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" OFF)
 option(LLPC_BUILD_NAVI22 "LLPC support for NAVI22?" OFF)
 option(LLPC_BUILD_NAVI23 "LLPC support for NAVI23?" OFF)
 option(LLPC_BUILD_NAVI24 "LLPC support for NAVI24?" OFF)
-
 option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 ### Compiler Options ###################################################################################################

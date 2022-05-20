@@ -911,6 +911,7 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
   auto srcType = src->getType();
   auto dstType = transType(bc->getType());
   CastInst::CastOps co = Instruction::BitCast;
+
   bool isExt = dstType->getScalarSizeInBits() > srcType->getScalarSizeInBits();
   switch (bc->getOpCode()) {
   case OpSConvert:
@@ -931,7 +932,6 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
   else {
     assert(CastInst::isCast(co) && "Invalid cast op code");
     if (bb) {
-
       bool srcIsPtr = srcType->isPtrOrPtrVectorTy();
       bool dstIsPtr = dstType->isPtrOrPtrVectorTy();
       // OpBitcast in SPIR-V allows casting between pointers and integers (and integer vectors),
@@ -1072,7 +1072,7 @@ void SPIRVToLLVM::setFastMathFlags(Value *val) {
   }
 }
 
-BinaryOperator *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f) {
+Value *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f) {
   SPIRVBinary *bbn = static_cast<SPIRVBinary *>(bv);
   assert(bb && "Invalid BB");
   Instruction::BinaryOps bo;
@@ -1247,7 +1247,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
           Value *const pointer = valueMap[load->getPointerOperand()];
           Type *const pointerType = pointer->getType();
-          Type *const pointerEltType = pointerType->getScalarType()->getPointerElementType();
+          Type *const pointerElemType = pointerType->getScalarType()->getPointerElementType();
 
           // If the remapped pointer type isn't a pointer, it's a vector of pointers instead.
           if (!pointerType->isPointerTy()) {
@@ -1271,7 +1271,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             }
 
             load->replaceAllUsesWith(newLoad);
-          } else if (isTypeWithPadRowMajorMatrix(pointerEltType)) {
+          } else if (isTypeWithPadRowMajorMatrix(pointerElemType)) {
             Type *const newRowType = FixedVectorType::get(matrixElementType, columnCount);
             Type *const newLoadType = ArrayType::get(newRowType, rowCount);
             Value *newLoad = UndefValue::get(newLoadType);
@@ -1279,7 +1279,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             // If we are loading a full row major matrix, need to load the rows and then transpose.
             for (unsigned i = 0; i < rowCount; i++) {
               Value *pointerElem = getBuilder()->CreateGEP(
-                  pointerEltType, pointer,
+                  pointerElemType, pointer,
                   {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
               Type *castType = pointerElem->getType()->getPointerElementType();
               assert(castType->isArrayTy());
@@ -1323,7 +1323,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
           Value *const pointer = valueMap[store->getPointerOperand()];
           Type *const pointerType = pointer->getType();
-          Type *const pointerEltType = pointer->getType()->getScalarType()->getPointerElementType();
+          Type *const pointerElemType = pointer->getType()->getScalarType()->getPointerElementType();
 
           // If the remapped pointer type isn't a pointer, it's a vector of pointers instead.
           if (!pointerType->isPointerTy()) {
@@ -1347,7 +1347,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
               if (store->getMetadata(LLVMContext::MD_nontemporal))
                 transNonTemporalMetadata(newStoreElem);
             }
-          } else if (isTypeWithPadRowMajorMatrix(pointerEltType)) {
+          } else if (isTypeWithPadRowMajorMatrix(pointerElemType)) {
             Value *storeValue = store->getValueOperand();
 
             Type *const storeType = storeValue->getType();
@@ -1380,7 +1380,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             // If we are storing a full row major matrix, need to transpose then store the rows.
             for (unsigned i = 0; i < rowCount; i++) {
               Value *pointerElem = getBuilder()->CreateGEP(
-                  pointerEltType, pointer,
+                  pointerElemType, pointer,
                   {getBuilder()->getInt32(0), getBuilder()->getInt32(i), getBuilder()->getInt32(0)});
               Type *castType = pointerElem->getType()->getPointerElementType();
               assert(castType->isArrayTy());
@@ -2853,11 +2853,15 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     }
 
     // Do the final index if we have one.
-    Type *const newBaseEltType = newBase->getType()->getScalarType()->getPointerElementType();
-    if (spvAccessChain->isInBounds())
-      return getBuilder()->CreateInBoundsGEP(newBaseEltType, newBase, indices);
-    else
-      return getBuilder()->CreateGEP(newBaseEltType, newBase, indices);
+    Type *newBaseEltType = newBase->getType()->getScalarType()->getPointerElementType();
+    Value *resultValue = nullptr;
+    if (spvAccessChain->isInBounds()) {
+      resultValue = getBuilder()->CreateInBoundsGEP(newBaseEltType, newBase, indices);
+    } else {
+      resultValue = getBuilder()->CreateGEP(newBaseEltType, newBase, indices);
+    }
+
+    return resultValue;
   } else {
     Type *const baseEltType = base->getType()->getScalarType()->getPointerElementType();
     if (spvAccessChain->isInBounds())
@@ -4051,7 +4055,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesScalar>(SPIRVV
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const matrix = transValue(spvOperands[0], func, block);
   Value *const scalar = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateMatrixTimesScalar(matrix, scalar);
+  { return getBuilder()->CreateMatrixTimesScalar(matrix, scalar); }
 }
 
 // =====================================================================================================================
@@ -6557,6 +6561,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   // Shader modes contain also data for other modules (subgroup size usage), so query it in the pipeline context.
   auto pipelineContext = (static_cast<Llpc::Context *>(m_context))->getPipelineContext();
   unsigned subgroupSizeUsage = pipelineContext->getSubgroupSizeUsage();
+
   if (pipelineContext->isGraphics() && subgroupSizeUsage) {
     for (lgc::ShaderStage stage : lgc::enumRange<lgc::ShaderStage>()) {
       if (subgroupSizeUsage & (1 << stage)) {
@@ -6612,6 +6617,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
       // NOTE: Constant folding is applied to OpSpecConstantOp because at this
       // time, specialization info is obtained and all specialization constants
       // get their own finalized specialization values.
+
       auto bi = static_cast<SPIRVSpecConstantOp *>(bv);
       bv = createValueFromSpecConstantOp(bi, m_fpControlFlags.RoundingModeRTE);
       bi->mapToConstant(bv);
@@ -6853,7 +6859,7 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.workgroupSizeY = workgroupSizeY;
           computeMode.workgroupSizeZ = workgroupSizeZ;
           getBuilder()->setComputeShaderMode(computeMode);
-          // clang-format on
+        // clang-format on
       } else
         llvm_unreachable("Invalid execution model");
 

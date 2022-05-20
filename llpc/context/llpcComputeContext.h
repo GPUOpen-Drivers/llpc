@@ -45,7 +45,6 @@ public:
   // Gets pipeline shader info of the specified shader stage
   virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const override;
 
-  // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
 
   // Gets the mask of active shader stages bound to this pipeline
