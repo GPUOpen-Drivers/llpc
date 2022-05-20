@@ -3176,7 +3176,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
 
   // Initialize thread ID in subgroup
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
-  auto waveId = getFunctionArgument(gsEntryPoint, entryArgIdxs.waveId);
+  auto waveId = getFunctionArgument(gsEntryPoint, entryArgIdxs.gsWaveId);
 
   auto threadIdInSubgroup = m_builder->CreateMul(waveId, m_builder->getInt32(waveSize));
   threadIdInSubgroup = m_builder->CreateAdd(threadIdInSubgroup, threadIdInWave);

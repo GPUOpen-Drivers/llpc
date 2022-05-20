@@ -506,7 +506,7 @@ struct InterfaceData {
       // Geometry shader
       struct {
         unsigned gsVsOffset;                      // GS -> VS ring offset
-        unsigned waveId;                          // GS wave ID
+        unsigned gsWaveId;                        // GS wave ID
         unsigned esGsOffsets[MaxEsGsOffsetCount]; // ES -> GS ring offset
         unsigned primitiveId;                     // Primitive ID
         unsigned invocationId;                    // Invocation ID

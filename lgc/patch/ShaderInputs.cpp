@@ -420,7 +420,7 @@ static const ShaderInputDesc TcsSgprInputs[] = {
 // SGPRs: GS
 static const ShaderInputDesc GsSgprInputs[] = {
     {ShaderInput::GsVsOffset, offsetof(InterfaceData, entryArgIdxs.gs.gsVsOffset), true},
-    {ShaderInput::GsWaveId, offsetof(InterfaceData, entryArgIdxs.gs.waveId), true},
+    {ShaderInput::GsWaveId, offsetof(InterfaceData, entryArgIdxs.gs.gsWaveId), true},
 };
 
 // SGPRs: FS

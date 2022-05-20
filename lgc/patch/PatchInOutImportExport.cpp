@@ -1533,8 +1533,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     }
 
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
-    auto waveId = getFunctionArgument(m_entryPoint, entryArgIdxs.waveId);
-    Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), GsDone), waveId};
+    auto gsWaveId = getFunctionArgument(m_entryPoint, entryArgIdxs.gsWaveId);
+    Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), GsDone), gsWaveId};
 
     emitCall("llvm.amdgcn.s.sendmsg", Type::getVoidTy(*m_context), args, {}, insertPos);
   } else if (m_shaderStage == ShaderStageFragment) {
@@ -2292,8 +2292,8 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   // Handle internal-use built-ins
-  case BuiltInWaveId: {
-    input = getFunctionArgument(m_entryPoint, entryArgIdxs.waveId);
+  case BuiltInGsWaveId: {
+    input = getFunctionArgument(m_entryPoint, entryArgIdxs.gsWaveId);
     break;
   }
   default: {

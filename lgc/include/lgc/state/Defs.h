@@ -47,7 +47,7 @@ static const BuiltInKind BuiltInInterpLinearCentroid = static_cast<BuiltInKind>(
 static const BuiltInKind BuiltInSamplePosOffset = static_cast<BuiltInKind>(0x10000007);
 static const BuiltInKind BuiltInNumSamples = static_cast<BuiltInKind>(0x10000008);
 static const BuiltInKind BuiltInSamplePatternIdx = static_cast<BuiltInKind>(0x10000009);
-static const BuiltInKind BuiltInWaveId = static_cast<BuiltInKind>(0x1000000A);
+static const BuiltInKind BuiltInGsWaveId = static_cast<BuiltInKind>(0x1000000A);
 
 // Names used for calls added to IR to represent various actions internally.
 namespace lgcName {
