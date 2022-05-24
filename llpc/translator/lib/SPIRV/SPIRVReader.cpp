@@ -961,73 +961,56 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
   }
 }
 
+static FastMathFlags buildFastMathFlags(unsigned flags) {
+  FastMathFlags fmf;
+
+  if (flags & FastMathFlags::AllowReassoc)
+    fmf.setAllowReassoc();
+
+  if (flags & FastMathFlags::NoNaNs)
+    fmf.setNoNaNs();
+
+  if (flags & FastMathFlags::NoInfs)
+    fmf.setNoInfs();
+
+  if (flags & FastMathFlags::NoSignedZeros)
+    fmf.setNoSignedZeros();
+
+  if (flags & FastMathFlags::AllowReciprocal)
+    fmf.setAllowReciprocal();
+
+  if (flags & FastMathFlags::AllowContract)
+    fmf.setAllowContract();
+
+  if (flags & FastMathFlags::ApproxFunc)
+    fmf.setApproxFunc();
+
+  return fmf;
+}
+
 // Decide what fast math flags to set in Builder, just before generating
 // code for BV. Decorations on BV may prevent us from setting some flags.
 FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
-  FastMathFlags fmf;
-
   // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
   // flags on the handled instruction
-  if (const unsigned flags = m_shaderOptions->fastMathFlags) {
-    if (flags & FastMathFlags::AllowReassoc)
-      fmf.setAllowReassoc();
+  if (const unsigned flags = m_shaderOptions->fastMathFlags)
+    return buildFastMathFlags(flags);
 
-    if (flags & FastMathFlags::NoNaNs)
-      fmf.setNoNaNs();
-
-    if (flags & FastMathFlags::NoInfs)
-      fmf.setNoInfs();
-
-    if (flags & FastMathFlags::NoSignedZeros)
-      fmf.setNoSignedZeros();
-
-    if (flags & FastMathFlags::AllowReciprocal)
-      fmf.setAllowReciprocal();
-
-    if (flags & FastMathFlags::AllowContract)
-      fmf.setAllowContract();
-
-    if (flags & FastMathFlags::ApproxFunc)
-      fmf.setApproxFunc();
-
-    return fmf;
-  }
-  if (SPIRVGenFastMathFlags) {
-    if (SPIRVGenFastMathFlags & FastMathFlags::AllowReassoc)
-      fmf.setAllowReassoc();
-
-    if (SPIRVGenFastMathFlags & FastMathFlags::NoNaNs)
-      fmf.setNoNaNs();
-
-    if (SPIRVGenFastMathFlags & FastMathFlags::NoInfs)
-      fmf.setNoInfs();
-
-    if (SPIRVGenFastMathFlags & FastMathFlags::NoSignedZeros)
-      fmf.setNoSignedZeros();
-
-    if (SPIRVGenFastMathFlags & FastMathFlags::AllowReciprocal)
-      fmf.setAllowReciprocal();
-
-    if (SPIRVGenFastMathFlags & FastMathFlags::AllowContract)
-      fmf.setAllowContract();
-
-    if (SPIRVGenFastMathFlags & FastMathFlags::ApproxFunc)
-      fmf.setApproxFunc();
-
-    return fmf;
-  }
+  if (SPIRVGenFastMathFlags)
+    return buildFastMathFlags(SPIRVGenFastMathFlags);
 
   // Only do this for operations with floating point type.
   if (!bv->hasType())
-    return fmf;
+    return {};
   SPIRVType *ty = bv->getType();
   if (ty->isTypeVector())
     ty = ty->getVectorComponentType();
   else if (ty->isTypeMatrix())
     ty = ty->getMatrixColumnType()->getVectorComponentType();
   if (!ty->isTypeFloat())
-    return fmf;
+    return {};
 
+  FastMathFlags fmf;
   fmf.setAllowReciprocal();
   if (!ty->isTypeFloat(64)) {
     // Only do this for half and float, not double, to avoid problems with Vulkan CTS precision_double tests.
@@ -1053,6 +1036,10 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
 
     fmf.setNoSignedZeros();
   }
+
+  if (m_shaderOptions->disableFastMathFlags)
+    fmf &= buildFastMathFlags(~m_shaderOptions->disableFastMathFlags);
+
   return fmf;
 }
 

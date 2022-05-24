@@ -1,0 +1,122 @@
+// This test checks that setting disableFastMathFlags to 32 (1<<5 == AllowContract)
+// does actually stop contract (no fma instructions are formed).
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: _amdgpu_ps_main:
+; SHADERTEST: s_waitcnt
+; SHADERTEST:	v_mul_f32_e64 v[[ACC1:[0-9]*]], s{{[0-9]*}}, s{{[0-9]*}}
+; SHADERTEST-DAG:	v_mul_f32_e64 v[[ACC2:[0-9]*]], s{{[0-9]*}}, s{{[0-9]*}}
+; SHADERTEST-DAG:	v_add_f32_e32 v[[ACC1]], s{{[0-9]*}}, v[[ACC1]]
+; SHADERTEST-DAG:	v_add_f32_e32 v[[ACC2]], s{{[0-9]*}}, v[[ACC2]]
+; END_SHADERTEST
+
+// Test the same shader without the disableFastMathFlags
+
+; BEGIN_NODISABLETEST
+; Remove the disableFastMathFlags option
+; RUN: grep -v "options.disableFastMathFlags" %s > %t.pipe
+; RUN: amdllpc %gfxip %t.pipe -v | FileCheck -check-prefix=NODISABLETEST %s
+; NODISABLETEST-LABEL: _amdgpu_ps_main:
+; NODISABLETEST: s_waitcnt
+; NODISABLETEST:	v_mov_b32_e32 v[[ACC1:[0-9]*]], s6
+; NODISABLETEST-DAG: v_mov_b32_e32 v[[ACC2:[0-9]*]], s7
+; NODISABLETEST-DAG: v_fmac_f32_e64 v[[ACC1]], s{{[0-9]*}}, s{{[0-9]*}}
+; NODISABLETEST-DAG: v_fmac_f32_e64 v[[ACC2]], s{{[0-9]*}}, s{{[0-9]*}}
+; END_NODISABLETEST
+
+// Check the cache hash is different
+; BEGIN_HASHTEST
+; RUN: grep -v "options.disableFastMathFlags" %s > %t.pipe
+; RUN: amdllpc %gfxip -v %s %t.pipe | FileCheck -check-prefix=HASHTEST %s
+; HASHTEST-LABEL: LLPC final ELF info
+; HASHTEST: 128_bit_cache_hash: [ [[HASH1:0x[0-9a-fA-F]*]] [[HASH2:0x[0-9a-fA-F]*]] ]
+; HASHTEST-LABEL: LLPC final ELF info
+; HASHTEST: 128_bit_cache_hash: [
+; HASHTEST-NOT: [[HASH1]] [[HASH2]]
+; END_HASHTEST
+
+[FsGlsl]
+#version 450
+
+layout(binding = 0) uniform Uniforms
+{
+    float f1_1, f1_2, f1_3;
+    vec3 f3_1, f3_2, f3_3;
+};
+
+layout(location = 0) out vec4 fragColor;
+
+void main()
+{
+    float f1_0 = f1_1 * f1_2 + f1_3;
+
+    vec3 f3_0 = f3_1 * f3_2 + f3_3;
+
+    fragColor = (f3_0.x != f1_0) ? vec4(0.0) : vec4(1.0);
+}
+
+[FsInfo]
+entryPoint = main
+options.disableFastMathFlags = 32
+
+[ResourceMapping]
+userDataNode[0].visibility = 64
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorBuffer
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 4
+userDataNode[0].next[0].set = 0x00000000
+userDataNode[0].next[0].binding = 0
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+patchControlPoints = 3
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 0
+rasterizerDiscardEnable = 0
+perSampleShading = 0
+numSamples = 0
+pixelShaderSamples = 0
+samplePatternIdx = 0
+usrClipPlaneMask = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+colorBuffer[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+nggState.enableNgg = 1
+nggState.enableGsUse = 0
+nggState.forceCullingMode = 0
+nggState.compactMode = NggCompactDisable
+nggState.enableVertexReuse = 0
+nggState.enableBackfaceCulling = 1
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 1
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 256
+nggState.vertsPerSubgroup = 256
+dynamicVertexStride = 0
+enableUberFetchShader = 0
+enableEarlyCompile = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 0
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+options.shadowDescriptorTableUsage = Auto
+options.shadowDescriptorTablePtrHigh = 0
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 0
+options.extendedRobustness.nullDescriptor = 0
