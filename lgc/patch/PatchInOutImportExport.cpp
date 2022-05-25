@@ -321,9 +321,9 @@ void PatchInOutImportExport::processShader() {
     const bool hasTcs = ((stageMask & shaderStageToMask(ShaderStageTessControl)) != 0);
 
     auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
-    if (calcFactor.inVertexStride == InvalidValue && calcFactor.outVertexStride == InvalidValue &&
-        calcFactor.patchCountPerThreadGroup == InvalidValue && calcFactor.outPatchSize == InvalidValue &&
-        calcFactor.patchConstSize == InvalidValue) {
+    if (!calcFactor.initialized) {
+      calcFactor.initialized = true;
+
       //
       // NOTE: The LDS for tessellation is as follow:
       //
