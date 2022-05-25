@@ -62,6 +62,12 @@ public:
   // Get the geometry shader mode
   const GeometryShaderMode &getGeometryShaderMode();
 
+  // Set the mesh shader mode
+  void setMeshShaderMode(const MeshShaderMode &inMode);
+
+  // Get the mesh shader mode
+  const MeshShaderMode &getMeshShaderMode();
+
   // Set the fragment shader mode
   void setFragmentShaderMode(const FragmentShaderMode &inMode);
 
@@ -96,6 +102,7 @@ private:
   CommonShaderMode m_commonShaderModes[ShaderStageCompute + 1] = {}; // Per-shader FP modes
   TessellationMode m_tessellationMode = {};                          // Tessellation mode
   GeometryShaderMode m_geometryShaderMode = {};                      // Geometry shader mode
+  MeshShaderMode m_meshShaderMode = {};                              // Mesh shader mode
   FragmentShaderMode m_fragmentShaderMode = {};                      // Fragment shader mode
   ComputeShaderMode m_computeShaderMode = {};                        // Compute shader mode (workgroup size)
 };

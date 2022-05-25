@@ -105,6 +105,14 @@ void Builder::setGeometryShaderMode(const GeometryShaderMode &geometryShaderMode
 }
 
 // =====================================================================================================================
+// Set the mesh shader mode
+//
+// @param meshShaderMode : Mesh shader mode
+void Builder::setMeshShaderMode(const MeshShaderMode &meshShaderMode) {
+  getShaderModes()->setMeshShaderMode(meshShaderMode);
+}
+
+// =====================================================================================================================
 // Set the fragment shader mode
 //
 // @param fragmentShaderMode : Fragment shader mode

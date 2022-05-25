@@ -42,6 +42,7 @@ struct CommonShaderMode;
 struct ComputeShaderMode;
 struct FragmentShaderMode;
 struct GeometryShaderMode;
+struct MeshShaderMode;
 class Pipeline;
 class ShaderModes;
 struct TessellationMode;
@@ -173,6 +174,11 @@ public:
   // The client should always zero-initialize the struct before setting it up, in case future versions
   // add more fields. A local struct variable can be zero-initialized with " = {}".
   void setGeometryShaderMode(const GeometryShaderMode &geometryShaderMode);
+
+  // Set the mesh shader state.
+  // The client should always zero-initialize the struct before setting it up, in case future versions
+  // add more fields. A local struct variable can be zero-initialized with " = {}".
+  void setMeshShaderMode(const MeshShaderMode &meshShaderMode);
 
   // Set the fragment shader mode.
   // The client should always zero-initialize the struct before setting it up, in case future versions
