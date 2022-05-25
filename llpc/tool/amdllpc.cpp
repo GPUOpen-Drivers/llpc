@@ -79,6 +79,11 @@ using namespace Vkgc;
 namespace {
 // Represents options of the amdllpc standalone tool.
 // -gfxip: graphics IP version
+// NOTE: This object is not actually used to parse anything or provide access to
+// the gfx version. Its only purpose is to ensure the "--gfxip" option is included
+// in the --help output and that it is not rejected as unknown option by the main parser.
+// Parsing "--gfxip" instead is done in the init(..) function,
+// before calling ICompiler::Create, which invokes the cl::opt parsing.
 cl::opt<std::string> GfxIp("gfxip", cl::desc("Graphics IP version"), cl::value_desc("major.minor.step"),
                            cl::init("8.0.2"));
 
