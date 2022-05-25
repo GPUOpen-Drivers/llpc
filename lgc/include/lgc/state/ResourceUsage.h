@@ -364,6 +364,8 @@ struct ResourceUsage {
 
         unsigned tessOnChipLdsSize; // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
 
+        bool initialized; // Whether calcFactor has been initialized
+
       } calcFactor;
     } tcs = {};
 

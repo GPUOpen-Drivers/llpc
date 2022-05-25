@@ -43,18 +43,7 @@ ResourceUsage::ResourceUsage(ShaderStage shaderStage) {
     builtInUsage.vs.baseVertex = true;
     builtInUsage.vs.baseInstance = true;
   } else if (shaderStage == ShaderStageTessControl) {
-    auto &calcFactor = inOutUsage.tcs.calcFactor;
-
-    calcFactor.inVertexStride = InvalidValue;
-    calcFactor.outVertexStride = InvalidValue;
-    calcFactor.patchCountPerThreadGroup = InvalidValue;
-    calcFactor.offChip.outPatchStart = InvalidValue;
-    calcFactor.offChip.patchConstStart = InvalidValue;
-    calcFactor.onChip.outPatchStart = InvalidValue;
-    calcFactor.onChip.patchConstStart = InvalidValue;
-    calcFactor.onChip.tessFactorStart = InvalidValue;
-    calcFactor.outPatchSize = InvalidValue;
-    calcFactor.patchConstSize = InvalidValue;
+    inOutUsage.tcs.calcFactor = {};
   } else if (shaderStage == ShaderStageGeometry) {
     inOutUsage.gs.rasterStream = 0;
     inOutUsage.gs.calcFactor = {};
