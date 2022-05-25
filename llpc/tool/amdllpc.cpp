@@ -45,6 +45,7 @@
 #include "spvgen.h"
 #include "lgc/LgcContext.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -371,6 +372,11 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
   Result result = ICompiler::Create(ParsedGfxIp, argc, argv, &compiler);
   if (result != Result::Success)
     return result;
+
+  if (!llvm::codegen::getMCPU().empty()) {
+    LLPC_ERRS("Option --mcpu is not supported in amdllpc, use --gfxip instead!\n");
+    return Result::Unsupported;
+  }
 
   // Debug utility that prints all LLVM option values. This is activated by passing:
   // `--print-options`     -- prints all LLVM options with non-default values, or
