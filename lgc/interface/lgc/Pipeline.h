@@ -482,8 +482,14 @@ struct TessellationMode {
 // Kind of GS input primitives.
 enum class InputPrimitives : unsigned { Points, Lines, LinesAdjacency, Triangles, TrianglesAdjacency };
 
-// Kind of GS output primitives
-enum class OutputPrimitives : unsigned { Points, LineStrip, TriangleStrip };
+// Kind of GS/mesh shader output primitives
+enum class OutputPrimitives : unsigned {
+  Points,       // GS or mesh shader
+  Lines,        // Mesh shader only
+  LineStrip,    // GS only
+  Triangles,    // Mesh shader only
+  TriangleStrip // GS only
+};
 
 // Struct to pass to SetGeometryShaderMode. The front-end should zero-initialize it with "= {}" in case
 // future changes add new fields.
@@ -494,6 +500,19 @@ struct GeometryShaderMode {
   OutputPrimitives outputPrimitive; // Kind of output primitives
   unsigned invocations;             // Number of times to invoke shader for each input primitive
   unsigned outputVertices;          // Max number of vertices the shader will emit in one invocation
+};
+
+// Struct to pass to MeshShaderMode. The front-end should zero-initialize it with "= {}" in case
+// future changes add new fields.
+// All fields are unsigned, even those that could be bool, because the way the state is written to and read
+// from IR metadata relies on that.
+struct MeshShaderMode {
+  OutputPrimitives outputPrimitive; // Kind of output primitives
+  unsigned outputVertices;          // Max number of vertices the shader will emit in the invocation group
+  unsigned outputPrimitives;        // Max number of primitives the shader will emit in the invocation group
+  unsigned workgroupSizeX;          // X dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeY;          // Y dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeZ;          // Z dimension of workgroup size. 0 is taken to be 1
 };
 
 // Kind of conservative depth/stencil

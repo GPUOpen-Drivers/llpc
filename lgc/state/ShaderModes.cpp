@@ -127,6 +127,18 @@ const GeometryShaderMode &ShaderModes::getGeometryShaderMode() {
 }
 
 // =====================================================================================================================
+// Set the mesh shader mode
+void ShaderModes::setMeshShaderMode(const MeshShaderMode &inMode) {
+  m_meshShaderMode = inMode;
+}
+
+// =====================================================================================================================
+// Get the mesh shader mode
+const MeshShaderMode &ShaderModes::getMeshShaderMode() {
+  return m_meshShaderMode;
+}
+
+// =====================================================================================================================
 // Set the fragment shader mode
 void ShaderModes::setFragmentShaderMode(const FragmentShaderMode &inMode) {
   m_fragmentShaderMode = inMode;
