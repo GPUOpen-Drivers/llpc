@@ -1,0 +1,20 @@
+; Check that ldsSpillLimitDwords shader option gets propagated to the backend as amdgpu-lds-spill-limit-dwords attribute.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
+; SHADERTEST: "amdgpu-lds-spill-limit-dwords"="1024"
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[CsGlsl]
+#version 450
+
+layout(local_size_x = 2, local_size_y = 3) in;
+void main()
+{
+}
+
+[CsInfo]
+entryPoint = main
+options.ldsSpillLimitDwords = 1024

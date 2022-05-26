@@ -130,6 +130,11 @@ static cl::opt<int> DontUnrollHintThreshold("dontunroll-hint-threshold",
                                             cl::desc("loop unroll threshold to use for loops with DontUnroll hint"),
                                             cl::init(0));
 
+// -lds-spill-limit-dwords: Maximum amount of LDS space to be used for spilling. The value of 0 disables LDS spilling.
+static cl::opt<unsigned> LdsSpillLimitDwords("lds-spill-limit-dwords",
+                                             cl::desc("Maximum amount of LDS space to be used for spilling"),
+                                             cl::init(0));
+
 namespace Llpc {
 
 // =====================================================================================================================
@@ -439,6 +444,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
       shaderOptions.dontUnrollHintThreshold = shaderInfo->options.dontUnrollHintThreshold;
     else
       shaderOptions.dontUnrollHintThreshold = DontUnrollHintThreshold;
+    if (shaderInfo->options.ldsSpillLimitDwords > 0)
+      shaderOptions.ldsSpillLimitDwords = shaderInfo->options.ldsSpillLimitDwords;
+    else
+      shaderOptions.ldsSpillLimitDwords = LdsSpillLimitDwords;
+
     pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
   }
 }

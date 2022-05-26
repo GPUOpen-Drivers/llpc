@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 53
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 3
+#define LLPC_INTERFACE_MINOR_VERSION 4
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     53.4 | Add ldsSpillLimitDwords shader option                                                                 |
 //  |     53.3 | Add disableFastMathFlags shader option, plus support for this and fastMathFlags in pipeline files     |
 //  |     53.2 | Add resourceLayoutScheme to PipelineOptions                                                           |
 //  |     53.1 | Add PartPipelineStage enum for part-pipeline mode                                                     |
@@ -662,6 +663,9 @@ struct PipelineShaderOptions {
 
   /// Disable fast math flags mask (0 = nothing disabled).
   unsigned disableFastMathFlags;
+
+  /// Maximum amount of LDS space to be used for spilling.
+  unsigned ldsSpillLimitDwords;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor

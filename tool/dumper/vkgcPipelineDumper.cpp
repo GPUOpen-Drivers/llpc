@@ -540,6 +540,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.dontUnrollHintThreshold = " << shaderInfo->options.dontUnrollHintThreshold << "\n";
   dumpFile << "options.fastMathFlags = " << shaderInfo->options.fastMathFlags << "\n";
   dumpFile << "options.disableFastMathFlags = " << shaderInfo->options.disableFastMathFlags << "\n";
+  dumpFile << "options.ldsSpillLimitDwords = " << shaderInfo->options.ldsSpillLimitDwords << "\n";
   dumpFile << "\n";
 }
 
@@ -1186,6 +1187,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.dontUnrollHintThreshold);
       hasher->Update(options.fastMathFlags);
       hasher->Update(options.disableFastMathFlags);
+      hasher->Update(options.ldsSpillLimitDwords);
     }
   }
 }
