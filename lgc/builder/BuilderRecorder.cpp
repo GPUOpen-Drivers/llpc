@@ -212,6 +212,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "is.helper.invocation";
   case Opcode::EmitMeshTasks:
     return "emit.mesh.tasks";
+  case Opcode::SetMeshOutputs:
+    return "set.mesh.outputs";
   case Opcode::ImageLoad:
     return "image.load";
   case Opcode::ImageLoadWithFmask:
@@ -902,8 +904,20 @@ Value *BuilderRecorder::CreateIsHelperInvocation(const Twine &instName) {
 // @param instName : Name to give final instruction
 // @returns Instruction to emit mesh tasks
 Instruction *BuilderRecorder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
-                                                  const llvm::Twine &instName) {
+                                                  const Twine &instName) {
   return record(Opcode::EmitMeshTasks, nullptr, {groupCountX, groupCountY, groupCountZ}, instName);
+}
+
+// =====================================================================================================================
+// In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
+// emit upon completion.
+//
+// @param vertexCount : Actual output size of the vertices
+// @param primitiveCount : Actual output size of the primitives
+// @param instName : Name to give final instruction
+// @returns Instruction to set the actual size of mesh outputs
+Instruction *BuilderRecorder::CreateSetMeshOutputs(Value *vertexCount, Value *primitiveCount, const Twine &instName) {
+  return record(Opcode::SetMeshOutputs, nullptr, {vertexCount, primitiveCount}, instName);
 }
 
 // =====================================================================================================================
@@ -2103,6 +2117,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ImageQuerySize:
     case Opcode::IsHelperInvocation:
     case Opcode::EmitMeshTasks:
+    case Opcode::SetMeshOutputs:
     case Opcode::Kill:
     case Opcode::ReadClock:
     case Opcode::WriteBuiltInOutput:

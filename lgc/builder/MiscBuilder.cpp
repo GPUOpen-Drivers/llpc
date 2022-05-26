@@ -126,10 +126,23 @@ Value *MiscBuilder::CreateIsHelperInvocation(const Twine &instName) {
 // @param instName : Name to give final instruction
 // @returns Instruction to emit mesh tasks
 Instruction *MiscBuilder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
-                                              const llvm::Twine &instName) {
+                                              const Twine &instName) {
   assert(m_shaderStage == ShaderStageTask); // Only valid for task shader
   return emitCall(lgcName::MeshTaskEmitMeshTasks, getVoidTy(), {groupCountX, groupCountY, groupCountZ}, {},
                   &*GetInsertPoint());
+}
+
+// =====================================================================================================================
+// In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
+// emit upon completion.
+//
+// @param vertexCount : Actual output size of the vertices
+// @param primitiveCount : Actual output size of the primitives
+// @param instName : Name to give final instruction
+// @returns Instruction to set the actual size of mesh outputs
+Instruction *MiscBuilder::CreateSetMeshOutputs(Value *vertexCount, Value *primitiveCount, const Twine &instName) {
+  assert(m_shaderStage == ShaderStageMesh); // Only valid for mesh shader
+  return emitCall(lgcName::MeshTaskSetMeshOutputs, getVoidTy(), {vertexCount, primitiveCount}, {}, &*GetInsertPoint());
 }
 
 // =====================================================================================================================

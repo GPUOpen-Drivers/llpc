@@ -725,6 +725,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderRecorder::Opcode::EmitMeshTasks: {
     return m_builder->CreateEmitMeshTasks(args[0], args[1], args[2]);
   }
+  case BuilderRecorder::Opcode::SetMeshOutputs: {
+    return m_builder->CreateSetMeshOutputs(args[0], args[1]);
+  }
   case BuilderRecorder::Opcode::TransposeMatrix: {
     return m_builder->CreateTransposeMatrix(args[0]);
   }

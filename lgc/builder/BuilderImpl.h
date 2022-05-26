@@ -664,7 +664,12 @@ public:
   // In the task shader, emit the current values of all per-task output variables to the current task output by
   // specifying the group count XYZ of the launched child mesh tasks.
   llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, llvm::Value *groupCountZ,
-                                         const llvm::Twine &instName) override final;
+                                         const llvm::Twine &instName = "") override final;
+
+  // In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
+  // emit upon completion.
+  llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount,
+                                          const llvm::Twine &instName = "") override final;
 
 private:
   MiscBuilder() = delete;
