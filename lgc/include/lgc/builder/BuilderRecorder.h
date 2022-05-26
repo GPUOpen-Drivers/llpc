@@ -185,6 +185,7 @@ public:
     DemoteToHelperInvocation,
     IsHelperInvocation,
     EmitMeshTasks,
+    SetMeshOutputs,
     GetWaveSize,
 
     // Subgroup
@@ -497,7 +498,9 @@ public:
   llvm::Instruction *CreateDemoteToHelperInvocation(const llvm::Twine &instName) override final;
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName) override final;
   llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, llvm::Value *groupCountZ,
-                                         const llvm::Twine &instName) override final;
+                                         const llvm::Twine &instName = "") override final;
+  llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount,
+                                          const llvm::Twine &instName = "") override final;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Builder methods implemented in MatrixBuilder
