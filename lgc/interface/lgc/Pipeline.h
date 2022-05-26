@@ -196,6 +196,9 @@ struct ShaderOptions {
   // Threshold to use for loops with DontUnroll hint. 0 to use llvm.loop.unroll.disable metadata.
   unsigned dontUnrollHintThreshold;
 
+  // Maximum amount of LDS space to be used for spilling.
+  unsigned ldsSpillLimitDwords;
+
   ShaderOptions() {
     // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from
     // being written, we force everything to 0, including alignment gaps.
