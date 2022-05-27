@@ -591,11 +591,15 @@ template <typename T> void ConfigBuilder::buildEsRegConfig(ShaderStage shaderSta
   SET_REG_FIELD(&config->esRegs, SPI_SHADER_PGM_RSRC2_ES, TRAP_PRESENT, shaderOptions.trapPresent);
   if (m_pipelineState->isGsOnChip()) {
     assert(calcFactor.gsOnChipLdsSize <= m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize);
-    assert((calcFactor.gsOnChipLdsSize %
-            (1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift)) == 0);
-    SET_REG_FIELD(
-        &config->esRegs, SPI_SHADER_PGM_RSRC2_ES, LDS_SIZE__CI__VI,
-        (calcFactor.gsOnChipLdsSize >> m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift));
+
+    const unsigned ldsSizeDwordGranularityShift =
+        m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+    const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
+
+    const unsigned ldsSizeInDwords = alignTo(calcFactor.gsOnChipLdsSize, ldsSizeDwordGranularity);
+
+    const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
+    SET_REG_FIELD(&config->esRegs, SPI_SHADER_PGM_RSRC2_ES, LDS_SIZE__CI__VI, ldsSize);
     setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
   }
 
@@ -683,15 +687,13 @@ template <typename T> void ConfigBuilder::buildLsRegConfig(ShaderStage shaderSta
     }
   }
 
-  unsigned ldsSize = 0;
-
-  // NOTE: On GFX6, granularity for the LDS_SIZE field is 64. The range is 0~128 which allocates 0 to 8K dwords.
-  // On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K dwords.
   const unsigned ldsSizeDwordGranularityShift =
       m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
   const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
-  ldsSize = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity) >> ldsSizeDwordGranularityShift;
 
+  ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
+
+  const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
   SET_REG_FIELD(&config->lsRegs, SPI_SHADER_PGM_RSRC2_LS, LDS_SIZE, ldsSize);
   setLdsSizeByteSize(Util::Abi::HardwareStage::Ls, ldsSizeInDwords * 4);
 
