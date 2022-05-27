@@ -1094,16 +1094,17 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, TRAP_PRESENT, tcsShaderOptions.trapPresent);
   SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, userDataCount);
 
-  // NOTE: On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K
-  // dwords.
   const auto &calcFactor = tcsResUsage->inOutUsage.tcs.calcFactor;
   assert(m_pipelineState->isTessOffChip()); // Must be off-chip on GFX9+
+
+  const unsigned ldsSizeDwordGranularityShift =
+      m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+  const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
+
   unsigned ldsSizeInDwords = calcFactor.tessOnChipLdsSize;
+  ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
-  const unsigned ldsSizeDwordGranularity = 128u;
-  const unsigned ldsSizeDwordGranularityShift = 7u;
-  unsigned ldsSize = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity) >> ldsSizeDwordGranularityShift;
-
+  const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
   if (gfxIp.major == 9) {
     SET_REG_GFX9_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
   } else {
@@ -1219,13 +1220,17 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
 
-  const auto ldsSizeDwordGranularityShift =
+  const unsigned ldsSizeDwordGranularityShift =
       m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+  const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
 
-  SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE,
-                calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
+  unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
+  ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
-  setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, calcFactor.gsOnChipLdsSize * 4);
+  const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
+  SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE, ldsSize);
+
+  setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
   setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
   unsigned maxVertOut = std::max(1u, static_cast<unsigned>(geometryMode.outputVertices));
@@ -1427,13 +1432,15 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
 
   SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
 
-  const auto ldsSizeDwordGranularityShift =
+  const unsigned ldsSizeDwordGranularityShift =
       m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+  const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
 
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
+  ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
-  SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE,
-                ldsSizeInDwords >> ldsSizeDwordGranularityShift);
+  const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
+  SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE, ldsSize);
   setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
   setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
