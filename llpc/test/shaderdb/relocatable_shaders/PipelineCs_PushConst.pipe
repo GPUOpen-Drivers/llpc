@@ -7,10 +7,9 @@
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
 ; This tries to match the sequence that loads the vector from the push constant.  This is the only 2 element load in the
 ; code.  The "4" is the offset of the push constant area in the root table.
-; SHADERTEST: s_mov_b32 [[r1:s[0-9]+]], 4 //
-; SHADERTEST: s_ashr_i32 s[[r2:[0-9]+]], [[r1]], 31
-; SHADERTEST: s_add_u32 s[[addr1:[0-9]+]], {{s[0-9]+}}, [[r1]]
-; SHADERTEST: s_addc_u32 s[[addr2:[0-9]+]], {{s[0-9]+}}, s[[r2]]
+; SHADERTEST: s_ashr_i32 s[[r1:[0-9]+]], 4, 31
+; SHADERTEST: s_add_u32 s[[addr1:[0-9]+]], {{s[0-9]+}}, 4
+; SHADERTEST: s_addc_u32 s[[addr2:[0-9]+]], {{s[0-9]+}}, s[[r1]]
 ; SHADERTEST: s_load_dwordx2 {{s\[[0-9]+:[0-9]+\]}}, {{s\[}}[[addr1]]:[[addr2]]{{\]}}, 0x0
 ; END_SHADERTEST
 
