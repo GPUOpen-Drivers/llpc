@@ -538,6 +538,8 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.disableLicmThreshold = " << shaderInfo->options.disableLicmThreshold << "\n";
   dumpFile << "options.unrollHintThreshold = " << shaderInfo->options.unrollHintThreshold << "\n";
   dumpFile << "options.dontUnrollHintThreshold = " << shaderInfo->options.dontUnrollHintThreshold << "\n";
+  dumpFile << "options.fastMathFlags = " << shaderInfo->options.fastMathFlags << "\n";
+  dumpFile << "options.disableFastMathFlags = " << shaderInfo->options.disableFastMathFlags << "\n";
   dumpFile << "\n";
 }
 
@@ -1122,7 +1124,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 // @param stage : Shader stage
 // @param shaderInfo : Shader info in specified shader stage
 // @param isCacheHash : TRUE if the hash is used by shader cache
-// @param [in/out] hasher : Haher to generate hash code
+// @param [in/out] hasher : Hasher to generate hash code
 // @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo,
                                                      bool isCacheHash, MetroHash64 *hasher, bool isRelocatableShader) {
@@ -1182,6 +1184,8 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.disableLicmThreshold);
       hasher->Update(options.unrollHintThreshold);
       hasher->Update(options.dontUnrollHintThreshold);
+      hasher->Update(options.fastMathFlags);
+      hasher->Update(options.disableFastMathFlags);
     }
   }
 }
