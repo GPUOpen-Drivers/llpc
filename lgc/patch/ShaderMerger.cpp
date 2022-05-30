@@ -229,48 +229,21 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
       arg.addAttr(Attribute::InReg);
   }
 
-  // define dllexport amdgpu_hs @_amdgpu_hs_main(
-  //     inreg i32 %sgpr0..7, inreg <n x i32> %userData, i32 %vgpr0..5)
-  // {
-  // .entry
-  //     ; Initialize EXEC mask: exec = 0xFFFFFFFF'FFFFFFFF
-  //     call void @llvm.amdgcn.init.exec(i64 -1)
   //
-  //     ; Get thread ID:
-  //     ;   bitCount  = ((1 << threadPosition) - 1) & 0xFFFFFFFF
-  //     ;   bitCount += (((1 << threadPosition) - 1) >> 32) & 0xFFFFFFFF
-  //     ;   threadId = bitCount
-  //     %threadId = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
-  //     %threadId = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %threadId)
+  // The processing is something like this:
   //
-  //     %lsVertCount = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 0, i32 8)
-  //     %hsVertCount = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 8, i32 8)
+  // LS_HS() {
+  //   Initialize exec mask to all ones
   //
-  //     %nullHs = icmp eq i32 %hsVertCount, 0
-  //     %vgpr0 = select i1 %nullHs, i32 %vgpr0, i32 %vgpr2
-  //     %vgpr1 = select i1 %nullHs, i32 %vgpr1, i32 %vgpr3
-  //     %vgpr2 = select i1 %nullHs, i32 %vgpr2, i32 %vgpr4
-  //     %vgpr3 = select i1 %nullHs, i32 %vgpr3, i32 %vgpr5
+  //   if (threadIdInWave < lsVertCount)
+  //     Run LS
   //
-  //     %lsEnable = icmp ult i32 %threadId, %lsVertCount
-  //     br i1 %lsEnable, label %.beginLs, label %.endLs
+  //   Barrier
   //
-  // .beginLs:
-  //     call void @lgc.shader.LS.main(%sgpr..., %userData..., %vgpr...)
-  //     br label %.endLs
-  //
-  // .endLs:
-  //     call void @llvm.amdgcn.s.barrier()
-  //     %hsEnable = icmp ult i32 %threadId, %hsVertCount
-  //     br i1 %hsEnable, label %.beginHs, label %.endHs
-  //
-  // .beginHs:
-  //     call void @lgc.shader.HS.main(%sgpr..., %userData..., %vgpr...)
-  //     br label %.endHs
-  //
-  // .endHs:
-  //     ret void
+  //   if (threadIdInWave < hsVertCount)
+  //     Run HS
   // }
+  //
 
   std::vector<Value *> args;
   std::vector<Attribute::AttrKind> attribs;
@@ -650,42 +623,21 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
       arg.addAttr(Attribute::InReg);
   }
 
-  // define dllexport amdgpu_gs @_amdgpu_gs_main(
-  //     inreg i32 %sgpr0..7, inreg <n x i32> %userData, i32 %vgpr0..8)
-  // {
-  // .entry
-  //     ; Initialize EXEC mask: exec = 0xFFFFFFFF'FFFFFFFF
-  //     call void @llvm.amdgcn.init.exec(i64 -1)
   //
-  //     ; Get thread ID:
-  //     ;   bitCount  = ((1 << threadPosition) - 1) & 0xFFFFFFFF
-  //     ;   bitCount += (((1 << threadPosition) - 1) >> 32) & 0xFFFFFFFF
-  //     ;   threadId = bitCount
-  //     %threadId = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
-  //     %threadId = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %threadId)
+  // The processing is something like this:
   //
-  //     %esVertCount = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 0, i32 8)
-  //     %gsPrimCount = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 8, i32 8)
+  // ES_GS() {
+  //   Initialize exec mask to all ones
   //
-  //     %esEnable = icmp ult i32 %threadId, %esVertCount
-  //     br i1 %esEnable, label %.beginEs, label %.endEs
+  //   if (threadIdInWave < esVertCount)
+  //     Run ES
   //
-  // .beginEs:
-  //     call void @lgc.shader.ES.main(%sgpr..., %userData..., %vgpr...)
-  //     br label %.endEs
+  //   Barrier
   //
-  // .endEs:
-  //     call void @llvm.amdgcn.s.barrier()
-  //     %gsEnable = icmp ult i32 %threadId, %gsPrimCount
-  //     br i1 %gsEnable, label %.beginGs, label %.endGs
-  //
-  // .beginGs:
-  //     call void @lgc.shader.GS.main(%sgpr..., %userData..., %vgpr...)
-  //     br label %.endGs
-  //
-  // .endGs:
-  //     ret void
+  //   if (threadIdInWave < gsPrimCount)
+  //     Run GS
   // }
+  //
 
   std::vector<Value *> args;
   std::vector<Attribute::AttrKind> attribs;
