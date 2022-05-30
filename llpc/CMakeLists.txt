@@ -33,10 +33,7 @@ if(ICD_BUILD_LLPC)
 endif()
 
 ### Cached Project Options #############################################################################################
-# LLPC_BUILD_TESTS should be the only option once XGL and all scripts get updated.
 option(LLPC_BUILD_TESTS      "LLPC build all tests"        OFF)
-# Deprecated, use LLPC_BUILD_TESTS instead.
-option(LLPC_BUILD_LIT        "LLPC build lit tests"        OFF)
 option(LLPC_BUILD_LLVM_TOOLS "Build LLVM tools"            OFF)
 option(LLPC_ENABLE_WERROR    "Build LLPC with more errors" OFF)
 
@@ -60,7 +57,7 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_DOCS OFF CACHE BOOL Force)
     set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL Force)
     set(LLVM_INCLUDE_GO_TESTS OFF CACHE BOOL Force)
-    if(LLPC_BUILD_TESTS OR LLPC_BUILD_LIT)
+    if(LLPC_BUILD_TESTS)
         set(LLVM_INCLUDE_TESTS ON CACHE BOOL Force)
     else()
         set(LLVM_INCLUDE_TESTS OFF CACHE BOOL Force)
@@ -390,12 +387,10 @@ add_compile_definitions(amdllpc PRIVATE SH_EXPORTING)
 
 endif()
 ### Add Subdirectories #################################################################################################
-if(ICD_BUILD_LLPC)
-    if(LLPC_BUILD_TESTS OR LLPC_BUILD_LIT)
-        # Unit tests.
-        add_subdirectory(unittests)
+if(ICD_BUILD_LLPC AND LLPC_BUILD_TESTS)
+    # Unit tests.
+    add_subdirectory(unittests)
 
-        # Lit tests.
-        add_subdirectory(test)
-    endif()
+    # LIT tests.
+    add_subdirectory(test)
 endif()
