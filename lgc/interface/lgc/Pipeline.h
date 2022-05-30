@@ -200,6 +200,9 @@ struct ShaderOptions {
   // Maximum amount of LDS space to be used for spilling.
   unsigned ldsSpillLimitDwords;
 
+  // Attempt to scalarize waterfall descriptor loads.
+  bool scalarizeWaterfallLoads;
+
   ShaderOptions() {
     // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from
     // being written, we force everything to 0, including alignment gaps.

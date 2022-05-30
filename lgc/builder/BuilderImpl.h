@@ -77,7 +77,7 @@ protected:
 
   // Create a waterfall loop containing the specified instruction.
   llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::ArrayRef<unsigned> operandIdxs,
-                                         const llvm::Twine &instName = "");
+                                         bool scalarizeDescriptorLoads = false, const llvm::Twine &instName = "");
 
   // Helper method to scalarize a possibly vector unary operation
   llvm::Value *scalarize(llvm::Value *value, const std::function<llvm::Value *(llvm::Value *)> &callback);

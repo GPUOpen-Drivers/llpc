@@ -541,6 +541,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.fastMathFlags = " << shaderInfo->options.fastMathFlags << "\n";
   dumpFile << "options.disableFastMathFlags = " << shaderInfo->options.disableFastMathFlags << "\n";
   dumpFile << "options.ldsSpillLimitDwords = " << shaderInfo->options.ldsSpillLimitDwords << "\n";
+  dumpFile << "options.scalarizeWaterfallLoads = " << shaderInfo->options.scalarizeWaterfallLoads << "\n";
   dumpFile << "\n";
 }
 
@@ -1190,6 +1191,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.fastMathFlags);
       hasher->Update(options.disableFastMathFlags);
       hasher->Update(options.ldsSpillLimitDwords);
+      hasher->Update(options.scalarizeWaterfallLoads);
     }
   }
 }
