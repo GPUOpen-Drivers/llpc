@@ -135,6 +135,11 @@ static cl::opt<unsigned> LdsSpillLimitDwords("lds-spill-limit-dwords",
                                              cl::desc("Maximum amount of LDS space to be used for spilling"),
                                              cl::init(0));
 
+// -scalarize-waterfall-descriptor-loads: try to scalarize loads for non-uniform image sample descriptors
+static cl::opt<bool> ScalarizeWaterfallDescriptorLoads("scalarize-waterfall-descriptor-loads",
+                                                       cl::desc("Try to scalarize non-uniform descriptor loads"),
+                                                       cl::init(false));
+
 namespace Llpc {
 
 // =====================================================================================================================
@@ -374,6 +379,15 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
       shaderOptions.vgprLimit = shaderInfo->options.vgprLimit;
     else
       shaderOptions.vgprLimit = VgprLimit;
+
+    if (ScalarizeWaterfallDescriptorLoads.getNumOccurrences() > 0) {
+      shaderOptions.scalarizeWaterfallLoads = ScalarizeWaterfallDescriptorLoads;
+    } else {
+      shaderOptions.scalarizeWaterfallLoads = shaderInfo->options.scalarizeWaterfallLoads;
+      // Enable waterfall load scalarization when vgpr limit is set.
+      if (shaderOptions.vgprLimit != 0 && shaderOptions.vgprLimit != UINT_MAX)
+        shaderOptions.scalarizeWaterfallLoads = true;
+    }
 
     if (shaderInfo->options.sgprLimit != 0 && shaderInfo->options.sgprLimit != UINT_MAX)
       shaderOptions.sgprLimit = shaderInfo->options.sgprLimit;

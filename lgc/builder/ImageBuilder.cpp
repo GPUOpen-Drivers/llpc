@@ -509,7 +509,8 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
   // Add a waterfall loop if needed.
   Value *result = imageInst;
   if (flags & ImageFlagNonUniformImage)
-    result = createWaterfallLoop(imageInst, imageDescArgIndex);
+    result = createWaterfallLoop(imageInst, imageDescArgIndex,
+                                 getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
   else if (flags & ImageFlagEnforceReadFirstLaneImage)
     enforceReadFirstLane(imageInst, imageDescArgIndex);
 
@@ -701,7 +702,8 @@ Value *ImageBuilder::CreateImageStore(Value *texel, unsigned dim, unsigned flags
 
   // Add a waterfall loop if needed.
   if (flags & ImageFlagNonUniformImage)
-    createWaterfallLoop(imageStore, imageDescArgIndex);
+    createWaterfallLoop(imageStore, imageDescArgIndex,
+                        getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
   else if (flags & ImageFlagEnforceReadFirstLaneImage)
     enforceReadFirstLane(imageStore, imageDescArgIndex);
 
@@ -1182,7 +1184,8 @@ Value *ImageBuilder::CreateImageSampleGather(Type *resultTy, unsigned dim, unsig
     enforceReadFirstLane(imageOp, samplerDescArgIndex);
 
   if (!nonUniformArgIndexes.empty())
-    imageOp = createWaterfallLoop(imageOp, nonUniformArgIndexes);
+    imageOp = createWaterfallLoop(imageOp, nonUniformArgIndexes,
+                                  getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
   return imageOp;
 }
 
@@ -1288,7 +1291,8 @@ Value *ImageBuilder::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, un
         CreateIntrinsic(StructBufferAtomicIntrinsicTable[atomicOp], inputValue->getType(), args, nullptr, instName);
   }
   if (flags & ImageFlagNonUniformImage)
-    atomicInst = createWaterfallLoop(atomicInst, imageDescArgIndex);
+    atomicInst = createWaterfallLoop(atomicInst, imageDescArgIndex,
+                                     getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
   else if (flags & ImageFlagEnforceReadFirstLaneImage)
     enforceReadFirstLane(atomicInst, imageDescArgIndex);
 
@@ -1530,7 +1534,8 @@ Value *ImageBuilder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imag
     enforceReadFirstLane(result, samplerDescArgIndex);
 
   if (!nonUniformArgIndexes.empty())
-    result = createWaterfallLoop(result, nonUniformArgIndexes);
+    result = createWaterfallLoop(result, nonUniformArgIndexes,
+                                 getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
 
   return result;
 }

@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     53.6 | Add scalarizeWaterfallLoads to PipelineShaderOptions                                                  |
 //  |     53.5 | Add forceCsThreadIdSwizzling for thread id swizzle in 8*4                                             |
 //  |     53.4 | Add ldsSpillLimitDwords shader option                                                                 |
 //  |     53.3 | Add disableFastMathFlags shader option, plus support for this and fastMathFlags in pipeline files     |
@@ -668,6 +669,9 @@ struct PipelineShaderOptions {
 
   /// Maximum amount of LDS space to be used for spilling.
   unsigned ldsSpillLimitDwords;
+
+  /// Attempt to scalarize waterfall descriptor loads.
+  bool scalarizeWaterfallLoads;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
