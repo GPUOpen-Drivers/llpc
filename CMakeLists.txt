@@ -113,7 +113,7 @@ if(ICD_BUILD_LLPC)
 
     add_subdirectory(llpc ${PROJECT_BINARY_DIR}/llpc)
 
-    if(LLPC_BUILD_TESTS OR LLPC_BUILD_LIT)
+    if(LLPC_BUILD_TESTS)
         add_subdirectory(test)
     endif()
 
