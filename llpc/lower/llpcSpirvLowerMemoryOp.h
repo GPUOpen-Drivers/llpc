@@ -43,14 +43,6 @@ class StoreInst;
 namespace Llpc {
 
 // =====================================================================================================================
-// The structure for store instruction which needs to be expanded.
-struct StoreExpandInfo {
-  llvm::StoreInst *storeInst;                                  ///< "Store" instruction
-  llvm::SmallVector<llvm::GetElementPtrInst *, 1> getElemPtrs; ///< A group of "getelementptr" with constant indices
-  llvm::Value *dynIndex;                                       ///< Dynamic index of destination.
-};
-
-// =====================================================================================================================
 // Represents the pass of SPIR-V lowering memory operations.
 class SpirvLowerMemoryOp : public SpirvLower,
                            public llvm::InstVisitor<SpirvLowerMemoryOp>,
@@ -61,22 +53,10 @@ public:
 
   static llvm::StringRef name() { return "Lower SPIR-V memory operations"; }
 
-  virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElementPtrInst);
   virtual void visitExtractElementInst(llvm::ExtractElementInst &extractElementInst);
 
 private:
-  bool needExpandDynamicIndex(llvm::GetElementPtrInst *getElemPtr, unsigned *operandIndex,
-                              unsigned *dynIndexBound) const;
-  void expandLoadInst(llvm::LoadInst *loadInst, llvm::ArrayRef<llvm::GetElementPtrInst *> getElemPtrs,
-                      llvm::Value *dynIndex);
-  void recordStoreExpandInfo(llvm::StoreInst *storeInst, llvm::ArrayRef<llvm::GetElementPtrInst *> getElemPtrs,
-                             llvm::Value *dynIndex);
-  void expandStoreInst(llvm::StoreInst *storeInst, llvm::ArrayRef<llvm::GetElementPtrInst *> getElemPtrs,
-                       llvm::Value *dynIndex);
-
   std::unordered_set<llvm::Instruction *> m_removeInsts;
-  std::unordered_set<llvm::Instruction *> m_preRemoveInsts;
-  llvm::SmallVector<StoreExpandInfo, 1> m_storeExpandInfo;
 };
 
 // =====================================================================================================================
