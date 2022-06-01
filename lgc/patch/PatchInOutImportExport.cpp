@@ -4589,172 +4589,6 @@ void PatchInOutImportExport::writeValueToLds(bool offChip, Value *writeValue, Va
 }
 
 // =====================================================================================================================
-// Stores tessellation factors (outer/inner) to corresponding tessellation factor (TF) buffer.
-//
-// @param tessFactors : Tessellation factors to be stored
-// @param tessFactorOffset : Start offset to store the specified tessellation factors
-// @param insertPos : Where to insert store instructions
-void PatchInOutImportExport::storeTessFactorToBuffer(ArrayRef<Value *> tessFactors, Value *tessFactorOffset,
-                                                     Instruction *insertPos) {
-  assert(m_shaderStage == ShaderStageTessControl);
-
-  if (tessFactors.size() == 0) {
-    // No tessellation factor should be stored
-    return;
-  }
-
-  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
-  const auto &calcFactor = inOutUsage.calcFactor;
-
-  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl)->entryArgIdxs.tcs;
-  Value *tfBufferBase = getFunctionArgument(m_entryPoint, entryArgIdxs.tfBufferBase);
-
-  auto tessFactorStride = ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.tessFactorStride);
-
-  BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
-
-  // Mangle the call name according to the count of tessellation factors.
-  std::string callName(lgcName::TfBufferStore);
-  const unsigned compCount = tessFactors.size();
-  Value *tfValue = nullptr;
-  if (compCount == 1) {
-    tfValue = tessFactors[0];
-  } else {
-    tfValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), compCount));
-    for (unsigned compIdx = 0; compIdx < compCount; ++compIdx)
-      tfValue = builder.CreateInsertElement(tfValue, tessFactors[compIdx], compIdx);
-  }
-  callName += getTypeName(tfValue->getType());
-  if (!m_module->getFunction(callName))
-    createTessBufferStoreFunction(callName, compCount, tfValue->getType());
-
-  if (m_pipelineState->isTessOffChip()) {
-    if (m_gfxIp.major <= 8) {
-      // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
-      tfBufferBase =
-          BinaryOperator::CreateAdd(tfBufferBase, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
-    }
-  }
-
-  Value *args[] = {
-      m_pipelineSysValues.get(m_entryPoint)->getTessFactorBufDesc(), // tfBufferDesc
-      tfBufferBase,                                                  // tfBufferBase
-      m_pipelineSysValues.get(m_entryPoint)->getRelativeId(),        // relPatchId
-      tessFactorStride,                                              // tfStride
-      tessFactorOffset,                                              // tfOffset
-      tfValue                                                        // tfValue
-  };
-  builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
-}
-
-// =====================================================================================================================
-// Creates the LLPC intrinsic "lgc.tfbuffer.store.%tfValueType" to store tessellation factor.
-//
-// param@ funcName : The internal function name
-// param@ compCount : The component count of the store value
-// param@ tfValueTy : The type of the store value
-void PatchInOutImportExport::createTessBufferStoreFunction(StringRef funcName, unsigned compCount, Type *tfValueTy) {
-  // %tfValueType could be one of {f32, v2f32, v3f32, v4f32}
-  // define void @lgc.tfbuffer.store.%tfValueType(
-  //     <4 x i32> %tfBufferDesc, i32 %tfBufferBase, i32 %relPatchId, i32 %tfStride, i32 %tfOffset, %tfValueType
-  //     %tfValue)
-  // {
-  //     %1 = icmp ne i32 %tfOffset, -1 (invalidValue)
-  //     br i1 %1, label %.tfstore, label %.end
-  //
-  // .tfstore:
-  //     %2 = mul i32 %tfStride, 4
-  //     %3 = mul i32 %relPatchId, %2
-  //     %4 = mul i32 %tfOffset, 4
-  //     %5 = add i32 %3, %4
-  //     call void @llvm.amdgcn.raw.tbuffer.store.%tfValueType(
-  //         tfValueType %tfValue, <4 x i32> %tfBufferDesc, i32 %5, i32 %tfBufferBase, i32 1)
-  //     br label %.end
-  //
-  // .end:
-  //     ret void
-  // }
-  assert(tfValueTy->getScalarType()->isFloatTy());
-  BuilderBase builder(*m_context);
-  Type *argTys[] = {
-      FixedVectorType::get(Type::getInt32Ty(*m_context), 4), // TF buffer descriptor
-      builder.getInt32Ty(),                                  // TF buffer base
-      builder.getInt32Ty(),                                  // Relative patch ID
-      builder.getInt32Ty(),                                  // TF stride
-      builder.getInt32Ty(),                                  // TF offset
-      tfValueTy                                              // TF value
-  };
-  auto funcTy = FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, funcName, m_module);
-
-  func->setCallingConv(CallingConv::C);
-  func->addFnAttr(Attribute::NoUnwind);
-  func->addFnAttr(Attribute::AlwaysInline);
-
-  auto argIt = func->arg_begin();
-
-  Value *tfBufferDesc = argIt++;
-  tfBufferDesc->setName("tfBufferDesc");
-
-  Value *tfBufferBase = argIt++;
-  tfBufferBase->setName("tfBufferBase");
-
-  Value *relPatchId = argIt++;
-  relPatchId->setName("relPatchId");
-
-  Value *tfStride = argIt++;
-  tfStride->setName("tfStride");
-
-  Value *tfOffset = argIt++;
-  tfOffset->setName("tfOffset");
-
-  Value *tfValue = argIt++;
-  tfValue->setName("tfValue");
-
-  // Create ".end" block
-  BasicBlock *endBlock = BasicBlock::Create(*m_context, ".end", func);
-  ReturnInst::Create(*m_context, endBlock);
-
-  // Create ".tfstore" block
-  BasicBlock *tfStoreBlock = BasicBlock::Create(*m_context, ".tfstore", func, endBlock);
-
-  Value *tfByteOffset =
-      BinaryOperator::CreateMul(tfOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", tfStoreBlock);
-
-  Value *tfByteStride =
-      BinaryOperator::CreateMul(tfStride, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", tfStoreBlock);
-  Value *tfBufferOffset = BinaryOperator::CreateMul(relPatchId, tfByteStride, "", tfStoreBlock);
-
-  tfBufferOffset = BinaryOperator::CreateAdd(tfBufferOffset, tfByteOffset, "", tfStoreBlock);
-
-  auto branch = BranchInst::Create(endBlock, tfStoreBlock);
-
-  // Create llvm.amdgcn.raw.tbuffer.store.
-  CoherentFlag coherent = {};
-  coherent.bits.glc = true;
-
-  Value *args[] = {
-      tfValue,                                           // vdata
-      tfBufferDesc,                                      // rsrc
-      tfBufferOffset,                                    // voffset
-      tfBufferBase,                                      // soffset
-      builder.getInt32((*m_buffFormats)[compCount - 1]), // format
-      builder.getInt32(coherent.u32All)                  // glc
-  };
-
-  builder.SetInsertPoint(branch);
-  builder.CreateNamedCall((Twine("llvm.amdgcn.raw.tbuffer.store.") + getTypeName(tfValueTy)).str(), builder.getVoidTy(),
-                          args, {});
-
-  // Create entry block
-  BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func, tfStoreBlock);
-  Value *cond = new ICmpInst(*entryBlock, ICmpInst::ICMP_NE, tfOffset,
-                             ConstantInt::get(Type::getInt32Ty(*m_context), InvalidValue), "");
-  BranchInst::Create(tfStoreBlock, endBlock, cond, entryBlock);
-}
-
-// =====================================================================================================================
 // Calculates the dword offset to write value to LDS based on the specified VS output info.
 //
 // @param outputTy : Type of the output
@@ -5886,18 +5720,19 @@ void PatchInOutImportExport::storeTessFactors() {
     if (primitiveMode == PrimitiveMode::Isolines)
       std::swap(outerTessFactors[0], outerTessFactors[1]);
 
-    doTessFactorBufferStore(outerTessFactors, innerTessFactors, insertPos);
+    storeTessFactorToBuffer(outerTessFactors, innerTessFactors, insertPos);
   }
 }
 
 // =====================================================================================================================
-// Write the collected tessellation factors of Outer and Inner to TF buffer in turn.
+// Write the collected tessellation factors to TF buffer.
 //
-// @param outerTessFactors : The collected tessellation factors of Outer
-// @param innerTessFactors : The collected tessellation factors of Inner
+// @param outerTessFactors : The collected outer tessellation factors
+// @param innerTessFactors : The collected inner tessellation factors
 // @param insertPos : Where to insert instructions
-void PatchInOutImportExport::doTessFactorBufferStore(ArrayRef<Value *> outerTessFactors,
+void PatchInOutImportExport::storeTessFactorToBuffer(ArrayRef<Value *> outerTessFactors,
                                                      ArrayRef<Value *> innerTessFactors, Instruction *insertPos) {
+  assert(m_shaderStage == ShaderStageTessControl);
 
   // NOTE: Tessellation factors are from tessellation level array and we have:
   //   (1) Isoline
@@ -5919,32 +5754,81 @@ void PatchInOutImportExport::doTessFactorBufferStore(ArrayRef<Value *> outerTess
   IRBuilder<> builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
-  const unsigned outerTessFactorStart = 0;
-  unsigned innerTessFactorStart = 0;
+  Value *tfBufferDesc = m_pipelineSysValues.get(m_entryPoint)->getTessFactorBufDesc();
+
+  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl)->entryArgIdxs.tcs;
+  Value *tfBufferBase = getFunctionArgument(m_entryPoint, entryArgIdxs.tfBufferBase);
+  if (m_pipelineState->isTessOffChip()) {
+    if (m_gfxIp.major <= 8) {
+      // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
+      tfBufferBase =
+          BinaryOperator::CreateAdd(tfBufferBase, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
+    }
+  }
+
+  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+  auto relPatchId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
+  Value *tfBufferOffset = builder.CreateMul(relPatchId, builder.getInt32(calcFactor.tessFactorStride * sizeof(float)));
+
+  CoherentFlag coherent = {};
+  coherent.bits.glc = true;
+
   auto primitiveMode = m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
-  switch (primitiveMode) {
-  case PrimitiveMode::Isolines:
-    innerTessFactorStart = 2;
-    break;
-  case PrimitiveMode::Triangles:
-    innerTessFactorStart = 3;
-    break;
-  case PrimitiveMode::Quads:
-    innerTessFactorStart = 4;
-    break;
-  default:
-    llvm_unreachable("Invalid primitive mode!");
-    break;
-  }
+  if (primitiveMode == PrimitiveMode::Isolines || primitiveMode == PrimitiveMode::Triangles) {
+    // For isoline and triangle, we can combine outer tessellation factors with inner ones
+    FixedVectorType *tfValueTy =
+        FixedVectorType::get(builder.getFloatTy(), outerTessFactors.size() + innerTessFactors.size());
+    Value *tfValue = UndefValue::get(tfValueTy);
 
-  if (!outerTessFactors.empty()) {
-    assert(outerTessFactors.size() >= 2 && outerTessFactors.size() <= 4);
-    storeTessFactorToBuffer(outerTessFactors, builder.getInt32(outerTessFactorStart), insertPos);
-  }
+    assert(outerTessFactors.size() == 2 || outerTessFactors.size() == 3);
+    for (unsigned i = 0; i < outerTessFactors.size(); ++i)
+      tfValue = builder.CreateInsertElement(tfValue, outerTessFactors[i], i);
 
-  if (!innerTessFactors.empty()) {
-    assert(innerTessFactors.size() >= 1 && innerTessFactors.size() <= 2);
-    storeTessFactorToBuffer(innerTessFactors, builder.getInt32(innerTessFactorStart), insertPos);
+    assert(innerTessFactors.size() == 0 || innerTessFactors.size() == 1);
+    for (unsigned i = 0; i < innerTessFactors.size(); ++i)
+      tfValue = builder.CreateInsertElement(tfValue, innerTessFactors[i], outerTessFactors.size() + i);
+
+    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, tfValueTy,
+                            {tfValue,                                                             // vdata
+                             tfBufferDesc,                                                        // rsrc
+                             tfBufferOffset,                                                      // voffset
+                             tfBufferBase,                                                        // soffset
+                             builder.getInt32((*m_buffFormats)[tfValueTy->getNumElements() - 1]), // format
+                             builder.getInt32(coherent.u32All)});                                 // glc
+  } else {
+    assert(primitiveMode == PrimitiveMode::Quads);
+
+    FixedVectorType *outerTfValueTy = FixedVectorType::get(builder.getFloatTy(), outerTessFactors.size());
+    Value *outerTfValue = UndefValue::get(outerTfValueTy);
+
+    assert(outerTessFactors.size() == 4);
+    for (unsigned i = 0; i < outerTessFactors.size(); ++i)
+      outerTfValue = builder.CreateInsertElement(outerTfValue, outerTessFactors[i], i);
+
+    FixedVectorType *innerTfValueTy = FixedVectorType::get(builder.getFloatTy(), innerTessFactors.size());
+    Value *innerTfValue = UndefValue::get(innerTfValueTy);
+
+    assert(innerTessFactors.size() == 2);
+    for (unsigned i = 0; i < innerTessFactors.size(); ++i)
+      innerTfValue = builder.CreateInsertElement(innerTfValue, innerTessFactors[i], i);
+
+    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTfValueTy,
+                            {outerTfValue,                                                             // vdata
+                             tfBufferDesc,                                                             // rsrc
+                             tfBufferOffset,                                                           // voffset
+                             tfBufferBase,                                                             // soffset
+                             builder.getInt32((*m_buffFormats)[outerTfValueTy->getNumElements() - 1]), // format
+                             builder.getInt32(coherent.u32All)});                                      // glc
+
+    tfBufferOffset =
+        builder.CreateAdd(tfBufferOffset, builder.getInt32(outerTfValueTy->getNumElements() * sizeof(float)));
+    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, innerTfValueTy,
+                            {innerTfValue,                                                             // vdata
+                             tfBufferDesc,                                                             // rsrc
+                             tfBufferOffset,                                                           // voffset
+                             tfBufferBase,                                                             // soffset
+                             builder.getInt32((*m_buffFormats)[innerTfValueTy->getNumElements() - 1]), // format
+                             builder.getInt32(coherent.u32All)});                                      // glc
   }
 }
 

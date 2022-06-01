@@ -164,11 +164,6 @@ private:
   llvm::Value *readValueFromLds(bool offChip, llvm::Type *readTy, llvm::Value *ldsOffset, llvm::Instruction *insertPos);
   void writeValueToLds(bool offChip, llvm::Value *writeValue, llvm::Value *ldsOffset, llvm::Instruction *insertPos);
 
-  void storeTessFactorToBuffer(llvm::ArrayRef<llvm::Value *> tessFactors, llvm::Value *tessFactorOffset,
-                               llvm::Instruction *insertPos);
-
-  void createTessBufferStoreFunction(llvm::StringRef funcName, unsigned compCount, llvm::Type *tfValueTy);
-
   unsigned calcPatchCountPerThreadGroup(unsigned inVertexCount, unsigned inVertexStride, unsigned outVertexCount,
                                         unsigned outVertexStride, unsigned patchConstCount,
                                         unsigned tessFactorStride) const;
@@ -203,7 +198,7 @@ private:
   void exportVertexAttribs(llvm::Instruction *insertPos);
 
   void storeTessFactors();
-  void doTessFactorBufferStore(llvm::ArrayRef<llvm::Value *> outerTessFactors,
+  void storeTessFactorToBuffer(llvm::ArrayRef<llvm::Value *> outerTessFactors,
                                llvm::ArrayRef<llvm::Value *> innerTessFactors, llvm::Instruction *insertPos);
 
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
