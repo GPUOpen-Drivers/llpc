@@ -7,7 +7,7 @@
 ; SHADERTEST: Patch constant size: 0
 ; SHADERTEST: Patch constant total size: 0
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.raw.tbuffer.store.f32
+; SHADERTEST: call void @llvm.amdgcn.raw.tbuffer.store.v4f32
 ; SHADERTEST-NEXT: ret void
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
