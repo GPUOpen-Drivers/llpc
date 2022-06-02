@@ -1158,11 +1158,12 @@ public:
   // 64-bit elements.)
   // @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
   // @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
-  // @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
+  // @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
+  //                                 output: primitive index; else nullptr
   virtual llvm::Instruction *CreateWriteGenericOutput(llvm::Value *valueToWrite, unsigned location,
                                                       llvm::Value *locationOffset, llvm::Value *elemIdx,
                                                       unsigned locationCount, InOutInfo outputInfo,
-                                                      llvm::Value *vertexIndex) = 0;
+                                                      llvm::Value *vertexOrPrimitiveIndex) = 0;
 
   // Create a write to an XFB (transform feedback / streamout) buffer.
   // The value to write must be a scalar or vector type with no more than four elements.
@@ -1231,10 +1232,11 @@ public:
   // @param valueToWrite : Value to write
   // @param builtIn : Built-in kind, one of the BuiltIn* constants
   // @param outputInfo : Extra output info (shader-defined array length; GS stream id)
-  // @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
+  // @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
+  //                                 output: primitive index; else nullptr
   // @param index : For TCS: array or vector index to access part of an output, else nullptr
   virtual llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn,
-                                                      InOutInfo outputInfo, llvm::Value *vertexIndex,
+                                                      InOutInfo outputInfo, llvm::Value *vertexOrPrimitiveIndex,
                                                       llvm::Value *index) = 0;
 
   // Create a read of (part of) a task payload.
