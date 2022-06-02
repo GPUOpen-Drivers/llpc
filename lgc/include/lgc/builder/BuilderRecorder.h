@@ -448,7 +448,7 @@ public:
   // Create a write of (part of) a user output value.
   llvm::Instruction *CreateWriteGenericOutput(llvm::Value *valueToWrite, unsigned location, llvm::Value *locationOffset,
                                               llvm::Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
-                                              llvm::Value *vertexIndex) override final;
+                                              llvm::Value *vertexOrPrimitiveIndex) override final;
 
   // Create a write to an XFB (transform feedback / streamout) buffer.
   llvm::Instruction *CreateWriteXfbOutput(llvm::Value *valueToWrite, bool isBuiltIn, unsigned location,
@@ -465,7 +465,7 @@ public:
 
   // Create a write of (part of) a built-in output value.
   llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
-                                              llvm::Value *vertexIndex, llvm::Value *index) override final;
+                                              llvm::Value *vertexOrPrimitiveIndex, llvm::Value *index) override final;
 
   // Create a read of (part of) a pervertex input value.
   llvm::Value *CreateReadPerVertexInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,

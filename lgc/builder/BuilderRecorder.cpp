@@ -1478,10 +1478,11 @@ Value *BuilderRecorder::CreateReadGenericOutput(Type *resultTy, unsigned locatio
 // 64-bit elements.)
 // @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
 // @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
-// @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
+// @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
+//                                 output: primitive index; else nullptr
 Instruction *BuilderRecorder::CreateWriteGenericOutput(Value *valueToWrite, unsigned location, Value *locationOffset,
                                                        Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
-                                                       Value *vertexIndex) {
+                                                       Value *vertexOrPrimitiveIndex) {
   return record(Opcode::WriteGenericOutput, nullptr,
                 {
                     valueToWrite,
@@ -1490,7 +1491,7 @@ Instruction *BuilderRecorder::CreateWriteGenericOutput(Value *valueToWrite, unsi
                     elemIdx,
                     getInt32(locationCount),
                     getInt32(outputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
+                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : UndefValue::get(getInt32Ty()),
                 },
                 "");
 }
@@ -1578,16 +1579,17 @@ Value *BuilderRecorder::CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo o
 // @param valueToWrite : Value to write
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param outputInfo : Extra output info (shader-defined array length; GS stream id)
-// @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
+// @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
+//                                 output: primitive index; else nullptr
 // @param index : Array or vector index to access part of an input, else nullptr
 Instruction *BuilderRecorder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
-                                                       Value *vertexIndex, Value *index) {
+                                                       Value *vertexOrPrimitiveIndex, Value *index) {
   return record(Opcode::WriteBuiltInOutput, nullptr,
                 {
                     valueToWrite,
                     getInt32(builtIn),
                     getInt32(outputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
+                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : UndefValue::get(getInt32Ty()),
                     index ? index : UndefValue::get(getInt32Ty()),
                 },
                 "");

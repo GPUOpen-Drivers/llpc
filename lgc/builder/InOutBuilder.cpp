@@ -409,10 +409,11 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
 // 64-bit elements.)
 // @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
 // @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
-// @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
+// @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
+//                                 output: primitive index; else nullptr
 Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigned location, Value *locationOffset,
                                                     Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
-                                                    Value *vertexIndex) {
+                                                    Value *vertexOrPrimitiveIndex) {
   assert(valueToWrite->getType()->isAggregateType() == false);
 
   // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
@@ -424,7 +425,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
   }
 
   // Mark the usage of the output.
-  markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexIndex);
+  markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexOrPrimitiveIndex);
 
   // Set up the args for the llpc call.
   SmallVector<Value *, 6> args;
@@ -445,7 +446,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
     args.push_back(getInt32(location));
     args.push_back(locationOffset);
     args.push_back(elemIdx);
-    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    args.push_back(vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : getInt32(InvalidValue));
     break;
   }
 
@@ -1174,10 +1175,11 @@ Value *InOutBuilder::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
 // @param valueToWrite : Value to write
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param outputInfo : Extra output info (shader-defined array size; GS stream id)
-// @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
+// @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
+//                                 output: primitive index; else nullptr
 // @param index : Array or vector index to access part of an input, else nullptr
 Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
-                                                    Value *vertexIndex, Value *index) {
+                                                    Value *vertexOrPrimitiveIndex, Value *index) {
   // Mark usage.
   unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
   unsigned arraySize = outputInfo.getArraySize();
@@ -1214,14 +1216,14 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
   switch (m_shaderStage) {
   case ShaderStageTessControl:
     args.push_back(index ? index : getInt32(InvalidValue));
-    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    args.push_back(vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : getInt32(InvalidValue));
     break;
   case ShaderStageGeometry:
-    assert(!index && !vertexIndex);
+    assert(!index && !vertexOrPrimitiveIndex);
     args.push_back(getInt32(streamId));
     break;
   default:
-    assert(!index && !vertexIndex);
+    assert(!index && !vertexOrPrimitiveIndex);
     break;
   }
   args.push_back(valueToWrite);
