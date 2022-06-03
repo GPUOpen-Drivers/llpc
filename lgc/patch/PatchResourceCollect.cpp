@@ -693,9 +693,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           esVertsPerSubgroup = std::min(esVertsPerSubgroup, OptimalVerticesPerPrimitiveForTess * gsPrimsPerSubgroup);
 
         // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
-        if (gfxIp >= GfxIpVersion{10, 3})
+        if (gfxIp == GfxIpVersion{10, 3})
           esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
-        else if (gfxIp >= GfxIpVersion{10, 1})
+        else if (gfxIp == GfxIpVersion{10, 1})
           esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
       } else {
         // If GS is not present, instance count must be 1
@@ -754,9 +754,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
                                               Gfx9::NggMaxThreadsPerSubgroup));
 
         // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
-        if (gfxIp >= GfxIpVersion{10, 3})
+        if (gfxIp == GfxIpVersion{10, 3})
           esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
-        else if (gfxIp >= GfxIpVersion{10, 1})
+        else if (gfxIp == GfxIpVersion{10, 1})
           esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
 
         // And then recalculate our LDS usage.
