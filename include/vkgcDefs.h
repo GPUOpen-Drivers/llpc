@@ -408,6 +408,7 @@ struct PipelineOptions {
                                    ///  the pipeline ELF.
   bool scalarBlockLayout;          ///< If set, allows scalar block layout of types.
   bool reconfigWorkgroupLayout;    ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.
+  bool forceCsThreadIdSwizzling;   ///< Force rearranges threadId within group into blocks of 8*8 or 8*4.
   bool includeIr;                  ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
   bool robustBufferAccess;         ///< If set, out of bounds accesses to buffer or private array will be handled.
                                    ///  for now this option is used by LLPC shader and affects only the private array,

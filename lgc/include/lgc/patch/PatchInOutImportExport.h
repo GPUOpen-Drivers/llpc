@@ -190,7 +190,7 @@ private:
 
   WorkgroupLayout calculateWorkgroupLayout();
   llvm::Value *reconfigWorkgroup(llvm::Value *localInvocationId, llvm::Instruction *insertPos);
-
+  llvm::Value *swizzleLocalInvocationIdIn8x4(llvm::Value *localInvocationId, llvm::Instruction *insertPos);
   void exportShadingRate(llvm::Value *shadingRate, llvm::Instruction *insertPos);
   llvm::Value *getShadingRate(llvm::Instruction *insertPos);
 

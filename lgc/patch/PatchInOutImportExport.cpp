@@ -478,6 +478,19 @@ void PatchInOutImportExport::processShader() {
           reconfigCall->eraseFromParent();
         }
       }
+      // Different with above, this will force the threadID swizzle which will rearrange thread ID within a group into
+      // blocks of 8*4, not to reconfig workgroup automatically and will support to be swizzled in 8*4 block
+      // split.
+      if (func.isDeclaration() && func.getName().startswith(lgcName::SwizzleLocalInvocationId)) {
+        while (!func.use_empty()) {
+          CallInst *swizzleCall = cast<CallInst>(*func.user_begin());
+          Value *localInvocationId = swizzleCall->getArgOperand(0);
+
+          localInvocationId = swizzleLocalInvocationIdIn8x4(localInvocationId, swizzleCall);
+          swizzleCall->replaceAllUsesWith(localInvocationId);
+          swizzleCall->eraseFromParent();
+        }
+      }
     }
   }
 }
@@ -5438,6 +5451,73 @@ Value *PatchInOutImportExport::reconfigWorkgroup(Value *localInvocationId, Instr
   remappedId = InsertElementInst::Create(remappedId, newY, ConstantInt::get(int32Ty, 1), "", insertPos);
 
   return remappedId;
+}
+
+// =====================================================================================================================
+// This function adds instructions to swizzle thread ID inside a group.
+//
+// The data layout in TCP is typically 8 x something.
+// The typewriter style SIMD layout does not match well with the data layout,
+// which will potentially cause partial cache line read/write.
+//
+// In the case of 16x16 thread group size, wf32 SIMD will be created in eight 16x2 regions.
+// This function maps the eight 16x2 regions into eight 8x4 regions.
+//
+// Originally SIMDs cover 16x2 regions, after swizzling they cover 8x4 regions.
+//
+// @param localInvocationId : The original workgroup ID.
+// @param insertPos : Where to insert instructions.
+Value *PatchInOutImportExport::swizzleLocalInvocationIdIn8x4(Value *localInvocationId, Instruction *insertPos) {
+  IRBuilder<> builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+  auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+
+  const unsigned workgroupSizeX = mode.workgroupSizeX;
+  const unsigned workgroupSizeY = mode.workgroupSizeY;
+
+  if (workgroupSizeX < 16)
+    return localInvocationId;
+
+  if (workgroupSizeX % 8 != 0)
+    return localInvocationId;
+
+  if (workgroupSizeY % 4 != 0)
+    return localInvocationId;
+
+  if ((workgroupSizeX >= 16) && (workgroupSizeX % 8 == 0) && (workgroupSizeY % 4 == 0)) {
+    Value *threadIdInGroupX = builder.CreateExtractElement(localInvocationId, (uint64_t)0);
+    Value *threadIdInGroupY = builder.CreateExtractElement(localInvocationId, 1);
+    Value *threadIdInGroupZ = builder.CreateExtractElement(localInvocationId, 2);
+    const unsigned blockSizeX = 8;
+    const unsigned blockSizeY = 4;
+    const unsigned blockDimY = workgroupSizeY / 4; // How many blocks are split in Y level.
+
+    const unsigned blockSize = blockSizeX * blockSizeY; // 32 threads per-block
+
+    Value *linearId = builder.CreateMul(threadIdInGroupY, builder.getInt32(workgroupSizeX));
+    linearId = builder.CreateAdd(linearId, threadIdInGroupX);
+
+    Value *waveId = builder.CreateUDiv(linearId, builder.getInt32(blockSize));
+    Value *waveLinearId = builder.CreateURem(linearId, builder.getInt32(blockSize));
+    Value *blockOffsX = builder.CreateUDiv(waveId, builder.getInt32(blockDimY));
+    Value *blockOffsY = builder.CreateURem(waveId, builder.getInt32(blockDimY));
+
+    Value *blockThreadIdX = builder.CreateURem(waveLinearId, builder.getInt32(blockSizeX));
+    Value *blockThreadIdY = builder.CreateUDiv(waveLinearId, builder.getInt32(blockSizeX));
+
+    Value *newThreadIdInGroupX = builder.CreateMul(blockOffsX, builder.getInt32(blockSizeX));
+    newThreadIdInGroupX = builder.CreateAdd(newThreadIdInGroupX, blockThreadIdX);
+    Value *newThreadIdInGroupY = builder.CreateMul(blockOffsY, builder.getInt32(blockSizeY));
+    newThreadIdInGroupY = builder.CreateAdd(newThreadIdInGroupY, blockThreadIdY);
+
+    Value *newThreadIdInGroupZ = threadIdInGroupZ;
+    Value *newThreadIdInGroup = PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 3));
+    newThreadIdInGroup = builder.CreateInsertElement(newThreadIdInGroup, newThreadIdInGroupX, uint64_t(0));
+    newThreadIdInGroup = builder.CreateInsertElement(newThreadIdInGroup, newThreadIdInGroupY, 1);
+    newThreadIdInGroup = builder.CreateInsertElement(newThreadIdInGroup, newThreadIdInGroupZ, 2);
+    return newThreadIdInGroup;
+  }
+  return localInvocationId;
 }
 
 // =====================================================================================================================

@@ -272,6 +272,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
 
   options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || getPipelineOptions()->includeDisassembly);
   options.reconfigWorkgroupLayout = getPipelineOptions()->reconfigWorkgroupLayout;
+  options.forceCsThreadIdSwizzling = getPipelineOptions()->forceCsThreadIdSwizzling;
   options.includeIr = (IncludeLlvmIr || getPipelineOptions()->includeIr);
 
   switch (getPipelineOptions()->shadowDescriptorTableUsage) {

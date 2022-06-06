@@ -132,6 +132,7 @@ Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
   pipelineInfo->options.enableRelocatableShaderElf = compileInfo.relocatableShaderElf;
   pipelineInfo->options.scalarBlockLayout = compileInfo.scalarBlockLayout;
   pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo.scratchAccessBoundsChecks;
+  pipelineInfo->options.forceCsThreadIdSwizzling = compileInfo.compPipelineInfo.options.forceCsThreadIdSwizzling;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   if (compileInfo.optimizationLevel.hasValue()) {
     pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.getValue();
