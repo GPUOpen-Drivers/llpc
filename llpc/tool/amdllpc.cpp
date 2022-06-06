@@ -230,6 +230,12 @@ cl::opt<bool> EnableScratchAccessBoundsChecks("enable-scratch-bounds-checks",
                                               cl::desc("Insert scratch access bounds checks on loads and stores"),
                                               cl::init(false));
 
+// -enable-forceCsThreadIdSwizzling: force cs thread id swizzling
+cl::opt<bool> ForceCsThreadIdSwizzling("force-compute-shader-thread-id-swizzling",
+                                              cl::desc("force compute shader thread-id swizzling"),
+                                              cl::init(false));
+
+
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 cl::opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
                                            cl::desc("Filter which types of pipeline dump are disabled\n"
@@ -427,6 +433,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->compPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
 #endif
   compileInfo->gfxPipelineInfo.options.resourceLayoutScheme = LayoutScheme;
+  compileInfo->compPipelineInfo.options.forceCsThreadIdSwizzling = ForceCsThreadIdSwizzling;
 
   // Set NGG control settings
   if (ParsedGfxIp.major >= 10) {

@@ -1095,6 +1095,18 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
       localInvocationId = CreateNamedCall(lgcName::ReconfigureLocalInvocationId, localInvocationId->getType(),
                                           localInvocationId, Attribute::ReadNone);
     }
+
+    // In the case of 16x16 thread group size, wave32 SIMD will be created in eight 16x2 regions.
+    // This function maps the eight 16x2 regions into eight 8x4 regions.
+    //
+    // Originally SIMDs cover 16x2 regions, after swizzling they cover 8x4 regions.
+
+    if (m_pipelineState->getOptions().forceCsThreadIdSwizzling && !getPipelineState()->isComputeLibrary()) {
+      // Insert a call that later on might get lowered to code to reconfigure the workgroup.
+      localInvocationId = CreateNamedCall(lgcName::SwizzleLocalInvocationId, localInvocationId->getType(),
+                                          localInvocationId, Attribute::ReadNone);
+    }
+
     return localInvocationId;
   }
 

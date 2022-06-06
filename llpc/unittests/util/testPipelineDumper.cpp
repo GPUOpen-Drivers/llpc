@@ -279,6 +279,19 @@ TEST(PipelineDumperTest, TestOptimizationLevel1Compute) {
     runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
   }
 }
+
+// =====================================================================================================================
+// Test the forceCsthreadIdSwizzling option.
+
+TEST(PipelineDumperTest, TestForceCsThreadIdSwizzlingCompute) {
+  ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
+    buildInfo->options.forceCsThreadIdSwizzling = true;
+  };
+
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
+  runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
 #endif
 
 } // namespace
