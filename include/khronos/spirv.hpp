@@ -35,7 +35,5 @@
 #include "spirv/unified1/spirv.hpp"
 #else
 #include "spirv/spirv.hpp"
-#endif
-
 #include "devext/spv_amd_shader_early_and_late_fragment_tests.h"
-
+#endif
