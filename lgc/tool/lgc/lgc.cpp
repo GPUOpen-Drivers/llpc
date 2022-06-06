@@ -113,6 +113,9 @@ static bool isIsaText(StringRef data) {
 int main(int argc, char **argv) {
   const char *progName = sys::path::filename(argv[0]).data();
   LLVMContext context;
+  // Temporarily disable opaque pointers (llvm is making opaque the default).
+  // TODO: Remove this once work complete on transition to opaque pointers.
+  context.setOpaquePointers(false);
   LgcContext::initialize();
 
   // Set our category on options that we want to show in -help, and hide other options.

@@ -65,6 +65,9 @@ namespace Llpc {
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
   reset();
+  // Temporarily disable opaque pointers (llvm is making opaque the default).
+  // TODO: Remove this once work complete on transition to opaque pointers.
+  setOpaquePointers(false);
 }
 
 // =====================================================================================================================
