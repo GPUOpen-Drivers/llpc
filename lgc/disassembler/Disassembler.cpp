@@ -245,7 +245,13 @@ void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
     return;
 
   // Switch the streamer to the section.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 425813
+  // Old version of code
   m_streamer->AddBlankLine();
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  m_streamer->addBlankLine();
+#endif
   unsigned sectFlags = sectionRef.getFlags();
   MCSection *sect = m_context->getELFSection(cantFail(sectionRef.getName()), sectType, sectFlags);
   m_streamer->SwitchSection(sect);
