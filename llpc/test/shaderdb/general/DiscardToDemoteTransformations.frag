@@ -4,7 +4,7 @@
 // RUN: amdllpc %gfxip --v %s \
 // RUN:   | tee %t.disabled | FileCheck %s --check-prefix=DISABLED
 //
-// DISABLED-LABEL: {{^}}SPIR-V disassembly:
+// DISABLED-LABEL: {{^}}SPIR-V disassembly
 // DISABLED:       {{^}} {{OpKill|OpTerminateInvocation}}
 // DISABLED:             OpImageSampleImplicitLod
 // DISABLED-LABEL: {{^}}// LLPC SPIR-V lowering results
@@ -22,7 +22,7 @@
 // RUN:   --amdgpu-transform-discard-to-demote \
 // RUN:   | tee %t.enabled | FileCheck %s --check-prefix=ENABLED
 //
-// ENABLED-LABEL: {{^}}SPIR-V disassembly:
+// ENABLED-LABEL: {{^}}SPIR-V disassembly
 // ENABLED:       {{^}} {{OpKill|OpTerminateInvocation}}
 // ENABLED:             OpImageSampleImplicitLod
 // ENABLED-LABEL: {{^}}// LLPC SPIR-V lowering results

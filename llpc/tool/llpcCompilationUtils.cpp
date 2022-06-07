@@ -149,6 +149,21 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
 }
 
 // =====================================================================================================================
+// Disassemble SPIR-V binary file.
+//
+// @param binSize: Binary size.
+// @param code: Pointer to binary.
+// @param header: Extra info.
+static void disassembleSpirv(unsigned binSize, const void *code, const llvm::Twine &header) {
+  assert(EnableOuts());
+  unsigned textSize = binSize * 10 + 1024;
+  std::vector<char> spvText(textSize);
+  LLPC_OUTS("\nSPIR-V disassembly for " << header << ":\n");
+  spvDisassembleSpirv(binSize, code, textSize, spvText.data());
+  LLPC_OUTS(spvText.data() << "\n");
+}
+
+// =====================================================================================================================
 // GLSL compiler, compiles GLSL source text file (input) to SPIR-V binary file (output).
 //
 // @param inFilename : Input filename, GLSL source text
@@ -222,11 +237,8 @@ Expected<BinaryData> compileGlsl(const std::string &inFilename, ShaderStage *sta
   void *bin = new char[binSize]();
   llvm::copy(llvm::make_range(spvBin, spvBin + binSize / sizeof(unsigned)), reinterpret_cast<unsigned *>(bin));
 
-  textSize = binSize * 10 + 1024;
-  std::vector<char> spvText(textSize, '\0');
-  LLPC_OUTS("\nSPIR-V disassembly:\n");
-  spvDisassembleSpirv(binSize, spvBin, textSize, spvText.data());
-  LLPC_OUTS(spvText.data() << "\n");
+  if (EnableOuts())
+    disassembleSpirv(binSize, spvBin, inFilename);
 
   return BinaryData{static_cast<size_t>(binSize), bin};
 }
@@ -380,14 +392,9 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
 
       compileInfo.shaderModuleDatas.push_back(shaderModuleData);
       compileInfo.stageMask |= shaderStageToMask(pipelineState->stages[stage].stage);
-
-      unsigned binSize = pipelineState->stages[stage].dataSize;
-      unsigned textSize = binSize * 10 + 1024;
-      LLPC_OUTS("\nSPIR-V disassembly for " << getShaderStageName(pipelineState->stages[stage].stage)
-                                            << " shader module:\n");
-      std::vector<char> spvText(textSize);
-      spvDisassembleSpirv(binSize, shaderModuleData.spirvBin.pCode, textSize, spvText.data());
-      LLPC_OUTS(spvText.data() << "\n");
+      if (EnableOuts())
+        disassembleSpirv(pipelineState->stages[stage].dataSize, shaderModuleData.spirvBin.pCode,
+                         Twine(getShaderStageName(pipelineState->stages[stage].stage)) + " shader module");
     }
   }
 
@@ -432,12 +439,8 @@ static Expected<ShaderModuleData> processInputSpirvStage(const InputSpec &spirvI
   if (!isSpvGenLoaded) {
     LLPC_OUTS("Failed to load SPVGEN -- no SPIR-V disassembler available\n");
   } else {
-    // Disassemble SPIR-V code.
-    unsigned textSize = spvBin.codeSize * 10 + 1024;
-    SmallVector<char> spvText(textSize);
-    LLPC_OUTS("\nSPIR-V disassembly for " << spirvInput.filename << "\n");
-    spvDisassembleSpirv(spvBin.codeSize, spvBin.pCode, textSize, spvText.data());
-    LLPC_OUTS(spvText.data() << "\n");
+    if (EnableOuts())
+      disassembleSpirv(spvBin.codeSize, spvBin.pCode, spirvInput.filename);
   }
 
   if (validateSpirv) {
