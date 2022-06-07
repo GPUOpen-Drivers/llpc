@@ -4,7 +4,7 @@
 ; RUN:   && cat %t.stdout %t.stderr | FileCheck %s
 ;
 ; Check stdout.
-; CHECK:       {{^}}SPIR-V disassembly for [[INPUT:.+\.spvasm]]{{$}}
+; CHECK:       {{^}}SPIR-V disassembly for [[INPUT:.+\.spvasm]]:{{$}}
 ; CHECK:       {{^}}LLPC PipelineHash: 0x[[#%.16X,PIPE_HASH:]] Files: [[INPUT]]{{$}}
 ;
 ; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
