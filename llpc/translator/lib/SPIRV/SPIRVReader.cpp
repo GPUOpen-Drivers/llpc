@@ -93,10 +93,6 @@ using namespace Llpc;
 
 namespace SPIRV {
 
-cl::opt<unsigned> SPIRVGenFastMathFlags("spirv-gen-fast-math-flags", cl::init(0),
-                                        cl::desc("Enable fast math mode with generating floating"
-                                                 "point binary ops"));
-
 cl::opt<bool> SPIRVWorkaroundBadSPIRV("spirv-workaround-bad-spirv", cl::init(true),
                                       cl::desc("Enable workarounds for bad SPIR-V"));
 
@@ -995,9 +991,6 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
   // flags on the handled instruction
   if (const unsigned flags = m_shaderOptions->fastMathFlags)
     return buildFastMathFlags(flags);
-
-  if (SPIRVGenFastMathFlags)
-    return buildFastMathFlags(SPIRVGenFastMathFlags);
 
   // Only do this for operations with floating point type.
   if (!bv->hasType())
