@@ -1,0 +1,82 @@
+; Test that the view index folds to 0 when multiview is not enabled.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: {{^//}} LLPC final ELF info
+; SHADERTEST: _amdgpu_vs_main:
+; SHADERTEST: s_buffer_load_dwordx4 {{.*}}, {{.*}}, 0x180
+; SHADERTEST: s_endpgm
+; SHADERTEST: _amdgpu_ps_main:
+; SHADERTEST: s_endpgm
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 52
+
+[VsSpirv]
+               OpCapability Shader
+               OpCapability MultiView
+               OpExtension "SPV_KHR_multiview"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %2 "main" %3 %4
+               OpDecorate %3 BuiltIn ViewIndex
+               OpDecorate %_arr_v4float_uint_8 ArrayStride 16
+               OpMemberDecorate %_struct_15 0 Offset 384
+               OpDecorate %_struct_15 Block
+               OpDecorate %16 DescriptorSet 1
+               OpDecorate %16 Binding 1
+               OpMemberDecorate %_struct_17 0 BuiltIn Position
+               OpMemberDecorate %_struct_17 1 BuiltIn PointSize
+               OpMemberDecorate %_struct_17 2 BuiltIn ClipDistance
+               OpDecorate %_struct_17 Block
+       %void = OpTypeVoid
+         %20 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+%_ptr_Uniform_v4float = OpTypePointer Uniform %v4float
+      %int_2 = OpConstant %int 2
+      %int_3 = OpConstant %int 3
+%_ptr_Input_uint = OpTypePointer Input %uint
+          %3 = OpVariable %_ptr_Input_uint Input
+     %uint_8 = OpConstant %uint 8
+%_arr_v4float_uint_8 = OpTypeArray %v4float %uint_8
+ %_struct_15 = OpTypeStruct %_arr_v4float_uint_8
+%_ptr_Uniform__struct_15 = OpTypePointer Uniform %_struct_15
+         %16 = OpVariable %_ptr_Uniform__struct_15 Uniform
+     %uint_1 = OpConstant %uint 1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+ %_struct_17 = OpTypeStruct %v4float %float %_arr_float_uint_1
+%_ptr_Output__struct_17 = OpTypePointer Output %_struct_17
+          %4 = OpVariable %_ptr_Output__struct_17 Output
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+     %uint_0 = OpConstant %uint 0
+          %2 = OpFunction %void None %20
+         %40 = OpLabel
+         %41 = OpLoad %uint %3
+         %45 = OpAccessChain %_ptr_Uniform_v4float %16 %uint_0 %41
+         %46 = OpLoad %v4float %45
+         %47 = OpAccessChain %_ptr_Output_v4float %4 %int_0
+               OpStore %47 %46
+               OpReturn
+               OpFunctionEnd
+
+[VsInfo]
+entryPoint = main
+
+
+[ResourceMapping]
+userDataNode[0].visibility = 1
+userDataNode[0].type = DescriptorConstBufferCompact
+userDataNode[0].offsetInDwords = 2
+userDataNode[0].sizeInDwords = 2
+userDataNode[0].set = 0x00000001
+userDataNode[0].binding = 1
+
+[GraphicsPipelineState]
+enableMultiView = 0
+
