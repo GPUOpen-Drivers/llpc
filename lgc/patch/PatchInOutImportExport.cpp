@@ -2038,8 +2038,12 @@ Value *PatchInOutImportExport::patchVsBuiltInInputImport(Type *inputTy, unsigned
   switch (builtInId) {
   // BuiltInVertexIndex, BuiltInInstanceIndex, BuiltInBaseVertex, BuiltInBaseInstance, BuiltInDrawIndex
   // now handled in InOutBuilder.
-  case BuiltInViewIndex:
-    return getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+  case BuiltInViewIndex: {
+    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+      return getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+    }
+    return ConstantInt::get(Type::getInt32Ty(*m_context), 0);
+  }
   default:
     llvm_unreachable("Should never be called!");
     return UndefValue::get(inputTy);
