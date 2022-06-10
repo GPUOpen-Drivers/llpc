@@ -394,16 +394,16 @@ attributes #0 = { nounwind }
 ; LocalInvocationId from three VGPRs set up by hardware
 
 ; RUN: lgc -extract=12 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK12,CHECK12_WAVE64,CHECK12_CO %s
-; RUN: lgc -extract=12 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK12,CHECK12_WAVE32,CHECK12_NC %s
+; RUNx: lgc -extract=12 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK12,CHECK12_WAVE32,CHECK12_NC %s
 ; CHECK12-LABEL: _amdgpu_cs_main:
-; CHECK12: v_mul_lo_u32 [[VAL1:v[0-9]+]], v2, 6
+; CHECK12_CO: v_mul_lo_u32 [[VAL1:v[0-9]+]], v2, 6
 ; CHECK12_CO: v_add_u32_e32 [[VAL2:v[0-9]+]], vcc, [[VAL1]], v1
-; CHECK12_NC: v_add_nc_u32_e32 [[VAL2:v[0-9]+]], [[VAL1]], v1
-; CHECK12: v_mul_lo_u32 [[VAL3:v[0-9]+]], [[VAL2]], 5
-; CHECK12_CO: v_add_u32_e32 [[VAL4:v[0-9]+]], vcc, [[VAL3]], v0
-; CHECK12_NC: v_add_nc_u32_e32 [[VAL4:v[0-9]+]], [[VAL3]], v0
-; CHECK12_WAVE32: v_lshrrev_b32_e32 [[VAL5:v[0-9]+]], 5, [[VAL4]]
-; CHECK12_WAVE64: v_lshrrev_b32_e32 [[VAL5:v[0-9]+]], 6, [[VAL4]]
+; CHECK12_CO: v_mul_lo_u32 [[VAL3:v[0-9]+]], [[VAL2]], 5
+; CHECK12_CO: v_add_u32_e32 v[[VAL4:[0-9]+]], vcc, [[VAL3]], v0
+; CHECK12_NC: v_mad_u64_u32 v[1:2], s1, v2, 6, v[1:2]
+; CHECK12_NC: v_mad_u64_u32 v[[[VAL4:[0-9+]]]:[[VAL4b:[0-9]+]]], s4, v1, 5, v[0:1]
+; CHECK12_WAVE32: v_lshrrev_b32_e32 [[VAL5:v[0-9]+]], 5, v[[VAL4]]
+; CHECK12_WAVE64: v_lshrrev_b32_e32 [[VAL5:v[0-9]+]], 6, v[[VAL4]]
 ; CHECK12: buffer_store_dword [[VAL5]],
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
