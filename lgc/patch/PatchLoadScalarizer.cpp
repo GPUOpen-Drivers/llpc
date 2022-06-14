@@ -182,10 +182,10 @@ void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
       Value *loadCompPtr = m_builder->CreateConstGEP1_32(compTy, newLoadPtr, i,
                                                          loadInst.getPointerOperand()->getName() + ".i" + Twine(i));
       // Calculate the alignment of component i
-      uint64_t compAlignment = MinAlign(loadInst.getAlignment(), i * compSize);
+      Align compAlignment = commonAlignment(loadInst.getAlign(), i * compSize);
 
-      loadComps[i] = m_builder->CreateAlignedLoad(compTy, loadCompPtr, Align(compAlignment),
-                                                  loadInst.getName() + ".ii" + Twine(i));
+      loadComps[i] =
+          m_builder->CreateAlignedLoad(compTy, loadCompPtr, compAlignment, loadInst.getName() + ".ii" + Twine(i));
 
       for (auto metaNode : allMetaNodes)
         dyn_cast<Instruction>(loadComps[i])->setMetadata(metaNode.first, metaNode.second);
