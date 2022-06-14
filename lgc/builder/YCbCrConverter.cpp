@@ -349,19 +349,16 @@ void YCbCrConverter::genImgDescChroma() {
   SqImgRsrcRegHandler proxySqRsrcRegHelper(m_builder, m_imgDescLuma, m_gfxIp);
 
   Value *width = nullptr;
-  Value *height = nullptr;
-
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 52
   if ((m_metaData.word5.lumaDepth > 1) && (m_metaData.word1.planes > 1)) {
     width = ConstantInt::get(m_builder->getInt32Ty(), m_metaData.word4.lumaWidth);
-    height = ConstantInt::get(m_builder->getInt32Ty(), m_metaData.word4.lumaHeight);
     m_width = ConstantFP::get(m_builder->getFloatTy(), m_metaData.word4.lumaWidth);
     m_height = ConstantFP::get(m_builder->getFloatTy(), m_metaData.word4.lumaHeight);
   } else
 #endif
   {
     width = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Width);
-    height = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Height);
+    Value *height = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Height);
     m_width = m_builder->CreateUIToFP(width, m_builder->getFloatTy());
     m_height = m_builder->CreateUIToFP(height, m_builder->getFloatTy());
   }

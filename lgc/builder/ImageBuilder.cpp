@@ -542,7 +542,6 @@ Value *ImageBuilder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flag
       result = CreateInsertValue(CreateInsertValue(UndefValue::get(intrinsicDataTy), texel, uint64_t(0)),
                                  CreateExtractValue(result, 1), 1);
     } else {
-      intrinsicDataTy = origTexelTy;
       result = texel;
     }
   }

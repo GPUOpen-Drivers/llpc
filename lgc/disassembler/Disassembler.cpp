@@ -444,10 +444,9 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
 
     // Got a disassemblable instruction.
     // First output any non-disassemblable data up to this point.
-    if (lastOffset != offset) {
+    if (lastOffset != offset)
       outputData(outputting, lastOffset, contents.slice(lastOffset, offset), relocs);
-      lastOffset = offset;
-    }
+
     // Output reloc.
     outputRelocs(outputting, offset, inst.bytes.size(), relocs);
 

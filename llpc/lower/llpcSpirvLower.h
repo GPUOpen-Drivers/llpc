@@ -101,8 +101,7 @@ llvm::ModulePass *createSpirvLowerTranslator(ShaderStage stage, const PipelineSh
 // Represents the pass of SPIR-V lowering operations, as the base class.
 class SpirvLower {
 public:
-  explicit SpirvLower()
-    : m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid), m_entryPoint(nullptr) {}
+  explicit SpirvLower() {}
 
   // Add per-shader lowering passes to pass manager
   static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer
@@ -117,11 +116,11 @@ public:
 protected:
   void init(llvm::Module *module);
 
-  llvm::Module *m_module;       // LLVM module to be run on
-  Context *m_context;           // Associated LLPC context of the LLVM module that passes run on
-  ShaderStage m_shaderStage;    // Shader stage
-  llvm::Function *m_entryPoint; // Entry point of input module
-  lgc::Builder *m_builder;      // LGC builder object
+  llvm::Module *m_module = nullptr;               // LLVM module to be run on
+  Context *m_context = nullptr;                   // Associated LLPC context of the LLVM module that passes run on
+  ShaderStage m_shaderStage = ShaderStageInvalid; // Shader stage
+  llvm::Function *m_entryPoint = nullptr;         // Entry point of input module
+  lgc::Builder *m_builder = nullptr;              // LGC builder object
 };
 
 // =====================================================================================================================

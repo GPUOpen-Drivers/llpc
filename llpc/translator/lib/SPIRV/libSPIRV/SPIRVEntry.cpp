@@ -160,6 +160,7 @@ void SPIRVEntry::decode(std::istream &I) { assert(0 && "Not implemented"); }
 std::vector<SPIRVValue *>
 SPIRVEntry::getValues(const std::vector<SPIRVId> &IdVec) const {
   std::vector<SPIRVValue *> ValueVec;
+  ValueVec.reserve(IdVec.size());
   for (auto I : IdVec)
     ValueVec.push_back(getValue(I));
   return ValueVec;
@@ -168,14 +169,15 @@ SPIRVEntry::getValues(const std::vector<SPIRVId> &IdVec) const {
 std::vector<SPIRVType *>
 SPIRVEntry::getValueTypes(const std::vector<SPIRVId> &IdVec) const {
   std::vector<SPIRVType *> TypeVec;
+  TypeVec.reserve(IdVec.size());
   for (auto I : IdVec)
     TypeVec.push_back(getValue(I)->getType());
   return TypeVec;
 }
 
-std::vector<SPIRVId>
-SPIRVEntry::getIds(const std::vector<SPIRVValue *> ValueVec) const {
+std::vector<SPIRVId> SPIRVEntry::getIds(const std::vector<SPIRVValue *> &ValueVec) const {
   std::vector<SPIRVId> IdVec;
+  IdVec.reserve(ValueVec.size());
   for (auto I : ValueVec)
     IdVec.push_back(I->getId());
   return IdVec;

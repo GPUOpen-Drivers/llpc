@@ -132,7 +132,7 @@ PreservedAnalyses PatchInOutImportExport::run(Module &module, ModuleAnalysisMana
 // @returns : True if the module was modified by the transformation and false otherwise
 bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
                                      PipelineState *pipelineState,
-                                     std::function<PostDominatorTree &(Function &)> getPostDominatorTree) {
+                                     const std::function<PostDominatorTree &(Function &)> &getPostDominatorTree) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-In-Out-Import-Export\n");
 
   Patch::init(&module);
@@ -221,10 +221,10 @@ bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipe
   return true;
 }
 
-void PatchInOutImportExport::processFunction(Function &func, ShaderStage shaderStage,
-                                             SmallVectorImpl<Function *> &inputCallees,
-                                             SmallVectorImpl<Function *> &otherCallees,
-                                             std::function<PostDominatorTree &(Function &)> getPostDominatorTree) {
+void PatchInOutImportExport::processFunction(
+    Function &func, ShaderStage shaderStage, SmallVectorImpl<Function *> &inputCallees,
+    SmallVectorImpl<Function *> &otherCallees,
+    const std::function<PostDominatorTree &(Function &)> &getPostDominatorTree) {
   PostDominatorTree &postDomTree = getPostDominatorTree(func);
 
   initPerShader();
@@ -445,11 +445,9 @@ void PatchInOutImportExport::processShader() {
         break;
       case PrimitiveMode::Quads:
         LLPC_OUTS("quads");
-        tessFactorStride = 6;
         break;
       case PrimitiveMode::Isolines:
         LLPC_OUTS("isolines");
-        tessFactorStride = 2;
         break;
       default:
         llvm_unreachable("Should never be called!");
@@ -1280,6 +1278,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
       // Merge gl_ClipDistance[] and gl_CullDistance[]
       std::vector<Value *> clipCullDistance;
+      clipCullDistance.reserve(clipDistance.size() + cullDistance.size());
       for (auto clipDistanceElement : clipDistance)
         clipCullDistance.push_back(clipDistanceElement);
 
@@ -1739,7 +1738,6 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
                                                          unsigned interpLoc, bool highHalf, Instruction *insertPos) {
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
-  Value *input = UndefValue::get(inputTy);
 
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
   auto &interpInfo = resUsage->inOutUsage.fs.interpInfo;
@@ -1892,9 +1890,10 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   }
 
   // Store interpolation results to inputs
-  if (interpTy == inputTy)
+  Value *input;
+  if (interpTy == inputTy) {
     input = interp;
-  else {
+  } else {
     assert(canBitCast(interpTy, inputTy));
     input = new BitCastInst(interp, inputTy, "", insertPos);
   }

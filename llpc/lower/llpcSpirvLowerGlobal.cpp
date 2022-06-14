@@ -278,7 +278,7 @@ void SpirvLowerGlobal::handleReturnInst() {
       Instruction *terminator = block.getTerminator();
       if (!terminator || terminator->getOpcode() != Instruction::Ret)
         continue;
-      ReturnInst *returnInst = dyn_cast<ReturnInst>(terminator);
+      ReturnInst *returnInst = cast<ReturnInst>(terminator);
       assert(m_retBlock);
       BranchInst::Create(m_retBlock, &block);
       m_retInsts.insert(returnInst);
@@ -300,7 +300,7 @@ void SpirvLowerGlobal::handleCallInst(bool checkEmitCall, bool checkInterpCall) 
     // by interpolateInputElement
     SmallVector<User *> users(function.users());
     for (User *user : users) {
-      assert(dyn_cast<CallInst>(user) && "We should only have CallInst instructions here.");
+      assert(isa<CallInst>(user) && "We should only have CallInst instructions here.");
       CallInst *callInst = cast<CallInst>(user);
       if (checkEmitCall) {
         if (mangledName.startswith(gSPIRVName::EmitVertex) || mangledName.startswith(gSPIRVName::EmitStreamVertex))
@@ -425,10 +425,9 @@ void SpirvLowerGlobal::handleLoadInstGEP(GetElementPtrInst *const getElemPtr, Lo
 
   assert(cast<ConstantInt>(getElemPtr->getOperand(1))->isZero() && "Non-zero GEP first index\n");
 
-  GlobalVariable *inOut = dyn_cast<GlobalVariable>(getElemPtr->getPointerOperand());
-  assert(!dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
+  GlobalVariable *inOut = cast<GlobalVariable>(getElemPtr->getPointerOperand());
+  assert(!isa<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
          "Chained GEPs should have been coalesced by SpirvLowerAccessChain.");
-  assert(inOut && "The root of the GEP should always be the global variable.");
 
   for (auto &index : drop_begin(getElemPtr->indices()))
     indexOperands.push_back(toInt32Value(index, &loadInst));
@@ -480,7 +479,7 @@ void SpirvLowerGlobal::handleLoadInst() {
         // We look for load instructions in the GEP users
         for (User *gepUser : gep->users()) {
           // We shouldn't have any chained GEPs here, they are coalesced by the LowerAccessChain pass.
-          assert(!dyn_cast<GetElementPtrInst>(gepUser));
+          assert(!isa<GetElementPtrInst>(gepUser));
           if (LoadInst *loadInst = dyn_cast<LoadInst>(gepUser))
             handleLoadInstGEP(gep, *loadInst, addrSpace);
         }
@@ -534,10 +533,9 @@ void SpirvLowerGlobal::handleStoreInstGEP(GetElementPtrInst *const getElemPtr, S
 
   assert(cast<ConstantInt>(getElemPtr->getOperand(1))->isZero() && "Non-zero GEP first index\n");
 
-  GlobalVariable *output = dyn_cast<GlobalVariable>(getElemPtr->getPointerOperand());
-  assert(!dyn_cast<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
+  GlobalVariable *output = cast<GlobalVariable>(getElemPtr->getPointerOperand());
+  assert(!isa<GetElementPtrInst>(getElemPtr->getPointerOperand()) &&
          "Chained GEPs should have been coalesced by SpirvLowerAccessChain.");
-  assert(output && "The root of the GEP should always be the global variable.");
 
   for (auto &index : drop_begin(getElemPtr->indices()))
     indexOperands.push_back(toInt32Value(index, &storeInst));
@@ -582,7 +580,7 @@ void SpirvLowerGlobal::handleStoreInst() {
         // We look for store instructions in the GEP users
         for (User *gepUser : gep->users()) {
           // We shouldn't have any chained GEPs here, they are coalesced by the LowerAccessChain pass.
-          assert(!dyn_cast<GetElementPtrInst>(gepUser));
+          assert(!isa<GetElementPtrInst>(gepUser));
           if (StoreInst *storeInst = dyn_cast<StoreInst>(gepUser))
             handleStoreInstGEP(gep, *storeInst);
         }
@@ -1716,8 +1714,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
               replaceInstsInfo.bitCastInst = bitCast;
             } else {
               // The users of the select must be a GEP.
-              SelectInst *selectInst = dyn_cast<SelectInst>(inst);
-              assert(selectInst);
+              SelectInst *selectInst = cast<SelectInst>(inst);
               assert(selectInst->getTrueValue() == &global || selectInst->getFalseValue() == &global);
               replaceInstsInfo.selectInst = selectInst;
               for (User *selectUser : selectInst->users()) {

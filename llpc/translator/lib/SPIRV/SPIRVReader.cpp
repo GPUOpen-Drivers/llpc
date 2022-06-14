@@ -171,8 +171,8 @@ Value *SPIRVToLLVM::mapValue(SPIRVValue *bv, Value *v) {
     if (loc->second == v)
       return v;
     auto ld = dyn_cast<LoadInst>(loc->second);
-    auto placeholder = dyn_cast<GlobalVariable>(ld->getPointerOperand());
-    assert(ld && placeholder && placeholder->getName().startswith(KPlaceholderPrefix) && "A value is translated twice");
+    auto placeholder = cast<GlobalVariable>(ld->getPointerOperand());
+    assert(ld && placeholder->getName().startswith(KPlaceholderPrefix) && "A value is translated twice");
     // Replaces placeholders for PHI nodes
     ld->replaceAllUsesWith(v);
     ld->eraseFromParent();
@@ -803,7 +803,7 @@ bool SPIRVToLLVM::isSPIRVCmpInstTransToLLVMInst(SPIRVInstruction *bi) const {
 }
 
 void SPIRVToLLVM::setName(llvm::Value *v, SPIRVValue *bv) {
-  auto name = bv->getName();
+  const auto &name = bv->getName();
 
   if (name.empty())
     return;
@@ -1143,8 +1143,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
       while (!workList.empty()) {
         Value *const value = workList.pop_back_val();
 
-        Instruction *const inst = dyn_cast<Instruction>(value);
-        assert(inst);
+        Instruction *const inst = cast<Instruction>(value);
 
         getBuilder()->SetInsertPoint(inst);
 
@@ -4920,8 +4919,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
 
     Value *ptrDiff = getBuilder()->CreatePtrDiff(ty, op1, op2);
 
-    auto destType = dyn_cast<IntegerType>(transType(bv->getType()));
-    auto ptrDiffType = dyn_cast<IntegerType>(ptrDiff->getType());
+    auto destType = cast<IntegerType>(transType(bv->getType()));
+    auto ptrDiffType = cast<IntegerType>(ptrDiff->getType());
     assert(destType->getBitWidth() <= ptrDiffType->getBitWidth());
     if (destType->getBitWidth() < ptrDiffType->getBitWidth())
       ptrDiff = new TruncInst(ptrDiff, destType, "", bb);
@@ -5209,8 +5208,7 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
   SPIRVExecutionModelKind execModel = isEntry ? entryPoint->getExecModel() : ExecutionModelMax;
   auto linkage = isEntry ? GlobalValue::ExternalLinkage : transLinkageType(bf);
   FunctionType *ft = dyn_cast<FunctionType>(transType(bf->getFunctionType()));
-  Function *f = dyn_cast<Function>(mapValue(bf, Function::Create(ft, linkage, bf->getName(), m_m)));
-  assert(f);
+  Function *f = cast<Function>(mapValue(bf, Function::Create(ft, linkage, bf->getName(), m_m)));
   mapFunction(bf, f);
   if (!f->isIntrinsic()) {
     if (isEntry) {
@@ -6013,7 +6011,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
 // @param convertingSamplerIdx : [in] The index of converting sampler that will be used in createImageOp.
 // @param createImageOp : [in] A function that accepts converting sampler and returns the same type as result.
 Value *SPIRVToLLVM::ConvertingSamplerSelectLadderHelper(Value *result, Value *convertingSamplerIdx,
-                                                        std::function<Value *(Value *)> createImageOp) {
+                                                        const std::function<Value *(Value *)> &createImageOp) {
   // We have converting samplers. We need to create a converting image sample for each possible one, and
   // select the one we want with a select ladder. In any sensible case, the converting sampler index is
   // statically determinable by later optimizations, and all but the correct image sample get optimized away.
@@ -7485,7 +7483,6 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
         else
           memberDec.XfbExtraOffset = xfbExtraOffset;
       }
-      xfbExtraOffset = memberDec.XfbExtraOffset;
       SPIRVWord memberStreamId = SPIRVID_INVALID;
       if (bt->hasMemberDecorate(memberIdx, DecorationStream, 0, &memberStreamId))
         memberDec.StreamId = memberStreamId;
@@ -8184,7 +8181,7 @@ Value *SPIRVToLLVM::flushDenorm(Value *val) {
 // =============================================================================
 // Translate ShaderTrinaryMinMax extended instructions
 Value *SPIRVToLLVM::transTrinaryMinMaxExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
-  auto bArgs = extInst->getArguments();
+  const auto &bArgs = extInst->getArguments();
   auto args = transValue(extInst->getValues(bArgs), bb->getParent(), bb);
   switch (extInst->getExtOp()) {
 
@@ -8464,10 +8461,7 @@ bool SPIRVToLLVM::shouldInsertScratchBoundsCheck(SPIRVValue *memOp, SPIRVToLLVM:
   SPIRVStorageClassKind pointerStorageClass = accessChain->getType()->getPointerStorageClass();
 
   // We don't want bounds checks if we are outside private or function storage class.
-  if (pointerStorageClass != StorageClassPrivate && pointerStorageClass != StorageClassFunction)
-    return false;
-
-  return true;
+  return pointerStorageClass == StorageClassPrivate || pointerStorageClass == StorageClassFunction;
 }
 
 Instruction *SPIRVToLLVM::getLastInsertedValue() {

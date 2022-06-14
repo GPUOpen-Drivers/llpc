@@ -352,7 +352,7 @@ private:
   void truncConstantIndex(std::vector<Value *> &indices, BasicBlock *bb);
 
   Value *ConvertingSamplerSelectLadderHelper(Value *result, Value *convertingSamplerIdx,
-                                             std::function<Value *(Value *)> createImageOp);
+                                             const std::function<Value *(Value *)> &createImageOp);
 
   Function *createLibraryEntryFunc();
   // ========================================================================================================================

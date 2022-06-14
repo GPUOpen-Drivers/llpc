@@ -165,7 +165,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
 
   // Check shader cache
-  passMgr.addPass(PatchCheckShaderCache(checkShaderCacheFunc));
+  passMgr.addPass(PatchCheckShaderCache(std::move(checkShaderCacheFunc)));
 
   // Stop timer for patching passes and start timer for optimization passes.
   if (patchTimer) {
@@ -324,7 +324,7 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   // Check shader cache
   auto checkShaderCachePass = createLegacyPatchCheckShaderCache();
   passMgr.add(checkShaderCachePass);
-  checkShaderCachePass->setCallbackFunction(checkShaderCacheFunc);
+  checkShaderCachePass->setCallbackFunction(std::move(checkShaderCacheFunc));
 
   // Stop timer for patching passes and start timer for optimization passes.
   if (patchTimer) {

@@ -50,7 +50,7 @@ public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
   bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState,
-               std::function<llvm::PostDominatorTree &(llvm::Function &)> getPostDominatorTree);
+               const std::function<llvm::PostDominatorTree &(llvm::Function &)> &getPostDominatorTree);
 
   static llvm::StringRef name() { return "Patch LLVM for input import and output export operations"; }
 
@@ -61,7 +61,7 @@ private:
   void processFunction(llvm::Function &func, ShaderStage shaderStage,
                        llvm::SmallVectorImpl<llvm::Function *> &inputCallees,
                        llvm::SmallVectorImpl<llvm::Function *> &otherCallees,
-                       std::function<llvm::PostDominatorTree &(llvm::Function &)> getPostDominatorTree);
+                       const std::function<llvm::PostDominatorTree &(llvm::Function &)> &getPostDominatorTree);
   void initPerShader();
 
   void markExportDone(llvm::Function *func, llvm::PostDominatorTree &postDomTree);

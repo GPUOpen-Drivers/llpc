@@ -761,8 +761,7 @@ void PatchBufferOp::visitMemMoveInst(MemMoveInst &memMoveInst) {
   const MaybeAlign srcAlignment = memMoveInst.getParamAlign(1);
 
   // We assume LLVM is not introducing variable length mem moves.
-  ConstantInt *const length = dyn_cast<ConstantInt>(memMoveInst.getArgOperand(2));
-  assert(length);
+  ConstantInt *const length = cast<ConstantInt>(memMoveInst.getArgOperand(2));
 
   // Get a vector type that is the length of the memmove.
   VectorType *const memoryType = FixedVectorType::get(m_builder->getInt8Ty(), length->getZExtValue());
@@ -1320,8 +1319,7 @@ Value *PatchBufferOp::getPointerOperandAsInst(Value *const value) {
     return value;
   }
 
-  ConstantExpr *const constExpr = dyn_cast<ConstantExpr>(value);
-  assert(constExpr);
+  ConstantExpr *const constExpr = cast<ConstantExpr>(value);
 
   Instruction *const newInst = m_builder->Insert(constExpr->getAsInstruction());
 
