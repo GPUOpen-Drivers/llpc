@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
 
   // Read and process each input file.
   SmallVector<std::unique_ptr<MemoryBuffer>, 4> inBuffers;
-  for (auto inFileName : InFiles) {
+  for (const auto &inFileName : InFiles) {
     // Read the input file. getFileOrSTDIN handles the case of inFileName being "-".
     ErrorOr<std::unique_ptr<MemoryBuffer>> fileOrErr = MemoryBuffer::getFileOrSTDIN(inFileName);
     if (std::error_code errorCode = fileOrErr.getError()) {

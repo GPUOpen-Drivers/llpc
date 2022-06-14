@@ -168,8 +168,8 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
       if (compCount == 2) {
         scalar = CreateIntrinsic(intrinsicDot2, {}, {input1, input2, accumulator, clamp}, nullptr, instName);
       } else {
-        Value *intermediateRes = getInt32(0);
-        scalar = getInt32(0);
+        Value *intermediateRes = nullptr;
+        scalar = nullptr;
         if (compCount == 3) {
           // Split <3xi16> up with an integer multiplication, a 16-bit integer dot product
           Value *w1 = CreateExtractElement(input1, 2);

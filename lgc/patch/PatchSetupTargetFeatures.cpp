@@ -167,8 +167,9 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       // Set the work group size
       const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
       unsigned flatWorkGroupSize = computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
-      auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
-      builder.addAttribute("amdgpu-flat-work-group-size", flatWorkGroupSizeString + "," + flatWorkGroupSizeString);
+      SmallVector<char, 8> attributeBuf;
+      builder.addAttribute("amdgpu-flat-work-group-size",
+                           (Twine(flatWorkGroupSize) + "," + Twine(flatWorkGroupSize)).toStringRef(attributeBuf));
     }
 
     auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();

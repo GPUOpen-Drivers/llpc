@@ -372,6 +372,8 @@ bool Document::parseKey(const char *key, unsigned lineNum, Section *sectionObjec
     if (isArrayAccess(keyTok)) {
       char *lBracket = nullptr;
       result = parseArrayAccess(keyTok, lineNum, &parsedArrayIndex, &lBracket, nullptr, &m_errorMsg);
+      if (!result)
+        break;
       // Remove bracket from string token
       *lBracket = '\0';
       keyTok = trimStringEnd(keyTok);

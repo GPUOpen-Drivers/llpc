@@ -102,8 +102,7 @@ void SpirvLower::replaceConstWithInsts(Context *context, Constant *const constVa
     users.push_back(user);
 
   for (Value *const user : users) {
-    Instruction *const inst = dyn_cast<Instruction>(user);
-    assert(inst);
+    Instruction *const inst = cast<Instruction>(user);
 
     // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
     if (PHINode *const phiNode = dyn_cast<PHINode>(inst)) {

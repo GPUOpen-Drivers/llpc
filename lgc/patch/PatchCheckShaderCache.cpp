@@ -72,7 +72,7 @@ template <class MapType> static void streamMapEntries(MapType &map, raw_ostream 
 
 // =====================================================================================================================
 PatchCheckShaderCache::PatchCheckShaderCache(Pipeline::CheckShaderCacheFunc callbackFunc)
-    : m_callbackFunc(callbackFunc) {
+    : m_callbackFunc(std::move(callbackFunc)) {
 }
 
 // =====================================================================================================================

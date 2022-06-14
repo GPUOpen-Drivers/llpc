@@ -331,32 +331,29 @@ Result ShaderCache::buildFileName(const char *executableName, const char *cacheF
   // The file name is constructed by taking the executable file name, appending the client string, device ID and
   // GPU index then hashing the result.
   char hashedFileName[PathBufferLen];
-  int length = 0;
   if (ShaderCacheFilename.empty()) {
-    length = snprintf(hashedFileName, PathBufferLen, "%s.%s.%u.%u.%u", executableName, ClientStr, gfxIp.major,
-                      gfxIp.minor, gfxIp.stepping);
+    snprintf(hashedFileName, PathBufferLen, "%s.%s.%u.%u.%u", executableName, ClientStr, gfxIp.major, gfxIp.minor,
+             gfxIp.stepping);
 
     const unsigned nameHash = djbHash(hashedFileName, 0);
-    length = snprintf(hashedFileName, PathBufferLen, "%08x.bin", nameHash);
+    snprintf(hashedFileName, PathBufferLen, "%08x.bin", nameHash);
 
     // Combine the base path, the sub-path and the file name to get the fully qualified path to the cache file
-    length = snprintf(m_fileFullPath, PathBufferLen, "%s%s%s", cacheFilePath, CacheFileSubPath, hashedFileName);
+    snprintf(m_fileFullPath, PathBufferLen, "%s%s%s", cacheFilePath, CacheFileSubPath, hashedFileName);
   } else {
-    length =
-        snprintf(m_fileFullPath, PathBufferLen, "%s%s%s", cacheFilePath, CacheFileSubPath, ShaderCacheFilename.c_str());
+    snprintf(m_fileFullPath, PathBufferLen, "%s%s%s", cacheFilePath, CacheFileSubPath, ShaderCacheFilename.c_str());
   }
 
   assert(cacheFileExists);
   *cacheFileExists = File::exists(m_fileFullPath);
   Result result = Result::Success;
   if (!*cacheFileExists) {
-    length = snprintf(hashedFileName, PathBufferLen, "%s%s", cacheFilePath, CacheFileSubPath);
+    snprintf(hashedFileName, PathBufferLen, "%s%s", cacheFilePath, CacheFileSubPath);
     std::error_code errCode = sys::fs::create_directories(hashedFileName);
     if (!errCode)
       result = Result::Success;
   }
 
-  ((void)length);
   return result;
 }
 

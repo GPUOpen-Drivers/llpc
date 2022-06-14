@@ -1338,6 +1338,7 @@ SPIRVType *SPIRVModuleImpl::getValueType(SPIRVId TheId) const {
 std::vector<SPIRVValue *>
 SPIRVModuleImpl::getValues(const std::vector<SPIRVId> &IdVec) const {
   std::vector<SPIRVValue *> ValueVec;
+  ValueVec.reserve(IdVec.size());
   for (auto I : IdVec)
     ValueVec.push_back(getValue(I));
   return ValueVec;
@@ -1346,6 +1347,7 @@ SPIRVModuleImpl::getValues(const std::vector<SPIRVId> &IdVec) const {
 std::vector<SPIRVType *>
 SPIRVModuleImpl::getValueTypes(const std::vector<SPIRVId> &IdVec) const {
   std::vector<SPIRVType *> TypeVec;
+  TypeVec.reserve(IdVec.size());
   for (auto I : IdVec)
     TypeVec.push_back(getValue(I)->getType());
   return TypeVec;
@@ -1354,6 +1356,7 @@ SPIRVModuleImpl::getValueTypes(const std::vector<SPIRVId> &IdVec) const {
 std::vector<SPIRVId>
 SPIRVModuleImpl::getIds(const std::vector<SPIRVEntry *> &ValueVec) const {
   std::vector<SPIRVId> IdVec;
+  IdVec.reserve(ValueVec.size());
   for (auto I : ValueVec)
     IdVec.push_back(I->getId());
   return IdVec;
@@ -1362,6 +1365,7 @@ SPIRVModuleImpl::getIds(const std::vector<SPIRVEntry *> &ValueVec) const {
 std::vector<SPIRVId>
 SPIRVModuleImpl::getIds(const std::vector<SPIRVValue *> &ValueVec) const {
   std::vector<SPIRVId> IdVec;
+  IdVec.reserve(ValueVec.size());
   for (auto I : ValueVec)
     IdVec.push_back(I->getId());
   return IdVec;

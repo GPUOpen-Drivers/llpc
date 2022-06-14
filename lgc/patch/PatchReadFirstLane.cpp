@@ -159,7 +159,7 @@ bool PatchReadFirstLane::runImpl(Function &function, std::function<bool(const Us
                                  TargetTransformInfo *targetTransformInfo) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Read-First-Lane\n");
 
-  m_isDivergentUse = isDivergentUse;
+  m_isDivergentUse = std::move(isDivergentUse);
   m_targetTransformInfo = targetTransformInfo;
 
   bool changed = promoteEqualUniformOps(function);
@@ -280,7 +280,7 @@ bool PatchReadFirstLane::liftReadFirstLane(Function &function) {
   bool changed = false;
 
   // Lift readfirstlanes in each relevant basic block
-  for (auto blockInitialReadFirstLanes : blockInitialReadFirstLanesMap) {
+  for (const auto &blockInitialReadFirstLanes : blockInitialReadFirstLanesMap) {
     BasicBlock *curBb = blockInitialReadFirstLanes.first;
 
     // Step 1: Collect all instructions that "can be assumed uniform" with its divergent uses in a map
@@ -535,7 +535,7 @@ bool PatchReadFirstLane::isAllUsersAssumedUniform(Instruction *inst) {
 void PatchReadFirstLane::applyReadFirstLane(Instruction *inst, BuilderBase &builder) {
   // Guarantee the insert position is behind all PhiNodes
   Instruction *insertPos = inst->getNextNonDebugInstruction();
-  while (dyn_cast<PHINode>(insertPos))
+  while (isa<PHINode>(insertPos))
     insertPos = insertPos->getNextNonDebugInstruction();
   builder.SetInsertPoint(insertPos);
 

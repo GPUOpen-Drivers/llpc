@@ -1,6 +1,6 @@
  # Do not modify llpc.h, vkgcDefs.h, anything in the SPIRV library, or vfx.h, or anything in lgc/imported.
 HeaderFilterRegex: '.*/vfx/vfx..*\\.h|.*/dumper/vkgc.*\\.h|.*/util/vkgc.*\\.h|.*/lgc/include/.*\\.h|.*/context/llpc[^/]*\\.h|.*/util/llpc[^/]*\\.h|.*/lower/llpc[^/]*\\.h|.*/builder/llpc[^/]*\\.h|.*/patch.*/llpc[^/]*\\.h|.*/tool/[^/]*\\.h'
-Checks: '-*,clang-diagnostic-*,llvm-*,-llvm-include-order,-llvm-qualified-auto,-llvm-header-guard,performance-*,misc-*,-misc-no-recursion,-misc-unused-parameters,-misc-non-private-member-variables-in-classes,readability-identifier-naming,readability-simplify-boolean-expr,readability-redundant-nullptr-comparison,readability-redundant-parentheses,readability-declaration-inline-comment'
+Checks: '-*,clang-analyzer-*,clang-diagnostic-*,-clang-analyzer-core.CallAndMessage,-clang-analyzer-core.DivideZero,-clang-analyzer-core.NonNullParamChecker,-clang-analyzer-core.NullDereference,-clang-analyzer-core.uninitialized.UndefReturn,-clang-analyzer-core.UndefinedBinaryOperatorResult,-clang-analyzer-optin.cplusplus.VirtualCall,llvm-*,-llvm-include-order,-llvm-qualified-auto,-llvm-header-guard,performance-*,misc-*,-misc-no-recursion,-misc-unused-parameters,-misc-non-private-member-variables-in-classes,readability-simplify-boolean-expr,readability-redundant-nullptr-comparison,readability-redundant-parentheses,readability-declaration-inline-comment'
 CheckOptions:
   - { key: readability-identifier-naming.ParameterCase, value: camelBack }
   - { key: readability-identifier-naming.ParameterRemovePrefixes, value: 'p,b,pfn' }

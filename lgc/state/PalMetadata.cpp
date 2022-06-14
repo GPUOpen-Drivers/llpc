@@ -434,7 +434,7 @@ void PalMetadata::fixUpRegisters() {
 
   // First find the descriptor sets and push const nodes.
   SmallVector<const ResourceNode *, 4> descSetNodes;
-  const ResourceNode *pushConstNode;
+  const ResourceNode *pushConstNode = nullptr;
   for (const auto &node : m_pipelineState->getUserDataNodes()) {
     if (node.type == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
       size_t descSet = node.innerTable[0].set;

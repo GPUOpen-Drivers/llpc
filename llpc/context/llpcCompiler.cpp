@@ -1032,8 +1032,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   raw_svector_ostream elfStream(*pipelineElf);
 
   if (result == Result::Success) {
-    result = Result::ErrorInvalidShader;
 #if LLPC_ENABLE_EXCEPTION
+    result = Result::ErrorInvalidShader;
     try
 #endif
     {
@@ -1044,7 +1044,9 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       };
 
       pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers, cl::NewPassManager == 2);
+#if LLPC_ENABLE_EXCEPTION
       result = Result::Success;
+#endif
     }
 #if LLPC_ENABLE_EXCEPTION
     catch (const char *) {

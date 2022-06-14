@@ -2473,7 +2473,7 @@ void NggPrimShader::doEarlyExit(unsigned fullyCulledExportCount) {
 // @param sysValueStart : Start of system value
 void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
   const bool hasTs = (m_hasTcs || m_hasTes);
-  if (((hasTs && m_hasTes) || (!hasTs && m_hasVs)) == false) {
+  if (!((hasTs && m_hasTes) || (!hasTs && m_hasVs))) {
     // No TES (tessellation is enabled) or VS (tessellation is disabled), don't have to run
     return;
   }
@@ -2943,8 +2943,7 @@ void NggPrimShader::splitEs(Module *module) {
 
   for (auto func : expFuncs) {
     for (auto user : func->users()) {
-      CallInst *const call = dyn_cast<CallInst>(user);
-      assert(call);
+      CallInst *const call = cast<CallInst>(user);
 
       if (call->getParent()->getParent() != esCullDataFetchFunc)
         continue; // Export call doesn't belong to targeted function, skip
@@ -3008,8 +3007,7 @@ void NggPrimShader::splitEs(Module *module) {
 
   for (auto func : expFuncs) {
     for (auto user : func->users()) {
-      CallInst *const call = dyn_cast<CallInst>(user);
-      assert(call);
+      CallInst *const call = cast<CallInst>(user);
 
       if (call->getParent()->getParent() != esDeferredVertexExportFunc)
         continue; // Export call doesn't belong to targeted function, skip
@@ -3186,8 +3184,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
     if (func.getName().startswith(lgcName::NggGsOutputExport)) {
       // Export GS outputs to GS-VS ring
       for (auto user : func.users()) {
-        CallInst *const call = dyn_cast<CallInst>(user);
-        assert(call);
+        CallInst *const call = cast<CallInst>(user);
         m_builder->SetInsertPoint(call);
 
         assert(call->arg_size() == 4);
@@ -3205,8 +3202,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
     } else if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg) {
       // Handle GS message
       for (auto user : func.users()) {
-        CallInst *const call = dyn_cast<CallInst>(user);
-        assert(call);
+        CallInst *const call = cast<CallInst>(user);
         m_builder->SetInsertPoint(call);
 
         if (getShaderStage(call->getParent()->getParent()) != ShaderStageGeometry)
@@ -3330,8 +3326,7 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
     if (func.getName().startswith(lgcName::NggGsOutputImport)) {
       // Import GS outputs from GS-VS ring
       for (auto user : func.users()) {
-        CallInst *const call = dyn_cast<CallInst>(user);
-        assert(call);
+        CallInst *const call = cast<CallInst>(user);
 
         if (call->getFunction() != copyShaderEntryPoint)
           continue; // Not belong to copy shader
@@ -4573,7 +4568,7 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
 
     // vtxZFmt = (VTX_Z_FMT, PA_CL_VTE_CNTL[9], 0 = 1/W0, 1 = none)
     Value *vtxZFmt = CreateUBfe(paClVteCntl, 9, 1);
-    vtxZFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
+    vtxZFmt = m_builder->CreateTrunc(vtxZFmt, m_builder->getInt1Ty());
 
     // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
     Value *clipSpaceDef = CreateUBfe(paClClipCntl, 19, 1);
@@ -4800,7 +4795,7 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
 
     // vtxZFmt = (VTX_Z_FMT, PA_CL_VTE_CNTL[9], 0 = 1/W0, 1 = none)
     Value *vtxZFmt = CreateUBfe(paClVteCntl, 9, 1);
-    vtxZFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
+    vtxZFmt = m_builder->CreateTrunc(vtxZFmt, m_builder->getInt1Ty());
 
     // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
     Value *clipSpaceDef = CreateUBfe(paClClipCntl, 19, 1);
