@@ -597,36 +597,35 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
     loadPtr = builder.CreateBitCast(loadPtr, PointerType::get(loadTy, m_lds->getType()->getPointerAddressSpace()));
 
     return builder.CreateAlignedLoad(loadTy, loadPtr, m_lds->getAlign());
-  } else {
-    assert(m_gsVsRingBufDesc);
-
-    CoherentFlag coherent = {};
-    coherent.bits.glc = true;
-    coherent.bits.slc = true;
-
-    Value *loadValue = UndefValue::get(loadTy);
-
-    for (unsigned i = 0; i < elemCount; ++i) {
-      Value *ringOffset = calcGsVsRingOffsetForInput(location + i / 4, i % 4, streamId, builder);
-      auto loadElem = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load, elemTy,
-                                              {
-                                                  m_gsVsRingBufDesc, ringOffset,
-                                                  builder.getInt32(0),              // soffset
-                                                  builder.getInt32(coherent.u32All) // glc, slc
-                                              });
-
-      if (loadTy->isArrayTy())
-        loadValue = builder.CreateInsertValue(loadValue, loadElem, i);
-      else if (loadTy->isVectorTy())
-        loadValue = builder.CreateInsertElement(loadValue, loadElem, i);
-      else {
-        assert(elemCount == 1);
-        loadValue = loadElem;
-      }
-    }
-
-    return loadValue;
   }
+  assert(m_gsVsRingBufDesc);
+
+  CoherentFlag coherent = {};
+  coherent.bits.glc = true;
+  coherent.bits.slc = true;
+
+  Value *loadValue = UndefValue::get(loadTy);
+
+  for (unsigned i = 0; i < elemCount; ++i) {
+    Value *ringOffset = calcGsVsRingOffsetForInput(location + i / 4, i % 4, streamId, builder);
+    auto loadElem = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load, elemTy,
+                                            {
+                                                m_gsVsRingBufDesc, ringOffset,
+                                                builder.getInt32(0),              // soffset
+                                                builder.getInt32(coherent.u32All) // glc, slc
+                                            });
+
+    if (loadTy->isArrayTy())
+      loadValue = builder.CreateInsertValue(loadValue, loadElem, i);
+    else if (loadTy->isVectorTy())
+      loadValue = builder.CreateInsertElement(loadValue, loadElem, i);
+    else {
+      assert(elemCount == 1);
+      loadValue = loadElem;
+    }
+  }
+
+  return loadValue;
 }
 
 // =====================================================================================================================

@@ -148,7 +148,8 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
       result = CreateInsertElement(result, results[i], i);
 
     return result;
-  } else if (type->isIntegerTy() && type->getIntegerBitWidth() == 1) {
+  }
+  if (type->isIntegerTy() && type->getIntegerBitWidth() == 1) {
     SmallVector<Value *, 4> newMappedArgs;
 
     for (Value *const mappedArg : mappedArgs)
@@ -156,7 +157,8 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
 
     Value *const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
     return CreateTrunc(result, getInt1Ty());
-  } else if (type->isIntegerTy() && type->getIntegerBitWidth() < 32) {
+  }
+  if (type->isIntegerTy() && type->getIntegerBitWidth() < 32) {
     SmallVector<Value *, 4> newMappedArgs;
 
     Type *const vectorType = FixedVectorType::get(type, type->getPrimitiveSizeInBits() == 16 ? 2 : 4);
@@ -169,7 +171,8 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
 
     Value *const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
     return CreateExtractElement(CreateBitCast(result, vectorType), static_cast<uint64_t>(0));
-  } else if (type->getPrimitiveSizeInBits() == 64) {
+  }
+  if (type->getPrimitiveSizeInBits() == 64) {
     SmallVector<Value *, 4> castMappedArgs;
 
     for (Value *const mappedArg : mappedArgs)
@@ -189,7 +192,8 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
     }
 
     return CreateBitCast(result, type);
-  } else if (type->isFloatingPointTy()) {
+  }
+  if (type->isFloatingPointTy()) {
     SmallVector<Value *, 4> newMappedArgs;
 
     for (Value *const mappedArg : mappedArgs)
@@ -197,12 +201,11 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
 
     Value *const result = CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs);
     return CreateBitCast(result, type);
-  } else if (type->isIntegerTy(32))
-    return mapFunc(*this, mappedArgs, passthroughArgs);
-  else {
-    llvm_unreachable("Should never be called!");
-    return nullptr;
   }
+  if (type->isIntegerTy(32))
+    return mapFunc(*this, mappedArgs, passthroughArgs);
+  llvm_unreachable("Should never be called!");
+  return nullptr;
 }
 
 // =====================================================================================================================

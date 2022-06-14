@@ -80,18 +80,18 @@ protected:
                                          const llvm::Twine &instName = "");
 
   // Helper method to scalarize a possibly vector unary operation
-  llvm::Value *scalarize(llvm::Value *value, std::function<llvm::Value *(llvm::Value *)> callback);
+  llvm::Value *scalarize(llvm::Value *value, const std::function<llvm::Value *(llvm::Value *)> &callback);
 
   // Helper method to scalarize in pairs a possibly vector unary operation.
-  llvm::Value *scalarizeInPairs(llvm::Value *value, std::function<llvm::Value *(llvm::Value *)> callback);
+  llvm::Value *scalarizeInPairs(llvm::Value *value, const std::function<llvm::Value *(llvm::Value *)> &callback);
 
   // Helper method to scalarize a possibly vector binary operation
   llvm::Value *scalarize(llvm::Value *value0, llvm::Value *value1,
-                         std::function<llvm::Value *(llvm::Value *, llvm::Value *)> callback);
+                         const std::function<llvm::Value *(llvm::Value *, llvm::Value *)> &callback);
 
   // Helper method to scalarize a possibly vector trinary operation
   llvm::Value *scalarize(llvm::Value *value0, llvm::Value *value1, llvm::Value *value2,
-                         std::function<llvm::Value *(llvm::Value *, llvm::Value *, llvm::Value *)> callback);
+                         const std::function<llvm::Value *(llvm::Value *, llvm::Value *, llvm::Value *)> &callback);
 
   // Create code to get the lane number within the wave. This depends on whether the shader is wave32 or wave64,
   // and thus on the shader stage it is used from.

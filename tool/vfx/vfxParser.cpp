@@ -597,15 +597,14 @@ bool Document::parse(const TestCaseInfo &info) {
       if (!linePtr) {
         result = endSection();
         break;
-      } else {
-        result = macroSubstituteLine(linePtr, m_currentLineNum + 1, &info.macros, MaxLineBufSize);
-        if (!result)
-          break;
-
-        result = parseLine(linePtr);
-        if (!result)
-          break;
       }
+      result = macroSubstituteLine(linePtr, m_currentLineNum + 1, &info.macros, MaxLineBufSize);
+      if (!result)
+        break;
+
+      result = parseLine(linePtr);
+      if (!result)
+        break;
     }
 
     fclose(configFile);
@@ -1317,10 +1316,8 @@ bool isArrayAccess(const char *str) {
     for (const char *p = lBracket + 1; p != rBracket; ++p) {
       if ((*p >= '0' && *p <= '9') || *p == ' ' || *p == '\t')
         continue;
-      else {
-        result = false;
-        break;
-      }
+      result = false;
+      break;
     }
   }
 

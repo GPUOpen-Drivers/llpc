@@ -684,9 +684,7 @@ bool ElfLinkerImpl::getRelocValue(object::RelocationRef reloc, uint64_t &value) 
   StringRef name = cantFail(reloc.getSymbol()->getName());
 
   // Handle the special case relocs from pipeline state
-  if (m_relocHandler.getValue(name, value))
-    return true;
-  return false;
+  return m_relocHandler.getValue(name, value);
 }
 
 // =====================================================================================================================

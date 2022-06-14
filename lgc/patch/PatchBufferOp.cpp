@@ -1496,15 +1496,14 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
         newLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, None));
 
       return newLoad;
-    } else {
-      StoreInst *const newStore =
-          m_builder->CreateAlignedStore(storeInst->getValueOperand(), pointer, alignment, storeInst->isVolatile());
-      newStore->setOrdering(ordering);
-      newStore->setSyncScopeID(syncScopeID);
-      copyMetadata(newStore, storeInst);
-
-      return newStore;
     }
+    StoreInst *const newStore =
+        m_builder->CreateAlignedStore(storeInst->getValueOperand(), pointer, alignment, storeInst->isVolatile());
+    newStore->setOrdering(ordering);
+    newStore->setSyncScopeID(syncScopeID);
+    copyMetadata(newStore, storeInst);
+
+    return newStore;
   }
 
   switch (ordering) {

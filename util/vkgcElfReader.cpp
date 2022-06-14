@@ -466,12 +466,11 @@ template <class Elf> const msgpack::DocNode *ElfReader<Elf>::getMsgNode() const 
   auto curIter = &(m_iteratorStack.back());
   if (curIter->status == MsgPackIteratorArrayValue)
     return &(*curIter->arrayIt);
-  else if (curIter->status == MsgPackIteratorMapValue)
+  if (curIter->status == MsgPackIteratorMapValue)
     return &(curIter->mapIt->second);
-  else if (curIter->status == MsgPackIteratorMapKey)
+  if (curIter->status == MsgPackIteratorMapKey)
     return &(curIter->mapIt->first);
-  else
-    return curIter->node;
+  return curIter->node;
 }
 
 // =====================================================================================================================

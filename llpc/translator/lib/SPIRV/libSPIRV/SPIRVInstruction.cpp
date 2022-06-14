@@ -256,12 +256,8 @@ SPIRVValue * constantCompositeExtract(SPIRVValue *Composite,
     if (Composite->getOpCode() == OpUndef ||
         Composite->getOpCode() == OpConstantNull)
       return BM->addNullConstant(ObjectTy);
-    else {
-      assert(Composite->getOpCode() == OpConstantComposite ||
-             Composite->getOpCode() == OpSpecConstantComposite);
-      Composite = static_cast<SPIRVConstantComposite *>(
-        Composite)->getElements()[I];
-    }
+    assert(Composite->getOpCode() == OpConstantComposite || Composite->getOpCode() == OpSpecConstantComposite);
+    Composite = static_cast<SPIRVConstantComposite *>(Composite)->getElements()[I];
   }
 
   return Composite;
@@ -392,8 +388,8 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
     }
 
     return BM->addCompositeConstant(DestTy, DestComps);
-
-  } else if (OC == OpCompositeExtract) {
+  }
+  if (OC == OpCompositeExtract) {
     assert(Ops.size() >= 2);
     auto ObjectTy = DestTy;
     auto Composite = BM->getValue(Ops[0]);
@@ -404,8 +400,8 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
       Indices.push_back(Ops[1 + I]);
 
     return constantCompositeExtract(Composite, ObjectTy, Indices);
-
-  } else if (OC == OpCompositeInsert) {
+  }
+  if (OC == OpCompositeInsert) {
     assert(Ops.size() >= 2);
     auto Object = BM->getValue(Ops[0]);
     auto Composite = BM->getValue(Ops[1]);
@@ -416,12 +412,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
       Indices.push_back(Ops[2 + I]);
 
     return constantCompositeInsert(Composite, Object, Indices);
-
   } else {
     assert(DestTy->isTypeVector() || DestTy->isTypeScalar());
 
-    const uint32_t CompCount =
-      DestTy->isTypeVector() ? DestTy->getVectorComponentCount() : 1;
+    const uint32_t CompCount = DestTy->isTypeVector() ? DestTy->getVectorComponentCount() : 1;
     auto DestCompTy = (CompCount > 1) ? DestTy->getVectorComponentType() : DestTy;
 
     auto SrcTy = BM->getValue(Ops[0])->getType();
@@ -558,16 +552,16 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
             spvutils::HexFloat<spvutils::FloatProxy<float>> FVal(SrcVal[0].FloatVal);
             spvutils::HexFloat<spvutils::FloatProxy<spvutils::Float16>> F16Val(0);
 
-            FVal.castTo(F16Val, (RoundingTypeMask & SPIRVTW_16Bit) ?
-                spvutils::kRoundToNearestEven : spvutils::kRoundToZero);
+            FVal.castTo(F16Val,
+                        (RoundingTypeMask & SPIRVTW_16Bit) ? spvutils::kRoundToNearestEven : spvutils::kRoundToZero);
             DestVal.Float16Val = F16Val.getBits();
           } else if (SrcCompTy->isTypeFloat(64)) {
             // Float16 <- Double
             spvutils::HexFloat<spvutils::FloatProxy<double>> F64Val(SrcVal[0].DoubleVal);
             spvutils::HexFloat<spvutils::FloatProxy<spvutils::Float16>> F16Val(0);
 
-            F64Val.castTo(F16Val, (RoundingTypeMask & SPIRVTW_16Bit) ?
-                spvutils::kRoundToNearestEven : spvutils::kRoundToZero);
+            F64Val.castTo(F16Val,
+                          (RoundingTypeMask & SPIRVTW_16Bit) ? spvutils::kRoundToNearestEven : spvutils::kRoundToZero);
             DestVal.Float16Val = F16Val.getBits();
           } else
             llvm_unreachable("Invalid type");
@@ -584,8 +578,8 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
             spvutils::HexFloat<spvutils::FloatProxy<double>> F64Val(SrcVal[0].DoubleVal);
             spvutils::HexFloat<spvutils::FloatProxy<float>> FVal(0.0f);
 
-            F64Val.castTo(FVal, (RoundingTypeMask & SPIRVTW_32Bit) ?
-                spvutils::kRoundToNearestEven : spvutils::kRoundToZero);
+            F64Val.castTo(FVal,
+                          (RoundingTypeMask & SPIRVTW_32Bit) ? spvutils::kRoundToNearestEven : spvutils::kRoundToZero);
             DestVal.FloatVal = FVal.value().getAsFloat();
           } else
             llvm_unreachable("Invalid type");
@@ -613,7 +607,7 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         FVal.castTo(F16Val, spvutils::kRoundToZero);
         // Flush denormals to zero (sign is preserved)
         if (F16Val.getExponentBits() == 0 && F16Val.getSignificandBits() != 0)
-            F16Val.set_value(F16Val.isNegative() ? F16Val.sign_mask : 0);
+          F16Val.set_value(F16Val.isNegative() ? F16Val.sign_mask : 0);
         F16Val.castTo(FVal, spvutils::kRoundToZero);
         DestVal.FloatVal = FVal.value().getAsFloat();
 
@@ -758,29 +752,21 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
       case OpSMod: {
         if (DestCompTy->isTypeInt(8)) {
           // Mod(int8, int8)
-          float Quo =
-            static_cast<float>(SrcVal[0].Int8Val) / SrcVal[1].Int8Val;
-          DestVal.Int8Val = SrcVal[0].Int8Val -
-            SrcVal[1].Int8Val * static_cast<int8_t>(std::floor(Quo));
+          float Quo = static_cast<float>(SrcVal[0].Int8Val) / SrcVal[1].Int8Val;
+          DestVal.Int8Val = SrcVal[0].Int8Val - SrcVal[1].Int8Val * static_cast<int8_t>(std::floor(Quo));
         } else if (DestCompTy->isTypeInt(16)) {
           // Mod(int16, int16)
-          float Quo =
-            static_cast<float>(SrcVal[0].Int16Val) / SrcVal[1].Int16Val;
-          DestVal.Int16Val = SrcVal[0].Int16Val -
-            SrcVal[1].Int16Val * static_cast<int16_t>(std::floor(Quo));
+          float Quo = static_cast<float>(SrcVal[0].Int16Val) / SrcVal[1].Int16Val;
+          DestVal.Int16Val = SrcVal[0].Int16Val - SrcVal[1].Int16Val * static_cast<int16_t>(std::floor(Quo));
         } else if (DestCompTy->isTypeInt(32)) {
           // Mod(int, int)
-          float Quo =
-            static_cast<float>(SrcVal[0].IntVal) / SrcVal[1].IntVal;
-          DestVal.IntVal = SrcVal[0].IntVal -
-            SrcVal[1].IntVal * static_cast<int32_t>(std::floor(Quo));
+          float Quo = static_cast<float>(SrcVal[0].IntVal) / SrcVal[1].IntVal;
+          DestVal.IntVal = SrcVal[0].IntVal - SrcVal[1].IntVal * static_cast<int32_t>(std::floor(Quo));
         } else {
           // Mod(int64, int64)
           assert(DestCompTy->isTypeInt(64));
-          double Quo =
-            static_cast<double>(SrcVal[0].Int64Val) / SrcVal[1].Int64Val;
-          DestVal.Int64Val = SrcVal[0].Int64Val -
-            SrcVal[1].Int64Val * static_cast<int64_t>(std::floor(Quo));
+          double Quo = static_cast<double>(SrcVal[0].Int64Val) / SrcVal[1].Int64Val;
+          DestVal.Int64Val = SrcVal[0].Int64Val - SrcVal[1].Int64Val * static_cast<int64_t>(std::floor(Quo));
         }
         break;
       }
@@ -1115,8 +1101,7 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
 
     if (CompCount == 1)
       return DestComps[0];
-    else
-      return BM->addCompositeConstant(DestTy, DestComps);
+    return BM->addCompositeConstant(DestTy, DestComps);
   }
 }
 

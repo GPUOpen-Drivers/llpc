@@ -525,7 +525,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
 //
 // @param value : Input value
 // @param callback : Callback function
-Value *BuilderImplBase::scalarize(Value *value, std::function<Value *(Value *)> callback) {
+Value *BuilderImplBase::scalarize(Value *value, const std::function<Value *(Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
     Value *result0 = callback(CreateExtractElement(value, uint64_t(0)));
     Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
@@ -544,7 +544,7 @@ Value *BuilderImplBase::scalarize(Value *value, std::function<Value *(Value *)> 
 //
 // @param value : Input value
 // @param callback : Callback function
-Value *BuilderImplBase::scalarizeInPairs(Value *value, std::function<Value *(Value *)> callback) {
+Value *BuilderImplBase::scalarizeInPairs(Value *value, const std::function<Value *(Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
     Value *inComps = CreateShuffleVector(value, value, ArrayRef<int>{0, 1});
     Value *resultComps = callback(inComps);
@@ -579,7 +579,8 @@ Value *BuilderImplBase::scalarizeInPairs(Value *value, std::function<Value *(Val
 // @param value0 : Input value 0
 // @param value1 : Input value 1
 // @param callback : Callback function
-Value *BuilderImplBase::scalarize(Value *value0, Value *value1, std::function<Value *(Value *, Value *)> callback) {
+Value *BuilderImplBase::scalarize(Value *value0, Value *value1,
+                                  const std::function<Value *(Value *, Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)));
     Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
@@ -602,7 +603,7 @@ Value *BuilderImplBase::scalarize(Value *value0, Value *value1, std::function<Va
 // @param value2 : Input value 2
 // @param callback : Callback function
 Value *BuilderImplBase::scalarize(Value *value0, Value *value1, Value *value2,
-                                  std::function<Value *(Value *, Value *, Value *)> callback) {
+                                  const std::function<Value *(Value *, Value *, Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)),
                               CreateExtractElement(value2, uint64_t(0)));
