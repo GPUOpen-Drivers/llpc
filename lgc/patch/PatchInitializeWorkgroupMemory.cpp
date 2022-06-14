@@ -260,14 +260,13 @@ unsigned PatchInitializeWorkgroupMemory::getTypeSizeInDwords(Type *inputTy) {
   if (inputTy->isArrayTy()) {
     const unsigned elemSize = getTypeSizeInDwords(inputTy->getArrayElementType());
     return inputTy->getArrayNumElements() * elemSize;
-  } else {
-    assert(inputTy->isStructTy());
-    const unsigned memberCount = inputTy->getStructNumElements();
-    unsigned memberSize = 0;
-    for (unsigned idx = 0; idx < memberCount; ++idx)
-      memberSize += getTypeSizeInDwords(inputTy->getStructElementType(idx));
-    return memberSize;
   }
+  assert(inputTy->isStructTy());
+  const unsigned memberCount = inputTy->getStructNumElements();
+  unsigned memberSize = 0;
+  for (unsigned idx = 0; idx < memberCount; ++idx)
+    memberSize += getTypeSizeInDwords(inputTy->getStructElementType(idx));
+  return memberSize;
 }
 
 } // namespace lgc

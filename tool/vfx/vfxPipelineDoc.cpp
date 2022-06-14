@@ -230,14 +230,13 @@ bool PipelineDocument::validate() {
       if (i == m_sectionList.size()) {
         PARSE_ERROR(m_errorMsg, m_sectionList[i]->getLineNum(), "Fails to find related shader info section!\n");
         return false;
-      } else {
-        auto nextSectionType = m_sectionList[i + 1]->getSectionType();
-        if ((nextSectionType != SectionTypeShaderInfo) ||
-            (reinterpret_cast<SectionShaderInfo *>(m_sectionList[i + 1])->getShaderStage() != stage)) {
-          PARSE_ERROR(m_errorMsg, m_sectionList[i + 1]->getLineNum(),
-                      "Unexpected section type. Shader source and shader info must be in pair!\n");
-          return false;
-        }
+      }
+      auto nextSectionType = m_sectionList[i + 1]->getSectionType();
+      if ((nextSectionType != SectionTypeShaderInfo) ||
+          (reinterpret_cast<SectionShaderInfo *>(m_sectionList[i + 1])->getShaderStage() != stage)) {
+        PARSE_ERROR(m_errorMsg, m_sectionList[i + 1]->getLineNum(),
+                    "Unexpected section type. Shader source and shader info must be in pair!\n");
+        return false;
       }
     }
   }

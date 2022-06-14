@@ -208,7 +208,8 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
                                           thresholdMetaNode, false);
             changed = true;
             break;
-          } else if (m_unrollHintThreshold > 0 && mdString->getString().startswith("llvm.loop.unroll.full")) {
+          }
+          if (m_unrollHintThreshold > 0 && mdString->getString().startswith("llvm.loop.unroll.full")) {
             LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.full to amdgpu.loop.unroll.threshold "
                               << m_unrollHintThreshold << "\n");
             Metadata *thresholdMeta[] = {

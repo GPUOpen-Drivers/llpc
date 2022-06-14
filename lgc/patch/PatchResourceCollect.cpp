@@ -1044,7 +1044,7 @@ void PatchResourceCollect::processShader() {
     // into PAL metadata, for the other half of the pipeline to be compiled against later.
     if (m_pipelineState->getShaderStageMask() == 1U << ShaderStageFragment) {
       FsInputMappings fsInputMappings = {};
-      for (auto it : m_resUsage->inOutUsage.inputLocInfoMap)
+      for (const auto &it : m_resUsage->inOutUsage.inputLocInfoMap)
         fsInputMappings.locationInfo.push_back({it.first.getData(), it.second.getData()});
       for (auto it : m_resUsage->inOutUsage.builtInInputLocMap)
         fsInputMappings.builtInLocationInfo.push_back({it.first, it.second});

@@ -184,31 +184,27 @@ unsigned SPIRVType::getDerivedMatrixStride() const {
 SPIRVType* SPIRVType::getCompositeElementType(size_t Index) const {
   if (OpCode == OpTypeStruct)
     return getStructMemberType(Index);
-  else if (OpCode == OpTypeArray)
+  if (OpCode == OpTypeArray)
     return getArrayElementType();
-  else if (OpCode == OpTypeMatrix)
+  if (OpCode == OpTypeMatrix)
     return getMatrixColumnType();
-  else if (OpCode == OpTypeVector)
+  if (OpCode == OpTypeVector)
     return getVectorComponentType();
-  else {
-    llvm_unreachable("Not composite type");
-    return nullptr;
-  }
+  llvm_unreachable("Not composite type");
+  return nullptr;
 }
 
 SPIRVWord SPIRVType::getCompositeElementCount() const {
   if (OpCode == OpTypeStruct)
     return getStructMemberCount();
-  else if (OpCode == OpTypeArray)
+  if (OpCode == OpTypeArray)
     return getArrayLength();
-  else if (OpCode == OpTypeMatrix)
+  if (OpCode == OpTypeMatrix)
     return getMatrixColumnCount();
-  else if (OpCode == OpTypeVector)
+  if (OpCode == OpTypeVector)
     return getVectorComponentCount();
-  else {
-    llvm_unreachable("Not composite type");
-    return 1;
-  }
+  llvm_unreachable("Not composite type");
+  return 1;
 }
 
 bool SPIRVType::isTypeVoid() const {
@@ -308,7 +304,7 @@ SPIRVConstant *SPIRVTypeArray::getLength() const {
     auto MappedConst =
       static_cast<SPIRVSpecConstantOp *>(BV)->getMappedConstant();
     return static_cast<SPIRVConstant *>(MappedConst);
-  } else
+  }
   return get<SPIRVConstant>(Length);
 }
 

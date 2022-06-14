@@ -1540,9 +1540,9 @@ unsigned PipelineState::getVerticesPerPrimitive() {
     const auto &tessMode = getShaderModes()->getTessellationMode();
     if (tessMode.pointMode)
       return 1;
-    else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
+    if (tessMode.primitiveMode == PrimitiveMode::Isolines)
       return 2;
-    else if (tessMode.primitiveMode == PrimitiveMode::Triangles)
+    if (tessMode.primitiveMode == PrimitiveMode::Triangles)
       return 3;
   } else {
     auto primType = getInputAssemblyState().primitiveType;

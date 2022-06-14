@@ -333,13 +333,13 @@ DINode *SPIRVToLLVMDbgTran::transTypeEnum(const SPIRVExtInst *DebugInst) {
   if (Flags & SPIRVDebug::FlagIsFwdDecl) {
     return Builder.createForwardDecl(dwarf::DW_TAG_enumeration_type, Name, Scope, File, LineNo, AlignInBits,
                                      SizeInBits);
-  } else {
-    SmallVector<llvm::Metadata *, 16> Elts;
-    for (size_t I = FirstEnumeratorIdx, E = Ops.size(); I < E; I += 2) {
-      uint64_t Val = BM->get<SPIRVConstant>(Ops[I])->getZExtIntValue();
-      StringRef Name = getString(Ops[I + 1]);
-      Elts.push_back(Builder.createEnumerator(Name, Val));
-    }
+  }
+  SmallVector<llvm::Metadata *, 16> Elts;
+  for (size_t I = FirstEnumeratorIdx, E = Ops.size(); I < E; I += 2) {
+    uint64_t Val = BM->get<SPIRVConstant>(Ops[I])->getZExtIntValue();
+    StringRef Name = getString(Ops[I + 1]);
+    Elts.push_back(Builder.createEnumerator(Name, Val));
+  }
     DINodeArray Enumerators = Builder.getOrCreateArray(Elts);
     DIType *UnderlyingType = nullptr;
     SPIRVEntry *E = BM->getEntry(Ops[UnderlyingTypeIdx]);
@@ -347,7 +347,6 @@ DINode *SPIRVToLLVMDbgTran::transTypeEnum(const SPIRVExtInst *DebugInst) {
       UnderlyingType = transDebugInst<DIType>(static_cast<SPIRVExtInst *>(E));
     return Builder.createEnumerationType(Scope, Name, File, LineNo, SizeInBits, AlignInBits, Enumerators,
                                          UnderlyingType, "", UnderlyingType);
-  }
 }
 
 DINode *SPIRVToLLVMDbgTran::transTypeFunction(const SPIRVExtInst *DebugInst) {

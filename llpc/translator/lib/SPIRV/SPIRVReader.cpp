@@ -290,8 +290,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(SPIRVType *const spvType, con
                                                    const bool isExplicitlyLaidOut) {
   if (isParentPointer)
     return getBuilder()->getInt32Ty();
-  else
-    return getBuilder()->getInt1Ty();
+  return getBuilder()->getInt1Ty();
 }
 
 // =====================================================================================================================
@@ -562,10 +561,9 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
     // First order by offsets.
     if (std::get<1>(left) < std::get<1>(right))
       return true;
-    else if (std::get<1>(left) > std::get<1>(right))
+    if (std::get<1>(left) > std::get<1>(right))
       return false;
-    else
-      return std::get<0>(left) < std::get<0>(right);
+    return std::get<0>(left) < std::get<0>(right);
   });
 
   SPIRVWord lastIndex = 0;
@@ -665,8 +663,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
   // If the vector is in a pointer, we need to use an array to represent it because of LLVMs data layout rules.
   if (isExplicitlyLaidOut)
     return ArrayType::get(compType, spvType->getVectorComponentCount());
-  else
-    return FixedVectorType::get(compType, spvType->getVectorComponentCount());
+  return FixedVectorType::get(compType, spvType->getVectorComponentCount());
 }
 
 Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
@@ -785,6 +782,7 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
 
 std::vector<Type *> SPIRVToLLVM::transTypeVector(const std::vector<SPIRVType *> &bt) {
   std::vector<Type *> t;
+  t.reserve(bt.size());
   for (auto i : bt)
     t.push_back(transType(i));
   return t;
@@ -792,6 +790,7 @@ std::vector<Type *> SPIRVToLLVM::transTypeVector(const std::vector<SPIRVType *> 
 
 std::vector<Value *> SPIRVToLLVM::transValue(const std::vector<SPIRVValue *> &bv, Function *f, BasicBlock *bb) {
   std::vector<Value *> v;
+  v.reserve(bv.size());
   for (auto i : bv)
     v.push_back(transValue(i, f, bb));
   return v;
@@ -828,7 +827,8 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
   if (lm->getLoopControl() == LoopControlMaskNone) {
     bi->setMetadata("llvm.loop", self);
     return;
-  } else if (lm->getLoopControl() == LoopControlUnrollMask) {
+  }
+  if (lm->getLoopControl() == LoopControlUnrollMask) {
     name = llvm::MDString::get(*m_context, "llvm.loop.unroll.full");
     mDs.push_back(name);
   } else if (lm->getLoopControl() == LoopControlDontUnrollMask) {
@@ -925,36 +925,34 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
 
   if (dstType == srcType)
     return src;
-  else {
-    assert(CastInst::isCast(co) && "Invalid cast op code");
-    if (bb) {
-      bool srcIsPtr = srcType->isPtrOrPtrVectorTy();
-      bool dstIsPtr = dstType->isPtrOrPtrVectorTy();
-      // OpBitcast in SPIR-V allows casting between pointers and integers (and integer vectors),
-      // but LLVM BitCast does not allow converting pointers to other types, PtrToInt and IntToPtr
-      // should be used instead.
-      if (co == Instruction::BitCast && srcIsPtr != dstIsPtr) {
-        auto int64Ty = Type::getInt64Ty(*m_context);
-        if (srcIsPtr) {
-          assert(dstType->isIntOrIntVectorTy());
-          Instruction *ret = new PtrToIntInst(src, int64Ty, bv->getName(), bb);
-          if (dstType != int64Ty)
-            ret = new BitCastInst(ret, dstType, bv->getName(), bb);
-          return ret;
-        }
-
-        if (dstIsPtr) {
-          assert(srcType->isIntOrIntVectorTy());
-          if (srcType != int64Ty)
-            src = new BitCastInst(src, int64Ty, bv->getName(), bb);
-          return new IntToPtrInst(src, dstType, bv->getName(), bb);
-        }
-      } else {
-        return CastInst::Create(co, src, dstType, bv->getName(), bb);
+  assert(CastInst::isCast(co) && "Invalid cast op code");
+  if (bb) {
+    bool srcIsPtr = srcType->isPtrOrPtrVectorTy();
+    bool dstIsPtr = dstType->isPtrOrPtrVectorTy();
+    // OpBitcast in SPIR-V allows casting between pointers and integers (and integer vectors),
+    // but LLVM BitCast does not allow converting pointers to other types, PtrToInt and IntToPtr
+    // should be used instead.
+    if (co == Instruction::BitCast && srcIsPtr != dstIsPtr) {
+      auto int64Ty = Type::getInt64Ty(*m_context);
+      if (srcIsPtr) {
+        assert(dstType->isIntOrIntVectorTy());
+        Instruction *ret = new PtrToIntInst(src, int64Ty, bv->getName(), bb);
+        if (dstType != int64Ty)
+          ret = new BitCastInst(ret, dstType, bv->getName(), bb);
+        return ret;
       }
+
+      if (dstIsPtr) {
+        assert(srcType->isIntOrIntVectorTy());
+        if (srcType != int64Ty)
+          src = new BitCastInst(src, int64Ty, bv->getName(), bb);
+        return new IntToPtrInst(src, dstType, bv->getName(), bb);
+      }
+    } else {
+      return CastInst::Create(co, src, dstType, bv->getName(), bb);
     }
-    return ConstantExpr::getCast(co, dyn_cast<Constant>(src), dstType);
   }
+  return ConstantExpr::getCast(co, dyn_cast<Constant>(src), dstType);
 }
 
 static FastMathFlags buildFastMathFlags(unsigned flags) {
@@ -1521,7 +1519,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       load = getBuilder()->CreateInsertValue(load, memberLoads[i], i);
 
     return load;
-  } else if (loadType->isArrayTy() && !spvType->isTypeVector()) {
+  }
+  if (loadType->isArrayTy() && !spvType->isTypeVector()) {
     // Matrix and arrays both get here. For both we need to turn [<{element-type, pad}>] into [element-type].
     const bool needsPad = isTypeWithPad(loadType);
 
@@ -1548,7 +1547,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     }
 
     return load;
-  } else if (spvType->isTypeVector() && isCoherent) {
+  }
+  if (spvType->isTypeVector() && isCoherent) {
     // Coherent load operand must be integer, pointer, or floating point type, so need to spilte vector.
     SPIRVType *spvElementType = spvType->getVectorComponentType();
     Type *elementType = transType(spvElementType);
@@ -1562,21 +1562,21 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     }
 
     return load;
-  } else {
-    Type *alignmentType = loadType;
+  }
+  Type *alignmentType = loadType;
 
-    // Vectors are represented as arrays in memory, so we need to cast the array to a vector before loading.
-    if (spvType->isTypeVector()) {
-      Type *const vectorType = transType(spvType, 0, false, true, false);
-      Type *const castType = vectorType->getPointerTo(loadPointer->getType()->getPointerAddressSpace());
-      loadPointer = getBuilder()->CreateBitCast(loadPointer, castType);
-      loadType = vectorType;
+  // Vectors are represented as arrays in memory, so we need to cast the array to a vector before loading.
+  if (spvType->isTypeVector()) {
+    Type *const vectorType = transType(spvType, 0, false, true, false);
+    Type *const castType = vectorType->getPointerTo(loadPointer->getType()->getPointerAddressSpace());
+    loadPointer = getBuilder()->CreateBitCast(loadPointer, castType);
+    loadType = vectorType;
 
-      const bool scalarBlockLayout = static_cast<Llpc::Context &>(getBuilder()->getContext()).getScalarBlockLayout();
+    const bool scalarBlockLayout = static_cast<Llpc::Context &>(getBuilder()->getContext()).getScalarBlockLayout();
 
-      if (!scalarBlockLayout)
-        alignmentType = vectorType;
-    }
+    if (!scalarBlockLayout)
+      alignmentType = vectorType;
+  }
 
     LoadInst *const load = getBuilder()->CreateAlignedLoad(
         loadType, loadPointer, m_m->getDataLayout().getABITypeAlign(alignmentType), isVolatile);
@@ -1590,9 +1590,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     // If the load was a bool or vector of bool, need to truncate the result.
     if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool()))
       return getBuilder()->CreateTruncOrBitCast(load, transType(spvType));
-    else
-      return load;
-  }
+    return load;
 }
 
 // =====================================================================================================================
@@ -1755,7 +1753,8 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
     }
 
     return ConstantStruct::get(cast<StructType>(storeType), constMembers);
-  } else if (storeType->isArrayTy() && !spvType->isTypeVector()) {
+  }
+  if (storeType->isArrayTy() && !spvType->isTypeVector()) {
     // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
     const bool needsPad = isTypeWithPad(storeType);
 
@@ -1784,25 +1783,24 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
     }
 
     return ConstantArray::get(cast<ArrayType>(storeType), constElements);
-  } else {
-    // If the store was a bool or vector of bool, need to zext the storing value.
-    if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool()))
-      constStoreValue = ConstantExpr::getZExtOrBitCast(constStoreValue, storeType);
-
-    // If the LLVM type is a not a vector, we need to change the constant into an array.
-    if (spvType->isTypeVector() && !storeType->isVectorTy()) {
-      assert(storeType->isArrayTy());
-
-      SmallVector<Constant *, 8> constElements(storeType->getArrayNumElements(), nullptr);
-
-      for (unsigned i = 0, compCount = spvType->getVectorComponentCount(); i < compCount; i++)
-        constElements[i] = constStoreValue->getAggregateElement(i);
-
-      return ConstantArray::get(cast<ArrayType>(storeType), constElements);
-    }
-
-    return constStoreValue;
   }
+  // If the store was a bool or vector of bool, need to zext the storing value.
+  if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool()))
+    constStoreValue = ConstantExpr::getZExtOrBitCast(constStoreValue, storeType);
+
+  // If the LLVM type is a not a vector, we need to change the constant into an array.
+  if (spvType->isTypeVector() && !storeType->isVectorTy()) {
+    assert(storeType->isArrayTy());
+
+    SmallVector<Constant *, 8> constElements(storeType->getArrayNumElements(), nullptr);
+
+    for (unsigned i = 0, compCount = spvType->getVectorComponentCount(); i < compCount; i++)
+      constElements[i] = constStoreValue->getAggregateElement(i);
+
+    return ConstantArray::get(cast<ArrayType>(storeType), constElements);
+  }
+
+  return constStoreValue;
 }
 
 // =====================================================================================================================
@@ -1840,13 +1838,13 @@ static AtomicOrdering transMemorySemantics(const SPIRVConstant *const spvMemoryS
 
   if (semantics & MemorySemanticsSequentiallyConsistentMask)
     return AtomicOrdering::SequentiallyConsistent;
-  else if (semantics & MemorySemanticsAcquireReleaseMask)
+  if (semantics & MemorySemanticsAcquireReleaseMask)
     return AtomicOrdering::AcquireRelease;
-  else if (semantics & MemorySemanticsAcquireMask)
+  if (semantics & MemorySemanticsAcquireMask)
     return AtomicOrdering::Acquire;
-  else if (semantics & MemorySemanticsReleaseMask)
+  if (semantics & MemorySemanticsReleaseMask)
     return AtomicOrdering::Release;
-  else if (semantics & (MemorySemanticsMakeAvailableKHRMask | MemorySemanticsMakeVisibleKHRMask))
+  if (semantics & (MemorySemanticsMakeAvailableKHRMask | MemorySemanticsMakeVisibleKHRMask))
     return AtomicOrdering::Monotonic;
 
   return AtomicOrdering::Monotonic;
@@ -1880,8 +1878,8 @@ Value *SPIRVToLLVM::transAtomicRMW(SPIRVValue *const spvValue, const AtomicRMWIn
         getBuilder()->CreateAtomicRMW(binOp, int64AtomicPointer, int64Value, MaybeAlign(), ordering, scope);
 
     return getBuilder()->CreateBitCast(atomicRes, getBuilder()->getDoubleTy());
-  } else
-    return getBuilder()->CreateAtomicRMW(binOp, atomicPointer, atomicValue, MaybeAlign(), ordering, scope);
+  }
+  return getBuilder()->CreateAtomicRMW(binOp, atomicPointer, atomicValue, MaybeAlign(), ordering, scope);
 }
 
 // =====================================================================================================================
@@ -2841,13 +2839,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     }
 
     return resultValue;
-  } else {
-    Type *const baseEltType = base->getType()->getScalarType()->getPointerElementType();
-    if (spvAccessChain->isInBounds())
-      return getBuilder()->CreateInBoundsGEP(baseEltType, base, indices);
-    else
-      return getBuilder()->CreateGEP(baseEltType, base, indices);
   }
+  Type *const baseEltType = base->getType()->getScalarType()->getPointerElementType();
+  if (spvAccessChain->isInBounds())
+    return getBuilder()->CreateInBoundsGEP(baseEltType, base, indices);
+  return getBuilder()->CreateGEP(baseEltType, base, indices);
 }
 
 // =====================================================================================================================
@@ -3038,10 +3034,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(SPIRVV
   if (spvType->isTypeVectorInt(32)) {
     assert(spvType->getVectorComponentCount() == 2);                   // Must be uvec2
     return getBuilder()->CreateBitCast(readClock, transType(spvType)); // uint64 -> uvec2
-  } else {
-    assert(spvType->isTypeInt(64));
-    return readClock;
   }
+  assert(spvType->isTypeInt(64));
+  return readClock;
 }
 
 // =====================================================================================================================
@@ -3853,7 +3848,8 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
     }
 
     return structInitializer;
-  } else if (type->isArrayTy()) {
+  }
+  if (type->isArrayTy()) {
     SPIRVConstantComposite *const spvConstArray = static_cast<SPIRVConstantComposite *>(spvValue);
 
     std::vector<SPIRVValue *> spvElements(spvConstArray->getElements());
@@ -3877,18 +3873,17 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
     }
 
     return arrayInitializer;
-  } else {
-    Constant *initializer = cast<Constant>(transValue(spvValue, nullptr, nullptr, false));
-    if (initializer->getType() != type) {
-      // The translated value type is different to the requested type. This can only happen in the
-      // case that the SPIR-V value was (vector of) bool but the requested type was (vector of) i32 because it is a bool
-      // in memory.
-      assert(initializer->getType()->isIntOrIntVectorTy(1));
-      assert(type->isIntOrIntVectorTy(32));
-      initializer = ConstantExpr::getZExt(initializer, type);
-    }
-    return initializer;
   }
+  Constant *initializer = cast<Constant>(transValue(spvValue, nullptr, nullptr, false));
+  if (initializer->getType() != type) {
+    // The translated value type is different to the requested type. This can only happen in the
+    // case that the SPIR-V value was (vector of) bool but the requested type was (vector of) i32 because it is a bool
+    // in memory.
+    assert(initializer->getType()->isIntOrIntVectorTy(1));
+    assert(type->isIntOrIntVectorTy(32));
+    initializer = ConstantExpr::getZExt(initializer, type);
+  }
+  return initializer;
 }
 
 // =====================================================================================================================
@@ -4445,6 +4440,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto cc = static_cast<SPIRVCompositeConstruct *>(bv);
     auto constituents = transValue(cc->getConstituents(), f, bb);
     std::vector<Constant *> cv;
+    cv.reserve(constituents.size());
     for (const auto &i : constituents)
       cv.push_back(dyn_cast<Constant>(i));
     switch (bv->getType()->getOpCode()) {
@@ -4517,8 +4513,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
         assert(v->getType()->isVectorTy());
         return mapValue(
             bv, ExtractElementInst::Create(v, ConstantInt::get(*m_context, APInt(32, lastIdx)), bv->getName(), bb));
-      } else
-        return mapValue(bv, ExtractValueInst::Create(cv, ce->getIndices(), bv->getName(), bb));
+      }
+      return mapValue(bv, ExtractValueInst::Create(cv, ce->getIndices(), bv->getName(), bb));
     }
   }
 
@@ -4535,28 +4531,27 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
       return mapValue(bv, InsertElementInst::Create(
                               transValue(ci->getComposite(), f, bb), transValue(ci->getObject(), f, bb),
                               ConstantInt::get(*m_context, APInt(32, ci->getIndices()[0])), bv->getName(), bb));
-    } else {
-      auto cv = transValue(ci->getComposite(), f, bb);
-      auto indexedTy = ExtractValueInst::getIndexedType(cv->getType(), ci->getIndices());
-      if (!indexedTy) {
-        // NOTE: "OpCompositeInsert" could insert a scalar component to a
-        // vector or a vector in an aggregate. But in LLVM, "insertvalue" is
-        // unable to do such thing. We have to replace it with "extractvalue" +
-        // "insertelement" + "insertvalue" to achieve this purpose.
-        assert(ci->getObject()->getType()->isTypeScalar());
-        std::vector<SPIRVWord> idxs = ci->getIndices();
-        auto lastIdx = idxs.back();
-        idxs.pop_back();
-
-        Value *v = ExtractValueInst::Create(cv, idxs, "", bb);
-        assert(v->getType()->isVectorTy());
-        v = InsertElementInst::Create(v, transValue(ci->getObject(), f, bb),
-                                      ConstantInt::get(*m_context, APInt(32, lastIdx)), "", bb);
-        return mapValue(bv, InsertValueInst::Create(cv, v, idxs, bv->getName(), bb));
-      } else
-        return mapValue(
-            bv, InsertValueInst::Create(cv, transValue(ci->getObject(), f, bb), ci->getIndices(), bv->getName(), bb));
     }
+    auto cv = transValue(ci->getComposite(), f, bb);
+    auto indexedTy = ExtractValueInst::getIndexedType(cv->getType(), ci->getIndices());
+    if (!indexedTy) {
+      // NOTE: "OpCompositeInsert" could insert a scalar component to a
+      // vector or a vector in an aggregate. But in LLVM, "insertvalue" is
+      // unable to do such thing. We have to replace it with "extractvalue" +
+      // "insertelement" + "insertvalue" to achieve this purpose.
+      assert(ci->getObject()->getType()->isTypeScalar());
+      std::vector<SPIRVWord> idxs = ci->getIndices();
+      auto lastIdx = idxs.back();
+      idxs.pop_back();
+
+      Value *v = ExtractValueInst::Create(cv, idxs, "", bb);
+      assert(v->getType()->isVectorTy());
+      v = InsertElementInst::Create(v, transValue(ci->getObject(), f, bb),
+                                    ConstantInt::get(*m_context, APInt(32, lastIdx)), "", bb);
+      return mapValue(bv, InsertValueInst::Create(cv, v, idxs, bv->getName(), bb));
+    }
+    return mapValue(
+        bv, InsertValueInst::Create(cv, transValue(ci->getObject(), f, bb), ci->getIndices(), bv->getName(), bb));
   }
 
   case OpVectorInsertDynamic: {
@@ -5147,18 +5142,18 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto oc = bv->getOpCode();
     if (isSPIRVCmpInstTransToLLVMInst(static_cast<SPIRVInstruction *>(bv)))
       return mapValue(bv, transCmpInst(bv, bb, f));
-    else if (isBinaryShiftLogicalBitwiseOpCode(oc) || isLogicalOpCode(oc))
+    if (isBinaryShiftLogicalBitwiseOpCode(oc) || isLogicalOpCode(oc))
       return mapValue(bv, transShiftLogicalBitwiseInst(bv, bb, f));
-    else if (isCvtOpCode(oc)) {
+    if (isCvtOpCode(oc)) {
       Value *inst = transConvertInst(bv, f, bb);
       return mapValue(bv, inst);
     }
     return mapValue(bv, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(bv), bb));
   }
-
-    llvm_unreachable("Translation of SPIRV instruction not implemented");
-    return NULL;
   }
+
+  llvm_unreachable("Translation of SPIRV instruction not implemented");
+  return NULL;
 }
 
 void SPIRVToLLVM::truncConstantIndex(std::vector<Value *> &indices, BasicBlock *bb) {
@@ -6851,13 +6846,13 @@ bool SPIRVToLLVM::transMetadata() {
 bool SPIRVToLLVM::checkContains64BitType(SPIRVType *bt) {
   if (bt->isTypeScalar())
     return bt->getBitWidth() == 64;
-  else if (bt->isTypeVector())
+  if (bt->isTypeVector())
     return checkContains64BitType(bt->getVectorComponentType());
-  else if (bt->isTypeMatrix())
+  if (bt->isTypeMatrix())
     return checkContains64BitType(bt->getMatrixColumnType());
-  else if (bt->isTypeArray())
+  if (bt->isTypeArray())
     return checkContains64BitType(bt->getArrayElementType());
-  else if (bt->isTypeStruct()) {
+  if (bt->isTypeStruct()) {
     bool contains64BitType = false;
     auto memberCount = bt->getStructMemberCount();
     for (auto memberIdx = 0; memberIdx < memberCount; ++memberIdx) {
@@ -6865,10 +6860,9 @@ bool SPIRVToLLVM::checkContains64BitType(SPIRVType *bt) {
       contains64BitType = contains64BitType || checkContains64BitType(memberTy);
     }
     return contains64BitType;
-  } else {
-    llvm_unreachable("Invalid type");
-    return false;
   }
+  llvm_unreachable("Invalid type");
+  return false;
 }
 
 bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
@@ -7293,8 +7287,8 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     mdValues.push_back(ConstantInt::get(int64Ty, inOutMd.U64All[1]));
 
     return ConstantStruct::get(static_cast<StructType *>(mdTy), mdValues);
-
-  } else if (bt->isTypeArray() || bt->isTypeMatrix()) {
+  }
+  if (bt->isTypeArray() || bt->isTypeMatrix()) {
     // Handle array or matrix type
     auto int32Ty = Type::getInt32Ty(*m_context);
     auto int64Ty = Type::getInt64Ty(*m_context);
@@ -7394,8 +7388,8 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     mdValues.push_back(ConstantInt::get(int64Ty, inOutMd.U64All[1]));
 
     return ConstantStruct::get(static_cast<StructType *>(mdTy), mdValues);
-
-  } else if (bt->isTypeStruct()) {
+  }
+  if (bt->isTypeStruct()) {
     // Handle structure type
     std::vector<Type *> memberMdTys;
     std::vector<Constant *> memberMdValues;
@@ -7537,8 +7531,8 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
 
     mdTy = Type::getInt64Ty(*m_context);
     return ConstantInt::get(mdTy, blockMd.U64All);
-
-  } else if (bt->isTypeArray() || bt->isTypeMatrix() || bt->isTypePointer()) {
+  }
+  if (bt->isTypeArray() || bt->isTypeMatrix() || bt->isTypePointer()) {
     // Handle array or matrix type
     auto int32Ty = Type::getInt32Ty(*m_context);
     auto int64Ty = Type::getInt64Ty(*m_context);
@@ -7607,8 +7601,8 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     mdValues.push_back(ConstantInt::get(int64Ty, blockMd.U64All));
     mdValues.push_back(elemMd);
     return ConstantStruct::get(static_cast<StructType *>(mdTy), mdValues);
-
-  } else if (bt->isTypeStruct()) {
+  }
+  if (bt->isTypeStruct()) {
     // Handle structure type
     blockDec.IsMatrix = false;
 
@@ -7685,7 +7679,8 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     mdValues.push_back(structMd);
 
     return ConstantStruct::get(static_cast<StructType *>(mdTy), mdValues);
-  } else if (bt->isTypeForwardPointer()) {
+  }
+  if (bt->isTypeForwardPointer()) {
     ShaderBlockMetadata blockMd = {};
     blockMd.offset = blockDec.Offset;
     blockMd.IsMatrix = false; // Scalar or vector, clear matrix flag
@@ -8389,11 +8384,12 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
           storageClass == StorageClassUniform || storageClass == StorageClassPushConstant ||
           storageClass == StorageClassStorageBuffer)
         return GlobalValue::ExternalLinkage;
-      else if (storageClass == StorageClassPrivate || storageClass == StorageClassOutput)
+      if (storageClass == StorageClassPrivate || storageClass == StorageClassOutput)
         return GlobalValue::PrivateLinkage;
     }
     return GlobalValue::InternalLinkage;
-  } else if (v->getLinkageType() == LinkageTypeImport) {
+  }
+  if (v->getLinkageType() == LinkageTypeImport) {
     // Function declaration
     if (v->getOpCode() == OpFunction) {
       if (static_cast<const SPIRVFunction *>(v)->getNumBasicBlock() == 0)
@@ -8406,14 +8402,14 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
     }
     // Definition
     return GlobalValue::AvailableExternallyLinkage;
-  } else { // LinkageTypeExport
-    if (v->getOpCode() == OpVariable) {
-      if (static_cast<const SPIRVVariable *>(v)->getInitializer() == 0)
-        // Tentative definition
-        return GlobalValue::CommonLinkage;
-    }
-    return GlobalValue::ExternalLinkage;
   }
+  // LinkageTypeExport
+  if (v->getOpCode() == OpVariable) {
+    if (static_cast<const SPIRVVariable *>(v)->getInitializer() == 0)
+      // Tentative definition
+      return GlobalValue::CommonLinkage;
+  }
+  return GlobalValue::ExternalLinkage;
 }
 
 llvm::Function *SPIRVToLLVM::createLibraryEntryFunc() {
