@@ -394,7 +394,7 @@ attributes #0 = { nounwind }
 ; LocalInvocationId from three VGPRs set up by hardware
 
 ; RUN: lgc -extract=12 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK12,CHECK12_WAVE64,CHECK12_CO %s
-; RUNx: lgc -extract=12 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK12,CHECK12_WAVE32,CHECK12_NC %s
+; RUN: lgc -extract=12 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK12,CHECK12_WAVE32,CHECK12_NC %s
 ; CHECK12-LABEL: _amdgpu_cs_main:
 ; CHECK12_CO: v_mul_lo_u32 [[VAL1:v[0-9]+]], v2, 6
 ; CHECK12_CO: v_add_u32_e32 [[VAL2:v[0-9]+]], vcc, [[VAL1]], v1
