@@ -78,7 +78,6 @@ void main()
 ; SHADERTEST: atomicrmw xor i32 addrspace(3)* @{{.*}}, i32 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw xor i32 addrspace(3)* %{{[0-9]*}}, i32 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw xchg i32 addrspace(3)* @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xchg i32 addrspace(3)* %{{[0-9]*}}, i32 %{{[0-9]*}} monotonic
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
