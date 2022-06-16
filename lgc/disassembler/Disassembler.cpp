@@ -254,7 +254,13 @@ void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
 #endif
   unsigned sectFlags = sectionRef.getFlags();
   MCSection *sect = m_context->getELFSection(cantFail(sectionRef.getName()), sectType, sectFlags);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 425813
+  // Old version of code
   m_streamer->SwitchSection(sect);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  m_streamer->switchSection(sect);
+#endif
 
   // Create all symbols in this section. Also emit directives for symbol type and size,
   // adding a synthesized label for the end of the symbol.
