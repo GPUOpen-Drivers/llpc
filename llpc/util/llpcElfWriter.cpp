@@ -1232,17 +1232,15 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
   (void(fragmentIntrlDataSymbolName));   // unused
   (void(fragmentAmdIlSymbolName));       // unused
 
-  // Merge ISA disassemble
+  // Merge ISA disassembly.
   auto fragmentDisassemblySecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
   auto nonFragmentDisassemblySecIndex = GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
-  ElfSectionBuffer<Elf64::SectionHeader> *fragmentDisassemblySection = nullptr;
-  const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentDisassemblySection = nullptr;
-  result = reader.getSectionDataBySectionIndex(fragmentDisassemblySecIndex, &fragmentDisassemblySection);
-  assert(result == Result::Success || result == Result::ErrorInvalidValue);
-  (void)result;
-  mustSucceed(getSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &nonFragmentDisassemblySection));
-  if (nonFragmentDisassemblySection) {
-    assert(fragmentDisassemblySection);
+  if (fragmentDisassemblySecIndex != InvalidValue && nonFragmentDisassemblySecIndex != InvalidValue) {
+    ElfSectionBuffer<Elf64::SectionHeader> *fragmentDisassemblySection = nullptr;
+    const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentDisassemblySection = nullptr;
+    mustSucceed(reader.getSectionDataBySectionIndex(fragmentDisassemblySecIndex, &fragmentDisassemblySection));
+    mustSucceed(getSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &nonFragmentDisassemblySection));
+
     // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
     // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
     // for all section data.
@@ -1270,23 +1268,14 @@ void ElfWriter<Elf>::mergeElfBinary(Context *pContext, const BinaryData *pFragme
     setSection(nonFragmentDisassemblySecIndex, &newSection);
   }
 
-  // Merge LLVM IR disassemble
-  const std::string llvmIrSectionName = std::string(Util::Abi::AmdGpuCommentLlvmIrName);
-  ElfSectionBuffer<Elf64::SectionHeader> *fragmentLlvmIrSection = nullptr;
-  const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentLlvmIrSection = nullptr;
-
-  auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(llvmIrSectionName.c_str());
-  auto nonFragmentLlvmIrSecIndex = GetSectionIndex(llvmIrSectionName.c_str());
-  result = reader.getSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &fragmentLlvmIrSection);
-  assert(result == Result::Success || result == Result::ErrorInvalidValue);
-  (void)result;
-
-  result = getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &nonFragmentLlvmIrSection);
-  assert(result == Result::Success || result == Result::NotFound);
-  (void)result;
-
-  if (nonFragmentLlvmIrSection) {
-    assert(fragmentLlvmIrSection);
+  // Merge LLVM IR disassembly.
+  auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuCommentLlvmIrName);
+  auto nonFragmentLlvmIrSecIndex = GetSectionIndex(Util::Abi::AmdGpuCommentLlvmIrName);
+  if (fragmentLlvmIrSecIndex != InvalidValue && nonFragmentLlvmIrSecIndex != InvalidValue) {
+    ElfSectionBuffer<Elf64::SectionHeader> *fragmentLlvmIrSection = nullptr;
+    const ElfSectionBuffer<Elf64::SectionHeader> *nonFragmentLlvmIrSection = nullptr;
+    mustSucceed(reader.getSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &fragmentLlvmIrSection));
+    mustSucceed(getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &nonFragmentLlvmIrSection));
 
     // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
     // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
