@@ -603,14 +603,15 @@ void SpirvLowerGlobal::handleStoreInst() {
 void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   const auto &dataLayout = m_module->getDataLayout();
   Type *globalVarTy = globalVar->getValueType();
-  auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
 
-  auto proxy = new AllocaInst(globalVarTy, dataLayout.getAllocaAddrSpace(),
-                              Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName(), &*insertPos);
+  m_builder->setInsertPointPastAllocas(*m_entryPoint);
+
+  auto proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
+                                       Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
 
   if (globalVar->hasInitializer()) {
     auto initializer = globalVar->getInitializer();
-    new StoreInst(initializer, proxy, &*insertPos);
+    m_builder->CreateStore(initializer, proxy);
   }
 
   m_globalVarProxyMap[globalVar] = proxy;
@@ -629,24 +630,24 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
     return;
   }
 
+  m_builder->setInsertPointPastAllocas(*m_entryPoint);
+
   const auto &dataLayout = m_module->getDataLayout();
   Type *inputTy = input->getValueType();
   if (inputTy->isPointerTy())
     inputTy = m_builder->getInt64Ty();
-  auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
-  m_builder->SetInsertPoint(&*insertPos);
 
   MDNode *metaNode = input->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);
 
   auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-  auto proxy = new AllocaInst(inputTy, dataLayout.getAllocaAddrSpace(),
-                              Twine(LlpcName::InputProxyPrefix) + input->getName(), &*insertPos);
+  auto proxy = m_builder->CreateAlloca(inputTy, dataLayout.getAllocaAddrSpace(), nullptr,
+                                       Twine(LlpcName::InputProxyPrefix) + input->getName());
 
   // Import input to proxy variable
   auto inputValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, meta, nullptr, 0, nullptr, nullptr,
                                               InterpLocUnknown, nullptr, false);
-  new StoreInst(inputValue, proxy, &*insertPos);
+  m_builder->CreateStore(inputValue, proxy);
 
   m_inputProxyMap[input] = proxy;
 }
@@ -656,14 +657,14 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
 //
 // @param output : Output to be mapped
 void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
-  auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
+  m_builder->setInsertPointPastAllocas(*m_entryPoint);
 
   // NOTE: For tessellation control shader, we do not map outputs to real proxy variables. Instead, we directly
   // replace "store" instructions with export calls in the lowering operation.
   if (m_shaderStage == ShaderStageTessControl) {
     if (output->hasInitializer()) {
       auto initializer = output->getInitializer();
-      new StoreInst(initializer, output, &*insertPos);
+      m_builder->CreateStore(initializer, output);
     }
     m_outputProxyMap.emplace_back(output, nullptr);
     m_lowerOutputInPlace = true;
@@ -675,12 +676,12 @@ void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
   if (outputTy->isPointerTy())
     outputTy = m_builder->getInt64Ty();
 
-  auto proxy = new AllocaInst(outputTy, dataLayout.getAllocaAddrSpace(),
-                              Twine(LlpcName::OutputProxyPrefix) + output->getName(), &*insertPos);
+  auto proxy = m_builder->CreateAlloca(outputTy, dataLayout.getAllocaAddrSpace(), nullptr,
+                                       Twine(LlpcName::OutputProxyPrefix) + output->getName());
 
   if (output->hasInitializer()) {
     auto initializer = output->getInitializer();
-    new StoreInst(initializer, proxy, &*insertPos);
+    m_builder->CreateStore(initializer, proxy);
   }
 
   m_outputProxyMap.emplace_back(output, proxy);
@@ -1565,7 +1566,6 @@ Value *SpirvLowerGlobal::loadInOutMember(Type *inOutTy, unsigned addrSpace, Arra
 // @param outputMetaVal : Metadata of this output member
 // @param locOffset : Relative location offset of this output member
 // @param vertexIdx : Input array outermost index used for vertex indexing
-// @param insertPos : Where to insert store instructions
 void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, ArrayRef<Value *> indexOperands,
                                          unsigned maxLocOffset, Constant *outputMetaVal, Value *locOffset,
                                          Value *vertexIdx) {
@@ -1871,7 +1871,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
           }
         }
       } else {
-        m_builder->SetInsertPoint(&func->getEntryBlock(), func->getEntryBlock().getFirstInsertionPt());
+        m_builder->setInsertPointPastAllocas(*func);
 
         Value *const bufferDesc = m_builder->CreateLoadBufferDesc(
             descSet, binding, m_builder->getInt32(0), global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten,
@@ -1981,7 +1981,7 @@ void SpirvLowerGlobal::lowerPushConsts() {
     }
 
     for (Function *const func : funcsUsedIn) {
-      m_builder->SetInsertPoint(&func->getEntryBlock(), func->getEntryBlock().getFirstInsertionPt());
+      m_builder->setInsertPointPastAllocas(*func);
 
       MDNode *metaNode = global.getMetadata(gSPIRVMD::PushConst);
       auto pushConstSize = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
