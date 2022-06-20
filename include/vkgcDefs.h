@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 53
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 4
+#define LLPC_INTERFACE_MINOR_VERSION 5
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     53.5 | Add forceCsThreadIdSwizzling for thread id swizzle in 8*4                                             |
 //  |     53.4 | Add ldsSpillLimitDwords shader option                                                                 |
 //  |     53.3 | Add disableFastMathFlags shader option, plus support for this and fastMathFlags in pipeline files     |
 //  |     53.2 | Add resourceLayoutScheme to PipelineOptions                                                           |

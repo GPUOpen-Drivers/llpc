@@ -539,8 +539,10 @@ void Patch::init(Module *module) {
 GlobalVariable *Patch::getLdsVariable(PipelineState *pipelineState, Module *module) {
   auto context = &module->getContext();
 
+  static const char *LdsName = "Lds"; // Name of LDS
+
   // See if this module already has LDS.
-  auto oldLds = module->getNamedValue("lds");
+  auto oldLds = module->getNamedValue(LdsName);
   if (oldLds) {
     // We already have LDS.
     return cast<GlobalVariable>(oldLds);
@@ -550,7 +552,7 @@ GlobalVariable *Patch::getLdsVariable(PipelineState *pipelineState, Module *modu
   auto ldsSize = pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup;
   auto ldsTy = ArrayType::get(Type::getInt32Ty(*context), ldsSize);
 
-  auto lds = new GlobalVariable(*module, ldsTy, false, GlobalValue::ExternalLinkage, nullptr, "lds", nullptr,
+  auto lds = new GlobalVariable(*module, ldsTy, false, GlobalValue::ExternalLinkage, nullptr, LdsName, nullptr,
                                 GlobalValue::NotThreadLocal, ADDR_SPACE_LOCAL);
   lds->setAlignment(MaybeAlign(sizeof(unsigned)));
   return lds;

@@ -136,6 +136,7 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, EsGs::Specia
 // @param copyShaderEntryPoint : Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 Function *ShaderMerger::buildPrimShader(Function *esEntryPoint, Function *gsEntryPoint,
                                         Function *copyShaderEntryPoint) {
+
   NggPrimShader primShader(m_pipelineState);
   return primShader.generate(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
 }

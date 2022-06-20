@@ -55,9 +55,6 @@ function(add_llpc_unittest_impl test_suite test_name)
   set_output_directory(${test_name} BINARY_DIR ${outdir} LIBRARY_DIR ${outdir})
 
   target_link_libraries(${test_name} PRIVATE ${LLVM_GTEST_LIBS} llpc_standalone_compiler)
-  target_compile_definitions(${test_name} PRIVATE
-    LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION}  # Required by vkgcDefs.h.
-  )
   target_include_directories(${test_name} PRIVATE
     ${LLVM_INCLUDE_DIRS}  # This is necessary to discover the auto-generated llvm-config.h header.
   )

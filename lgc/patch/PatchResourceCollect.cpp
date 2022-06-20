@@ -1001,12 +1001,12 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   LLPC_OUTS("\n");
 
   if (gsOnChip || m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
+
     if (m_pipelineState->getNggControl()->enableNgg) {
       LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
       LLPC_OUTS("GS enable max output vertices per instance: "
                 << (gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false") << "\n");
       LLPC_OUTS("\n");
-
       LLPC_OUTS("GS is on-chip (NGG)\n");
     } else
       LLPC_OUTS("GS is " << (gsOnChip ? "on-chip" : "off-chip") << "\n");

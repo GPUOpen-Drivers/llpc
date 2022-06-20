@@ -47,7 +47,7 @@
     int pos = vfxSnprintf(errorBuf, 4096, "Parse error at line %u: ", lineNum);                                        \
     pos += vfxSnprintf(errorBuf + pos, 4096 - pos, __VA_ARGS__);                                                       \
     pos += vfxSnprintf(errorBuf + pos, 4096 - pos, "\n");                                                              \
-    VFX_ASSERT(pos < 4096);                                                                                            \
+    VFX_NEVER_CALLED();                                                                                                \
     errorMsg += errorBuf;                                                                                              \
   }
 

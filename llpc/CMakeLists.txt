@@ -141,10 +141,6 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
 
-if(VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
-  target_compile_definitions(llpc PRIVATE VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
-endif()
-
 if(ICD_BUILD_LLPC)
     if(XGL_LLVM_UPSTREAM)
         target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM)
@@ -329,16 +325,6 @@ target_include_directories(llpc_standalone_compiler PUBLIC
     ${XGL_PAL_PATH}/inc/util
     ${LLVM_INCLUDE_DIRS}
 )
-
-#if VKI_KHR_FRAGMENT_SHADER_BARYCENTRIC
-if(VKI_KHR_FRAGMENT_SHADER_BARYCENTRIC)
-  target_compile_definitions(llpc_standalone_compiler PUBLIC VKI_KHR_FRAGMENT_SHADER_BARYCENTRIC)
-endif()
-#endif
-
-if(VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
-  target_compile_definitions(llpc_standalone_compiler PUBLIC VKI_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS)
-endif()
 
 llvm_map_components_to_libnames(llvm_libs
     lgc
