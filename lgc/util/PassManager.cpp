@@ -172,7 +172,7 @@ PassManagerImpl::PassManagerImpl(TargetMachine *targetMachine)
       m_instrumentationStandard(cl::DebugPassManager, cl::DebugPassManager || cl::VerifyIr,
                                 /*PrintPassOpts=*/{true, false, true}) {
   if (!cl::DumpCfgAfter.empty())
-    llvm_unreachable("The --dump-cfg-after option is not supported with the new pass manager.");
+    report_fatal_error("The --dump-cfg-after option is not supported with the new pass manager.");
 
   // Setup custom instrumentation callbacks and register LLVM's default module
   // analyses to the analysis manager.
