@@ -203,6 +203,7 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
 // @param module : IR module
 void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
   m_computeWithCalls = false;
+
   if (m_pipelineState->isComputeLibrary()) {
     m_computeWithCalls = true;
     return;

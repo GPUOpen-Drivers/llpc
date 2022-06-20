@@ -729,6 +729,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
     auto &locInfoXfbOutInfoMap = resUsage->inOutUsage.gs.locInfoXfbOutInfoMap;
     const auto &locInfoXfbOutInfoMapIt = locInfoXfbOutInfoMap.find(outLocInfo);
     if (locInfoXfbOutInfoMapIt != locInfoXfbOutInfoMap.end()) {
+
       const auto &xfbOutInfo = locInfoXfbOutInfoMapIt->second;
       std::string instName(lgcName::OutputExportXfb);
       Value *args[] = {builder.getInt32(xfbOutInfo.xfbBuffer), builder.getInt32(xfbOutInfo.xfbOffset),

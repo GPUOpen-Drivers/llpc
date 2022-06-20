@@ -416,27 +416,27 @@ void PatchInOutImportExport::processShader() {
       LLPC_OUTS("\n");
       LLPC_OUTS("Input vertex count: " << inVertexCount << "\n");
       LLPC_OUTS("Input vertex stride: " << calcFactor.inVertexStride << "\n");
-      LLPC_OUTS("Input patch size: " << inPatchSize << "\n");
+      LLPC_OUTS("Input patch size (in dwords): " << inPatchSize << "\n");
       LLPC_OUTS("Input patch start: 0 (LDS)\n");
-      LLPC_OUTS("Input patch total size: " << inPatchTotalSize << "\n");
+      LLPC_OUTS("Input patch total size (in dwords): " << inPatchTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("Output vertex count: " << outVertexCount << "\n");
       LLPC_OUTS("Output vertex stride: " << calcFactor.outVertexStride << "\n");
-      LLPC_OUTS("Output patch size: " << outPatchSize << "\n");
+      LLPC_OUTS("Output patch size (in dwords): " << outPatchSize << "\n");
       LLPC_OUTS("Output patch start: " << (m_pipelineState->isTessOffChip() ? calcFactor.offChip.outPatchStart
                                                                             : calcFactor.onChip.outPatchStart)
                                        << (m_pipelineState->isTessOffChip() ? " (LDS buffer)" : "(LDS)") << "\n");
-      LLPC_OUTS("Output patch total size: " << outPatchTotalSize << "\n");
+      LLPC_OUTS("Output patch total size (in dwords): " << outPatchTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("Patch constant count: " << patchConstCount << "\n");
-      LLPC_OUTS("Patch constant size: " << calcFactor.patchConstSize << "\n");
+      LLPC_OUTS("Patch constant size (in dwords): " << calcFactor.patchConstSize << "\n");
       LLPC_OUTS("Patch constant start: " << (m_pipelineState->isTessOffChip() ? calcFactor.offChip.patchConstStart
                                                                               : calcFactor.onChip.patchConstStart)
                                          << (m_pipelineState->isTessOffChip() ? " (LDS buffer)" : "(LDS)") << "\n");
-      LLPC_OUTS("Patch constant total size: " << patchConstTotalSize << "\n");
+      LLPC_OUTS("Patch constant total size (in dwords): " << patchConstTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("Tess factor start: " << calcFactor.onChip.tessFactorStart << " (LDS)\n");
-      LLPC_OUTS("Tess factor total size: " << tessFactorTotalSize << "\n");
+      LLPC_OUTS("Tess factor total size (in dwords): " << tessFactorTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("Tess factor stride: " << tessFactorStride << " (");
       switch (m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode) {
@@ -456,7 +456,8 @@ void PatchInOutImportExport::processShader() {
         break;
       }
       LLPC_OUTS(")\n\n");
-      LLPC_OUTS("Tess on-chip LDS total size: " << calcFactor.tessOnChipLdsSize << "\n\n");
+      LLPC_OUTS("Tess on-chip LDS total size (in dwords): " << calcFactor.tessOnChipLdsSize << "\n");
+      LLPC_OUTS("\n");
     }
   }
 
@@ -4844,8 +4845,9 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
                                                               unsigned outVertexCount, unsigned outVertexStride,
                                                               unsigned patchConstCount,
                                                               unsigned tessFactorStride) const {
-  const unsigned maxThreadCountPerThreadGroup =
+  unsigned maxThreadCountPerThreadGroup =
       m_gfxIp.major >= 9 ? Gfx9::MaxHsThreadsPerSubgroup : Gfx6::MaxHsThreadsPerSubgroup;
+
   const unsigned maxThreadCountPerPatch = std::max(inVertexCount, outVertexCount);
   const unsigned patchCountLimitedByThread = maxThreadCountPerThreadGroup / maxThreadCountPerPatch;
 
@@ -4856,8 +4858,8 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
   // Compute the required LDS size per patch, always include the space for input patch and tess factor
   unsigned ldsSizePerPatch = inPatchSize + MaxTessFactorsPerPatch;
 
-  unsigned patchCountLimitedByLds =
-      (m_pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup / ldsSizePerPatch);
+  unsigned ldsSizePerThreadGroup = m_pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup;
+  unsigned patchCountLimitedByLds = ldsSizePerThreadGroup / ldsSizePerPatch;
 
   unsigned patchCountPerThreadGroup = std::min(patchCountLimitedByThread, patchCountLimitedByLds);
 

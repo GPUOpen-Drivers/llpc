@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 53
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 4
+#define LLPC_INTERFACE_MINOR_VERSION 5
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     53.5 | Add forceCsThreadIdSwizzling for thread id swizzle in 8*4                                             |
 //  |     53.4 | Add ldsSpillLimitDwords shader option                                                                 |
 //  |     53.3 | Add disableFastMathFlags shader option, plus support for this and fastMathFlags in pipeline files     |
 //  |     53.2 | Add resourceLayoutScheme to PipelineOptions                                                           |
@@ -408,6 +409,7 @@ struct PipelineOptions {
                                    ///  the pipeline ELF.
   bool scalarBlockLayout;          ///< If set, allows scalar block layout of types.
   bool reconfigWorkgroupLayout;    ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.
+  bool forceCsThreadIdSwizzling;   ///< Force rearranges threadId within group into blocks of 8*8 or 8*4.
   bool includeIr;                  ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
   bool robustBufferAccess;         ///< If set, out of bounds accesses to buffer or private array will be handled.
                                    ///  for now this option is used by LLPC shader and affects only the private array,
