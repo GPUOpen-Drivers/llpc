@@ -80,29 +80,24 @@ private:
   llvm::Value *addCallInstForInOutImport(llvm::Type *inOutTy, unsigned addrSpace, llvm::Constant *inOutMeta,
                                          llvm::Value *startLoc, unsigned maxLocOffset, llvm::Value *compIdx,
                                          llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,
-                                         bool isPerVertexDimension, llvm::Instruction *insertPos);
+                                         bool isPerVertexDimension);
 
   void addCallInstForOutputExport(llvm::Value *outputValue, llvm::Constant *outputMeta, llvm::Value *locOffset,
                                   unsigned maxLocOffset, unsigned xfbOffsetAdjust, unsigned xfbBufferAdjust,
-                                  llvm::Value *elemIdx, llvm::Value *vertexIdx, unsigned emitStreamId,
-                                  llvm::Instruction *insertPos);
+                                  llvm::Value *elemIdx, llvm::Value *vertexIdx, unsigned emitStreamId);
 
   Value *loadDynamicIndexedMembers(Type *inOutTy, unsigned addrSpace, llvm::ArrayRef<llvm::Value *> indexOperands,
-                                   Constant *inOutMetaVal, Value *locOffset, unsigned interpLoc, Value *auxInterpValue,
-                                   Instruction *insertPos);
+                                   Constant *inOutMetaVal, Value *locOffset, unsigned interpLoc, Value *auxInterpValue);
 
   llvm::Value *loadInOutMember(llvm::Type *inOutTy, unsigned addrSpace, llvm::ArrayRef<llvm::Value *> indexOperands,
                                unsigned maxLocOffset, llvm::Constant *inOutMeta, llvm::Value *locOffset,
-                               llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,
-                               llvm::Instruction *insertPos);
+                               llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo);
 
   void storeOutputMember(llvm::Type *outputTy, llvm::Value *storeValue, llvm::ArrayRef<llvm::Value *> indexOperands,
                          unsigned maxLocOffset, llvm::Constant *outputMeta, llvm::Value *locOffset,
-                         llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                         llvm::Value *vertexIdx);
 
   void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst);
-
-  llvm::Value *toInt32Value(llvm::Value *value, llvm::Instruction *insertPos);
 
   std::unordered_map<llvm::Value *, llvm::Value *> m_globalVarProxyMap; // Proxy map for lowering global variables
   std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap;     // Proxy map for lowering inputs
