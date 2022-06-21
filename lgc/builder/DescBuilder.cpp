@@ -74,6 +74,11 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       return UndefValue::get(getBufferDescTy(pointeeTy));
     }
 
+    if (node->binding != binding) {
+      // We found a binding in the middle of a range. Add the difference to the index.
+      descIndex = CreateAdd(descIndex, getInt32(binding - node->binding));
+    }
+
     if (node == topNode && isa<Constant>(descIndex) && node->type != ResourceNodeType::InlineBuffer) {
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
       // indexed and is not an InlineBuffer. This lgc.root.descriptor call is by default lowered in
@@ -91,6 +96,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
         desc = UndefValue::get(descTy);
       } else {
         dwordOffset += node->offsetInDwords;
+        dwordOffset += (binding - node->binding) * node->stride;
         desc = CreateNamedCall(callName, descTy, getInt32(dwordOffset), Attribute::ReadNone);
       }
     } else if (node->type == ResourceNodeType::InlineBuffer) {
@@ -403,7 +409,9 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
     unsigned offsetInDwords = node->offsetInDwords;
+    offsetInDwords += (binding - node->binding) * node->stride;
     unsigned offsetInBytes = offsetInDwords * 4;
+
     if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
       offsetInBytes += DescriptorSizeResource;
     offset = getInt32(offsetInBytes);
