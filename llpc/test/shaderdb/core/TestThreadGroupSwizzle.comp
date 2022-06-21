@@ -1,0 +1,30 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0) buffer Buffers
+{
+    uvec3 test;
+};
+
+void main()
+{
+    test = gl_WorkGroupID;
+}
+
+// BEGIN_SWIZZLETEST
+// RUN: amdllpc -v %gfxip %s  --thread-group-swizzle-mode=4x4 | FileCheck -check-prefix=SWIZZLETEST %s
+// SWIZZLETEST-LABEL: {{^// LLPC}} pipeline before-patching results
+// SWIZZLETEST: %{{[0-9]+}} = call <3 x i32> @lgc.swizzle.workgroup.id(<3 x i32> %{{[0-9]+}}, <3 x i32> %{{[0-9]+}})
+// SWIZZLETEST-LABEL: {{^// LLPC}} pipeline patching results
+// SWIZZLETEST: .performSwizzle{{.*}}:
+// SWIZZLETEST: AMDLLPC SUCCESS
+// END_SWIZZLETEST
+// BEGIN_NOTSWIZZLETEST
+// RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=NOTSWIZZLETEST %s
+// NOTSWIZZLETEST-LABEL: {{^// LLPC}} pipeline before-patching results
+// NOTSWIZZLETEST-NOT: lgc.swizzle.workgroup.id
+// NOTSWIZZLETEST-LABEL: {{^// LLPC}} pipeline patching results
+// NOTSWIZZLETEST-NOT: .performSwizzle{{.*}}:
+// NOTSWIZZLETEST: AMDLLPC SUCCESS
+// END_NOTSWIZZLETEST

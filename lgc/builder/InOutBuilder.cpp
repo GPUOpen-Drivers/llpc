@@ -1069,9 +1069,18 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     return load;
   }
 
-  case BuiltInWorkgroupId:
+  case BuiltInWorkgroupId: {
     // WorkgroupId is a v3i32 shader input (three SGPRs set up by hardware).
-    return ShaderInputs::getInput(ShaderInput::WorkgroupId, BuilderBase::get(*this), *getLgcContext());
+    Value *workgroupId = ShaderInputs::getInput(ShaderInput::WorkgroupId, BuilderBase::get(*this), *getLgcContext());
+
+    // If thread group swizzle is enabled, we insert a call here and later lower it to code.
+    if (m_pipelineState->getOptions().threadGroupSwizzleMode != ThreadGroupSwizzleMode::Default) {
+      // The calculation requires NumWorkgroups and WorkgroupId.
+      workgroupId = CreateNamedCall(lgcName::SwizzleWorkgroupId, workgroupId->getType(),
+                                    {readCsBuiltIn(BuiltInNumWorkgroups), workgroupId}, {});
+    }
+    return workgroupId;
+  }
 
   case BuiltInLocalInvocationId: {
     // LocalInvocationId is a v3i32 shader input (three VGPRs set up in hardware).

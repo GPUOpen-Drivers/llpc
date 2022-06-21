@@ -351,6 +351,7 @@ public:
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizationLevel, MemberTypeInt, false);
 #endif
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, threadGroupSwizzleMode, MemberTypeEnum, false);
     INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_extendedRobustness, MemberTypeExtendedRobustness, true);
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
@@ -362,7 +363,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 12;
+  static const unsigned MemberCount = 13;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
