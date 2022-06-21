@@ -1,6 +1,8 @@
 ; Check that enabling pipeline dumps produces the expected files (.pipe, .spv, and .elf).
 
 ; REQUIRES: llpc-client-interface-53
+; Test contains a lot of non-windows commands, so excluding windows from testing
+; UNSUPPORTED: system-windows
 
 ; Create a fresh directory for pipeline dump files.
 ; RUN: mkdir -p %t/dump
