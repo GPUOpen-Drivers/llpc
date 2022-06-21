@@ -124,7 +124,8 @@ struct Options {
   unsigned allowNullDescriptor;        // Allow and give defined behavior for null descriptor
   unsigned disableImageResourceCheck;  // Don't do image resource type check
   unsigned reserved0f;                 // Reserved for future functionality
-  unsigned reserved10;                 // Reserved for future functionality
+  unsigned useResourceBindingRange;    // A resource node binding is the start of a range whose size is
+                                       //  sizeInDwords/stride.
   unsigned reserved1f;                // Reserved for future functionality
   unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
   unsigned pageMigrationEnabled;  // Enable page migration
@@ -233,6 +234,8 @@ struct ResourceNode {
     struct {
       unsigned set;                   // Descriptor set
       unsigned binding;               // Binding
+                                      // If pipeline option "useResourceBindingRange" is set, then this is the
+                                      //  start of a range of bindings whose size is sizeInDwords/stride.
       unsigned stride;                // Size of each descriptor in the indexable range in dwords.
       unsigned immutableSize;         // Size (in units of DescriptorSizeSampler bytes) of immutableValue array
       const uint32_t *immutableValue; // Array of dwords for immutable sampler.

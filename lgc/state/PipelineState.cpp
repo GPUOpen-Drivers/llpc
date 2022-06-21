@@ -801,6 +801,8 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
 
 // =====================================================================================================================
 // Check whether a (non-table) resource node matches the given {set,binding} compatible with nodeType
+// If pipeline option useResourceBindingRange is set, then a node matches a range of bindings of size
+// sizeInDwords/stride.
 //
 // @param node : Node to try and match
 // @param nodeType : Resource node type being searched for
@@ -812,6 +814,8 @@ bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType
     return false;
   if (node.binding == binding)
     return true;
+  if (getOptions().useResourceBindingRange)
+    return node.binding <= binding && (binding - node.binding) * node.stride < node.sizeInDwords;
   return false;
 }
 
