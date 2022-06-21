@@ -482,7 +482,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
     result = CreateSelect(
         CreateICmpUGE(clusterSize, getInt32(2)),
         createGroupArithmeticOperation(groupArithOp, result,
-                                       createDppUpdate(identity, result, DppCtrl::DppQuadPerm1032, 0xF, 0xF, 0)),
+                                       createDppUpdate(identity, result, DppCtrl::DppQuadPerm1032, 0xF, 0xF, true)),
         result);
 
     // Perform The group arithmetic operation between N <-> N+2 lanes in the subgroup, with all masks and rows enabled
@@ -490,22 +490,22 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
     result = CreateSelect(
         CreateICmpUGE(clusterSize, getInt32(4)),
         createGroupArithmeticOperation(groupArithOp, result,
-                                       createDppUpdate(identity, result, DppCtrl::DppQuadPerm2301, 0xF, 0xF, 0)),
+                                       createDppUpdate(identity, result, DppCtrl::DppQuadPerm2301, 0xF, 0xF, true)),
         result);
 
     // Use a row half mirror to make all values in a cluster of 8 the same, with all masks and rows enabled (0xF).
     result = CreateSelect(
         CreateICmpUGE(clusterSize, getInt32(8)),
         createGroupArithmeticOperation(groupArithOp, result,
-                                       createDppUpdate(identity, result, DppCtrl::DppRowHalfMirror, 0xF, 0xF, 0)),
+                                       createDppUpdate(identity, result, DppCtrl::DppRowHalfMirror, 0xF, 0xF, true)),
         result);
 
     // Use a row mirror to make all values in a cluster of 16 the same, with all masks and rows enabled (0xF).
-    result =
-        CreateSelect(CreateICmpUGE(clusterSize, getInt32(16)),
-                     createGroupArithmeticOperation(
-                         groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowMirror, 0xF, 0xF, 0)),
-                     result);
+    result = CreateSelect(
+        CreateICmpUGE(clusterSize, getInt32(16)),
+        createGroupArithmeticOperation(groupArithOp, result,
+                                       createDppUpdate(identity, result, DppCtrl::DppRowMirror, 0xF, 0xF, true)),
+        result);
 
     if (supportPermLaneDpp()) {
       // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
@@ -529,7 +529,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
       result = CreateSelect(
           CreateICmpUGE(clusterSize, getInt32(32)),
           createGroupArithmeticOperation(groupArithOp, result,
-                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)),
+                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast15, 0xA, 0xF, true)),
           result);
 
       // Use a row broadcast to move the 31st element from the lower cluster of 32 to the upper cluster. The row
@@ -537,7 +537,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
       result = CreateSelect(
           CreateICmpEQ(clusterSize, getInt32(64)),
           createGroupArithmeticOperation(groupArithOp, result,
-                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast31, 0x8, 0xF, 0)),
+                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast31, 0x8, 0xF, true)),
           result);
 
       Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
@@ -690,7 +690,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArith
       result = CreateSelect(
           CreateICmpUGE(clusterSize, getInt32(32)),
           createGroupArithmeticOperation(groupArithOp, result,
-                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)),
+                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast15, 0xA, 0xF, true)),
           result);
 
       // The DPP operation has a row mask of 0xc (0b1100) so only the 3rd and 4th clusters of 16 perform the
@@ -698,7 +698,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArith
       result = CreateSelect(
           CreateICmpEQ(clusterSize, getInt32(64)),
           createGroupArithmeticOperation(groupArithOp, result,
-                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast31, 0xC, 0xF, 0)),
+                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast31, 0xC, 0xF, true)),
           result);
     }
 
@@ -868,7 +868,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArith
       result = CreateSelect(
           CreateICmpUGE(clusterSize, getInt32(32)),
           createGroupArithmeticOperation(groupArithOp, result,
-                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)),
+                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast15, 0xA, 0xF, true)),
           result);
 
       // The DPP operation has a row mask of 0xc (0b1100) so only the 3rd and 4th clusters of 16 perform the
@@ -876,7 +876,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArith
       result = CreateSelect(
           CreateICmpEQ(clusterSize, getInt32(64)),
           createGroupArithmeticOperation(groupArithOp, result,
-                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast31, 0xC, 0xF, 0)),
+                                         createDppUpdate(identity, result, DppCtrl::DppRowBcast31, 0xC, 0xF, true)),
           result);
     }
 
