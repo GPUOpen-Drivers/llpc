@@ -477,6 +477,10 @@ void PatchInOutImportExport::processShader() {
           reconfigCall->eraseFromParent();
         }
       }
+
+      if (func.isDeclaration() && func.getName().startswith(lgcName::SwizzleWorkgroupId)) {
+        createSwizzleThreadGroupFunction();
+      }
       // Different with above, this will force the threadID swizzle which will rearrange thread ID within a group into
       // blocks of 8*4, not to reconfig workgroup automatically and will support to be swizzled in 8*4 block
       // split.
@@ -5519,6 +5523,329 @@ Value *PatchInOutImportExport::swizzleLocalInvocationIdIn8x4(Value *localInvocat
     return newThreadIdInGroup;
   }
   return localInvocationId;
+}
+
+// =====================================================================================================================
+// Creates the LGC intrinsic "lgc.swizzle.thread.group" to swizzle thread group for optimization purposes.
+//
+void PatchInOutImportExport::createSwizzleThreadGroupFunction() {
+
+  // Generate IR instructions to swizzle thread groups with repeating N x N tiles of morton patterns. If the X or Y
+  // dimensions are not divisible by N, thread groups along the right and bottom sections of the dispatch get row-major
+  // and column-major ordering. Only the XY groups are swizzled, the Z value for thread ID and group ID are preserved.
+  // Swizzling happens when there is more than 1 morton tile.
+  //
+  // Z - Swizzled set of N x N thread groups
+  // R - Row-major thread groups
+  // C - Column-major thread groups
+  //
+  // |ZZZZZZZZZZZZZZZZZZ|R|
+  // |ZZZZZZZZZZZZZZZZZZ|R|
+  // |ZZZZZZZZZZZZZZZZZZ|R|
+  // |ZZZZZZZZZZZZZZZZZZ|R|
+  // |CCCCCCCCCCCCCCCCCCCC|
+
+  // The basic algorithm is that (in pseudo-code):
+  //
+  // define <3 x i32> @lgc.swizzle.thread.group(<3 x i32> %numWorkgroups, <3 x i32> %nativeWorkgroupId) {
+
+  //   threadGroupFlatId = nativeWorkgroupId.y * numWorkgroups.x + nativeWorkgroupId.x
+  //   numTiles = numWorkgroups / tileDim
+  //   if (isMoreThanOneTile.x && isMoreThanOneTile.y)
+  //     perform swizzle
+  //   else
+  //     disable swizzle
+  //   ret swizzledWorkgroupId
+  // }
+
+  // Perform swizzle:
+  //   // Calculate the size of section need to be swizzled
+  //   numSwizzledThreadGroup = numTiles * tileDim
+  //
+  //   // Calculate the size of the side section
+  //   sideStart = numSwizzledThreadGroup.x * numSwizzledThreadGroup.y
+  //   sideWidth = numWorkgroups.x - numSwizzledThreadGroup.x
+  //   sideSize = sideWidth * numSwizzledThreadGroup.y
+  //
+  //   // Calculate the size of the bottom section
+  //   bottomStart = sideStart + sideSize
+  //   bottomHeight = numWorkgroups.y - numSwizzledThreadGroup.y
+  //
+  //   if (threadGroupFlatId >= bottomStart)
+  //     // Bottom tile
+  //     // Get new thread group ID for thread group in the bottom section
+  //     // Thread groups are reordered up->down then left->right
+  //     localThreadGroupFlatId = threadGroupFlatId - bottomStart
+  //     swizzledWorkgroupId.x = localThreadGroupFlatId / bottomHeight
+  //     swizzledWorkgroupId.y = (localThreadGroupFlatId % bottomHeight) + numSwizzledThreadGroup.y
+  //   else if (threadGroupFlatId >= sideStart)
+  //     // Side tile
+  //     // Get new thread group ID for thread group in the side section
+  //     // Thread groups are reordered left->right then up->down
+  //     localThreadGroupFlatId = threadGroupFlatId - sideStart
+  //     swizzledWorkgroupId.x = (localThreadGroupFlatId % sideWidth) + numSwizzledThreadGroup.x
+  //     swizzledWorkgroupId.y = localThreadGroupFlatId / sideWidth
+  //   else
+  //     // Morton tile
+  //     localThreadGroupFlatId = threadGroupFlatId % tileSize
+  //     // Extract to xy dimension based on Z-order curved
+  //     localThreadGroupId.x = Compact1By1Bits(tileBits, localThreadGroupFlatId)
+  //     localThreadGroupId.y = Compact1By1Bits(tileBits, localThreadGroupFlatId >> 1)
+  //     flatTileId = threadGroupFlatId / tileSize
+  //     swizzledWorkgroupId.x = (flatTileId % numTiles.x) * tileDim + localThreadGroupId.x
+  //     swizzledWorkgroupId.y = (flatTileId / numTiles.x) * tileDim + localThreadGroupId.y
+  //
+  //   // Finalize
+  //   swizzledWorkgroupId.z = nativeWorkgroupId.z
+  //
+  // Disable swizzle:
+  //   swizzledWorkgroupId = nativeWorkgroupId
+
+  BuilderBase builder(*m_context);
+
+  Type *ivec3Ty = FixedVectorType::get(Type::getInt32Ty(*m_context), 3);
+
+  auto func = m_module->getFunction(lgcName::SwizzleWorkgroupId);
+
+  func->setCallingConv(CallingConv::C);
+  func->addFnAttr(Attribute::NoUnwind);
+  func->addFnAttr(Attribute::AlwaysInline);
+  func->addFnAttr(Attribute::ReadNone);
+  func->setLinkage(GlobalValue::InternalLinkage);
+
+  auto argIt = func->arg_begin();
+
+  Value *numWorkgroups = argIt++;
+  numWorkgroups->setName("numWorkgroups");
+
+  Value *nativeWorkgroupId = argIt++;
+  nativeWorkgroupId->setName("nativeWorkgroupId");
+
+  static constexpr unsigned tileDims[] = {InvalidValue, 4, 8, 16};
+  static constexpr unsigned tileBits[] = {InvalidValue, 2, 3, 4};
+  static_assert((sizeof(tileDims) / sizeof(unsigned)) == static_cast<unsigned>(ThreadGroupSwizzleMode::Count),
+                "The length of tileDims is not as expected.");
+  static_assert((sizeof(tileBits) / sizeof(unsigned)) == static_cast<unsigned>(ThreadGroupSwizzleMode::Count),
+                "The length of tileBits is not as expected.");
+
+  assert(m_pipelineState->getOptions().threadGroupSwizzleMode != ThreadGroupSwizzleMode::Default);
+  const unsigned tileIndex = static_cast<unsigned>(m_pipelineState->getOptions().threadGroupSwizzleMode);
+
+  auto entryBlock = BasicBlock::Create(*m_context, ".entry", func);
+  builder.SetInsertPoint(entryBlock);
+
+  Constant *tileDim = builder.getInt32(tileDims[tileIndex]);
+  Constant *tileSize = builder.getInt32(tileDims[tileIndex] * tileDims[tileIndex]);
+  Constant *one = builder.getInt32(1);
+
+  ElementCount ec = ElementCount::get(3, false);
+
+  auto swizzledWorkgroupIdPtr = builder.CreateAlloca(ivec3Ty);
+
+  // Calculate flat thread group ID
+  // threadGroupFlatId = nativeWorkgroupId.y * numWorkgroups.x + nativeWorkgroupId.x
+  auto threadGroupFlatId =
+      builder.CreateAdd(builder.CreateMul(builder.CreateExtractElement(nativeWorkgroupId, 1),
+                                          builder.CreateExtractElement(numWorkgroups, uint64_t(0))),
+                        builder.CreateExtractElement(nativeWorkgroupId, uint64_t(0)));
+
+  // Calculate the number of thread group tiles that need to be swizzled
+  // numTiles = numWorkgroups / tileDim
+  auto numTiles = builder.CreateUDiv(numWorkgroups, ConstantVector::getSplat(ec, tileDim));
+
+  // Calculate whether there is more than one tile
+  auto isMoreThanOneTile = builder.CreateICmpUGT(numTiles, ConstantVector::getSplat(ec, one));
+
+  // if (isMoreThanOneTile.x && isMoreThanOneTile.y)
+  //   perform swizzle
+  // else
+  //   disable swizzle
+  auto performSwizzleBlock = BasicBlock::Create(*m_context, ".performSwizzle", func);
+  auto disableSwizzleBlock = BasicBlock::Create(*m_context, ".disableSwizzle", func);
+  auto finalizeBlock = BasicBlock::Create(*m_context, ".finalize", func);
+  auto returnBlock = BasicBlock::Create(*m_context, ".return", func);
+  auto isXAndYMoreThanOneTile = builder.CreateAnd(builder.CreateExtractElement(isMoreThanOneTile, uint64_t(0)),
+                                                  builder.CreateExtractElement(isMoreThanOneTile, 1));
+  builder.CreateCondBr(isXAndYMoreThanOneTile, performSwizzleBlock, disableSwizzleBlock);
+
+  {
+    // Perform swizzle
+    builder.SetInsertPoint(performSwizzleBlock);
+    // Calculate the size of section need to be swizzled
+    // numSwizzledThreadGroup = numTiles * tileDim
+    auto numSwizzledThreadGroup = builder.CreateMul(numTiles, ConstantVector::getSplat(ec, tileDim));
+
+    // Calculate the size of the side section
+    // sideStart = numSwizzledThreadGroup.x * numSwizzledThreadGroup.y
+    // sideWidth = numWorkgroups.x - numSwizzledThreadGroup.x
+    // sideSize = sideWidth * numSwizzledThreadGroup.y
+    auto sideStart = builder.CreateMul(builder.CreateExtractElement(numSwizzledThreadGroup, uint64_t(0)),
+                                       builder.CreateExtractElement(numSwizzledThreadGroup, 1));
+    auto sideWidth = builder.CreateSub(builder.CreateExtractElement(numWorkgroups, uint64_t(0)),
+                                       builder.CreateExtractElement(numSwizzledThreadGroup, uint64_t(0)));
+    auto sideSize = builder.CreateMul(sideWidth, builder.CreateExtractElement(numSwizzledThreadGroup, 1));
+
+    // Calculate the size of the bottom section
+    // bottomStart = sideStart + sideSize
+    // bottomHeight = numWorkgroups.y - numSwizzledThreadGroup.y
+    auto bottomStart = builder.CreateAdd(sideStart, sideSize);
+    auto bottomHeight = builder.CreateSub(builder.CreateExtractElement(numWorkgroups, 1),
+                                          builder.CreateExtractElement(numSwizzledThreadGroup, 1));
+
+    // if (threadGroupFlatId >= bottomStart)
+    //   bottom tile
+    // else if (threadGroupFlatId >= sideStart)
+    //   side tile
+    // else
+    //   morton tile
+    // finalize
+    auto bottomTileBlock = BasicBlock::Create(*m_context, "bottomTile", func, finalizeBlock);
+    auto bottomTileElseIfBlock = BasicBlock::Create(*m_context, ".bottomTile.elseIf", func, finalizeBlock);
+    auto sideTileBlock = BasicBlock::Create(*m_context, ".sideTile", func, finalizeBlock);
+    auto mortonTileBlock = BasicBlock::Create(*m_context, ".mortonTile", func, finalizeBlock);
+    auto isInBottomTile = builder.CreateICmpUGE(threadGroupFlatId, bottomStart);
+    builder.CreateCondBr(isInBottomTile, bottomTileBlock, bottomTileElseIfBlock);
+
+    {
+      // Bottom tile
+      builder.SetInsertPoint(bottomTileBlock);
+      // Get new thread group ID for thread group in the bottom section
+      // Thread groups are reordered up->down then left->right
+
+      // localThreadGroupFlatId = threadGroupFlatId - bottomStart
+      // swizzledWorkgroupId.x = localThreadGroupFlatId / bottomHeight
+      // swizzledWorkgroupId.y = (localThreadGroupFlatId % bottomHeight) + numSwizzledThreadGroup.y
+      auto localThreadGroupFlatId = builder.CreateSub(threadGroupFlatId, bottomStart);
+      auto swizzledWorkgroupId = builder.CreateInsertElement(
+          UndefValue::get(ivec3Ty), builder.CreateUDiv(localThreadGroupFlatId, bottomHeight), uint64_t(0));
+      swizzledWorkgroupId =
+          builder.CreateInsertElement(swizzledWorkgroupId,
+                                      builder.CreateAdd(builder.CreateURem(localThreadGroupFlatId, bottomHeight),
+                                                        builder.CreateExtractElement(numSwizzledThreadGroup, 1)),
+                                      1);
+
+      builder.CreateStore(swizzledWorkgroupId, swizzledWorkgroupIdPtr);
+      builder.CreateBr(finalizeBlock);
+    }
+    {
+      // else if (threadGroupFlatId >= sideStart)
+      builder.SetInsertPoint(bottomTileElseIfBlock);
+
+      auto isInSideTile = builder.CreateICmpUGE(threadGroupFlatId, sideStart);
+      builder.CreateCondBr(isInSideTile, sideTileBlock, mortonTileBlock);
+    }
+    {
+      // Side tile
+      builder.SetInsertPoint(sideTileBlock);
+
+      // Get new thread group ID for thread group in the side section
+      // Thread groups are reordered left->right then up->down
+
+      // localThreadGroupFlatId = threadGroupFlatId - sideStart
+      // swizzledWorkgroupId.x = (localThreadGroupFlatId % sideWidth) + numSwizzledThreadGroup.x
+      // swizzledWorkgroupId.y = localThreadGroupFlatId / sideWidth
+      auto localThreadGroupFlatId = builder.CreateSub(threadGroupFlatId, sideStart);
+      auto swizzledWorkgroupId = builder.CreateInsertElement(
+          UndefValue::get(ivec3Ty),
+          builder.CreateAdd(builder.CreateURem(localThreadGroupFlatId, sideWidth),
+                            builder.CreateExtractElement(numSwizzledThreadGroup, uint64_t(0))),
+          uint64_t(0));
+      swizzledWorkgroupId =
+          builder.CreateInsertElement(swizzledWorkgroupId, builder.CreateUDiv(localThreadGroupFlatId, sideWidth), 1);
+
+      builder.CreateStore(swizzledWorkgroupId, swizzledWorkgroupIdPtr);
+      builder.CreateBr(finalizeBlock);
+    }
+    {
+      // Morton tile
+      builder.SetInsertPoint(mortonTileBlock);
+
+      // Helper to compact bits for Z-order curve
+      auto createCompact1By1Bits = [&](unsigned bitsToExtract, Value *src) {
+        auto createCompactShift = [&](unsigned shift, unsigned mask, Value *src) {
+          auto result = builder.CreateLShr(src, ConstantInt::get(Type::getInt32Ty(*m_context), shift));
+          result = builder.CreateOr(result, src);
+          result = builder.CreateAnd(result, ConstantInt::get(Type::getInt32Ty(*m_context), mask));
+          return result;
+        };
+
+        // x &= 0x55555555;                   // x = -f-e -d-c -b-a -9-8 -7-6 -5-4 -3-2 -1-0
+        auto result = builder.CreateAnd(src, ConstantInt::get(Type::getInt32Ty(*m_context), 0x55555555));
+
+        // x = (x | (x >> 1)) & 0x33333333;   // x = --fe --dc --ba --98 --76 --54 --32 --10 // NOLINT
+        result = createCompactShift(1, 0x33333333, result);
+
+        if (bitsToExtract > 2)
+          // x = (x | (x >> 2)) & 0x0F0F0F0F; // x = ---- fedc ---- ba98 ---- 7654 ---- 3210 // NOLINT
+          result = createCompactShift(2, 0x0F0F0F0F, result);
+
+        if (bitsToExtract > 4)
+          // x = (x | (x >> 4)) & 0x00FF00FF; // x = ---- ---- fedc ba98 ---- ---- 7654 3210 // NOLINT
+          result = createCompactShift(4, 0x00FF00FF, result);
+
+        if (bitsToExtract > 8)
+          // x = (x | (x >> 8)) & 0x0000FFFF; // x = ---- ---- ---- ---- fedc ba98 7654 3210 // NOLINT
+          result = createCompactShift(8, 0x0000FFFF, result);
+
+        return result;
+      };
+
+      // localThreadGroupFlatId = threadGroupFlatId % tileSize
+      auto localThreadGroupFlatId = builder.CreateURem(threadGroupFlatId, tileSize);
+
+      // Extract to xy dimension based on Z-order curved
+      auto localThreadGroupIdX = createCompact1By1Bits(tileBits[tileIndex], localThreadGroupFlatId);
+      auto localThreadGroupIdY =
+          createCompact1By1Bits(tileBits[tileIndex], builder.CreateLShr(localThreadGroupFlatId, one));
+
+      // flatTileId = threadGroupFlatId / tileSize
+      auto flatTileId = builder.CreateUDiv(threadGroupFlatId, tileSize);
+
+      // swizzledWorkgroupId.x = (flatTileId % numTiles.x) * tileDim + localThreadGroupId.x
+      // swizzledWorkgroupId.y = (flatTileId / numTiles.x) * tileDim + localThreadGroupId.y
+      auto swizzledWorkgroupIdX = builder.CreateAdd(
+          builder.CreateMul(builder.CreateURem(flatTileId, builder.CreateExtractElement(numTiles, uint64_t(0))),
+                            tileDim),
+          localThreadGroupIdX);
+      auto swizzledWorkgroupIdY = builder.CreateAdd(
+          builder.CreateMul(builder.CreateUDiv(flatTileId, builder.CreateExtractElement(numTiles, uint64_t(0))),
+                            tileDim),
+          localThreadGroupIdY);
+
+      auto swizzledWorkgroupId =
+          builder.CreateInsertElement(UndefValue::get(ivec3Ty), swizzledWorkgroupIdX, uint64_t(0));
+      swizzledWorkgroupId = builder.CreateInsertElement(swizzledWorkgroupId, swizzledWorkgroupIdY, 1);
+
+      builder.CreateStore(swizzledWorkgroupId, swizzledWorkgroupIdPtr);
+      builder.CreateBr(finalizeBlock);
+    }
+
+    // Finalize
+    builder.SetInsertPoint(finalizeBlock);
+
+    // swizzledWorkgroupId.z = nativeWorkgroupId.z
+    Value *swizzledWorkgroupId = builder.CreateLoad(ivec3Ty, swizzledWorkgroupIdPtr);
+    swizzledWorkgroupId =
+        builder.CreateInsertElement(swizzledWorkgroupId, builder.CreateExtractElement(nativeWorkgroupId, 2), 2);
+
+    builder.CreateStore(swizzledWorkgroupId, swizzledWorkgroupIdPtr);
+
+    builder.CreateBr(returnBlock);
+  }
+  {
+    // Disable swizzle
+    builder.SetInsertPoint(disableSwizzleBlock);
+
+    builder.CreateStore(nativeWorkgroupId, swizzledWorkgroupIdPtr);
+
+    builder.CreateBr(returnBlock);
+  }
+
+  // Return
+  builder.SetInsertPoint(returnBlock);
+
+  auto swizzledWorkgroupId = builder.CreateLoad(ivec3Ty, swizzledWorkgroupIdPtr);
+  builder.CreateRet(swizzledWorkgroupId);
 }
 
 // =====================================================================================================================

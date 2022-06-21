@@ -95,6 +95,15 @@ enum class WaveBreak : unsigned {
   _32x32 = 0x3,   ///< Outside a 32x32 pixel region
 };
 
+// Enumerate the thread group swizzle modes.
+enum class ThreadGroupSwizzleMode : unsigned {
+  Default = 0, // Use the default layout. There is no swizzling conducted.
+  _4x4 = 1,    // The tile size is 4x4 in x and y dimension.
+  _8x8 = 2,    // The tile size is 8x8 in x and y dimension.
+  _16x16 = 3,  // The tile size is 16x16 in x and y dimension.
+  Count,
+};
+
 // Value for shadowDescriptorTable pipeline option.
 static const unsigned ShadowDescriptorTableDisable = ~0U;
 
@@ -129,6 +138,7 @@ struct Options {
   unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
   unsigned pageMigrationEnabled;  // Enable page migration
   ResourceLayoutScheme resourceLayoutScheme; // Resource layout scheme
+  ThreadGroupSwizzleMode threadGroupSwizzleMode; // Thread group swizzle mode
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

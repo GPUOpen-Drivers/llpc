@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 53
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 5
+#define LLPC_INTERFACE_MINOR_VERSION 7
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     53.7 | Add threadGroupSwizzleMode to PipelineOptions                                                         |
 //  |     53.6 | Add scalarizeWaterfallLoads to PipelineShaderOptions                                                  |
 //  |     53.5 | Add forceCsThreadIdSwizzling for thread id swizzle in 8*4                                             |
 //  |     53.4 | Add ldsSpillLimitDwords shader option                                                                 |
@@ -433,6 +434,7 @@ struct PipelineOptions {
                               ///< between 0 and 3.
 #endif
   ResourceLayoutScheme resourceLayoutScheme; ///< Resource layout scheme
+  ThreadGroupSwizzleMode threadGroupSwizzleMode; /// Controls thread group swizzle mode for compute shader.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

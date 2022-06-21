@@ -138,6 +138,7 @@ Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
     pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.getValue();
   }
 #endif
+  pipelineInfo->options.threadGroupSwizzleMode = compileInfo.compPipelineInfo.options.threadGroupSwizzleMode;
 
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pComputeInfo = pipelineInfo;

@@ -235,6 +235,14 @@ cl::opt<bool> ForceCsThreadIdSwizzling("force-compute-shader-thread-id-swizzling
                                               cl::desc("force compute shader thread-id swizzling"),
                                               cl::init(false));
 
+// -thread-group-swizzle-mode: specifies the thread group swizzle mode
+cl::opt<ThreadGroupSwizzleMode> ThreadGroupSwizzleModeSetting("thread-group-swizzle-mode",
+                                                              cl::desc("Set thread group swizzle mode\n"),
+                                                              cl::init(ThreadGroupSwizzleMode::Default),
+                                                              values(clEnumValN(ThreadGroupSwizzleMode::Default, "default", "disable thread group swizzle"),
+                                                                     clEnumValN(ThreadGroupSwizzleMode::_4x4, "4x4", "tile size is 4x4 in x and y dimension"),
+                                                                     clEnumValN(ThreadGroupSwizzleMode::_8x8, "8x8", "tile size is 8x8 in x and y dimension"),
+                                                                     clEnumValN(ThreadGroupSwizzleMode::_16x16, "16x16", "tile size is 16x16   in x and y dimension")));
 
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 cl::opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
@@ -434,6 +442,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 #endif
   compileInfo->gfxPipelineInfo.options.resourceLayoutScheme = LayoutScheme;
   compileInfo->compPipelineInfo.options.forceCsThreadIdSwizzling = ForceCsThreadIdSwizzling;
+  compileInfo->compPipelineInfo.options.threadGroupSwizzleMode = ThreadGroupSwizzleModeSetting;
 
   // Set NGG control settings
   if (ParsedGfxIp.major >= 10) {

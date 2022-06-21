@@ -65,6 +65,7 @@ std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize);
 std::ostream &operator<<(std::ostream &out, ShadowDescriptorTableUsage shadowDescriptorTableUsage);
 std::ostream &operator<<(std::ostream &out, VkProvokingVertexModeEXT provokingVertexMode);
 std::ostream &operator<<(std::ostream &out, ResourceLayoutScheme layout);
+std::ostream &operator<<(std::ostream &out, ThreadGroupSwizzleMode threadGroupSwizzleMode);
 
 template std::ostream &operator<<(std::ostream &out, ElfReader<Elf64> &reader);
 template raw_ostream &operator<<(raw_ostream &out, ElfReader<Elf64> &reader);
@@ -705,6 +706,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   dumpFile << "options.optimizationLevel = " << options->optimizationLevel << "\n";
 #endif
+  dumpFile << "options.threadGroupSwizzleMode = " << options->threadGroupSwizzleMode << "\n";
 }
 
 // =====================================================================================================================
@@ -1120,6 +1122,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   hasher->Update(options->optimizationLevel);
 #endif
+  hasher->Update(options->threadGroupSwizzleMode);
 }
 
 // =====================================================================================================================
@@ -2059,6 +2062,26 @@ std::ostream &operator<<(std::ostream &out, ResourceLayoutScheme layout) {
     break;
   }
 
+  return out << string;
+}
+
+// =====================================================================================================================
+// Translates enum "ThreadGroupSwizzleMode" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param threadGroupSwizzleMode : Provoking vertex mode
+std::ostream &operator<<(std::ostream &out, ThreadGroupSwizzleMode threadGroupSwizzleMode) {
+  const char *string = nullptr;
+  switch (threadGroupSwizzleMode) {
+    CASE_CLASSENUM_TO_STRING(ThreadGroupSwizzleMode, Default)
+    CASE_CLASSENUM_TO_STRING(ThreadGroupSwizzleMode, _4x4)
+    CASE_CLASSENUM_TO_STRING(ThreadGroupSwizzleMode, _8x8)
+    CASE_CLASSENUM_TO_STRING(ThreadGroupSwizzleMode, _16x16)
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
   return out << string;
 }
 

@@ -280,6 +280,9 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
   options.forceCsThreadIdSwizzling = getPipelineOptions()->forceCsThreadIdSwizzling;
   options.includeIr = (IncludeLlvmIr || getPipelineOptions()->includeIr);
 
+  options.threadGroupSwizzleMode =
+      static_cast<lgc::ThreadGroupSwizzleMode>(getPipelineOptions()->threadGroupSwizzleMode);
+
   switch (getPipelineOptions()->shadowDescriptorTableUsage) {
   case Vkgc::ShadowDescriptorTableUsage::Auto:
     // Use default of 2 for standalone amdllpc.
