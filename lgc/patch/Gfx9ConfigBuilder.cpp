@@ -1298,9 +1298,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   SET_REG_FIELD(&config->esGsRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
 
   VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = TRISTRIP;
-  if (gsInOutUsage.outputMapLocCount == 0)
-    gsOutputPrimitiveType = POINTLIST;
-  else if (geometryMode.outputPrimitive == OutputPrimitives::Points)
+  if (geometryMode.outputPrimitive == OutputPrimitives::Points)
     gsOutputPrimitiveType = POINTLIST;
   else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
     gsOutputPrimitiveType = LINESTRIP;
