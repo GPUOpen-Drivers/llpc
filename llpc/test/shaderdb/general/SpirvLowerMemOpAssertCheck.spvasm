@@ -1,0 +1,46 @@
+; This test is designed to provoke an assert in SpirvLowerMemoryOp when
+; Instructions are removed in the incorrect order. This results in an assert for
+; removing an instruction that still has a use.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; Check that it doesn't crash
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 132
+; Schema: 0
+               OpCapability Shader
+               OpExtension "SPV_KHR_storage_buffer_storage_class"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main"
+               OpSource GLSL 450
+               OpDecorate %buffer DescriptorSet 0
+               OpDecorate %buffer Binding 3
+               OpDecorate %_runtimearr_x2v3float ArrayStride 32
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+     %uint_0 = OpConstant %uint 0
+      %float = OpTypeFloat 32
+    %v3float = OpTypeVector %float 3
+%_ptr_StorageBuffer_v3float = OpTypePointer StorageBuffer %v3float
+            %x2v3float = OpTypeStruct %v3float %float %v3float %uint
+%_runtimearr_x2v3float = OpTypeRuntimeArray %x2v3float
+     %x2v3float_struct = OpTypeStruct %_runtimearr_x2v3float
+%_ptr_StorageBuffer_x2v3float_struct = OpTypePointer StorageBuffer %x2v3float_struct
+               %buffer = OpVariable %_ptr_StorageBuffer_x2v3float_struct StorageBuffer
+
+         %void_fun = OpTypeFunction %void
+             %main = OpFunction %void None %void_fun
+              %lab = OpLabel
+              %ptr = OpAccessChain %_ptr_StorageBuffer_v3float %buffer %int_0 %uint_0 %int_0
+           %loaded = OpLoad %v3float %ptr
+        %extracted = OpCompositeExtract %float %loaded 0
+               OpReturn
+               OpFunctionEnd

@@ -79,6 +79,13 @@ bool SpirvLowerMemoryOp::runImpl(Module &module) {
 
   visit(m_module);
 
+  for (auto inst : m_preRemoveInsts) {
+    assert(inst->user_empty());
+    inst->dropAllReferences();
+    inst->eraseFromParent();
+  }
+  m_preRemoveInsts.clear();
+
   for (auto inst : m_removeInsts) {
     assert(inst->user_empty());
     inst->dropAllReferences();
@@ -125,7 +132,7 @@ void SpirvLowerMemoryOp::visitExtractElementInst(ExtractElementInst &extractElem
       auto newLoad = new LoadInst(elementTy, elementPtr, "", &extractElementInst);
       extractElementInst.replaceAllUsesWith(newLoad);
 
-      m_removeInsts.insert(&extractElementInst);
+      m_preRemoveInsts.insert(&extractElementInst);
       m_removeInsts.insert(loadInst);
     }
   }
