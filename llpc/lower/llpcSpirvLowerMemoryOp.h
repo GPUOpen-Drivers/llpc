@@ -56,6 +56,7 @@ public:
   virtual void visitExtractElementInst(llvm::ExtractElementInst &extractElementInst);
 
 private:
+  std::unordered_set<llvm::Instruction *> m_preRemoveInsts;
   std::unordered_set<llvm::Instruction *> m_removeInsts;
 };
 
