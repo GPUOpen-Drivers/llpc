@@ -136,6 +136,9 @@ public:
   // Returns the optimization level for the context.
   llvm::CodeGenOpt::Level getOptimizationLevel() const;
 
+  // Returns the optimization level used for context initialization.
+  llvm::CodeGenOpt::Level getInitialOptimizationLevel() const { return m_initialOptLevel; }
+
   // Utility method to create a start/stop timer pass
   static llvm::ModulePass *createStartStopTimer(llvm::Timer *timer, bool starting);
 
@@ -167,6 +170,7 @@ private:
   TargetInfo *m_targetInfo = nullptr;             // Target info
   unsigned m_palAbiVersion = 0xFFFFFFFF;          // PAL pipeline ABI version to compile for
   PassManagerCache *m_passManagerCache = nullptr; // Pass manager cache and creator
+  llvm::CodeGenOpt::Level m_initialOptLevel;      // Optimization level at initialization
 };
 
 } // namespace lgc

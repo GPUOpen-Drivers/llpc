@@ -215,9 +215,10 @@ bool LgcContext::isGpuNameValid(llvm::StringRef gpuName) {
 // @param context : LLVM context to give each Builder
 // @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
 // @param palAbiVersion : PAL pipeline ABI version to compile for
+// @param optLevel : LLVM optimization level used to initialize target machine
 LgcContext *LgcContext::create(LLVMContext &context, StringRef gpuName, unsigned palAbiVersion,
                                CodeGenOpt::Level optLevel) {
-  assert(Initialized && "Must call LgcContext::Initialize before LgcContext::create");
+  assert(Initialized && "Must call LgcContext::initialize before LgcContext::create");
 
   LgcContext *builderContext = new LgcContext(context, palAbiVersion);
 
@@ -247,6 +248,9 @@ LgcContext *LgcContext::create(LLVMContext &context, StringRef gpuName, unsigned
     targetOpts.MCOptions.ShowMCEncoding = true;
     targetOpts.MCOptions.AsmVerbose = true;
   }
+
+  // Save optimization level given at initialization.
+  builderContext->m_initialOptLevel = optLevel;
 
   // If the "opt" option is given, set the optimization level to that value.
   if (OptLevel.getPosition() != 0) {

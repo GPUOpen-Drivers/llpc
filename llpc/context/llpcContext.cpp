@@ -84,8 +84,8 @@ void Context::reset() {
 // =====================================================================================================================
 // Get (create if necessary) LgcContext
 LgcContext *Context::getLgcContext() {
-  if (!m_builderContext) {
-    // First time: Create the LgcContext.
+  // Create the LgcContext on first execution or optimization level change.
+  if (!m_builderContext || m_builderContext->getInitialOptimizationLevel() != getOptimizationLevel()) {
     std::string gpuName = LgcContext::getGpuNameString(m_gfxIp.major, m_gfxIp.minor, m_gfxIp.stepping);
     m_builderContext.reset(
         LgcContext::create(*this, gpuName, PAL_CLIENT_INTERFACE_MAJOR_VERSION, getOptimizationLevel()));
