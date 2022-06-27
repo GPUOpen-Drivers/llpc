@@ -1,0 +1,17 @@
+; RUN: llvm-mc -triple=amdgcn-- -mcpu=gfx1030 -filetype=obj %s | lgcdis - | FileCheck %s
+
+; Test to check that ASCII data is disassembled as ASCII, separating just after
+; a bunch of consecutive newlines.
+
+; CHECK: .ascii "line 1\n\n"
+; CHECK-NEXT: .ascii "line 3\n"
+; CHECK-NEXT: .asciz "line 4"
+
+.rodata
+
+.ascii "line 1"
+.byte 10
+.byte 10
+.ascii "line 3"
+.byte 10
+.asciz "line 4"
