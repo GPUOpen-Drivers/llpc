@@ -672,22 +672,34 @@ void ObjDisassembler::addBinaryEncodingComment(raw_ostream &stream, unsigned ins
 // @param [in/out] relocs : ArrayRef of relocs, bumped on output past relocs that have been consumed
 void ObjDisassembler::outputData(bool outputting, uint64_t offset, StringRef data,
                                  ArrayRef<object::RelocationRef> &relocs) {
+  // Check whether the data is mostly ASCII, possibly with a terminating 0.
+  size_t asciiCount = 0;
+  for (char ch : data) {
+    if ((ch >= ' ' && ch <= '~') || ch == '\n' || ch == '\r' || ch == '\t')
+      ++asciiCount;
+  }
+  bool isAscii = asciiCount * 10 >= data.size() * 9;
+
   while (!data.empty()) {
     if (!relocs.empty() && relocs[0].getOffset() == offset)
       outputRelocs(outputting, offset, 1, relocs);
 
+    // Only go as far as the next reloc.
     size_t size = data.size();
     if (!relocs.empty())
       size = std::min(size, size_t(relocs[0].getOffset() - offset));
 
-    if (outputting) {
-      // Check whether the data is mostly ASCII, possibly with a terminating 0.
-      size_t asciiCount = 0;
-      for (size_t i = 0; i != size; ++i) {
-        if (data[i] >= ' ' && data[i] <= '~')
-          ++asciiCount;
+    // If outputting ascii, only go as far as just past the next bunch of consecutive newlines.
+    if (isAscii) {
+      size_t nl = data.find('\n');
+      if (nl != StringRef::npos) {
+        for (size = nl + 1; size != data.size() && data[size] == '\n'; ++size)
+          ;
       }
-      if (asciiCount * 10 >= size * 9)
+    }
+
+    if (outputting) {
+      if (isAscii)
         m_streamer->emitBytes(data.take_front(size));
       else
         m_streamer->emitBinaryData(data.take_front(size));
