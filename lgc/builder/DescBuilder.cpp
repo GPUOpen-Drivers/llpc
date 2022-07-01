@@ -74,11 +74,6 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       return UndefValue::get(getBufferDescTy(pointeeTy));
     }
 
-    if (node->binding != binding) {
-      // We found a binding in the middle of a range. Add the difference to the index.
-      descIndex = CreateAdd(descIndex, getInt32(binding - node->binding));
-    }
-
     if (node == topNode && isa<Constant>(descIndex) && node->type != ResourceNodeType::InlineBuffer) {
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
       // indexed and is not an InlineBuffer. This lgc.root.descriptor call is by default lowered in
@@ -360,7 +355,7 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     Value *useShadowReloc = CreateRelocationConstant(reloc::ShadowDescriptorTableEnabled);
     Value *useShadowTable = CreateICmpNE(useShadowReloc, getInt32(0));
     return CreateSelect(useShadowTable, shadowAddr, nonShadowAddr);
-   
+
   };
 
   // Get the descriptor table pointer.
