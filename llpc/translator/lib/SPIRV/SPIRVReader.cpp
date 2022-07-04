@@ -1852,10 +1852,18 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
           buildConstStoreRecursively(spvElementType, elementStoreType->getPointerTo(addrSpace), elementStoreType,
                                      constStoreValue->getAggregateElement(i));
 
-      if (needsPad)
+      if (needsPad) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
+        // Old version of the code
         constElements[i] = ConstantExpr::getInsertValue(constElements[i], constElement, 0);
-      else
+#else
+        // New version of the code (also handles unknown version, which we treat as latest).
+        constElements[i] = llvm::ConstantFoldInsertValueInstruction(constElements[i], constElement, 0);
+        assert(constElements[i] && "unexpected error creating aggregate initializer, malformed aggregate?");
+#endif
+      } else {
         constElements[i] = constElement;
+      }
     }
 
     return ConstantArray::get(cast<ArrayType>(storeType), constElements);
@@ -3958,7 +3966,14 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
 
       Constant *const initializer = transInitializer(spvMembers[i], type->getStructElementType(memberIndex));
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
+      // Old version of the code
       structInitializer = ConstantExpr::getInsertValue(structInitializer, initializer, memberIndex);
+#else
+      // New version of the code (also handles unknown version, which we treat as latest).
+      structInitializer = llvm::ConstantFoldInsertValueInstruction(structInitializer, initializer, memberIndex);
+      assert(structInitializer && "unexpected error creating aggregate initializer, malformed aggregate?");
+#endif
     }
 
     return structInitializer;
@@ -3978,11 +3993,25 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
       if (needsPad) {
         Type *const elementType = type->getArrayElementType()->getStructElementType(0);
         Constant *const initializer = transInitializer(spvElements[i], elementType);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
+        // Old version of the code
         arrayInitializer = ConstantExpr::getInsertValue(arrayInitializer, initializer, {i, 0});
+#else
+        // New version of the code (also handles unknown version, which we treat as latest).
+        arrayInitializer = llvm::ConstantFoldInsertValueInstruction(arrayInitializer, initializer, {i, 0});
+        assert(arrayInitializer && "unexpected error creating aggregate initializer, malformed aggregate?");
+#endif
       } else {
         Type *const elementType = type->getArrayElementType();
         Constant *const initializer = transInitializer(spvElements[i], elementType);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
+        // Old version of the code
         arrayInitializer = ConstantExpr::getInsertValue(arrayInitializer, initializer, i);
+#else
+        // New version of the code (also handles unknown version, which we treat as latest).
+        arrayInitializer = llvm::ConstantFoldInsertValueInstruction(arrayInitializer, initializer, i);
+        assert(arrayInitializer && "unexpected error creating aggregate initializer, malformed aggregate?");
+#endif
       }
     }
 
