@@ -1678,7 +1678,9 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
   if (isTypeWithPadRowMajorMatrix(storeType)) {
     auto storePair = createLaunderRowMajorMatrix(storeType, storePointer);
     storePointer = storePair.second;
-    storeType = storePointer->getType()->getPointerElementType();
+    storeType = storePair.first;
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(cast<PointerType>(storePointer->getType())->isOpaqueOrPointeeTypeMatches(storeType));
   }
 
   const Align alignment = m_m->getDataLayout().getABITypeAlign(storeType);
@@ -2718,14 +2720,15 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
 
   Value *const pStruct =
       transValue(spvStruct, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-  assert(pStruct->getType()->isPointerTy() &&
-         (pStruct->getType()->isOpaquePointerTy() || pStruct->getType()->getPointerElementType()->isStructTy()));
+  assert(pStruct->getType()->isPointerTy());
 
   const unsigned memberIndex = spvArrayLength->getMemberIndex();
   const unsigned remappedMemberIndex =
       lookupRemappedTypeElements(spvStruct->getType()->getPointerElementType(), memberIndex);
 
-  StructType *const structType = cast<StructType>(pStruct->getType()->getPointerElementType());
+  StructType *const structType = cast<StructType>(getPointeeType(spvStruct));
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(cast<PointerType>(pStruct->getType())->isOpaqueOrPointeeTypeMatches(structType));
   const StructLayout *const structLayout = m_m->getDataLayout().getStructLayout(structType);
   const unsigned offset = static_cast<unsigned>(structLayout->getElementOffset(remappedMemberIndex));
   Value *const offsetVal = getBuilder()->getInt32(offset);
@@ -8126,7 +8129,10 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
       return result;
     }
     // Frexp: Store the exponent and return the mantissa.
-    exp = getBuilder()->CreateSExtOrTrunc(exp, args[1]->getType()->getPointerElementType());
+    Type *pointeeType = getPointeeType(extInst->getValues(bArgs)[1]);
+    exp = getBuilder()->CreateSExtOrTrunc(exp, pointeeType);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(cast<PointerType>(args[1]->getType())->isOpaqueOrPointeeTypeMatches(pointeeType));
     // Vectors are represented as arrays in memory, so we need to cast the pointer of array to pointer of vector before
     // storing.
     if (exp->getType()->isVectorTy()) {
