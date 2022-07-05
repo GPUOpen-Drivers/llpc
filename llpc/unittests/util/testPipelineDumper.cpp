@@ -297,6 +297,32 @@ TEST(PipelineDumperTest, TestForceCsThreadIdSwizzlingCompute) {
   HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
+
+// =====================================================================================================================
+// Test overrideThreadGroupSize option.
+
+TEST(PipelineDumperTest, TestOverrideThreadGroupSizeValue1Compute) {
+  ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
+    buildInfo->options.overrideThreadGroupSizeX = 8;
+    buildInfo->options.overrideThreadGroupSizeY = 8;
+    buildInfo->options.overrideThreadGroupSizeZ = 1;
+  };
+
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &) { return false; };
+  runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
+TEST(PipelineDumperTest, TestOverrideThreadGroupSizeValue2Compute) {
+  ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
+    buildInfo->options.overrideThreadGroupSizeX = 16;
+    buildInfo->options.overrideThreadGroupSizeY = 16;
+    buildInfo->options.overrideThreadGroupSizeZ = 1;
+  };
+
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &) { return false; };
+  runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
 #endif
 
 // =====================================================================================================================
