@@ -33,7 +33,7 @@
         %199 = OpVariable %108 Function
                OpBranch %205
         %205 = OpLabel
-        %279 = OpPhi %73 %76 %5 %76 %233
+        %279 = OpPhi %73 %76 %5
                OpSelectionMerge %233 None
                OpSwitch %22 %242
         %242 = OpLabel
@@ -41,5 +41,5 @@
         %454 = OpCopyObject %23 %217
                OpReturn
         %233 = OpLabel
-               OpBranch %205
+               OpReturn
                OpFunctionEnd
