@@ -2641,8 +2641,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       input = builder.CreateInsertElement(input, ConstantFP::get(builder.getFloatTy(), 0.0), 2);
       break;
     }
-    case PrimitiveType::Line_List:
-    case PrimitiveType::Line_Strip: {
+    case PrimitiveType::LineList:
+    case PrimitiveType::LineStrip: {
       // Lines
       // The weight of vertex0 is (1 - i - j), the weight of vertex1 is (i + j).
       auto kCoord = builder.CreateFSub(ConstantFP::get(builder.getFloatTy(), 1.0), iCoord);
@@ -2653,7 +2653,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       input = builder.CreateInsertElement(input, ConstantFP::get(builder.getFloatTy(), 0.0), 2);
       break;
     }
-    case PrimitiveType::Triangle_List: {
+    case PrimitiveType::TriangleList: {
       // Triangles
       // V0 ==> Attr_indx2
       // V1 ==> Attr_indx0
@@ -2665,7 +2665,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       input = builder.CreateInsertElement(input, kCoord, 1);
       break;
     }
-    case PrimitiveType::Triangle_Fan: {
+    case PrimitiveType::TriangleFan: {
       Value *odd = UndefValue::get(inputTy);
       Value *even = UndefValue::get(inputTy);
       auto kCoord = builder.CreateFSub(ConstantFP::get(builder.getFloatTy(), 1.0), iCoord);
@@ -2693,8 +2693,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       input = builder.CreateSelect(con, even, odd);
       break;
     }
-    case PrimitiveType::Triangle_Strip:
-    case PrimitiveType::Triangle_Strip_Adjacency: {
+    case PrimitiveType::TriangleStrip:
+    case PrimitiveType::TriangleStripAdjacency: {
       Value *odd = UndefValue::get(inputTy);
       Value *even = UndefValue::get(inputTy);
       auto kCoord = builder.CreateFSub(ConstantFP::get(builder.getFloatTy(), 1.0), iCoord);
@@ -2722,7 +2722,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       input = builder.CreateSelect(con, even, odd);
       break;
     }
-    case PrimitiveType::Triangle_List_Adjacency: {
+    case PrimitiveType::TriangleListAdjacency: {
       auto kCoord = builder.CreateFSub(ConstantFP::get(builder.getFloatTy(), 1.0), iCoord);
       kCoord = builder.CreateFSub(kCoord, jCoord);
       Value *odd = UndefValue::get(inputTy);

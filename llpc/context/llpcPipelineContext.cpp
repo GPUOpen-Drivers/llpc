@@ -713,26 +713,26 @@ void PipelineContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
       break;
     case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
     case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
-      inputAssemblyState.primitiveType = PrimitiveType::Line_List;
+      inputAssemblyState.primitiveType = PrimitiveType::LineList;
       break;
     case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
     case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
-      inputAssemblyState.primitiveType = PrimitiveType::Line_Strip;
+      inputAssemblyState.primitiveType = PrimitiveType::LineStrip;
       break;
     case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
-      inputAssemblyState.primitiveType = PrimitiveType::Triangle_List;
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleList;
       break;
     case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
-      inputAssemblyState.primitiveType = PrimitiveType::Triangle_Strip;
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleStrip;
       break;
     case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
-      inputAssemblyState.primitiveType = PrimitiveType::Triangle_Fan;
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleFan;
       break;
     case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
-      inputAssemblyState.primitiveType = PrimitiveType::Triangle_List_Adjacency;
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleListAdjacency;
       break;
     case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
-      inputAssemblyState.primitiveType = PrimitiveType::Triangle_Strip_Adjacency;
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleStripAdjacency;
       break;
     case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
       inputAssemblyState.primitiveType = PrimitiveType::Patch;
