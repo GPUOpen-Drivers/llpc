@@ -243,6 +243,28 @@ cl::opt<ThreadGroupSwizzleMode> ThreadGroupSwizzleModeSetting("thread-group-swiz
                                                                      clEnumValN(ThreadGroupSwizzleMode::_4x4, "4x4", "tile size is 4x4 in x and y dimension"),
                                                                      clEnumValN(ThreadGroupSwizzleMode::_8x8, "8x8", "tile size is 8x8 in x and y dimension"),
                                                                      clEnumValN(ThreadGroupSwizzleMode::_16x16, "16x16", "tile size is 16x16   in x and y dimension")));
+// -override-threadGroupSizeX
+cl::opt<unsigned> OverrideThreadGroupSizeX("override-threadGroupSizeX",
+                                              cl::desc("override threadGroupSize X\n"
+                                                       "0x00 - No override\n"
+                                                       "0x08 - Override threadGroupSizeX with Value:8 in wave32 or wave64\n"
+                                                       "0x10 - Override threadGroupSizeX with Value:16 in wave64\n"),
+                                              cl::init(0));
+
+// -override-threadGroupSizeY
+cl::opt<unsigned> OverrideThreadGroupSizeY("override-threadGroupSizeY",
+                                              cl::desc("override threadGroupSize Y\n"
+                                                       "0x00 - No override\n"
+                                                       "0x08 - Override threadGroupSizeY with Value:8 in wave32 or wave64\n"
+                                                       "0x10 - Override threadGroupSizeY with Value:16 in wave64\n"),
+                                              cl::init(0));
+
+// -override-threadGroupSizeZ
+cl::opt<unsigned> OverrideThreadGroupSizeZ("override-threadGroupSizeZ",
+                                              cl::desc("override threadGroupSize Z\n"
+                                                       "0x00 - No override\n"
+                                                       "0x01 - Override threadGroupSizeZ with Value:1 in wave32 or wave64\n"),
+                                              cl::init(0));
 
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 cl::opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
@@ -442,6 +464,9 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 #endif
   compileInfo->gfxPipelineInfo.options.resourceLayoutScheme = LayoutScheme;
   compileInfo->compPipelineInfo.options.forceCsThreadIdSwizzling = ForceCsThreadIdSwizzling;
+  compileInfo->compPipelineInfo.options.overrideThreadGroupSizeX = OverrideThreadGroupSizeX;
+  compileInfo->compPipelineInfo.options.overrideThreadGroupSizeY = OverrideThreadGroupSizeY;
+  compileInfo->compPipelineInfo.options.overrideThreadGroupSizeZ = OverrideThreadGroupSizeZ;
   compileInfo->compPipelineInfo.options.threadGroupSwizzleMode = ThreadGroupSwizzleModeSetting;
 
   // Set NGG control settings

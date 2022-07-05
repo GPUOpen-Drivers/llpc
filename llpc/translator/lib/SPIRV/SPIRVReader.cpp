@@ -6985,14 +6985,23 @@ bool SPIRVToLLVM::transMetadata() {
             }
           }
         }
-
-        // clang-format off
-          ComputeShaderMode computeMode = {};
+        ComputeShaderMode computeMode = {};
+        unsigned overrideThreadGroupSizeX = getPipelineOptions()->overrideThreadGroupSizeX;
+        unsigned overrideThreadGroupSizeY = getPipelineOptions()->overrideThreadGroupSizeY;
+        unsigned overrideThreadGroupSizeZ = getPipelineOptions()->overrideThreadGroupSizeZ;
+        if (overrideThreadGroupSizeX != 0 || overrideThreadGroupSizeY != 0 || overrideThreadGroupSizeZ != 0) {
+          computeMode.workgroupSizeX = overrideThreadGroupSizeX;
+          computeMode.workgroupSizeY = overrideThreadGroupSizeY;
+          computeMode.workgroupSizeZ = overrideThreadGroupSizeZ;
+          getBuilder()->setComputeShaderMode(computeMode);
+        } else {
+          // clang-format off
           computeMode.workgroupSizeX = workgroupSizeX;
           computeMode.workgroupSizeY = workgroupSizeY;
           computeMode.workgroupSizeZ = workgroupSizeZ;
           getBuilder()->setComputeShaderMode(computeMode);
         // clang-format on
+        }
       } else
         llvm_unreachable("Invalid execution model");
 

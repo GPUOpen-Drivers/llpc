@@ -695,6 +695,9 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.robustBufferAccess = " << options->robustBufferAccess << "\n";
   dumpFile << "options.reconfigWorkgroupLayout = " << options->reconfigWorkgroupLayout << "\n";
   dumpFile << "options.forceCsThreadIdSwizzling = " << options->forceCsThreadIdSwizzling << "\n";
+  dumpFile << "options.overrideThreadGroupSizeX = " << options->overrideThreadGroupSizeX << "\n";
+  dumpFile << "options.overrideThreadGroupSizeY = " << options->overrideThreadGroupSizeY << "\n";
+  dumpFile << "options.overrideThreadGroupSizeZ = " << options->overrideThreadGroupSizeZ << "\n";
   dumpFile << "options.shadowDescriptorTableUsage = " << options->shadowDescriptorTableUsage << "\n";
   dumpFile << "options.shadowDescriptorTablePtrHigh = " << options->shadowDescriptorTablePtrHigh << "\n";
   dumpFile << "options.extendedRobustness.robustBufferAccess = " << options->extendedRobustness.robustBufferAccess
@@ -1100,6 +1103,9 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->robustBufferAccess);
   hasher->Update(options->reconfigWorkgroupLayout);
   hasher->Update(options->forceCsThreadIdSwizzling);
+  hasher->Update(options->overrideThreadGroupSizeX);
+  hasher->Update(options->overrideThreadGroupSizeY);
+  hasher->Update(options->overrideThreadGroupSizeZ);
   hasher->Update(options->enableRelocatableShaderElf);
   hasher->Update(options->disableImageResourceCheck);
   hasher->Update(options->enableScratchAccessBoundsChecks);

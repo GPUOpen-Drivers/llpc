@@ -116,6 +116,9 @@ struct Options {
   unsigned reconfigWorkgroupLayout;    // If set, allows automatic workgroup reconfigure to take place on
                                        //   compute shaders.
   bool forceCsThreadIdSwizzling;       // Force rearranges threadId within group into blocks of 8*8 or 8*4.
+  unsigned overrideThreadGroupSizeX;   // Override value for thread group size.X
+  unsigned overrideThreadGroupSizeY;   // Override value for thread group size.Y
+  unsigned overrideThreadGroupSizeZ;   // Override value for thread group size.Z
   unsigned includeIr;                  // If set, the IR for all compiled shaders will be included in the
                                        //   pipeline ELF.
   unsigned nggFlags;                   // Flags to control NGG (NggFlag* values ored together)

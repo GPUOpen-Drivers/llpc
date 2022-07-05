@@ -443,6 +443,7 @@ private:
   // ========================================================================================================================
   void insertScratchBoundsChecks(SPIRVValue *const memOp, const ScratchBoundsCheckData &scratchBoundsCheckData,
                                  Function *parent);
+
 }; // class SPIRVToLLVM
 
 } // namespace SPIRV
