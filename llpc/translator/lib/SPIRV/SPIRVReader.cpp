@@ -4909,7 +4909,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     Value *val0 = transValue(bc->getOperand(0), f, bb);
     Value *val1 = transValue(bc->getOperand(1), f, bb);
     Type *inTy = val0->getType();
-    Type *extendedTy = lgc::Builder::getConditionallyVectorizedTy(getBuilder()->getInt64Ty(), val0->getType());
+    const unsigned bitWidth = inTy->getScalarSizeInBits();
+    Type *extendedTy = inTy->getExtendedType();
     if (oc == OpUMulExtended) {
       val0 = getBuilder()->CreateZExt(val0, extendedTy);
       val1 = getBuilder()->CreateZExt(val1, extendedTy);
@@ -4920,7 +4921,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     Value *mul = getBuilder()->CreateMul(val0, val1);
     Value *loResult = getBuilder()->CreateTrunc(mul, inTy);
     Value *hiResult =
-        getBuilder()->CreateTrunc(getBuilder()->CreateLShr(mul, ConstantInt::get(mul->getType(), 32)), inTy);
+        getBuilder()->CreateTrunc(getBuilder()->CreateLShr(mul, ConstantInt::get(mul->getType(), bitWidth)), inTy);
     Value *result = UndefValue::get(transType(bc->getType()));
     result = getBuilder()->CreateInsertValue(result, loResult, 0);
     result = getBuilder()->CreateInsertValue(result, hiResult, 1);
