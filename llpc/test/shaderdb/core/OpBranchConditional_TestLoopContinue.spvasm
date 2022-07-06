@@ -111,10 +111,10 @@
          %69 = OpVectorExtractDynamic %14 %67 %35
                OpBranch %70
          %70 = OpLabel
-         %71 = OpPhi %12 %39 %68 %72 %73
-         %74 = OpPhi %14 %29 %68 %75 %73
-         %76 = OpPhi %14 %69 %68 %77 %73
-               OpLoopMerge %78 %70 None
+         %71 = OpPhi %12 %39 %68 %72 %85
+         %74 = OpPhi %14 %29 %68 %75 %85
+         %76 = OpPhi %14 %69 %68 %77 %85
+               OpLoopMerge %78 %85 None
                OpBranch %79
          %79 = OpLabel
          %80 = OpFOrdGreaterThan %11 %74 %30
@@ -129,7 +129,9 @@
          %77 = OpFAdd %14 %76 %74
          %72 = OpISub %12 %71 %36
          %83 = OpSGreaterThan %11 %72 %35
-               OpBranchConditional %83 %70 %78
+               OpBranchConditional %83 %85 %78
+         %85 = OpLabel
+               OpBranch %70
          %78 = OpLabel
          %84 = OpVectorInsertDynamic %16 %67 %77 %35
                OpReturnValue %84
