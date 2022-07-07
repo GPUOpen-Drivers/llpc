@@ -87,11 +87,13 @@ private:
                                   llvm::Value *elemIdx, llvm::Value *vertexIdx, unsigned emitStreamId);
 
   Value *loadDynamicIndexedMembers(Type *inOutTy, unsigned addrSpace, llvm::ArrayRef<llvm::Value *> indexOperands,
-                                   Constant *inOutMetaVal, Value *locOffset, unsigned interpLoc, Value *auxInterpValue);
+                                   Constant *inOutMetaVal, Value *locOffset, unsigned interpLoc, Value *auxInterpValue,
+                                   bool isPerVertexDimension);
 
   llvm::Value *loadInOutMember(llvm::Type *inOutTy, unsigned addrSpace, llvm::ArrayRef<llvm::Value *> indexOperands,
                                unsigned maxLocOffset, llvm::Constant *inOutMeta, llvm::Value *locOffset,
-                               llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo);
+                               llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,
+                               bool isPerVertexDimension);
 
   void storeOutputMember(llvm::Type *outputTy, llvm::Value *storeValue, llvm::ArrayRef<llvm::Value *> indexOperands,
                          unsigned maxLocOffset, llvm::Constant *outputMeta, llvm::Value *locOffset,
