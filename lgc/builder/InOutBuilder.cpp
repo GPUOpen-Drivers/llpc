@@ -138,11 +138,12 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
     switch (primType) {
     case PrimitiveType::TriangleFan:
       oddOffset = provokingVertexMode == ProvokingVertexLast ? 1 : 2;
+      evenOffset = provokingVertexMode == ProvokingVertexLast ? 2 : 0;
       break;
     case PrimitiveType::TriangleStrip:
     case PrimitiveType::TriangleStripAdjacency:
       oddOffset = provokingVertexMode == ProvokingVertexLast ? 1 : 2;
-      evenOffset = provokingVertexMode == ProvokingVertexLast ? 2 : 0;
+      evenOffset = 0;
       break;
     case PrimitiveType::TriangleListAdjacency:
       oddOffset = 1;
