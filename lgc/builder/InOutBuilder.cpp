@@ -75,12 +75,13 @@ Value *InOutBuilder::CreateReadGenericInput(Type *resultTy, unsigned location, V
 // @param location : Base location (row) of input
 // @param locationOffset : Variable location offset; must be within locationCount
 // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
-// 64-bit elements.)
+//                  64-bit elements.)
 // @param locationCount : Count of locations taken by the input
 // @param inputInfo : Extra input info (FS interp info)
 // @param vertexIndex : Vertex index, for each vertex, it is unique. the range is 0-2, up to three vertices per
-// primitive; for FS custom interpolated input: auxiliary interpolation value;
+//                      primitive; for FS custom interpolated input: auxiliary interpolation value;
 // @param instName : Name to give instruction(s)
+//
 // @returns Value of input
 Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location, Value *locationOffset, Value *elemIdx,
                                               unsigned locationCount, InOutInfo inputInfo, Value *vertexIndex,
@@ -99,145 +100,7 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
   // Mark the usage of the input/output.
   markGenericInputOutputUsage(false, location, locationCount, inputInfo, vertexIndex);
 
-  // Fixing the order
-  bool parity = false;
-  Value *odd = nullptr;
-  Value *even = nullptr;
-
-  auto primType = getPipelineState()->getPrimitiveType();
-  auto provokingVertexMode = getPipelineState()->getRasterizerState().provokingVertexMode;
-  switch (primType) {
-  case PrimitiveType::Point:
-    break;
-  case PrimitiveType::Line_List:
-  case PrimitiveType::Line_Strip:
-    break;
-  case PrimitiveType::Triangle_List: {
-    switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
-    case 0: {
-      vertexIndex = getInt32(2);
-      break;
-    }
-    case 1: {
-      vertexIndex = getInt32(0);
-      break;
-    }
-    case 2: {
-      vertexIndex = getInt32(1);
-      break;
-    }
-    }
-    break;
-  }
-  case PrimitiveType::Triangle_Fan: {
-    if (provokingVertexMode == ProvokingVertexLast) {
-      switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
-      case 0: {
-        odd = getInt32(1);
-        even = getInt32(2);
-        break;
-      }
-      case 1: {
-        odd = getInt32(2);
-        even = getInt32(0);
-        break;
-      }
-      case 2: {
-        odd = getInt32(0);
-        even = getInt32(1);
-        break;
-      }
-      }
-    } else {
-      switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
-      case 0: {
-        odd = getInt32(2);
-        even = vertexIndex;
-        break;
-      }
-      case 1: {
-        odd = getInt32(0);
-        even = vertexIndex;
-        break;
-      }
-      case 2: {
-        odd = getInt32(1);
-        even = vertexIndex;
-        break;
-      }
-      }
-    }
-    parity = true;
-    break;
-  }
-  case PrimitiveType::Triangle_Strip:
-  case PrimitiveType::Triangle_Strip_Adjacency: {
-    if (provokingVertexMode == ProvokingVertexLast) {
-      switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
-      case 0: {
-        odd = getInt32(1);
-        even = getInt32(0);
-        break;
-      }
-      case 1: {
-        odd = getInt32(2);
-        even = getInt32(1);
-        break;
-      }
-      case 2: {
-        odd = getInt32(0);
-        even = getInt32(2);
-        break;
-      }
-      }
-    } else {
-      switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
-      case 0: {
-        odd = getInt32(2);
-        even = vertexIndex;
-        break;
-      }
-      case 1: {
-        odd = getInt32(0);
-        even = vertexIndex;
-        break;
-      }
-      case 2: {
-        odd = getInt32(1);
-        even = vertexIndex;
-        break;
-      }
-      }
-    }
-    parity = true;
-    break;
-  }
-  case PrimitiveType::Triangle_List_Adjacency: {
-    switch (cast<ConstantInt>(vertexIndex)->getZExtValue()) {
-    case 0: {
-      odd = getInt32(1);
-      even = vertexIndex;
-      break;
-    }
-    case 1: {
-      odd = getInt32(2);
-      even = vertexIndex;
-      break;
-    }
-    case 2: {
-      odd = getInt32(0);
-      even = vertexIndex;
-      break;
-    }
-    }
-    parity = true;
-    break;
-  }
-  default:
-    llvm_unreachable("Unable to get vertices per primitive!");
-    break;
-  }
-
+  // Lambda to do the actual input read.
   auto readInput = [&](Value *vertexIndex) {
     std::string callName = lgcName::InputImportInterpolant;
     SmallVector<Value *, 5> args({
@@ -251,19 +114,53 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
     return emitCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn}, &*GetInsertPoint());
   };
 
+  unsigned oddOffset = 0, evenOffset = 0;
+  auto primType = getPipelineState()->getPrimitiveType();
+  auto provokingVertexMode = getPipelineState()->getRasterizerState().provokingVertexMode;
+  unsigned vertexIndexInt = cast<ConstantInt>(vertexIndex)->getZExtValue();
   Value *result = nullptr;
-  if (parity) {
-    // Odd
-    auto oddRes = readInput(odd);
-    // Even
-    auto evenRes = readInput(even);
 
-    auto primtiveId = readBuiltIn(false, BuiltInPrimitiveId, {}, nullptr, nullptr, "");
-    auto evenV = CreateSRem(primtiveId, getInt32(2));
-    Value *con = CreateICmpEQ(evenV, getInt32(0));
-    result = CreateSelect(con, evenRes, oddRes);
-  } else {
+  switch (primType) {
+  case PrimitiveType::TriangleList:
+    vertexIndex = getInt32((vertexIndexInt + 2) % 3); // 0->2, 1->0, 2->1
+    [[clang::fallthrough]];
+    // fall through...
+  case PrimitiveType::Point:
+  case PrimitiveType::LineList:
+  case PrimitiveType::LineStrip:
+    // These are the non-parity modes that just read a single input.
     result = readInput(vertexIndex);
+    break;
+
+  default:
+    // The remaining modes are the parity modes that read two inputs and select between them.
+    // Fix the order.
+    switch (primType) {
+    case PrimitiveType::TriangleFan:
+      oddOffset = provokingVertexMode == ProvokingVertexLast ? 1 : 2;
+      evenOffset = provokingVertexMode == ProvokingVertexLast ? 2 : 0;
+      break;
+    case PrimitiveType::TriangleStrip:
+    case PrimitiveType::TriangleStripAdjacency:
+      oddOffset = provokingVertexMode == ProvokingVertexLast ? 1 : 2;
+      evenOffset = 0;
+      break;
+    case PrimitiveType::TriangleListAdjacency:
+      oddOffset = 1;
+      evenOffset = 0;
+      break;
+    default:
+      llvm_unreachable("Unable to get vertices per primitive!");
+    }
+
+    // Read the odd and even vertices.
+    Value *oddRes = readInput(getInt32((vertexIndexInt + oddOffset) % 3));
+    Value *evenRes = readInput(getInt32((vertexIndexInt + evenOffset) % 3));
+    // Select between them.
+    Value *primitiveId = readBuiltIn(false, BuiltInPrimitiveId, {}, nullptr, nullptr, "");
+    Value *parity = CreateTrunc(primitiveId, Type::getInt1Ty(getContext()));
+    result = CreateSelect(parity, oddRes, evenRes);
+    break;
   }
 
   result->setName(instName);

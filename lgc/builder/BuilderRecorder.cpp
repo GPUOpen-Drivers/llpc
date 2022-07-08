@@ -161,7 +161,7 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
   case Opcode::ReadGenericInput:
     return "read.generic.input";
   case Opcode::ReadPerVertexInput:
-    return "read.pervertex.input";
+    return "read.per.vertex.input";
   case Opcode::ReadGenericOutput:
     return "read.generic.output";
   case Opcode::WriteGenericOutput:

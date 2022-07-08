@@ -1549,14 +1549,14 @@ unsigned PipelineState::getVerticesPerPrimitive() {
     switch (primType) {
     case lgc::PrimitiveType::Point:
       return 1;
-    case lgc::PrimitiveType::Line_List:
-    case lgc::PrimitiveType::Line_Strip:
+    case lgc::PrimitiveType::LineList:
+    case lgc::PrimitiveType::LineStrip:
       return 2;
-    case lgc::PrimitiveType::Triangle_List:
-    case lgc::PrimitiveType::Triangle_Strip:
-    case lgc::PrimitiveType::Triangle_Fan:
-    case lgc::PrimitiveType::Triangle_List_Adjacency:
-    case lgc::PrimitiveType::Triangle_Strip_Adjacency:
+    case lgc::PrimitiveType::TriangleList:
+    case lgc::PrimitiveType::TriangleStrip:
+    case lgc::PrimitiveType::TriangleFan:
+    case lgc::PrimitiveType::TriangleListAdjacency:
+    case lgc::PrimitiveType::TriangleStripAdjacency:
       return 3;
     default:
       break;
@@ -1576,9 +1576,9 @@ PrimitiveType PipelineState::getPrimitiveType() {
     case OutputPrimitives::Points:
       return PrimitiveType::Point;
     case OutputPrimitives::LineStrip:
-      return PrimitiveType::Line_Strip;
+      return PrimitiveType::LineStrip;
     case OutputPrimitives::TriangleStrip:
-      return PrimitiveType::Triangle_Strip;
+      return PrimitiveType::TriangleStrip;
     default:
       llvm_unreachable("Unexpected output primitive type!");
     }
@@ -1588,14 +1588,14 @@ PrimitiveType PipelineState::getPrimitiveType() {
     if (tessMode.pointMode)
       return PrimitiveType::Point;
     if (tessMode.primitiveMode == PrimitiveMode::Isolines)
-      return PrimitiveType::Line_Strip;
+      return PrimitiveType::LineStrip;
     if (tessMode.primitiveMode == PrimitiveMode::Triangles || tessMode.primitiveMode == PrimitiveMode::Quads)
-      return PrimitiveType::Triangle_Strip;
+      return PrimitiveType::TriangleStrip;
   } else {
     return getInputAssemblyState().primitiveType;
   }
   llvm_unreachable("Unable to get primitive type!");
-  return PrimitiveType::Triangle_Strip;
+  return PrimitiveType::TriangleStrip;
 }
 
 // =====================================================================================================================

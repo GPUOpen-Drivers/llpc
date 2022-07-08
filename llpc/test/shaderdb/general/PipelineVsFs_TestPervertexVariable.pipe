@@ -4,12 +4,12 @@
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 0)
-; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 1, i32 0, i32 0, i32 195, i32 0)
-; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 1)
-; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 1, i32 0, i32 0, i32 195, i32 1)
-; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 2)
-; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.pervertex.input.f32(i32 0, i32 1, i32 0, i32 0, i32 195, i32 2)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.per.vertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 0)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.per.vertex.input.f32(i32 0, i32 1, i32 0, i32 0, i32 195, i32 0)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.per.vertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 1)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.per.vertex.input.f32(i32 0, i32 1, i32 0, i32 0, i32 195, i32 1)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.per.vertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 2)
+; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.per.vertex.input.f32(i32 0, i32 1, i32 0, i32 0, i32 195, i32 2)
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
