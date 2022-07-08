@@ -1312,7 +1312,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
               Value *pointerElem = getBuilder()->CreateGEP(pointerElemType, pointer, indices);
               Type *castType = GetElementPtrInst::getIndexedType(pointerElemType, indices);
               // TODO: Remove this when LLPC will switch fully to opaque pointers.
-              assert(castType == pointerElem->getType()->getNonOpaquePointerElementType());
+              assert(cast<PointerType>(pointerElem->getType())->isOpaqueOrPointeeTypeMatches(castType));
               assert(castType->isArrayTy());
               castType = FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
               const unsigned addrSpace = pointerElem->getType()->getPointerAddressSpace();
@@ -1414,7 +1414,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
               Value *pointerElem = getBuilder()->CreateGEP(pointerElemType, pointer, indices);
               Type *castType = GetElementPtrInst::getIndexedType(pointerElemType, indices);
               // TODO: Remove this when LLPC will switch fully to opaque pointers.
-              assert(castType == pointerElem->getType()->getNonOpaquePointerElementType());
+              assert(cast<PointerType>(pointerElem->getType())->isOpaqueOrPointeeTypeMatches(castType));
               assert(castType->isArrayTy());
               castType = FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
               const unsigned addrSpace = pointerElem->getType()->getPointerAddressSpace();
@@ -1529,7 +1529,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
   assert(loadPointer->getType()->isPointerTy());
 
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(loadPointer->getType()->getNonOpaquePointerElementType() == loadType);
+  assert(cast<PointerType>(loadPointer->getType())->isOpaqueOrPointeeTypeMatches(loadType));
 
   if (isTypeWithPadRowMajorMatrix(loadType)) {
     auto loadPair = createLaunderRowMajorMatrix(loadType, loadPointer);
@@ -1673,7 +1673,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
   assert(storePointer->getType()->isPointerTy());
 
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(storePointer->getType()->getNonOpaquePointerElementType() == storeType);
+  assert(cast<PointerType>(storePointer->getType())->isOpaqueOrPointeeTypeMatches(storeType));
 
   if (isTypeWithPadRowMajorMatrix(storeType)) {
     auto storePair = createLaunderRowMajorMatrix(storeType, storePointer);
@@ -1760,7 +1760,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
     Type *storeType = nullptr;
 
     // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(alignmentType == storePointer->getType()->getNonOpaquePointerElementType());
+    assert(cast<PointerType>(storePointer->getType())->isOpaqueOrPointeeTypeMatches(alignmentType));
 
     // If the store was a bool or vector of bool, need to zext the storing value.
     if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool())) {
@@ -1803,7 +1803,7 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
   assert(storePointerType->isPointerTy());
 
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(storePointerType->getNonOpaquePointerElementType() == storeType);
+  assert(cast<PointerType>(storePointerType)->isOpaqueOrPointeeTypeMatches(storeType));
 
   const unsigned addrSpace = storePointerType->getPointerAddressSpace();
 
@@ -2780,7 +2780,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
 
   Type *basePointeeType = getPointeeType(spvAccessChain->getBase());
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(basePointeeType == base->getType()->getNonOpaquePointerElementType());
+  assert(cast<PointerType>(base->getType())->isOpaqueOrPointeeTypeMatches(basePointeeType));
 
   SPIRVType *spvAccessType = spvBaseType;
 
@@ -2898,7 +2898,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     Type *newBaseType = basePointeeType;
 
     // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(newBaseType == newBase->getType()->getScalarType()->getNonOpaquePointerElementType());
+    assert(cast<PointerType>(newBase->getType()->getScalarType())->isOpaqueOrPointeeTypeMatches(newBaseType));
 
     for (auto split : splits) {
       const ArrayRef<Value *> indexArray(indices);
@@ -2907,14 +2907,14 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
       // Get the pointer to our row major matrix first.
       Type *const newBaseEltType = newBaseType;
       // TODO: Remove this when LLPC will switch fully to opaque pointers.
-      assert(newBaseEltType == newBase->getType()->getScalarType()->getNonOpaquePointerElementType());
+      assert(cast<PointerType>(newBase->getType()->getScalarType())->isOpaqueOrPointeeTypeMatches(newBaseEltType));
       if (spvAccessChain->isInBounds())
         newBase = getBuilder()->CreateInBoundsGEP(newBaseEltType, newBase, frontIndices);
       else
         newBase = getBuilder()->CreateGEP(newBaseEltType, newBase, frontIndices);
       newBaseType = GetElementPtrInst::getIndexedType(newBaseEltType, frontIndices);
       // TODO: Remove this when LLPC will switch fully to opaque pointers.
-      assert(newBaseType == newBase->getType()->getNonOpaquePointerElementType());
+      assert(cast<PointerType>(newBase->getType())->isOpaqueOrPointeeTypeMatches(newBaseType));
 
       // Matrix splits are identified by having a nullptr as the .second of the pair.
       if (!split.second) {
@@ -2926,7 +2926,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
         newBase = getBuilder()->CreateBitCast(newBase, bitCastType);
         newBaseType = split.second;
         // TODO: Remove this when LLPC will switch fully to opaque pointers.
-        assert(newBaseType == newBase->getType()->getNonOpaquePointerElementType());
+        assert(cast<PointerType>(newBase->getType())->isOpaqueOrPointeeTypeMatches(newBaseType));
       }
 
       // Lastly we remove the indices that we have already processed from the list of indices.
@@ -2944,7 +2944,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     // Do the final index if we have one.
     baseEltType = newBaseType;
     // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(baseEltType == newBase->getType()->getScalarType()->getNonOpaquePointerElementType());
+    assert(cast<PointerType>(newBase->getType()->getScalarType())->isOpaqueOrPointeeTypeMatches(baseEltType));
     if (spvAccessChain->isInBounds()) {
       resultValue = getBuilder()->CreateInBoundsGEP(baseEltType, newBase, indices);
     } else {
@@ -2954,7 +2954,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     baseEltType = basePointeeType;
 
     // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(baseEltType == base->getType()->getScalarType()->getNonOpaquePointerElementType());
+    assert(cast<PointerType>(base->getType()->getScalarType())->isOpaqueOrPointeeTypeMatches(baseEltType));
 
     if (spvAccessChain->isInBounds())
       resultValue = getBuilder()->CreateInBoundsGEP(baseEltType, base, indices);
@@ -4062,7 +4062,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   Type *const varType = transType(spvVar->getType()->getPointerElementType(), 0, true, true,
                                   isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass()));
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(varType == ptrType->getNonOpaquePointerElementType());
+  assert(cast<PointerType>(ptrType)->isOpaqueOrPointeeTypeMatches(varType));
 
   SPIRVValue *const spvInitializer = spvVar->getInitializer();
 
