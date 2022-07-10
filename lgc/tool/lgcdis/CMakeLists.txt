@@ -24,17 +24,16 @@
  #######################################################################################################################
 
 ### LGC disassembler tool ############################################################################################
-set(LLVM_LINK_COMPONENTS
-    lgcdis
-    AMDGPUDisassembler
-    Support
-)
-
 add_llvm_tool(lgcdis
     lgcdis.cpp
 )
 
-add_dependencies(lgcdis LLVMlgcdis)
+llvm_map_components_to_libnames(llvm_libs
+    lgcdis
+    AMDGPUDisassembler
+    Support
+)
+target_link_libraries(lgcdis PUBLIC ${llvm_libs})
 
 target_include_directories(lgcdis
 PRIVATE
