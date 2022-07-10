@@ -66,17 +66,16 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
     set(LLVM_ENABLE_ZLIB OFF CACHE BOOL Force)
-#if _WIN32
     if (NOT WIN32)
-#endif
-    set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
-#if _WIN32
+        # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
+        #
+        # Don't turn this on on Windows, because the required "cross compile" setup doesn't work in the internal CMake
+        # setup on Windows.
+        set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
     endif()
 
     # This will greatly speed up debug builds because we won't be listing all the symbols with llvm-nm.
-    # Not supported on Linux so we can keep it inside Windows ifdef.
     set(LLVM_BUILD_LLVM_C_DYLIB OFF CACHE BOOL Force)
-#endif
 
     if(EXISTS ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm)
         set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
