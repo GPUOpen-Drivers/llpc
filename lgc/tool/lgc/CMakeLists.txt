@@ -24,7 +24,11 @@
  #######################################################################################################################
 
 ### LGC Standalone Compiler ############################################################################################
-set(LLVM_LINK_COMPONENTS
+add_llvm_tool(lgc
+    lgc.cpp
+)
+
+llvm_map_components_to_libnames(llvm_libs
     lgc
     Core
     AMDGPUAsmParser
@@ -33,12 +37,7 @@ set(LLVM_LINK_COMPONENTS
     AsmParser
     Support
 )
-
-add_llvm_tool(lgc
-    lgc.cpp
-)
-
-add_dependencies(lgc LLVMlgc)
+target_link_libraries(lgc PUBLIC ${llvm_libs})
 
 target_compile_definitions(lgc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 
