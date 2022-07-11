@@ -1007,6 +1007,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
     if (gfxIp >= GfxIpVersion{10, 3}) {
       SET_REG_GFX10_3_PLUS_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VRS_RATE, useShadingRate);
+      SET_REG_GFX10_3_PLUS_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, BYPASS_PRIM_RATE_COMBINER, true);
     }
   }
 
@@ -1665,6 +1666,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     SET_REG_FIELD(&config->primShaderRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
     if (gfxIp >= GfxIpVersion{10, 3}) {
       SET_REG_GFX10_3_PLUS_FIELD(&config->primShaderRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VRS_RATE, useShadingRate);
+      SET_REG_GFX10_3_PLUS_FIELD(&config->primShaderRegs, PA_CL_VS_OUT_CNTL, BYPASS_PRIM_RATE_COMBINER, true);
     }
   }
 
