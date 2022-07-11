@@ -2,13 +2,23 @@
 ; RUN: lgc %s -print-after=lgc-builder-replayer -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
 
 ; CHECK: [[desc0:%[0-9]+]] = call i8 addrspace(4)* @lgc.descriptor.table.addr(i32 6
-; CHECK: %{{.*}} = getelementptr i8, i8 addrspace(4)* [[desc0]], i32 16
+; CHECK-NEXT: %{{.*}} = getelementptr i8, i8 addrspace(4)* [[desc0]], i32 16
 ; CHECK: call <2 x i32> @lgc.root.descriptor.v2i32(i32 6)
+; CHECK: call i8 addrspace(7)* @lgc.late.launder.fat.pointer(<4 x i32>
+; CHECK: [[varindex0:%[0-9]+]] = call i8 addrspace(7)* @lgc.late.launder.fat.pointer(<4 x i32>
+; CHECK: [[varindex1:%[0-9]+]] = bitcast i8 addrspace(7)* [[varindex0]] to i32 addrspace(7)*
+; CHECK-NEXT: [[varindex2:%[0-9]+]] = load i32, i32 addrspace(7)* [[varindex1]], align 4
+; CHECK-NEXT: [[varindex3:%[0-9]+]] = sext i32 [[varindex2]] to i64
+; CHECK-NEXT: getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* %{{.*}}, i64 0, i32 0, i64 [[varindex3]]
 ; CHECK: [[desc1:%[0-9]+]] = call i8 addrspace(4)* @lgc.descriptor.table.addr(i32 1
-; CHECK: %{{.*}} = getelementptr i8, i8 addrspace(4)* [[desc1]], i32 32
+; CHECK-NEXT: %{{.*}} = getelementptr i8, i8 addrspace(4)* [[desc1]], i32 32
 
 ; RUN: lgc -mcpu=gfx1030 -o - - <%s | FileCheck --check-prefixes=SHADER_TEST %s
+; SHADER_TEST: s_and_b32 s5, s5, 0xffff
+; SHADER_TEST: s_mov_b32 s7, 0x21014fac
+; SHADER_TEST: s_mov_b32 s6, -1
 ; SHADER_TEST: s_load_dwordx8 [[desc:.*]], {{.*}}, 0x20
+; SHADER_TEST: buffer_load_dword {{.*}}, {{.*}}, s[4:7], 0 offen
 ; SHADER_TEST: image_sample {{.*}}, {{.*}}, [[desc]], {{.*}} dmask:0xf
 ; SHADER_TEST: s_load_dwordx4 {{.*}}, {{.*}}, 0x10
 ; SHADER_TEST: .registers:
@@ -32,23 +42,29 @@ define dllexport spir_func void @lgc.shader.FS.PSMain() local_unnamed_addr #0 !s
   %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 -1610612736, i32 1, i32 0, i32 0)
   %1 = call {}* @llvm.invariant.start.p7i8(i64 -1, i8 addrspace(7)* %0)
   %2 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 -536870912, i32 1, i32 0, i32 2)
-  %3 = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 0, i32 0, i32 0, i32 0, i32 16, i32 undef)
-  %4 = bitcast i8 addrspace(7)* %2 to float addrspace(7)*
-  %5 = load float, float addrspace(7)* %4, align 4
-  %6 = getelementptr inbounds i8, i8 addrspace(7)* %0, i64 64
-  %7 = bitcast i8 addrspace(7)* %6 to float addrspace(7)*
-  %8 = load float, float addrspace(7)* %7, align 4
-  %9 = fmul reassoc nnan nsz arcp contract afn float %5, %8
-  %10 = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 -1073741824, i32 1)
-  %11 = call i32 (...) @lgc.create.get.desc.stride.i32(i32 1, i32 -1073741824, i32 1)
-  %12 = load <8 x i32>, <8 x i32> addrspace(4)* %10, align 32
-  %13 = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 -2147483648, i32 0)
-  %14 = call i32 (...) @lgc.create.get.desc.stride.i32(i32 2, i32 -2147483648, i32 0)
-  %15 = load <4 x i32>, <4 x i32> addrspace(4)* %13, align 16
-  %16 = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 512, <8 x i32> %12, <4 x i32> %15, i32 1, <2 x float> %3)
-  %.splatinsert = insertelement <4 x float> poison, float %9, i64 0
-  %17 = shufflevector <4 x float> %.splatinsert, <4 x float> poison, <4 x i32> zeroinitializer
-  %scale = fmul reassoc nnan nsz arcp contract afn <4 x float> %16, %17
+  %3 = bitcast i8 addrspace(7)* %2 to <{ [4294967295 x float] }> addrspace(7)*
+  %4 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 -1610612736, i32 3, i32 0, i32 0)
+  %5 = call {}* @llvm.invariant.start.p7i8(i64 -1, i8 addrspace(7)* %4)
+  %6 = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 0, i32 0, i32 0, i32 0, i32 16, i32 undef)
+  %7 = bitcast i8 addrspace(7)* %4 to i32 addrspace(7)*
+  %8 = load i32, i32 addrspace(7)* %7, align 4
+  %9 = sext i32 %8 to i64
+  %10 = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* %3, i64 0, i32 0, i64 %9
+  %11 = load float, float addrspace(7)* %10, align 4
+  %12 = getelementptr inbounds i8, i8 addrspace(7)* %0, i64 64
+  %13 = bitcast i8 addrspace(7)* %12 to float addrspace(7)*
+  %14 = load float, float addrspace(7)* %13, align 4
+  %15 = fmul reassoc nnan nsz arcp contract afn float %11, %14
+  %16 = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 -1073741824, i32 1)
+  %17 = call i32 (...) @lgc.create.get.desc.stride.i32(i32 1, i32 -1073741824, i32 1)
+  %18 = load <8 x i32>, <8 x i32> addrspace(4)* %16, align 32
+  %19 = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 -2147483648, i32 0)
+  %20 = call i32 (...) @lgc.create.get.desc.stride.i32(i32 2, i32 -2147483648, i32 0)
+  %21 = load <4 x i32>, <4 x i32> addrspace(4)* %19, align 16
+  %22 = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 512, <8 x i32> %18, <4 x i32> %21, i32 1, <2 x float> %6)
+  %.splatinsert = insertelement <4 x float> poison, float %15, i64 0
+  %23 = shufflevector <4 x float> %.splatinsert, <4 x float> poison, <4 x i32> zeroinitializer
+  %scale = fmul reassoc nnan nsz arcp contract afn <4 x float> %22, %23
   call void (...) @lgc.create.write.generic.output(<4 x float> %scale, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
   ret void
 }
@@ -92,9 +108,9 @@ attributes #3 = { nounwind readnone }
 !amdgpu.pal.metadata.msgpack = !{!15}
 
 !0 = !{!"Vulkan"}
-!1 = !{i32 -753554878, i32 248344356, i32 -1272835204, i32 -1818531522, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, i32 0, i32 0, i32 2, i32 0, i32 0, i32 0, i32 1}
+!1 = !{i32 477725446, i32 -860388617, i32 -1158977777, i32 1830480465, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, i32 0, i32 0, i32 2, i32 0, i32 0, i32 0, i32 1}
 !2 = !{i32 -64684466, i32 1801624907, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 20, i32 1800}
-!3 = !{i32 -295196488, i32 -704705974, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 20, i32 1800}
+!3 = !{i32 -1829766609, i32 -657263028, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 20, i32 1800}
 !4 = !{!"DescriptorTableVaPtr", i32 0, i32 1, i32 1}
 !5 = !{!"DescriptorBuffer", i32 0, i32 8, i32 -1610612736, i32 0, i32 4}
 !6 = !{!"DescriptorTableVaPtr", i32 1, i32 1, i32 2}
@@ -106,7 +122,7 @@ attributes #3 = { nounwind readnone }
 !12 = !{!"IndirectUserDataVaPtr", i32 7, i32 1, i32 0}
 !13 = !{i32 16}
 !14 = !{i32 3, i32 3}
-!15 = !{!"\82\B0amdpal.pipelines\91\84\AA.registers\80\B0.spill_threshold\CE\FF\FF\FF\FF\B0.user_data_limit\00\AF.xgl_cache_info\82\B3.128_bit_cache_hash\92\CF\D1[\149Mh\C7\B4\CF\B9Z^Uh\E4Zq\AD.llpc_version\A453.5\AEamdpal.version\92\02\03"}
+!15 = !{!"\82\B0amdpal.pipelines\91\84\AA.registers\80\B0.spill_threshold\CE\FF\FF\FF\FF\B0.user_data_limit\00\AF.xgl_cache_info\82\B3.128_bit_cache_hash\92\CF\9B\97\D5d\9F\E5\B7\11\CF\E9#\B4W\05\EA\C6\A7\AD.llpc_version\A453.5\AEamdpal.version\92\02\03"}
 !16 = !{i32 0}
 !17 = !{i32 1}
 !18 = !{i32 4}
