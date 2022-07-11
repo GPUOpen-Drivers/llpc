@@ -1,13 +1,13 @@
 #
 # Dockerfile for LLPC Continuous Integration.
 # Sample invocation:
-#    docker build . --file docker/llpc-clang-tidy.Dockerfile                                  \
-#                   --build-arg AMDVLK_IMAGE=gcr.io/stadia-open-source/amdvlk:nightly         \
-#                   --build-arg LLPC_REPO_NAME=GPUOpen-Drivers/llpc                           \
-#                   --build-arg LLPC_REPO_REF=<GIT_REF>                                       \
-#                   --build-arg LLPC_REPO_SHA=<GIT_SHA>                                       \
-#                   --build-arg LLPC_BASE_REF=<GIT_REF>                                       \
-#                   --tag llpc-ci/llpc
+#    docker build .                                                                                         \
+#      --file docker/llpc-clang-tidy.Dockerfile                                                             \
+#      --build-arg AMDVLK_IMAGE=us-docker.pkg.dev/stadia-open-source/amdvlk-public-ci/clang_release:nightly \
+#      --build-arg LLPC_REPO_NAME=GPUOpen-Drivers/llpc                                                      \
+#      --build-arg LLPC_REPO_REF=<GIT_REF>                                                                  \
+#      --build-arg LLPC_REPO_SHA=<GIT_SHA>                                                                  \
+#      --tag llpc-ci/llpc
 #
 # Required arguments:
 # - AMDVLK_IMAGE: Base image name for prebuilt amdvlk
