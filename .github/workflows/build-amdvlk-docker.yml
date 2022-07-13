@@ -63,3 +63,7 @@ jobs:
       - name: Push the new image
         run: |
           docker push "$IMAGE_TAG"
+      - name: Garbage collect old docker images
+        if: matrix.feature-set == '+clang'
+        run: |
+          python3 script/gc-amdvlk-docker-images.py
