@@ -1543,10 +1543,12 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       }
     }
   } else if (m_shaderStage == ShaderStageGeometry) {
-    if (!m_pipelineState->isGsOnChip() && m_gfxIp.major >= 10) {
-      // NOTE: This is a workaround because backend compiler does not provide s_waitcnt_vscnt intrinsic, so we
-      // use fence release to generate s_waitcnt vmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
-      new FenceInst(*m_context, AtomicOrdering::Release, SyncScope::System, insertPos);
+    if (m_gfxIp.major >= 10) {
+      // NOTE: Per programming guide, we should do a “s_waitcnt 0,0,0 + s_waitcnt_vscnt 0” before issuing a "done", so
+      // we use fence release to generate s_waitcnt vmcnt lgkmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
+      SyncScope::ID scope =
+          m_pipelineState->isGsOnChip() ? m_context->getOrInsertSyncScopeID("workgroup") : SyncScope::System;
+      new FenceInst(*m_context, AtomicOrdering::Release, scope, insertPos);
     }
 
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
