@@ -4074,29 +4074,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   else if (storageClass == SPIRVStorageClassKind::StorageClassWorkgroup)
     initializer = UndefValue::get(varType);
 
-  if (storageClass == StorageClassFunction) {
-    assert(getBuilder()->GetInsertBlock());
-
-    // Entry block allocas should appear at the start of the basic block so that if the entry block is split by
-    // function inlining or other transforms later on, the allocas stay in the entry block.
-    //
-    // Note that as of this writing, SPIR-V doesn't have the equivalent of C's alloca() builtin, so all allocas
-    // should be entry block allocas.
-    auto insertPoint = getBuilder()->saveIP();
-    BasicBlock *bb = getBuilder()->GetInsertBlock();
-    assert(bb->isEntryBlock());
-    getBuilder()->SetInsertPoint(bb, bb->getFirstInsertionPt());
-
-    Value *const var = getBuilder()->CreateAlloca(varType, nullptr, spvVar->getName());
-
-    getBuilder()->restoreIP(insertPoint);
-
-    if (initializer)
-      getBuilder()->CreateStore(initializer, var);
-
-    return var;
-  }
-
   bool readOnly = false;
 
   switch (storageClass) {
@@ -4143,6 +4120,29 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
 
     if (allReadOnly)
       readOnly = true;
+  }
+
+  if (!readOnly && storageClass == StorageClassFunction) {
+    assert(getBuilder()->GetInsertBlock());
+
+    // Entry block allocas should appear at the start of the basic block so that if the entry block is split by
+    // function inlining or other transforms later on, the allocas stay in the entry block.
+    //
+    // Note that as of this writing, SPIR-V doesn't have the equivalent of C's alloca() builtin, so all allocas
+    // should be entry block allocas.
+    auto insertPoint = getBuilder()->saveIP();
+    BasicBlock *bb = getBuilder()->GetInsertBlock();
+    assert(bb->isEntryBlock());
+    getBuilder()->SetInsertPoint(bb, bb->getFirstInsertionPt());
+
+    Value *const var = getBuilder()->CreateAlloca(varType, nullptr, spvVar->getName());
+
+    getBuilder()->restoreIP(insertPoint);
+
+    if (initializer)
+      getBuilder()->CreateStore(initializer, var);
+
+    return var;
   }
 
   string varName = spvVar->getName();
