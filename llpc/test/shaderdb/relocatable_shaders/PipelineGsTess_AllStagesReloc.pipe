@@ -10,7 +10,7 @@
 ; SHADERTEST: define dllexport amdgpu_hs void @_amdgpu_hs_main_fetchless({{.*}}, <4 x float> [[vert_attrib:%[0-9]*]])
 
 ; Call the original vertex shader passing in the attribute
-; SHADERTEST: call void @_amdgpu_ls_main_fetchless({{.*}}, <4 x float> [[vert_attrib]])
+; SHADERTEST: call amdgpu_ls void @_amdgpu_ls_main_fetchless({{.*}}, <4 x float> [[vert_attrib]])
 
 ; Reach the end of the hs shader
 ; SHADERTEST: ret void
