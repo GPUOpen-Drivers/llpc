@@ -666,7 +666,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       {
         m_builder->SetInsertPoint(endWritePrimIdBlock);
 
+        SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+        m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+        m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
         auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
         m_builder->CreateCondBr(vertValid, readPrimIdBlock, endReadPrimIdBlock);
@@ -695,7 +698,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         // Record primitive ID
         m_nggFactor.primitiveId = primitiveIdPhi;
 
+        SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+        m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+        m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
         if (!passthroughNoMsg) {
 
@@ -972,7 +978,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(endWritePrimIdBlock);
 
+      SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+      m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
       auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
       m_builder->CreateCondBr(vertValid, readPrimIdBlock, endReadPrimIdBlock);
@@ -1000,7 +1009,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       // Record primitive ID
       m_nggFactor.primitiveId = primitiveId;
 
+      SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+      m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
       auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
       m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1129,7 +1141,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   {
     m_builder->SetInsertPoint(endWriteVertCullDataBlock);
 
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
     auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
     m_builder->CreateCondBr(primValid, cullingBlock, endCullingBlock);
@@ -1176,7 +1191,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     cullFlagPhi->addIncoming(m_builder->getTrue(), endWriteVertCullDataBlock);
     cullFlag = cullFlagPhi;
 
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
     auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
     m_builder->CreateCondBr(vertValid, checkVertDrawFlagBlock, endCheckVertDrawFlagBlock);
@@ -1238,7 +1256,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   {
     m_builder->SetInsertPoint(endAccumVertCountBlock);
 
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
     auto vertCountInWaves =
         readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInWave, LdsRegionVertCountInWaves);
@@ -1415,7 +1436,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   {
     m_builder->SetInsertPoint(endAllocReqBlock);
 
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
     if (waNggCullingNoEmptySubgroups)
       m_builder->CreateCondBr(fullyCulled, earlyExitBlock, noEarlyExitBlock);
@@ -1726,7 +1750,10 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(endInitOutPrimDataBlock);
 
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
     auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.primCountInWave);
     m_builder->CreateCondBr(primValid, beginGsBlock, endGsBlock);
@@ -1765,7 +1792,10 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(endInitOutVertCountBlock);
 
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
     if (cullingMode) {
       // Do culling
@@ -1820,7 +1850,10 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     {
       m_builder->SetInsertPoint(endCullingBlock);
 
+      SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+      m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
       auto outVertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
       m_builder->CreateCondBr(outVertValid, checkOutVertDrawFlagBlock, endCheckOutVertDrawFlagBlock);
@@ -1912,7 +1945,10 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(endAccumOutVertCountBlock);
 
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
     if (disableCompact) {
       auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
@@ -1990,8 +2026,12 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     m_builder->SetInsertPoint(endAllocReqBlock);
 
     // NOTE: This barrier is not necessary if we disable vertex compaction.
-    if (!disableCompact)
+    if (!disableCompact) {
+      SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+      m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    }
 
     auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
     m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);

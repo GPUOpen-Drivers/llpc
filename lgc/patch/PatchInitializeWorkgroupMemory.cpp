@@ -240,7 +240,10 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
   {
     // Set barrier after writing LDS
     builder.SetInsertPoint(&*endInitBlock->getFirstInsertionPt());
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    builder.CreateFence(AtomicOrdering::Release, workgroupScope);
     builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
   }
 }
 

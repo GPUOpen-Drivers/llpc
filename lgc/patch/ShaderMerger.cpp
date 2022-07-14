@@ -239,7 +239,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   //   if (threadIdInWave < lsVertCount)
   //     Run LS
   //
-  //   Barrier
+  //   Fence + Barrier
   //
   //   if (threadIdInWave < hsVertCount)
   //     Run HS
@@ -418,7 +418,10 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   args.clear();
   attribs.clear();
   attribs.push_back(Attribute::NoRecurse);
+  SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+  new FenceInst(*m_context, AtomicOrdering::Release, workgroupScope, endLsBlock);
   emitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_context), args, attribs, endLsBlock);
+  new FenceInst(*m_context, AtomicOrdering::Acquire, workgroupScope, endLsBlock);
 
   auto hsEnable = new ICmpInst(*endLsBlock, ICmpInst::ICMP_ULT, threadId, hsVertCount, "");
   BranchInst::Create(beginHsBlock, endHsBlock, hsEnable, endLsBlock);
@@ -633,7 +636,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   //   if (threadIdInWave < esVertCount)
   //     Run ES
   //
-  //   Barrier
+  //   Fence + Barrier
   //
   //   if (threadIdInWave < gsPrimCount)
   //     Run GS
@@ -874,7 +877,10 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   args.clear();
   attribs.clear();
   attribs.push_back(Attribute::NoRecurse);
+  SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+  new FenceInst(*m_context, AtomicOrdering::Release, workgroupScope, endEsBlock);
   emitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_context), args, attribs, endEsBlock);
+  new FenceInst(*m_context, AtomicOrdering::Acquire, workgroupScope, endEsBlock);
 
   auto gsEnable = new ICmpInst(*endEsBlock, ICmpInst::ICMP_ULT, threadId, gsPrimCount, "");
   BranchInst::Create(beginGsBlock, endGsBlock, gsEnable, endEsBlock);
