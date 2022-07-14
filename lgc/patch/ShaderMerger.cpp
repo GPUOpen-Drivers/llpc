@@ -349,7 +349,9 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
     appendArguments(args, vertexFetchesStart, vertexFetchesEnd);
     lsArgIdx += (vertexFetchesEnd - vertexFetchesStart);
-    builder.CreateCall(lsEntryPoint, args);
+
+    CallInst *call = builder.CreateCall(lsEntryPoint, args);
+    call->setCallingConv(CallingConv::AMDGPU_LS);
   }
 
   builder.CreateBr(endLsBlock);
@@ -402,7 +404,8 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
     assert(hsArgIdx == hsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
 
-    builder.CreateCall(hsEntryPoint, args);
+    CallInst *call = builder.CreateCall(hsEntryPoint, args);
+    call->setCallingConv(CallingConv::AMDGPU_HS);
   }
   builder.CreateBr(endHsBlock);
 
@@ -695,7 +698,8 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
       esArgIdx += (vertexFetchesEnd - vertexFetchesStart);
     }
 
-    builder.CreateCall(esEntryPoint, args);
+    CallInst *call = builder.CreateCall(esEntryPoint, args);
+    call->setCallingConv(CallingConv::AMDGPU_ES);
   }
   builder.CreateBr(endEsBlock);
 
@@ -770,7 +774,8 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
     assert(gsArgIdx == gsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
 
-    builder.CreateCall(gsEntryPoint, args);
+    CallInst *call = builder.CreateCall(gsEntryPoint, args);
+    call->setCallingConv(CallingConv::AMDGPU_GS);
   }
   builder.CreateBr(endGsBlock);
 
