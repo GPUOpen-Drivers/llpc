@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 """Script to garbage collect old amdvlk docker images created by the public CI on GitHub.
 
-Requires python 3.9 or later.
+Requires python 3.8 or later.
 """
 
 import argparse
@@ -11,9 +11,9 @@ import subprocess
 import sys
 
 from collections import defaultdict
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-def _run_cmd(cmd: list[str]) -> tuple[bool, str]:
+def _run_cmd(cmd: List[str]) -> Tuple[bool, str]:
     """
     Runs a shell command capturing its output.
 
@@ -31,7 +31,7 @@ def _run_cmd(cmd: list[str]) -> tuple[bool, str]:
     return True, result.stdout
 
 
-def query_images(artifact_repository_url: str) -> Optional[list[dict[str, Any]]]:
+def query_images(artifact_repository_url: str) -> Optional[List[Dict[str, Any]]]:
     """
     Returns a list of JSON objects representing docker images found under
     |artifact_repository_url|, or None on error.
@@ -52,7 +52,7 @@ def query_images(artifact_repository_url: str) -> Optional[list[dict[str, Any]]]
     return list(json.loads(text))
 
 
-def find_images_to_gc(images: list[dict[str, Any]], num_last_to_keep) -> list[dict[str, Any]]:
+def find_images_to_gc(images: List[Dict[str, Any]], num_last_to_keep) -> List[Dict[str, Any]]:
     """
     Returns a subset of |images| that should be garbage collected. Preserves tagged
     images and also the most recent |num_last_to_keep| for each package.
@@ -72,7 +72,7 @@ def find_images_to_gc(images: list[dict[str, Any]], num_last_to_keep) -> list[di
     return to_gc
 
 
-def delete_images(images: list[dict[str, Any]], dry_run: bool) -> None:
+def delete_images(images: List[Dict[str, Any]], dry_run: bool) -> None:
     """
     Deletes all |images| from the repository. When |dry_run| is True, synthesizes the delete
     commands and logs but does not execute them.
