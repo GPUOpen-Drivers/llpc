@@ -34,10 +34,12 @@
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Module.h"
 
 namespace lgc {
 
+class BuilderBase;
 class PipelineState;
 
 // Enumerates first 8 SGPRs (always loaded) for the LS-HS merged shader
@@ -101,8 +103,11 @@ private:
   llvm::FunctionType *generateLsHsEntryPointType(uint64_t *inRegMask) const;
   llvm::FunctionType *generateEsGsEntryPointType(uint64_t *inRegMask) const;
 
+  void appendUserData(BuilderBase &builder, llvm::SmallVectorImpl<llvm::Value *> &args, llvm::Function *target,
+                      unsigned &argIdx, llvm::Value *userData, unsigned userDataCount,
+                      llvm::ArrayRef<std::pair<unsigned, unsigned>> substitutions = {});
   void appendVertexFetchTypes(std::vector<llvm::Type *> &argTys) const;
-  void appendArguments(std::vector<llvm::Value *> &args, llvm::Argument *begin, llvm::Argument *end) const;
+  void appendArguments(llvm::SmallVectorImpl<llvm::Value *> &args, llvm::Argument *begin, llvm::Argument *end) const;
 
   PipelineState *m_pipelineState; // Pipeline state
   llvm::LLVMContext *m_context;   // LLVM context
