@@ -131,6 +131,8 @@ private:
                              SymbolPool &symbols, ArrayRef<object::RelocationRef> relocs);
   bool disasmInstSeq(SmallVectorImpl<InstOrDirective> &seq, uint64_t offset, bool outputting, StringRef contents,
                      SymbolPool &symbols);
+  bool disasmLongJump(SmallVectorImpl<InstOrDirective> &seq, const InstOrDirective &inst, bool outputting,
+                      StringRef contents, SymbolPool &symbols);
   bool disasmTableJump(SmallVectorImpl<InstOrDirective> &seq, const InstOrDirective &inst, bool outputting,
                        StringRef contents, SymbolPool &symbols);
   InstOrDirective disasmInst(uint64_t offset, StringRef contents);
@@ -482,10 +484,54 @@ bool ObjDisassembler::disasmInstSeq(SmallVectorImpl<InstOrDirective> &seq, uint6
   if (inst.status == MCDisassembler::Fail)
     return false;
 
-  if (disasmTableJump(seq, inst, outputting, contents, symbols))
+  if (disasmLongJump(seq, inst, outputting, contents, symbols) ||
+      disasmTableJump(seq, inst, outputting, contents, symbols))
     return true;
 
   seq.emplace_back(inst);
+  return true;
+}
+
+// =====================================================================================================================
+// Try disassembling a long jump sequence.
+//
+// @param [out] seq : The sequence of instructions or directives
+// @param inst : The first instruction of the potential sequence
+// @param outputting : True to actually stream the disassembly output
+// @param contents : The bytes of the section
+// @param symbols : The symbols of the section
+// @returns : Return true on success.
+bool ObjDisassembler::disasmLongJump(SmallVectorImpl<InstOrDirective> &seq, const InstOrDirective &inst,
+                                     bool outputting, StringRef contents, SymbolPool &symbols) {
+  InstOrDirective getpc = inst;
+  if (getpc.mnemonic != "s_getpc_b64")
+    return false;
+
+  InstOrDirective add = disasmInst(getpc.getEndOffset(), contents);
+  if (add.mnemonic != "s_add_u32" || *add.op0.sReg != *getpc.op0.sReg || *add.op1.sReg != *getpc.op0.sReg ||
+      !add.op2.imm)
+    return false;
+
+  InstOrDirective addc = disasmInst(add.getEndOffset(), contents);
+  if (addc.mnemonic != "s_addc_u32" || *addc.op0.sReg != *getpc.op0.sReg + 1 || *addc.op1.sReg != *getpc.op0.sReg + 1 ||
+      !addc.op2.imm || *addc.op2.imm != 0)
+    return false;
+
+  InstOrDirective setpc = disasmInst(addc.getEndOffset(), contents);
+  if (setpc.mnemonic != "s_setpc_b64" || *setpc.op0.sReg != *getpc.op0.sReg)
+    return false;
+
+  MCSymbol *getpcLabel = getOrCreateSymbol(symbols, getpc.getEndOffset());
+  MCSymbol *targetLabel = getOrCreateSymbol(symbols, getpc.getEndOffset() + *add.op2.imm);
+  if (outputting) {
+    const MCExpr *targetOffsetExpr = MCBinaryExpr::createSub(
+        MCSymbolRefExpr::create(targetLabel, *m_context), MCSymbolRefExpr::create(getpcLabel, *m_context), *m_context);
+    add.mcInst.getOperand(2) = MCOperand::createExpr(targetOffsetExpr);
+  }
+
+  for (const InstOrDirective &i : {getpc, add, addc, setpc})
+    seq.emplace_back(i);
+
   return true;
 }
 
