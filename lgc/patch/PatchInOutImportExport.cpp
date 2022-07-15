@@ -311,8 +311,9 @@ void PatchInOutImportExport::processShader() {
 
   if (useThreadId) {
     // Calculate and store thread ID
-    auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
-    m_threadId = getSubgroupLocalInvocationId(&*insertPos);
+    BuilderBase builder(*m_context);
+    builder.setInsertPointPastAllocas(*m_entryPoint);
+    m_threadId = getSubgroupLocalInvocationId(builder);
   }
 
   // Initialize calculation factors for tessellation shader
@@ -5243,17 +5244,15 @@ Value *PatchInOutImportExport::adjustCentroidIj(Value *centroidIj, Value *center
 // =====================================================================================================================
 // Get Subgroup local invocation Id
 //
-// @param insertPos : Where to insert this call
-Value *PatchInOutImportExport::getSubgroupLocalInvocationId(Instruction *insertPos) {
-  Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), -1),
-                   ConstantInt::get(Type::getInt32Ty(*m_context), 0)};
+// @param builder : The builder to use
+Value *PatchInOutImportExport::getSubgroupLocalInvocationId(BuilderBase &builder) {
   Value *subgroupLocalInvocationId =
-      emitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_context), args, {}, &*insertPos);
+      builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
   unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
   if (waveSize == 64) {
-    Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), -1), subgroupLocalInvocationId};
-    subgroupLocalInvocationId = emitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_context), args, {}, &*insertPos);
+    subgroupLocalInvocationId =
+        builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), subgroupLocalInvocationId});
   }
 
   return subgroupLocalInvocationId;
