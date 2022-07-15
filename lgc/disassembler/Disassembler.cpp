@@ -135,6 +135,7 @@ private:
                        StringRef contents, SymbolPool &symbols);
   InstOrDirective disasmInst(uint64_t offset, StringRef contents);
   void addBinaryEncodingComment(raw_ostream &stream, unsigned instAlignment, ArrayRef<uint8_t> instBytes);
+  void outputInst(InstOrDirective inst, unsigned instAlignment);
   void outputData(bool outputting, uint64_t offset, StringRef data, ArrayRef<object::RelocationRef> &relocs);
   void outputRelocs(bool outputting, uint64_t offset, uint64_t size, ArrayRef<object::RelocationRef> &relocs);
   size_t decodeNote(StringRef data);
@@ -456,24 +457,9 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
     // Output reloc.
     outputRelocs(outputting, offset, inst.bytes.size(), relocs);
 
-    if (outputting) {
-      // Output the binary encoding as a comment.
-      if (inst.status == MCDisassembler::SoftFail)
-        m_streamer->AddComment("Illegal instruction encoding ");
-      std::string comment = inst.comment.str();
-      raw_string_ostream commentStream(comment);
-      if (!comment.empty())
-        commentStream << " ";
-      commentStream << format("%06x:", inst.offset);
-      addBinaryEncodingComment(commentStream, instAlignment, inst.bytes);
-      // Output the instruction to the streamer.
-      if (!comment.empty())
-        m_streamer->AddComment(comment);
-      if (const MCExpr *expr = inst.valueDirectiveExpr)
-        m_streamer->emitValue(expr, inst.bytes.size());
-      else
-        m_streamer->emitInstruction(inst.mcInst, *m_subtargetInfo);
-    }
+    if (outputting)
+      outputInst(inst, instAlignment);
+
     offset += inst.bytes.size();
     lastOffset = offset;
   }
@@ -661,6 +647,30 @@ void ObjDisassembler::addBinaryEncodingComment(raw_ostream &stream, unsigned ins
       byte = instBytes[subOffset ^ (instAlignment - 1)];
     stream << format("%02x", byte);
   }
+}
+
+// =====================================================================================================================
+// Outputs a given instruction or directive.
+//
+// @param inst : The instruction or directive to output.
+// @param instAlignment : Alignment (instruction unit size in bytes)
+void ObjDisassembler::outputInst(InstOrDirective inst, unsigned instAlignment) {
+  // Output the binary encoding as a comment.
+  if (inst.status == MCDisassembler::SoftFail)
+    m_streamer->AddComment("Illegal instruction encoding ");
+  std::string comment = inst.comment.str();
+  raw_string_ostream commentStream(comment);
+  if (!comment.empty())
+    commentStream << " ";
+  commentStream << format("%06x:", inst.offset);
+  addBinaryEncodingComment(commentStream, instAlignment, inst.bytes);
+  // Output the instruction to the streamer.
+  if (!comment.empty())
+    m_streamer->AddComment(comment);
+  if (const MCExpr *expr = inst.valueDirectiveExpr)
+    m_streamer->emitValue(expr, inst.bytes.size());
+  else
+    m_streamer->emitInstruction(inst.mcInst, *m_subtargetInfo);
 }
 
 // =====================================================================================================================
