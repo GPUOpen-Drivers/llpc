@@ -43,9 +43,9 @@ jobs:
           credentials_json: '${{ secrets.GCR_KEY }}'
       - name: Setup Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v0
-      - name: Setup Docker to use the GCR
+      - name: Setup Docker to use the Google Cloud Artifact Registry
         run: |
-          gcloud auth configure-docker
+          gcloud auth configure-docker us-docker.pkg.dev --quiet
       - name: Generate Docker image tag string
         run: |
           CONFIG_LOWER=$(echo "${{ matrix.config }}" | tr "[:upper:]" "[:lower:]")
