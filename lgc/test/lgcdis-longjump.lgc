@@ -1,0 +1,26 @@
+; RUN: llvm-mc -triple=amdgcn--amdpal -mcpu=gfx1030 -filetype=obj %s | \
+; RUN:   lgcdis - | FileCheck %s
+
+    .text
+
+; CHECK-LABEL:  foo:
+; CHECK:            s_getpc
+; CHECK-NEXT:   getpc:
+; CHECK-NEXT:       s_add_u32 {{.*}}, {{.*}}, target-getpc
+; CHECK-NEXT:       s_addc_u32
+; CHECK-NEXT:       s_setpc
+; CHECK-NEXT:   target:
+; CHECK-NEXT:       s_endpgm
+
+    .p2align 8
+    .type foo, @function
+foo:
+    s_getpc_b64 s[26:27]
+getpc:
+    s_add_u32 s26, s26, target - getpc
+    s_addc_u32 s27, s27, 0
+    s_setpc_b64 s[26:27]
+
+target:
+    s_endpgm
+    s_code_end
