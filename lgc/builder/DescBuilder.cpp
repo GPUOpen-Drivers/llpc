@@ -219,10 +219,9 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet
 // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
 // The type passed must have the correct size for the push constants.
 //
-// @param pushConstantsTy : Type of the push constants table that the returned pointer will point to
+// @param returnTy : Return type of the load
 // @param instName : Name to give instruction(s)
-Value *DescBuilder::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const Twine &instName) {
-  Type *returnTy = pushConstantsTy->getPointerTo(ADDR_SPACE_CONST);
+Value *DescBuilder::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &instName) {
   const bool isIndirect = getPipelineState()->getOptions().resourceLayoutScheme == ResourceLayoutScheme::Indirect;
   if (isIndirect) {
     // Push const is the sub node of DescriptorTableVaPtr.

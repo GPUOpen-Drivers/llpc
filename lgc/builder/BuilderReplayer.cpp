@@ -451,7 +451,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
                                        cast<ConstantInt>(args[2])->getZExtValue()); // binding
 
   case BuilderRecorder::Opcode::LoadPushConstantsPtr: {
-    return m_builder->CreateLoadPushConstantsPtr(call->getType()->getPointerElementType()); // pPushConstantsTy
+    return m_builder->CreateLoadPushConstantsPtr(call->getType()); // returnTy
   }
 
   case BuilderRecorder::Opcode::GetBufferDescLength: {

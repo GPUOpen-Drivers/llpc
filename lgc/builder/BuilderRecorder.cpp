@@ -1099,11 +1099,10 @@ Value *BuilderRecorder::CreateGetDescPtr(ResourceNodeType descType, unsigned des
 // =====================================================================================================================
 // Create a load of the spill table pointer for push constants.
 //
-// @param pushConstantsTy : Type of the push constants table that the returned pointer will point to
+// @param returnTy : Return type of the load
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateLoadPushConstantsPtr(Type *pushConstantsTy, const Twine &instName) {
-  Type *resultTy = PointerType::get(pushConstantsTy, ADDR_SPACE_CONST);
-  return record(Opcode::LoadPushConstantsPtr, resultTy, {}, instName);
+Value *BuilderRecorder::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &instName) {
+  return record(Opcode::LoadPushConstantsPtr, returnTy, {}, instName);
 }
 
 // =====================================================================================================================
