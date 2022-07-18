@@ -465,7 +465,7 @@ static bool instructionsEqual(Instruction *lhs, Instruction *rhs) {
 
   return true;
 }
-#endif // defined(LLVM_HAVE_BRANCH_AMD_GFX)
+#endif
 
 // =====================================================================================================================
 // Create a waterfall loop containing the specified instruction.

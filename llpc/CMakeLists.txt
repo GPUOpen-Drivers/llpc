@@ -278,6 +278,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(llpc PRIVATE Threads::Threads)
 
+if(LLPC_BUILD_TOOLS)
 ### VFX library for Standalone Compiler ###################################################################################
 if(ICD_BUILD_LLPC)
     set(VFX_ENABLE_WERROR ${LLPC_ENABLE_WERROR} CACHE BOOL "${PROJECT_NAME} override." FORCE)
@@ -371,6 +372,7 @@ target_link_libraries(amdllpc PRIVATE llpc_standalone_compiler)
 set_compiler_options(amdllpc ${LLPC_ENABLE_WERROR})
 add_compile_definitions(amdllpc PRIVATE SH_EXPORTING)
 
+endif()
 endif()
 ### Add Subdirectories #################################################################################################
 if(ICD_BUILD_LLPC AND LLPC_BUILD_TESTS)
