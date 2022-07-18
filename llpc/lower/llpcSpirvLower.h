@@ -54,7 +54,6 @@ void initializeLegacySpirvLowerConstImmediateStorePass(PassRegistry &);
 void initializeLegacySpirvLowerMemoryOpPass(PassRegistry &);
 void initializeLegacySpirvLowerGlobalPass(PassRegistry &);
 void initializeLegacySpirvLowerInstMetaRemovePass(PassRegistry &);
-void initializeSpirvLowerResourceCollectPass(PassRegistry &);
 void initializeLegacySpirvLowerTerminatorPass(PassRegistry &);
 void initializeLegacySpirvLowerTranslatorPass(PassRegistry &);
 } // namespace llvm
@@ -79,7 +78,6 @@ inline void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
   initializeLegacySpirvLowerMemoryOpPass(passRegistry);
   initializeLegacySpirvLowerGlobalPass(passRegistry);
   initializeLegacySpirvLowerInstMetaRemovePass(passRegistry);
-  initializeSpirvLowerResourceCollectPass(passRegistry);
   initializeLegacySpirvLowerTerminatorPass(passRegistry);
   initializeLegacySpirvLowerTranslatorPass(passRegistry);
 }
