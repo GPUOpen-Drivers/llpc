@@ -39,6 +39,9 @@ add_library(vkgc INTERFACE)
 ### VKGC header-only library ###
 add_library(vkgc_headers INTERFACE)
 
+### Cached Project Options #############################################################################################
+option(LLPC_BUILD_TOOLS "LLPC build all tools" ON)
+
 ### Options that affect the headers ####################################################################################
 option(LLPC_ENABLE_SHADER_CACHE "Enable experimental shader cache" OFF)
 
@@ -93,6 +96,7 @@ else()
     )
 endif()
 
+if(LLPC_BUILD_TOOLS)
 # SPVGEN
 if(EXISTS ${PROJECT_SOURCE_DIR}/../spvgen)
     set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../spvgen CACHE PATH "Specify the path to SPVGEN.")
@@ -105,6 +109,8 @@ endif()
 if(EXISTS ${XGL_SPVGEN_PATH})
     set(XGL_SPVGEN_BUILD_PATH ${CMAKE_BINARY_DIR}/spvgen)
     add_subdirectory(${XGL_SPVGEN_PATH} ${XGL_SPVGEN_BUILD_PATH} EXCLUDE_FROM_ALL)
+endif()
+
 endif()
 
 ### VKGC build LLPC ################################################################

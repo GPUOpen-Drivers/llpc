@@ -35,10 +35,6 @@
 #include <inttypes.h>
 
 #ifndef VFX_DISABLE_SPVGEN
-#if VFX_INSIDE_SPVGEN
-#define SH_EXPORTING
-#endif
-
 #include "spvgen.h"
 #endif
 

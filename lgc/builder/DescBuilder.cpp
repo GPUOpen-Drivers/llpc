@@ -354,7 +354,7 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     Value *useShadowReloc = CreateRelocationConstant(reloc::ShadowDescriptorTableEnabled);
     Value *useShadowTable = CreateICmpNE(useShadowReloc, getInt32(0));
     return CreateSelect(useShadowTable, shadowAddr, nonShadowAddr);
-   
+
   };
 
   // Get the descriptor table pointer.

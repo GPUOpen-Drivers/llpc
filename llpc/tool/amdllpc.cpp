@@ -235,7 +235,6 @@ cl::opt<bool> ForceCsThreadIdSwizzling("force-compute-shader-thread-id-swizzling
                                               cl::desc("force compute shader thread-id swizzling"),
                                               cl::init(false));
 
-
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 cl::opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
                                            cl::desc("Filter which types of pipeline dump are disabled\n"

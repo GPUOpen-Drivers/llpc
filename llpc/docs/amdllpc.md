@@ -4,7 +4,8 @@ LLPC can be built into a standalone offline compiler (amdllpc). It supports GLSL
 
 ## Build instructions
 
-LLPC is normally built as part of the [AMD Open Source Driver for Vulkan](https://github.com/GPUOpen-Drivers/AMDVLK/blob/dev/README.md). The build includes standalone `lgc` and `amdllpc`. You can build `lgc amdllpc` only or build `check-lgc check-lgc-units check-amdllpc check-amdllpc-units` to run local tests besides the build (**Note:** You need to add the option `-DXGL_BUILD_TESTS=ON` in the AMDVLK cmake command before building these local test targets).
+LLPC is normally built as part of the [AMD Open Source Driver for Vulkan](https://github.com/GPUOpen-Drivers/AMDVLK/blob/dev/README.md). The build includes standalone `lgc` and `amdllpc` (**Note:** You need to add the option `-DXGL_BUILD_TOOLS=ON` in the AMDVLK cmake command before building `amdllpc`).
+You can build `lgc amdllpc` only or build `check-lgc check-lgc-units check-amdllpc check-amdllpc-units` to run local tests besides the build (**Note:** You need to add the option `-DXGL_BUILD_TESTS=ON` in the AMDVLK cmake command before building these local test targets).
 ```
 cmake --build xgl/builds/Release64 --target lgc amdllpc
 ```
@@ -19,8 +20,8 @@ LLPC also contains amber tests that need an actual GPU to run. See the [test dir
 cmake --build xgl/builds/Release64 --target check-amber
 ```
 
-Building the `check-amdllpc` target also builds spvgen.so.
-If the spvgen.so build fails with an error like this:
+The `amdllpc` build needs SPVGEN.
+If the SPVGEN build fails with an error like this:
 ```
 drivers/spvgen/source/spvgen.cpp:51:10: fatal error: doc.h: No such file or directory
 ```
@@ -58,7 +59,6 @@ If you want to make amdllpc compatible with driver, you could get `<pal_interfac
 
 ## Usage
 ```
-export LD_LIBRARY_PATH=<path_to_spvgen>:$LD_LIBRARY_PATH
 amdllpc [<options>...] [<input_file[,entry_point]>...]
 ```
 

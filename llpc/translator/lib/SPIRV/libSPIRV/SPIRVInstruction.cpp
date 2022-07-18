@@ -412,6 +412,7 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
       Indices.push_back(Ops[2 + I]);
 
     return constantCompositeInsert(Composite, Object, Indices);
+
   } else {
     assert(DestTy->isTypeVector() || DestTy->isTypeScalar());
 
