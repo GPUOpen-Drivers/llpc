@@ -110,11 +110,16 @@ bool PatchPreparePipelineAbi::runImpl(Module &module, PipelineShadersResult &pip
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   // If we've only to set the calling conventions, do that now.
-  if (m_gfxIp.major >= 9)
-    mergeShader(module);
+  if (m_onlySetCallingConvs) {
+    setCallingConvs(module);
+    setRemainingCallingConvs(module);
+  } else {
+    if (m_gfxIp.major >= 9)
+      mergeShaderAndSetCallingConvs(module);
 
-  setAbiEntryNames(module);
-
+    setAbiEntryNames(module);
+    setRemainingCallingConvs(module);
+  }
   addAbiMetadata(module);
 
   m_pipelineState->getPalMetadata()->finalizePipeline(m_pipelineState->isWholePipeline());

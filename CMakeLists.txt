@@ -40,7 +40,7 @@ add_library(vkgc INTERFACE)
 add_library(vkgc_headers INTERFACE)
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_TOOLS "LLPC build all tools" OFF)
+option(LLPC_BUILD_TOOLS "LLPC build all tools" ON)
 
 ### Options that affect the headers ####################################################################################
 option(LLPC_ENABLE_SHADER_CACHE "Enable experimental shader cache" OFF)
