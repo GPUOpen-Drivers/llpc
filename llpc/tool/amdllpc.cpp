@@ -404,6 +404,11 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
     *static_cast<cl::opt<std::string> *>(opt) = ".";
   }
 
+  if (!InitSpvGen(nullptr)) {
+    LLPC_ERRS("Failed to initialize SPVGEN\n");
+    return Result::ErrorUnavailable;
+  }
+
   // Check to see that the ParsedGfxIp is valid
   std::string gfxIpName = lgc::LgcContext::getGpuNameString(ParsedGfxIp.major, ParsedGfxIp.minor, ParsedGfxIp.stepping);
   if (!lgc::LgcContext::isGpuNameValid(gfxIpName)) {
@@ -426,11 +431,6 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
   //
   // We call this after compiler initialization to account for any flags overridden by LLPC.
   cl::PrintOptionValues();
-
-  if (!InitSpvGen(nullptr)) {
-    LLPC_ERRS("Failed to initialize SPVGEN\n");
-    return Result::ErrorUnavailable;
-  }
 
   if (EnableOuts() && NumThreads != 1) {
     LLPC_ERRS("Verbose output is not available when compiling with multiple threads\n");
