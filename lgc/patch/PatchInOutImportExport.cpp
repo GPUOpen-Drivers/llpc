@@ -6084,7 +6084,10 @@ void PatchInOutImportExport::storeTessFactors() {
   auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
   // NOTE: We are going to read back tess factors from on-chip LDS. Make sure they have been stored already.
+  SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+  builder.CreateFence(AtomicOrdering::Release, workgroupScope);
   builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
   SmallVector<Value *> outerTessFactors, innerTessFactors;
 
