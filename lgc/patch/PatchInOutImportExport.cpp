@@ -619,10 +619,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         break;
       }
       case ShaderStageFragment: {
-        Value *sampleId = nullptr;
+        Value *generalVal = nullptr;
         if (callInst.arg_size() >= 2)
-          sampleId = callInst.getArgOperand(1);
-        input = patchFsBuiltInInputImport(inputTy, builtInId, sampleId, &callInst);
+          generalVal = callInst.getArgOperand(1);
+        input = patchFsBuiltInInputImport(inputTy, builtInId, generalVal, &callInst);
         break;
       }
       default: {
@@ -2331,9 +2331,9 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
 //
 // @param inputTy : Type of input value
 // @param builtInId : ID of the built-in variable
-// @param sampleId : Sample ID; only needed for BuiltInSamplePosOffset
+// @param generalVal : Sample ID, only needed for BuiltInSamplePosOffset; InterpLoc, only needed for BuiltInBaryCoord
 // @param insertPos : Where to insert the patch instruction
-Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *sampleId,
+Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *generalVal,
                                                          Instruction *insertPos) {
   Value *input = UndefValue::get(inputTy);
 
@@ -2609,7 +2609,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInSamplePosOffset: {
-    input = getSamplePosOffset(inputTy, sampleId, insertPos);
+    input = getSamplePosOffset(inputTy, generalVal, insertPos);
     break;
   }
   case BuiltInSamplePosition: {
@@ -2618,16 +2618,25 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   }
   case BuiltInBaryCoord:
   case BuiltInBaryCoordNoPerspKHR: {
-    unsigned int idx = 0;
-    if (BuiltInBaryCoord == builtInId) {
-      assert(entryArgIdxs.perspInterp.center != 0);
-      idx = entryArgIdxs.perspInterp.center;
+    assert(isa<ConstantInt>(generalVal));
+    unsigned idx = 0;
+    unsigned interpLoc = cast<ConstantInt>(generalVal)->getZExtValue();
+    Value *iJCoord = nullptr;
+    if (interpLoc == InOutInfo::InterpLocCentroid) {
+      if (BuiltInBaryCoord == builtInId)
+        iJCoord = adjustCentroidIj(getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.centroid),
+                                   getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.center), insertPos);
+      else
+        iJCoord = adjustCentroidIj(getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.centroid),
+                                   getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center), insertPos);
+    } else if (interpLoc == InOutInfo::InterpLocSample) {
+      idx = (BuiltInBaryCoord == builtInId) ? entryArgIdxs.perspInterp.sample : entryArgIdxs.linearInterp.sample;
+      iJCoord = getFunctionArgument(m_entryPoint, idx);
     } else {
-      assert(entryArgIdxs.linearInterp.center != 0);
-      idx = entryArgIdxs.linearInterp.center;
+      idx = (BuiltInBaryCoord == builtInId) ? entryArgIdxs.perspInterp.center : entryArgIdxs.linearInterp.center;
+      iJCoord = getFunctionArgument(m_entryPoint, idx);
     }
 
-    auto iJCoord = getFunctionArgument(m_entryPoint, idx);
     builder.SetInsertPoint(insertPos);
     auto iCoord = builder.CreateExtractElement(iJCoord, uint64_t(0));
     auto jCoord = builder.CreateExtractElement(iJCoord, 1);

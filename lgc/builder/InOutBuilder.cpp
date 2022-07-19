@@ -850,7 +850,9 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
       Value *sampleNum = vertexIndex;
       vertexIndex = nullptr;
       args.push_back(sampleNum);
-    }
+    } else if (builtIn == BuiltInBaryCoord || builtIn == BuiltInBaryCoordNoPerspKHR)
+      // BuiltInBaryCoord requires interpolate mode.
+      args.push_back(getInt32(inOutInfo.getInterpLoc()));
     assert(!index && !vertexIndex);
     break;
   default:

@@ -4,7 +4,7 @@
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: define dllexport spir_func void @lgc.shader.FS.main()
-; SHADERTEST: call <3 x float> @lgc.input.import.builtin.BaryCoord.v3f32.i32(i32 5286)
+; SHADERTEST: call <3 x float> @lgc.input.import.builtin.BaryCoord.v3f32.i32.i32(i32 5286, i32 0)
 
 // barycentric coordinate: (1 - i - j, i + j, 0)
 ; SHADERTEST-LABEL: define dllexport amdgpu_ps void @_amdgpu_ps_main(i32 inreg %globalTable, i32 inreg %perShaderTable,
