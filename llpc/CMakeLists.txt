@@ -88,32 +88,41 @@ if(ICD_BUILD_LLPC)
     # Export the LLVM build path so that it's available in XGL.
     set(XGL_LLVM_BUILD_PATH ${XGL_LLVM_BUILD_PATH} PARENT_SCOPE)
 
-    llvm_map_components_to_libnames(llvm_libs
-        lgc
-        AMDGPUAsmParser
-        AMDGPUCodeGen
-        AMDGPUDisassembler
-        AMDGPUInfo
-        Analysis
-        BinaryFormat
-        Core
-        Coroutines
-        LTO
-        ipo
-        BitReader
-        BitWriter
-        CodeGen
-        InstCombine
-        IRReader
-        Linker
-        MC
-        Passes
-        ScalarOpts
-        Support
-        Target
-        TransformUtils
-    )
-    target_link_libraries(llpc PUBLIC ${llvm_libs})
+    if (LLVM_LINK_LLVM_DYLIB)
+        # Link dynamically against libLLVM-${version}.so
+        target_link_libraries(llpc PUBLIC LLVM)
+    else()
+        # Link statically against the required component libraries
+        llvm_map_components_to_libnames(llvm_libs
+            AMDGPUAsmParser
+            AMDGPUCodeGen
+            AMDGPUDisassembler
+            AMDGPUInfo
+            Analysis
+            BinaryFormat
+            Core
+            Coroutines
+            LTO
+            ipo
+            BitReader
+            BitWriter
+            CodeGen
+            InstCombine
+            IRReader
+            Linker
+            MC
+            Passes
+            ScalarOpts
+            Support
+            Target
+            TransformUtils
+        )
+        target_link_libraries(llpc PUBLIC ${llvm_libs})
+    endif()
+
+    # Always link statically against libLLVMlgc
+    llvm_map_components_to_libnames(extra_llvm_libs lgc)
+    target_link_libraries(llpc PUBLIC ${extra_llvm_libs})
 endif()
 
 ### Compiler Options ###################################################################################################
@@ -325,33 +334,9 @@ target_include_directories(llpc_standalone_compiler PUBLIC
     ${LLVM_INCLUDE_DIRS}
 )
 
-llvm_map_components_to_libnames(llvm_libs
-    lgc
-    aggressiveinstcombine
-    amdgpuasmparser
-    amdgpucodegen
-    amdgpudisassembler
-    amdgpuinfo
-    analysis
-    asmparser
-    bitreader
-    bitwriter
-    codegen
-    coroutines
-    ipo
-    irreader
-    linker
-    LTO
-    mc
-    passes
-    support
-    target
-    transformutils
-)
 target_link_libraries(llpc_standalone_compiler PUBLIC
     cwpack
     llpc
-    ${llvm_libs}
     metrohash
     spvgen_static
     vfx
