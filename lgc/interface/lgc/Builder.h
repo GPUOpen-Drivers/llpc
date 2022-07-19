@@ -720,6 +720,9 @@ public:
   // @param descType : Descriptor type, one of the ResourceNodeType values
   llvm::Type *getDescPtrTy(ResourceNodeType descType);
 
+  // Get address space of constant memory.
+  unsigned getAddrSpaceConst();
+
   // Create a get of the stride (in bytes) of a descriptor. Returns an i32 value.
   //
   // @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
@@ -744,9 +747,9 @@ public:
   // Create a load of the push constants pointer.
   // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
   //
-  // @param pushConstantsTy : Type that the returned pointer will point to
+  // @param returnTy : Return type of the load
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *pushConstantsTy, const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName = "") = 0;
 
   // Create a buffer length query based on the specified descriptor, subtracting an offset from the length. The result
   // is 0 for a null descriptor when allowNullDescriptor is enabled.

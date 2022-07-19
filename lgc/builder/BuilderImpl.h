@@ -298,7 +298,7 @@ public:
                                 const llvm::Twine &instName) override final;
 
   // Create a load of the push constants pointer.
-  llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *pushConstantsTy, const llvm::Twine &instName) override final;
+  llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName) override final;
 
   // Create a buffer length query based on the specified descriptor.
   llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc, llvm::Value *offset,
