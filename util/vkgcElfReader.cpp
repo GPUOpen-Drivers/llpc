@@ -376,7 +376,10 @@ template <class Elf> bool ElfReader<Elf>::getNextMsgNode() {
     curIter.mapIt = map->begin();
     curIter.mapEnd = map->end();
     m_msgPackMapLevel++;
-    curIter.status = MsgPackIteratorMapPair;
+    if (curIter.mapIt == curIter.mapEnd)
+      curIter.status = MsgPackIteratorMapEnd;
+    else
+      curIter.status = MsgPackIteratorMapPair;
     m_iteratorStack.push_back(curIter);
     skipPostCheck = true;
   } else if (curIter.status == MsgPackIteratorMapPair) {
