@@ -157,7 +157,7 @@ bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipe
   // Create the global variable that is to model LDS
   // NOTE: ES -> GS ring is always on-chip on GFX9.
   if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)))
-    m_lds = LegacyPatch::getLdsVariable(m_pipelineState, m_module);
+    m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
 
   // Set buffer formats based on specific GFX
   static const std::array<unsigned char, 4> BufferFormatsGfx9 = {
