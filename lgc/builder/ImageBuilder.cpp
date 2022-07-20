@@ -1926,7 +1926,7 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
     std::string callName = lgcName::InputImportBuiltIn;
     Type *builtInTy = FixedVectorType::get(getFloatTy(), 4);
     addTypeMangling(builtInTy, {}, callName);
-    Value *fragCoord = emitCall(callName, builtInTy, getInt32(BuiltInFragCoord), {}, &*GetInsertPoint());
+    Value *fragCoord = CreateNamedCall(callName, builtInTy, getInt32(BuiltInFragCoord), {});
     fragCoord->setName("FragCoord");
     fragCoord = CreateShuffleVector(fragCoord, fragCoord, ArrayRef<int>{0, 1});
     fragCoord = CreateFPToSI(fragCoord, FixedVectorType::get(getInt32Ty(), 2));
@@ -1966,7 +1966,7 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
     std::string callName = lgcName::InputImportBuiltIn;
     Type *builtInTy = getInt32Ty();
     addTypeMangling(builtInTy, {}, callName);
-    Value *viewIndex = emitCall(callName, builtInTy, getInt32(BuiltInViewIndex), {}, &*GetInsertPoint());
+    Value *viewIndex = CreateNamedCall(callName, builtInTy, getInt32(BuiltInViewIndex), {});
     viewIndex->setName("ViewIndex");
     coord = CreateInsertElement(coord, viewIndex, 2);
   }
