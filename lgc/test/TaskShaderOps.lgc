@@ -21,38 +21,40 @@
 ; CHECK-NEXT: [[tempResult2:%[0-9]*]] = mul i32 [[tempResult1]], [[dimX]]
 ; CHECK-NEXT: [[groupIdX:%[0-9]*]] = extractelement <3 x i32> %WorkgroupId, i64 0
 ; CHECK-NEXT: [[flattenId:%[0-9]*]] = add i32 [[tempResult2]], [[groupIdX]]
-; CHECK-NEXT: [[entryIndex:%[0-9]*]] = add i32 %meshTaskRingIndex, [[flattenId]]
-; CHECK: [[payloadRingDescPtr:%[0-9]*]] = getelementptr <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}, i32 13
-; CHECK-NEXT: [[payloadRingDesc:%[0-9]*]] = load <4 x i32>, <4 x i32> addrspace(4)* [[payloadRingDescPtr]], align 16
-; CHECK: [[drawDataRingDescPtr:%[0-9]*]] = getelementptr <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}, i32 14
-; CHECK-NEXT: [[drawDataRingDesc:%[0-9]*]] = load <4 x i32>, <4 x i32> addrspace(4)* [[drawDataRingDescPtr]], align 16
-; CHECK: [[meshPipeStatsBufAddr2x32:%[0-9]*]] = insertelement <2 x i32> %{{[0-9]*}}, i32 %meshPipeStatsBuf, i32 0
+; CHECK-NEXT: [[entryIndex:%[0-9]*]] = add i32 [[flattenId]], %meshTaskRingIndex
+; CHECK: [[payloadRingDescPtr:%[0-9]*]] = getelementptr i8, i8 addrspace(4)* %{{[0-9]*}}, i64 208
+; CHECK-NEXT: [[payloadRingDescPtr_cast:%[0-9]*]] = bitcast i8 addrspace(4)* [[payloadRingDescPtr]] to <4 x i32> addrspace(4)*
+; CHECK-NEXT: [[payloadRingDesc:%[0-9]*]] = load <4 x i32>, <4 x i32> addrspace(4)* [[payloadRingDescPtr_cast]], align 16
+; CHECK: [[drawDataRingDescPtr:%[0-9]*]] = getelementptr i8, i8 addrspace(4)* %{{[0-9]*}}, i64 224
+; CHECK-NEXT: [[drawDataRingDescPtr_cast:%[0-9]*]] = bitcast i8 addrspace(4)* [[drawDataRingDescPtr]] to <4 x i32> addrspace(4)*
+; CHECK-NEXT: [[drawDataRingDesc:%[0-9]*]] = load <4 x i32>, <4 x i32> addrspace(4)* [[drawDataRingDescPtr_cast]], align 16
+; CHECK: [[meshPipeStatsBufAddr2x32:%[0-9]*]] = insertelement <2 x i32> %{{[0-9]*}}, i32 %meshPipeStatsBuf, i64 0
 ; CHECK-NEXT: [[meshPipeStatsBufAddr64:%[0-9]*]] = bitcast <2 x i32> [[meshPipeStatsBufAddr2x32]] to i64
 ; CHECK-NEXT: [[meshPipeStatsBufAddr:%[0-9]*]] = inttoptr i64 [[meshPipeStatsBufAddr64]] to i8 addrspace(1)*
 ; CHECK: [[ringSize:%[0-9]*]] = extractelement <4 x i32> [[payloadRingDesc]], i64 2
-; CHECK-NEXT: [[numEntries:%[0-9]*]] = udiv i32 [[ringSize]], 16384
-; CHECK-NEXT: [[wrapMask:%[0-9]*]] = sub i32 [[numEntries]], 1
+; CHECK-NEXT: [[numEntries:%[0-9]*]] = lshr i32 [[ringSize]], 14
+; CHECK-NEXT: [[wrapMask:%[0-9]*]] = add nuw nsw i32 [[numEntries]], 262143
 ; CHECK-NEXT: [[wrappedEntryIndex:%[0-9]*]] = and i32 [[entryIndex]], [[wrapMask]]
-; CHECK-NEXT: [[entryOffset:%[0-9]*]] = mul i32 [[wrappedEntryIndex]], 16384
+; CHECK-NEXT: [[entryOffset:%[0-9]*]] = shl i32 [[wrappedEntryIndex]], 14
 ; CHECK: %{{[0-9]*}} = call float @llvm.amdgcn.raw.buffer.load.f32(<4 x i32> [[payloadRingDesc]], i32 %{{[0-9]*}}, i32 [[entryOffset]], i32 5)
 ; CHECK: call void @llvm.amdgcn.raw.buffer.store.f32(float %{{[0-9]*}}, <4 x i32> [[payloadRingDesc]], i32 %{{[0-9]*}}, i32 [[entryOffset]], i32 1)
 ; CHECK: br i1 %{{[0-9]*}}, label %.emitMeshs, label %.endEmitMeshs
 ;
 ; CHECK: .emitMeshs:
-; CHECK-NEXT: [[numTaskThreadsPtr8:%[0-9]*]] = getelementptr i8, i8 addrspace(1)* [[meshPipeStatsBufAddr]], i32 16
+; CHECK: [[numTaskThreadsPtr8:%[0-9]*]] = getelementptr i8, i8 addrspace(1)* [[meshPipeStatsBufAddr]], i64 16
 ; CHECK-NEXT: [[numTaskThreadsPtr:%[0-9]*]] = bitcast i8 addrspace(1)* [[numTaskThreadsPtr8]] to i64 addrspace(1)*
 ; CHECK: %{{[0-9]*}} = atomicrmw add i64 addrspace(1)* [[numTaskThreadsPtr]], i64 %{{[0-9]*}} monotonic, align 8
 ; CHECK: [[ringSize:%[0-9]*]] = extractelement <4 x i32> [[drawDataRingDesc]], i64 2
-; CHECK-NEXT: [[numEntries:%[0-9]*]] = udiv i32 [[ringSize]], 16
-; CHECK-NEXT: [[wrapMask:%[0-9]*]] = sub i32 [[numEntries]], 1
+; CHECK-NEXT: [[numEntries:%[0-9]*]] = lshr i32 [[ringSize]], 4
+; CHECK-NEXT: [[wrapMask:%[0-9]*]] = add nuw nsw i32 [[numEntries]], 268435455
 ; CHECK-NEXT: [[wrappedEntryIndex:%[0-9]*]] = and i32 [[entryIndex]], [[wrapMask]]
-; CHECK-NEXT: [[entryOffset:%[0-9]*]] = mul i32 [[wrappedEntryIndex]], 16
+; CHECK-NEXT: [[entryOffset:%[0-9]*]] = shl i32 [[wrappedEntryIndex]], 4
 ; CHECK: [[ringSize:%[0-9]*]] = extractelement <4 x i32> [[drawDataRingDesc]], i64 2
-; CHECK-NEXT: [[numEntries:%[0-9]*]] = udiv i32 [[ringSize]], 16
+; CHECK-NEXT: [[numEntries:%[0-9]*]] = lshr i32 [[ringSize]], 4
 ; CHECK-NEXT: [[checkReadyBit:%[0-9]*]] = and i32 [[entryIndex]], [[numEntries]]
 ; CHECK-NEXT: [[readyBit:%[0-9]*]] = icmp ne i32 [[checkReadyBit]], 0
 ; CHECK-NEXT: [[readyBit32:%[0-9]*]] = zext i1 [[readyBit]] to i32
-; CHECK-NEXT: [[drawData:%[0-9]*]] = insertelement <4 x i32> %{{[0-9]*}}, i32 [[readyBit32]], i64 3
+; CHECK-NEXT: [[drawData:%[0-9]*]] = insertelement <4 x i32> <i32 3, i32 1, i32 1, i32 poison>, i32 [[readyBit32]], i64 3
 ; CHECK: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> [[drawData]], <4 x i32> [[drawDataRingDesc]], i32 0, i32 [[entryOffset]], i32 0)
 ; CHECK-NEXT: br label %.endEmitMeshs
 ;
