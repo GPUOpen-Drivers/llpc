@@ -134,8 +134,8 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
       if (compBitWidth == 8 || compBitWidth == 16) {
         scalar = CreateTrunc(scalar, getInt32Ty());
         accumulator = CreateTrunc(accumulator, getInt32Ty());
-        StringRef addIntrinsic = isSigned ? "llvm.sadd.sat.i32" : "llvm.uadd.sat.i32";
-        scalar = CreateNamedCall(addIntrinsic, getInt32Ty(), {scalar, accumulator}, {}, instName);
+        Intrinsic::ID addIntrinsic = isSigned ? Intrinsic::sadd_sat : Intrinsic::uadd_sat;
+        scalar = CreateBinaryIntrinsic(addIntrinsic, scalar, accumulator, nullptr, instName);
       } else {
         scalar = CreateAdd(scalar, accumulator);
       }
@@ -197,8 +197,8 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
         }
         // Add a saturation add if required.
         if (hasAccumulator) {
-          StringRef addIntrinsic = isSigned ? "llvm.sadd.sat.i32" : "llvm.uadd.sat.i32";
-          scalar = CreateNamedCall(addIntrinsic, getInt32Ty(), {scalar, accumulator}, {}, instName);
+          Intrinsic::ID addIntrinsic = isSigned ? Intrinsic::sadd_sat : Intrinsic::uadd_sat;
+          scalar = CreateBinaryIntrinsic(addIntrinsic, scalar, accumulator, nullptr, instName);
         }
       }
     }
