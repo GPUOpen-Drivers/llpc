@@ -247,7 +247,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
 //
 // @param [in/out] passMgr : Pass manager
 void Patch::registerPasses(lgc::PassManager &passMgr) {
-#define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, decltype(CLASS)::name());
+#define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, CLASS::name());
 #include "PassRegistry.inc"
 }
 
