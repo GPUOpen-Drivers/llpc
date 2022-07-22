@@ -673,9 +673,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   setFuncAttrs(entryPoint);
 
   // Remove original entry-point
-  int argOffset = origEntryPoint->getFunctionType()->getNumParams();
   origEntryPoint->eraseFromParent();
-  processCalls(*entryPoint, argTys, argNames, inRegMask, argOffset);
 }
 
 // =====================================================================================================================
