@@ -1540,25 +1540,13 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
   if (!isLoad) {
     storeValue = storeInst->getValueOperand();
     Type *storeTy = storeValue->getType();
-    if (storeTy->isArrayTy()) {
-      const unsigned elemCount = cast<ArrayType>(storeTy)->getNumElements();
-      Value *castValue = UndefValue::get(castType);
-      for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx) {
-        Value *elem = m_builder->CreateExtractValue(storeValue, elemIdx);
-        elem = m_builder->CreateBitCast(elem, smallestType);
-        castValue = m_builder->CreateInsertElement(castValue, elem, elemIdx);
-      }
-      storeValue = castValue;
-      copyMetadata(storeValue, storeInst);
-    } else {
-      if (storeTy->isPointerTy()) {
-        storeValue = m_builder->CreatePtrToInt(storeValue, m_builder->getIntNTy(bytesToHandle * 8));
-        copyMetadata(storeValue, storeInst);
-      }
-
-      storeValue = m_builder->CreateBitCast(storeValue, castType);
+    if (storeTy->isPointerTy()) {
+      storeValue = m_builder->CreatePtrToInt(storeValue, m_builder->getIntNTy(bytesToHandle * 8));
       copyMetadata(storeValue, storeInst);
     }
+
+    storeValue = m_builder->CreateBitCast(storeValue, castType);
+    copyMetadata(storeValue, storeInst);
   }
 
   // The index in pStoreValue which we use next
