@@ -612,7 +612,8 @@ void PatchBufferOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
 
   Value *newGetElemPtr = nullptr;
   auto getElemPtrPtr = m_replacementMap[pointer].second;
-  auto getElemPtrEltTy = getElemPtrPtr->getType()->getScalarType()->getPointerElementType();
+  auto getElemPtrEltTy = getElemPtrInst.getSourceElementType();
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(getElemPtrPtr->getType()->getScalarType(), getElemPtrEltTy));
 
   if (getElemPtrInst.isInBounds())
     newGetElemPtr = m_builder->CreateInBoundsGEP(getElemPtrEltTy, getElemPtrPtr, indices);
