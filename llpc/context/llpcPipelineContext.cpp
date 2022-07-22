@@ -622,6 +622,8 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
 
       destNode.set = node.srdRange.set;
       destNode.binding = node.srdRange.binding;
+      destNode.matchType = destNode.type;
+
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
       switch (node.type) {

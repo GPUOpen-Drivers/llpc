@@ -810,7 +810,7 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
 // @param binding : Descriptor binding being searched for
 bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, unsigned descSet,
                                       unsigned binding) const {
-  if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.type))
+  if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.matchType))
     return false;
   if (node.binding == binding)
     return true;

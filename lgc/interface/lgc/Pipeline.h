@@ -241,9 +241,10 @@ struct ShaderOptions {
 struct ResourceNode {
   ResourceNode() {}
 
-  ResourceNodeType type;   // Type of this node
-  unsigned sizeInDwords;   // Size in dwords
-  unsigned offsetInDwords; // Offset in dwords
+  ResourceNodeType type;      // Type of this node
+  ResourceNodeType matchType; // Node type for resource node matching
+  unsigned sizeInDwords;      // Size in dwords
+  unsigned offsetInDwords;    // Offset in dwords
 
   union {
     // Info for generic descriptor nodes.
