@@ -48,18 +48,16 @@ char LegacyPatchPreparePipelineAbi::ID = 0;
 // Create pass to prepare the pipeline ABI
 //
 // @param onlySetCallingConvs : Should we only set the calling conventions, or do the full prepare.
-ModulePass *lgc::createLegacyPatchPreparePipelineAbi(bool onlySetCallingConvs) {
-  return new LegacyPatchPreparePipelineAbi(onlySetCallingConvs);
+ModulePass *lgc::createLegacyPatchPreparePipelineAbi() {
+  return new LegacyPatchPreparePipelineAbi;
 }
 
 // =====================================================================================================================
-PatchPreparePipelineAbi::PatchPreparePipelineAbi(bool onlySetCallingConvs)
-    : m_onlySetCallingConvs(onlySetCallingConvs) {
+PatchPreparePipelineAbi::PatchPreparePipelineAbi() {
 }
 
 // =====================================================================================================================
-LegacyPatchPreparePipelineAbi::LegacyPatchPreparePipelineAbi(bool onlySetCallingConvs)
-    : ModulePass(ID), m_impl(onlySetCallingConvs) {
+LegacyPatchPreparePipelineAbi::LegacyPatchPreparePipelineAbi() : ModulePass(ID) {
 }
 
 // =====================================================================================================================
@@ -112,90 +110,26 @@ bool PatchPreparePipelineAbi::runImpl(Module &module, PipelineShadersResult &pip
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   // If we've only to set the calling conventions, do that now.
-  if (m_onlySetCallingConvs) {
-    setCallingConvs(module);
-    setRemainingCallingConvs(module);
-  } else {
-    if (m_gfxIp.major >= 9)
-      mergeShaderAndSetCallingConvs(module);
+  if (m_gfxIp.major >= 9)
+    mergeShader(module);
 
-    setAbiEntryNames(module);
-    setRemainingCallingConvs(module);
+  setAbiEntryNames(module);
 
-    addAbiMetadata(module);
+  addAbiMetadata(module);
 
-    m_pipelineState->getPalMetadata()->finalizePipeline(m_pipelineState->isWholePipeline());
-  }
+  m_pipelineState->getPalMetadata()->finalizePipeline(m_pipelineState->isWholePipeline());
 
   return true; // Modified the module.
-}
-
-// =====================================================================================================================
-// Set calling convention for the entry-point of each shader (pre-GFX9)
-//
-// @param module : LLVM module
-void PatchPreparePipelineAbi::setCallingConvs(Module &module) {
-  const bool hasTs = (m_hasTcs || m_hasTes);
-
-  // NOTE: For each entry-point, set the calling convention appropriate to the hardware shader stage. The action here
-  // depends on the pipeline type.
-  setCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
-  setCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
-  setCallingConv(ShaderStageTask, CallingConv::AMDGPU_CS);
-  setCallingConv(ShaderStageMesh, CallingConv::AMDGPU_GS);
-
-  if (hasTs && m_hasGs) {
-    // TS-GS pipeline
-    setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_LS);
-    setCallingConv(ShaderStageTessControl, CallingConv::AMDGPU_HS);
-    setCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_ES);
-    setCallingConv(ShaderStageGeometry, CallingConv::AMDGPU_GS);
-    setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
-  } else if (hasTs) {
-    // TS-only pipeline
-    setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_LS);
-    setCallingConv(ShaderStageTessControl, CallingConv::AMDGPU_HS);
-    setCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
-  } else if (m_hasGs) {
-    // GS-only pipeline
-    setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_ES);
-    setCallingConv(ShaderStageGeometry, CallingConv::AMDGPU_GS);
-    setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
-  } else if (m_hasVs) {
-    // VS-FS pipeline
-    setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
-  }
-}
-
-// =====================================================================================================================
-// Set calling convention for the non-entry-points that do not yet have a calling convention set.
-//
-// @param module : LLVM module
-void PatchPreparePipelineAbi::setRemainingCallingConvs(Module &module) {
-  for (Function &func : module) {
-    if (func.isDeclaration() || func.getIntrinsicID() != Intrinsic::not_intrinsic ||
-        func.getName().startswith(lgcName::InternalCallPrefix) ||
-        func.getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
-      continue;
-    func.setCallingConv(CallingConv::AMDGPU_Gfx);
-  }
 }
 
 // =====================================================================================================================
 // Merge shaders and set calling convention for the entry-point of each shader (GFX9+)
 //
 // @param module : LLVM module
-void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
+void PatchPreparePipelineAbi::mergeShader(Module &module) {
   assert(m_gfxIp.major >= 9);
 
   const bool hasTs = (m_hasTcs || m_hasTes);
-
-  // NOTE: For each entry-point, set the calling convention appropriate to the hardware shader stage. The action here
-  // depends on the pipeline type, and, for GFX9+, may involve merging shaders.
-  setCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
-  setCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
-  setCallingConv(ShaderStageTask, CallingConv::AMDGPU_CS);
-  setCallingConv(ShaderStageMesh, CallingConv::AMDGPU_GS);
 
   if (m_pipelineState->isGraphics()) {
     if (m_hasTask || m_hasMesh) {
@@ -233,8 +167,6 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
           esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(esGsEntryPoint, ShaderStageGeometry);
         }
-
-        setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
       }
 
       // This must be done after generating the EsGs entry point because it must appear first in the module.
@@ -275,8 +207,6 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(primShaderEntryPoint, ShaderStageTessEval);
         }
-      } else {
-        setCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
       }
     } else if (m_hasGs) {
       // GS-only pipeline
@@ -302,8 +232,6 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
           esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(esGsEntryPoint, ShaderStageGeometry);
         }
-
-        setCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
       }
     } else if (m_hasVs) {
       // VS_FS pipeline
@@ -317,21 +245,9 @@ void PatchPreparePipelineAbi::mergeShaderAndSetCallingConvs(Module &module) {
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(primShaderEntryPoint, ShaderStageVertex);
         }
-      } else
-        setCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
+      }
     }
   }
-}
-
-// =====================================================================================================================
-// Set calling convention on a particular API shader stage, if that stage has a shader
-//
-// @param shaderStage : Shader stage
-// @param callingConv : Calling convention to set it to
-void PatchPreparePipelineAbi::setCallingConv(ShaderStage shaderStage, CallingConv::ID callingConv) {
-  auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
-  if (entryPoint)
-    entryPoint->setCallingConv(callingConv);
 }
 
 // =====================================================================================================================

@@ -172,6 +172,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   // Create function for the copy shader entrypoint, and insert it before the FS (if there is one).
   auto entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::CopyShaderEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  entryPoint->setCallingConv(CallingConv::AMDGPU_VS);
 
   auto insertPos = module.getFunctionList().end();
   auto fsEntryPoint = pipelineShaders.getEntryPoint(ShaderStageFragment);
