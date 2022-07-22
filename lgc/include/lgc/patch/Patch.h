@@ -106,7 +106,7 @@ llvm::FunctionPass *createLegacyPatchLoadScalarizer();
 llvm::LoopPass *createLegacyPatchLoopMetadata();
 llvm::ModulePass *createLegacyPatchNullFragShader();
 llvm::FunctionPass *createLegacyPatchPeepholeOpt();
-llvm::ModulePass *createLegacyPatchPreparePipelineAbi(bool onlySetCallingConvs);
+llvm::ModulePass *createLegacyPatchPreparePipelineAbi();
 llvm::ModulePass *createLegacyPatchResourceCollect();
 llvm::ModulePass *createLegacyPatchSetupTargetFeatures();
 llvm::ModulePass *createLegacyPatchWorkarounds();

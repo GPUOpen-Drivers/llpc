@@ -669,6 +669,41 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   Function *entryPoint =
       addFunctionArgs(origEntryPoint, origEntryPoint->getFunctionType()->getReturnType(), argTys, argNames, inRegMask);
 
+  // We always deal with pre-merge functions here, so set the fitting pre-merge calling conventions.
+  switch (m_shaderStage) {
+  case ShaderStageTask:
+    entryPoint->setCallingConv(CallingConv::AMDGPU_CS);
+    break;
+  case ShaderStageMesh:
+    entryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+    break;
+  case ShaderStageVertex:
+    if (m_pipelineState->hasShaderStage(ShaderStageTessControl))
+      entryPoint->setCallingConv(CallingConv::AMDGPU_LS);
+    else if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
+      entryPoint->setCallingConv(CallingConv::AMDGPU_ES);
+    else
+      entryPoint->setCallingConv(CallingConv::AMDGPU_VS);
+    break;
+  case ShaderStageTessControl:
+    entryPoint->setCallingConv(CallingConv::AMDGPU_HS);
+    break;
+  case ShaderStageTessEval:
+    if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
+      entryPoint->setCallingConv(CallingConv::AMDGPU_ES);
+    else
+      entryPoint->setCallingConv(CallingConv::AMDGPU_VS);
+    break;
+  case ShaderStageGeometry:
+    entryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+    break;
+  case ShaderStageFragment:
+    entryPoint->setCallingConv(CallingConv::AMDGPU_PS);
+    break;
+  default:
+    llvm_unreachable("unexpected shader stage for graphics shader");
+  }
+
   // Set Attributes on new function.
   setFuncAttrs(entryPoint);
 
@@ -691,8 +726,14 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
   // Process each function definition.
   SmallVector<Function *, 4> origFuncs;
   for (Function &func : module) {
-    if (!func.isDeclaration())
+    if (func.isDeclaration()) {
+      if (!func.isIntrinsic() && !func.getName().startswith(lgcName::InternalCallPrefix)) {
+        // This is the declaration of a callable function that is defined in a different module.
+        func.setCallingConv(CallingConv::AMDGPU_Gfx);
+      }
+    } else {
       origFuncs.push_back(&func);
+    }
   }
 
   for (Function *origFunc : origFuncs) {
@@ -706,6 +747,8 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     // Create the new function and transfer code and attributes to it.
     Function *newFunc =
         addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
+    const bool isEntryPoint = isShaderEntryPoint(newFunc);
+    newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
 
     // Set Attributes on new function.
     setFuncAttrs(newFunc);
@@ -782,9 +825,6 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       // Create the call.
       CallInst *newCall = builder.CreateCall(calledTy, newCalledVal, args);
       newCall->setCallingConv(CallingConv::AMDGPU_Gfx);
-      // Prevent calling convention mismatch
-      if (calledFunc)
-        calledFunc->setCallingConv(CallingConv::AMDGPU_Gfx);
 
       // Mark sgpr arguments as inreg
       for (unsigned idx = 0; idx != shaderInputTys.size(); ++idx) {

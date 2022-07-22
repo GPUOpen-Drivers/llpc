@@ -41,7 +41,7 @@ namespace lgc {
 // Pass to prepare the pipeline ABI
 class PatchPreparePipelineAbi final : public Patch, public llvm::PassInfoMixin<PatchPreparePipelineAbi> {
 public:
-  PatchPreparePipelineAbi(bool onlySetCallingConvs = false);
+  PatchPreparePipelineAbi();
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
@@ -50,13 +50,7 @@ public:
   static llvm::StringRef name() { return "Patch LLVM for preparing pipeline ABI"; }
 
 private:
-  void setCallingConvs(llvm::Module &module);
-
-  void setRemainingCallingConvs(llvm::Module &module);
-
-  void mergeShaderAndSetCallingConvs(llvm::Module &module);
-
-  void setCallingConv(ShaderStage stage, llvm::CallingConv::ID callingConv);
+  void mergeShader(llvm::Module &module);
 
   void setAbiEntryNames(llvm::Module &module);
 
@@ -73,8 +67,6 @@ private:
   bool m_hasMesh; // Whether the pipeline has mesh shader
 
   GfxIpVersion m_gfxIp; // Graphics IP version info
-
-  const bool m_onlySetCallingConvs; // Whether to only set the calling conventions
 };
 
 // =====================================================================================================================
@@ -82,7 +74,7 @@ private:
 class LegacyPatchPreparePipelineAbi final : public llvm::ModulePass {
 public:
   static char ID; // NOLINT
-  LegacyPatchPreparePipelineAbi(bool onlySetCallingConvs = false);
+  LegacyPatchPreparePipelineAbi();
 
   bool runOnModule(llvm::Module &module) override;
 

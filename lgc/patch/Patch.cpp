@@ -155,8 +155,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
     LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
   }
 
-  passMgr.addPass(PatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
-
   addOptimizationPasses(passMgr, optLevel);
 
   if (patchTimer) {
@@ -165,7 +163,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   }
 
   // Second part of lowering to "AMDGCN-style"
-  passMgr.addPass(PatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
+  passMgr.addPass(PatchPreparePipelineAbi());
 
   const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
                          (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
@@ -311,9 +309,6 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
     passMgr.add(LgcContext::createStartStopTimer(optTimer, true));
   }
 
-  // Prepare pipeline ABI but only set the calling conventions to AMDGPU ones for now.
-  passMgr.add(createLegacyPatchPreparePipelineAbi(/* onlySetCallingConvs = */ true));
-
   // Add some optimization passes
   addOptimizationPasses(passMgr, optLevel);
 
@@ -329,7 +324,7 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   passMgr.add(createInstructionCombiningPass(2));
 
   // Fully prepare the pipeline ABI (must be after optimizations)
-  passMgr.add(createLegacyPatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
+  passMgr.add(createLegacyPatchPreparePipelineAbi());
 
   const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
                          (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
