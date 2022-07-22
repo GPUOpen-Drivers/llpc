@@ -27,9 +27,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 ; DeviceIndex
 !3 = !{i32 12345678}
 
@@ -92,9 +92,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 ; Compute mode, containing workgroup size
 !3 = !{i32 5, i32 6, i32 7}
 
@@ -127,9 +127,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 
 ; ----------------------------------------------------------------------
 ; Extract 5: WorkgroupId test, from three SGPRs set up by hardware
@@ -162,9 +162,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 
 ; ----------------------------------------------------------------------
 ; Extract 6: LocalInvocationId test, from three VGPRs set up by hardware
@@ -196,9 +196,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 ; Compute mode, containing workgroup size
 !3 = !{i32 5, i32 6, i32 7}
 
@@ -231,9 +231,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 
 ; ----------------------------------------------------------------------
 ; Extract 8: SubgroupLocalInvocationId, from v_mbcnt instruction(s)
@@ -265,9 +265,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 
 ; ----------------------------------------------------------------------
 ; Extract 9: NumSubgroups, constant calculated from WorkgroupSize and wave size
@@ -299,9 +299,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 ; Compute mode, containing workgroup size
 !3 = !{i32 5, i32 6, i32 7}
 
@@ -344,9 +344,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 ; Compute mode, containing workgroup size
 !3 = !{i32 5, i32 6, i32 7}
 
@@ -382,9 +382,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 ; Compute mode, containing workgroup size
 !3 = !{i32 5, i32 6, i32 7}
 
@@ -426,9 +426,9 @@ attributes #0 = { nounwind }
 ; ShaderStageCompute
 !0 = !{i32 7}
 ; type, offset, size, count
-!1 = !{!"DescriptorTableVaPtr", i32 2, i32 1, i32 1}
+!1 = !{!"DescriptorTableVaPtr", i32 0, i32 2, i32 1, i32 1}
 ; type, offset, size, set, binding, stride
-!2 = !{!"DescriptorBuffer", i32 0, i32 4, i32 0, i32 0, i32 4}
+!2 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
 ; Compute mode, containing workgroup size
 !3 = !{i32 5, i32 6, i32 7}
 

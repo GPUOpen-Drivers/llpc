@@ -604,14 +604,16 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
     assert(node.type < ResourceNodeType::Count);
     // Operand 0: type
     operands.push_back(getResourceTypeName(node.type));
-    // Operand 1: offsetInDwords
+    // Operand 1: matchType
+    operands.push_back(ConstantAsMetadata::get(builder.getInt32(static_cast<uint32_t>(node.matchType))));
+    // Operand 2: offsetInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.offsetInDwords)));
-    // Operand 2: sizeInDwords
+    // Operand 3: sizeInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.sizeInDwords)));
 
     switch (node.type) {
     case ResourceNodeType::DescriptorTableVaPtr: {
-      // Operand 3: Node count in sub-table.
+      // Operand 4: Node count in sub-table.
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.innerTable.size())));
       // Create the metadata node here.
       userDataMetaNode->addOperand(MDNode::get(getContext(), operands));
@@ -621,18 +623,18 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
     }
     case ResourceNodeType::IndirectUserDataVaPtr:
     case ResourceNodeType::StreamOutTableVaPtr: {
-      // Operand 3: Size of the indirect data in dwords.
+      // Operand 4: Size of the indirect data in dwords.
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.indirectSizeInDwords)));
       break;
     }
     default: {
-      // Operand 3: set
+      // Operand 4: set
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.set)));
-      // Operand 4: binding
+      // Operand 5: binding
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.binding)));
-      // Operand 5: stride
+      // Operand 6: stride
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.stride)));
-      // Operand 6 onwards: immutable descriptor constants
+      // Operand 7 onwards: immutable descriptor constants
       for (uint32_t element :
            ArrayRef<uint32_t>(node.immutableValue, node.immutableSize * DescriptorSizeSamplerInDwords))
         operands.push_back(ConstantAsMetadata::get(builder.getInt32(element)));
@@ -670,14 +672,17 @@ void PipelineState::readUserDataNodes(Module *module) {
     MDNode *metadataNode = userDataMetaNode->getOperand(nodeIndex);
     // Operand 0: node type
     nextNode->type = getResourceTypeFromName(cast<MDString>(metadataNode->getOperand(0)));
-    // Operand 1: offsetInDwords
-    nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue();
-    // Operand 2: sizeInDwords
-    nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
+    // Operand 1: matchType
+    nextNode->matchType =
+        static_cast<ResourceNodeType>(mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue());
+    // Operand 2: offsetInDwords
+    nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
+    // Operand 3: sizeInDwords
+    nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
 
     if (nextNode->type == ResourceNodeType::DescriptorTableVaPtr) {
-      // Operand 3: number of nodes in inner table
-      unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
+      // Operand 4: number of nodes in inner table
+      unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
       // Go into inner table.
       assert(!endThisInnerTable);
       endThisInnerTable = endNextInnerTable;
@@ -688,18 +693,18 @@ void PipelineState::readUserDataNodes(Module *module) {
     } else {
       if (nextNode->type == ResourceNodeType::IndirectUserDataVaPtr ||
           nextNode->type == ResourceNodeType::StreamOutTableVaPtr) {
-        // Operand 3: Size of the indirect data in dwords
-        nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
+        // Operand 4: Size of the indirect data in dwords
+        nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
       } else {
-        // Operand 3: set
-        nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
-        // Operand 4: binding
-        nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
-        // Operand 5: stride
-        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
+        // Operand 4: set
+        nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
+        // Operand 5: binding
+        nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
+        // Operand 6: stride
+        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(6))->getZExtValue();
         nextNode->immutableValue = nullptr;
-        // Operand 6 onward: immutable descriptor constants
-        constexpr unsigned ImmutableStartOperand = 6;
+        // Operand 7 onward: immutable descriptor constants
+        constexpr unsigned ImmutableStartOperand = 7;
         unsigned immutableSizeInDwords = metadataNode->getNumOperands() - ImmutableStartOperand;
         nextNode->immutableSize = immutableSizeInDwords / DescriptorSizeSamplerInDwords;
         if (nextNode->immutableSize) {

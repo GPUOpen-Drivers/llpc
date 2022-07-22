@@ -550,6 +550,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
 
     destNode.sizeInDwords = node.sizeInDwords;
     destNode.offsetInDwords = node.offsetInDwords;
+    destNode.matchType = ResourceNodeType::Unknown;
 
     switch (node.type) {
     case ResourceMappingNodeType::DescriptorTableVaPtr: {
@@ -623,7 +624,6 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       destNode.set = node.srdRange.set;
       destNode.binding = node.srdRange.binding;
       destNode.matchType = destNode.type;
-
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
       switch (node.type) {
