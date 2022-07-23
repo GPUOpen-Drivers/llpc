@@ -2166,7 +2166,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicFMinEXT>(SPIRVValue
     return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(spvValue), getBuilder()->GetInsertBlock());
   }
 
-  return transAtomicRMW(spvValue, AtomicRMWInst::Min);
+  return transAtomicRMW(spvValue, AtomicRMWInst::FMin);
 }
 
 // =====================================================================================================================
@@ -2179,7 +2179,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicFMaxEXT>(SPIRVValue
     return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(spvValue), getBuilder()->GetInsertBlock());
   }
 
-  return transAtomicRMW(spvValue, AtomicRMWInst::Max);
+  return transAtomicRMW(spvValue, AtomicRMWInst::FMax);
 }
 
 // =====================================================================================================================
