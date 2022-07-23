@@ -350,16 +350,10 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
         intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_xor;
         break;
       case AtomicRMWInst::Max:
-        if (storeType->isFloatTy() || storeType->isDoubleTy())
-          intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmax;
-        else
-          intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smax;
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smax;
         break;
       case AtomicRMWInst::Min:
-        if (storeType->isFloatTy() || storeType->isDoubleTy())
-          intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmin;
-        else
-          intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smin;
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smin;
         break;
       case AtomicRMWInst::UMax:
         intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umax;
@@ -369,6 +363,12 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
         break;
       case AtomicRMWInst::FAdd:
         intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fadd;
+        break;
+      case AtomicRMWInst::FMax:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmax;
+        break;
+      case AtomicRMWInst::FMin:
+        intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmin;
         break;
       default:
         llvm_unreachable("Should never be called!");
@@ -401,16 +401,15 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
   } else if (atomicRmwInst.getPointerAddressSpace() == ADDR_SPACE_GLOBAL) {
     AtomicRMWInst::BinOp op = atomicRmwInst.getOperation();
     Type *const storeType = atomicRmwInst.getValOperand()->getType();
-    if ((op == AtomicRMWInst::Min || op == AtomicRMWInst::Max || op == AtomicRMWInst::FAdd) &&
-        storeType->isFloatingPointTy()) {
+    if (op == AtomicRMWInst::FMin || op == AtomicRMWInst::FMax || op == AtomicRMWInst::FAdd) {
       Value *const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
       m_builder->SetInsertPoint(&atomicRmwInst);
       Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
       switch (atomicRmwInst.getOperation()) {
-      case AtomicRMWInst::Min:
+      case AtomicRMWInst::FMin:
         intrinsic = Intrinsic::amdgcn_global_atomic_fmin;
         break;
-      case AtomicRMWInst::Max:
+      case AtomicRMWInst::FMax:
         intrinsic = Intrinsic::amdgcn_global_atomic_fmax;
         break;
       case AtomicRMWInst::FAdd:
@@ -431,16 +430,15 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
   } else if (atomicRmwInst.getPointerAddressSpace() == ADDR_SPACE_LOCAL) {
     AtomicRMWInst::BinOp op = atomicRmwInst.getOperation();
     Type *const storeType = atomicRmwInst.getValOperand()->getType();
-    if ((op == AtomicRMWInst::Min || op == AtomicRMWInst::Max || op == AtomicRMWInst::FAdd) &&
-        storeType->isFloatingPointTy()) {
+    if (op == AtomicRMWInst::FMin || op == AtomicRMWInst::FMax || op == AtomicRMWInst::FAdd) {
       Value *const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
       m_builder->SetInsertPoint(&atomicRmwInst);
       Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
       switch (atomicRmwInst.getOperation()) {
-      case AtomicRMWInst::Min:
+      case AtomicRMWInst::FMin:
         intrinsic = Intrinsic::amdgcn_ds_fmin;
         break;
-      case AtomicRMWInst::Max:
+      case AtomicRMWInst::FMax:
         intrinsic = Intrinsic::amdgcn_ds_fmax;
         break;
       case AtomicRMWInst::FAdd:
