@@ -1558,7 +1558,6 @@ void PatchResourceCollect::matchGenericInOut() {
   // Update location count of input/output
   LLPC_OUTS("===============================================================================\n");
   LLPC_OUTS("// LLPC location input/output mapping results (" << getShaderStageAbbreviation(m_shaderStage)
-
                                                               << " shader)\n\n");
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &inLocInfoMap = inOutUsage.inputLocInfoMap;
