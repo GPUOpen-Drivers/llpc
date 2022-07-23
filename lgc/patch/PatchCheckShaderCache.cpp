@@ -157,12 +157,14 @@ bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState
   if (stagesLeftToCompile == stageMask)
     return false;
 
-  // "Remove" a shader stage by making its entry-point function internal and not DLLExport, so it gets removed later.
+  // "Remove" a shader stage by making its entry-point function an external but not DLLExport declaration, so further
+  // passes no longer treat it as an entry point (based on the DLL storage class) and don't attempt to compile any code
+  // for it (because it contains no code).
   for (auto &func : module) {
     if (isShaderEntryPoint(&func)) {
       auto stage = getShaderStage(&func);
       if (stage != ShaderStageInvalid && (shaderStageToMask(stage) & ~stagesLeftToCompile) != 0) {
-        func.setLinkage(GlobalValue::InternalLinkage);
+        func.deleteBody();
         func.setDLLStorageClass(GlobalValue::DefaultStorageClass);
       }
     }
