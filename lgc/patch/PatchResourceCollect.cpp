@@ -119,6 +119,8 @@ bool PatchResourceCollect::runImpl(Module &module, PipelineShadersResult &pipeli
   // from the separate compile of the FS.
   m_processMissingFs = pipelineState->isPartPipeline();
 
+  m_tcsInputHasDynamicIndexing = false;
+
   bool needPack = false;
   for (int shaderStage = 0; shaderStage < ShaderStageGfxCount; ++shaderStage) {
     ShaderStage stage = static_cast<ShaderStage>(shaderStage);
@@ -1451,13 +1453,19 @@ void PatchResourceCollect::matchGenericInOut() {
   assert(m_pipelineState->isGraphics());
 
   // Do input matching and location remapping
-  if (m_pipelineState->canPackInput(m_shaderStage))
+  bool packInput = m_pipelineState->canPackInput(m_shaderStage);
+  if (m_shaderStage == ShaderStageTessControl && m_tcsInputHasDynamicIndexing)
+    packInput = false;
+  if (packInput)
     updateInputLocInfoMapWithPack();
   else
     updateInputLocInfoMapWithUnpack();
 
   // Do output matching and location remapping
-  if (m_pipelineState->canPackOutput(m_shaderStage)) {
+  bool packOutput = m_pipelineState->canPackOutput(m_shaderStage);
+  if (m_shaderStage == ShaderStageVertex && m_tcsInputHasDynamicIndexing)
+    packOutput = false;
+  if (packOutput) {
     // Re-create output export calls to pack exp instruction for the last vertex processing stage
     if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() && m_shaderStage != ShaderStageGeometry)
       reassembleOutputExportCalls();
@@ -2555,23 +2563,8 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   // The locations of TCS with dynamic indexing (locOffset/elemIdx) cannot be unpacked
   // NOTE: Dynamic indexing in FS is processed to be constant in the lower pass.
   std::vector<CallInst *> packableCalls;
-  DenseSet<unsigned> unpackableLocs;
-  if (isTcs) {
-    for (auto call : m_inputCalls) {
-      const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-      if (!isa<ConstantInt>(call->getOperand(1)) || !isa<ConstantInt>(call->getOperand(2)))
-        unpackableLocs.insert(loc);
-    }
-    for (auto call : m_inputCalls) {
-      const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-      if (unpackableLocs.count(loc) == 0)
-        packableCalls.push_back(call);
-    }
-    m_inputCalls.clear();
-  } else {
-    packableCalls = std::move(m_inputCalls);
-    inputLocInfoMap.clear();
-  }
+  packableCalls = std::move(m_inputCalls);
+  inputLocInfoMap.clear();
 
   // LDS load/store copes with dword. For 8-bit/16-bit data type, we will extend them to 32-bit
   bool partPipelineHasGs = m_pipelineState->isPartPipeline() && m_pipelineState->getPreRasterHasGs();
@@ -2629,8 +2622,6 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
     assert(nextStage != ShaderStageInvalid);
     // In reassembleOutputExportCalls, the unused calls in next stage have been added into dead call set.
     bool isMarkedDeadCall = (m_shaderStage == m_pipelineState->getLastVertexProcessingStage());
-    bool checkDynIndex =
-        (m_shaderStage == ShaderStageVertex && m_pipelineState->hasShaderStage(ShaderStageTessControl));
     auto &nextStageInputLocInfoMap = m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.inputLocInfoMap;
     for (auto call : m_outputCalls) {
       InOutLocationInfo origLocInfo;
@@ -2638,12 +2629,6 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
       origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
 
       auto locInfoMapIt = nextStageInputLocInfoMap.find(origLocInfo);
-      if (locInfoMapIt == nextStageInputLocInfoMap.end() && checkDynIndex) {
-        // Output is always scalarized. If it is VS and the next stage is TCS, try if the location corresponds a
-        // dynamic indexing in TCS.
-        origLocInfo.setComponent(0);
-        locInfoMapIt = nextStageInputLocInfoMap.find(origLocInfo);
-      }
       if (locInfoMapIt != nextStageInputLocInfoMap.end())
         outputLocInfoMap[origLocInfo] = locInfoMapIt->second;
       else if (!isMarkedDeadCall)
@@ -2829,7 +2814,6 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
   // First gather the input/output calls that need scalarizing.
   SmallVector<CallInst *, 4> outputCalls;
   SmallVector<CallInst *, 4> inputCalls;
-  DenseSet<unsigned> dynamicLocs;
   for (Function &func : *module) {
     const bool isInterpolant = func.getName().startswith(lgcName::InputImportInterpolant);
     if (func.getName().startswith(lgcName::InputImportGeneric) || isInterpolant) {
@@ -2846,8 +2830,10 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
           const bool hasDynIndex = shaderStage == ShaderStageTessControl ? (!isa<ConstantInt>(call->getOperand(1)) ||
                                                                             !isa<ConstantInt>(call->getOperand(2)))
                                                                          : false;
-          if (hasDynIndex)
-            dynamicLocs.insert(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
+          if (hasDynIndex) {
+            // Conservatively disable all packing of the VS-TCS interface if dynamic indexing is detected.
+            m_tcsInputHasDynamicIndexing = true;
+          }
           if (!hasDynIndex &&
               (isa<FixedVectorType>(call->getType()) || call->getType()->getPrimitiveSizeInBits() == 64))
             inputCalls.push_back(call);
@@ -2869,15 +2855,23 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
   }
   // Scalarize the gathered inputs and outputs.
   for (CallInst *call : inputCalls) {
-    const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-    ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
-    // Don't scalarize the location of the call that has dynamic indexing in TCS
-    if (shaderStage == ShaderStageTessControl && dynamicLocs.count(loc) > 0)
-      continue;
+    // Don't scalarize TCS inputs if dynamic indexing is used.
+    if (m_tcsInputHasDynamicIndexing) {
+      ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
+      if (shaderStage == ShaderStageTessControl)
+        continue;
+    }
     scalarizeGenericInput(call);
   }
-  for (CallInst *call : outputCalls)
+  for (CallInst *call : outputCalls) {
+    // Don't scalarize VS outputs if dynamic indexing is used in TCS inputs.
+    if (m_tcsInputHasDynamicIndexing) {
+      ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
+      if (shaderStage == ShaderStageVertex)
+        continue;
+    }
     scalarizeGenericOutput(call);
+  }
 }
 
 // =====================================================================================================================
