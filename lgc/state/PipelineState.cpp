@@ -1426,7 +1426,7 @@ const char *PipelineState::getResourceNodeTypeName(ResourceNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved12)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved13)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, InlineBuffer)
-    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved15)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorConstBuffer)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved16)
     break;
   default:

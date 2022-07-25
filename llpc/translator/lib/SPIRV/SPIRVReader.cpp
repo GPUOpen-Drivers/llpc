@@ -2527,6 +2527,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   // generating the code to get the descriptor pointer(s).
   SPIRVWord binding = 0;
   unsigned descriptorSet = 0;
+  unsigned flag = 0;
   spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
 
   spvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
@@ -2548,11 +2549,11 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
     auto desc = &static_cast<SPIRVTypeImage *>(spvImageTy)->getDescriptor();
     auto resType =
         desc->Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer : ResourceNodeType::DescriptorResource;
-    imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding);
+    imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding, flag);
 
     if (desc->MS) {
       // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
-      Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding);
+      Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding, flag);
       imageDescPtr = getBuilder()->CreateInsertValue(
           UndefValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})),
           imageDescPtr, 0);
@@ -2562,7 +2563,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
 
   if (spvTy->getOpCode() != OpTypeImage) {
     // Sampler or sampledimage -- need to get the sampler {pointer,stride,convertingSamplerIdx}
-    samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding);
+    samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding, flag);
 
     if (spvTy->getOpCode() == OpTypeSampler)
       return samplerDescPtr;
@@ -2587,10 +2588,12 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
 // @param resType : ResourceNodeType value
 // @param descriptorSet : Descriptor set
 // @param binding : Binding
-Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned descriptorSet, unsigned binding) {
+// @param flags : Flags
+Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned descriptorSet, unsigned binding,
+                                            unsigned flags) {
   if (resType != ResourceNodeType::DescriptorSampler) {
     // Image/f-mask/texel buffer, where a pointer is represented by a struct {pointer,stride}.
-    Value *descPtr = getBuilder()->CreateGetDescPtr(resType, descriptorSet, binding);
+    Value *descPtr = getBuilder()->CreateGetDescPtr(resType, descriptorSet, binding, flags);
     Value *descStride = getBuilder()->CreateGetDescStride(resType, descriptorSet, binding);
     descPtr = getBuilder()->CreateInsertValue(
         UndefValue::get(StructType::get(*m_context, {descPtr->getType(), descStride->getType()})), descPtr, 0);
@@ -2617,7 +2620,7 @@ Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned d
   if (convertingSamplerIdx == 0) {
     // Not a converting sampler. Get a normal sampler pointer and stride and put it in the struct.
     samplerDescPtr = getBuilder()->CreateInsertValue(
-        samplerDescPtr, getBuilder()->CreateGetDescPtr(resType, descriptorSet, binding), 0);
+        samplerDescPtr, getBuilder()->CreateGetDescPtr(resType, descriptorSet, binding, flags), 0);
     samplerDescPtr = getBuilder()->CreateInsertValue(
         samplerDescPtr, getBuilder()->CreateGetDescStride(resType, descriptorSet, binding), 1);
   } else {

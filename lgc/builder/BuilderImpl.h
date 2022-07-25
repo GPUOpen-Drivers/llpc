@@ -294,7 +294,7 @@ public:
                                    const llvm::Twine &instName) override final;
 
   // Create a pointer to a descriptor.
-  llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+  llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding, unsigned flags,
                                 const llvm::Twine &instName) override final;
 
   // Create a load of the push constants pointer.

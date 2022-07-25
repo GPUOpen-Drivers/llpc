@@ -1089,11 +1089,13 @@ Value *BuilderRecorder::CreateGetDescStride(ResourceNodeType descType, unsigned 
 //                   DescriptorTexelBuffer, DescriptorFmask.
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
+// @param flags :   Descriptor flag settings
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+Value *BuilderRecorder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding, unsigned flags,
                                          const Twine &instName) {
   return record(Opcode::GetDescPtr, getDescPtrTy(descType),
-                {getInt32(static_cast<unsigned>(descType)), getInt32(descSet), getInt32(binding)}, instName);
+                {getInt32(static_cast<unsigned>(descType)), getInt32(descSet), getInt32(binding), getInt32(flags)},
+                instName);
 }
 
 // =====================================================================================================================

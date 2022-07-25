@@ -54,12 +54,12 @@ using namespace llvm;
 Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
                                          Type *const pointeeTy, const Twine &instName) {
   Value *desc = nullptr;
-  descIndex = scalarizeIfUniform(descIndex, flags & BufferFlagNonUniform);
+  descIndex = scalarizeIfUniform(descIndex, flags & FlagBufferNonUniform);
 
   // Mark the shader as reading and writing (if applicable) a resource.
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
   resUsage->resourceRead = true;
-  if (flags & BufferFlagWritten)
+  if (flags & FlagBufferWritten)
     resUsage->resourceWrite = true;
 
   // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
@@ -68,7 +68,17 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     // We have the user data layout. Find the node.
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorBuffer, descSet, binding);
+    ResourceNodeType searchNodeType = ResourceNodeType::DescriptorBuffer;
+    if (flags & FlagConstBuffer)
+      searchNodeType = ResourceNodeType::DescriptorConstBuffer;
+    else if (flags & FlagNonConstBuffer)
+      searchNodeType = ResourceNodeType::DescriptorBuffer;
+    else if (flags & FlagShaderResource)
+      searchNodeType = ResourceNodeType::DescriptorResource;
+    else if (flags & FlagSampler)
+      searchNodeType = ResourceNodeType::DescriptorSampler;
+
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(searchNodeType, descSet, binding);
     if (!node) {
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getBufferDescTy(pointeeTy));
@@ -163,15 +173,25 @@ Value *DescBuilder::CreateGetDescStride(ResourceNodeType descType, unsigned desc
 //                   DescriptorTexelBuffer, DescriptorFmask.
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
+// @param flags :   Descriptor Flag bit settings
 // @param instName : Name to give instruction(s)
-Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding, unsigned flags,
                                      const Twine &instName) {
   // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
   // look; we will use relocs instead.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(descType, descSet, binding);
+    ResourceNodeType searchNodeType = descType;
+    if (flags & FlagConstBuffer)
+      searchNodeType = ResourceNodeType::DescriptorConstBuffer;
+    else if (flags & FlagNonConstBuffer)
+      searchNodeType = ResourceNodeType::DescriptorBuffer;
+    else if (flags & FlagShaderResource)
+      searchNodeType = ResourceNodeType::DescriptorResource;
+    else if (flags & FlagSampler)
+      searchNodeType = ResourceNodeType::DescriptorSampler;
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(searchNodeType, descSet, binding);
     if (!node) {
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getDescPtrTy(descType));

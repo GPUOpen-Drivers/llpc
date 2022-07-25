@@ -690,10 +690,14 @@ public:
 
   // Bit settings for flags argument in CreateLoadBufferDesc.
   enum {
-    BufferFlagNonUniform = 1, // Descriptor index is non-uniform
-    BufferFlagWritten = 2,    // Buffer is (or might be) written to
-    BufferFlagReserved4 = 4,  // Reserved for future functionality
-    BufferFlagReserved8 = 8,  // Reserved for future functionality
+    FlagBufferNonUniform = 1, // Descriptor index is non-uniform
+    FlagBufferWritten = 2,    // Buffer is (or might be) written to
+    FlagConstBuffer = 4,      // Const buffer: Find a DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
+                              // descriptor entry, rather than DescriptorBuffer/DescriptorBufferCompact
+    FlagNonConstBuffer = 8,   // Non-const buffer: Find a DescriptorBuffer/DescriptorBufferCompact descriptor
+                              //  entry, rather than DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
+    FlagShaderResource = 16,  // Flag to find a Descriptor Resource
+    FlagSampler = 32          // Flag to find Descriptor Sampler
   };
 
   // Get the type of pointer returned by CreateLoadBufferDesc.
@@ -740,8 +744,9 @@ public:
   //                   DescriptorTexelBuffer, DescriptorFmask.
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
+  // @param flags :   Descriptor Flag bit settings
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding, unsigned flags,
                                         const llvm::Twine &instName = "") = 0;
 
   // Create a load of the push constants pointer.
