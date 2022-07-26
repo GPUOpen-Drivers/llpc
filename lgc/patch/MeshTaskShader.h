@@ -89,8 +89,6 @@ private:
   bool m_accessTaskPayload = false;                 // Whether task shader has payload access operations
   llvm::Value *m_shaderRingEntryIndex = nullptr;    // Shader ring entry index of current workgroup
   llvm::Value *m_payloadRingEntryOffset = nullptr;  // Entry offset (in bytes) of the payload ring
-  llvm::Value *m_drawDataRingEntryOffset = nullptr; // Entry offset (in bytes) of the draw data ring
-  llvm::Value *m_drawDataReadyBit = nullptr;        // Flag indicating whether the draw data is ready for CP to fetch
 };
 
 } // namespace lgc

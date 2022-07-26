@@ -69,6 +69,7 @@ const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invoca
 const static char SwizzleLocalInvocationId[] = "lgc.swizzle.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
+const static char MeshTaskCallPrefix[] = "lgc.mesh.task.";
 const static char MeshTaskReadTaskPayload[] = "lgc.mesh.task.read.task.payload";
 const static char MeshTaskWriteTaskPayload[] = "lgc.mesh.task.write.task.payload";
 const static char MeshTaskEmitMeshTasks[] = "lgc.mesh.task.emit.mesh.tasks";
