@@ -946,7 +946,7 @@ Value *InOutBuilder::readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy
 }
 
 // =====================================================================================================================
-// Read compute shader input
+// Read compute/task shader input
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param instName : Name to give instruction(s)
@@ -961,7 +961,12 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
                                 getInt32(shaderMode.workgroupSizeZ)});
 
   case BuiltInNumWorkgroups: {
-    // NumWorkgroups is a v3i32 loaded from an address pointed to by a special user data item.
+    if (m_shaderStage == ShaderStageTask) {
+      // For task shader, NumWorkgroups is a v3i32 special user data (three SGPRs).
+      return ShaderInputs::getSpecialUserData(UserDataMapping::MeshTaskDispatchDims, BuilderBase::get(*this));
+    }
+
+    // For compute shader, NumWorkgroups is a v3i32 loaded from an address pointed to by a special user data item.
     Value *numWorkgroupPtr = ShaderInputs::getSpecialUserData(UserDataMapping::Workgroup, BuilderBase::get(*this));
     LoadInst *load = CreateLoad(FixedVectorType::get(getInt32Ty(), 3), numWorkgroupPtr);
     load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
@@ -1051,6 +1056,10 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     Value *localInvocationIndex = readCsBuiltIn(BuiltInLocalInvocationIndex);
     unsigned subgroupSize = getPipelineState()->getShaderWaveSize(m_shaderStage);
     return CreateLShr(localInvocationIndex, getInt32(Log2_32(subgroupSize)));
+  }
+
+  case BuiltInDrawIndex: {
+    return ShaderInputs::getSpecialUserData(UserDataMapping::DrawIndex, BuilderBase::get(*this));
   }
 
   default:

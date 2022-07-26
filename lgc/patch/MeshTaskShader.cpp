@@ -101,11 +101,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
     if (!func.isDeclaration())
       continue; // Not targets
 
-    const bool isReadTaskPayload = func.getName().startswith(lgcName::MeshTaskReadTaskPayload);
-    const bool isWriteTaskPayload = func.getName().startswith(lgcName::MeshTaskWriteTaskPayload);
-    const bool isEmitMeshTasks = func.getName().startswith(lgcName::MeshTaskEmitMeshTasks);
-
-    if (isReadTaskPayload || isWriteTaskPayload || isEmitMeshTasks) {
+    if (func.getName().startswith(lgcName::MeshTaskCallPrefix)) {
       for (auto user : func.users()) {
         CallInst *const call = cast<CallInst>(user);
 
@@ -114,7 +110,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
 
         m_builder->SetInsertPoint(call);
 
-        if (isReadTaskPayload) {
+        if (func.getName().startswith(lgcName::MeshTaskReadTaskPayload)) {
           // Read task payload
           assert(call->arg_size() == 1);
           auto byteOffset = call->getOperand(0);
@@ -122,7 +118,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
           auto readValue = readTaskPayload(entryPoint, call->getType(), byteOffset);
           call->replaceAllUsesWith(readValue);
           m_accessTaskPayload = true;
-        } else if (isWriteTaskPayload) {
+        } else if (func.getName().startswith(lgcName::MeshTaskWriteTaskPayload)) {
           // Write task payload
           assert(call->arg_size() == 2);
           auto byteOffset = call->getOperand(0);
@@ -130,15 +126,16 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
 
           writeTaskPayload(entryPoint, writeValue, byteOffset);
           m_accessTaskPayload = true;
-        } else {
+        } else if (func.getName().startswith(lgcName::MeshTaskEmitMeshTasks)) {
           // Emit mesh tasks
-          assert(isEmitMeshTasks);
           assert(call->arg_size() == 3);
           auto groupCountX = call->getOperand(0);
           auto groupCountY = call->getOperand(1);
           auto groupCountZ = call->getOperand(2);
 
           emitTaskMeshs(entryPoint, groupCountX, groupCountY, groupCountZ);
+        } else {
+          llvm_unreachable("Unknown task shader call!");
         }
 
         removedCalls.push_back(call);
@@ -171,14 +168,56 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 // @param readTy : Type of value to read
 // @param byteOffset : Byte offset within the payload entry
 Value *MeshTaskShader::readTaskPayload(Function *entryPoint, Type *readTy, Value *byteOffset) {
-  assert(getShaderStage(entryPoint) == ShaderStageTask);
-
   auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
   auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
 
   CoherentFlag coherent = {};
   coherent.bits.glc = true;
   coherent.bits.dlc = true;
+
+  const unsigned bitWidth = readTy->getScalarSizeInBits();
+  const unsigned numElements = readTy->isVectorTy() ? cast<FixedVectorType>(readTy)->getNumElements() : 1;
+  assert(numElements >= 1 && numElements <= 4);
+
+  // NOTE: There are some special types that LLVM backend couldn't support. We have to lower them here.
+  if (bitWidth == 64) {
+    // 64 -> vec2
+    // 64vec2 -> vec4
+    // 64vec3 -> vec4 + vec2
+    // 64vec4 -> vec4 + vec4
+    Type *readTy1 = FixedVectorType::get(m_builder->getInt32Ty(), std::min(2 * numElements, 4u));
+    Value *readValue1 = readTaskPayload(entryPoint, readTy1, byteOffset);
+
+    Value *readValue = nullptr;
+    if (numElements > 2) {
+      Type *readTy2 = FixedVectorType::get(m_builder->getInt32Ty(), 2 * numElements - 4);
+      byteOffset = m_builder->CreateAdd(byteOffset, m_builder->getInt32(4 * sizeof(unsigned)));
+      Value *readValue2 = readTaskPayload(entryPoint, readTy2, byteOffset);
+
+      if (numElements == 3) {
+        readValue2 = m_builder->CreateShuffleVector(readValue2, PoisonValue::get(readValue2->getType()),
+                                                    ArrayRef<int>{0, 1, 2, 3});
+      }
+      readValue = m_builder->CreateShuffleVector(readValue1, readValue2,
+                                                 ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7}.slice(0, numElements * 2));
+    } else {
+      readValue = readValue1;
+    }
+
+    return m_builder->CreateBitCast(readValue, readTy);
+  } else if (bitWidth == 8 || bitWidth == 16) {
+    if (numElements > 1) {
+      // Scalarize
+      Value *readValue = UndefValue::get(readTy);
+      for (unsigned i = 0; i < numElements; ++i) {
+        auto elemByteOffset =
+            i > 0 ? m_builder->CreateAdd(byteOffset, m_builder->getInt32(i * bitWidth / 8)) : byteOffset;
+        auto elem = readTaskPayload(entryPoint, readTy->getScalarType(), elemByteOffset);
+        readValue = m_builder->CreateInsertElement(readValue, elem, i);
+      }
+      return readValue;
+    }
+  }
 
   return m_builder->CreateIntrinsic(
       Intrinsic::amdgcn_raw_buffer_load, readTy,
@@ -200,6 +239,49 @@ void MeshTaskShader::writeTaskPayload(Function *entryPoint, Value *writeValue, V
   CoherentFlag coherent = {};
   coherent.bits.glc = true;
 
+  const auto writeTy = writeValue->getType();
+  const unsigned bitWidth = writeTy->getScalarSizeInBits();
+  const unsigned numElements = writeTy->isVectorTy() ? cast<FixedVectorType>(writeTy)->getNumElements() : 1;
+  assert(numElements >= 1 && numElements <= 4);
+
+  // NOTE: There are some special types that LLVM backend couldn't support. We have to lower them here.
+  if (bitWidth == 64) {
+    // Cast to <n x i32>
+    auto castTy = FixedVectorType::get(m_builder->getInt32Ty(), 2 * numElements);
+    writeValue = m_builder->CreateBitCast(writeValue, castTy);
+
+    // 64scalar -> vec2
+    // 64vec2 -> vec4
+    // 64vec3 -> vec4 + vec2
+    // 64vec4 -> vec4 + vec4
+    auto writeValue1 = writeValue;
+    if (numElements > 2) {
+      writeValue1 = m_builder->CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
+                                                   ArrayRef<int>({0, 1, 2, 3}));
+    }
+    writeTaskPayload(entryPoint, writeValue1, byteOffset);
+
+    if (numElements > 2) {
+      auto writeValue2 = m_builder->CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
+                                                        ArrayRef<int>({4, 5, 6, 7}).slice(0, 2 * numElements - 4));
+      byteOffset = m_builder->CreateAdd(byteOffset, m_builder->getInt32(4 * sizeof(unsigned)));
+      writeTaskPayload(entryPoint, writeValue2, byteOffset);
+    }
+
+    return;
+  } else if (bitWidth == 8 || bitWidth == 16) {
+    if (numElements > 1) {
+      // Scalarize
+      for (unsigned i = 0; i < numElements; ++i) {
+        auto elem = m_builder->CreateExtractElement(writeValue, i);
+        auto elemByteOffset =
+            i > 0 ? m_builder->CreateAdd(byteOffset, m_builder->getInt32(i * bitWidth / 8)) : byteOffset;
+        writeTaskPayload(entryPoint, elem, elemByteOffset);
+      }
+      return;
+    }
+  }
+
   m_builder->CreateIntrinsic(
       Intrinsic::amdgcn_raw_buffer_store, writeValue->getType(),
       {writeValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder->getInt32(coherent.u32All)});
@@ -210,13 +292,16 @@ void MeshTaskShader::writeTaskPayload(Function *entryPoint, Value *writeValue, V
 //
 // @param entryPoint : Shader entry-point
 void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
+  m_waveThreadInfo = {}; // Reset it
+
   if (getShaderStage(entryPoint) == ShaderStageTask) {
     // Task shader
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
 
     // waveId = dispatchInfo[24:20]
-    m_waveThreadInfo.waveIdInSubgroup = m_builder->CreateAnd(
-        m_builder->CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20), 0x1F);
+    m_waveThreadInfo.waveIdInSubgroup =
+        m_builder->CreateAnd(m_builder->CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20),
+                             0x1F, "waveIdInSubgroup");
 
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTask);
 
@@ -226,10 +311,11 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
       m_waveThreadInfo.threadIdInWave = m_builder->CreateIntrinsic(
           Intrinsic::amdgcn_mbcnt_hi, {}, {m_builder->getInt32(-1), m_waveThreadInfo.threadIdInWave});
     }
+    m_waveThreadInfo.threadIdInWave->setName("threadIdInWave");
 
     m_waveThreadInfo.threadIdInSubgroup =
         m_builder->CreateAdd(m_builder->CreateMul(m_waveThreadInfo.waveIdInSubgroup, m_builder->getInt32(waveSize)),
-                             m_waveThreadInfo.threadIdInWave);
+                             m_waveThreadInfo.threadIdInWave, "threadIdInSubgroup");
   } else {
     // Mesh shader
     assert(getShaderStage(entryPoint) == ShaderStageMesh);
@@ -245,34 +331,35 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
 // @param entryPoint : Shader entry-point
 // @returns : The shader ring entry index of current workgroup
 Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
-  assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
-
   if (!m_shaderRingEntryIndex) {
-    // NOTE: The calculation of shader ring entry index should be done at the beginning of the entry block. And the
-    // value could be reused in subsequent operations.
-    auto savedInsertPoint = m_builder->saveIP();
-    m_builder->SetInsertPoint(&*entryPoint->getEntryBlock().getFirstInsertionPt());
+    if (getShaderStage(entryPoint) == ShaderStageTask) {
+      // NOTE: The calculation of shader ring entry index should be done at the beginning of the entry block. And the
+      // value could be reused in subsequent operations.
+      IRBuilder<>::InsertPointGuard guard(*m_builder);
+      m_builder->SetInsertPoint(&*entryPoint->getEntryBlock().getFirstInsertionPt());
 
-    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
 
-    auto workgroupId = getFunctionArgument(entryPoint, entryArgIdxs.workgroupId);
-    auto dispatchDims = getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
+      auto workgroupId = getFunctionArgument(entryPoint, entryArgIdxs.workgroupId);
+      auto dispatchDims = getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
 
-    // flattenWorkgroupId = workgroupId.z * dispatchDims.x * dispatchDims.y +
-    //                      workgroupId.y * dispatchDims.x + workgroupId.x
-    //                    = (workgroupId.z * dispatchDims.y + workgroupId.y) * dispatchDims.x + workgroupId.x
-    auto flattenWorkgroupId = m_builder->CreateMul(m_builder->CreateExtractElement(workgroupId, 2),
-                                                   m_builder->CreateExtractElement(dispatchDims, 1));
-    flattenWorkgroupId = m_builder->CreateAdd(flattenWorkgroupId, m_builder->CreateExtractElement(workgroupId, 1));
-    flattenWorkgroupId = m_builder->CreateMul(flattenWorkgroupId,
-                                              m_builder->CreateExtractElement(dispatchDims, static_cast<uint64_t>(0)));
-    flattenWorkgroupId = m_builder->CreateAdd(flattenWorkgroupId,
-                                              m_builder->CreateExtractElement(workgroupId, static_cast<uint64_t>(0)));
+      // flattenWorkgroupId = workgroupId.z * dispatchDims.x * dispatchDims.y +
+      //                      workgroupId.y * dispatchDims.x + workgroupId.x
+      //                    = (workgroupId.z * dispatchDims.y + workgroupId.y) * dispatchDims.x + workgroupId.x
+      auto flattenWorkgroupId = m_builder->CreateMul(m_builder->CreateExtractElement(workgroupId, 2),
+                                                     m_builder->CreateExtractElement(dispatchDims, 1));
+      flattenWorkgroupId = m_builder->CreateAdd(flattenWorkgroupId, m_builder->CreateExtractElement(workgroupId, 1));
+      flattenWorkgroupId = m_builder->CreateMul(
+          flattenWorkgroupId, m_builder->CreateExtractElement(dispatchDims, static_cast<uint64_t>(0)));
+      flattenWorkgroupId = m_builder->CreateAdd(flattenWorkgroupId,
+                                                m_builder->CreateExtractElement(workgroupId, static_cast<uint64_t>(0)));
 
-    auto baseRingEntryIndex = getFunctionArgument(entryPoint, entryArgIdxs.baseRingEntryIndex);
-    m_shaderRingEntryIndex = m_builder->CreateAdd(baseRingEntryIndex, flattenWorkgroupId);
-
-    m_builder->restoreIP(savedInsertPoint);
+      auto baseRingEntryIndex = getFunctionArgument(entryPoint, entryArgIdxs.baseRingEntryIndex);
+      m_shaderRingEntryIndex = m_builder->CreateAdd(baseRingEntryIndex, flattenWorkgroupId);
+    } else {
+      assert(getShaderStage(entryPoint) == ShaderStageMesh);
+      llvm_unreachable("Not implemented!");
+    }
   }
 
   return m_shaderRingEntryIndex;
@@ -284,11 +371,14 @@ Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
 // @param entryPoint : Entry-point of task shader
 // @returns : The payload ring entry offset of current workgroup
 Value *MeshTaskShader::getPayloadRingEntryOffset(Function *entryPoint) {
-  assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
-
   if (!m_payloadRingEntryOffset) {
     Value *ringEntryIndex = getShaderRingEntryIndex(entryPoint);
     Value *payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
+
+    // NOTE: Make sure below calculation follows payload ring descriptor getter and is prior to any task payload
+    // access operations.
+    IRBuilder<>::InsertPointGuard guard(*m_builder);
+    m_builder->SetInsertPoint(cast<Instruction>(payloadRingBufDesc)->getNextNode());
 
     // NUM_RECORDS = SQ_BUF_RSRC_WORD2[31:0]
     Value *numPayloadRingEntries = m_builder->CreateUDiv(m_builder->CreateExtractElement(payloadRingBufDesc, 2),
@@ -310,20 +400,16 @@ Value *MeshTaskShader::getPayloadRingEntryOffset(Function *entryPoint) {
 Value *MeshTaskShader::getDrawDataRingEntryOffset(Function *entryPoint) {
   assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
 
-  if (!m_drawDataRingEntryOffset) {
-    Value *ringEntryIndex = getShaderRingEntryIndex(entryPoint);
-    Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
+  Value *ringEntryIndex = getShaderRingEntryIndex(entryPoint);
+  Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
 
-    // NUM_RECORDS = SQ_BUF_RSRC_WORD2[31:0]
-    Value *numDrawDataRingEntries = m_builder->CreateUDiv(m_builder->CreateExtractElement(drawDataRingBufDesc, 2),
-                                                          m_builder->getInt32(DrawDataRingEntrySize));
-    // wrappedRingEntryIndex = ringEntryIndex % numRingEntries = ringEntryIndex & (numRingEntries - 1)
-    Value *wrappedRingEntryIndex =
-        m_builder->CreateAnd(ringEntryIndex, m_builder->CreateSub(numDrawDataRingEntries, m_builder->getInt32(1)));
-    m_drawDataRingEntryOffset = m_builder->CreateMul(wrappedRingEntryIndex, m_builder->getInt32(DrawDataRingEntrySize));
-  }
-
-  return m_drawDataRingEntryOffset;
+  // NUM_RECORDS = SQ_BUF_RSRC_WORD2[31:0]
+  Value *numDrawDataRingEntries = m_builder->CreateUDiv(m_builder->CreateExtractElement(drawDataRingBufDesc, 2),
+                                                        m_builder->getInt32(DrawDataRingEntrySize));
+  // wrappedRingEntryIndex = ringEntryIndex % numRingEntries = ringEntryIndex & (numRingEntries - 1)
+  Value *wrappedRingEntryIndex =
+      m_builder->CreateAnd(ringEntryIndex, m_builder->CreateSub(numDrawDataRingEntries, m_builder->getInt32(1)));
+  return m_builder->CreateMul(wrappedRingEntryIndex, m_builder->getInt32(DrawDataRingEntrySize));
 }
 
 // =====================================================================================================================
@@ -334,19 +420,14 @@ Value *MeshTaskShader::getDrawDataRingEntryOffset(Function *entryPoint) {
 Value *MeshTaskShader::getDrawDataReadyBit(Function *entryPoint) {
   assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
 
-  if (!m_drawDataReadyBit) {
-    Value *ringEntryIndex = getShaderRingEntryIndex(entryPoint);
-    Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
+  Value *ringEntryIndex = getShaderRingEntryIndex(entryPoint);
+  Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
 
-    // NUM_RECORDS = SQ_BUF_RSRC_WORD2[31:0]
-    Value *numDrawDataRingEntries = m_builder->CreateUDiv(m_builder->CreateExtractElement(drawDataRingBufDesc, 2),
-                                                          m_builder->getInt32(DrawDataRingEntrySize));
-    // readyBit = ringEntryIndex & numRingEnties != 0
-    m_drawDataReadyBit =
-        m_builder->CreateICmpNE(m_builder->CreateAnd(ringEntryIndex, numDrawDataRingEntries), m_builder->getInt32(0));
-  }
-
-  return m_drawDataReadyBit;
+  // NUM_RECORDS = SQ_BUF_RSRC_WORD2[31:0]
+  Value *numDrawDataRingEntries = m_builder->CreateUDiv(m_builder->CreateExtractElement(drawDataRingBufDesc, 2),
+                                                        m_builder->getInt32(DrawDataRingEntrySize));
+  // readyBit = ringEntryIndex & numRingEnties != 0
+  return m_builder->CreateICmpNE(m_builder->CreateAnd(ringEntryIndex, numDrawDataRingEntries), m_builder->getInt32(0));
 }
 
 // =====================================================================================================================

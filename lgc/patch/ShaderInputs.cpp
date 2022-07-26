@@ -69,6 +69,12 @@ const char *ShaderInputs::getSpecialUserDataName(UserDataMapping kind) {
     return "VertexBufferTable";
   case UserDataMapping::NggCullingData:
     return "NggCullingData";
+  case UserDataMapping::MeshTaskDispatchDims:
+    return "MeshTaskDispatchDims";
+  case UserDataMapping::MeshTaskRingIndex:
+    return "MeshTaskRingIndex";
+  case UserDataMapping::MeshPipeStatsBuf:
+    return "MeshPipeStatsBuf";
   default:
     return "";
   }
@@ -83,6 +89,8 @@ CallInst *ShaderInputs::getSpecialUserData(UserDataMapping kind, BuilderBase &bu
   Type *ty = builder.getInt32Ty();
   if (kind == UserDataMapping::NggCullingData)
     ty = builder.getInt64Ty();
+  else if (kind == UserDataMapping::MeshTaskDispatchDims)
+    ty = FixedVectorType::get(builder.getInt32Ty(), 3);
   else if (kind == UserDataMapping::Workgroup)
     ty = FixedVectorType::get(builder.getInt32Ty(), 3)->getPointerTo(ADDR_SPACE_CONST);
   return builder.CreateNamedCall((Twine(lgcName::SpecialUserData) + getSpecialUserDataName(kind)).str(), ty,
