@@ -690,14 +690,14 @@ public:
 
   // Bit settings for flags argument in CreateLoadBufferDesc.
   enum {
-    FlagBufferNonUniform = 1, // Descriptor index is non-uniform
-    FlagBufferWritten = 2,    // Buffer is (or might be) written to
-    FlagConstBuffer = 4,      // Const buffer: Find a DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
-                              // descriptor entry, rather than DescriptorBuffer/DescriptorBufferCompact
-    FlagNonConstBuffer = 8,   // Non-const buffer: Find a DescriptorBuffer/DescriptorBufferCompact descriptor
+    BufferFlagNonUniform = 1, // Descriptor index is non-uniform
+    BufferFlagWritten = 2,    // Buffer is (or might be) written to
+    BufferFlagConst = 4,      // Const buffer: Find a DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
+                              //  descriptor entry, rather than DescriptorBuffer/DescriptorBufferCompact
+    BufferFlagNonConst = 8,   // Non-const buffer: Find a DescriptorBuffer/DescriptorBufferCompact descriptor
                               //  entry, rather than DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
-    FlagShaderResource = 16,  // Flag to find a Descriptor Resource
-    FlagSampler = 32          // Flag to find Descriptor Sampler
+    BufferFlagShaderResource = 16, // Flag to find a Descriptor Resource
+    BufferFlagSampler = 32         // Flag to find Descriptor Sampler
   };
 
   // Get the type of pointer returned by CreateLoadBufferDesc.
@@ -744,10 +744,10 @@ public:
   //                   DescriptorTexelBuffer, DescriptorFmask.
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
-  // @param flags :   Descriptor Flag bit settings
+  // @param resourceType : Descriptor type to find user resource nodes;
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding, unsigned flags,
-                                        const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                        ResourceNodeType resourceType, const llvm::Twine &instName = "") = 0;
 
   // Create a load of the push constants pointer.
   // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.

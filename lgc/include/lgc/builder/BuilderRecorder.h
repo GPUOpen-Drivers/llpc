@@ -360,8 +360,8 @@ public:
   llvm::Value *CreateGetDescStride(ResourceNodeType descType, unsigned descSet, unsigned binding,
                                    const llvm::Twine &instName) override final;
 
-  llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding, unsigned flags,
-                                const llvm::Twine &instName) override final;
+  llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
+                                ResourceNodeType resourceType, const llvm::Twine &instName) override final;
 
   llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName) override final;
 

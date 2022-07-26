@@ -94,7 +94,7 @@ public:
   Value *loadImageSampler(Type *elementTy, Value *base);
   Value *transImagePointer(SPIRVValue *spvImagePtr);
   Value *getDescPointerAndStride(lgc::ResourceNodeType resType, unsigned descriptorSet, unsigned binding,
-                                 unsigned flags);
+                                 lgc::ResourceNodeType searchType);
   Value *transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessChain);
   Value *indexDescPtr(Type *elementTy, Value *base, Value *index);
   Value *transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue *);
