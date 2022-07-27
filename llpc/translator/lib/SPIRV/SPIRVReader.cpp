@@ -1277,7 +1277,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
           Value *const pointer = valueMap[load->getPointerOperand()];
           Type *const pointerType = pointer->getType();
-          Type *const pointerElemType = pointerType->getScalarType()->getPointerElementType();
+          Type *const pointerElemType = load->getType()->getScalarType();
+          // TODO: Remove this when LLPC will switch fully to opaque pointers.
+          assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(pointerType->getScalarType(), pointerElemType));
 
           // If the remapped pointer type isn't a pointer, it's a vector of pointers instead.
           if (!pointerType->isPointerTy()) {
@@ -1287,10 +1289,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
             for (unsigned i = 0; i < cast<FixedVectorType>(pointerType)->getNumElements(); i++) {
               Value *const pointerElem = getBuilder()->CreateExtractElement(pointer, i);
-              Type *const newLoadElemType = pointerElem->getType()->getPointerElementType();
+              // TODO: Remove this when LLPC will switch fully to opaque pointers.
+              assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(pointerElem->getType(), pointerElemType));
 
               LoadInst *const newLoadElem =
-                  getBuilder()->CreateAlignedLoad(newLoadElemType, pointerElem, load->getAlign(), load->isVolatile());
+                  getBuilder()->CreateAlignedLoad(pointerElemType, pointerElem, load->getAlign(), load->isVolatile());
               newLoadElem->setOrdering(load->getOrdering());
               newLoadElem->setSyncScopeID(load->getSyncScopeID());
 
@@ -1314,11 +1317,13 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
               // TODO: Remove this when LLPC will switch fully to opaque pointers.
               assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(pointerElem->getType(), castType));
               assert(castType->isArrayTy());
-              castType = FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
+              Type *const newLoadElemType =
+                  FixedVectorType::get(castType->getArrayElementType(), castType->getArrayNumElements());
               const unsigned addrSpace = pointerElem->getType()->getPointerAddressSpace();
-              castType = castType->getPointerTo(addrSpace);
+              castType = newLoadElemType->getPointerTo(addrSpace);
               pointerElem = getBuilder()->CreateBitCast(pointerElem, castType);
-              Type *const newLoadElemType = pointerElem->getType()->getPointerElementType();
+              // TODO: Remove this when LLPC will switch fully to opaque pointers.
+              assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(pointerElem->getType(), newLoadElemType));
 
               LoadInst *const newLoadElem =
                   getBuilder()->CreateAlignedLoad(newLoadElemType, pointerElem, load->getAlign(), load->isVolatile());
@@ -1334,9 +1339,10 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
             load->replaceAllUsesWith(getBuilder()->CreateTransposeMatrix(newLoad));
           } else {
             // Otherwise we are loading a single element and it's a simple load.
-            Type *const newLoadType = pointer->getType()->getPointerElementType();
+            // TODO: Remove this when LLPC will switch fully to opaque pointers.
+            assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(pointer->getType(), pointerElemType));
             LoadInst *const newLoad =
-                getBuilder()->CreateAlignedLoad(newLoadType, pointer, load->getAlign(), load->isVolatile());
+                getBuilder()->CreateAlignedLoad(pointerElemType, pointer, load->getAlign(), load->isVolatile());
             newLoad->setOrdering(load->getOrdering());
             newLoad->setSyncScopeID(load->getSyncScopeID());
 
