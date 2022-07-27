@@ -42,6 +42,7 @@ using namespace llvm;
 static const char CommonShaderModeMetadataPrefix[] = "llpc.shader.mode.";
 static const char TessellationModeMetadataName[] = "llpc.tessellation.mode";
 static const char GeometryShaderModeMetadataName[] = "llpc.geometry.mode";
+static const char MeshShaderModeMetadataName[] = "llpc.mesh.mode";
 static const char FragmentShaderModeMetadataName[] = "llpc.fragment.mode";
 static const char ComputeShaderModeMetadataName[] = "llpc.compute.mode";
 
@@ -196,6 +197,7 @@ void ShaderModes::record(Module *module) {
   // Then the specific shader modes.
   PipelineState::setNamedMetadataToArrayOfInt32(module, m_tessellationMode, TessellationModeMetadataName);
   PipelineState::setNamedMetadataToArrayOfInt32(module, m_geometryShaderMode, GeometryShaderModeMetadataName);
+  PipelineState::setNamedMetadataToArrayOfInt32(module, m_meshShaderMode, MeshShaderModeMetadataName);
   PipelineState::setNamedMetadataToArrayOfInt32(module, m_fragmentShaderMode, FragmentShaderModeMetadataName);
   PipelineState::setNamedMetadataToArrayOfInt32(module, m_computeShaderMode, ComputeShaderModeMetadataName);
 }
@@ -226,6 +228,9 @@ void ShaderModes::readModesFromShader(Module *module, ShaderStage stage) {
   case ShaderStageGeometry:
     PipelineState::readNamedMetadataArrayOfInt32(module, GeometryShaderModeMetadataName, m_geometryShaderMode);
     break;
+  case ShaderStageMesh:
+    PipelineState::readNamedMetadataArrayOfInt32(module, MeshShaderModeMetadataName, m_meshShaderMode);
+    break;
   case ShaderStageFragment:
     PipelineState::readNamedMetadataArrayOfInt32(module, FragmentShaderModeMetadataName, m_fragmentShaderMode);
     break;
@@ -252,6 +257,7 @@ void ShaderModes::readModesFromPipeline(Module *module) {
   // Then the specific shader modes.
   PipelineState::readNamedMetadataArrayOfInt32(module, TessellationModeMetadataName, m_tessellationMode);
   PipelineState::readNamedMetadataArrayOfInt32(module, GeometryShaderModeMetadataName, m_geometryShaderMode);
+  PipelineState::readNamedMetadataArrayOfInt32(module, MeshShaderModeMetadataName, m_meshShaderMode);
   PipelineState::readNamedMetadataArrayOfInt32(module, FragmentShaderModeMetadataName, m_fragmentShaderMode);
   PipelineState::readNamedMetadataArrayOfInt32(module, ComputeShaderModeMetadataName, m_computeShaderMode);
 }
