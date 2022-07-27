@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 54
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 2
+#define LLPC_INTERFACE_MINOR_VERSION 3
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ------------------------------------------------------------------------------------------------------|
+//  |     54.3 | Add usePointSize to ShaderModuleUsage                                                                 |
 //  |     54.2 | Add subgroupSize to PipelineShaderOptions                                                             |
 //  |     54.1 | Add overrideForceThreadIdSwizzling overrideShaderThreadGroupSizeX, overrideShaderThreadGroupSizeY     |
 //  |          | and overrideShaderThreadGroupSizeZ  to PipelineShaderOptions                                          |
@@ -483,6 +484,7 @@ struct ShaderModuleUsage {
   bool keepUnusedFunctions;    ///< Whether to keep unused function
   bool useIsNan;               ///< Whether IsNan is used
   bool useInvariant;           ///< Whether invariant variable is used
+  bool usePointSize;           ///< Whether gl_PointSize is used in output
 };
 
 /// Represents common part of shader module data

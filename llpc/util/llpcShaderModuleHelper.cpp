@@ -96,6 +96,12 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       if (decoration == DecorationInvariant) {
         shaderModuleUsage.useInvariant = true;
       }
+      if (decoration == DecorationBuiltIn) {
+        auto builtIn = (opCode == OpDecorate) ? static_cast<BuiltIn>(codePos[3]) : static_cast<BuiltIn>(codePos[4]);
+        if (builtIn == BuiltInPointSize) {
+          shaderModuleUsage.usePointSize = true;
+        }
+      }
       break;
     }
     case OpSpecConstantTrue:
