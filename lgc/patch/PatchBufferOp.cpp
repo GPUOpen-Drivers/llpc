@@ -1097,7 +1097,8 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
         makeLoop(ConstantInt::get(lengthType, 0), length, ConstantInt::get(lengthType, stride), &memCpyInst);
 
     // Get the current index into our source pointer.
-    Value *const srcPtr = m_builder->CreateGEP(src->getType()->getScalarType()->getPointerElementType(), src, index);
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(src->getType()->getScalarType(), m_builder->getInt8Ty()));
+    Value *const srcPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), src, index);
     copyMetadata(srcPtr, &memCpyInst);
 
     Value *const castSrc = m_builder->CreateBitCast(srcPtr, castSrcType);
@@ -1108,7 +1109,8 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     copyMetadata(srcLoad, &memCpyInst);
 
     // Get the current index into our destination pointer.
-    Value *const destPtr = m_builder->CreateGEP(dest->getType()->getScalarType()->getPointerElementType(), dest, index);
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(dest->getType()->getScalarType(), m_builder->getInt8Ty()));
+    Value *const destPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), dest, index);
     copyMetadata(destPtr, &memCpyInst);
 
     Value *const castDest = m_builder->CreateBitCast(destPtr, castDestType);
@@ -1244,7 +1246,8 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
         makeLoop(ConstantInt::get(lengthType, 0), length, ConstantInt::get(lengthType, stride), &memSetInst);
 
     // Get the current index into our destination pointer.
-    Value *const destPtr = m_builder->CreateGEP(dest->getType()->getScalarType()->getPointerElementType(), dest, index);
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(dest->getType()->getScalarType(), m_builder->getInt8Ty()));
+    Value *const destPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), dest, index);
     copyMetadata(destPtr, &memSetInst);
 
     Value *const castDest = m_builder->CreateBitCast(destPtr, castDestType->getPointerTo(destAddrSpace));
