@@ -1054,7 +1054,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     // gl_NumSubgroups = (workgroupSize + gl_SubGroupSize - 1) / gl_SubgroupSize
     auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
     unsigned workgroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
-    unsigned subgroupSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
+    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(m_shaderStage);
     unsigned numSubgroups = (workgroupSize + subgroupSize - 1) / subgroupSize;
     return getInt32(numSubgroups);
   }
@@ -1080,7 +1080,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInSubgroupId: {
     // gl_SubgroupID = gl_LocationInvocationIndex / gl_SubgroupSize
     Value *localInvocationIndex = readCsBuiltIn(BuiltInLocalInvocationIndex);
-    unsigned subgroupSize = getPipelineState()->getShaderWaveSize(m_shaderStage);
+    unsigned subgroupSize = getPipelineState()->getShaderSubgroupSize(m_shaderStage);
     return CreateLShr(localInvocationIndex, getInt32(Log2_32(subgroupSize)));
   }
 

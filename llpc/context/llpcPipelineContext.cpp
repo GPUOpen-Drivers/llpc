@@ -407,7 +407,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
 
     shaderOptions.waveSize = shaderInfo->options.waveSize;
     shaderOptions.wgpMode = shaderInfo->options.wgpMode;
-    if (!shaderInfo->options.allowVaryWaveSize) {
+
+    // If subgroupSize is specified, we should use the specified value.
+    if (shaderInfo->options.subgroupSize != 0)
+      shaderOptions.subgroupSize = shaderInfo->options.subgroupSize;
+    else if (!shaderInfo->options.allowVaryWaveSize) {
       // allowVaryWaveSize is disabled, so use -subgroup-size (default 64) to override the wave
       // size for a shader that uses gl_SubgroupSize.
       shaderOptions.subgroupSize = SubgroupSize;
