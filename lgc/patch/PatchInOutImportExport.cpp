@@ -2402,11 +2402,6 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     assert(inOutUsage.builtInInputLocMap.find(BuiltInPointCoord) != inOutUsage.builtInInputLocMap.end());
     const unsigned loc = inOutUsage.builtInInputLocMap[BuiltInPointCoord];
 
-    auto &interpInfo = inOutUsage.fs.interpInfo;
-    while (interpInfo.size() <= loc)
-      interpInfo.push_back(InvalidFsInterpInfo);
-    interpInfo[loc] = {loc, false, false, false};
-
     // Emulation for "in vec2 gl_PointCoord"
     const bool perSampleShading = m_pipelineState->getRasterizerState().perSampleShading;
     input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, nullptr, InOutInfo::InterpModeSmooth,
@@ -2425,27 +2420,14 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   case BuiltInViewportIndex:
   case BuiltInViewIndex: {
     unsigned loc = InvalidValue;
+    const auto prevStage = m_pipelineState->getPrevShaderStage(ShaderStageFragment);
 
-    if (builtInId == BuiltInPrimitiveId) {
-      assert(inOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) != inOutUsage.builtInInputLocMap.end());
-      loc = inOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
-    } else if (builtInId == BuiltInLayer) {
-      assert(inOutUsage.builtInInputLocMap.find(BuiltInLayer) != inOutUsage.builtInInputLocMap.end());
-      loc = inOutUsage.builtInInputLocMap[BuiltInLayer];
-    } else if (builtInId == BuiltInViewIndex) {
-      assert(inOutUsage.builtInInputLocMap.find(BuiltInViewIndex) != inOutUsage.builtInInputLocMap.end());
-      loc = inOutUsage.builtInInputLocMap[BuiltInViewIndex];
+    if (prevStage == ShaderStageMesh) {
+      llvm_unreachable("Not implemented!");
     } else {
-      assert(builtInId == BuiltInViewportIndex);
-
-      assert(inOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) != inOutUsage.builtInInputLocMap.end());
-      loc = inOutUsage.builtInInputLocMap[BuiltInViewportIndex];
+      assert(inOutUsage.builtInInputLocMap.count(builtInId) > 0);
+      loc = inOutUsage.builtInInputLocMap[builtInId];
     }
-
-    auto &interpInfo = inOutUsage.fs.interpInfo;
-    while (interpInfo.size() <= loc)
-      interpInfo.push_back(InvalidFsInterpInfo);
-    interpInfo[loc] = {loc, true, false}; // Flat interpolation
 
     // Emulation for "in int gl_PrimitiveID" or "in int gl_Layer" or "in int gl_ViewportIndex"
     // or "in int gl_ViewIndex"
