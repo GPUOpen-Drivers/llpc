@@ -980,25 +980,27 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   LLPC_OUTS("GS-VS ring item size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << "\n");
   LLPC_OUTS("\n");
 
-  LLPC_OUTS("GS stream item size:\n");
-  for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    unsigned streamItemSize = gsResUsage->inOutUsage.gs.outLocCount[i] * geometryMode.outputVertices * 4;
-    LLPC_OUTS("    stream " << i << " = " << streamItemSize);
+  if (hasGs) {
+    LLPC_OUTS("GS stream item size:\n");
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      unsigned streamItemSize = gsResUsage->inOutUsage.gs.outLocCount[i] * geometryMode.outputVertices * 4;
+      LLPC_OUTS("    stream " << i << " = " << streamItemSize);
 
-    if (gsResUsage->inOutUsage.enableXfb) {
-      LLPC_OUTS(", XFB buffer = ");
-      for (unsigned j = 0; j < MaxTransformFeedbackBuffers; ++j) {
-        if ((gsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0) {
-          LLPC_OUTS(j);
-          if (j != MaxTransformFeedbackBuffers - 1)
-            LLPC_OUTS(", ");
+      if (gsResUsage->inOutUsage.enableXfb) {
+        LLPC_OUTS(", XFB buffer = ");
+        for (unsigned j = 0; j < MaxTransformFeedbackBuffers; ++j) {
+          if ((gsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0) {
+            LLPC_OUTS(j);
+            if (j != MaxTransformFeedbackBuffers - 1)
+              LLPC_OUTS(", ");
+          }
         }
       }
-    }
 
+      LLPC_OUTS("\n");
+    }
     LLPC_OUTS("\n");
   }
-  LLPC_OUTS("\n");
 
   if (gsOnChip || m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
 
