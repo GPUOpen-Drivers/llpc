@@ -1624,6 +1624,8 @@ unsigned InOutBuilder::getBuiltInValidMask(BuiltInKind builtIn, bool isOutput) {
     MVDG = shaderStageToMask(ShaderStageMesh, ShaderStageVertex, ShaderStageTessEval, ShaderStageGeometry),
     MVHDG = shaderStageToMask(ShaderStageMesh, ShaderStageVertex, ShaderStageTessControl, ShaderStageTessEval,
                               ShaderStageGeometry),
+    MVHDGP = shaderStageToMask(ShaderStageMesh, ShaderStageVertex, ShaderStageTessControl, ShaderStageTessEval,
+                               ShaderStageGeometry, ShaderStageFragment),
     N = 0,
     P = shaderStageToMask(ShaderStageFragment),
     T = shaderStageToMask(ShaderStageTask),
