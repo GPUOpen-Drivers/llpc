@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/SystemValues.h"
+#include "ShaderMerger.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Constants.h"
@@ -112,10 +113,10 @@ Value *ShaderSystemValues::getTaskPayloadRingBufDesc() {
 }
 
 // =====================================================================================================================
-// Get the descriptor for task draw data ring buffer (for task and mesh shader)
+// Get the descriptor for task draw data ring buffer (for task shader)
 Value *ShaderSystemValues::getTaskDrawDataRingBufDesc() {
   assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
-  assert(m_shaderStage == ShaderStageTask || m_shaderStage == ShaderStageMesh);
+  assert(m_shaderStage == ShaderStageTask);
   if (!m_taskDrawDataRingBufDesc) {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
@@ -321,8 +322,12 @@ std::pair<Type *, ArrayRef<Value *>> ShaderSystemValues::getEmitCounterPtr() {
 Instruction *ShaderSystemValues::getInternalGlobalTablePtr() {
   if (!m_internalGlobalTablePtr) {
     auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
-    // Global table is always the first function argument
-    m_internalGlobalTablePtr = makePointer(getFunctionArgument(m_entryPoint, 0, "globalTable"), ptrTy, InvalidValue);
+    // Global table is always the first function argument (separate shader) or the eighth function argument (merged
+    // shader). And mesh shader is actually mapped to ES-GS merged shader.
+    m_internalGlobalTablePtr = makePointer(
+        getFunctionArgument(m_entryPoint, getShaderStage(m_entryPoint) == ShaderStageMesh ? NumSpecialSgprInputs : 0,
+                            "globalTable"),
+        ptrTy, InvalidValue);
   }
   return m_internalGlobalTablePtr;
 }
@@ -332,9 +337,13 @@ Instruction *ShaderSystemValues::getInternalGlobalTablePtr() {
 Value *ShaderSystemValues::getInternalPerShaderTablePtr() {
   if (!m_internalPerShaderTablePtr) {
     auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
-    // Per shader table is always the second function argument
+    // Per shader table is always the second function argument (separate shader) or the ninth function argument (merged
+    // shader). And mesh shader is actually mapped to ES-GS merged shader.
     m_internalPerShaderTablePtr =
-        makePointer(getFunctionArgument(m_entryPoint, 1, "perShaderTable"), ptrTy, InvalidValue);
+        makePointer(getFunctionArgument(m_entryPoint,
+                                        getShaderStage(m_entryPoint) == ShaderStageMesh ? NumSpecialSgprInputs + 1 : 1,
+                                        "perShaderTable"),
+                    ptrTy, InvalidValue);
   }
   return m_internalPerShaderTablePtr;
 }
