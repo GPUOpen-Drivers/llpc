@@ -2315,8 +2315,6 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->inOutUsage;
 
-  Attribute::AttrKind attribs[] = {Attribute::ReadNone};
-
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
@@ -2328,20 +2326,18 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     auto ancillary = getFunctionArgument(m_entryPoint, entryArgIdxs.ancillary);
 
     // gl_SampleID = Ancillary[11:8]
-    Value *args[] = {ancillary, ConstantInt::get(Type::getInt32Ty(*m_context), 8),
-                     ConstantInt::get(Type::getInt32Ty(*m_context), 4)};
-    auto sampleId = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, {}, insertPos);
+    auto sampleId = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
+                                            {ancillary, builder.getInt32(8), builder.getInt32(4)});
 
     Value *sampleMaskIn = sampleCoverage;
     if (m_pipelineState->getRasterizerState().perSampleShading) {
       // gl_SampleMaskIn[0] = (SampleCoverage & (1 << gl_SampleID))
-      sampleMaskIn =
-          BinaryOperator::CreateShl(ConstantInt::get(Type::getInt32Ty(*m_context), 1), sampleId, "", insertPos);
-      sampleMaskIn = BinaryOperator::CreateAnd(sampleCoverage, sampleMaskIn, "", insertPos);
+      sampleMaskIn = builder.CreateShl(builder.getInt32(1), sampleId);
+      sampleMaskIn = builder.CreateAnd(sampleCoverage, sampleMaskIn);
     }
 
     // NOTE: Only gl_SampleMaskIn[0] is valid for us.
-    input = InsertValueInst::Create(input, sampleMaskIn, {0}, "", insertPos);
+    input = builder.CreateInsertValue(input, sampleMaskIn, 0);
 
     break;
   }
@@ -2383,19 +2379,17 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       fragCoord[2] = adjustedFragCoordZ;
     }
 
-    fragCoord[3] = emitCall("llvm.amdgcn.rcp.f32", Type::getFloatTy(*m_context), {fragCoord[3]}, attribs, insertPos);
+    fragCoord[3] = builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_rcp, fragCoord[3]);
 
     for (unsigned i = 0; i < 4; ++i) {
-      input = InsertElementInst::Create(input, fragCoord[i], ConstantInt::get(Type::getInt32Ty(*m_context), i), "",
-                                        insertPos);
+      input = builder.CreateInsertElement(input, fragCoord[i], i);
     }
 
     break;
   }
   case BuiltInFrontFacing: {
     auto frontFacing = getFunctionArgument(m_entryPoint, entryArgIdxs.frontFacing);
-    input = new ICmpInst(insertPos, ICmpInst::ICMP_NE, frontFacing, ConstantInt::get(Type::getInt32Ty(*m_context), 0));
-    input = CastInst::CreateIntegerCast(input, inputTy, false, "", insertPos);
+    input = builder.CreateICmpNE(frontFacing, builder.getInt32(0));
     break;
   }
   case BuiltInPointCoord: {
@@ -2410,9 +2404,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInHelperInvocation: {
-    input = emitCall("llvm.amdgcn.ps.live", Type::getInt1Ty(*m_context), {}, Attribute::ReadNone, insertPos);
-    input = BinaryOperator::CreateNot(input, "", insertPos);
-    input = CastInst::CreateIntegerCast(input, inputTy, false, "", insertPos);
+    input = builder.CreateIntrinsic(Intrinsic::amdgcn_ps_live, {}, {});
+    input = builder.CreateNot(input);
     break;
   }
   case BuiltInPrimitiveId:
@@ -2469,9 +2462,9 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     auto primMask = getFunctionArgument(m_entryPoint, entryArgIdxs.primMask);
     Value *ij = getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center);
 
-    ij = new BitCastInst(ij, FixedVectorType::get(Type::getFloatTy(*m_context), 2), "", insertPos);
-    auto coordI = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 0), "", insertPos);
-    auto coordJ = ExtractElementInst::Create(ij, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
+    ij = builder.CreateBitCast(ij, FixedVectorType::get(builder.getFloatTy(), 2));
+    auto coordI = builder.CreateExtractElement(ij, static_cast<uint64_t>(0));
+    auto coordJ = builder.CreateExtractElement(ij, 1);
 
     const unsigned elemCount = inputTy->getArrayNumElements();
     assert(elemCount <= MaxClipCullDistanceCount);
@@ -2480,7 +2473,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       auto compValue = performFsFloatInterpolation(builder, builder.getInt32(loc + (startChannel + i) / 4) /* attr */,
                                                    builder.getInt32((startChannel + i) % 4) /* attr_chan */, coordI,
                                                    coordJ, primMask);
-      input = InsertValueInst::Create(input, compValue, {i}, "", insertPos);
+      input = builder.CreateInsertValue(input, compValue, i);
     }
 
     break;
@@ -2489,9 +2482,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     auto ancillary = getFunctionArgument(m_entryPoint, entryArgIdxs.ancillary);
 
     // gl_SampleID = Ancillary[11:8]
-    Value *args[] = {ancillary, ConstantInt::get(Type::getInt32Ty(*m_context), 8),
-                     ConstantInt::get(Type::getInt32Ty(*m_context), 4)};
-    input = emitCall("llvm.amdgcn.ubfe.i32", inputTy, args, {}, insertPos);
+    input = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
+                                    {ancillary, builder.getInt32(8), builder.getInt32(4)});
 
     break;
   }
@@ -2507,7 +2499,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     if (m_pipelineState->isUnlinked()) {
       input = builder.CreateRelocationConstant(reloc::NumSamples);
     } else {
-      input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().numSamples);
+      input = builder.getInt32(m_pipelineState->getRasterizerState().numSamples);
     }
     break;
   }
@@ -2515,7 +2507,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     if (m_pipelineState->isUnlinked()) {
       input = builder.CreateRelocationConstant(reloc::SamplePatternIdx);
     } else {
-      input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getRasterizerState().samplePatternIdx);
+      input = builder.getInt32(m_pipelineState->getRasterizerState().samplePatternIdx);
     }
     break;
   }
@@ -2593,7 +2585,6 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
       iJCoord = getFunctionArgument(m_entryPoint, idx);
     }
 
-    builder.SetInsertPoint(insertPos);
     auto iCoord = builder.CreateExtractElement(iJCoord, uint64_t(0));
     auto jCoord = builder.CreateExtractElement(iJCoord, 1);
     auto primType = m_pipelineState->getPrimitiveType();
