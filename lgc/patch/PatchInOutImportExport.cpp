@@ -1640,6 +1640,7 @@ Value *PatchInOutImportExport::performFsFloatInterpolation(BuilderBase &builder,
 // @param coordI: Value of I coordinate
 // @param coordJ: Value of J coordinate
 // @param primMask: Value to fill into m0 register
+// @param highHalf : Whether it is a high half in a 16-bit attribute
 Value *PatchInOutImportExport::performFsHalfInterpolation(BuilderBase &builder, Value *attr, Value *channel,
                                                           Value *coordI, Value *coordJ, Value *primMask,
                                                           Value *highHalf) {
@@ -4683,13 +4684,13 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsOutput(Type *outputTy, unsigne
       m_pipelineState->isTessOffChip() ? calcFactor.offChip.patchConstStart : calcFactor.onChip.patchConstStart;
 
   // attribOffset = (location + locOffset) * 4 + compIdx * bitWidth / 32
-  Value *attibOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
+  Value *attribOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
 
   if (locOffset)
-    attibOffset = BinaryOperator::CreateAdd(attibOffset, locOffset, "", insertPos);
+    attribOffset = BinaryOperator::CreateAdd(attribOffset, locOffset, "", insertPos);
 
-  attibOffset =
-      BinaryOperator::CreateMul(attibOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
+  attribOffset =
+      BinaryOperator::CreateMul(attribOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
 
   if (compIdx) {
     const unsigned bitWidth = outputTy->getScalarSizeInBits();
@@ -4700,7 +4701,7 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsOutput(Type *outputTy, unsigne
       compIdx = BinaryOperator::CreateMul(compIdx, ConstantInt::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
     }
 
-    attibOffset = BinaryOperator::CreateAdd(attibOffset, compIdx, "", insertPos);
+    attribOffset = BinaryOperator::CreateAdd(attribOffset, compIdx, "", insertPos);
   }
 
   Value *ldsOffset = nullptr;
@@ -4715,7 +4716,7 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsOutput(Type *outputTy, unsigne
     auto patchConstStartVal = ConstantInt::get(Type::getInt32Ty(*m_context), patchConstStart);
     ldsOffset = BinaryOperator::CreateAdd(ldsOffset, patchConstStartVal, "", insertPos);
 
-    ldsOffset = BinaryOperator::CreateAdd(ldsOffset, attibOffset, "", insertPos);
+    ldsOffset = BinaryOperator::CreateAdd(ldsOffset, attribOffset, "", insertPos);
   } else {
     // dwordOffset = outPatchStart + (relativeId * outVertexCount + vertexId) * outVertexStride + attribOffset
     //             = outPatchStart + relativeId * outPatchSize + vertexId  * outVertexStride + attribOffset
@@ -4729,7 +4730,7 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsOutput(Type *outputTy, unsigne
     ldsOffset = BinaryOperator::CreateAdd(
         ldsOffset, BinaryOperator::CreateMul(vertexIdx, outVertexStride, "", insertPos), "", insertPos);
 
-    ldsOffset = BinaryOperator::CreateAdd(ldsOffset, attibOffset, "", insertPos);
+    ldsOffset = BinaryOperator::CreateAdd(ldsOffset, attribOffset, "", insertPos);
   }
 
   return ldsOffset;
@@ -4761,13 +4762,13 @@ Value *PatchInOutImportExport::calcLdsOffsetForTesInput(Type *inputTy, unsigned 
   auto relPatchId = getFunctionArgument(m_entryPoint, entryArgIdxs.relPatchId);
 
   // attribOffset = (location + locOffset) * 4 + compIdx
-  Value *attibOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
+  Value *attribOffset = ConstantInt::get(Type::getInt32Ty(*m_context), location);
 
   if (locOffset)
-    attibOffset = BinaryOperator::CreateAdd(attibOffset, locOffset, "", insertPos);
+    attribOffset = BinaryOperator::CreateAdd(attribOffset, locOffset, "", insertPos);
 
-  attibOffset =
-      BinaryOperator::CreateMul(attibOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
+  attribOffset =
+      BinaryOperator::CreateMul(attribOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
 
   if (compIdx) {
     const unsigned bitWidth = inputTy->getScalarSizeInBits();
@@ -4778,7 +4779,7 @@ Value *PatchInOutImportExport::calcLdsOffsetForTesInput(Type *inputTy, unsigned 
       compIdx = BinaryOperator::CreateMul(compIdx, ConstantInt::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
     }
 
-    attibOffset = BinaryOperator::CreateAdd(attibOffset, compIdx, "", insertPos);
+    attribOffset = BinaryOperator::CreateAdd(attribOffset, compIdx, "", insertPos);
   }
 
   Value *ldsOffset = nullptr;
@@ -4792,7 +4793,7 @@ Value *PatchInOutImportExport::calcLdsOffsetForTesInput(Type *inputTy, unsigned 
     auto patchConstStartVal = ConstantInt::get(Type::getInt32Ty(*m_context), patchConstStart);
     ldsOffset = BinaryOperator::CreateAdd(ldsOffset, patchConstStartVal, "", insertPos);
 
-    ldsOffset = BinaryOperator::CreateAdd(ldsOffset, attibOffset, "", insertPos);
+    ldsOffset = BinaryOperator::CreateAdd(ldsOffset, attribOffset, "", insertPos);
   } else {
     // dwordOffset = patchStart + (relPatchId * vertexCount + vertexId) * vertexStride + attribOffset
     //             = patchStart + relPatchId * patchSize + vertexId  * vertexStride + attribOffset
@@ -4806,7 +4807,7 @@ Value *PatchInOutImportExport::calcLdsOffsetForTesInput(Type *inputTy, unsigned 
     ldsOffset = BinaryOperator::CreateAdd(ldsOffset, BinaryOperator::CreateMul(vertexIdx, vertexStride, "", insertPos),
                                           "", insertPos);
 
-    ldsOffset = BinaryOperator::CreateAdd(ldsOffset, attibOffset, "", insertPos);
+    ldsOffset = BinaryOperator::CreateAdd(ldsOffset, attribOffset, "", insertPos);
   }
 
   return ldsOffset;
