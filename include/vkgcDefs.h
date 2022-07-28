@@ -81,8 +81,10 @@
 //  @page VersionHistory
 //  %Version History
 //  | %Version | Change Description                                                                                    |
-//  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     54.0 | Add overrideThreadGroupSizeX,overrideThreadGroupSizeY and overrideThreadGroupSizeZ to PipelineOptions |
+//  | -------- | ---------------------------------------------------------------------------------------------|
+//  |     54.1 | Add overrideForceThreadIdSwizzling overrideShaderThreadGroupSizeX, overrideShaderThreadGroupSizeY
+//  |          | and overrideShaderThreadGroupSizeZ  to PipelineShaderOptions                                          |
+//  |     54.0 | Add overrideThreadGroupSizeX, overrideThreadGroupSizeY and overrideThreadGroupSizeZ to PipelineOptions|
 //  |     53.7 | Add threadGroupSwizzleMode to PipelineOptions                                                         |
 //  |     53.6 | Add scalarizeWaterfallLoads to PipelineShaderOptions                                                  |
 //  |     53.5 | Add forceCsThreadIdSwizzling for thread id swizzle in 8*4                                             |
@@ -678,6 +680,18 @@ struct PipelineShaderOptions {
 
   /// Attempt to scalarize waterfall descriptor loads.
   bool scalarizeWaterfallLoads;
+
+  /// Force rearranges threadId within group into blocks of 8*8 or 8*4
+  bool overrideForceThreadIdSwizzling;
+
+  /// Override value for ThreadGroupSizeX
+  unsigned overrideShaderThreadGroupSizeX;
+
+  /// Override value for ThreadGroupSizeY
+  unsigned overrideShaderThreadGroupSizeY;
+
+  /// Override value for ThreadGroupSizeZ
+  unsigned overrideShaderThreadGroupSizeZ;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
