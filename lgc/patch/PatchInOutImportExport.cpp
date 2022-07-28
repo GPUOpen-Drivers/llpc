@@ -943,13 +943,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
 
       if (m_shaderStage == ShaderStageTessControl) {
-        // NOTE: If location offset is a constant, we have to add it to the unmapped location before querying
-        // the mapped location. Meanwhile, we have to adjust the location offset to 0 (rebase it).
         locOffset = callInst.getOperand(1);
-        if (isa<ConstantInt>(locOffset)) {
-          value += cast<ConstantInt>(locOffset)->getZExtValue();
-          locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-        }
 
         // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
         if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
