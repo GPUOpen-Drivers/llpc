@@ -135,10 +135,14 @@ bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState
     streamMapEntries(resUsage->inOutUsage.outputLocInfoMap, stream);
     streamMapEntries(resUsage->inOutUsage.perPatchInputLocMap, stream);
     streamMapEntries(resUsage->inOutUsage.perPatchOutputLocMap, stream);
+    streamMapEntries(resUsage->inOutUsage.perPrimitiveInputLocMap, stream);
+    streamMapEntries(resUsage->inOutUsage.perPrimitiveOutputLocMap, stream);
     streamMapEntries(resUsage->inOutUsage.builtInInputLocMap, stream);
     streamMapEntries(resUsage->inOutUsage.builtInOutputLocMap, stream);
     streamMapEntries(resUsage->inOutUsage.perPatchBuiltInInputLocMap, stream);
     streamMapEntries(resUsage->inOutUsage.perPatchBuiltInOutputLocMap, stream);
+    streamMapEntries(resUsage->inOutUsage.perPrimitiveBuiltInInputLocMap, stream);
+    streamMapEntries(resUsage->inOutUsage.perPrimitiveBuiltInOutputLocMap, stream);
 
     if (stage == ShaderStageGeometry) {
       // NOTE: For geometry shader, copy shader will use this special map info (from built-in outputs to

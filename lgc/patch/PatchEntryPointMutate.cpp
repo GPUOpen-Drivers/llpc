@@ -1160,6 +1160,24 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "meshPipeStatsBuf",
                                               UserDataMapping::MeshPipeStatsBuf,
                                               &intfData->entryArgIdxs.task.pipeStatsBuf));
+  } else if (m_shaderStage == ShaderStageMesh) {
+    if (m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->builtInUsage.mesh.drawIndex) {
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "drawIndex", UserDataMapping::DrawIndex,
+                                                &intfData->entryArgIdxs.mesh.drawIndex));
+    }
+    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+      specialUserDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.mesh.viewIndex));
+    }
+    specialUserDataArgs.push_back(UserDataArg(FixedVectorType::get(builder.getInt32Ty(), 3), "meshTaskDispatchDims",
+                                              UserDataMapping::MeshTaskDispatchDims,
+                                              &intfData->entryArgIdxs.mesh.dispatchDims));
+    specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "meshTaskRingIndex",
+                                              UserDataMapping::MeshTaskRingIndex,
+                                              &intfData->entryArgIdxs.mesh.baseRingEntryIndex));
+    specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "meshPipeStatsBuf",
+                                              UserDataMapping::MeshPipeStatsBuf,
+                                              &intfData->entryArgIdxs.mesh.pipeStatsBuf));
   }
 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones

@@ -363,7 +363,7 @@ Value *ShaderSystemValues::getMeshPipeStatsBufPtr() {
       entryArgIdx = intfData->entryArgIdxs.task.pipeStatsBuf;
       break;
     case ShaderStageMesh:
-      llvm_unreachable("Not implemented!");
+      entryArgIdx = intfData->entryArgIdxs.mesh.pipeStatsBuf;
       break;
     default:
       llvm_unreachable("Should never be called!");
