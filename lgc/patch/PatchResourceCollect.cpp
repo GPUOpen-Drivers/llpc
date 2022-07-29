@@ -1027,7 +1027,6 @@ void PatchResourceCollect::processShader() {
   // Invoke handling of "call" instruction
   visit(m_entryPoint);
 
-  clearInactiveBuiltInInput();
   clearInactiveBuiltInOutput();
 
   if (m_pipelineState->isGraphics()) {
@@ -1165,12 +1164,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       m_inputCalls.push_back(&callInst);
   } else if (mangledName.startswith(lgcName::InputImportBuiltIn)) {
     // Built-in input import
-    if (isDeadCall)
-      m_deadCalls.push_back(&callInst);
-    else {
-      unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-      m_activeInputBuiltIns.insert(builtInId);
-    }
+    assert(!isDeadCall); // All dead calls are supposed to be removed by DCE pass in front-end
   } else if (mangledName.startswith(lgcName::OutputImportGeneric)) {
     // Generic output import
     assert(m_shaderStage == ShaderStageTessControl);
@@ -1229,184 +1223,6 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       // call.
       m_deadCalls.push_back(&callInst);
     }
-  }
-}
-
-// =====================================================================================================================
-// Clears inactive (those actually unused) inputs.
-void PatchResourceCollect::clearInactiveBuiltInInput() {
-  // Clear those inactive built-in inputs (some are not checked, whose usage flags do not rely on their
-  // actual uses)
-  auto &builtInUsage = m_resUsage->builtInUsage;
-
-  // Check per-stage built-in usage
-  if (m_shaderStage == ShaderStageTessControl) {
-    if (builtInUsage.tcs.pointSizeIn && m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end())
-      builtInUsage.tcs.pointSizeIn = false;
-
-    if (builtInUsage.tcs.positionIn && m_activeInputBuiltIns.find(BuiltInPosition) == m_activeInputBuiltIns.end())
-      builtInUsage.tcs.positionIn = false;
-
-    if (builtInUsage.tcs.clipDistanceIn > 0 &&
-        m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end())
-      builtInUsage.tcs.clipDistanceIn = 0;
-
-    if (builtInUsage.tcs.cullDistanceIn > 0 &&
-        m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end())
-      builtInUsage.tcs.cullDistanceIn = 0;
-
-    if (builtInUsage.tcs.patchVertices &&
-        m_activeInputBuiltIns.find(BuiltInPatchVertices) == m_activeInputBuiltIns.end())
-      builtInUsage.tcs.patchVertices = false;
-
-    if (builtInUsage.tcs.primitiveId && m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
-      builtInUsage.tcs.primitiveId = false;
-
-    if (builtInUsage.tcs.invocationId && m_activeInputBuiltIns.find(BuiltInInvocationId) == m_activeInputBuiltIns.end())
-      builtInUsage.tcs.invocationId = false;
-
-    if (builtInUsage.tcs.viewIndex && m_activeInputBuiltIns.find(BuiltInViewIndex) == m_activeInputBuiltIns.end())
-      builtInUsage.tcs.viewIndex = false;
-  } else if (m_shaderStage == ShaderStageTessEval) {
-    if (builtInUsage.tes.pointSizeIn && m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end())
-      builtInUsage.tes.pointSizeIn = false;
-
-    if (builtInUsage.tes.positionIn && m_activeInputBuiltIns.find(BuiltInPosition) == m_activeInputBuiltIns.end())
-      builtInUsage.tes.positionIn = false;
-
-    if (builtInUsage.tes.clipDistanceIn > 0 &&
-        m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end())
-      builtInUsage.tes.clipDistanceIn = 0;
-
-    if (builtInUsage.tes.cullDistanceIn > 0 &&
-        m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end())
-      builtInUsage.tes.cullDistanceIn = 0;
-
-    if (builtInUsage.tes.patchVertices &&
-        m_activeInputBuiltIns.find(BuiltInPatchVertices) == m_activeInputBuiltIns.end())
-      builtInUsage.tes.patchVertices = false;
-
-    if (builtInUsage.tes.primitiveId && m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
-      builtInUsage.tes.primitiveId = false;
-
-    if (builtInUsage.tes.tessCoord && m_activeInputBuiltIns.find(BuiltInTessCoord) == m_activeInputBuiltIns.end())
-      builtInUsage.tes.tessCoord = false;
-
-    if (builtInUsage.tes.tessLevelOuter &&
-        m_activeInputBuiltIns.find(BuiltInTessLevelOuter) == m_activeInputBuiltIns.end())
-      builtInUsage.tes.tessLevelOuter = false;
-
-    if (builtInUsage.tes.tessLevelInner &&
-        m_activeInputBuiltIns.find(BuiltInTessLevelInner) == m_activeInputBuiltIns.end())
-      builtInUsage.tes.tessLevelInner = false;
-  } else if (m_shaderStage == ShaderStageGeometry) {
-    if (builtInUsage.gs.pointSizeIn && m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end())
-      builtInUsage.gs.pointSizeIn = false;
-
-    if (builtInUsage.gs.positionIn && m_activeInputBuiltIns.find(BuiltInPosition) == m_activeInputBuiltIns.end())
-      builtInUsage.gs.positionIn = false;
-
-    if (builtInUsage.gs.clipDistanceIn > 0 &&
-        m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end())
-      builtInUsage.gs.clipDistanceIn = 0;
-
-    if (builtInUsage.gs.cullDistanceIn > 0 &&
-        m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end())
-      builtInUsage.gs.cullDistanceIn = 0;
-
-    if (builtInUsage.gs.primitiveIdIn && m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
-      builtInUsage.gs.primitiveIdIn = false;
-
-    if (builtInUsage.gs.invocationId && m_activeInputBuiltIns.find(BuiltInInvocationId) == m_activeInputBuiltIns.end())
-      builtInUsage.gs.invocationId = false;
-  } else if (m_shaderStage == ShaderStageFragment) {
-    if (builtInUsage.fs.fragCoord && m_activeInputBuiltIns.find(BuiltInFragCoord) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.fragCoord = false;
-
-    if (builtInUsage.fs.frontFacing && m_activeInputBuiltIns.find(BuiltInFrontFacing) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.frontFacing = false;
-
-    if (builtInUsage.fs.fragCoord && m_activeInputBuiltIns.find(BuiltInFragCoord) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.fragCoord = false;
-
-    if (builtInUsage.fs.clipDistance > 0 &&
-        m_activeInputBuiltIns.find(BuiltInClipDistance) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.clipDistance = 0;
-
-    if (builtInUsage.fs.cullDistance > 0 &&
-        m_activeInputBuiltIns.find(BuiltInCullDistance) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.cullDistance = 0;
-
-    if (builtInUsage.fs.pointCoord && m_activeInputBuiltIns.find(BuiltInPointCoord) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.pointCoord = false;
-
-    if (builtInUsage.fs.baryCoord && m_activeInputBuiltIns.find(BuiltInBaryCoord) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoord = false;
-
-    if (builtInUsage.fs.baryCoordNoPerspKHR &&
-        m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspKHR) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoordNoPerspKHR = false;
-
-    // BaryCoord depends on PrimitiveID
-    if (builtInUsage.fs.primitiveId && !(builtInUsage.fs.baryCoordNoPerspKHR || builtInUsage.fs.baryCoord) &&
-        m_activeInputBuiltIns.find(BuiltInPrimitiveId) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.primitiveId = false;
-
-    if (builtInUsage.fs.sampleId && m_activeInputBuiltIns.find(BuiltInSampleId) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.sampleId = false;
-
-    if (builtInUsage.fs.samplePosition &&
-        m_activeInputBuiltIns.find(BuiltInSamplePosition) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.samplePosition = false;
-
-    if (builtInUsage.fs.sampleMaskIn && m_activeInputBuiltIns.find(BuiltInSampleMask) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.sampleMaskIn = false;
-
-    if (builtInUsage.fs.layer && m_activeInputBuiltIns.find(BuiltInLayer) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.layer = false;
-
-    if (builtInUsage.fs.viewIndex && m_activeInputBuiltIns.find(BuiltInViewIndex) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.viewIndex = false;
-
-    if (builtInUsage.fs.viewportIndex &&
-        m_activeInputBuiltIns.find(BuiltInViewportIndex) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.viewportIndex = false;
-
-    if (builtInUsage.fs.helperInvocation &&
-        m_activeInputBuiltIns.find(BuiltInHelperInvocation) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.helperInvocation = false;
-
-    if (builtInUsage.fs.shadingRate &&
-        m_activeInputBuiltIns.find(BuiltInShadingRate) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.shadingRate = false;
-
-    if (builtInUsage.fs.baryCoordNoPersp &&
-        m_activeInputBuiltIns.find(BuiltInBaryCoordNoPersp) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoordNoPersp = false;
-
-    if (builtInUsage.fs.baryCoordNoPerspCentroid &&
-        m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspCentroid) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoordNoPerspCentroid = false;
-
-    if (builtInUsage.fs.baryCoordNoPerspSample &&
-        m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspSample) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoordNoPerspSample = false;
-
-    if (builtInUsage.fs.baryCoordSmooth &&
-        m_activeInputBuiltIns.find(BuiltInBaryCoordSmooth) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoordSmooth = false;
-
-    if (builtInUsage.fs.baryCoordSmoothCentroid &&
-        m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothCentroid) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoordSmoothCentroid = false;
-
-    if (builtInUsage.fs.baryCoordSmoothSample &&
-        m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothSample) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoordNoPerspSample = false;
-
-    if (builtInUsage.fs.baryCoordPullModel &&
-        m_activeInputBuiltIns.find(BuiltInBaryCoordPullModel) == m_activeInputBuiltIns.end())
-      builtInUsage.fs.baryCoordPullModel = false;
   }
 }
 
