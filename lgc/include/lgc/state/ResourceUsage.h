@@ -241,6 +241,30 @@ struct ResourceUsage {
         unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
       } gs;
 
+      // Mesh shader
+      struct {
+        // Input
+        unsigned drawIndex : 1;            // Whether gl_DrawIDARB is used
+        unsigned viewIndex : 1;            // Whether gl_ViewIndex is used
+        unsigned numWorkgroups : 1;        // Whether gl_NumWorkGroups is used
+        unsigned workgroupId : 1;          // Whether gl_WorkGroupID is used
+        unsigned localInvocationId : 1;    // Whether gl_LocalInvocationID is used
+        unsigned globalInvocationId : 1;   // Whether gl_GlobalInvocationID is used
+        unsigned localInvocationIndex : 1; // Whether gl_LocalInvocationIndex is used
+        unsigned subgroupId : 1;           // Whether gl_SubgroupID is used
+        unsigned numSubgroups : 1;         // Whether gl_NumSubgroups is used
+        // Output
+        unsigned pointSize : 1;            // Whether gl_PointSize is used
+        unsigned position : 1;             // Whether gl_Position is used
+        unsigned clipDistance : 4;         // Array size gl_ClipDistance[] (0 means unused)
+        unsigned cullDistance : 4;         // Array size gl_CullDistance[] (0 means unused)
+        unsigned primitiveId : 1;          // Whether gl_PrimitiveID is used
+        unsigned viewportIndex : 1;        // Whether gl_ViewportIndex is used
+        unsigned layer : 1;                // Whether gl_Layer is used
+        unsigned cullPrimitive : 1;        // Whether gl_CullPrimitive is used
+        unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
+      } mesh;
+
       // Fragment shader
       struct {
         // Interpolation
@@ -304,12 +328,18 @@ struct ResourceUsage {
     std::map<unsigned, unsigned> perPatchInputLocMap;
     std::map<unsigned, unsigned> perPatchOutputLocMap;
 
+    std::map<unsigned, unsigned> perPrimitiveInputLocMap;
+    std::map<unsigned, unsigned> perPrimitiveOutputLocMap;
+
     // Map from built-in IDs to specially assigned locations
     std::map<unsigned, unsigned> builtInInputLocMap;
     std::map<unsigned, unsigned> builtInOutputLocMap;
 
     std::map<unsigned, unsigned> perPatchBuiltInInputLocMap;
     std::map<unsigned, unsigned> perPatchBuiltInOutputLocMap;
+
+    std::map<unsigned, unsigned> perPrimitiveBuiltInInputLocMap;
+    std::map<unsigned, unsigned> perPrimitiveBuiltInOutputLocMap;
 
     // Transform feedback strides
     unsigned xfbStrides[MaxTransformFeedbackBuffers] = {};
@@ -326,8 +356,11 @@ struct ResourceUsage {
     unsigned outputMapLocCount = 0;
     unsigned perPatchInputMapLocCount = 0;
     unsigned perPatchOutputMapLocCount = 0;
+    unsigned perPrimitiveInputMapLocCount = 0;
+    unsigned perPrimitiveOutputMapLocCount = 0;
 
-    unsigned expCount = 0; // Export count (number of "exp" instructions) for generic outputs
+    unsigned expCount = 0;     // Export count (number of "exp" instructions) for generic per-vertex outputs
+    unsigned primExpCount = 0; // Export count (number of "exp" instructions) for generic per-primitive outputs
 
     struct {
       struct {
@@ -514,6 +547,15 @@ struct InterfaceData {
         unsigned viewIndex;                       // View Index
         StreamOutData streamOutData;              // Stream-out Data
       } gs;
+
+      // Mesh shader
+      struct {
+        unsigned drawIndex;          // Draw index
+        unsigned viewIndex;          // View index
+        unsigned dispatchDims;       // Dispatch dimensions
+        unsigned baseRingEntryIndex; // Base entry index (first workgroup) of mesh/task shader ring for current dispatch
+        unsigned pipeStatsBuf;       // Pipeline statistics buffer
+      } mesh;
 
       // Fragment shader
       struct {

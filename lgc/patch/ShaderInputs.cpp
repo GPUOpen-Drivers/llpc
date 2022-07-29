@@ -611,6 +611,10 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
     sgprInputDescs = GsSgprInputs;
     vgprInputDescs = GsVgprInputs;
     break;
+  case ShaderStageMesh:
+    // NOTE: Mesh shader is finally mapped to HW GS in fast launch mode. Therefore, we don't add SGPR and VGPR inputs
+    // here. Instead, this is deferred to mesh shader lowering in later phase.
+    break;
   case ShaderStageFragment:
     sgprInputDescs = FsSgprInputs;
     vgprInputDescs = FsVgprInputs;

@@ -386,29 +386,42 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
 // @param location : Input/output base location
 // @param locationCount : Count of locations taken by the input
 // @param inOutInfo : Extra input/output information
-// @param vertexIndex : For TCS/TES/GS per-vertex input/output: vertex index; for FS custom-interpolated input:
-// auxiliary value; else nullptr. (This is just used to tell whether an input/output is per-vertex.)
+// @param vertexOrPrimIndex : For TCS/TES/GS/mesh shader per-vertex input/output: vertex index;
+//                            for mesh shader per-primitive output: primitive index;
+//                            for FS custom-interpolated input: auxiliary value;
+//                            else nullptr.
 void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount,
-                                               InOutInfo &inOutInfo, Value *vertexIndex) {
+                                               InOutInfo &inOutInfo, Value *vertexOrPrimIndex) {
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
 
   // Mark the input or output locations as in use.
   std::map<InOutLocationInfo, InOutLocationInfo> *inOutLocInfoMap = nullptr;
   std::map<unsigned, unsigned> *perPatchInOutLocMap = nullptr;
+  std::map<unsigned, unsigned> *perPrimitiveInOutLocMap = nullptr;
   if (!isOutput) {
-    if (m_shaderStage != ShaderStageTessEval || vertexIndex) {
-      // Normal input
+    if (inOutInfo.isPerPrimitive()) {
+      // Per-primitive input
+      assert(m_shaderStage == ShaderStageFragment); // Must be FS
+      perPrimitiveInOutLocMap = &resUsage->inOutUsage.perPrimitiveInputLocMap;
+    } else if (m_shaderStage != ShaderStageTessEval || vertexOrPrimIndex) {
+      // Per-vertex input
       inOutLocInfoMap = &resUsage->inOutUsage.inputLocInfoMap;
     } else {
-      // TES per-patch input
+      // Per-patch input
+      assert(m_shaderStage == ShaderStageTessEval); // Must be TES
       perPatchInOutLocMap = &resUsage->inOutUsage.perPatchInputLocMap;
     }
   } else {
-    if (m_shaderStage != ShaderStageTessControl || vertexIndex) {
-      // Normal output
+    if (inOutInfo.isPerPrimitive()) {
+      // Per-primitive output
+      assert(m_shaderStage == ShaderStageMesh); // Must be mesh shader
+      perPrimitiveInOutLocMap = &resUsage->inOutUsage.perPrimitiveOutputLocMap;
+    } else if (m_shaderStage != ShaderStageTessControl || vertexOrPrimIndex) {
+      // Per-vertex output
       inOutLocInfoMap = &resUsage->inOutUsage.outputLocInfoMap;
     } else {
-      // TCS per-patch output
+      // Per-patch output
+      assert(m_shaderStage == ShaderStageTessControl); // Must be TCS
       perPatchInOutLocMap = &resUsage->inOutUsage.perPatchOutputLocMap;
     }
   }
@@ -436,6 +449,10 @@ void InOutBuilder::markGenericInputOutputUsage(bool isOutput, unsigned location,
     if (perPatchInOutLocMap) {
       for (unsigned i = startLocation; i < location + locationCount; ++i)
         (*perPatchInOutLocMap)[i] = InvalidValue;
+    }
+    if (perPrimitiveInOutLocMap) {
+      for (unsigned i = startLocation; i < location + locationCount; ++i)
+        (*perPrimitiveInOutLocMap)[i] = InvalidValue;
     }
   } else {
     // GS output. We include the stream ID with the location in the map key.
@@ -843,6 +860,10 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
     assert(!index);
     args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
     break;
+  case ShaderStageMesh:
+    assert(!vertexIndex);
+    args.push_back(index ? index : getInt32(InvalidValue));
+    break;
   case ShaderStageFragment:
     if (builtIn == BuiltInSamplePosOffset) {
       // Special case for BuiltInSamplePosOffset: pVertexIndex is the sample number.
@@ -1119,6 +1140,14 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
 #ifndef NDEBUG
   // Assert we have the right type. Allow for ClipDistance/CullDistance being a different array size.
   Type *expectedTy = getBuiltInTy(builtIn, outputInfo);
+  if (builtIn == BuiltInPrimitivePointIndices || builtIn == BuiltInPrimitiveLineIndices ||
+      builtIn == BuiltInPrimitiveTriangleIndices) {
+    // The built-ins PrimitivePointIndices, PrimitiveLineIndices, and PrimitiveTriangleIndices are output arrays
+    // for primitive-based indexing. Writing to the whole array is disallowed.
+    assert(m_shaderStage == ShaderStageMesh && vertexOrPrimitiveIndex);
+    assert(expectedTy->isArrayTy());
+    expectedTy = cast<ArrayType>(expectedTy)->getElementType();
+  }
   if (index) {
     if (isa<ArrayType>(expectedTy))
       expectedTy = cast<ArrayType>(expectedTy)->getElementType();
@@ -1329,6 +1358,41 @@ void InOutBuilder::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySiz
       break;
     case BuiltInViewIndex:
       usage.gs.viewIndex = true;
+      break;
+    default:
+      break;
+    }
+    break;
+  }
+
+  case ShaderStageMesh: {
+    switch (builtIn) {
+    case BuiltInDrawIndex:
+      usage.mesh.drawIndex = true;
+      break;
+    case BuiltInViewIndex:
+      usage.mesh.viewIndex = true;
+      break;
+    case BuiltInNumWorkgroups:
+      usage.mesh.numWorkgroups = true;
+      break;
+    case BuiltInWorkgroupId:
+      usage.mesh.workgroupId = true;
+      break;
+    case BuiltInLocalInvocationId:
+      usage.mesh.localInvocationId = true;
+      break;
+    case BuiltInGlobalInvocationId:
+      usage.mesh.globalInvocationId = true;
+      break;
+    case BuiltInLocalInvocationIndex:
+      usage.mesh.localInvocationIndex = true;
+      break;
+    case BuiltInSubgroupId:
+      usage.mesh.subgroupId = true;
+      break;
+    case BuiltInNumSubgroups:
+      usage.mesh.numSubgroups = true;
       break;
     default:
       break;
@@ -1578,6 +1642,40 @@ void InOutBuilder::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySiz
     if (streamId != InvalidValue)
       getPipelineState()->getShaderResourceUsage(m_shaderStage)->inOutUsage.gs.rasterStream = streamId;
     break;
+  }
+
+  case ShaderStageMesh: {
+    switch (builtIn) {
+    case BuiltInPointSize:
+      usage.mesh.pointSize = true;
+      break;
+    case BuiltInPosition:
+      usage.mesh.position = true;
+      break;
+    case BuiltInClipDistance:
+      usage.mesh.clipDistance = std::max(usage.mesh.clipDistance, arraySize);
+      break;
+    case BuiltInCullDistance:
+      usage.mesh.cullDistance = std::max(usage.mesh.cullDistance, arraySize);
+      break;
+    case BuiltInPrimitiveId:
+      usage.mesh.primitiveId = true;
+      break;
+    case BuiltInViewportIndex:
+      usage.mesh.viewportIndex = true;
+      break;
+    case BuiltInLayer:
+      usage.mesh.layer = true;
+      break;
+    case BuiltInCullPrimitive:
+      usage.mesh.cullPrimitive = true;
+      break;
+    case BuiltInPrimitiveShadingRate:
+      usage.mesh.primitiveShadingRate = true;
+      break;
+    default:
+      break;
+    }
   }
 
   case ShaderStageFragment: {

@@ -533,7 +533,7 @@ private:
 
   // Mark usage for a generic (user) input or output
   void markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount, InOutInfo &inOutInfo,
-                                   llvm::Value *vertexIndex);
+                                   llvm::Value *vertexOrPrimIndex);
 
   // Mark interpolation info for FS input.
   void markInterpolationInfo(InOutInfo &interpInfo);
