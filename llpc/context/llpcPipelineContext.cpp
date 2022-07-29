@@ -550,12 +550,13 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
 
     destNode.sizeInDwords = node.sizeInDwords;
     destNode.offsetInDwords = node.offsetInDwords;
-    destNode.matchType = ResourceNodeType::Unknown;
+    destNode.abstractType = ResourceNodeType::Unknown;
 
     switch (node.type) {
     case ResourceMappingNodeType::DescriptorTableVaPtr: {
       // Process an inner table.
-      destNode.type = ResourceNodeType::DescriptorTableVaPtr;
+      destNode.concreteType = ResourceNodeType::DescriptorTableVaPtr;
+      destNode.abstractType = ResourceNodeType::DescriptorTableVaPtr;
       destInnerTable -= node.tablePtr.nodeCount;
       destNode.innerTable = ArrayRef<ResourceNode>(destInnerTable, node.tablePtr.nodeCount);
       setUserDataNodesTable(pipeline, ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
@@ -564,13 +565,15 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
     }
     case ResourceMappingNodeType::IndirectUserDataVaPtr: {
       // Process an indirect pointer.
-      destNode.type = ResourceNodeType::IndirectUserDataVaPtr;
+      destNode.concreteType = ResourceNodeType::IndirectUserDataVaPtr;
+      destNode.abstractType = ResourceNodeType::IndirectUserDataVaPtr;
       destNode.indirectSizeInDwords = node.userDataPtr.sizeInDwords;
       break;
     }
     case ResourceMappingNodeType::StreamOutTableVaPtr: {
       // Process an indirect pointer.
-      destNode.type = ResourceNodeType::StreamOutTableVaPtr;
+      destNode.concreteType = ResourceNodeType::StreamOutTableVaPtr;
+      destNode.abstractType = ResourceNodeType::StreamOutTableVaPtr;
       destNode.indirectSizeInDwords = node.userDataPtr.sizeInDwords;
       break;
     }
@@ -607,23 +610,23 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       // A "PushConst" is in fact an InlineBuffer when it appears in a non-root table.
       if (node.type == ResourceMappingNodeType::PushConst && !isRoot)
 #endif
-        destNode.type = ResourceNodeType::InlineBuffer;
+        destNode.concreteType = ResourceNodeType::InlineBuffer;
       else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
-        destNode.type = ResourceNodeType::DescriptorResource;
+        destNode.concreteType = ResourceNodeType::DescriptorResource;
       else if (node.type == ResourceMappingNodeType::DescriptorImage)
-        destNode.type = ResourceNodeType::DescriptorResource;
+        destNode.concreteType = ResourceNodeType::DescriptorResource;
       else if (node.type == ResourceMappingNodeType::DescriptorConstTexelBuffer)
-        destNode.type = ResourceNodeType::DescriptorTexelBuffer;
+        destNode.concreteType = ResourceNodeType::DescriptorTexelBuffer;
       else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBufferCompact)
-        destNode.type = ResourceNodeType::DescriptorBufferCompact;
+        destNode.concreteType = ResourceNodeType::DescriptorBufferCompact;
       else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
-        destNode.type = ResourceNodeType::DescriptorBuffer;
+        destNode.concreteType = ResourceNodeType::DescriptorBuffer;
       else
-        destNode.type = static_cast<ResourceNodeType>(node.type);
+        destNode.concreteType = static_cast<ResourceNodeType>(node.type);
 
       destNode.set = node.srdRange.set;
       destNode.binding = node.srdRange.binding;
-      destNode.matchType = destNode.type;
+      destNode.abstractType = destNode.concreteType;
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
       switch (node.type) {

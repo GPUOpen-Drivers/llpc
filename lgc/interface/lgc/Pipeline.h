@@ -138,10 +138,10 @@ struct Options {
   unsigned reserved0f;                 // Reserved for future functionality
   unsigned useResourceBindingRange;    // A resource node binding is the start of a range whose size is
                                        //  sizeInDwords/stride.
-  unsigned reserved1f;                // Reserved for future functionality
-  unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
-  unsigned pageMigrationEnabled;  // Enable page migration
-  ResourceLayoutScheme resourceLayoutScheme; // Resource layout scheme
+  unsigned reserved1f;                 // Reserved for future functionality
+  unsigned enableInterpModePatch;      // Enable to do per-sample interpolation for nonperspective and smooth input
+  unsigned pageMigrationEnabled;       // Enable page migration
+  ResourceLayoutScheme resourceLayoutScheme;     // Resource layout scheme
   ThreadGroupSwizzleMode threadGroupSwizzleMode; // Thread group swizzle mode
 };
 
@@ -241,10 +241,10 @@ struct ShaderOptions {
 struct ResourceNode {
   ResourceNode() {}
 
-  ResourceNodeType type;      // Type of this node
-  ResourceNodeType matchType; // Node type for resource node matching
-  unsigned sizeInDwords;      // Size in dwords
-  unsigned offsetInDwords;    // Offset in dwords
+  ResourceNodeType concreteType; // Underlying actual type of this node
+  ResourceNodeType abstractType; // Node type for resource node matching
+  unsigned sizeInDwords;         // Size in dwords
+  unsigned offsetInDwords;       // Offset in dwords
 
   union {
     // Info for generic descriptor nodes.

@@ -527,7 +527,7 @@ unsigned ShaderSystemValues::findResourceNodeByDescSet(unsigned descSet) {
   auto userDataNodes = m_pipelineState->getUserDataNodes();
   for (unsigned i = 0; i < userDataNodes.size(); ++i) {
     auto node = &userDataNodes[i];
-    if (node->type == ResourceNodeType::DescriptorTableVaPtr && node->innerTable[0].set == descSet)
+    if (node->concreteType == ResourceNodeType::DescriptorTableVaPtr && node->innerTable[0].set == descSet)
       return i;
   }
   return InvalidValue;

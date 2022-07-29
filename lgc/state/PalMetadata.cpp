@@ -436,15 +436,15 @@ void PalMetadata::fixUpRegisters() {
   SmallVector<const ResourceNode *, 4> descSetNodes;
   const ResourceNode *pushConstNode = nullptr;
   for (const auto &node : m_pipelineState->getUserDataNodes()) {
-    if (node.type == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
+    if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
       size_t descSet = node.innerTable[0].set;
       descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
       descSetNodes[descSet] = &node;
-    } else if (node.type == ResourceNodeType::DescriptorBuffer) {
+    } else if (node.concreteType == ResourceNodeType::DescriptorBuffer) {
       size_t descSet = node.set;
       descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
       descSetNodes[descSet] = &node;
-    } else if (node.type == ResourceNodeType::PushConst) {
+    } else if (node.concreteType == ResourceNodeType::PushConst) {
       pushConstNode = &node;
     }
   }
@@ -673,7 +673,8 @@ void PalMetadata::setRegister(unsigned regNum, unsigned newValue) {
 void PalMetadata::setUserDataLimit() {
   unsigned userDataLimit = 0;
   for (auto &node : m_pipelineState->getUserDataNodes()) {
-    if (node.type != ResourceNodeType::IndirectUserDataVaPtr && node.type != ResourceNodeType::StreamOutTableVaPtr)
+    if (node.concreteType != ResourceNodeType::IndirectUserDataVaPtr &&
+        node.concreteType != ResourceNodeType::StreamOutTableVaPtr)
       userDataLimit = std::max(userDataLimit, node.offsetInDwords + node.sizeInDwords);
   }
   *m_userDataLimit = userDataLimit;

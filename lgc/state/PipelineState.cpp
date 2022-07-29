@@ -521,7 +521,7 @@ void PipelineState::setUserDataNodes(ArrayRef<ResourceNode> nodes) {
   // Count how many entries in total and allocate the buffer.
   unsigned nodeCount = nodes.size();
   for (auto &node : nodes) {
-    if (node.type == ResourceNodeType::DescriptorTableVaPtr)
+    if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr)
       nodeCount += node.innerTable.size();
   }
   assert(m_allocUserDataNodes == nullptr);
@@ -550,7 +550,7 @@ void PipelineState::setUserDataNodesTable(ArrayRef<ResourceNode> nodes, Resource
     // Copy the node.
     destNode = node;
 
-    switch (node.type) {
+    switch (node.concreteType) {
     case ResourceNodeType::DescriptorTableVaPtr:
       // Process an inner table.
       destInnerTable -= node.innerTable.size();
@@ -601,17 +601,17 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
 
   for (const ResourceNode &node : nodes) {
     SmallVector<Metadata *, 5> operands;
-    assert(node.type < ResourceNodeType::Count);
+    assert(node.concreteType < ResourceNodeType::Count);
     // Operand 0: type
-    operands.push_back(getResourceTypeName(node.type));
+    operands.push_back(getResourceTypeName(node.concreteType));
     // Operand 1: matchType
-    operands.push_back(ConstantAsMetadata::get(builder.getInt32(static_cast<uint32_t>(node.matchType))));
+    operands.push_back(ConstantAsMetadata::get(builder.getInt32(static_cast<uint32_t>(node.abstractType))));
     // Operand 2: offsetInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.offsetInDwords)));
     // Operand 3: sizeInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.sizeInDwords)));
 
-    switch (node.type) {
+    switch (node.concreteType) {
     case ResourceNodeType::DescriptorTableVaPtr: {
       // Operand 4: Node count in sub-table.
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.innerTable.size())));
@@ -671,16 +671,16 @@ void PipelineState::readUserDataNodes(Module *module) {
   for (unsigned nodeIndex = 0; nodeIndex < totalNodeCount; ++nodeIndex) {
     MDNode *metadataNode = userDataMetaNode->getOperand(nodeIndex);
     // Operand 0: node type
-    nextNode->type = getResourceTypeFromName(cast<MDString>(metadataNode->getOperand(0)));
+    nextNode->concreteType = getResourceTypeFromName(cast<MDString>(metadataNode->getOperand(0)));
     // Operand 1: matchType
-    nextNode->matchType =
+    nextNode->abstractType =
         static_cast<ResourceNodeType>(mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue());
     // Operand 2: offsetInDwords
     nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
     // Operand 3: sizeInDwords
     nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
 
-    if (nextNode->type == ResourceNodeType::DescriptorTableVaPtr) {
+    if (nextNode->concreteType == ResourceNodeType::DescriptorTableVaPtr) {
       // Operand 4: number of nodes in inner table
       unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
       // Go into inner table.
@@ -691,8 +691,8 @@ void PipelineState::readUserDataNodes(Module *module) {
       nextOuterNode->innerTable = ArrayRef<ResourceNode>(nextNode, innerNodeCount);
       ++nextOuterNode;
     } else {
-      if (nextNode->type == ResourceNodeType::IndirectUserDataVaPtr ||
-          nextNode->type == ResourceNodeType::StreamOutTableVaPtr) {
+      if (nextNode->concreteType == ResourceNodeType::IndirectUserDataVaPtr ||
+          nextNode->concreteType == ResourceNodeType::StreamOutTableVaPtr) {
         // Operand 4: Size of the indirect data in dwords
         nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
       } else {
@@ -733,10 +733,10 @@ void PipelineState::readUserDataNodes(Module *module) {
 // Returns the resource node for the push constant.
 const ResourceNode *PipelineState::findPushConstantResourceNode() const {
   for (const ResourceNode &node : getUserDataNodes()) {
-    if (node.type == ResourceNodeType::PushConst)
+    if (node.concreteType == ResourceNodeType::PushConst)
       return &node;
-    if (node.type == ResourceNodeType::DescriptorTableVaPtr) {
-      if (!node.innerTable.empty() && node.innerTable[0].type == ResourceNodeType::PushConst) {
+    if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
+      if (!node.innerTable.empty() && node.innerTable[0].concreteType == ResourceNodeType::PushConst) {
         assert(ResourceLayoutScheme::Indirect == m_options.resourceLayoutScheme);
         return &node;
       }
@@ -815,7 +815,7 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
 // @param binding : Descriptor binding being searched for
 bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, unsigned descSet,
                                       unsigned binding) const {
-  if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.matchType))
+  if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.abstractType))
     return false;
   if (node.binding == binding)
     return true;
@@ -840,10 +840,10 @@ bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType
 std::pair<const ResourceNode *, const ResourceNode *>
 PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, unsigned binding) const {
   for (const ResourceNode &node : getUserDataNodes()) {
-    if (!nodeTypeHasBinding(node.type))
+    if (!nodeTypeHasBinding(node.concreteType))
       continue;
 
-    if (node.type == ResourceNodeType::DescriptorTableVaPtr) {
+    if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
       if (nodeType == ResourceNodeType::DescriptorTableVaPtr) {
         assert(!node.innerTable.empty());
 
@@ -883,7 +883,7 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
 // @param nodeType : Type of the resource mapping node
 const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType) const {
   for (const ResourceNode &node : getUserDataNodes()) {
-    if (node.type == nodeType)
+    if (node.concreteType == nodeType)
       return &node;
   }
   return nullptr;
