@@ -108,6 +108,8 @@ private:
                                           llvm::Value *vertexIdx, llvm::Instruction *insertPos);
   llvm::Value *patchGsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *vertexIdx,
                                          llvm::Instruction *insertPos);
+  llvm::Value *patchMeshBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
+                                           llvm::Instruction *insertPos);
   llvm::Value *patchFsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *sampleId,
                                          llvm::Instruction *insertPos);
   llvm::Value *getSamplePosOffset(llvm::Type *inputTy, llvm::Value *sampleId, llvm::Instruction *insertPos);
