@@ -1166,20 +1166,25 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
 
   // For now, this just generates a call to lgc.output.export.builtin. A future commit will
   // change it to generate IR more directly here.
-  // A vertex index is valid only in TCS.
+  // A vertex/primitive index is valid only in TCS and mesh shader.
   // Currently we can only cope with an array/vector index in TCS.
   //
-  // VS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
+  // VS: @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
   // TCS: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx, %Type% outputValue)
   // TES: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, %Type% outputValue)
-  // GS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
-  // FS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
+  // GS: @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
+  // Mesh: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexOrPrimitiveIdx,
+  //                                                   i1 perPrimitive, %Type% outputValue)
+  // FS: @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
   SmallVector<Value *, 4> args;
   args.push_back(getInt32(builtIn));
   switch (m_shaderStage) {
   case ShaderStageTessControl:
+  case ShaderStageMesh:
     args.push_back(index ? index : getInt32(InvalidValue));
     args.push_back(vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : getInt32(InvalidValue));
+    if (m_shaderStage == ShaderStageMesh)
+      args.push_back(getInt1(outputInfo.isPerPrimitive()));
     break;
   case ShaderStageGeometry:
     assert(!index && !vertexOrPrimitiveIndex);

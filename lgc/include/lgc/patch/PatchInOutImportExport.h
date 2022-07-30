@@ -127,6 +127,9 @@ private:
   void patchTesBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
   void patchGsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, unsigned streamId,
                                   llvm::Instruction *insertPos);
+  void patchMeshBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
+                                    llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
+                                    llvm::Instruction *insertPos);
   void patchFsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
 
   void patchCopyShaderGenericOutputExport(llvm::Value *output, unsigned location, llvm::Instruction *insertPos);
