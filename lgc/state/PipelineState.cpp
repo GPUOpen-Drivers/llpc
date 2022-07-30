@@ -1481,6 +1481,14 @@ void PipelineState::initializeInOutPackState() {
     m_outputPackState[ShaderStageVertex] = true;
     m_outputPackState[ShaderStageTessEval] = true;
     m_outputPackState[ShaderStageGeometry] = true;
+
+    // NOTE: For mesh shader, we don't do in-out packing currently in that mesh shader could emit per-vertex outputs
+    // and per-primitive outputs, which introduces additional complexity and this complexity increases with the
+    // involvement of dynamic indexing.
+    if (hasShaderStage(ShaderStageMesh)) {
+      m_outputPackState[ShaderStageMesh] = false;
+      m_inputPackState[ShaderStageFragment] = false;
+    }
   } else {
     // For unlinked shaders, we can do in-out packing if the pipeline has two adjacent shaders.
     // We are assuming that if any of the vertex processing, then the vertex processing stages are complete.  For

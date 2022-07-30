@@ -329,7 +329,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
   switch (m_shaderStage) {
   case ShaderStageVertex:
   case ShaderStageTessEval: {
-    // VS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // VS: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     // TES: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
@@ -337,18 +337,23 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
     break;
   }
 
-  case ShaderStageTessControl: {
+  case ShaderStageTessControl:
+  case ShaderStageMesh: {
     // TCS: @lgc.output.export.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx,
     //                                        %Type% outputValue)
+    // Mesh: @lgc.output.export.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexOrPrimitiveIdx, i1
+    //                                         perPrimitive, %Type% outputValue)
     args.push_back(getInt32(location));
     args.push_back(locationOffset);
     args.push_back(elemIdx);
     args.push_back(vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : getInt32(InvalidValue));
+    if (m_shaderStage == ShaderStageMesh)
+      args.push_back(getInt1(outputInfo.isPerPrimitive()));
     break;
   }
 
   case ShaderStageGeometry: {
-    // GS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
+    // GS: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
     unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
@@ -361,7 +366,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
     // Mark fragment output type.
     markFsOutputType(valueToWrite->getType(), location, outputInfo);
 
-    // FS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // FS: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
     args.push_back(elemIdx);
