@@ -100,6 +100,9 @@ private:
                                    llvm::Instruction *insertPos);
   void patchGsGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                                   llvm::Instruction *insertPos);
+  void patchMeshGenericOutputExport(llvm::Value *output, unsigned location, llvm::Value *locOffset,
+                                    llvm::Value *compIdx, llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
+                                    llvm::Instruction *insertPos);
 
   llvm::Value *patchVsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Instruction *insertPos);
   llvm::Value *patchTcsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,

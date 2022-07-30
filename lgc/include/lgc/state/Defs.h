@@ -75,6 +75,8 @@ const static char MeshTaskWriteTaskPayload[] = "lgc.mesh.task.write.task.payload
 const static char MeshTaskEmitMeshTasks[] = "lgc.mesh.task.emit.mesh.tasks";
 const static char MeshTaskSetMeshOutputs[] = "lgc.mesh.task.set.mesh.outputs";
 const static char MeshTaskGetMeshInput[] = "lgc.mesh.task.get.mesh.input.";
+const static char MeshTaskWriteVertexOutput[] = "lgc.mesh.task.write.vertex.output.";
+const static char MeshTaskWritePrimitiveOutput[] = "lgc.mesh.task.write.primitive.output.";
 
 // Get pointer to spill table (as pointer to i8)
 const static char SpillTable[] = "lgc.spill.table";

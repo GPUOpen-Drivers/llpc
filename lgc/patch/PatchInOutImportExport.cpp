@@ -948,10 +948,11 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         origLocInfo.setStreamId(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
       auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
 
-      if (m_shaderStage == ShaderStageTessControl) {
+      if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageMesh) {
         locOffset = callInst.getOperand(1);
 
-        // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
+        // NOTE: For generic outputs of tessellation control shader or mesh shader, they could be per-patch ones or
+        // per-primitive ones.
         if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
           exist = true;
           loc = locInfoMapIt->second.getLocation();
@@ -959,6 +960,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
                    resUsage->inOutUsage.perPatchOutputLocMap.end()) {
           exist = true;
           loc = resUsage->inOutUsage.perPatchOutputLocMap[value];
+        } else if (resUsage->inOutUsage.perPrimitiveOutputLocMap.find(value) !=
+                   resUsage->inOutUsage.perPrimitiveOutputLocMap.end()) {
+          exist = true;
+          loc = resUsage->inOutUsage.perPrimitiveOutputLocMap[value];
         }
       } else if (m_shaderStage == ShaderStageCopyShader) {
         exist = true;
@@ -1030,6 +1035,18 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
             elemIdx = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
           const unsigned streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
           patchGsGenericOutputExport(output, loc, elemIdx, streamId, &callInst);
+          break;
+        }
+        case ShaderStageMesh: {
+          assert(callInst.arg_size() == 6);
+
+          auto elemIdx = callInst.getOperand(2);
+          assert(isDontCareValue(elemIdx) == false);
+
+          auto vertexOrPrimitiveIdx = callInst.getOperand(3);
+          bool isPerPrimitive = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue() != 0;
+          patchMeshGenericOutputExport(output, loc, locOffset, elemIdx, vertexOrPrimitiveIdx, isPerPrimitive,
+                                       &callInst);
           break;
         }
         case ShaderStageFragment: {
@@ -2016,6 +2033,38 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
   assert(compIdx <= 4);
 
   storeValueToGsVsRing(output, location, compIdx, streamId, insertPos);
+}
+
+// =====================================================================================================================
+// Patches export calls for generic outputs of mesh shader.
+//
+// @param output : Output value
+// @param location : Base location of the output
+// @param locOffset : Relative location offset
+// @param compIdx : Index used for vector element indexing
+// @param vertexOrPrimitiveIdx : Input array outermost index used for vertex or primitive indexing
+// @param isPerPrimitive : Whether the output is per-primitive
+// @param insertPos : Where to insert the patch instruction
+void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigned location, Value *locOffset,
+                                                          Value *compIdx, Value *vertexOrPrimitiveIdx,
+                                                          bool isPerPrimitive, Instruction *insertPos) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+
+  // outputOffset = (location + locOffset) * 4 + compIdx * (bitWidth == 64 ? 2 : 1)
+  Value *outputOffset = builder.CreateAdd(builder.getInt32(location), locOffset);
+  outputOffset = builder.CreateShl(outputOffset, 2);
+
+  auto outputTy = output->getType();
+  if (outputTy->getScalarSizeInBits() == 64) {
+    compIdx = builder.CreateShl(compIdx, 1);
+  }
+
+  outputOffset = builder.CreateAdd(outputOffset, compIdx);
+
+  std::string callName(isPerPrimitive ? lgcName::MeshTaskWritePrimitiveOutput : lgcName::MeshTaskWriteVertexOutput);
+  callName += getTypeName(outputTy);
+  builder.CreateNamedCall(callName, builder.getVoidTy(), {outputOffset, vertexOrPrimitiveIdx, output}, {});
 }
 
 // =====================================================================================================================
