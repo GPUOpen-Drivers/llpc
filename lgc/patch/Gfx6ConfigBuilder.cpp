@@ -802,9 +802,7 @@ template <typename T> void ConfigBuilder::buildGsRegConfig(ShaderStage shaderSta
   SET_REG_FIELD(&config->gsRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
 
   VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = TRISTRIP;
-  if (inOutUsage.outputMapLocCount == 0)
-    gsOutputPrimitiveType = POINTLIST;
-  else if (geometryMode.outputPrimitive == OutputPrimitives::Points)
+  if (geometryMode.outputPrimitive == OutputPrimitives::Points)
     gsOutputPrimitiveType = POINTLIST;
   else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
     gsOutputPrimitiveType = LINESTRIP;

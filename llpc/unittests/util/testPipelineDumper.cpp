@@ -24,11 +24,17 @@
  **********************************************************************************************************************/
 
 #include "vkgcPipelineDumper.h"
+#include "lgc/EnumIterator.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <memory>
 
 using namespace Vkgc;
+
+namespace llvm {
+// Make Vkgc::ThreadGroupSwizzleMode iterable using `lgc::enumRange<Vkgc::ShaderStage>()`.
+LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(Vkgc::ThreadGroupSwizzleMode, Vkgc::ThreadGroupSwizzleMode::Count);
+} // namespace llvm
 
 namespace Llpc {
 namespace {
@@ -292,7 +298,48 @@ TEST(PipelineDumperTest, TestForceCsThreadIdSwizzlingCompute) {
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
 
+// =====================================================================================================================
+// Test overrideThreadGroupSize option.
+
+TEST(PipelineDumperTest, TestOverrideThreadGroupSizeValue1Compute) {
+  ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
+    buildInfo->options.overrideThreadGroupSizeX = 8;
+    buildInfo->options.overrideThreadGroupSizeY = 8;
+    buildInfo->options.overrideThreadGroupSizeZ = 1;
+  };
+
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &) { return false; };
+  runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
+TEST(PipelineDumperTest, TestOverrideThreadGroupSizeValue2Compute) {
+  ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
+    buildInfo->options.overrideThreadGroupSizeX = 16;
+    buildInfo->options.overrideThreadGroupSizeY = 16;
+    buildInfo->options.overrideThreadGroupSizeZ = 1;
+  };
+
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &) { return false; };
+  runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
 #endif
+
+// =====================================================================================================================
+// Test the threadGroupSwizzleMode option.
+
+TEST(PipelineDumperTest, TestThreadGroupSwizzleModeCompute) {
+  for (ThreadGroupSwizzleMode threadGroupSwizzleMode : lgc::enumRange<ThreadGroupSwizzleMode>()) {
+    ModifyComputeBuildInfo modifyBuildInfo = [threadGroupSwizzleMode](ComputePipelineBuildInfo *buildInfo) {
+      buildInfo->options.threadGroupSwizzleMode = threadGroupSwizzleMode;
+    };
+
+    HashModifiedFunc expectHashToBeEqual = [threadGroupSwizzleMode](const GenerateHashParams &params) {
+      return (threadGroupSwizzleMode == ThreadGroupSwizzleMode::Default);
+    };
+    runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+  }
+}
 
 } // namespace
 } // namespace Llpc

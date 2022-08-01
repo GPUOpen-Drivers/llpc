@@ -232,6 +232,29 @@ public:
   /// @returns : Result::Success if successful. Other return codes indicate failure.
   virtual Result BuildShaderModule(const ShaderModuleBuildInfo *pShaderInfo, ShaderModuleBuildOut *pShaderOut) = 0;
 
+  /// Build unlinked shader to ElfPackage with part pipeline info.
+  ///
+  /// @param [in]  pipelineInfo     : Info to build this shader module
+  /// @param [out] pipelineOut      : Output of building this shader module
+  /// @param [in]  stage            : Shader stage of needing to compile
+  /// @param [out] pipelineDumpFile : Handle of pipeline dump file
+  ///
+  /// @returns : Result::Success if successful. Other return codes indicate failure.
+  virtual Result buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipelineInfo,
+                                          GraphicsPipelineBuildOut *pipelineOut, Vkgc::UnlinkedShaderStage stage,
+                                          void *pipelineDumpFile = nullptr) = 0;
+
+  /// Build the whole graphics pipeline. If missing elfPackage of a certain stage, we will build it first, and
+  /// link them to the full pipeline last.
+  ///
+  /// @param [in]  pipelineInfo : Info to build this shader module
+  /// @param [out] pipelineOut  : Output of building this shader module
+  /// @param [in]  elfPackage   : Early compiled elfPackage; it is an array which size is UnlinkedStageCount.
+  ///
+  /// @returns : Result::Success if successful. Other return codes indicate failure.
+  virtual Result buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *pipelineInfo,
+                                              GraphicsPipelineBuildOut *pipelineOut, const BinaryData *elfPackage) = 0;
+
   /// Build graphics pipeline from the specified info.
   ///
   /// @param [in]  pPipelineInfo  Info to build this graphics pipeline

@@ -97,6 +97,11 @@ public:
 
     ADD_CLASS_ENUM_MAP(ResourceLayoutScheme, Compact)
     ADD_CLASS_ENUM_MAP(ResourceLayoutScheme, Indirect)
+
+    ADD_CLASS_ENUM_MAP(ThreadGroupSwizzleMode, Default)
+    ADD_CLASS_ENUM_MAP(ThreadGroupSwizzleMode, _4x4)
+    ADD_CLASS_ENUM_MAP(ThreadGroupSwizzleMode, _8x8)
+    ADD_CLASS_ENUM_MAP(ThreadGroupSwizzleMode, _16x16)
   }
 };
 

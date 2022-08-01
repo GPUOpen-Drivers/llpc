@@ -630,7 +630,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
         if (!passthroughNoMsg) {
-
           auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
           m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
         } else {
@@ -698,7 +697,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
         if (!passthroughNoMsg) {
-
           auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
           m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
         } else {
@@ -738,8 +736,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(endExpPrimBlock);
 
-      auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
-      m_builder->CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
+      {
+        auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
+        m_builder->CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
+      }
     }
 
     // Construct ".expVert" block

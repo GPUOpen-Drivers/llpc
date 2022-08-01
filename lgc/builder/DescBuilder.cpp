@@ -91,6 +91,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
         desc = UndefValue::get(descTy);
       } else {
         dwordOffset += node->offsetInDwords;
+        dwordOffset += (binding - node->binding) * node->stride;
         desc = CreateNamedCall(callName, descTy, getInt32(dwordOffset), Attribute::ReadNone);
       }
     } else if (node->type == ResourceNodeType::InlineBuffer) {
@@ -403,6 +404,8 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
     // add on the size of the first part.
     unsigned offsetInDwords = node->offsetInDwords;
+    offsetInDwords += (binding - node->binding) * node->stride;
+
     unsigned offsetInBytes = offsetInDwords * 4;
     if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
       offsetInBytes += DescriptorSizeResource;

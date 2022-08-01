@@ -1852,10 +1852,18 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
           buildConstStoreRecursively(spvElementType, elementStoreType->getPointerTo(addrSpace), elementStoreType,
                                      constStoreValue->getAggregateElement(i));
 
-      if (needsPad)
+      if (needsPad) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
+        // Old version of the code
         constElements[i] = ConstantExpr::getInsertValue(constElements[i], constElement, 0);
-      else
+#else
+        // New version of the code (also handles unknown version, which we treat as latest).
+        constElements[i] = llvm::ConstantFoldInsertValueInstruction(constElements[i], constElement, 0);
+        assert(constElements[i] && "unexpected error creating aggregate initializer, malformed aggregate?");
+#endif
+      } else {
         constElements[i] = constElement;
+      }
     }
 
     return ConstantArray::get(cast<ArrayType>(storeType), constElements);
@@ -3959,7 +3967,14 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
 
       Constant *const initializer = transInitializer(spvMembers[i], type->getStructElementType(memberIndex));
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
+      // Old version of the code
       structInitializer = ConstantExpr::getInsertValue(structInitializer, initializer, memberIndex);
+#else
+      // New version of the code (also handles unknown version, which we treat as latest).
+      structInitializer = llvm::ConstantFoldInsertValueInstruction(structInitializer, initializer, memberIndex);
+      assert(structInitializer && "unexpected error creating aggregate initializer, malformed aggregate?");
+#endif
     }
 
     return structInitializer;
@@ -3979,11 +3994,25 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
       if (needsPad) {
         Type *const elementType = type->getArrayElementType()->getStructElementType(0);
         Constant *const initializer = transInitializer(spvElements[i], elementType);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
+        // Old version of the code
         arrayInitializer = ConstantExpr::getInsertValue(arrayInitializer, initializer, {i, 0});
+#else
+        // New version of the code (also handles unknown version, which we treat as latest).
+        arrayInitializer = llvm::ConstantFoldInsertValueInstruction(arrayInitializer, initializer, {i, 0});
+        assert(arrayInitializer && "unexpected error creating aggregate initializer, malformed aggregate?");
+#endif
       } else {
         Type *const elementType = type->getArrayElementType();
         Constant *const initializer = transInitializer(spvElements[i], elementType);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
+        // Old version of the code
         arrayInitializer = ConstantExpr::getInsertValue(arrayInitializer, initializer, i);
+#else
+        // New version of the code (also handles unknown version, which we treat as latest).
+        arrayInitializer = llvm::ConstantFoldInsertValueInstruction(arrayInitializer, initializer, i);
+        assert(arrayInitializer && "unexpected error creating aggregate initializer, malformed aggregate?");
+#endif
       }
     }
 
@@ -4046,7 +4075,19 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   if (storageClass == StorageClassFunction) {
     assert(getBuilder()->GetInsertBlock());
 
+    // Entry block allocas should appear at the start of the basic block so that if the entry block is split by
+    // function inlining or other transforms later on, the allocas stay in the entry block.
+    //
+    // Note that as of this writing, SPIR-V doesn't have the equivalent of C's alloca() builtin, so all allocas
+    // should be entry block allocas.
+    auto insertPoint = getBuilder()->saveIP();
+    BasicBlock *bb = getBuilder()->GetInsertBlock();
+    assert(bb->isEntryBlock());
+    getBuilder()->SetInsertPoint(bb, bb->getFirstInsertionPt());
+
     Value *const var = getBuilder()->CreateAlloca(varType, nullptr, spvVar->getName());
+
+    getBuilder()->restoreIP(insertPoint);
 
     if (initializer)
       getBuilder()->CreateStore(initializer, var);
@@ -6944,14 +6985,23 @@ bool SPIRVToLLVM::transMetadata() {
             }
           }
         }
-
         // clang-format off
-          ComputeShaderMode computeMode = {};
+        ComputeShaderMode computeMode = {};
+        unsigned overrideThreadGroupSizeX = getPipelineOptions()->overrideThreadGroupSizeX;
+        unsigned overrideThreadGroupSizeY = getPipelineOptions()->overrideThreadGroupSizeY;
+        unsigned overrideThreadGroupSizeZ = getPipelineOptions()->overrideThreadGroupSizeZ;
+        if (overrideThreadGroupSizeX != 0 || overrideThreadGroupSizeY != 0 || overrideThreadGroupSizeZ != 0) {
+          computeMode.workgroupSizeX = overrideThreadGroupSizeX;
+          computeMode.workgroupSizeY = overrideThreadGroupSizeY;
+          computeMode.workgroupSizeZ = overrideThreadGroupSizeZ;
+          getBuilder()->setComputeShaderMode(computeMode);
+        }else{
           computeMode.workgroupSizeX = workgroupSizeX;
           computeMode.workgroupSizeY = workgroupSizeY;
           computeMode.workgroupSizeZ = workgroupSizeZ;
           getBuilder()->setComputeShaderMode(computeMode);
-        // clang-format on
+          // clang-format on
+        }
       } else
         llvm_unreachable("Invalid execution model");
 

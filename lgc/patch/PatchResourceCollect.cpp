@@ -370,7 +370,7 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
         return false;
     } else {
       // Check primitive type specified in pipeline state
-      if (primType < PrimitiveType::Triangle_List)
+      if (primType < PrimitiveType::TriangleList)
         return false;
     }
   }
@@ -477,15 +477,15 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     case PrimitiveType::Point:
       inVertsPerPrim = 1;
       break;
-    case PrimitiveType::Line_List:
-    case PrimitiveType::Line_Strip:
+    case PrimitiveType::LineList:
+    case PrimitiveType::LineStrip:
       inVertsPerPrim = 2;
       break;
-    case PrimitiveType::Triangle_List:
-    case PrimitiveType::Triangle_Strip:
-    case PrimitiveType::Triangle_Fan:
-    case PrimitiveType::Triangle_List_Adjacency:
-    case PrimitiveType::Triangle_Strip_Adjacency:
+    case PrimitiveType::TriangleList:
+    case PrimitiveType::TriangleStrip:
+    case PrimitiveType::TriangleFan:
+    case PrimitiveType::TriangleListAdjacency:
+    case PrimitiveType::TriangleStripAdjacency:
       inVertsPerPrim = 3;
       break;
     default:

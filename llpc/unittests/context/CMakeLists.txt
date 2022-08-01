@@ -24,5 +24,6 @@
  #######################################################################################################################
 
 add_llpc_unittest(LlpcContextTests
+  testOptLevel.cpp
   testShaderCache.cpp
 )

@@ -133,11 +133,15 @@ Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
   pipelineInfo->options.scalarBlockLayout = compileInfo.scalarBlockLayout;
   pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo.scratchAccessBoundsChecks;
   pipelineInfo->options.forceCsThreadIdSwizzling = compileInfo.compPipelineInfo.options.forceCsThreadIdSwizzling;
+  pipelineInfo->options.overrideThreadGroupSizeX = compileInfo.compPipelineInfo.options.overrideThreadGroupSizeX;
+  pipelineInfo->options.overrideThreadGroupSizeY = compileInfo.compPipelineInfo.options.overrideThreadGroupSizeY;
+  pipelineInfo->options.overrideThreadGroupSizeZ = compileInfo.compPipelineInfo.options.overrideThreadGroupSizeZ;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   if (compileInfo.optimizationLevel.hasValue()) {
     pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.getValue();
   }
 #endif
+  pipelineInfo->options.threadGroupSwizzleMode = compileInfo.compPipelineInfo.options.threadGroupSwizzleMode;
 
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pComputeInfo = pipelineInfo;

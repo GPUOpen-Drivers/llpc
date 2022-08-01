@@ -1298,9 +1298,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   SET_REG_FIELD(&config->esGsRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
 
   VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = TRISTRIP;
-  if (gsInOutUsage.outputMapLocCount == 0)
-    gsOutputPrimitiveType = POINTLIST;
-  else if (geometryMode.outputPrimitive == OutputPrimitives::Points)
+  if (geometryMode.outputPrimitive == OutputPrimitives::Points)
     gsOutputPrimitiveType = POINTLIST;
   else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
     gsOutputPrimitiveType = LINESTRIP;
@@ -1505,15 +1503,15 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     case PrimitiveType::Point:
       gsOutputPrimitiveType = POINTLIST;
       break;
-    case PrimitiveType::Line_List:
-    case PrimitiveType::Line_Strip:
+    case PrimitiveType::LineList:
+    case PrimitiveType::LineStrip:
       gsOutputPrimitiveType = LINESTRIP;
       break;
-    case PrimitiveType::Triangle_List:
-    case PrimitiveType::Triangle_Strip:
-    case PrimitiveType::Triangle_Fan:
-    case PrimitiveType::Triangle_List_Adjacency:
-    case PrimitiveType::Triangle_Strip_Adjacency:
+    case PrimitiveType::TriangleList:
+    case PrimitiveType::TriangleStrip:
+    case PrimitiveType::TriangleFan:
+    case PrimitiveType::TriangleListAdjacency:
+    case PrimitiveType::TriangleStripAdjacency:
       gsOutputPrimitiveType = TRISTRIP;
       break;
     default:

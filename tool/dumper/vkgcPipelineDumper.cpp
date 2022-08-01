@@ -65,6 +65,7 @@ std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize);
 std::ostream &operator<<(std::ostream &out, ShadowDescriptorTableUsage shadowDescriptorTableUsage);
 std::ostream &operator<<(std::ostream &out, VkProvokingVertexModeEXT provokingVertexMode);
 std::ostream &operator<<(std::ostream &out, ResourceLayoutScheme layout);
+std::ostream &operator<<(std::ostream &out, ThreadGroupSwizzleMode threadGroupSwizzleMode);
 
 template std::ostream &operator<<(std::ostream &out, ElfReader<Elf64> &reader);
 template raw_ostream &operator<<(raw_ostream &out, ElfReader<Elf64> &reader);
@@ -694,6 +695,9 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.robustBufferAccess = " << options->robustBufferAccess << "\n";
   dumpFile << "options.reconfigWorkgroupLayout = " << options->reconfigWorkgroupLayout << "\n";
   dumpFile << "options.forceCsThreadIdSwizzling = " << options->forceCsThreadIdSwizzling << "\n";
+  dumpFile << "options.overrideThreadGroupSizeX = " << options->overrideThreadGroupSizeX << "\n";
+  dumpFile << "options.overrideThreadGroupSizeY = " << options->overrideThreadGroupSizeY << "\n";
+  dumpFile << "options.overrideThreadGroupSizeZ = " << options->overrideThreadGroupSizeZ << "\n";
   dumpFile << "options.shadowDescriptorTableUsage = " << options->shadowDescriptorTableUsage << "\n";
   dumpFile << "options.shadowDescriptorTablePtrHigh = " << options->shadowDescriptorTablePtrHigh << "\n";
   dumpFile << "options.extendedRobustness.robustBufferAccess = " << options->extendedRobustness.robustBufferAccess
@@ -705,6 +709,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   dumpFile << "options.optimizationLevel = " << options->optimizationLevel << "\n";
 #endif
+  dumpFile << "options.threadGroupSwizzleMode = " << options->threadGroupSwizzleMode << "\n";
 }
 
 // =====================================================================================================================
@@ -1098,6 +1103,9 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->robustBufferAccess);
   hasher->Update(options->reconfigWorkgroupLayout);
   hasher->Update(options->forceCsThreadIdSwizzling);
+  hasher->Update(options->overrideThreadGroupSizeX);
+  hasher->Update(options->overrideThreadGroupSizeY);
+  hasher->Update(options->overrideThreadGroupSizeZ);
   hasher->Update(options->enableRelocatableShaderElf);
   hasher->Update(options->disableImageResourceCheck);
   hasher->Update(options->enableScratchAccessBoundsChecks);
@@ -1120,6 +1128,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   hasher->Update(options->optimizationLevel);
 #endif
+  hasher->Update(options->threadGroupSwizzleMode);
 }
 
 // =====================================================================================================================
@@ -2059,6 +2068,26 @@ std::ostream &operator<<(std::ostream &out, ResourceLayoutScheme layout) {
     break;
   }
 
+  return out << string;
+}
+
+// =====================================================================================================================
+// Translates enum "ThreadGroupSwizzleMode" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param threadGroupSwizzleMode : Provoking vertex mode
+std::ostream &operator<<(std::ostream &out, ThreadGroupSwizzleMode threadGroupSwizzleMode) {
+  const char *string = nullptr;
+  switch (threadGroupSwizzleMode) {
+    CASE_CLASSENUM_TO_STRING(ThreadGroupSwizzleMode, Default)
+    CASE_CLASSENUM_TO_STRING(ThreadGroupSwizzleMode, _4x4)
+    CASE_CLASSENUM_TO_STRING(ThreadGroupSwizzleMode, _8x8)
+    CASE_CLASSENUM_TO_STRING(ThreadGroupSwizzleMode, _16x16)
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
   return out << string;
 }
 

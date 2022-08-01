@@ -1115,11 +1115,12 @@ public:
   // @param location : Base location (row) of input
   // @param locationOffset : Location offset; must be within locationCount if variable
   // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
-  // 64-bit elements.)
+  //                  64-bit elements.)
   // @param locationCount : Count of locations taken by the input. Ignored if pLocationOffset is const
   // @param inputInfo : Extra input info (FS interp info)
   // @param vertexIndex : Vertex index (For FS custom interpolated input: auxiliary interpolation value)
   // @param instName : Name to give instruction(s)
+  //
   // @returns Value of input
   virtual llvm::Value *CreateReadPerVertexInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
                                                 llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,

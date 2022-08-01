@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 53
+#define LLPC_INTERFACE_MAJOR_VERSION 54
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 5
+#define LLPC_INTERFACE_MINOR_VERSION 7
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -81,7 +81,10 @@
 //  @page VersionHistory
 //  %Version History
 //  | %Version | Change Description                                                                                    |
-//  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  | -------- | ------------------------------------------------------------------------------------------------------|
+//  |     54.0 | Add overrideThreadGroupSizeX, overrideThreadGroupSizeY and overrideThreadGroupSizeZ  to               |
+//  |          | PipelineOptions                                                                                       |
+//  |     53.7 | Add threadGroupSwizzleMode to PipelineOptions                                                         |
 //  |     53.6 | Add scalarizeWaterfallLoads to PipelineShaderOptions                                                  |
 //  |     53.5 | Add forceCsThreadIdSwizzling for thread id swizzle in 8*4                                             |
 //  |     53.4 | Add ldsSpillLimitDwords shader option                                                                 |
@@ -432,7 +435,11 @@ struct PipelineOptions {
   uint32_t optimizationLevel; ///< The higher the number the more optimizations will be performed.  Valid values are
                               ///< between 0 and 3.
 #endif
+  unsigned overrideThreadGroupSizeX;         ///< Override value for ThreadGroupSizeX
+  unsigned overrideThreadGroupSizeY;         ///< Override value for ThreadGroupSizeY
+  unsigned overrideThreadGroupSizeZ;         ///< Override value for ThreadGroupSizeZ
   ResourceLayoutScheme resourceLayoutScheme; ///< Resource layout scheme
+  ThreadGroupSwizzleMode threadGroupSwizzleMode; /// Controls thread group swizzle mode for compute shader.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

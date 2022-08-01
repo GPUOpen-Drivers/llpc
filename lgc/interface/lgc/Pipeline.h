@@ -95,6 +95,15 @@ enum class WaveBreak : unsigned {
   _32x32 = 0x3,   ///< Outside a 32x32 pixel region
 };
 
+// Enumerate the thread group swizzle modes.
+enum class ThreadGroupSwizzleMode : unsigned {
+  Default = 0, // Use the default layout. There is no swizzling conducted.
+  _4x4 = 1,    // The tile size is 4x4 in x and y dimension.
+  _8x8 = 2,    // The tile size is 8x8 in x and y dimension.
+  _16x16 = 3,  // The tile size is 16x16 in x and y dimension.
+  Count,
+};
+
 // Value for shadowDescriptorTable pipeline option.
 static const unsigned ShadowDescriptorTableDisable = ~0U;
 
@@ -107,6 +116,9 @@ struct Options {
   unsigned reconfigWorkgroupLayout;    // If set, allows automatic workgroup reconfigure to take place on
                                        //   compute shaders.
   bool forceCsThreadIdSwizzling;       // Force rearranges threadId within group into blocks of 8*8 or 8*4.
+  unsigned overrideThreadGroupSizeX;   // Override value for thread group size.X
+  unsigned overrideThreadGroupSizeY;   // Override value for thread group size.Y
+  unsigned overrideThreadGroupSizeZ;   // Override value for thread group size.Z
   unsigned includeIr;                  // If set, the IR for all compiled shaders will be included in the
                                        //   pipeline ELF.
   unsigned nggFlags;                   // Flags to control NGG (NggFlag* values ored together)
@@ -124,11 +136,13 @@ struct Options {
   unsigned allowNullDescriptor;        // Allow and give defined behavior for null descriptor
   unsigned disableImageResourceCheck;  // Don't do image resource type check
   unsigned reserved0f;                 // Reserved for future functionality
-  unsigned reserved10;                 // Reserved for future functionality
+  unsigned useResourceBindingRange;    // A resource node binding is the start of a range whose size is
+                                       //  sizeInDwords/stride.
   unsigned reserved1f;                // Reserved for future functionality
   unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
   unsigned pageMigrationEnabled;  // Enable page migration
   ResourceLayoutScheme resourceLayoutScheme; // Resource layout scheme
+  ThreadGroupSwizzleMode threadGroupSwizzleMode; // Thread group swizzle mode
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.
@@ -236,6 +250,8 @@ struct ResourceNode {
     struct {
       unsigned set;                   // Descriptor set
       unsigned binding;               // Binding
+                                      // If pipeline option "useResourceBindingRange" is set, then this is the
+                                      //  start of a range of bindings whose size is sizeInDwords/stride.
       unsigned stride;                // Size of each descriptor in the indexable range in dwords.
       unsigned immutableSize;         // Size (in units of DescriptorSizeSampler bytes) of immutableValue array
       const uint32_t *immutableValue; // Array of dwords for immutable sampler.
@@ -258,13 +274,13 @@ struct ResourceNode {
 // Primitive type.
 enum class PrimitiveType : unsigned {
   Point = 0,
-  Line_List = 1,
-  Line_Strip = 2,
-  Triangle_List = 3,
-  Triangle_Strip = 4,
-  Triangle_Fan = 5,
-  Triangle_List_Adjacency = 6,
-  Triangle_Strip_Adjacency = 7,
+  LineList = 1,
+  LineStrip = 2,
+  TriangleList = 3,
+  TriangleStrip = 4,
+  TriangleFan = 5,
+  TriangleListAdjacency = 6,
+  TriangleStripAdjacency = 7,
   Rect = 8,
   Quad = 9,
   Patch = 10,

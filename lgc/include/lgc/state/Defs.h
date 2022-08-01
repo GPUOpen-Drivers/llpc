@@ -67,6 +67,7 @@ const static char TfBufferStore[] = "lgc.tfbuffer.store.";
 const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 const static char SwizzleLocalInvocationId[] = "lgc.swizzle.local.invocation.id";
+const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
 const static char MeshTaskReadTaskPayload[] = "lgc.mesh.task.read.task.payload";
 const static char MeshTaskWriteTaskPayload[] = "lgc.mesh.task.write.task.payload";

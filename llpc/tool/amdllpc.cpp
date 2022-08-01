@@ -235,6 +235,37 @@ cl::opt<bool> ForceCsThreadIdSwizzling("force-compute-shader-thread-id-swizzling
                                               cl::desc("force compute shader thread-id swizzling"),
                                               cl::init(false));
 
+// -thread-group-swizzle-mode: specifies the thread group swizzle mode
+cl::opt<ThreadGroupSwizzleMode> ThreadGroupSwizzleModeSetting("thread-group-swizzle-mode",
+                                                              cl::desc("Set thread group swizzle mode\n"),
+                                                              cl::init(ThreadGroupSwizzleMode::Default),
+                                                              values(clEnumValN(ThreadGroupSwizzleMode::Default, "default", "disable thread group swizzle"),
+                                                                     clEnumValN(ThreadGroupSwizzleMode::_4x4, "4x4", "tile size is 4x4 in x and y dimension"),
+                                                                     clEnumValN(ThreadGroupSwizzleMode::_8x8, "8x8", "tile size is 8x8 in x and y dimension"),
+                                                                     clEnumValN(ThreadGroupSwizzleMode::_16x16, "16x16", "tile size is 16x16   in x and y dimension")));
+
+cl::opt<unsigned> OverrideThreadGroupSizeX("override-threadGroupSizeX",
+                                              cl::desc("override threadGroupSize X\n"
+                                                       "0x00 - No override\n"
+                                                       "0x08 - Override threadGroupSizeX with Value:8 in wave32 or wave64\n"
+                                                       "0x10 - Override threadGroupSizeX with Value:16 in wave64\n"),
+                                              cl::init(0));
+
+// -override-threadGroupSizeY
+cl::opt<unsigned> OverrideThreadGroupSizeY("override-threadGroupSizeY",
+                                              cl::desc("override threadGroupSize Y\n"
+                                                       "0x00 - No override\n"
+                                                       "0x08 - Override threadGroupSizeY with Value:8 in wave32 or wave64\n"
+                                                       "0x10 - Override threadGroupSizeY with Value:16 in wave64\n"),
+                                              cl::init(0));
+
+// -override-threadGroupSizeZ
+cl::opt<unsigned> OverrideThreadGroupSizeZ("override-threadGroupSizeZ",
+                                              cl::desc("override threadGroupSize Z\n"
+                                                       "0x00 - No override\n"
+                                                       "0x01 - Override threadGroupSizeZ with Value:1 in wave32 or wave64\n"),
+                                              cl::init(0));
+
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 cl::opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
                                            cl::desc("Filter which types of pipeline dump are disabled\n"
@@ -373,6 +404,11 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
     *static_cast<cl::opt<std::string> *>(opt) = ".";
   }
 
+  if (!InitSpvGen(nullptr)) {
+    LLPC_ERRS("Failed to initialize SPVGEN\n");
+    return Result::ErrorUnavailable;
+  }
+
   // Check to see that the ParsedGfxIp is valid
   std::string gfxIpName = lgc::LgcContext::getGpuNameString(ParsedGfxIp.major, ParsedGfxIp.minor, ParsedGfxIp.stepping);
   if (!lgc::LgcContext::isGpuNameValid(gfxIpName)) {
@@ -395,11 +431,6 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
   //
   // We call this after compiler initialization to account for any flags overridden by LLPC.
   cl::PrintOptionValues();
-
-  if (!InitSpvGen(nullptr)) {
-    LLPC_ERRS("Failed to initialize SPVGEN\n");
-    return Result::ErrorUnavailable;
-  }
 
   if (EnableOuts() && NumThreads != 1) {
     LLPC_ERRS("Verbose output is not available when compiling with multiple threads\n");
@@ -433,6 +464,10 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 #endif
   compileInfo->gfxPipelineInfo.options.resourceLayoutScheme = LayoutScheme;
   compileInfo->compPipelineInfo.options.forceCsThreadIdSwizzling = ForceCsThreadIdSwizzling;
+  compileInfo->compPipelineInfo.options.threadGroupSwizzleMode = ThreadGroupSwizzleModeSetting;
+  compileInfo->compPipelineInfo.options.overrideThreadGroupSizeX = OverrideThreadGroupSizeX;
+  compileInfo->compPipelineInfo.options.overrideThreadGroupSizeY = OverrideThreadGroupSizeY;
+  compileInfo->compPipelineInfo.options.overrideThreadGroupSizeZ = OverrideThreadGroupSizeZ;
 
   // Set NGG control settings
   if (ParsedGfxIp.major >= 10) {
