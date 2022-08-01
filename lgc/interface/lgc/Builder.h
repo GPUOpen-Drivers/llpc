@@ -692,12 +692,8 @@ public:
   enum {
     BufferFlagNonUniform = 1, // Descriptor index is non-uniform
     BufferFlagWritten = 2,    // Buffer is (or might be) written to
-    BufferFlagConst = 4,      // Const buffer: Find a DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
-                              //  descriptor entry, rather than DescriptorBuffer/DescriptorBufferCompact
-    BufferFlagNonConst = 8,   // Non-const buffer: Find a DescriptorBuffer/DescriptorBufferCompact descriptor
-                              //  entry, rather than DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
-    BufferFlagShaderResource = 16, // Flag to find a Descriptor Resource
-    BufferFlagSampler = 32         // Flag to find Descriptor Sampler
+    BufferFlagReserved4 = 4,  // Reserved for future functionality
+    BufferFlagReserved8 = 8,  // Reserved for future functionality
   };
 
   // Get the type of pointer returned by CreateLoadBufferDesc.
@@ -740,14 +736,14 @@ public:
   // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
   // GetTexelBufferDescPtrTy or GetFmaskDescPtrTy, depending on descType.
   //
-  // @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+  // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
   //                   DescriptorTexelBuffer, DescriptorFmask.
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
-  // @param resourceType : Descriptor type to find user resource nodes;
+  // @param abstractType : Descriptor type to find user resource nodes;
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
-                                        ResourceNodeType resourceType, const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, unsigned descSet, unsigned binding,
+                                        ResourceNodeType abstractType, const llvm::Twine &instName = "") = 0;
 
   // Create a load of the push constants pointer.
   // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.

@@ -450,7 +450,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
         static_cast<ResourceNodeType>(cast<ConstantInt>(args[0])->getZExtValue()),
         cast<ConstantInt>(args[1])->getZExtValue(),                                 // descSet
         cast<ConstantInt>(args[2])->getZExtValue(),                                 // binding
-        static_cast<ResourceNodeType>(cast<ConstantInt>(args[3])->getZExtValue())); // resourceType
+        static_cast<ResourceNodeType>(cast<ConstantInt>(args[3])->getZExtValue())); // abstractType
 
   case BuilderRecorder::Opcode::LoadPushConstantsPtr: {
     return m_builder->CreateLoadPushConstantsPtr(call->getType()); // returnTy

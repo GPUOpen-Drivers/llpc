@@ -1085,17 +1085,17 @@ Value *BuilderRecorder::CreateGetDescStride(ResourceNodeType descType, unsigned 
 // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
 // GetTexelBufferDescPtrTy or GetFmaskDescPtrTy, depending on descType.
 //
-// @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+// @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
 //                   DescriptorTexelBuffer, DescriptorFmask.
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
-// @param resourceType : Descriptor type to find user resource nodes;
+// @param abstractType : Descriptor type to find user resource nodes;
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
-                                         ResourceNodeType resourceType, const Twine &instName) {
-  return record(Opcode::GetDescPtr, getDescPtrTy(descType),
-                {getInt32(static_cast<unsigned>(descType)), getInt32(descSet), getInt32(binding),
-                 getInt32(static_cast<unsigned>(resourceType))},
+Value *BuilderRecorder::CreateGetDescPtr(ResourceNodeType concreteType, unsigned descSet, unsigned binding,
+                                         ResourceNodeType abstractType, const Twine &instName) {
+  return record(Opcode::GetDescPtr, getDescPtrTy(concreteType),
+                {getInt32(static_cast<unsigned>(concreteType)), getInt32(descSet), getInt32(binding),
+                 getInt32(static_cast<unsigned>(abstractType))},
                 instName);
 }
 
