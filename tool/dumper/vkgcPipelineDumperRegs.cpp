@@ -367,6 +367,7 @@ const PipelineDumperReg PipelineDumperRegs[] = {
     {0xA29B, "VGT_GS_OUT_PRIM_TYPE"},
     {0xA2A1, "VGT_PRIMITIVEID_EN"},
     {0xA2A5, "VGT_GS_MAX_PRIMS_PER_SUBGROUP"},
+    {0xA2A6, "VGT_DRAW_PAYLOAD_CNTL"},
     {0xA2AA, "IA_MULTI_VGT_PARAM"},
     {0xA2AA, "IA_MULTI_VGT_PARAM_BC"},
     {0xA2AB, "VGT_ESGS_RING_ITEMSIZE"},

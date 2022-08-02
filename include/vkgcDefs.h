@@ -81,8 +81,8 @@
 //  @page VersionHistory
 //  %Version History
 //  | %Version | Change Description                                                                                    |
-//  | -------- | ---------------------------------------------------------------------------------------------|
-//  |     54.1 | Add overrideForceThreadIdSwizzling overrideShaderThreadGroupSizeX, overrideShaderThreadGroupSizeY
+//  | -------- | ------------------------------------------------------------------------------------------------------|
+//  |     54.1 | Add overrideForceThreadIdSwizzling overrideShaderThreadGroupSizeX, overrideShaderThreadGroupSizeY     |
 //  |          | and overrideShaderThreadGroupSizeZ  to PipelineShaderOptions                                          |
 //  |     54.0 | Add overrideThreadGroupSizeX, overrideThreadGroupSizeY and overrideThreadGroupSizeZ to PipelineOptions|
 //  |     53.7 | Add threadGroupSwizzleMode to PipelineOptions                                                         |
