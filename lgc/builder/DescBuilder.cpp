@@ -74,14 +74,14 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       return UndefValue::get(getBufferDescTy(pointeeTy));
     }
 
-    if (node == topNode && isa<Constant>(descIndex) && node->type != ResourceNodeType::InlineBuffer) {
+    if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
       // indexed and is not an InlineBuffer. This lgc.root.descriptor call is by default lowered in
       // PatchEntryPointMutate into a load from the spill table, but it might be able to "unspill" it to
       // directly use shader entry SGPRs.
       // TODO: Handle root InlineBuffer specially in a similar way to PushConst. The default handling is
       // suboptimal as it always loads from the spill table.
-      Type *descTy = getDescTy(node->type);
+      Type *descTy = getDescTy(node->concreteType);
       std::string callName = lgcName::RootDescriptor;
       addTypeMangling(descTy, {}, callName);
       unsigned dwordSize = descTy->getPrimitiveSizeInBits() / 32;
@@ -94,9 +94,9 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
         dwordOffset += (binding - node->binding) * node->stride;
         desc = CreateNamedCall(callName, descTy, getInt32(dwordOffset), Attribute::ReadNone);
       }
-    } else if (node->type == ResourceNodeType::InlineBuffer) {
+    } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
       // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
-      Value *descPtr = getDescPtr(node->type, descSet, binding, topNode, node);
+      Value *descPtr = getDescPtr(node->concreteType, descSet, binding, topNode, node);
       desc = buildInlineBufferDesc(descPtr);
     }
   }
@@ -104,7 +104,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   if (!desc) {
     // Not handled by either of the special cases above...
     // Get a pointer to the descriptor, as a pointer to i8.
-    ResourceNodeType resType = node ? node->type : ResourceNodeType::DescriptorBuffer;
+    ResourceNodeType resType = node ? node->concreteType : ResourceNodeType::DescriptorBuffer;
     Value *descPtr = getDescPtr(resType, descSet, binding, topNode, node);
     // Index it.
     if (descIndex != getInt32(0)) {
@@ -119,7 +119,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
 
   // If it is a compact buffer descriptor, expand it. (That can only happen when user data layout is available;
   // compact buffer descriptors are disallowed when using shader compilation with no user data layout).
-  if (node && node->type == ResourceNodeType::DescriptorBufferCompact)
+  if (node && node->concreteType == ResourceNodeType::DescriptorBufferCompact)
     desc = buildBufferCompactDesc(desc);
 
   if (!instName.isTriviallyEmpty())
@@ -354,7 +354,6 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     Value *useShadowReloc = CreateRelocationConstant(reloc::ShadowDescriptorTableEnabled);
     Value *useShadowTable = CreateICmpNE(useShadowReloc, getInt32(0));
     return CreateSelect(useShadowTable, shadowAddr, nonShadowAddr);
-
   };
 
   // Get the descriptor table pointer.
@@ -406,7 +405,8 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     offsetInDwords += (binding - node->binding) * node->stride;
     unsigned offsetInBytes = offsetInDwords * 4;
 
-    if (resType == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
+    if (resType == ResourceNodeType::DescriptorSampler &&
+        node->concreteType == ResourceNodeType::DescriptorCombinedTexture)
       offsetInBytes += DescriptorSizeResource;
     offset = getInt32(offsetInBytes);
   }

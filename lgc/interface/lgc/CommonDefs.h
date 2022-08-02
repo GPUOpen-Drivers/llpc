@@ -72,7 +72,7 @@ namespace lgc {
 // Enumerates the function of a particular node in a shader's resource mapping graph. Also used as descriptor
 // type in Builder descriptor functions.
 enum class ResourceNodeType : unsigned {
-  Unknown,                   ///< Invalid type
+  Unknown = 0,               ///< Invalid type
   DescriptorResource,        ///< Generic descriptor: resource, including texture resource, image, input
                              ///  attachment
   DescriptorSampler,         ///< Generic descriptor: sampler

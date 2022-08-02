@@ -105,11 +105,12 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
 
       if (!node)
         report_fatal_error("No resource node for " + name);
-      if (node->type == ResourceNodeType::DescriptorBufferCompact)
+      if (node->concreteType == ResourceNodeType::DescriptorBufferCompact)
         getPipelineState()->setError("Cannot relocate to compact buffer descriptor");
 
       value = node->offsetInDwords * 4;
-      if (type == ResourceNodeType::DescriptorSampler && node->type == ResourceNodeType::DescriptorCombinedTexture)
+      if (type == ResourceNodeType::DescriptorSampler &&
+          node->concreteType == ResourceNodeType::DescriptorCombinedTexture)
         value += DescriptorSizeResource;
       return true;
     }
@@ -152,7 +153,7 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
       if (!node)
         report_fatal_error("No resource node for " + name);
 
-      assert(node->type == ResourceNodeType::DescriptorBuffer);
+      assert(node->concreteType == ResourceNodeType::DescriptorBuffer);
       // Check if this is a top-level node.
       value = (node == outerNode) ? 1 : 0;
 

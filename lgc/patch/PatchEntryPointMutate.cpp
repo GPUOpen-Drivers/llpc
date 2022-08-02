@@ -1273,7 +1273,7 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
 
   for (unsigned userDataNodeIdx = 0; userDataNodeIdx != m_pipelineState->getUserDataNodes().size(); ++userDataNodeIdx) {
     const ResourceNode &node = m_pipelineState->getUserDataNodes()[userDataNodeIdx];
-    switch (node.type) {
+    switch (node.concreteType) {
 
     case ResourceNodeType::IndirectUserDataVaPtr:
     case ResourceNodeType::StreamOutTableVaPtr:

@@ -521,7 +521,7 @@ void PipelineState::setUserDataNodes(ArrayRef<ResourceNode> nodes) {
   // Count how many entries in total and allocate the buffer.
   unsigned nodeCount = nodes.size();
   for (auto &node : nodes) {
-    if (node.type == ResourceNodeType::DescriptorTableVaPtr)
+    if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr)
       nodeCount += node.innerTable.size();
   }
   assert(m_allocUserDataNodes == nullptr);
@@ -550,7 +550,7 @@ void PipelineState::setUserDataNodesTable(ArrayRef<ResourceNode> nodes, Resource
     // Copy the node.
     destNode = node;
 
-    switch (node.type) {
+    switch (node.concreteType) {
     case ResourceNodeType::DescriptorTableVaPtr:
       // Process an inner table.
       destInnerTable -= node.innerTable.size();
@@ -601,17 +601,19 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
 
   for (const ResourceNode &node : nodes) {
     SmallVector<Metadata *, 5> operands;
-    assert(node.type < ResourceNodeType::Count);
+    assert(node.concreteType < ResourceNodeType::Count);
     // Operand 0: type
-    operands.push_back(getResourceTypeName(node.type));
-    // Operand 1: offsetInDwords
+    operands.push_back(getResourceTypeName(node.concreteType));
+    // Operand 1: matchType
+    operands.push_back(ConstantAsMetadata::get(builder.getInt32(static_cast<uint32_t>(node.abstractType))));
+    // Operand 2: offsetInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.offsetInDwords)));
-    // Operand 2: sizeInDwords
+    // Operand 3: sizeInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.sizeInDwords)));
 
-    switch (node.type) {
+    switch (node.concreteType) {
     case ResourceNodeType::DescriptorTableVaPtr: {
-      // Operand 3: Node count in sub-table.
+      // Operand 4: Node count in sub-table.
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.innerTable.size())));
       // Create the metadata node here.
       userDataMetaNode->addOperand(MDNode::get(getContext(), operands));
@@ -621,18 +623,18 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
     }
     case ResourceNodeType::IndirectUserDataVaPtr:
     case ResourceNodeType::StreamOutTableVaPtr: {
-      // Operand 3: Size of the indirect data in dwords.
+      // Operand 4: Size of the indirect data in dwords.
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.indirectSizeInDwords)));
       break;
     }
     default: {
-      // Operand 3: set
+      // Operand 4: set
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.set)));
-      // Operand 4: binding
+      // Operand 5: binding
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.binding)));
-      // Operand 5: stride
+      // Operand 6: stride
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.stride)));
-      // Operand 6 onwards: immutable descriptor constants
+      // Operand 7 onwards: immutable descriptor constants
       for (uint32_t element :
            ArrayRef<uint32_t>(node.immutableValue, node.immutableSize * DescriptorSizeSamplerInDwords))
         operands.push_back(ConstantAsMetadata::get(builder.getInt32(element)));
@@ -669,15 +671,18 @@ void PipelineState::readUserDataNodes(Module *module) {
   for (unsigned nodeIndex = 0; nodeIndex < totalNodeCount; ++nodeIndex) {
     MDNode *metadataNode = userDataMetaNode->getOperand(nodeIndex);
     // Operand 0: node type
-    nextNode->type = getResourceTypeFromName(cast<MDString>(metadataNode->getOperand(0)));
-    // Operand 1: offsetInDwords
-    nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue();
-    // Operand 2: sizeInDwords
-    nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
+    nextNode->concreteType = getResourceTypeFromName(cast<MDString>(metadataNode->getOperand(0)));
+    // Operand 1: matchType
+    nextNode->abstractType =
+        static_cast<ResourceNodeType>(mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue());
+    // Operand 2: offsetInDwords
+    nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
+    // Operand 3: sizeInDwords
+    nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
 
-    if (nextNode->type == ResourceNodeType::DescriptorTableVaPtr) {
-      // Operand 3: number of nodes in inner table
-      unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
+    if (nextNode->concreteType == ResourceNodeType::DescriptorTableVaPtr) {
+      // Operand 4: number of nodes in inner table
+      unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
       // Go into inner table.
       assert(!endThisInnerTable);
       endThisInnerTable = endNextInnerTable;
@@ -686,20 +691,20 @@ void PipelineState::readUserDataNodes(Module *module) {
       nextOuterNode->innerTable = ArrayRef<ResourceNode>(nextNode, innerNodeCount);
       ++nextOuterNode;
     } else {
-      if (nextNode->type == ResourceNodeType::IndirectUserDataVaPtr ||
-          nextNode->type == ResourceNodeType::StreamOutTableVaPtr) {
-        // Operand 3: Size of the indirect data in dwords
-        nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
+      if (nextNode->concreteType == ResourceNodeType::IndirectUserDataVaPtr ||
+          nextNode->concreteType == ResourceNodeType::StreamOutTableVaPtr) {
+        // Operand 4: Size of the indirect data in dwords
+        nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
       } else {
-        // Operand 3: set
-        nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
-        // Operand 4: binding
-        nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
-        // Operand 5: stride
-        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
+        // Operand 4: set
+        nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
+        // Operand 5: binding
+        nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
+        // Operand 6: stride
+        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(6))->getZExtValue();
         nextNode->immutableValue = nullptr;
-        // Operand 6 onward: immutable descriptor constants
-        constexpr unsigned ImmutableStartOperand = 6;
+        // Operand 7 onward: immutable descriptor constants
+        constexpr unsigned ImmutableStartOperand = 7;
         unsigned immutableSizeInDwords = metadataNode->getNumOperands() - ImmutableStartOperand;
         nextNode->immutableSize = immutableSizeInDwords / DescriptorSizeSamplerInDwords;
         if (nextNode->immutableSize) {
@@ -728,10 +733,10 @@ void PipelineState::readUserDataNodes(Module *module) {
 // Returns the resource node for the push constant.
 const ResourceNode *PipelineState::findPushConstantResourceNode() const {
   for (const ResourceNode &node : getUserDataNodes()) {
-    if (node.type == ResourceNodeType::PushConst)
+    if (node.concreteType == ResourceNodeType::PushConst)
       return &node;
-    if (node.type == ResourceNodeType::DescriptorTableVaPtr) {
-      if (!node.innerTable.empty() && node.innerTable[0].type == ResourceNodeType::PushConst) {
+    if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
+      if (!node.innerTable.empty() && node.innerTable[0].concreteType == ResourceNodeType::PushConst) {
         assert(ResourceLayoutScheme::Indirect == m_options.resourceLayoutScheme);
         return &node;
       }
@@ -810,7 +815,7 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
 // @param binding : Descriptor binding being searched for
 bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, unsigned descSet,
                                       unsigned binding) const {
-  if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.type))
+  if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.abstractType))
     return false;
   if (node.binding == binding)
     return true;
@@ -835,10 +840,10 @@ bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType
 std::pair<const ResourceNode *, const ResourceNode *>
 PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, unsigned binding) const {
   for (const ResourceNode &node : getUserDataNodes()) {
-    if (!nodeTypeHasBinding(node.type))
+    if (!nodeTypeHasBinding(node.concreteType))
       continue;
 
-    if (node.type == ResourceNodeType::DescriptorTableVaPtr) {
+    if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
       if (nodeType == ResourceNodeType::DescriptorTableVaPtr) {
         assert(!node.innerTable.empty());
 
@@ -878,7 +883,7 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
 // @param nodeType : Type of the resource mapping node
 const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType) const {
   for (const ResourceNode &node : getUserDataNodes()) {
-    if (node.type == nodeType)
+    if (node.concreteType == nodeType)
       return &node;
   }
   return nullptr;
