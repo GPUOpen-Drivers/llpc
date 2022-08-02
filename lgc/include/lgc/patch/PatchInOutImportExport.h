@@ -100,6 +100,9 @@ private:
                                    llvm::Instruction *insertPos);
   void patchGsGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                                   llvm::Instruction *insertPos);
+  void patchMeshGenericOutputExport(llvm::Value *output, unsigned location, llvm::Value *locOffset,
+                                    llvm::Value *compIdx, llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
+                                    llvm::Instruction *insertPos);
 
   llvm::Value *patchVsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Instruction *insertPos);
   llvm::Value *patchTcsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
@@ -124,6 +127,9 @@ private:
   void patchTesBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
   void patchGsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, unsigned streamId,
                                   llvm::Instruction *insertPos);
+  void patchMeshBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
+                                    llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
+                                    llvm::Instruction *insertPos);
   void patchFsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
 
   void patchCopyShaderGenericOutputExport(llvm::Value *output, unsigned location, llvm::Instruction *insertPos);

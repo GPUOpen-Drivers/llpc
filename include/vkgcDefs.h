@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 54
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 7
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ------------------------------------------------------------------------------------------------------|
+//  |     54.2 | Add subgroupSize to PipelineShaderOptions                                                             |
 //  |     54.1 | Add overrideForceThreadIdSwizzling overrideShaderThreadGroupSizeX, overrideShaderThreadGroupSizeY     |
 //  |          | and overrideShaderThreadGroupSizeZ  to PipelineShaderOptions                                          |
 //  |     54.0 | Add overrideThreadGroupSizeX, overrideThreadGroupSizeY and overrideThreadGroupSizeZ to PipelineOptions|
@@ -621,6 +622,8 @@ struct PipelineShaderOptions {
   /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
   unsigned maxThreadGroupsPerComputeUnit;
 
+  unsigned subgroupSize;       ///< The number of invocations in each subgroup, it is a power-of-two. 0 means
+                               ///  the size is unspecified, the current reasonable value should be 32 or 64.
   unsigned waveSize;           ///< Control the number of threads per wavefront (GFX10+)
   bool wgpMode;                ///< Whether to choose WGP mode or CU mode (GFX10+)
   WaveBreakSize waveBreakSize; ///< Size of region to force the end of a wavefront (GFX10+).

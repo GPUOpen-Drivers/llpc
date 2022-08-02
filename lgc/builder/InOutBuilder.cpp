@@ -329,7 +329,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
   switch (m_shaderStage) {
   case ShaderStageVertex:
   case ShaderStageTessEval: {
-    // VS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // VS: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     // TES: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
@@ -337,18 +337,23 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
     break;
   }
 
-  case ShaderStageTessControl: {
+  case ShaderStageTessControl:
+  case ShaderStageMesh: {
     // TCS: @lgc.output.export.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx,
     //                                        %Type% outputValue)
+    // Mesh: @lgc.output.export.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexOrPrimitiveIdx, i1
+    //                                         perPrimitive, %Type% outputValue)
     args.push_back(getInt32(location));
     args.push_back(locationOffset);
     args.push_back(elemIdx);
     args.push_back(vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : getInt32(InvalidValue));
+    if (m_shaderStage == ShaderStageMesh)
+      args.push_back(getInt1(outputInfo.isPerPrimitive()));
     break;
   }
 
   case ShaderStageGeometry: {
-    // GS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
+    // GS: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
     unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : InvalidValue;
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
@@ -361,7 +366,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
     // Mark fragment output type.
     markFsOutputType(valueToWrite->getType(), location, outputInfo);
 
-    // FS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // FS: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
     assert(locationOffset == getInt32(0));
     args.push_back(getInt32(location));
     args.push_back(elemIdx);
@@ -1049,7 +1054,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     // gl_NumSubgroups = (workgroupSize + gl_SubGroupSize - 1) / gl_SubgroupSize
     auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
     unsigned workgroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
-    unsigned subgroupSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
+    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(m_shaderStage);
     unsigned numSubgroups = (workgroupSize + subgroupSize - 1) / subgroupSize;
     return getInt32(numSubgroups);
   }
@@ -1075,7 +1080,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInSubgroupId: {
     // gl_SubgroupID = gl_LocationInvocationIndex / gl_SubgroupSize
     Value *localInvocationIndex = readCsBuiltIn(BuiltInLocalInvocationIndex);
-    unsigned subgroupSize = getPipelineState()->getShaderWaveSize(m_shaderStage);
+    unsigned subgroupSize = getPipelineState()->getShaderSubgroupSize(m_shaderStage);
     return CreateLShr(localInvocationIndex, getInt32(Log2_32(subgroupSize)));
   }
 
@@ -1161,20 +1166,25 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
 
   // For now, this just generates a call to lgc.output.export.builtin. A future commit will
   // change it to generate IR more directly here.
-  // A vertex index is valid only in TCS.
+  // A vertex/primitive index is valid only in TCS and mesh shader.
   // Currently we can only cope with an array/vector index in TCS.
   //
-  // VS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
+  // VS: @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
   // TCS: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx, %Type% outputValue)
   // TES: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, %Type% outputValue)
-  // GS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
-  // FS:  @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
+  // GS: @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
+  // Mesh: @lgc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexOrPrimitiveIdx,
+  //                                                   i1 perPrimitive, %Type% outputValue)
+  // FS: @lgc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
   SmallVector<Value *, 4> args;
   args.push_back(getInt32(builtIn));
   switch (m_shaderStage) {
   case ShaderStageTessControl:
+  case ShaderStageMesh:
     args.push_back(index ? index : getInt32(InvalidValue));
     args.push_back(vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : getInt32(InvalidValue));
+    if (m_shaderStage == ShaderStageMesh)
+      args.push_back(getInt1(outputInfo.isPerPrimitive()));
     break;
   case ShaderStageGeometry:
     assert(!index && !vertexOrPrimitiveIndex);
