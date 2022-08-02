@@ -738,12 +738,12 @@ public:
   //
   // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
   //                   DescriptorTexelBuffer, DescriptorFmask.
+  // @param abstractType : Descriptor type to find user resource nodes;
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
-  // @param abstractType : Descriptor type to find user resource nodes;
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, unsigned descSet, unsigned binding,
-                                        ResourceNodeType abstractType, const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+                                        unsigned binding, const llvm::Twine &instName = "") = 0;
 
   // Create a load of the push constants pointer.
   // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.

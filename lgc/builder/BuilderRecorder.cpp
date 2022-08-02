@@ -1091,11 +1091,11 @@ Value *BuilderRecorder::CreateGetDescStride(ResourceNodeType descType, unsigned 
 // @param binding : Descriptor binding
 // @param abstractType : Descriptor type to find user resource nodes;
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateGetDescPtr(ResourceNodeType concreteType, unsigned descSet, unsigned binding,
-                                         ResourceNodeType abstractType, const Twine &instName) {
+Value *BuilderRecorder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+                                         unsigned binding, const Twine &instName) {
   return record(Opcode::GetDescPtr, getDescPtrTy(concreteType),
-                {getInt32(static_cast<unsigned>(concreteType)), getInt32(descSet), getInt32(binding),
-                 getInt32(static_cast<unsigned>(abstractType))},
+                {getInt32(static_cast<unsigned>(concreteType)), getInt32(static_cast<unsigned>(abstractType)),
+                 getInt32(descSet), getInt32(binding)},
                 instName);
 }
 

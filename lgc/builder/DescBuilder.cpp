@@ -161,12 +161,12 @@ Value *DescBuilder::CreateGetDescStride(ResourceNodeType descType, unsigned desc
 //
 // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
 //                   DescriptorTexelBuffer, DescriptorFmask.
+// @param abstractType : Descriptor type to find user resource nodes;
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
-// @param abstractType : Descriptor type to find user resource nodes;
 // @param instName : Name to give instruction(s)
-Value *DescBuilder::CreateGetDescPtr(ResourceNodeType concreteType, unsigned descSet, unsigned binding,
-                                     ResourceNodeType abstractType, const Twine &instName) {
+Value *DescBuilder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+                                     unsigned binding, const Twine &instName) {
   // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
   // look; we will use relocs instead.
   const ResourceNode *topNode = nullptr;
