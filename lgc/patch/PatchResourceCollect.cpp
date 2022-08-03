@@ -2392,7 +2392,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   // Fill inputLocInfoMap of {TCS, GS, FS} for the packable calls
   unsigned newLocIdx = 0;
   for (auto call : packableCalls) {
-    const bool isInterpolant = isFs && call->arg_size() == 5;
+    const bool isInterpolant = call->getCalledFunction()->getName().startswith(lgcName::InputImportInterpolant);
     unsigned locOffset = 0;
     unsigned compIdxArgIdx = 1;
     if (isInterpolant || isTcs) {
@@ -2708,7 +2708,7 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
     args.push_back(call->getArgOperand(i));
 
   const auto shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
-  bool isInterpolant = shaderStage == ShaderStageFragment && args.size() == 5;
+  bool isInterpolant = call->getCalledFunction()->getName().startswith(lgcName::InputImportInterpolant);
   unsigned elemIdxArgIdx = shaderStage == ShaderStageTessControl || isInterpolant ? 2 : 1;
   unsigned elemIdx = cast<ConstantInt>(args[elemIdxArgIdx])->getZExtValue();
   Type *resultTy = call->getType();
@@ -2893,7 +2893,7 @@ void InOutLocationInfoMapManager::deserializeMap(ArrayRef<std::pair<unsigned, un
 // @param resUsage : The resource usage reference
 void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStage, bool requireDword) {
   const bool isFs = shaderStage == ShaderStageFragment;
-  const bool isInterpolant = isFs && call->arg_size() == 5;
+  const bool isInterpolant = call->getCalledFunction()->getName().startswith(lgcName::InputImportInterpolant);
   unsigned locOffset = 0;
   unsigned compIdxArgIdx = 1;
   if (isInterpolant || shaderStage == ShaderStageTessControl) {
