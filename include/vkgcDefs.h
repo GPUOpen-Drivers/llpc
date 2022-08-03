@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ------------------------------------------------------------------------------------------------------|
+//  |     54.4 | Add disableScalarizer to PipelineOptions                                                              |
 //  |     54.3 | Add usePointSize to ShaderModuleUsage                                                                 |
 //  |     54.2 | Add subgroupSize to PipelineShaderOptions                                                             |
 //  |     54.1 | Add overrideForceThreadIdSwizzling overrideShaderThreadGroupSizeX, overrideShaderThreadGroupSizeY     |
@@ -436,6 +437,7 @@ struct PipelineOptions {
   bool reserved1f;                                       /// Reserved for future functionality
   bool enableInterpModePatch; ///< If set, per-sample interpolation for nonperspective and smooth input is enabled
   bool pageMigrationEnabled;  ///< If set, page migration is enabled
+  bool disableScalarizer;     ///< If set, LLVM scalarizer pass is disabled
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   uint32_t optimizationLevel; ///< The higher the number the more optimizations will be performed.  Valid values are
                               ///< between 0 and 3.

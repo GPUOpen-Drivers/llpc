@@ -100,6 +100,9 @@ static cl::opt<bool> DisableFetchShader("disable-fetch-shader", cl::desc("Disabl
 static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl::desc("Disable color export shaders"),
                                               cl::init(false));
 
+// -disable-scalarizer: disable the LLVM Scalarizer pass
+static cl::opt<bool> DisableScalarizer("disable-scalarizer", cl::desc("Disable LLVM scalarizer pass"), cl::init(false));
+
 // -subgroup-size: sub-group size exposed via Vulkan API.
 static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), cl::init(64));
 
@@ -355,6 +358,8 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
   options.pageMigrationEnabled = getPipelineOptions()->pageMigrationEnabled;
   options.resourceLayoutScheme = static_cast<lgc::ResourceLayoutScheme>(getPipelineOptions()->resourceLayoutScheme);
 
+  options.disableScalarizer = (DisableScalarizer || getPipelineOptions()->disableScalarizer);
+  
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;
   if (pipeline)

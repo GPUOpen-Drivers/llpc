@@ -141,6 +141,7 @@ struct Options {
   unsigned reserved1f;                // Reserved for future functionality
   unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
   unsigned pageMigrationEnabled;  // Enable page migration
+  bool disableScalarizer; // Don't run the scalarizer.
   ResourceLayoutScheme resourceLayoutScheme; // Resource layout scheme
   ThreadGroupSwizzleMode threadGroupSwizzleMode; // Thread group swizzle mode
 };

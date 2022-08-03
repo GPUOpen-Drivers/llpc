@@ -136,7 +136,8 @@ public:
   static llvm::GlobalVariable *getLdsVariable(PipelineState *pipelineState, llvm::Module *module);
 
 protected:
-  static void addOptimizationPasses(lgc::PassManager &passMgr, llvm::CodeGenOpt::Level optLevel);
+  static void addOptimizationPasses(lgc::PassManager &passMgr, llvm::CodeGenOpt::Level optLevel,
+                                    bool disableScalarizer);
 
   void init(llvm::Module *module);
 

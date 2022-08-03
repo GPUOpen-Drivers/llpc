@@ -155,7 +155,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
     LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
   }
 
-  addOptimizationPasses(passMgr, optLevel);
+  addOptimizationPasses(passMgr, optLevel, pipelineState->getOptions().disableScalarizer);
 
   if (patchTimer) {
     LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
@@ -379,7 +379,8 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param optLevel : The optimization level uses to adjust the aggressiveness of
 //                   passes and which passes to add.
-void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level optLevel) {
+// @param disableScalarizer : Whether the scalarizer pass should be disabled.
+void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level optLevel, bool disableScalarizer) {
   LLPC_OUTS("PassManager optimization level = " << optLevel << "\n");
 
   passMgr.addPass(ForceFunctionAttrsPass());
@@ -413,7 +414,10 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm2), true));
   fpm.addPass(LoopUnrollPass(
       LoopUnrollOptions(optLevel).setPeeling(true).setRuntime(false).setUpperBound(false).setPartial(false)));
-  fpm.addPass(ScalarizerPass());
+  
+  if (!disableScalarizer)
+    fpm.addPass(ScalarizerPass());
+    
   fpm.addPass(PatchLoadScalarizer());
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(NewGVNPass());
