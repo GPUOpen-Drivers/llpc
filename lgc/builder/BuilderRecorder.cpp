@@ -1087,9 +1087,9 @@ Value *BuilderRecorder::CreateGetDescStride(ResourceNodeType descType, unsigned 
 //
 // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
 //                   DescriptorTexelBuffer, DescriptorFmask.
+// @param abstractType : Descriptor type to find user resource nodes;
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
-// @param abstractType : Descriptor type to find user resource nodes;
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
                                          unsigned binding, const Twine &instName) {
