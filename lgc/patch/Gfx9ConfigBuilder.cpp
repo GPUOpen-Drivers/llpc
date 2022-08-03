@@ -1538,7 +1538,6 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   unsigned cbShaderMask = resUsage->inOutUsage.fs.cbShaderMask;
   cbShaderMask = resUsage->inOutUsage.fs.isNullFs ? 0 : cbShaderMask;
   SET_REG(&config->psRegs, CB_SHADER_MASK, cbShaderMask);
-  SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, resUsage->inOutUsage.fs.interpInfo.size());
 
   auto waveFrontSize = m_pipelineState->getShaderWaveSize(shaderStage);
   if (waveFrontSize == 32) {
@@ -1558,12 +1557,16 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
 
   // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none
   // were identified in the shader.
-  const std::vector<FsInterpInfo> dummyInterpInfo{{0, false, false, false, false, false}};
+  const std::vector<FsInterpInfo> dummyInterpInfo{{0, false, false, false, false, false, false}};
   const auto &fsInterpInfo = resUsage->inOutUsage.fs.interpInfo;
   const auto *interpInfo = fsInterpInfo.size() == 0 ? &dummyInterpInfo : &fsInterpInfo;
 
+  unsigned numPrimInterp = 0;
   for (unsigned i = 0; i < interpInfo->size(); ++i) {
     auto interpInfoElem = (*interpInfo)[i];
+
+    if (interpInfoElem.isPerPrimitive)
+      ++numPrimInterp;
 
     if (!m_pipelineState->isWholePipeline() && interpInfoElem.loc == InvalidFsInterpInfo.loc) {
       appendConfig(mmSPI_PS_INPUT_CNTL_0 + i, i);
@@ -1574,7 +1577,8 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
       interpInfoElem.loc = i;
 
     regSPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
-    spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat;
+    // NOTE: Flat shading flag is only set for per-vertex parameter.
+    spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat && !interpInfoElem.isPerPrimitive;
     spiPsInputCntl.bits.OFFSET = interpInfoElem.loc;
 
     if (interpInfoElem.custom) {
@@ -1601,6 +1605,11 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     // can be amended.
     appendConfig(mmSPI_PS_INPUT_CNTL_0 + i, spiPsInputCntl.u32All);
   }
+
+  const unsigned numInterp = resUsage->inOutUsage.fs.interpInfo.size() - numPrimInterp;
+  SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, numInterp);
+  if (gfxIp >= GfxIpVersion{10, 3})
+    SET_REG_GFX10_3_PLUS_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_PRIM_INTERP, numPrimInterp);
 
   if (pointCoordLoc != InvalidValue) {
     SET_REG_FIELD(&config->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_ENA, true);
@@ -1641,22 +1650,125 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
 // @param [out] config : Register configuration for mesh-shader-specific pipeline
 template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderStage, T *config) {
   assert(shaderStage == ShaderStageMesh);
-  assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+
+  const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+  (void(gfxIp));                          // Unused
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
+  const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);
+
+  const auto &builtInUsage = resUsage->builtInUsage.mesh;
+
+  const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
   SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
 
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageMesh);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
   if (waveSize == 32)
     SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
 
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
   SET_REG_GFX09_1X_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_FAST_LAUNCH, true);
+
+  //
+  // Build ES-GS specific configuration
+  //
+  unsigned gsVgprCompCnt = 0;
+  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, GS_VGPR_COMP_CNT, gsVgprCompCnt);
+
+  unsigned floatMode = setupFloatingPointMode(shaderStage);
+  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, floatMode);
+  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true); // Follow PAL setting
+
+  unsigned userDataCount = intfData->userDataCount;
+
+  const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
+  bool wgpMode = getShaderWgpMode(shaderStage);
+
+  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, shaderOptions.debugMode);
+  SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, MEM_ORDERED, true);
+  SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, WGP_MODE, wgpMode);
+
+  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, shaderOptions.trapPresent);
+  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, userDataCount);
+
+  const bool userSgprMsb = (userDataCount > 31);
+  SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR_MSB, userSgprMsb);
+
+  unsigned esVgprCompCnt = 0;
+  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
+
+  const unsigned ldsSizeDwordGranularityShift =
+      m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+  const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
+
+  unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
+  ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
+
+  const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
+  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE, ldsSize);
+  setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
+
+  unsigned maxVertOut = std::max(1u, static_cast<unsigned>(meshMode.outputVertices));
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
+
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_MODE, MODE, GS_SCENARIO_G);
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_MODE, ONCHIP, VGT_GS_MODE_ONCHIP_OFF);
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, true);
+
+  assert(calcFactor.esVertsPerSubgroup == 1 && calcFactor.gsPrimsPerSubgroup == 1);
+  SET_REG_MOST_FIELD(&config->meshRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, 1);
+  SET_REG_MOST_FIELD(&config->meshRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, 1);
+  SET_REG_MOST_FIELD(&config->meshRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, 1);
+  setNggSubgroupSize(1);
+
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
+
+  VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = POINTLIST;
+  switch (meshMode.outputPrimitive) {
+  case OutputPrimitives::Points:
+    gsOutputPrimitiveType = POINTLIST;
+    break;
+  case OutputPrimitives::Lines:
+    gsOutputPrimitiveType = LINESTRIP;
+    break;
+  case OutputPrimitives::Triangles:
+    gsOutputPrimitiveType = TRISTRIP;
+    break;
+  default:
+    llvm_unreachable("Unknown primitive type!");
+    break;
+  }
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
+
+  const unsigned maxVertsPerSubgroup = std::min(meshMode.outputVertices, NggMaxThreadsPerSubgroup);
+  SET_REG_FIELD(&config->meshRegs, GE_MAX_OUTPUT_PER_SUBGROUP, MAX_VERTS_PER_SUBGROUP, maxVertsPerSubgroup);
+
+  //
+  // Build VS specific configuration
+  //
+  setupPaSpecificRegisters(&config->meshRegs);
+
+  //
+  // Build NGG specific configuration
+  //
+  assert(calcFactor.primAmpFactor >= 1);
+  SET_REG_FIELD(&config->meshRegs, GE_NGG_SUBGRP_CNTL, PRIM_AMP_FACTOR, calcFactor.primAmpFactor);
+  SET_REG_FIELD(&config->meshRegs, GE_NGG_SUBGRP_CNTL, THDS_PER_SUBGRP, calcFactor.primAmpFactor);
+
+  const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
+  const bool hasPrimitivePayload = builtInUsage.primitiveId || builtInUsage.layer || builtInUsage.viewportIndex ||
+                                   builtInUsage.primitiveShadingRate || enableMultiView;
+  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_IDX_FORMAT, IDX0_EXPORT_FORMAT,
+                hasPrimitivePayload ? SPI_SHADER_2COMP : SPI_SHADER_1COMP);
+  SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_DRAW_PAYLOAD_CNTL, EN_PRIM_PAYLOAD, hasPrimitivePayload);
 
   setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
 
@@ -1667,7 +1779,9 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
   if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling)
     SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
 
+  //
   // Set up IA_MULTI_VGT_PARAM
+  //
   regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
   static constexpr unsigned PrimGroupSize = 128;

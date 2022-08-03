@@ -163,7 +163,9 @@ bool PatchResourceCollect::runImpl(Module &module, PipelineShadersResult &pipeli
 
     // Determine whether or not GS on-chip mode is valid for this pipeline
     bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
-    bool checkGsOnChip = hasGs || pipelineState->getNggControl()->enableNgg;
+    const bool meshPipeline =
+        m_pipelineState->hasShaderStage(ShaderStageTask) || m_pipelineState->hasShaderStage(ShaderStageMesh);
+    bool checkGsOnChip = hasGs || meshPipeline || pipelineState->getNggControl()->enableNgg;
 
     if (checkGsOnChip) {
       bool gsOnChip = checkGsOnChipValidity();
@@ -183,6 +185,12 @@ void PatchResourceCollect::setNggControl(Module *module) {
 
   // For GFX10+, initialize NGG control settings
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
+    return;
+
+  // If mesh pipeline, skip NGG control settings
+  const bool meshPipeline =
+      m_pipelineState->hasShaderStage(ShaderStageTask) || m_pipelineState->hasShaderStage(ShaderStageMesh);
+  if (meshPipeline)
     return;
 
   const bool hasTs =
@@ -437,6 +445,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   const bool hasTs =
       m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
   const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+  const bool meshPipeline =
+      m_pipelineState->hasShaderStage(ShaderStageTask) || m_pipelineState->hasShaderStage(ShaderStageMesh);
 
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
   auto gsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
@@ -610,7 +620,36 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   } else {
     const auto nggControl = m_pipelineState->getNggControl();
 
-    if (nggControl->enableNgg) {
+    if (meshPipeline) {
+      assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+      const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+
+      // Make sure we have enough threads to execute mesh shader.
+      const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
+      unsigned primAmpFactor = std::max(numMeshThreads, std::max(meshMode.outputVertices, meshMode.outputPrimitives));
+
+      const unsigned ldsSizeDwordGranularity =
+          1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+      unsigned ldsSizeDwords = 0; // TODO: Get used LDS size from mesh shader
+      ldsSizeDwords = alignTo(ldsSizeDwords, ldsSizeDwordGranularity);
+
+      // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
+      unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
+      assert(ldsSizeDwords <= maxHwGsLdsSizeDwords);
+      (void(maxHwGsLdsSizeDwords)); // Unused
+
+      gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = 1;
+      gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = 1;
+
+      gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = ldsSizeDwords;
+
+      gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = 0;
+      gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = 0;
+
+      gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor = primAmpFactor;
+
+      gsOnChip = true; // For mesh shader, GS is always on-chip
+    } else if (nggControl->enableNgg) {
       unsigned esGsRingItemSize = NggPrimShader::calcEsGsRingItemSize(m_pipelineState); // In dwords
 
       const unsigned gsVsRingItemSize =
@@ -1005,15 +1044,19 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   }
 
   if (gsOnChip || m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-
-    if (m_pipelineState->getNggControl()->enableNgg) {
+    if (meshPipeline) {
+      LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
+      LLPC_OUTS("\n");
+      LLPC_OUTS("GS is on-chip (Mesh)\n");
+    } else if (m_pipelineState->getNggControl()->enableNgg) {
       LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
       LLPC_OUTS("GS enable max output vertices per instance: "
                 << (gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false") << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("GS is on-chip (NGG)\n");
-    } else
+    } else {
       LLPC_OUTS("GS is " << (gsOnChip ? "on-chip" : "off-chip") << "\n");
+    }
   } else
     LLPC_OUTS("GS is off-chip\n");
   LLPC_OUTS("\n");
