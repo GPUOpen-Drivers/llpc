@@ -554,7 +554,7 @@ private:
   // Read and directly handle certain built-ins that are common between shader stages
   llvm::Value *readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy, const llvm::Twine &instName = "");
 
-  // Read compute shader input
+  // Read compute/task shader input
   llvm::Value *readCsBuiltIn(BuiltInKind builtIn, const llvm::Twine &instName = "");
 
   // Read vertex shader input
