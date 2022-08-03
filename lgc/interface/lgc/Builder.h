@@ -740,13 +740,14 @@ public:
   // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
   // GetTexelBufferDescPtrTy or GetFmaskDescPtrTy, depending on descType.
   //
-  // @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+  // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
   //                   DescriptorTexelBuffer, DescriptorFmask.
+  // @param abstractType : Descriptor type to find user resource nodes;
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
-                                        const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+                                        unsigned binding, const llvm::Twine &instName = "") = 0;
 
   // Create a load of the push constants pointer.
   // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.

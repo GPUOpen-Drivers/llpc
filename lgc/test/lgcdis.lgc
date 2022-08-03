@@ -42,9 +42,9 @@ declare void @lgc.create.write.generic.output(...) #1
 define dllexport void @lgc.shader.FS.main() !lgc.shaderstage !25 {
 entry:
   %TEXCOORD = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 1, i32 0, i32 0, i32 1, i32 16, i32 undef)
-  %imageptr = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 0, i32 1)
+  %imageptr = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 1, i32 0)
   %image = load <8 x i32>, <8 x i32> addrspace(4)* %imageptr, align 32
-  %samplerptr = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 0, i32 2)
+  %samplerptr = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 2, i32 0, i32 2)
   %sampler = load <4 x i32>, <4 x i32> addrspace(4)* %samplerptr, align 16
   %sample = call <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 0, <8 x i32> %image, <4 x i32> %sampler, i32 1, <2 x float> %TEXCOORD)
   call void (...) @lgc.create.write.generic.output(<4 x float> %sample, i32 0, i32 0, i32 0, i32 1, i32 0, i32 undef)

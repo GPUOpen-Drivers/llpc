@@ -169,27 +169,28 @@ Value *DescBuilder::CreateGetDescStride(ResourceNodeType descType, unsigned desc
 // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
 // GetTexelBufferDescPtrTy or GetFmaskDescPtrTy, depending on descType.
 //
-// @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+// @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
 //                   DescriptorTexelBuffer, DescriptorFmask.
+// @param abstractType : Descriptor type to find user resource nodes;
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
-                                     const Twine &instName) {
+Value *DescBuilder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+                                     unsigned binding, const Twine &instName) {
   // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
   // look; we will use relocs instead.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(descType, descSet, binding);
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     if (!node) {
       // We did not find the resource node. Return an undef value.
-      return UndefValue::get(getDescPtrTy(descType));
+      return UndefValue::get(getDescPtrTy(concreteType));
     }
   }
 
   Value *descPtr = nullptr;
-  if (node && node->immutableSize != 0 && descType == ResourceNodeType::DescriptorSampler) {
+  if (node && node->immutableSize != 0 && concreteType == ResourceNodeType::DescriptorSampler) {
     // This is an immutable sampler. Put the immutable value into a static variable and return a pointer
     // to that. For a simple non-variably-indexed immutable sampler not passed through a function call
     // or phi node, we rely on subsequent LLVM optimizations promoting the value back to a constant.
@@ -217,11 +218,11 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType descType, unsigned descSet
     }
   } else {
     // Get a pointer to the descriptor.
-    descPtr = getDescPtr(descType, descSet, binding, topNode, node);
+    descPtr = getDescPtr(concreteType, descSet, binding, topNode, node);
   }
 
   // Cast to the right pointer type.
-  return CreateBitCast(descPtr, getDescPtrTy(descType));
+  return CreateBitCast(descPtr, getDescPtrTy(concreteType));
 }
 
 // =====================================================================================================================
