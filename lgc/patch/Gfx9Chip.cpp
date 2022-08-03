@@ -288,11 +288,52 @@ CsRegConfig::CsRegConfig(GfxIpVersion gfxIp) {
 //
 // @param gfxIp : Graphics IP version info
 MeshRegConfig::MeshRegConfig(GfxIpVersion gfxIp) {
-  // TODO: Add mesh shader support.
+  assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
   INIT_REG_APU09_1X_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_GS);
 
   INIT_REG(VGT_SHADER_STAGES_EN);
   INIT_REG_GFX10(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+
+  INIT_REG(SPI_SHADER_PGM_RSRC1_GS);
+  INIT_REG(SPI_SHADER_PGM_RSRC2_GS);
+  INIT_REG(SPI_SHADER_PGM_RSRC4_GS);
+  INIT_REG(VGT_GS_MAX_VERT_OUT);
+  INIT_REG(VGT_GS_INSTANCE_CNT);
+  INIT_REG(VGT_ESGS_RING_ITEMSIZE);
+
+  // Special registers, having different register IDs
+  if (gfxIp.major == 10) {
+    INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
+    INIT_REG_GFX9_10(gfxIp.major, VGT_GS_ONCHIP_CNTL);
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
+
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_PER_VS);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_ITEMSIZE);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_1);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_2);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_3);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_1);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_2);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_3);
+  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_MODE);
+
+  INIT_REG_GFX10_PLUS(gfxIp.major, GE_MAX_OUTPUT_PER_SUBGROUP);
+
+  INIT_REG(SPI_SHADER_POS_FORMAT);
+  INIT_REG(SPI_VS_OUT_CONFIG);
+  INIT_REG(PA_CL_VS_OUT_CNTL);
+  INIT_REG(PA_CL_CLIP_CNTL);
+  INIT_REG(PA_CL_VTE_CNTL);
+  INIT_REG(PA_SU_VTX_CNTL);
+  INIT_REG(VGT_PRIMITIVEID_EN);
+  INIT_REG(VGT_REUSE_OFF);
+  INIT_REG(VGT_DRAW_PAYLOAD_CNTL);
+
+  INIT_REG_GFX10_PLUS(gfxIp.major, GE_NGG_SUBGRP_CNTL);
+  INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_IDX_FORMAT);
 }
 
 // =====================================================================================================================
