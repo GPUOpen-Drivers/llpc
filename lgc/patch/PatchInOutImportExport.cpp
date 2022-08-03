@@ -664,14 +664,20 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         InOutLocationInfo origLocInfo;
         origLocInfo.setLocation(value);
         auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
-        if (m_shaderStage == ShaderStageTessEval) {
-          // NOTE: For generic inputs of tessellation evaluation shader, they could be per-patch ones.
+        if (m_shaderStage == ShaderStageTessEval ||
+            (m_shaderStage == ShaderStageFragment &&
+             m_pipelineState->getPrevShaderStage(m_shaderStage) == ShaderStageMesh)) {
+          // NOTE: For generic inputs of tessellation evaluation shader or fragment shader whose previous shader stage
+          // is mesh shader, they could be per-patch ones or per-primitive ones.
           if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
             loc = locInfoMapIt->second.getLocation();
-          } else {
-            assert(resUsage->inOutUsage.perPatchInputLocMap.find(value) !=
-                   resUsage->inOutUsage.perPatchInputLocMap.end());
+          } else if (resUsage->inOutUsage.perPatchInputLocMap.find(value) !=
+                     resUsage->inOutUsage.perPatchInputLocMap.end()) {
             loc = resUsage->inOutUsage.perPatchInputLocMap[value];
+          } else {
+            assert(resUsage->inOutUsage.perPrimitiveInputLocMap.find(value) !=
+                   resUsage->inOutUsage.perPrimitiveInputLocMap.end());
+            loc = resUsage->inOutUsage.perPrimitiveInputLocMap[value];
           }
         } else {
           if (m_pipelineState->canPackInput(m_shaderStage)) {
@@ -756,6 +762,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       case ShaderStageFragment: {
         unsigned interpMode = InOutInfo::InterpModeSmooth;
         unsigned interpLoc = InOutInfo::InterpLocCenter;
+        bool isPerPrimitive = false;
 
         if (!elemIdx)
           elemIdx = callInst.getOperand(isInterpolantInputImport ? 2 : 1);
@@ -764,10 +771,11 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         Value *auxInterpValue = nullptr;
 
         if (isGenericInputImport) {
-          assert(callInst.arg_size() == 4);
+          assert(callInst.arg_size() == 5);
 
-          interpMode = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
-          interpLoc = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
+          isPerPrimitive = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue() != 0;
+          interpMode = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
+          interpLoc = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue();
         } else {
           assert(isInterpolantInputImport);
           assert(callInst.arg_size() == 5);
@@ -778,8 +786,8 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           auxInterpValue = callInst.getOperand(4);
         }
 
-        input = patchFsGenericInputImport(inputTy, loc, locOffset, elemIdx, auxInterpValue, interpMode, interpLoc,
-                                          highHalf, &callInst);
+        input = patchFsGenericInputImport(inputTy, loc, locOffset, elemIdx, isPerPrimitive, auxInterpValue, interpMode,
+                                          interpLoc, highHalf, &callInst);
         break;
       }
       default: {
@@ -1733,6 +1741,7 @@ Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Valu
 // @param location : Base location of the input
 // @param locOffset : Relative location offset
 // @param compIdx : Index used for vector element indexing (could be null)
+// @param isPerPrimitive : Whether the input is per-primitive
 // @param auxInterpValue : Auxiliary value of interpolation: for non "custom" interpolation, it is the explicitly
 // calculated I/J; for "custom" interpolation, it is vertex no. (could be null)
 // @param interpMode : Interpolation mode
@@ -1740,13 +1749,22 @@ Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Valu
 // @param highHalf : Whether it is a high half in a 16-bit attribute
 // @param insertPos : Where to insert the patch instruction
 Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned location, Value *locOffset,
-                                                         Value *compIdx, Value *auxInterpValue, unsigned interpMode,
-                                                         unsigned interpLoc, bool highHalf, Instruction *insertPos) {
+                                                         Value *compIdx, bool isPerPrimitive, Value *auxInterpValue,
+                                                         unsigned interpMode, unsigned interpLoc, bool highHalf,
+                                                         Instruction *insertPos) {
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
   auto &interpInfo = resUsage->inOutUsage.fs.interpInfo;
+
+  // NOTE: For per-primitive input, the specified location is still per-primitive based. To import the input value, we
+  // have to adjust it by adding the total number of per-vertex inputs since per-vertex exports/imports are prior to
+  // per-primitive ones.
+  if (isPerPrimitive) {
+    auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->inOutUsage;
+    location += inOutUsage.inputMapLocCount;
+  }
 
   const unsigned locCount = inputTy->getPrimitiveSizeInBits() / 8 > SizeOfVec4 ? 2 : 1;
   while (interpInfo.size() <= location + locCount - 1)
@@ -1759,6 +1777,7 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
     interpInfoAtLoc.custom = interpMode == InOutInfo::InterpModeCustom;
     interpInfoAtLoc.is16bit = inputTy->getScalarSizeInBits() == 16;
     interpInfoAtLoc.attr0Valid = true;
+    interpInfoAtLoc.isPerPrimitive = isPerPrimitive;
   } else {
     // attr1Valid is false by default and set it true when it is really a high half
     interpInfo[location].attr1Valid = true;
@@ -1772,6 +1791,9 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
         (interpMode == InOutInfo::InterpModeFlat),
         (interpMode == InOutInfo::InterpModeCustom),
         false,
+        false,
+        false,
+        isPerPrimitive,
     };
   }
 
@@ -2535,7 +2557,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 
     // Emulation for "in vec2 gl_PointCoord"
     const bool perSampleShading = m_pipelineState->getRasterizerState().perSampleShading;
-    input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, nullptr, InOutInfo::InterpModeSmooth,
+    input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, false, nullptr, InOutInfo::InterpModeSmooth,
                                       perSampleShading ? InOutInfo::InterpLocSample : InOutInfo::InterpLocCenter, false,
                                       insertPos);
     break;
@@ -2552,17 +2574,21 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     unsigned loc = InvalidValue;
     const auto prevStage = m_pipelineState->getPrevShaderStage(ShaderStageFragment);
 
+    bool isPerPrimitive = false;
     if (prevStage == ShaderStageMesh) {
-      llvm_unreachable("Not implemented!");
+      assert(inOutUsage.perPrimitiveBuiltInInputLocMap.count(builtInId) > 0);
+      loc = inOutUsage.perPrimitiveBuiltInInputLocMap[builtInId];
+      // NOTE: If the previous shader stage is mesh shader, those built-ins are exported via primitive attributes.
+      isPerPrimitive = true;
     } else {
       assert(inOutUsage.builtInInputLocMap.count(builtInId) > 0);
       loc = inOutUsage.builtInInputLocMap[builtInId];
     }
 
     // Emulation for "in int gl_PrimitiveID" or "in int gl_Layer" or "in int gl_ViewportIndex"
-    // or "in int gl_ViewIndex"
-    input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, nullptr, InOutInfo::InterpModeFlat,
-                                      InOutInfo::InterpLocCenter, false, insertPos);
+    // or "in int gl_ViewIndex".
+    input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, isPerPrimitive, nullptr,
+                                      InOutInfo::InterpModeFlat, InOutInfo::InterpLocCenter, false, insertPos);
     break;
   }
   case BuiltInClipDistance:

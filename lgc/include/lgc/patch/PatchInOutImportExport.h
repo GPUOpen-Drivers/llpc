@@ -86,8 +86,9 @@ private:
                                       InterpParam interpParam, llvm::Value *primMask, unsigned bitWidth, bool highHalf);
 
   llvm::Value *patchFsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
-                                         llvm::Value *compIdx, llvm::Value *auxInterpValue, unsigned interpMode,
-                                         unsigned interpLoc, bool highHalf, llvm::Instruction *insertPos);
+                                         llvm::Value *compIdx, bool isPerPrimitive, llvm::Value *auxInterpValue,
+                                         unsigned interpMode, unsigned interpLoc, bool highHalf,
+                                         llvm::Instruction *insertPos);
 
   llvm::Value *patchTcsGenericOutputImport(llvm::Type *outputTy, unsigned location, llvm::Value *locOffset,
                                            llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
