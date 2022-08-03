@@ -79,16 +79,17 @@ union XfbOutInfo {
 
 // Represents interpolation info of fragment shader input
 struct FsInterpInfo {
-  unsigned loc; // Mapped input location (tightly packed)
-  bool flat;    // Whether it is "flat" interpolation
-  bool custom;  // Whether it is "custom" interpolation
-  bool is16bit; // Whether it is 16-bit interpolation
-  bool attr0Valid; // Whether the location has a valid low half
-  bool attr1Valid; // Wheterh the location has a valid high half
+  unsigned loc;        // Mapped input location (tightly packed)
+  bool flat;           // Whether it is "flat" interpolation
+  bool custom;         // Whether it is "custom" interpolation
+  bool is16bit;        // Whether it is 16-bit interpolation
+  bool attr0Valid;     // Whether the location has a valid low half
+  bool attr1Valid;     // Wheterh the location has a valid high half
+  bool isPerPrimitive; // Whether it is per-primitive
 };
 
 // Invalid interpolation info
-static const FsInterpInfo InvalidFsInterpInfo = {InvalidValue, false, false, false, false, false};
+static const FsInterpInfo InvalidFsInterpInfo = {InvalidValue, false, false, false, false, false, false};
 
 // Represents the location information on an input or output
 class InOutLocationInfo {

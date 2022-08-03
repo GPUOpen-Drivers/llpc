@@ -257,7 +257,7 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
   }
 
   case ShaderStageFragment: {
-    // FS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
+    // FS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 perPrimitive, i32 interpMode, i32 interpLoc)
     //      @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
     //                                           i32 interpMode, <2 x float> | i32 auxInterpValue)
     if (inOutInfo.hasInterpAux()) {
@@ -273,6 +273,7 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
       assert(locationOffset == getInt32(0));
       args.push_back(getInt32(location));
       args.push_back(elemIdx);
+      args.push_back(getInt1(inOutInfo.isPerPrimitive()));
       args.push_back(getInt32(inOutInfo.getInterpMode()));
       args.push_back(getInt32(inOutInfo.getInterpLoc()));
     }
