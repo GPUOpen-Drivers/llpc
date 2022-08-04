@@ -524,6 +524,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryInitializeKHR>
   // NOTE: Initialize rayQuery.committed to zero, as a workaround for CTS that uses it without committed intersection.
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!traceRaysArgs[0]->getType()->isOpaquePointerTy()) {
+    traceRaysArgs[0] = m_builder->CreateBitCast(
+        traceRaysArgs[0], rayQueryTy->getPointerTo(traceRaysArgs[0]->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(traceRaysArgs[0]->getType()->getScalarType(), rayQueryTy));
   Value *committedAddr =
       m_builder->CreateGEP(rayQueryTy, traceRaysArgs[0], {zero, m_builder->getInt32(RayQueryParams::Committed)});
@@ -635,6 +640,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryProceedKHR>(Fu
   Value *rayQuery = func->arg_begin();
   Type *rayQueryEltTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryEltTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType()->getScalarType(), rayQueryEltTy));
 
   // Initialize ldsUsage for the shader stage
@@ -691,6 +701,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
   committed = m_builder->CreateTrunc(committed, m_builder->getInt1Ty());
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   rayQuery = m_builder->CreateLoad(rayQueryTy, rayQuery);
   auto pCandidateTy = m_builder->CreateExtractValue(rayQuery, RayQueryParams::CandidateType);
@@ -721,6 +736,11 @@ Value *SpirvLowerRayQuery::createIntersectSystemValue(Function *func, unsigned r
   intersect = m_builder->CreateTrunc(intersect, m_builder->getInt1Ty());
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   rayQuery = m_builder->CreateLoad(rayQueryTy, rayQuery);
   auto candidate = m_builder->CreateExtractValue(rayQuery, RayQueryParams::Candidate);
@@ -750,6 +770,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryEltTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType()->getScalarType(), rayQueryEltTy));
   Value *intersect = func->arg_begin() + 1;
   Value *rayTMinAddr = m_builder->CreateGEP(rayQueryEltTy, rayQuery,
@@ -758,6 +783,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
 
   intersect = m_builder->CreateTrunc(intersect, m_builder->getInt1Ty());
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   rayQuery = m_builder->CreateLoad(rayQueryTy, rayQuery);
@@ -783,6 +813,11 @@ void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectionInstanceCus
   Value *rayQuery = func->arg_begin();
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   rayQuery = m_builder->CreateLoad(rayQueryTy, rayQuery);
   auto instanceNodeAddr = createGetInstanceNodeAddr(instanceNodePtr, rayQuery);
@@ -804,6 +839,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
   // Extract instance node address from instance node pointer
   Value *rayQuery = func->arg_begin();
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   rayQuery = m_builder->CreateLoad(rayQueryTy, rayQuery);
@@ -880,6 +920,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryTerminateKHR>(
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryEltTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType()->getScalarType(), rayQueryEltTy));
 
   {
@@ -930,6 +975,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGenerateInters
   Value *hitT = func->arg_begin() + 1;
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   Value *rayQueryVal = m_builder->CreateLoad(rayQueryTy, rayQuery);
   auto candidateTy = m_builder->CreateExtractValue(rayQueryVal, RayQueryParams::CandidateType);
@@ -977,6 +1027,10 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryConfirmInterse
   m_builder->SetInsertPoint(entryBlock);
   Value *rayQuery = func->arg_begin();
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   Value *rayQueryVal = m_builder->CreateLoad(rayQueryTy, rayQuery);
@@ -1011,6 +1065,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetRayTMinKHR>
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryEltTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType()->getScalarType(), rayQueryEltTy));
   Value *rayTMinAddr = m_builder->CreateGEP(rayQueryEltTy, rayQuery,
                                             {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::RayTMin)});
@@ -1029,6 +1088,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetRayFlagsKHR
 
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryEltTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType()->getScalarType(), rayQueryEltTy));
   Value *rayFlagsAddr = m_builder->CreateGEP(rayQueryEltTy, rayQuery,
@@ -1054,6 +1118,11 @@ void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectionCandidateAA
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryEltTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType()->getScalarType(), rayQueryEltTy));
   Value *candidateTypeAddr = m_builder->CreateGEP(
       rayQueryEltTy, rayQuery, {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::CandidateType)});
@@ -1076,6 +1145,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetWorldRayDir
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryEltTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType()->getScalarType(), rayQueryEltTy));
   Value *dirAddr = m_builder->CreateGEP(rayQueryEltTy, rayQuery,
                                         {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::RayDesc),
@@ -1094,6 +1168,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetWorldRayOri
 
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryEltTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType()->getScalarType(), rayQueryEltTy));
   Value *originAddr = m_builder->CreateGEP(rayQueryEltTy, rayQuery,
@@ -1116,6 +1195,11 @@ void SpirvLowerRayQuery::createIntersectMatrix(Function *func, unsigned builtInI
 
   Value *rayQuery = func->arg_begin();
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!rayQuery->getType()->isOpaquePointerTy()) {
+    rayQuery =
+        m_builder->CreateBitCast(rayQuery, rayQueryTy->getPointerTo(rayQuery->getType()->getPointerAddressSpace()));
+  }
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   rayQuery = m_builder->CreateLoad(rayQueryTy, rayQuery);
@@ -1476,25 +1560,41 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
 
   auto argIt = func->arg_begin();
 
+  Value *arg = argIt;
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!arg->getType()->isOpaquePointerTy()) {
+    arg = m_builder->CreateBitCast(
+        arg, FixedVectorType::get(m_builder->getInt32Ty(), 2)->getPointerTo(arg->getType()->getPointerAddressSpace()));
+  }
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getInt32Ty(), 2)));
-  Value *address = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), argIt);
-  argIt++;
+  Value *address = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), arg);
+  arg = ++argIt;
 
   // Address int64 type
   address = m_builder->CreateBitCast(address, m_builder->getInt64Ty());
 
   // Ray extent float Type
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!arg->getType()->isOpaquePointerTy()) {
+    arg =
+        m_builder->CreateBitCast(arg, m_builder->getFloatTy()->getPointerTo(arg->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getFloatTy()));
-  Value *extent = m_builder->CreateLoad(m_builder->getFloatTy(), argIt);
-  argIt++;
+  Value *extent = m_builder->CreateLoad(m_builder->getFloatTy(), arg);
+  arg = ++argIt;
 
   // Ray origin vec3 Type
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!arg->getType()->isOpaquePointerTy()) {
+    arg = m_builder->CreateBitCast(
+        arg, FixedVectorType::get(m_builder->getFloatTy(), 3)->getPointerTo(arg->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
-  Value *origin = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
-  argIt++;
+  Value *origin = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), arg);
+  arg = ++argIt;
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
   // Construct vec3 = {0.0, 1.0, 0.0}
@@ -1507,9 +1607,14 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
 #endif
   // Ray dir vec3 type
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!arg->getType()->isOpaquePointerTy()) {
+    arg = m_builder->CreateBitCast(
+        arg, FixedVectorType::get(m_builder->getFloatTy(), 3)->getPointerTo(arg->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
-  Value *dir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
-  argIt++;
+  Value *dir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), arg);
+  arg = ++argIt;
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
   // vec4 dir = vec4(dir.xyz, 0.0)
@@ -1517,24 +1622,39 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
 #endif
   // Ray inv_dir vec3 type
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!arg->getType()->isOpaquePointerTy()) {
+    arg = m_builder->CreateBitCast(
+        arg, FixedVectorType::get(m_builder->getFloatTy(), 3)->getPointerTo(arg->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
-  Value *invDir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
+  Value *invDir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), arg);
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
   // vec4 inDir = vec4(invDir, 0.0)
   invDir = m_builder->CreateShuffleVector(invDir, constVec, ArrayRef<int>{0, 1, 2, 3});
 #endif
-  argIt++;
+  arg = ++argIt;
 
   // uint flag
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!arg->getType()->isOpaquePointerTy()) {
+    arg =
+        m_builder->CreateBitCast(arg, m_builder->getInt32Ty()->getPointerTo(arg->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getInt32Ty()));
-  Value *flags = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
-  argIt++;
+  Value *flags = m_builder->CreateLoad(m_builder->getInt32Ty(), arg);
+  arg = ++argIt;
 
   // uint expansion
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!arg->getType()->isOpaquePointerTy()) {
+    arg =
+        m_builder->CreateBitCast(arg, m_builder->getInt32Ty()->getPointerTo(arg->getType()->getPointerAddressSpace()));
+  }
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getInt32Ty()));
-  Value *expansion = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
+  Value *expansion = m_builder->CreateLoad(m_builder->getInt32Ty(), arg);
   const unsigned boxExpansionShift = 23;
   expansion = m_builder->CreateShl(expansion, boxExpansionShift);
 

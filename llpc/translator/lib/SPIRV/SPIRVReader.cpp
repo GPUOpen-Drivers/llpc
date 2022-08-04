@@ -166,6 +166,25 @@ SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const 
   m_scratchBoundsChecksEnabled = scratchBoundsChecksEnabled();
 }
 
+// TODO: Remove this when LLPC will switch fully to opaque pointers.
+// TODO: This code is needed to have a possibility to turn on and off opaque-pointers.
+// At some point this should be remove when we decide that we do not what to have
+// a legacy pointers.
+// We have to revisit all function operands and in case of pointers we will cast them
+// to i8*. We are doing this because after the transition we will no longer have types
+// like i8* or [2 x float] addrspace(64)*. We will have just "ptr" type.
+void SPIRVToLLVM::castPtrArgsToPtri8ForNonOpaquePointers(std::vector<Value *> &args, std::vector<Type *> &argTys) {
+
+  for (auto &arg : args)
+    if (!arg->getType()->isOpaquePointerTy() && arg->getType()->isPointerTy())
+      arg = getBuilder()->CreateBitCast(
+          arg, getBuilder()->getInt8Ty()->getPointerTo(arg->getType()->getPointerAddressSpace()));
+
+  for (auto &argTy : argTys)
+    if (!argTy->isOpaquePointerTy() && argTy->isPointerTy())
+      argTy = getBuilder()->getInt8Ty()->getPointerTo(argTy->getPointerAddressSpace());
+}
+
 void SPIRVToLLVM::recordRemappedTypeElements(SPIRVType *bt, unsigned from, unsigned to) {
   auto &elements = m_remappedTypeElements[bt];
 
@@ -5672,11 +5691,6 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
 // Prints LLVM-style name for type to raw_ostream
 static void printTypeName(Type *ty, raw_ostream &nameStream) {
   for (;;) {
-    if (auto pointerTy = dyn_cast<PointerType>(ty)) {
-      nameStream << "p" << pointerTy->getAddressSpace();
-      ty = pointerTy->getPointerElementType();
-      continue;
-    }
     if (auto arrayTy = dyn_cast<ArrayType>(ty)) {
       nameStream << "a" << arrayTy->getNumElements();
       ty = arrayTy->getElementType();
@@ -5694,6 +5708,10 @@ static void printTypeName(Type *ty, raw_ostream &nameStream) {
       }
     }
     nameStream << "]";
+    return;
+  }
+  if (auto pointerTy = dyn_cast<PointerType>(ty)) {
+    nameStream << "p" << pointerTy->getAddressSpace();
     return;
   }
   if (auto vecTy = dyn_cast<FixedVectorType>(ty)) {
@@ -5776,7 +5794,9 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
 #endif
 
   std::string mangledName(funcName);
-  appendTypeMangling(nullptr, args, mangledName);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  castPtrArgsToPtri8ForNonOpaquePointers(args, argTys);
+  appendTypeMangling(retTy, args, mangledName);
   Function *func = m_m->getFunction(mangledName);
   FunctionType *ft = FunctionType::get(retTy, argTys, false);
   // ToDo: Some intermediate functions have duplicate names with
@@ -7546,6 +7566,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       // so we choose to add a dummy instruction and remove them when it isn't
       // needed.
       std::string mangledFuncName(gSPIRVMD::NonUniform);
+      // TODO: Remove this when LLPC will switch fully to opaque pointers.
+      castPtrArgsToPtri8ForNonOpaquePointers(args, types);
       appendTypeMangling(nullptr, args, mangledFuncName);
       auto f = getOrCreateFunction(m_m, voidTy, types, mangledFuncName);
       if (bb->getTerminator()) {
@@ -8729,8 +8751,12 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *bc, BasicBlock *bb
 
   string mangledName(unmangledName);
   std::vector<Value *> args = transValue(bc->getArgumentValues(), bb->getParent(), bb);
-  appendTypeMangling(nullptr, args, mangledName);
-  FunctionType *funcTy = FunctionType::get(transType(bc->getType()), argTys, false);
+  Type *retFuncType = transType(bc->getType());
+
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  castPtrArgsToPtri8ForNonOpaquePointers(args, argTys);
+  appendTypeMangling(retFuncType, args, mangledName);
+  FunctionType *funcTy = FunctionType::get(retFuncType, argTys, false);
   Function *func = m_m->getFunction(mangledName);
   if (!func) {
     func = Function::Create(funcTy, GlobalValue::ExternalLinkage, mangledName, m_m);

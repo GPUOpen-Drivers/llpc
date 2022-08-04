@@ -286,6 +286,9 @@ private:
     return t;
   }
 
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  void castPtrArgsToPtri8ForNonOpaquePointers(std::vector<Value *> &args, std::vector<Type *> &argTys);
+
   Type *getPointeeType(SPIRVValue *v);
 
   Type *tryGetAccessChainRetType(SPIRVValue *v) {

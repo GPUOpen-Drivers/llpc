@@ -150,9 +150,15 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpTraceRayKHR>(Funct
     Value *payload = m_builder->CreateAlloca(payloadTy, SPIRAS_Private);
 
     // Copy payload variable to the global payload variable
-    auto payloadArg = func->getArg(TraceRayParam::Payload);
+    Value *payloadArg = func->getArg(TraceRayParam::Payload);
     auto payloadTypeArg = func->arg_end() - 1;
     unsigned payloadArgSize = alignTo(m_module->getDataLayout().getTypeAllocSize(payloadTypeArg->getType()), 4);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    if (!payloadArg->getType()->isOpaquePointerTy()) {
+      payloadArg = m_builder->CreateBitCast(
+          payloadArg, payloadTypeArg->getType()->getPointerTo(payloadArg->getType()->getPointerAddressSpace()));
+    }
+
     // TODO: Remove this when LLPC will switch fully to opaque pointers.
     assert(payloadArg->getType()->isOpaquePointerTy() ||
            (payloadArgSize == (alignTo(m_module->getDataLayout().getTypeAllocSize(
@@ -221,6 +227,11 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpExecuteCallableKHR
   Value *callableData = func->arg_end() - 2;
   Value *callableTypeArg = func->arg_end() - 1;
   unsigned callableDataSize = alignTo(m_module->getDataLayout().getTypeAllocSize(callableTypeArg->getType()), 4);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (!callableData->getType()->isOpaquePointerTy()) {
+    callableData = m_builder->CreateBitCast(
+        callableData, callableTypeArg->getType()->getPointerTo(callableData->getType()->getPointerAddressSpace()));
+  }
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(callableData->getType()->isOpaquePointerTy() ||
          (callableDataSize == (alignTo(m_module->getDataLayout().getTypeAllocSize(

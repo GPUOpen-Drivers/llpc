@@ -314,6 +314,12 @@ void SpirvLowerGlobal::handleCallInst(bool checkEmitCall, bool checkInterpCall) 
             mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD)) {
           // Translate interpolation functions to LLPC intrinsic calls
           auto loadSrc = callInst->getArgOperand(0);
+
+          // TODO: Remove this when LLPC will switch fully to opaque pointers.
+          // This is needed to handle additional bitcast which was added while creating function call.
+          if (auto bitCast = dyn_cast<BitCastInst>(loadSrc))
+            loadSrc = bitCast->getOperand(0);
+
           unsigned interpLoc = InterpLocUnknown;
           Value *auxInterpValue = nullptr;
 
@@ -1801,7 +1807,16 @@ void SpirvLowerGlobal::lowerBufferBlock() {
 
               // Run the users of the GEP to check for any nonuniform calls.
               for (User *const user : getElemPtr->users()) {
-                CallInst *const call = dyn_cast<CallInst>(user);
+                // TODO: Remove this when LLPC will switch fully to opaque pointers.
+                // TODO: revert this back to 'const'
+                CallInst *call = dyn_cast<CallInst>(user);
+
+                // TODO: Remove this when LLPC will switch fully to opaque pointers.
+                // This is needed to handle additional bitcast which was added while creating function call.
+                if (auto bitCast = dyn_cast<BitCastInst>(user)) {
+                  User *bitCastUser = bitCast->user_back();
+                  call = dyn_cast<CallInst>(bitCastUser);
+                }
                 // If the user is not a call or the call is the function pointer call, bail.
                 if (!call)
                   continue;
@@ -2077,7 +2092,13 @@ void SpirvLowerGlobal::cleanupReturnBlock() {
 // "InterpLocCustom"
 // @param callInst : "Call" instruction
 void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInterpValue, CallInst &callInst) {
-  GetElementPtrInst *getElemPtr = cast<GetElementPtrInst>(callInst.getArgOperand(0));
+  Value *callOperand = callInst.getArgOperand(0);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  auto bitCast = dyn_cast<BitCastInst>(callOperand);
+  if (bitCast) {
+    callOperand = bitCast->getOperand(0);
+  }
+  GetElementPtrInst *getElemPtr = cast<GetElementPtrInst>(callOperand);
 
   assert(cast<ConstantInt>(getElemPtr->getOperand(1))->isZero() && "Non-zero GEP first index\n");
 
@@ -2124,6 +2145,12 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
       callInst.dropAllReferences();
       callInst.eraseFromParent();
     }
+  }
+
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  if (bitCast) {
+    // remove bitCast it will no longer be needed.
+    bitCast->eraseFromParent();
   }
 }
 
