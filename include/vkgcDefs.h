@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 54
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 3
+#define LLPC_INTERFACE_MINOR_VERSION 4
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
