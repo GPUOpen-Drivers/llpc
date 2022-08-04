@@ -137,7 +137,7 @@ public:
 
 protected:
   static void addOptimizationPasses(lgc::PassManager &passMgr, llvm::CodeGenOpt::Level optLevel,
-                                    bool disableScalarizer);
+                                    PipelineState *pipelineState);
 
   void init(llvm::Module *module);
 
