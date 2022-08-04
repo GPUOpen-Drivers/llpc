@@ -7001,6 +7001,7 @@ bool SPIRVToLLVM::transMetadata() {
             }
           }
         }
+        // clang-format off
         ComputeShaderMode computeMode = {};
         unsigned overrideThreadGroupSizeX = getPipelineOptions()->overrideThreadGroupSizeX;
         unsigned overrideThreadGroupSizeY = getPipelineOptions()->overrideThreadGroupSizeY;
@@ -7011,7 +7012,6 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.workgroupSizeZ = overrideThreadGroupSizeZ;
           getBuilder()->setComputeShaderMode(computeMode);
         } else {
-          // clang-format off
           computeMode.workgroupSizeX = workgroupSizeX;
           computeMode.workgroupSizeY = workgroupSizeY;
           computeMode.workgroupSizeZ = workgroupSizeZ;
