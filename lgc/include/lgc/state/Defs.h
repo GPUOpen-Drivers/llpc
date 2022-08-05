@@ -135,6 +135,29 @@ const static char EntryPointPrefix[] = "lgc.shader.";
 const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
 const static char NullFsEntryPoint[] = "lgc.shader.FS.null.main";
 
+const static char SubgroupPrefix[] = "lgc.subgroup.";
+const static char SubgroupGetSubgroupSize[] = "lgc.subgroup.get.size";
+const static char SubgroupGetWaveSize[] = "lgc.subgroup.get.wave.size";
+const static char SubgroupElect[] = "lgc.subgroup.elect";
+const static char SubgroupAll[] = "lgc.subgroup.all";
+const static char SubgroupAny[] = "lgc.subgroup.any";
+const static char SubgroupAllEqual[] = "lgc.subgroup.all.equal";
+const static char SubgroupBallot[] = "lgc.subgroup.ballot";
+const static char SubgroupInverseBallot[] = "lgc.subgroup.inverse.ballot";
+const static char SubgroupBallotBitExtract[] = "lgc.subgroup.ballot.bit.extract";
+const static char SubgroupBallotBitCount[] = "lgc.subgroup.ballot.bit.count";
+const static char SubgroupBallotInclusiveBitCount[] = "lgc.subgroup.ballot.inclusive.bit.count";
+const static char SubgroupBallotExclusiveBitCount[] = "lgc.subgroup.ballot.exclusive.bit.count";
+const static char SubgroupBallotFindLsb[] = "lgc.subgroup.ballot.find.lsb";
+const static char SubgroupBallotFindMsb[] = "lgc.subgroup.ballot.find.msb";
+const static char SubgroupShuffle[] = "lgc.subgroup.shuffle";
+const static char SubgroupShuffleXor[] = "lgc.subgroup.shuffle.xor";
+const static char SubgroupShuffleUp[] = "lgc.subgroup.shuffle.up";
+const static char SubgroupShuffleDown[] = "lgc.subgroup.shuffle.down";
+const static char SubgroupClusteredInclusive[] = "lgc.subgroup.clustered.inclusive";
+const static char SubgroupClusteredExclusive[] = "lgc.subgroup.clustered.exclusive";
+const static char SubgroupClusteredReduction[] = "lgc.subgroup.clustered.reduction";
+const static char SubgroupMbcnt[] = "lgc.subgroup.mbcnt";
 } // namespace lgcName
 
 // Value for high half of address that means "use PC".
