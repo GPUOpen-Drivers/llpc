@@ -156,6 +156,7 @@ target_sources(LLVMlgc PRIVATE
     patch/MeshTaskShader.cpp
     patch/NggLdsManager.cpp
     patch/NggPrimShader.cpp
+    patch/LowerSubgroupOperations.cpp
     patch/Patch.cpp
     patch/PatchBufferOp.cpp
     patch/PatchCheckShaderCache.cpp

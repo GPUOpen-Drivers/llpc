@@ -44,8 +44,7 @@ using namespace llvm;
 //
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateGetWaveSize(const Twine &instName) {
-  return CreateNamedCall(lgcName::SubgroupGetWaveSize, getInt32Ty(), {}, Attribute::ReadNone,
-                         instName);
+  return CreateNamedCall(lgcName::SubgroupGetWaveSize, getInt32Ty(), {}, Attribute::ReadNone, instName);
 }
 
 // =====================================================================================================================
@@ -83,8 +82,7 @@ Value *SubgroupBuilder::CreateSubgroupAll(Value *const value, const Twine &instN
 Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, const Twine &instName) {
   std::string originalTypeName(lgcName::SubgroupAny);
   addTypeMangling(getInt1Ty(), {value}, originalTypeName);
-  return CreateNamedCall(originalTypeName, getInt1Ty(), {value}, Attribute::ReadNone,
-                         instName);
+  return CreateNamedCall(originalTypeName, getInt1Ty(), {value}, Attribute::ReadNone, instName);
 }
 
 // =====================================================================================================================

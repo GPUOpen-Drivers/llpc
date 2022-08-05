@@ -30,6 +30,7 @@
  */
 
 LLPC_PASS("lgc-builder-replayer", BuilderReplayer)
+LLPC_PASS("lgc-lower-subgroup-operations", LowerSubgroupOperations)
 
 LLPC_PASS("lgc-patch-resource-collect", PatchResourceCollect)
 LLPC_PASS("lgc-patch-initialize-workgroup-memory", PatchInitializeWorkgroupMemory)
