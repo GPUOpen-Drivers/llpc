@@ -83,6 +83,9 @@ public:
 
   // Create a call to set inactive. Both active and inactive should have the same type.
   llvm::Value *CreateSetInactive(llvm::Value *const active, llvm::Value *const inactive);
+  // Create a waterfall loop containing the specified instruction.
+  llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::ArrayRef<unsigned> operandIdxs,
+                                         bool scalarizeDescriptorLoads = false, const llvm::Twine &instName = "");
 };
 
 } // namespace lgc

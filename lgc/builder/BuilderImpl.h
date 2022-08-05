@@ -75,10 +75,6 @@ protected:
   // Create an "if..endif" or "if..else..endif" structure.
   llvm::BranchInst *createIf(llvm::Value *condition, bool wantElse, const llvm::Twine &instName);
 
-  // Create a waterfall loop containing the specified instruction.
-  llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::ArrayRef<unsigned> operandIdxs,
-                                         bool scalarizeDescriptorLoads = false, const llvm::Twine &instName = "");
-
   // Helper method to scalarize a possibly vector unary operation
   llvm::Value *scalarize(llvm::Value *value, const std::function<llvm::Value *(llvm::Value *)> &callback);
 

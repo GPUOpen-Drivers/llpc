@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/util/BuilderBase.h"
+#include "lgc/state/Defs.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -250,4 +251,322 @@ Value *BuilderBase::CreateSetInactive(Value *active, Value *inactive) {
   };
 
   return CreateMapToInt32(mapFunc, {CreateInlineAsmSideEffect(active), inactive}, {});
+}
+
+#if defined(LLVM_HAVE_BRANCH_AMD_GFX)
+// =====================================================================================================================
+// For a non-uniform input, try and trace back through a descriptor load to
+// find the non-uniform index used in it. If that fails, we just use the
+// operand value as the index.
+//
+// Note: this code has to cope with relocs as well, this is why we have to
+// have a worklist of instructions to trace back
+// through. Something like this:
+// %1 = call .... @lgc.descriptor.set(...)          ;; Known uniform base
+// %2 = call .... @llvm.amdgcn.reloc.constant(...)  ;; Known uniform reloc constant
+// %3 = ptrtoint ... %1 to i64
+// %4 = zext ... %2 to i64
+// %5 = add i64 %3, %4
+// %6 = inttoptr i64 %5 to ....
+// %7 = bitcast .... %6 to ....
+// %8 = getelementptr .... %7, i64 %offset
+//
+// As long as the base pointer %7 can be traced back to a descriptor set and
+// reloc we can infer that it is truly uniform and use the gep index as the waterfall index safely.
+//
+// @param nonUniformVal : Value representing non-uniform descriptor
+// @return : Value representing the non-uniform index
+static Value *traceNonUniformIndex(Value *nonUniformVal) {
+  auto load = dyn_cast<LoadInst>(nonUniformVal);
+  if (!load) {
+    // Workarounds that modify image descriptor can be peeped through, i.e.
+    //   %baseValue = load <8 x i32>, <8 x i32> addrspace(4)* %..., align 16
+    //   %rawElement = extractelement <8 x i32> %baseValue, i64 6
+    //   %updatedElement = and i32 %rawElement, -1048577
+    //   %nonUniform = insertelement <8 x i32> %baseValue, i32 %updatedElement, i64 6
+    auto insert = dyn_cast<InsertElementInst>(nonUniformVal);
+    if (!insert)
+      return nonUniformVal;
+
+    load = dyn_cast<LoadInst>(insert->getOperand(0));
+    if (!load)
+      return nonUniformVal;
+
+    // We found the load, but must verify the chain.
+    // Consider updatedElement as a generic instruction or constant.
+    if (auto updatedElement = dyn_cast<Instruction>(insert->getOperand(1))) {
+      for (Value *operand : updatedElement->operands()) {
+        if (auto extract = dyn_cast<ExtractElementInst>(operand)) {
+          // Only dynamic value must be ExtractElementInst based on load.
+          if (dyn_cast<LoadInst>(extract->getOperand(0)) != load)
+            return nonUniformVal;
+        } else if (!isa<Constant>(operand)) {
+          return nonUniformVal;
+        }
+      }
+    } else if (!isa<Constant>(insert->getOperand(1))) {
+      return nonUniformVal;
+    }
+  }
+
+  SmallVector<Value *, 2> worklist;
+  Value *base = load->getOperand(0);
+  Value *index = nullptr;
+
+  // Loop until a descriptor table reference or unexpected operation is reached.
+  // In the worst case this may visit all instructions in a function.
+  for (;;) {
+    if (auto bitcast = dyn_cast<BitCastInst>(base)) {
+      base = bitcast->getOperand(0);
+      continue;
+    }
+    if (auto gep = dyn_cast<GetElementPtrInst>(base)) {
+      if (gep->hasAllConstantIndices()) {
+        base = gep->getPointerOperand();
+        continue;
+      }
+      // Variable GEP, to provide the index for the waterfall.
+      if (index || gep->getNumIndices() != 1)
+        break;
+      index = *gep->idx_begin();
+      base = gep->getPointerOperand();
+      continue;
+    }
+    if (auto extract = dyn_cast<ExtractValueInst>(base)) {
+      if (extract->getIndices().size() == 1 && extract->getIndices()[0] == 0) {
+        base = extract->getAggregateOperand();
+        continue;
+      }
+      break;
+    }
+    if (auto insert = dyn_cast<InsertValueInst>(base)) {
+      if (insert->getIndices()[0] != 0) {
+        base = insert->getAggregateOperand();
+        continue;
+      }
+      if (insert->getIndices().size() == 1 && insert->getIndices()[0] == 0) {
+        base = insert->getInsertedValueOperand();
+        continue;
+      }
+      break;
+    }
+    if (auto intToPtr = dyn_cast<IntToPtrInst>(base)) {
+      base = intToPtr->getOperand(0);
+      continue;
+    }
+    if (auto ptrToInt = dyn_cast<PtrToIntInst>(base)) {
+      base = ptrToInt->getOperand(0);
+      continue;
+    }
+    if (auto zExt = dyn_cast<ZExtInst>(base)) {
+      base = zExt->getOperand(0);
+      continue;
+    }
+    if (auto call = dyn_cast<CallInst>(base)) {
+      if (index) {
+        if (auto calledFunc = call->getCalledFunction()) {
+          if (calledFunc->getName().startswith(lgcName::DescriptorTableAddr) ||
+              calledFunc->getName().startswith("llvm.amdgcn.reloc.constant")) {
+            if (!worklist.empty()) {
+              base = worklist.pop_back_val();
+              continue;
+            }
+            nonUniformVal = index;
+            break;
+          }
+        }
+      }
+    }
+    if (auto addInst = dyn_cast<Instruction>(base)) {
+      // In this case we have to trace back both operands
+      // Set one to base for continued processing and put the other onto the worklist
+      // Give up if the worklist already has an entry - too complicated
+      if (addInst->isBinaryOp() && addInst->getOpcode() == Instruction::BinaryOps::Add) {
+        if (!worklist.empty())
+          break;
+        base = addInst->getOperand(0);
+        worklist.push_back(addInst->getOperand(1));
+        continue;
+      }
+    }
+    break;
+  }
+
+  return nonUniformVal;
+}
+
+// =====================================================================================================================
+// Test whether two instructions are identical
+// or are the same operation on identical operands.
+// @param lhs : First instruction
+// @param rhs : Second instruction
+// @return Result of equally test
+static bool instructionsEqual(Instruction *lhs, Instruction *rhs) {
+  if (lhs->isIdenticalTo(rhs))
+    return true;
+
+  if (!lhs->isSameOperationAs(rhs))
+    return false;
+
+  for (unsigned idx = 0, end = lhs->getNumOperands(); idx != end; ++idx) {
+    Value *lhsVal = lhs->getOperand(idx);
+    Value *rhsVal = rhs->getOperand(idx);
+    if (lhsVal == rhsVal)
+      continue;
+    Instruction *lhsInst = dyn_cast<Instruction>(lhsVal);
+    Instruction *rhsInst = dyn_cast<Instruction>(rhsVal);
+    if (!lhsInst || !rhsInst)
+      return false;
+    if (!lhsInst->isIdenticalTo(rhsInst))
+      return false;
+  }
+
+  return true;
+}
+#endif
+
+// =====================================================================================================================
+// Create a waterfall loop containing the specified instruction.
+// This does not use the current insert point; new code is inserted before and after pNonUniformInst.
+//
+// @param nonUniformInst : The instruction to put in a waterfall loop
+// @param operandIdxs : The operand index/indices for non-uniform inputs that need to be uniform
+// @param instName : Name to give instruction(s)
+Instruction *BuilderBase::createWaterfallLoop(Instruction *nonUniformInst, ArrayRef<unsigned> operandIdxs,
+                                              bool scalarizeDescriptorLoads, const Twine &instName) {
+#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
+#warning[!amd-gfx] Waterfall feature disabled
+  errs() << "Generating invalid waterfall loop code\n";
+  return nonUniformInst;
+#else
+  assert(operandIdxs.empty() == false);
+
+  SmallVector<Value *, 2> nonUniformIndices;
+  for (unsigned operandIdx : operandIdxs) {
+    Value *nonUniformIndex = traceNonUniformIndex(nonUniformInst->getOperand(operandIdx));
+    nonUniformIndices.push_back(nonUniformIndex);
+  }
+
+  // For any index that is 64 bit, change it back to 32 bit for comparison at the top of the
+  // waterfall loop.
+  for (Value *&nonUniformVal : nonUniformIndices) {
+    if (nonUniformVal->getType()->isIntegerTy(64)) {
+      auto sExt = dyn_cast<SExtInst>(nonUniformVal);
+      // 64-bit index may already be formed from extension of 32-bit value.
+      if (sExt && sExt->getOperand(0)->getType()->isIntegerTy(32)) {
+        nonUniformVal = sExt->getOperand(0);
+      } else {
+        nonUniformVal = CreateTrunc(nonUniformVal, getInt32Ty());
+      }
+    }
+  }
+
+  // Find first index instruction and check if index instructions are identical.
+  Instruction *firstIndexInst = nullptr;
+  bool identicalIndexes = true;
+  for (Value *nonUniformVal : nonUniformIndices) {
+    Instruction *nuInst = dyn_cast<Instruction>(nonUniformVal);
+    if (!nuInst || (firstIndexInst && !instructionsEqual(nuInst, firstIndexInst))) {
+      identicalIndexes = false;
+      break;
+    }
+    if (!firstIndexInst || nuInst->comesBefore(firstIndexInst))
+      firstIndexInst = nuInst;
+  }
+
+  // Save Builder's insert point
+  auto savedInsertPoint = saveIP();
+
+  Value *waterfallBegin;
+  if (scalarizeDescriptorLoads && firstIndexInst && identicalIndexes) {
+    // Attempt to scalarize descriptor loads.
+
+    // Begin waterfall loop just after shared index is computed.
+    // This places all dependent instructions within the waterfall loop, including descriptor loads.
+    auto nonUniformVal = cast<Value>(firstIndexInst);
+    SetInsertPoint(firstIndexInst->getNextNonDebugInstruction(false));
+    waterfallBegin = ConstantInt::get(getInt32Ty(), 0);
+    waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, nonUniformVal->getType(),
+                                     {waterfallBegin, nonUniformVal}, nullptr, instName);
+
+    // Scalarize shared index.
+    auto descTy = nonUniformVal->getType();
+    Value *desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {descTy, descTy},
+                                  {waterfallBegin, nonUniformVal}, nullptr, instName);
+
+    // Replace all references to shared index within the waterfall loop with scalarized index.
+    // (Note: this includes the non-uniform instruction itself.)
+    // Loads using scalarized index will become scalar loads.
+    for (Value *otherNonUniformVal : nonUniformIndices) {
+      otherNonUniformVal->replaceUsesWithIf(desc, [desc, waterfallBegin, nonUniformInst](Use &U) {
+        Instruction *userInst = cast<Instruction>(U.getUser());
+        return U.getUser() != waterfallBegin && U.getUser() != desc &&
+               (userInst->comesBefore(nonUniformInst) || userInst == nonUniformInst);
+      });
+    }
+  } else {
+    // Insert new code just before pNonUniformInst.
+    SetInsertPoint(nonUniformInst);
+
+    // The first begin contains a null token for the previous token argument
+    waterfallBegin = ConstantInt::get(getInt32Ty(), 0);
+    for (auto nonUniformVal : nonUniformIndices) {
+      // Start the waterfall loop using the waterfall index.
+      waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, nonUniformVal->getType(),
+                                       {waterfallBegin, nonUniformVal}, nullptr, instName);
+    }
+
+    // Scalarize each non-uniform operand of the instruction.
+    for (unsigned operandIdx : operandIdxs) {
+      Value *desc = nonUniformInst->getOperand(operandIdx);
+      auto descTy = desc->getType();
+      desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {descTy, descTy}, {waterfallBegin, desc},
+                             nullptr, instName);
+      if (nonUniformInst->getType()->isVoidTy()) {
+        // The buffer/image operation we are waterfalling is a store with no return value. Use
+        // llvm.amdgcn.waterfall.last.use on the descriptor.
+        desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_last_use, descTy, {waterfallBegin, desc}, nullptr, instName);
+      }
+      // Replace the descriptor operand in the buffer/image operation.
+      nonUniformInst->setOperand(operandIdx, desc);
+    }
+  }
+
+  Instruction *resultValue = nonUniformInst;
+
+  // End the waterfall loop (as long as pNonUniformInst is not a store with no result).
+  if (!nonUniformInst->getType()->isVoidTy()) {
+    SetInsertPoint(nonUniformInst->getNextNode());
+    SetCurrentDebugLocation(nonUniformInst->getDebugLoc());
+
+    Use *useOfNonUniformInst = nullptr;
+    Type *waterfallEndTy = resultValue->getType();
+    if (auto vecTy = dyn_cast<FixedVectorType>(waterfallEndTy)) {
+      if (vecTy->getElementType()->isIntegerTy(8)) {
+        // ISel does not like waterfall.end with vector of i8 type, so cast if necessary.
+        assert((vecTy->getNumElements() % 4) == 0);
+        waterfallEndTy = getInt32Ty();
+        if (vecTy->getNumElements() != 4)
+          waterfallEndTy = FixedVectorType::get(getInt32Ty(), vecTy->getNumElements() / 4);
+        resultValue = cast<Instruction>(CreateBitCast(resultValue, waterfallEndTy, instName));
+        useOfNonUniformInst = &resultValue->getOperandUse(0);
+      }
+    }
+    resultValue = CreateIntrinsic(Intrinsic::amdgcn_waterfall_end, waterfallEndTy, {waterfallBegin, resultValue},
+                                  nullptr, instName);
+    if (!useOfNonUniformInst)
+      useOfNonUniformInst = &resultValue->getOperandUse(1);
+    if (waterfallEndTy != nonUniformInst->getType())
+      resultValue = cast<Instruction>(CreateBitCast(resultValue, nonUniformInst->getType(), instName));
+
+    // Replace all uses of pNonUniformInst with the result of this code.
+    *useOfNonUniformInst = UndefValue::get(nonUniformInst->getType());
+    nonUniformInst->replaceAllUsesWith(resultValue);
+    *useOfNonUniformInst = nonUniformInst;
+  }
+
+  // Restore Builder's insert point.
+  restoreIP(savedInsertPoint);
+  return resultValue;
+#endif
 }
