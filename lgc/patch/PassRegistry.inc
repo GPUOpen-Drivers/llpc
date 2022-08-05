@@ -42,6 +42,8 @@
 #define LLPC_MODULE_PASS_WITH_PARSER LLPC_MODULE_PASS
 #endif
 
+LLPC_MODULE_PASS("lgc-lower-subgroup-operations", LowerSubgroupOperations)
+
 LLPC_MODULE_PASS_WITH_PARSER("lgc-builder-replayer", BuilderReplayer)
 
 LLPC_MODULE_PASS("lgc-patch-resource-collect", PatchResourceCollect)

@@ -31,6 +31,8 @@
 #pragma once
 
 #include "lgc/BuilderCommon.h"
+#include "lgc/state/Defs.h"
+#include "lgc/state/IntrinsDefs.h"
 
 namespace lgc {
 
@@ -83,6 +85,33 @@ public:
 
   // Create a call to set inactive. Both active and inactive should have the same type.
   llvm::Value *CreateSetInactive(llvm::Value *const active, llvm::Value *const inactive);
+
+  // Create a subgroup broadcast.
+  llvm::Value *CreateSubgroupBroadcastImpl(llvm::Value *const value, llvm::Value *const index,
+                                           const llvm::Twine &instName = "");
+  // Create a subgroup write invocation.
+  llvm::Value *CreateSubgroupWriteInvocationImpl(llvm::Value *const inputValue, llvm::Value *const writeValue,
+                                                 llvm::Value *const index, const llvm::Twine &instName = "");
+  // Create a subgroup broadcast first.
+  llvm::Value *CreateSubgroupBroadcastFirstImpl(llvm::Value *const value, const llvm::Twine &instName);
+  // Create a call to dpp mov.
+  llvm::Value *createDppMov(llvm::Value *const value, DppCtrl dppCtrl, unsigned rowMask, unsigned bankMask,
+                            bool boundCtrl);
+  // Create a call to permute lane.
+  llvm::Value *createPermLane16(llvm::Value *const origValue, llvm::Value *const updateValue, unsigned selectBitsLow,
+                                unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl);
+  // Create a call to permute lane.
+  llvm::Value *createPermLaneX16(llvm::Value *const origValue, llvm::Value *const updateValue, unsigned selectBitsLow,
+                                 unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl);
+  llvm::Value *createPermLane64(llvm::Value *const updateValue);
+  // Create a call to ds swizzle.
+  llvm::Value *createDsSwizzle(llvm::Value *const value, uint16_t dsPattern);
+  // Create a ds_swizzle bit mode pattern.
+  uint16_t getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask);
+
+  // Create a waterfall loop containing the specified instruction.
+  llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::ArrayRef<unsigned> operandIdxs,
+                                         bool scalarizeDescriptorLoads = false, const llvm::Twine &instName = "");
 };
 
 } // namespace lgc

@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/Patch.h"
+#include "LowerSubgroupOperations.h"
 #include "PatchNullFragShader.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
@@ -151,6 +152,9 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   // Patch invariant load and loop metadata.
   passMgr.addPass(createModuleToFunctionPassAdaptor(PatchInvariantLoads()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
+
+  // Lower subgroup operations as late as possible, optimization passes expect them to already be lowered
+  passMgr.addPass(LowerSubgroupOperations());
 
   if (patchTimer) {
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
@@ -374,6 +378,9 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   auto checkShaderCachePass = createLegacyPatchCheckShaderCache();
   passMgr.add(checkShaderCachePass);
   checkShaderCachePass->setCallbackFunction(std::move(checkShaderCacheFunc));
+
+  // Lower subgroup operations as late as possible, optimization passes expect them to already be lowered
+  passMgr.add(createLegacyLowerSubgroupOperations());
 
   // Stop timer for patching passes and start timer for optimization passes.
   if (patchTimer) {
