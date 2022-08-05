@@ -1390,6 +1390,18 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
           addUserDataArg(userDataArgs, node.offsetInDwords + dwordOffset, pushConstOffset.dwordSize,
                          "pushConst" + Twine(dwordOffset), &pushConstOffset.entryArgIdx, builder);
         }
+
+        if (!userDataUsage->pushConstSpill) {
+          // Fill the unused push const that occupys sgpr.
+          if (!userDataUsage->pushConstOffsets.empty()) {
+            const UserDataNodeUsage &pushConstOffset =
+                userDataUsage->pushConstOffsets[userDataUsage->pushConstOffsets.size() - 1];
+            unsigned actualEnd = userDataUsage->pushConstOffsets.size() + pushConstOffset.dwordSize - 1;
+            for (; actualEnd < node.sizeInDwords; actualEnd++)
+              addUserDataArg(userDataArgs, node.offsetInDwords + actualEnd, 1, "pushConst" + Twine(actualEnd), nullptr,
+                             builder);
+          }
+        }
       } else {
         // Mark push constant for spill for compute library.
         userDataUsage->pushConstSpill = true;
