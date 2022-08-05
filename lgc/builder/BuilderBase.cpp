@@ -253,6 +253,164 @@ Value *BuilderBase::CreateSetInactive(Value *active, Value *inactive) {
   return CreateMapToInt32(mapFunc, {CreateInlineAsmSideEffect(active), inactive}, {});
 }
 
+// =====================================================================================================================
+// Create a subgroup broadcast call.
+//
+// @param value : The value to read from the chosen lane to all active lanes.
+// @param index : The index to broadcast from. Must be an i32.
+// @param instName : Name to give final instruction.
+Value *BuilderBase::CreateSubgroupBroadcastImpl(Value *const value, Value *const index, const Twine &instName) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
+  };
+
+  return CreateMapToInt32(mapFunc, value, index);
+}
+
+// =====================================================================================================================
+// Create a subgroup write invocation.
+//
+// @param inputValue : The value to return for all but one invocations.
+// @param writeValue : The value to return for one invocation.
+// @param invocationIndex : The index of the invocation that gets the write value.
+// @param instName : Name to give instruction(s)
+Value *BuilderBase::CreateSubgroupWriteInvocationImpl(Value *const inputValue, Value *const writeValue,
+                                                      Value *const invocationIndex, const Twine &instName) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(Intrinsic::amdgcn_writelane, {},
+                                   {
+                                       mappedArgs[1],
+                                       passthroughArgs[0],
+                                       mappedArgs[0],
+                                   });
+  };
+
+  return CreateMapToInt32(mapFunc, {inputValue, writeValue}, invocationIndex);
+}
+
+// =====================================================================================================================
+// Create a subgroup broadcastfirst call.
+//
+// @param value : The value to read from the first active lane into all other active lanes.
+// @param instName : Name to give final instruction.
+Value *BuilderBase::CreateSubgroupBroadcastFirstImpl(Value *const value, const Twine &instName) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, mappedArgs[0]);
+  };
+
+  return CreateMapToInt32(mapFunc, {CreateInlineAsmSideEffect(value)}, {});
+}
+
+// =====================================================================================================================
+// Create a call to dpp mov.
+//
+// @param value : The value to DPP mov.
+// @param dppCtrl : The dpp_ctrl to use.
+// @param rowMask : The row mask.
+// @param bankMask : The bank mask.
+// @param boundCtrl : Whether bound_ctrl is used or not.
+Value *BuilderBase::createDppMov(Value *const value, DppCtrl dppCtrl, unsigned rowMask, unsigned bankMask,
+                                 bool boundCtrl) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(
+        Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
+        {mappedArgs[0], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
+  };
+
+  return CreateMapToInt32(
+      mapFunc, value,
+      {getInt32(static_cast<unsigned>(dppCtrl)), getInt32(rowMask), getInt32(bankMask), getInt1(boundCtrl)});
+}
+
+// =====================================================================================================================
+// Create a call to permute lane.
+//
+// @param origValue : The original value we are going to update.
+// @param updateValue : The value to update with.
+// @param selectBitsLow : Select bits low.
+// @param selectBitsHigh : Select bits high.
+// @param fetchInactive : FI mode, whether to fetch inactive lane.
+// @param boundCtrl : Whether bound_ctrl is used or not.
+Value *BuilderBase::createPermLane16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
+                                     unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(
+        Intrinsic::amdgcn_permlanex16, {},
+        {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
+  };
+
+  return CreateMapToInt32(
+      mapFunc,
+      {
+          origValue,
+          updateValue,
+      },
+      {getInt32(selectBitsLow), getInt32(selectBitsHigh), getInt1(fetchInactive), getInt1(boundCtrl)});
+}
+
+// =====================================================================================================================
+// Create a call to permute lane.
+//
+// @param origValue : The original value we are going to update.
+// @param updateValue : The value to update with.
+// @param selectBitsLow : Select bits low.
+// @param selectBitsHigh : Select bits high.
+// @param fetchInactive : FI mode, whether to fetch inactive lane.
+// @param boundCtrl : Whether bound_ctrl is used or not.
+Value *BuilderBase::createPermLaneX16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
+                                      unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(
+        Intrinsic::amdgcn_permlanex16, {},
+        {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
+  };
+
+  return CreateMapToInt32(
+      mapFunc,
+      {
+          origValue,
+          updateValue,
+      },
+      {getInt32(selectBitsLow), getInt32(selectBitsHigh), getInt1(fetchInactive), getInt1(boundCtrl)});
+}
+
+#if LLPC_BUILD_GFX11
+// =====================================================================================================================
+// Create a call to permute lane 64.
+//
+// @param updateValue : The value to update with.
+Value *SubgroupBuilder::createPermLane64(Value *const updateValue) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(Intrinsic::amdgcn_permlane64, {}, {mappedArgs[0]});
+  };
+
+  return CreateMapToInt32(mapFunc, updateValue, {});
+}
+#endif
+
+// =====================================================================================================================
+// Create a call to ds swizzle.
+//
+// @param value : The value to swizzle.
+// @param dsPattern : The pattern to swizzle with.
+Value *BuilderBase::createDsSwizzle(Value *const value, uint16_t dsPattern) {
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle, {}, {mappedArgs[0], passthroughArgs[0]});
+  };
+
+  return CreateMapToInt32(mapFunc, value, getInt32(dsPattern));
+}
+
+// =====================================================================================================================
+// Create a ds_swizzle bit mode pattern.
+//
+// @param xorMask : The xor mask (bits 10..14).
+// @param orMask : The or mask (bits 5..9).
+// @param andMask : The and mask (bits 0..4).
+uint16_t BuilderBase::getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask) {
+  return (static_cast<uint16_t>(xorMask & 0x1F) << 10) | (static_cast<uint16_t>(orMask & 0x1F) << 5) | (andMask & 0x1F);
+}
+
 #if defined(LLVM_HAVE_BRANCH_AMD_GFX)
 // =====================================================================================================================
 // For a non-uniform input, try and trace back through a descriptor load to

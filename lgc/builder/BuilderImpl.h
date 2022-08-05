@@ -806,30 +806,8 @@ private:
   SubgroupBuilder(const SubgroupBuilder &) = delete;
   SubgroupBuilder &operator=(const SubgroupBuilder &) = delete;
 
-  unsigned getShaderSubgroupSize();
-  unsigned getShaderWaveSize();
-  llvm::Value *createGroupArithmeticIdentity(GroupArithOp groupArithOp, llvm::Type *const type);
-  llvm::Value *createGroupArithmeticOperation(GroupArithOp groupArithOp, llvm::Value *const x, llvm::Value *const y);
-  llvm::Value *createDppMov(llvm::Value *const value, DppCtrl dppCtrl, unsigned rowMask, unsigned bankMask,
-                            bool boundCtrl);
-  llvm::Value *createDppUpdate(llvm::Value *const origValue, llvm::Value *const updateValue, DppCtrl dppCtrl,
-                               unsigned rowMask, unsigned bankMask, bool boundCtrl);
-
-  llvm::Value *createPermLane16(llvm::Value *const origValue, llvm::Value *const updateValue, unsigned selectBitsLow,
-                                unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl);
-  llvm::Value *createPermLaneX16(llvm::Value *const origValue, llvm::Value *const updateValue, unsigned selectBitsLow,
-                                 unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl);
-  llvm::Value *createPermLane64(llvm::Value *const updateValue);
-
-  llvm::Value *createDsSwizzle(llvm::Value *const value, uint16_t dsPattern);
-  llvm::Value *createWwm(llvm::Value *const value);
   llvm::Value *createWqm(llvm::Value *const value);
-  llvm::Value *createThreadMask();
-  llvm::Value *createThreadMaskedSelect(llvm::Value *const threadMask, uint64_t andMask, llvm::Value *const value1,
-                                        llvm::Value *const value2);
-  uint16_t getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask);
   uint16_t getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3);
-  llvm::Value *createGroupBallot(llvm::Value *const value);
 };
 
 // =====================================================================================================================
