@@ -74,6 +74,7 @@ private:
   void buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *config);
 
   void setupVgtTfParam(LsHsRegConfig *config);
+  template <typename T> void setupPaSpecificRegisters(T *config);
 
   bool getShaderWgpMode(ShaderStage shaderStage) const;
 };
