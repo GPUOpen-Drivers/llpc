@@ -161,6 +161,7 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchCheckShaderCache.cpp
     patch/PatchCopyShader.cpp
     patch/PatchEntryPointMutate.cpp
+    patch/PatchImageDerivatives.cpp
     patch/PatchInOutImportExport.cpp
     patch/PatchLlvmIrInclusion.cpp
     patch/PatchLoadScalarizer.cpp

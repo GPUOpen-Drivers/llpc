@@ -1,7 +1,8 @@
-// Check that amdllpc does not enable discard-to-demote transforms by default and that
-// they can be enabled on demand. This should affect the generated code and cache hash.
+// Check that amdllpc enables discard-to-demote transforms automatically and that they
+// can be disabled on demand. This should affect the generated code and cache hash.
 
 // RUN: amdllpc %gfxip --v %s \
+// RUN:   --amdgpu-conditional-discard-transformations=0 \
 // RUN:   | tee %t.disabled | FileCheck %s --check-prefix=DISABLED
 //
 // DISABLED-LABEL: {{^}}SPIR-V disassembly
@@ -18,8 +19,6 @@
 // DISABLED-LABEL: {{^}}===== AMDLLPC SUCCESS =====
 
 // RUN: amdllpc %gfxip --v %s \
-// RUN:   --amdgpu-conditional-discard-transformations \
-// RUN:   --amdgpu-transform-discard-to-demote \
 // RUN:   | tee %t.enabled | FileCheck %s --check-prefix=ENABLED
 //
 // ENABLED-LABEL: {{^}}SPIR-V disassembly
