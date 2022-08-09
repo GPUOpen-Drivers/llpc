@@ -33,7 +33,7 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
         target_compile_options("${PROJECT_NAME}" PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -fno-rtti
             -fPIC
-            -std=c++14
+            -std=c++17
             -Wno-ignored-qualifiers
             -Wno-missing-field-initializers
             -Wno-invalid-offsetof           # offsetof within non-standard-layout type 'x' is undefined
