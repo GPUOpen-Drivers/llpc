@@ -38,6 +38,7 @@
 #include "lgc/patch/PatchCheckShaderCache.h"
 #include "lgc/patch/PatchCopyShader.h"
 #include "lgc/patch/PatchEntryPointMutate.h"
+#include "lgc/patch/PatchImageDerivatives.h"
 #include "lgc/patch/PatchImageOpCollect.h"
 #include "lgc/patch/PatchInOutImportExport.h"
 #include "lgc/patch/PatchInitializeWorkgroupMemory.h"
@@ -197,6 +198,8 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   }
 
+  passMgr.addPass(PatchImageDerivatives());
+
   // Set up target features in shader entry-points.
   // NOTE: Needs to be done after post-NGG function inlining, because LLVM refuses to inline something
   // with conflicting attributes. Attributes could conflict on GFX10 because PatchSetupTargetFeatures
@@ -349,6 +352,8 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
       passMgr.add(LgcContext::createStartStopTimer(patchTimer, true));
     }
   }
+
+  passMgr.add(createLegacyPatchImageDerivatives());
 
   // Set up target features in shader entry-points.
   // NOTE: Needs to be done after post-NGG function inlining, because LLVM refuses to inline something
