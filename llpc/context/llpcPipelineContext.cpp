@@ -474,6 +474,10 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
     else
       shaderOptions.ldsSpillLimitDwords = LdsSpillLimitDwords;
 
+    shaderOptions.overrideShaderThreadGroupSizeX = shaderInfo->options.overrideShaderThreadGroupSizeX;
+    shaderOptions.overrideShaderThreadGroupSizeY = shaderInfo->options.overrideShaderThreadGroupSizeY;
+    shaderOptions.overrideShaderThreadGroupSizeZ = shaderInfo->options.overrideShaderThreadGroupSizeZ;
+
     pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
   }
 }

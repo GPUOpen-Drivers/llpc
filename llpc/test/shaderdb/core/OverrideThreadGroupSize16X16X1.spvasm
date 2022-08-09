@@ -3,9 +3,9 @@
 ; RUN:   --override-threadGroupSizeX=16 --override-threadGroupSizeY=16 --override-threadGroupSizeZ=1 \
 ; RUN: | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTESTTEST: !llpc.compute.mode = !{!0}
-; SHADERTESTTEST: !0 = !{i32 16, i32 16, i32 1}
-; SHADERTESTTEST: AMDLLPC SUCCESS
+; SHADERTEST: !llpc.compute.mode = !{!0}
+; SHADERTEST: !0 = !{i32 16, i32 16, i32 1}
+; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTESTTEST
 
 ; SPIR-V

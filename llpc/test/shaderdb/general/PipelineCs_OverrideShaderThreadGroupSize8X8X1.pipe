@@ -1,0 +1,23 @@
+; Check that overrideThreadGroupSize shader options are set correctly on PAL metadata.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST: !llpc.compute.mode = !{!0}
+; SHADERTEST: !0 = !{i32 8, i32 8, i32 1}
+; SHADERTEST: AMDLLPC SUCCESS
+
+[CsGlsl]
+#version 450
+
+layout(local_size_x = 2, local_size_y = 3) in;
+void main()
+{
+}
+
+[CsInfo]
+entryPoint = main
+options.ldsSpillLimitDwords = 1024
+options.overrideShaderThreadGroupSizeX = 8
+options.overrideShaderThreadGroupSizeY = 8
+options.overrideShaderThreadGroupSizeZ = 1
