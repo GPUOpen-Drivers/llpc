@@ -70,6 +70,7 @@ private:
 
   bool isVertexReuseDisabled();
 
+  void clearInactiveBuiltInInput();
   void clearInactiveBuiltInOutput();
   void clearUnusedOutput();
 
@@ -95,6 +96,7 @@ private:
 
   std::vector<llvm::CallInst *> m_deadCalls; // Dead calls
 
+  std::unordered_set<unsigned> m_activeInputBuiltIns;  // IDs of active built-in inputs
   std::unordered_set<unsigned> m_activeOutputBuiltIns; // IDs of active built-in outputs
 
   std::unordered_set<unsigned> m_importedOutputBuiltIns; // IDs of imported built-in outputs
