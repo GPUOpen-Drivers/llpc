@@ -1370,6 +1370,38 @@ void PatchResourceCollect::clearInactiveBuiltInInput() {
 
     if (builtInUsage.gs.viewIndex && m_activeInputBuiltIns.find(BuiltInViewIndex) == m_activeInputBuiltIns.end())
       builtInUsage.gs.viewIndex = false;
+  } else if (m_shaderStage == ShaderStageMesh) {
+    if (builtInUsage.mesh.drawIndex && m_activeInputBuiltIns.find(BuiltInDrawIndex) == m_activeInputBuiltIns.end())
+      builtInUsage.mesh.drawIndex = false;
+
+    if (builtInUsage.mesh.viewIndex && m_activeInputBuiltIns.find(BuiltInViewIndex) == m_activeInputBuiltIns.end())
+      builtInUsage.mesh.viewIndex = false;
+
+    if (builtInUsage.mesh.numWorkgroups &&
+        m_activeInputBuiltIns.find(BuiltInNumWorkgroups) == m_activeInputBuiltIns.end())
+      builtInUsage.mesh.numWorkgroups = false;
+
+    if (builtInUsage.mesh.workgroupId && m_activeInputBuiltIns.find(BuiltInWorkgroupId) == m_activeInputBuiltIns.end())
+      builtInUsage.mesh.workgroupId = false;
+
+    if (builtInUsage.mesh.localInvocationId &&
+        m_activeInputBuiltIns.find(BuiltInLocalInvocationId) == m_activeInputBuiltIns.end())
+      builtInUsage.mesh.localInvocationId = false;
+
+    if (builtInUsage.mesh.globalInvocationId &&
+        m_activeInputBuiltIns.find(BuiltInGlobalInvocationId) == m_activeInputBuiltIns.end())
+      builtInUsage.mesh.globalInvocationId = false;
+
+    if (builtInUsage.mesh.localInvocationIndex &&
+        m_activeInputBuiltIns.find(BuiltInLocalInvocationIndex) == m_activeInputBuiltIns.end())
+      builtInUsage.mesh.localInvocationIndex = false;
+
+    if (builtInUsage.mesh.subgroupId && m_activeInputBuiltIns.find(BuiltInSubgroupId) == m_activeInputBuiltIns.end())
+      builtInUsage.mesh.subgroupId = false;
+
+    if (builtInUsage.mesh.numSubgroups &&
+        m_activeInputBuiltIns.find(BuiltInNumSubgroups) == m_activeInputBuiltIns.end())
+      builtInUsage.mesh.numSubgroups = false;
   } else if (m_shaderStage == ShaderStageFragment) {
     if (builtInUsage.fs.fragCoord && m_activeInputBuiltIns.find(BuiltInFragCoord) == m_activeInputBuiltIns.end())
       builtInUsage.fs.fragCoord = false;
