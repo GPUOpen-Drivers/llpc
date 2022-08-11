@@ -1344,6 +1344,9 @@ void PatchResourceCollect::clearInactiveBuiltInInput() {
     if (builtInUsage.tes.tessLevelInner &&
         m_activeInputBuiltIns.find(BuiltInTessLevelInner) == m_activeInputBuiltIns.end())
       builtInUsage.tes.tessLevelInner = false;
+
+    if (builtInUsage.tes.viewIndex && m_activeInputBuiltIns.find(BuiltInViewIndex) == m_activeInputBuiltIns.end())
+      builtInUsage.tes.viewIndex = false;
   } else if (m_shaderStage == ShaderStageGeometry) {
     if (builtInUsage.gs.pointSizeIn && m_activeInputBuiltIns.find(BuiltInPointSize) == m_activeInputBuiltIns.end())
       builtInUsage.gs.pointSizeIn = false;
@@ -1364,6 +1367,9 @@ void PatchResourceCollect::clearInactiveBuiltInInput() {
 
     if (builtInUsage.gs.invocationId && m_activeInputBuiltIns.find(BuiltInInvocationId) == m_activeInputBuiltIns.end())
       builtInUsage.gs.invocationId = false;
+
+    if (builtInUsage.gs.viewIndex && m_activeInputBuiltIns.find(BuiltInViewIndex) == m_activeInputBuiltIns.end())
+      builtInUsage.gs.viewIndex = false;
   } else if (m_shaderStage == ShaderStageFragment) {
     if (builtInUsage.fs.fragCoord && m_activeInputBuiltIns.find(BuiltInFragCoord) == m_activeInputBuiltIns.end())
       builtInUsage.fs.fragCoord = false;
