@@ -51,9 +51,14 @@ void GlueShader::compile(raw_pwrite_stream &outStream) {
   palMetadata->record(&*module);
   delete palMetadata;
 
-  // Get the pass manager and run it on the module, generating ELF.
-  LegacyPassManager &passManager = m_lgcContext->getPassManagerCache()->getGlueShaderPassManager(outStream);
-  passManager.run(*module);
+  // Get the pass managers and run them on the module, generating ELF.
+  std::pair<lgc::PassManager &, LegacyPassManager &> passManagers =
+      m_lgcContext->getPassManagerCache()->getGlueShaderPassManager(outStream);
+  // Run IR passes
+  passManagers.first.run(*module);
+  // Run Codegen Passes
+  passManagers.second.run(*module);
+
   m_lgcContext->getPassManagerCache()->resetStream();
 }
 

@@ -35,6 +35,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 
 using namespace lgc;
@@ -54,7 +55,8 @@ struct PassManagerInfo {
 // Get pass manager for glue shader compilation
 //
 // @param outStream : Stream to output ELF info
-lgc::LegacyPassManager &PassManagerCache::getGlueShaderPassManager(raw_pwrite_stream &outStream) {
+std::pair<lgc::PassManager &, LegacyPassManager &>
+PassManagerCache::getGlueShaderPassManager(raw_pwrite_stream &outStream) {
   PassManagerInfo info = {};
   info.isGlue = true;
   return getPassManager(info, outStream);
@@ -65,42 +67,49 @@ lgc::LegacyPassManager &PassManagerCache::getGlueShaderPassManager(raw_pwrite_st
 //
 // @param info : PassManagerInfo to direct how to create the pass manager
 // @param outStream : Stream to output ELF info
-lgc::LegacyPassManager &PassManagerCache::getPassManager(const PassManagerInfo &info, raw_pwrite_stream &outStream) {
+std::pair<lgc::PassManager &, LegacyPassManager &> PassManagerCache::getPassManager(const PassManagerInfo &info,
+                                                                                    raw_pwrite_stream &outStream) {
   // Set our single proxy stream to use the provided stream.
   m_proxyStream.setUnderlyingStream(&outStream);
 
   // Check the cache.
-  std::unique_ptr<lgc::LegacyPassManager> &passManager =
+  std::pair<std::unique_ptr<lgc::PassManager>, std::unique_ptr<LegacyPassManager>> &passManagers =
       m_cache[StringRef(reinterpret_cast<const char *>(&info), sizeof(info))];
-  if (passManager)
-    return *passManager;
+  if (passManagers.first)
+    return {*passManagers.first, *passManagers.second};
 
   // Need to create the pass manager.
   // TODO: Creation of a normal compilation pass manager, not just one for a glue shader.
   assert(info.isGlue && "Non-glue shader compilation not implemented yet");
 
-  passManager.reset(LegacyPassManager::Create());
-  passManager->add(createTargetTransformInfoWrapperPass(m_lgcContext->getTargetMachine()->getTargetIRAnalysis()));
+  passManagers.first.reset(PassManager::Create(m_lgcContext->getTargetMachine()));
+  passManagers.first->registerFunctionAnalysis([&] { return m_lgcContext->getTargetMachine()->getTargetIRAnalysis(); });
 
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  m_lgcContext->preparePassManager(&*passManager);
+  m_lgcContext->preparePassManager(*passManagers.first);
 
   // Add a few optimizations.
-  passManager->add(createInstructionCombiningPass(5));
-  passManager->add(createInstSimplifyLegacyPass());
-  passManager->add(createEarlyCSEPass(true));
-
+  FunctionPassManager fpm;
+  fpm.addPass(InstCombinePass(5));
+  fpm.addPass(InstSimplifyPass());
+  fpm.addPass(EarlyCSEPass(true));
+  passManagers.first->addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
+  // Add one last pass that does nothing, but invalidates all the analyses.
+  // This is required to avoid the pass manager to use results of analyses from
+  // previous runs which is causing random crashes.
+  passManagers.first->addPass(InvalidateAllAnalysesPass());
   // Dump the result
   if (raw_ostream *outs = LgcContext::getLgcOuts()) {
-    passManager->add(
-        createPrintModulePass(*outs, "===============================================================================\n"
-                                     "// LGC glue shader results\n"));
+    passManagers.first->addPass(
+        PrintModulePass(*outs, "===============================================================================\n"
+                               "// LGC glue shader results\n"));
   }
 
   // Code generation.
-  m_lgcContext->addTargetPasses(*passManager, nullptr, m_proxyStream);
+  passManagers.second.reset(LegacyPassManager::Create());
+  m_lgcContext->addTargetPasses(*passManagers.second, nullptr, m_proxyStream);
 
-  return *passManager;
+  return {*passManagers.first, *passManagers.second};
 }
 
 // =====================================================================================================================
