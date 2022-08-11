@@ -1442,8 +1442,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         recordVertexAttribExport(loc, {primitiveId, undef, undef, undef});
       }
     }
-    // NOTE: If multi-view is enabled, always do exporting for gl_Layer.
-    if (m_gfxIp.major <= 8 && enableMultiView) {
+
+    if (m_gfxIp.major <= 8 && useLayer) {
       assert(m_layer);
       addExportInstForBuiltInOutput(m_layer, BuiltInLayer, insertPos);
     }
@@ -3205,18 +3205,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
   case BuiltInLayer: {
     if (!static_cast<bool>(builtInUsage.layer))
       return;
-
-    const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
-
-    // NOTE: Only last non-fragment shader stage has to export the value of gl_Layer.
-    if (!m_hasTs && !m_hasGs && !static_cast<bool>(enableMultiView)) {
-      if (m_gfxIp.major <= 8)
-        addExportInstForBuiltInOutput(output, builtInId, insertPos);
-      else {
-        // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
-        m_layer = output;
-      }
-    }
+    m_layer = output;
 
     break;
   }
@@ -3491,12 +3480,8 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 
     // NOTE: Only last non-fragment shader stage has to export the value of gl_Layer.
     if (!m_hasGs && !static_cast<bool>(enableMultiView)) {
-      if (m_gfxIp.major <= 8)
-        addExportInstForBuiltInOutput(output, builtInId, insertPos);
-      else {
-        // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
-        m_layer = output;
-      }
+      // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
+      m_layer = output;
     }
 
     break;
@@ -3754,14 +3739,8 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(Value *output, u
     break;
   }
   case BuiltInLayer: {
-    const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
-
-    if (m_gfxIp.major <= 8 && !static_cast<bool>(enableMultiView))
-      addExportInstForBuiltInOutput(output, builtInId, insertPos);
-    else {
-      // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
-      m_layer = output;
-    }
+    // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
+    m_layer = output;
 
     break;
   }
@@ -5353,21 +5332,27 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
     emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
 
     // NOTE: We have to export gl_Layer via generic outputs as well.
-    bool hasLayerExport = true;
     if (nextStage == ShaderStageFragment) {
       const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+      unsigned loc = InvalidValue;
+      Value *layer = nullptr;
+      if (nextBuiltInUsage.layer) {
+        assert(builtInOutLocs.find(BuiltInLayer) != builtInOutLocs.end());
+        loc = builtInOutLocs.find(BuiltInLayer)->second;
+        layer = new BitCastInst(output, Type::getFloatTy(*m_context), "", insertPos);
+      }
 
-      hasLayerExport = nextBuiltInUsage.layer || nextBuiltInUsage.viewIndex;
-    } else if (nextStage == ShaderStageInvalid) {
-      hasLayerExport = false;
-    }
+      if (nextBuiltInUsage.viewIndex) {
+        assert(builtInOutLocs.find(BuiltInViewIndex) != builtInOutLocs.end());
+        loc = builtInOutLocs.find(BuiltInViewIndex)->second;
 
-    if (hasLayerExport) {
-      BuiltInKind exportBuiltInId = enableMultiView ? BuiltInViewIndex : BuiltInLayer;
-      assert(builtInOutLocs.find(exportBuiltInId) != builtInOutLocs.end());
-      const unsigned loc = builtInOutLocs.find(exportBuiltInId)->second;
-
-      recordVertexAttribExport(loc, {layer, undef, undef, undef});
+        if (enableMultiView)
+          layer = new BitCastInst(output, Type::getFloatTy(*m_context), "", insertPos);
+        else
+          layer = ConstantFP::get(Type::getFloatTy(*m_context), 0.0f);
+      }
+      if (layer)
+        recordVertexAttribExport(loc, {layer, undef, undef, undef});
     }
 
     break;
