@@ -94,6 +94,9 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
                 /wd6246 # Local declaration of 'S' hides declaration of the same name in outer scope
                 /wd6323 # Use of arithmetic operator on Boolean type(s)
         )
+        target_compile_options("${PROJECT_NAME}" PRIVATE
+          /std:c++17
+        )
 
         target_compile_definitions("${PROJECT_NAME}" PRIVATE _SCL_SECURE_NO_WARNINGS)
         target_compile_definitions("${PROJECT_NAME}" PRIVATE _CRT_SECURE_NO_WARNINGS)
