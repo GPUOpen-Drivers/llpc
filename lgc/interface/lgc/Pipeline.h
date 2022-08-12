@@ -217,6 +217,15 @@ struct ShaderOptions {
   // Attempt to scalarize waterfall descriptor loads.
   bool scalarizeWaterfallLoads;
 
+  /// Override value for ThreadGroupSizeX
+  unsigned overrideShaderThreadGroupSizeX;
+
+  /// Override value for ThreadGroupSizeY
+  unsigned overrideShaderThreadGroupSizeY;
+
+  /// Override value for ThreadGroupSizeZ
+  unsigned overrideShaderThreadGroupSizeZ;
+
   ShaderOptions() {
     // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from
     // being written, we force everything to 0, including alignment gaps.

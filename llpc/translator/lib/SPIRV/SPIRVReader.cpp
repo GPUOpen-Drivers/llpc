@@ -7003,10 +7003,19 @@ bool SPIRVToLLVM::transMetadata() {
         }
         // clang-format off
         ComputeShaderMode computeMode = {};
+        unsigned overrideShaderGroupSizeX = m_shaderOptions->overrideShaderThreadGroupSizeX;
+        unsigned overrideShaderGroupSizeY = m_shaderOptions->overrideShaderThreadGroupSizeY;
+        unsigned overrideShaderGroupSizeZ = m_shaderOptions->overrideShaderThreadGroupSizeZ;
+
         unsigned overrideThreadGroupSizeX = getPipelineOptions()->overrideThreadGroupSizeX;
         unsigned overrideThreadGroupSizeY = getPipelineOptions()->overrideThreadGroupSizeY;
         unsigned overrideThreadGroupSizeZ = getPipelineOptions()->overrideThreadGroupSizeZ;
-        if (overrideThreadGroupSizeX != 0 || overrideThreadGroupSizeY != 0 || overrideThreadGroupSizeZ != 0) {
+        if (overrideShaderGroupSizeX != 0 || overrideShaderGroupSizeY != 0 || overrideShaderGroupSizeZ != 0) {
+          computeMode.workgroupSizeX = overrideShaderGroupSizeX;
+          computeMode.workgroupSizeY = overrideShaderGroupSizeY;
+          computeMode.workgroupSizeZ = overrideShaderGroupSizeZ;
+          getBuilder()->setComputeShaderMode(computeMode);
+        } else if (overrideThreadGroupSizeX != 0 || overrideThreadGroupSizeY != 0 || overrideThreadGroupSizeZ != 0) {
           computeMode.workgroupSizeX = overrideThreadGroupSizeX;
           computeMode.workgroupSizeY = overrideThreadGroupSizeY;
           computeMode.workgroupSizeZ = overrideThreadGroupSizeZ;

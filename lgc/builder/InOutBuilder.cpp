@@ -1040,8 +1040,9 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     // This function maps the eight 16x2 regions into eight 8x4 regions.
     //
     // Originally SIMDs cover 16x2 regions, after swizzling they cover 8x4 regions.
-
-    if (m_pipelineState->getOptions().forceCsThreadIdSwizzling && !getPipelineState()->isComputeLibrary()) {
+    bool pipelineThreadIdSwizzling =
+        m_pipelineState->getOptions().forceCsThreadIdSwizzling && !getPipelineState()->isComputeLibrary();
+    if (pipelineThreadIdSwizzling) {
       // Insert a call that later on might get lowered to code to reconfigure the workgroup.
       localInvocationId = CreateNamedCall(lgcName::SwizzleLocalInvocationId, localInvocationId->getType(),
                                           localInvocationId, Attribute::ReadNone);

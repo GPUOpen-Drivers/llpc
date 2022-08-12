@@ -543,6 +543,9 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.disableFastMathFlags = " << shaderInfo->options.disableFastMathFlags << "\n";
   dumpFile << "options.ldsSpillLimitDwords = " << shaderInfo->options.ldsSpillLimitDwords << "\n";
   dumpFile << "options.scalarizeWaterfallLoads = " << shaderInfo->options.scalarizeWaterfallLoads << "\n";
+  dumpFile << "options.overrideShaderThreadGroupSizeX = " << shaderInfo->options.overrideShaderThreadGroupSizeX << "\n";
+  dumpFile << "options.overrideShaderThreadGroupSizeY = " << shaderInfo->options.overrideShaderThreadGroupSizeY << "\n";
+  dumpFile << "options.overrideShaderThreadGroupSizeZ = " << shaderInfo->options.overrideShaderThreadGroupSizeZ << "\n";
   dumpFile << "\n";
 }
 
@@ -1201,6 +1204,9 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.disableFastMathFlags);
       hasher->Update(options.ldsSpillLimitDwords);
       hasher->Update(options.scalarizeWaterfallLoads);
+      hasher->Update(options.overrideShaderThreadGroupSizeX);
+      hasher->Update(options.overrideShaderThreadGroupSizeY);
+      hasher->Update(options.overrideShaderThreadGroupSizeZ);
     }
   }
 }
