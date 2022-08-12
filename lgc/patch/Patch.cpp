@@ -414,10 +414,10 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm2), true));
   fpm.addPass(LoopUnrollPass(
       LoopUnrollOptions(optLevel).setPeeling(true).setRuntime(false).setUpperBound(false).setPartial(false)));
-  
+
   if (!pipelineState->getOptions().disableScalarizer)
     fpm.addPass(ScalarizerPass());
-    
+
   fpm.addPass(PatchLoadScalarizer());
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(NewGVNPass());

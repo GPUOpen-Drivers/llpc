@@ -359,7 +359,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
   options.resourceLayoutScheme = static_cast<lgc::ResourceLayoutScheme>(getPipelineOptions()->resourceLayoutScheme);
 
   options.disableScalarizer = (DisableScalarizer || getPipelineOptions()->disableScalarizer);
-  
+
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;
   if (pipeline)
