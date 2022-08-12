@@ -5551,7 +5551,7 @@ Value *PatchInOutImportExport::reconfigWorkgroup(Value *localInvocationId, Instr
 
     if (isPowerOf2_32(workgroupSizeYMul8)) {
       // If we have a power of two, we can use a right shift to compute the division more efficiently.
-      offset = BinaryOperator::CreateLShr(x, ConstantInt::get(int32Ty, Log2(workgroupSizeYMul8)), "", insertPos);
+      offset = BinaryOperator::CreateLShr(x, ConstantInt::get(int32Ty, log2(workgroupSizeYMul8)), "", insertPos);
     } else {
       // Otherwise we truncate down to a 16-bit integer, do the division, and zero extend. This will
       // result in significantly less instructions to do the divide.
@@ -5616,7 +5616,7 @@ Value *PatchInOutImportExport::reconfigWorkgroup(Value *localInvocationId, Instr
 
     if (isPowerOf2_32(workgroupSizeXMul2)) {
       // If we have a power of two, we can use a right shift to compute the division more efficiently.
-      div = BinaryOperator::CreateLShr(maskedX, ConstantInt::get(int32Ty, Log2(workgroupSizeXMul2)), "", insertPos);
+      div = BinaryOperator::CreateLShr(maskedX, ConstantInt::get(int32Ty, log2(workgroupSizeXMul2)), "", insertPos);
     } else {
       // Otherwise we truncate down to a 16-bit integer, do the division, and zero extend. This will
       // result in significantly less instructions to do the divide.
