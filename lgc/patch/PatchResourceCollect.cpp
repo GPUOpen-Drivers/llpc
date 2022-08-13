@@ -2906,10 +2906,10 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
 
   // TCS: @lgc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-  // GS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-  // FS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
-  //      @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-  //                                           i32 interpMode, <2 x float> | i32 auxInterpValue)
+  // GS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
+  // FS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i1 perPrimitive, i32 interpMode, i32 interpLoc)
+  //     @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
+  //                                          i32 interpMode, <2 x float> | i32 auxInterpValue)
 
   // The locations of TCS with dynamic indexing (locOffset/elemIdx) cannot be unpacked
   // NOTE: Dynamic indexing in FS is processed to be constant in the lower pass.
@@ -3234,10 +3234,10 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   BuilderBase builder(call->getContext());
   builder.SetInsertPoint(call);
   // TCS: @lgc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-  // GS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-  // FS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
-  //      @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-  //                                           i32 interpMode, <2 x float> | i32 auxInterpValue)
+  // GS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
+  // FS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i1 perPrimitive, i32 interpMode, i32 interpLoc)
+  //     @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
+  //                                          i32 interpMode, <2 x float> | i32 auxInterpValue)
   SmallVector<Value *, 5> args;
   for (unsigned i = 0, end = call->arg_size(); i != end; ++i)
     args.push_back(call->getArgOperand(i));
@@ -3347,9 +3347,9 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
   BuilderBase builder(call->getContext());
   builder.SetInsertPoint(call);
 
-  // VS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+  // VS: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
   // TES: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-  // GS:  @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
+  // GS: @lgc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
   SmallVector<Value *, 5> args;
   for (unsigned i = 0, end = call->arg_size(); i != end; ++i)
     args.push_back(call->getArgOperand(i));
@@ -3457,7 +3457,7 @@ void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStag
   span.compatibilityInfo.is16Bit = bitWidth == 16;
 
   if (isFs) {
-    const unsigned interpMode = cast<ConstantInt>(call->getOperand(compIdxArgIdx + 1))->getZExtValue();
+    const unsigned interpMode = cast<ConstantInt>(call->getOperand(3))->getZExtValue();
     span.compatibilityInfo.isFlat = interpMode == InOutInfo::InterpModeFlat;
     span.compatibilityInfo.isCustom = interpMode == InOutInfo::InterpModeCustom;
 
