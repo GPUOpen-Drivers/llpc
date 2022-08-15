@@ -68,17 +68,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     // We have the user data layout. Find the node.
-    ResourceNodeType abstractType = ResourceNodeType::DescriptorBuffer;
-    if (flags & BufferFlagConst)
-      abstractType = ResourceNodeType::DescriptorConstBuffer;
-    else if (flags & BufferFlagNonConst)
-      abstractType = ResourceNodeType::DescriptorBuffer;
-    else if (flags & BufferFlagShaderResource)
-      abstractType = ResourceNodeType::DescriptorResource;
-    else if (flags & BufferFlagSampler)
-      abstractType = ResourceNodeType::DescriptorSampler;
-
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorBuffer, descSet, binding);
     if (!node) {
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getBufferDescTy(pointeeTy));
