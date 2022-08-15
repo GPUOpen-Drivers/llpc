@@ -692,12 +692,8 @@ public:
   enum {
     BufferFlagNonUniform = 1, // Descriptor index is non-uniform
     BufferFlagWritten = 2,    // Buffer is (or might be) written to
-    BufferFlagConst = 4,      // Const buffer: Find a DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
-                              //  descriptor entry, rather than DescriptorBuffer/DescriptorBufferCompact
-    BufferFlagNonConst = 8,   // Non-const buffer: Find a DescriptorBuffer/DescriptorBufferCompact descriptor
-                              //  entry, rather than DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
-    BufferFlagShaderResource = 16, // Flag to find a Descriptor Resource
-    BufferFlagSampler = 32         // Flag to find Descriptor Sampler
+    BufferFlagReserved4 = 4,  // Reserved for future functionality
+    BufferFlagReserved8 = 8,  // Reserved for future functionality
   };
 
   // Get the type of pointer returned by CreateLoadBufferDesc.
