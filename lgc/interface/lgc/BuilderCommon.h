@@ -50,7 +50,7 @@ public:
   // Use this method if you need to insert code to define values that are accessible in the entire function.
   void setInsertPointPastAllocas(llvm::Function &fn);
 
-  // Create an LLVM function call to the named function. The callee is built automically based on return
+  // Create an LLVM function call to the named function. The callee is built automatically based on return
   // type and its parameters.
   //
   // @param funcName : Name of the callee

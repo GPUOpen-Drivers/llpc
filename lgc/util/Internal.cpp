@@ -49,7 +49,7 @@ using namespace llvm;
 namespace lgc {
 
 // =====================================================================================================================
-// Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
+// Emits a LLVM function call (inserted before the specified instruction), builds it automatically based on return type
 // and its parameters.
 //
 // NOTE: Prefer BuilderBase::CreateNamedCall where possible.
@@ -66,8 +66,8 @@ CallInst *emitCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args, Arra
 }
 
 // =====================================================================================================================
-// Emits a LLVM function call (inserted at the end of the specified basic block), builds it automically based on return
-// type and its parameters.
+// Emits a LLVM function call (inserted at the end of the specified basic block), builds it automatically based on
+// return type and its parameters.
 //
 // NOTE: Prefer BuilderBase::CreateNamedCall where possible.
 //

@@ -581,7 +581,7 @@ Value *LowerFragColorExport::getOutputValue(ArrayRef<Value *> expFragColor, unsi
 
 // =====================================================================================================================
 // Collects the information needed to generate the export instructions for all of the generic outputs of the fragment
-// shader fragEntryPoint.  This infomration is stored in m_info and m_exportValues.
+// shader fragEntryPoint.  This information is stored in m_info and m_exportValues.
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
@@ -677,7 +677,7 @@ Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBas
 
 // =====================================================================================================================
 // Collects the information need to generate the export instruction for the builtin fragment outputs depth, stencil ref,
-// and sample mask.  This infomration is added to m_info and m_exportValues.
+// and sample mask.  This information is added to m_info and m_exportValues.
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
@@ -809,7 +809,7 @@ void FragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
 }
 
 // =====================================================================================================================
-// Generates the export instructions based on the given color export infomration.
+// Generates the export instructions based on the given color export information.
 //
 // @param info : The color export information for each color export in no particular order.
 // @param values : The values that are to be exported.  Indexed by the hw color target.
