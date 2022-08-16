@@ -132,9 +132,32 @@ void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
   if (!constOffset)
     return;
 
+  if (intToPtr.user_empty())
+    return;
+
+  auto *const user = cast<Instruction>(intToPtr.user_back());
+
+  const unsigned userOpcode = user->getOpcode();
+  // Check if user is Load or GEP instruction (right now only these two instructions are used).
+  if (userOpcode != Instruction::Load && userOpcode != Instruction::GetElementPtr)
+    return;
+
+  Type *elementType = nullptr;
+  if (auto loadInst = dyn_cast<LoadInst>(user)) {
+    elementType = loadInst->getType();
+
+  } else if (auto getElemPtr = dyn_cast<GetElementPtrInst>(user)) {
+    elementType = getElemPtr->getSourceElementType();
+
+  } else {
+    llvm_unreachable("Should never be called!");
+    return;
+  }
+
   // Create a getelementptr instruction (using offset / size).
   const DataLayout &dataLayout = intToPtr.getModule()->getDataLayout();
-  auto elementType = intToPtr.getType()->getPointerElementType();
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(intToPtr.getType(), elementType));
   const uint64_t size = dataLayout.getTypeAllocSize(elementType);
   APInt index = constOffset->getValue().udiv(size);
   if (constOffset->getValue().urem(size) != 0)
