@@ -288,7 +288,7 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   // Patch entry-point mutation (should be done before external library link)
   passMgr.add(createLegacyPatchEntryPointMutate());
 
-  // Patch workgroup memory initializaion.
+  // Patch workgroup memory initialization.
   passMgr.add(createLegacyPatchInitializeWorkgroupMemory());
 
   // Patch input import and output export operations

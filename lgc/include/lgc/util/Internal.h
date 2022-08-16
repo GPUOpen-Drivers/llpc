@@ -66,13 +66,13 @@ inline static void initializeUtilPasses(llvm::PassRegistry &passRegistry) {
   initializeLegacyStartStopTimerPass(passRegistry);
 }
 
-// Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
+// Emits a LLVM function call (inserted before the specified instruction), builds it automatically based on return type
 // and its parameters.
 llvm::CallInst *emitCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
                          llvm::ArrayRef<llvm::Attribute::AttrKind> attribs, llvm::Instruction *insertPos);
 
-// Emits a LLVM function call (inserted at the end of the specified basic block), builds it automically based on return
-// type and its parameters.
+// Emits a LLVM function call (inserted at the end of the specified basic block), builds it automatically based on
+// return type and its parameters.
 llvm::CallInst *emitCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
                          llvm::ArrayRef<llvm::Attribute::AttrKind> attribs, llvm::BasicBlock *insertAtEnd);
 
