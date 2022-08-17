@@ -34,8 +34,11 @@
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 
@@ -239,15 +242,12 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   //   if (threadIdInWave < lsVertCount)
   //     Run LS
   //
-  //   Barrier
+  //   Fence + Barrier
   //
   //   if (threadIdInWave < hsVertCount)
   //     Run HS
   // }
   //
-
-  std::vector<Value *> args;
-  std::vector<Attribute::AttrKind> attribs;
 
   auto arg = entryPoint->arg_begin();
 
@@ -272,41 +272,19 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint, beginLsBlock);
 
   // Construct ".entry" block
-  args.clear();
-  args.push_back(ConstantInt::get(Type::getInt64Ty(*m_context), -1));
+  BuilderBase builder(entryBlock);
 
-  attribs.clear();
-  attribs.push_back(Attribute::NoRecurse);
+  builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, {builder.getInt64(-1)});
 
-  emitCall("llvm.amdgcn.init.exec", Type::getVoidTy(*m_context), args, attribs, entryBlock);
-
-  args.clear();
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), -1));
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
-
-  attribs.clear();
-  attribs.push_back(Attribute::NoRecurse);
-
-  auto threadId = emitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
+  auto threadId = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
   unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
   if (waveSize == 64) {
-    args.clear();
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), -1));
-    args.push_back(threadId);
-
-    threadId = emitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
+    threadId = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadId});
   }
 
-  args.clear();
-  args.push_back(mergeWaveInfo);
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
-
-  attribs.clear();
-  attribs.push_back(Attribute::ReadNone);
-
-  auto lsVertCount = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
+  auto lsVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                             {mergeWaveInfo, builder.getInt32(0), builder.getInt32(8)});
 
   Value *patchId = arg;
   Value *relPatchId = (arg + 1);
@@ -317,75 +295,36 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto vertexFetchesStart = (arg + 6);
   auto vertexFetchesEnd = entryPoint->arg_end();
 
-  args.clear();
-  args.push_back(mergeWaveInfo);
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
+  auto hsVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                             {mergeWaveInfo, builder.getInt32(8), builder.getInt32(8)});
 
-  auto hsVertCount = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
   // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
   // VGPRs rather than expected v2~v4.
   auto gpuWorkarounds = &m_pipelineState->getTargetInfo().getGpuWorkarounds();
   if (gpuWorkarounds->gfx9.fixLsVgprInput) {
-    auto nullHs = new ICmpInst(*entryBlock, ICmpInst::ICMP_EQ, hsVertCount,
-                               ConstantInt::get(Type::getInt32Ty(*m_context), 0), "");
+    auto nullHs = builder.CreateICmpEQ(hsVertCount, builder.getInt32(0));
 
-    vertexId = SelectInst::Create(nullHs, arg, (arg + 2), "", entryBlock);
-    relVertexId = SelectInst::Create(nullHs, (arg + 1), (arg + 3), "", entryBlock);
-    stepRate = SelectInst::Create(nullHs, (arg + 2), (arg + 4), "", entryBlock);
-    instanceId = SelectInst::Create(nullHs, (arg + 3), (arg + 5), "", entryBlock);
+    vertexId = builder.CreateSelect(nullHs, arg, (arg + 2));
+    relVertexId = builder.CreateSelect(nullHs, (arg + 1), (arg + 3));
+    stepRate = builder.CreateSelect(nullHs, (arg + 2), (arg + 4));
+    instanceId = builder.CreateSelect(nullHs, (arg + 3), (arg + 5));
   }
 
-  auto lsEnable = new ICmpInst(*entryBlock, ICmpInst::ICMP_ULT, threadId, lsVertCount, "");
-  BranchInst::Create(beginLsBlock, endLsBlock, lsEnable, entryBlock);
+  auto lsEnable = builder.CreateICmpULT(threadId, lsVertCount);
+  builder.CreateCondBr(lsEnable, beginLsBlock, endLsBlock);
 
   // Construct ".beginLs" block
+  builder.SetInsertPoint(beginLsBlock);
+
   if (m_hasVs) {
     // Call LS main function
-    args.clear();
-
+    SmallVector<Value *> args;
     auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
-    const unsigned userDataCount = intfData->userDataCount;
-
-    unsigned userDataIdx = 0;
-
-    auto lsArgBegin = lsEntryPoint->arg_begin();
-    const unsigned lsArgCount = lsEntryPoint->arg_size();
 
     unsigned lsArgIdx = 0;
+    const unsigned lsArgCount = lsEntryPoint->arg_size();
 
-    // Set up user data SGPRs
-    while (userDataIdx < userDataCount) {
-      assert(lsArgIdx < lsArgCount);
-
-      auto lsArg = (lsArgBegin + lsArgIdx);
-      assert(lsArg->hasAttribute(Attribute::InReg));
-
-      auto lsArgTy = lsArg->getType();
-      if (lsArgTy->isVectorTy()) {
-        assert(cast<VectorType>(lsArgTy)->getElementType()->isIntegerTy());
-
-        const unsigned userDataSize = cast<FixedVectorType>(lsArgTy)->getNumElements();
-
-        std::vector<Constant *> shuffleMask;
-        for (unsigned i = 0; i < userDataSize; ++i)
-          shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
-
-        userDataIdx += userDataSize;
-
-        auto lsUserData = new ShuffleVectorInst(userData, userData, ConstantVector::get(shuffleMask), "", beginLsBlock);
-        args.push_back(lsUserData);
-      } else {
-        assert(lsArgTy->isIntegerTy());
-
-        auto lsUserData = ExtractElementInst::Create(
-            userData, ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx), "", beginLsBlock);
-        args.push_back(lsUserData);
-        ++userDataIdx;
-      }
-
-      ++lsArgIdx;
-    }
+    appendUserData(builder, args, lsEntryPoint, lsArgIdx, userData, intfData->userDataCount);
 
     // Set up system value VGPRs (LS does not have system value SGPRs)
     if (lsArgIdx < lsArgCount) {
@@ -410,74 +349,42 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
     appendArguments(args, vertexFetchesStart, vertexFetchesEnd);
     lsArgIdx += (vertexFetchesEnd - vertexFetchesStart);
-    CallInst::Create(lsEntryPoint, args, "", beginLsBlock);
+
+    CallInst *call = builder.CreateCall(lsEntryPoint, args);
+    call->setCallingConv(CallingConv::AMDGPU_LS);
   }
-  BranchInst::Create(endLsBlock, beginLsBlock);
+
+  builder.CreateBr(endLsBlock);
 
   // Construct ".endLs" block
-  args.clear();
-  attribs.clear();
-  attribs.push_back(Attribute::NoRecurse);
-  emitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_context), args, attribs, endLsBlock);
+  builder.SetInsertPoint(endLsBlock);
 
-  auto hsEnable = new ICmpInst(*endLsBlock, ICmpInst::ICMP_ULT, threadId, hsVertCount, "");
-  BranchInst::Create(beginHsBlock, endHsBlock, hsEnable, endLsBlock);
+  SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+  builder.CreateFence(AtomicOrdering::Release, workgroupScope);
+  builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
+
+  auto hsEnable = builder.CreateICmpULT(threadId, hsVertCount);
+  builder.CreateCondBr(hsEnable, beginHsBlock, endHsBlock);
 
   // Construct ".beginHs" block
+  builder.SetInsertPoint(beginHsBlock);
+
   if (m_hasTcs) {
     // Call HS main function
-    args.clear();
+    SmallVector<Value *> args;
 
     auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
-    const unsigned userDataCount = intfData->userDataCount;
-
-    unsigned userDataIdx = 0;
-
-    auto hsArgBegin = hsEntryPoint->arg_begin();
 
     unsigned hsArgIdx = 0;
 
-    // Set up user data SGPRs
-    while (userDataIdx < userDataCount) {
-      assert(hsArgIdx < hsEntryPoint->arg_size());
-
-      auto hsArg = (hsArgBegin + hsArgIdx);
-      assert(hsArg->hasAttribute(Attribute::InReg));
-
-      auto hsArgTy = hsArg->getType();
-      if (hsArgTy->isVectorTy()) {
-        assert(cast<VectorType>(hsArgTy)->getElementType()->isIntegerTy());
-
-        const unsigned userDataSize = cast<FixedVectorType>(hsArgTy)->getNumElements();
-
-        std::vector<Constant *> shuffleMask;
-        for (unsigned i = 0; i < userDataSize; ++i)
-          shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
-
-        userDataIdx += userDataSize;
-
-        auto hsUserData = new ShuffleVectorInst(userData, userData, ConstantVector::get(shuffleMask), "", beginHsBlock);
-        args.push_back(hsUserData);
-      } else {
-        assert(hsArgTy->isIntegerTy());
-        unsigned actualUserDataIdx = userDataIdx;
-        if (intfData->spillTable.sizeInDwords > 0) {
-          if (intfData->userDataUsage.spillTable == userDataIdx) {
-            if (m_hasVs) {
-              auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
-              assert(vsIntfData->userDataUsage.spillTable > 0);
-              actualUserDataIdx = vsIntfData->userDataUsage.spillTable;
-            }
-          }
-        }
-        auto hsUserData = ExtractElementInst::Create(
-            userData, ConstantInt::get(Type::getInt32Ty(*m_context), actualUserDataIdx), "", beginHsBlock);
-        args.push_back(hsUserData);
-        ++userDataIdx;
-      }
-
-      ++hsArgIdx;
+    SmallVector<std::pair<unsigned, unsigned>> substitutions;
+    if (intfData->spillTable.sizeInDwords > 0 && m_hasVs) {
+      auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+      assert(vsIntfData->userDataUsage.spillTable > 0);
+      substitutions.emplace_back(intfData->userDataUsage.spillTable, vsIntfData->userDataUsage.spillTable);
     }
+    appendUserData(builder, args, hsEntryPoint, hsArgIdx, userData, intfData->userDataCount, substitutions);
 
     // Set up system value SGPRs
     if (m_pipelineState->isTessOffChip()) {
@@ -497,12 +404,14 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
     assert(hsArgIdx == hsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
 
-    CallInst::Create(hsEntryPoint, args, "", beginHsBlock);
+    CallInst *call = builder.CreateCall(hsEntryPoint, args);
+    call->setCallingConv(CallingConv::AMDGPU_HS);
   }
-  BranchInst::Create(endHsBlock, beginHsBlock);
+  builder.CreateBr(endHsBlock);
 
   // Construct ".endHs" block
-  ReturnInst::Create(*m_context, endHsBlock);
+  builder.SetInsertPoint(endHsBlock);
+  builder.CreateRetVoid();
 
   return entryPoint;
 }
@@ -633,15 +542,12 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   //   if (threadIdInWave < esVertCount)
   //     Run ES
   //
-  //   Barrier
+  //   Fence + Barrier
   //
   //   if (threadIdInWave < gsPrimCount)
   //     Run GS
   // }
   //
-
-  std::vector<Value *> args;
-  std::vector<Attribute::AttrKind> attribs;
 
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
@@ -668,73 +574,34 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint, beginEsBlock);
 
   // Construct ".entry" block
-  args.clear();
-  args.push_back(ConstantInt::get(Type::getInt64Ty(*m_context), -1));
+  BuilderBase builder(entryBlock);
+  builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, {builder.getInt64(-1)});
 
-  attribs.clear();
-  attribs.push_back(Attribute::NoRecurse);
-
-  emitCall("llvm.amdgcn.init.exec", Type::getVoidTy(*m_context), args, attribs, entryBlock);
-
-  args.clear();
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), -1));
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
-
-  attribs.clear();
-  attribs.push_back(Attribute::NoRecurse);
-
-  auto threadId = emitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
+  auto threadId = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
   unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   if (waveSize == 64) {
-    args.clear();
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), -1));
-    args.push_back(threadId);
-
-    threadId = emitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
+    threadId = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadId});
   }
 
-  args.clear();
-  args.push_back(mergedWaveInfo);
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
-
-  attribs.clear();
-  attribs.push_back(Attribute::ReadNone);
-
-  auto esVertCount = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
-
-  args.clear();
-  args.push_back(mergedWaveInfo);
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
-
-  auto gsPrimCount = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
-
-  args.clear();
-  args.push_back(mergedWaveInfo);
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 8));
-
-  auto gsWaveId = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
-
-  args.clear();
-  args.push_back(mergedWaveInfo);
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 24));
-  args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 4));
-
-  auto waveInSubgroup = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, entryBlock);
+  auto esVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                             {mergedWaveInfo, builder.getInt32(0), builder.getInt32(8)});
+  auto gsPrimCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                             {mergedWaveInfo, builder.getInt32(8), builder.getInt32(8)});
+  auto gsWaveId = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                          {mergedWaveInfo, builder.getInt32(16), builder.getInt32(8)});
+  auto waveInSubgroup = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                                {mergedWaveInfo, builder.getInt32(24), builder.getInt32(4)});
 
   unsigned esGsBytesPerWave = waveSize * 4 * calcFactor.esGsRingItemSize;
-  auto esGsOffset = BinaryOperator::CreateMul(
-      waveInSubgroup, ConstantInt::get(Type::getInt32Ty(*m_context), esGsBytesPerWave), "", entryBlock);
+  auto esGsOffset = builder.CreateMul(waveInSubgroup, builder.getInt32(esGsBytesPerWave));
 
-  auto esEnable = new ICmpInst(*entryBlock, ICmpInst::ICMP_ULT, threadId, esVertCount, "");
-  BranchInst::Create(beginEsBlock, endEsBlock, esEnable, entryBlock);
+  auto esEnable = builder.CreateICmpULT(threadId, esVertCount);
+  builder.CreateCondBr(esEnable, beginEsBlock, endEsBlock);
 
   Value *esGsOffsets01 = arg;
 
-  Value *esGsOffsets23 = UndefValue::get(Type::getInt32Ty(*m_context));
+  Value *esGsOffsets23 = PoisonValue::get(Type::getInt32Ty(*m_context));
   if (calcFactor.inputVertices > 2) {
     // NOTE: ES to GS offset (vertex 2 and 3) is valid once the primitive type has more than 2 vertices.
     esGsOffsets23 = (arg + 1);
@@ -743,7 +610,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   Value *gsPrimitiveId = (arg + 2);
   Value *invocationId = (arg + 3);
 
-  Value *esGsOffsets45 = UndefValue::get(Type::getInt32Ty(*m_context));
+  Value *esGsOffsets45 = PoisonValue::get(Type::getInt32Ty(*m_context));
   if (calcFactor.inputVertices > 4) {
     // NOTE: ES to GS offset (vertex 4 and 5) is valid once the primitive type has more than 4 vertices.
     esGsOffsets45 = (arg + 4);
@@ -763,53 +630,18 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   // Construct ".beginEs" block
   unsigned spillTableIdx = 0;
+  builder.SetInsertPoint(beginEsBlock);
+
   if ((hasTs && m_hasTes) || (!hasTs && m_hasVs)) {
     // Call ES main function
-    args.clear();
-
+    SmallVector<Value *> args;
     auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
-    const unsigned userDataCount = intfData->userDataCount;
     spillTableIdx = intfData->userDataUsage.spillTable;
 
-    unsigned userDataIdx = 0;
-
-    auto esArgBegin = esEntryPoint->arg_begin();
+    unsigned esArgIdx = 0;
     const unsigned esArgCount = esEntryPoint->arg_size();
 
-    unsigned esArgIdx = 0;
-
-    // Set up user data SGPRs
-    while (userDataIdx < userDataCount) {
-      assert(esArgIdx < esArgCount);
-
-      auto esArg = (esArgBegin + esArgIdx);
-      assert(esArg->hasAttribute(Attribute::InReg));
-
-      auto esArgTy = esArg->getType();
-      if (esArgTy->isVectorTy()) {
-        assert(cast<VectorType>(esArgTy)->getElementType()->isIntegerTy());
-
-        const unsigned userDataSize = cast<FixedVectorType>(esArgTy)->getNumElements();
-
-        std::vector<Constant *> shuffleMask;
-        for (unsigned i = 0; i < userDataSize; ++i)
-          shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
-
-        userDataIdx += userDataSize;
-
-        auto esUserData = new ShuffleVectorInst(userData, userData, ConstantVector::get(shuffleMask), "", beginEsBlock);
-        args.push_back(esUserData);
-      } else {
-        assert(esArgTy->isIntegerTy());
-
-        auto esUserData = ExtractElementInst::Create(
-            userData, ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx), "", beginEsBlock);
-        args.push_back(esUserData);
-        ++userDataIdx;
-      }
-
-      ++esArgIdx;
-    }
+    appendUserData(builder, args, esEntryPoint, esArgIdx, userData, intfData->userDataCount);
 
     if (hasTs) {
       // Set up system value SGPRs
@@ -866,116 +698,47 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
       esArgIdx += (vertexFetchesEnd - vertexFetchesStart);
     }
 
-    CallInst::Create(esEntryPoint, args, "", beginEsBlock);
+    CallInst *call = builder.CreateCall(esEntryPoint, args);
+    call->setCallingConv(CallingConv::AMDGPU_ES);
   }
-  BranchInst::Create(endEsBlock, beginEsBlock);
+  builder.CreateBr(endEsBlock);
 
   // Construct ".endEs" block
-  args.clear();
-  attribs.clear();
-  attribs.push_back(Attribute::NoRecurse);
-  emitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_context), args, attribs, endEsBlock);
+  builder.SetInsertPoint(endEsBlock);
 
-  auto gsEnable = new ICmpInst(*endEsBlock, ICmpInst::ICMP_ULT, threadId, gsPrimCount, "");
-  BranchInst::Create(beginGsBlock, endGsBlock, gsEnable, endEsBlock);
+  SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+  builder.CreateFence(AtomicOrdering::Release, workgroupScope);
+  builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
+
+  auto gsEnable = builder.CreateICmpULT(threadId, gsPrimCount);
+  builder.CreateCondBr(gsEnable, beginGsBlock, endGsBlock);
 
   // Construct ".beginGs" block
+  builder.SetInsertPoint(beginGsBlock);
   {
-    attribs.clear();
-    attribs.push_back(Attribute::ReadNone);
-
-    args.clear();
-    args.push_back(esGsOffsets01);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-
-    auto esGsOffset0 = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
-
-    args.clear();
-    args.push_back(esGsOffsets01);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-
-    auto esGsOffset1 = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
-
-    args.clear();
-    args.push_back(esGsOffsets23);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-
-    auto esGsOffset2 = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
-
-    args.clear();
-    args.push_back(esGsOffsets23);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-
-    auto esGsOffset3 = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
-
-    args.clear();
-    args.push_back(esGsOffsets45);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 0));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-
-    auto esGsOffset4 = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
-
-    args.clear();
-    args.push_back(esGsOffsets45);
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), 16));
-
-    auto esGsOffset5 = emitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_context), args, attribs, beginGsBlock);
+    auto esGsOffset0 = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                               {esGsOffsets01, builder.getInt32(0), builder.getInt32(16)});
+    auto esGsOffset1 = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                               {esGsOffsets01, builder.getInt32(16), builder.getInt32(16)});
+    auto esGsOffset2 = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                               {esGsOffsets23, builder.getInt32(0), builder.getInt32(16)});
+    auto esGsOffset3 = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                               {esGsOffsets23, builder.getInt32(16), builder.getInt32(16)});
+    auto esGsOffset4 = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                               {esGsOffsets45, builder.getInt32(0), builder.getInt32(16)});
+    auto esGsOffset5 = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                               {esGsOffsets45, builder.getInt32(16), builder.getInt32(16)});
 
     // Call GS main function
-    args.clear();
-
+    SmallVector<llvm::Value *> args;
     auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
-    const unsigned userDataCount = intfData->userDataCount;
-
-    unsigned userDataIdx = 0;
-
-    auto gsArgBegin = gsEntryPoint->arg_begin();
-
     unsigned gsArgIdx = 0;
 
-    // Set up user data SGPRs
-    while (userDataIdx < userDataCount) {
-      assert(gsArgIdx < gsEntryPoint->arg_size());
-
-      auto gsArg = (gsArgBegin + gsArgIdx);
-      assert(gsArg->hasAttribute(Attribute::InReg));
-
-      auto gsArgTy = gsArg->getType();
-      if (gsArgTy->isVectorTy()) {
-        assert(cast<VectorType>(gsArgTy)->getElementType()->isIntegerTy());
-
-        const unsigned userDataSize = cast<FixedVectorType>(gsArgTy)->getNumElements();
-
-        std::vector<Constant *> shuffleMask;
-        for (unsigned i = 0; i < userDataSize; ++i)
-          shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), userDataIdx + i));
-
-        userDataIdx += userDataSize;
-
-        auto gsUserData = new ShuffleVectorInst(userData, userData, ConstantVector::get(shuffleMask), "", beginGsBlock);
-        args.push_back(gsUserData);
-      } else {
-        assert(gsArgTy->isIntegerTy());
-        unsigned actualUserDataIdx = userDataIdx;
-        if (intfData->spillTable.sizeInDwords > 0) {
-          if (intfData->userDataUsage.spillTable == userDataIdx) {
-            if (spillTableIdx > 0)
-              actualUserDataIdx = spillTableIdx;
-          }
-        }
-        auto gsUserData = ExtractElementInst::Create(
-            userData, ConstantInt::get(Type::getInt32Ty(*m_context), actualUserDataIdx), "", beginGsBlock);
-        args.push_back(gsUserData);
-        ++userDataIdx;
-      }
-
-      ++gsArgIdx;
-    }
+    SmallVector<std::pair<unsigned, unsigned>> substitutions;
+    if (intfData->spillTable.sizeInDwords > 0 && spillTableIdx > 0)
+      substitutions.emplace_back(intfData->userDataUsage.spillTable, spillTableIdx);
+    appendUserData(builder, args, gsEntryPoint, gsArgIdx, userData, intfData->userDataCount, substitutions);
 
     // Set up system value SGPRs
     args.push_back(gsVsOffset);
@@ -1011,14 +774,76 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
     assert(gsArgIdx == gsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
 
-    CallInst::Create(gsEntryPoint, args, "", beginGsBlock);
+    CallInst *call = builder.CreateCall(gsEntryPoint, args);
+    call->setCallingConv(CallingConv::AMDGPU_GS);
   }
-  BranchInst::Create(endGsBlock, beginGsBlock);
+  builder.CreateBr(endGsBlock);
 
   // Construct ".endGs" block
-  ReturnInst::Create(*m_context, endGsBlock);
+  builder.SetInsertPoint(endGsBlock);
+  builder.CreateRetVoid();
 
   return entryPoint;
+}
+
+// =====================================================================================================================
+// Append the user data arguments for calling @p target to @p args by referring to the arguments of @p target starting
+// at @p argIdx (which will be updated). User data values are taken from the @p userData vector.
+//
+// @param builder : The builder that will be used to create code to prepare the arguments
+// @param [in/out] args : The argument vector that will be appended to
+// @param target : The function we are preparing to call
+// @param [in/out] argIdx : Index into the target function's arguments
+// @param userData : The <N x i32> vector of user data values
+// @param userDataCount : The number of element of @p userData that should be processed
+// @param substitutions : A mapping of "target function user data index to merged function user data index" that is
+//                        applied to i32 arguments of the target function.
+void ShaderMerger::appendUserData(BuilderBase &builder, SmallVectorImpl<Value *> &args, Function *target,
+                                  unsigned &argIdx, Value *userData, unsigned userDataCount,
+                                  ArrayRef<std::pair<unsigned, unsigned>> substitutions) {
+  unsigned userDataIdx = 0;
+
+  auto argBegin = target->arg_begin();
+
+  // Set up user data SGPRs
+  while (userDataIdx < userDataCount) {
+    assert(argIdx < target->arg_size());
+
+    auto arg = (argBegin + argIdx);
+    assert(arg->hasAttribute(Attribute::InReg));
+
+    auto argTy = arg->getType();
+    if (argTy->isVectorTy()) {
+      assert(cast<VectorType>(argTy)->getElementType()->isIntegerTy());
+
+      const unsigned userDataSize = cast<FixedVectorType>(argTy)->getNumElements();
+
+      std::vector<int> shuffleMask;
+      for (unsigned i = 0; i < userDataSize; ++i)
+        shuffleMask.push_back(userDataIdx + i);
+
+      userDataIdx += userDataSize;
+
+      auto lsUserData = builder.CreateShuffleVector(userData, userData, shuffleMask);
+      args.push_back(lsUserData);
+    } else {
+      assert(argTy->isIntegerTy());
+
+      unsigned actualUserDataIdx = userDataIdx;
+      for (const auto &substitution : substitutions) {
+        if (userDataIdx == substitution.first) {
+          actualUserDataIdx = substitution.second;
+          break;
+        }
+      }
+
+      auto lsUserData = builder.CreateExtractElement(userData, actualUserDataIdx);
+      args.push_back(lsUserData);
+      ++userDataIdx;
+    }
+
+    ++argIdx;
+  }
 }
 
 // =====================================================================================================================
@@ -1042,7 +867,7 @@ void ShaderMerger::appendVertexFetchTypes(std::vector<Type *> &argTys) const {
 // @param [in/out] args : The vector to which the arguments will be appends.
 // @param begin : The start of the argument to add.
 // @param end : One past the last argument to add.
-void ShaderMerger::appendArguments(std::vector<Value *> &args, Argument *begin, Argument *end) const {
+void ShaderMerger::appendArguments(SmallVectorImpl<Value *> &args, Argument *begin, Argument *end) const {
   for (auto &fetch : make_range(begin, end)) {
     args.push_back(&fetch);
   }

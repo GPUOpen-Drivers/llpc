@@ -143,12 +143,12 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
     std::vector<Value *> idxs;
     unsigned startOperand = 1;
     Value *blockPtr = nullptr;
+    Type *coalescedType = nullptr;
 
     do {
       ptrVal = chainedInsts.top();
       chainedInsts.pop();
-      if (!blockPtr)
-        blockPtr = ptrVal->getOperand(0);
+
       for (unsigned i = startOperand; i != ptrVal->getNumOperands(); ++i)
         idxs.push_back(ptrVal->getOperand(i));
       // NOTE: For subsequent "getelementptr" instructions/constants, we skip the first two operands. The first
@@ -157,13 +157,21 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
       startOperand = 2;
 
       auto inst = dyn_cast<GetElementPtrInst>(ptrVal);
+
+      if (!blockPtr && inst) {
+        blockPtr = ptrVal->getOperand(0);
+        coalescedType = inst->getSourceElementType();
+      }
+
       if (inst)
         removedInsts.push(inst);
     } while (!chainedInsts.empty());
 
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(cast<PointerType>(blockPtr->getType())->isOpaqueOrPointeeTypeMatches(coalescedType));
+
     // Create the coalesced "getelementptr" instruction (do combining)
-    auto blockType = blockPtr->getType()->getPointerElementType();
-    coalescedGetElemPtr = GetElementPtrInst::Create(blockType, blockPtr, idxs, "", getElemPtr);
+    coalescedGetElemPtr = GetElementPtrInst::Create(coalescedType, blockPtr, idxs, "", getElemPtr);
     getElemPtr->replaceAllUsesWith(coalescedGetElemPtr);
 
     // Remove dead "getelementptr" instructions where possible.

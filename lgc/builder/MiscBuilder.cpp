@@ -49,7 +49,7 @@ Instruction *MiscBuilder::CreateEmitVertex(unsigned streamId) {
   // Get GsWaveId
   std::string callName = lgcName::InputImportBuiltIn;
   callName += "GsWaveId.i32.i32";
-  Value *gsWaveId = emitCall(callName, getInt32Ty(), getInt32(BuiltInGsWaveId), {}, &*GetInsertPoint());
+  Value *gsWaveId = CreateNamedCall(callName, getInt32Ty(), getInt32(BuiltInGsWaveId), {});
 
   // Do the sendmsg.
   // [9:8] = stream, [5:4] = 2 (emit), [3:0] = 2 (GS)
@@ -67,7 +67,7 @@ Instruction *MiscBuilder::CreateEndPrimitive(unsigned streamId) {
   // Get GsWaveId
   std::string callName = lgcName::InputImportBuiltIn;
   callName += "GsWaveId.i32.i32";
-  Value *gsWaveId = emitCall(callName, getInt32Ty(), getInt32(BuiltInGsWaveId), {}, &*GetInsertPoint());
+  Value *gsWaveId = CreateNamedCall(callName, getInt32Ty(), getInt32(BuiltInGsWaveId), {});
 
   // Do the sendmsg.
   // [9:8] = stream, [5:4] = 1 (cut), [3:0] = 2 (GS)
@@ -128,8 +128,7 @@ Value *MiscBuilder::CreateIsHelperInvocation(const Twine &instName) {
 Instruction *MiscBuilder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
                                               const Twine &instName) {
   assert(m_shaderStage == ShaderStageTask); // Only valid for task shader
-  return emitCall(lgcName::MeshTaskEmitMeshTasks, getVoidTy(), {groupCountX, groupCountY, groupCountZ}, {},
-                  &*GetInsertPoint());
+  return CreateNamedCall(lgcName::MeshTaskEmitMeshTasks, getVoidTy(), {groupCountX, groupCountY, groupCountZ}, {});
 }
 
 // =====================================================================================================================
@@ -142,7 +141,7 @@ Instruction *MiscBuilder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCo
 // @returns Instruction to set the actual size of mesh outputs
 Instruction *MiscBuilder::CreateSetMeshOutputs(Value *vertexCount, Value *primitiveCount, const Twine &instName) {
   assert(m_shaderStage == ShaderStageMesh); // Only valid for mesh shader
-  return emitCall(lgcName::MeshTaskSetMeshOutputs, getVoidTy(), {vertexCount, primitiveCount}, {}, &*GetInsertPoint());
+  return CreateNamedCall(lgcName::MeshTaskSetMeshOutputs, getVoidTy(), {vertexCount, primitiveCount}, {});
 }
 
 // =====================================================================================================================

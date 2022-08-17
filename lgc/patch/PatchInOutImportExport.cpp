@@ -157,7 +157,7 @@ bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipe
   // Create the global variable that is to model LDS
   // NOTE: ES -> GS ring is always on-chip on GFX9.
   if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)))
-    m_lds = LegacyPatch::getLdsVariable(m_pipelineState, m_module);
+    m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
 
   // Set buffer formats based on specific GFX
   static const std::array<unsigned char, 4> BufferFormatsGfx9 = {
@@ -311,8 +311,9 @@ void PatchInOutImportExport::processShader() {
 
   if (useThreadId) {
     // Calculate and store thread ID
-    auto insertPos = m_entryPoint->begin()->getFirstInsertionPt();
-    m_threadId = getSubgroupLocalInvocationId(&*insertPos);
+    BuilderBase builder(*m_context);
+    builder.setInsertPointPastAllocas(*m_entryPoint);
+    m_threadId = getSubgroupLocalInvocationId(builder);
   }
 
   // Initialize calculation factors for tessellation shader
@@ -619,10 +620,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         break;
       }
       case ShaderStageFragment: {
-        Value *sampleId = nullptr;
+        Value *generalVal = nullptr;
         if (callInst.arg_size() >= 2)
-          sampleId = callInst.getArgOperand(1);
-        input = patchFsBuiltInInputImport(inputTy, builtInId, sampleId, &callInst);
+          generalVal = callInst.getArgOperand(1);
+        input = patchFsBuiltInInputImport(inputTy, builtInId, generalVal, &callInst);
         break;
       }
       default: {
@@ -1543,10 +1544,12 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       }
     }
   } else if (m_shaderStage == ShaderStageGeometry) {
-    if (!m_pipelineState->isGsOnChip() && m_gfxIp.major >= 10) {
-      // NOTE: This is a workaround because backend compiler does not provide s_waitcnt_vscnt intrinsic, so we
-      // use fence release to generate s_waitcnt vmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
-      new FenceInst(*m_context, AtomicOrdering::Release, SyncScope::System, insertPos);
+    if (m_gfxIp.major >= 10) {
+      // NOTE: Per programming guide, we should do a "s_waitcnt 0,0,0 + s_waitcnt_vscnt 0" before issuing a "done", so
+      // we use fence release to generate s_waitcnt vmcnt lgkmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
+      SyncScope::ID scope =
+          m_pipelineState->isGsOnChip() ? m_context->getOrInsertSyncScopeID("workgroup") : SyncScope::System;
+      new FenceInst(*m_context, AtomicOrdering::Release, scope, insertPos);
     }
 
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
@@ -2331,9 +2334,9 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
 //
 // @param inputTy : Type of input value
 // @param builtInId : ID of the built-in variable
-// @param sampleId : Sample ID; only needed for BuiltInSamplePosOffset
+// @param generalVal : Sample ID, only needed for BuiltInSamplePosOffset; InterpLoc, only needed for BuiltInBaryCoord
 // @param insertPos : Where to insert the patch instruction
-Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *sampleId,
+Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *generalVal,
                                                          Instruction *insertPos) {
   Value *input = UndefValue::get(inputTy);
 
@@ -2609,7 +2612,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInSamplePosOffset: {
-    input = getSamplePosOffset(inputTy, sampleId, insertPos);
+    input = getSamplePosOffset(inputTy, generalVal, insertPos);
     break;
   }
   case BuiltInSamplePosition: {
@@ -2618,16 +2621,25 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   }
   case BuiltInBaryCoord:
   case BuiltInBaryCoordNoPerspKHR: {
-    unsigned int idx = 0;
-    if (BuiltInBaryCoord == builtInId) {
-      assert(entryArgIdxs.perspInterp.center != 0);
-      idx = entryArgIdxs.perspInterp.center;
+    assert(isa<ConstantInt>(generalVal));
+    unsigned idx = 0;
+    unsigned interpLoc = cast<ConstantInt>(generalVal)->getZExtValue();
+    Value *iJCoord = nullptr;
+    if (interpLoc == InOutInfo::InterpLocCentroid) {
+      if (BuiltInBaryCoord == builtInId)
+        iJCoord = adjustCentroidIj(getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.centroid),
+                                   getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.center), insertPos);
+      else
+        iJCoord = adjustCentroidIj(getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.centroid),
+                                   getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center), insertPos);
+    } else if (interpLoc == InOutInfo::InterpLocSample) {
+      idx = (BuiltInBaryCoord == builtInId) ? entryArgIdxs.perspInterp.sample : entryArgIdxs.linearInterp.sample;
+      iJCoord = getFunctionArgument(m_entryPoint, idx);
     } else {
-      assert(entryArgIdxs.linearInterp.center != 0);
-      idx = entryArgIdxs.linearInterp.center;
+      idx = (BuiltInBaryCoord == builtInId) ? entryArgIdxs.perspInterp.center : entryArgIdxs.linearInterp.center;
+      iJCoord = getFunctionArgument(m_entryPoint, idx);
     }
 
-    auto iJCoord = getFunctionArgument(m_entryPoint, idx);
     builder.SetInsertPoint(insertPos);
     auto iCoord = builder.CreateExtractElement(iJCoord, uint64_t(0));
     auto jCoord = builder.CreateExtractElement(iJCoord, 1);
@@ -5232,17 +5244,15 @@ Value *PatchInOutImportExport::adjustCentroidIj(Value *centroidIj, Value *center
 // =====================================================================================================================
 // Get Subgroup local invocation Id
 //
-// @param insertPos : Where to insert this call
-Value *PatchInOutImportExport::getSubgroupLocalInvocationId(Instruction *insertPos) {
-  Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), -1),
-                   ConstantInt::get(Type::getInt32Ty(*m_context), 0)};
+// @param builder : The builder to use
+Value *PatchInOutImportExport::getSubgroupLocalInvocationId(BuilderBase &builder) {
   Value *subgroupLocalInvocationId =
-      emitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_context), args, {}, &*insertPos);
+      builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
   unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
   if (waveSize == 64) {
-    Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), -1), subgroupLocalInvocationId};
-    subgroupLocalInvocationId = emitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_context), args, {}, &*insertPos);
+    subgroupLocalInvocationId =
+        builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), subgroupLocalInvocationId});
   }
 
   return subgroupLocalInvocationId;
@@ -6075,7 +6085,10 @@ void PatchInOutImportExport::storeTessFactors() {
   auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
   // NOTE: We are going to read back tess factors from on-chip LDS. Make sure they have been stored already.
+  SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+  builder.CreateFence(AtomicOrdering::Release, workgroupScope);
   builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
   SmallVector<Value *> outerTessFactors, innerTessFactors;
 

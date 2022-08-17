@@ -81,9 +81,8 @@
 //  @page VersionHistory
 //  %Version History
 //  | %Version | Change Description                                                                                    |
-//  | -------- | ------------------------------------------------------------------------------------------------------|
-//  |     54.0 | Add overrideThreadGroupSizeX, overrideThreadGroupSizeY and overrideThreadGroupSizeZ  to               |
-//  |          | PipelineOptions                                                                                       |
+//  | -------- | ---------------------------------------------------------------------------------------------|
+//  |     54.0 | Add overrideThreadGroupSizeX, overrideThreadGroupSizeY and overrideThreadGroupSizeZ  to PipelineOptions     |
 //  |     53.7 | Add threadGroupSwizzleMode to PipelineOptions                                                         |
 //  |     53.6 | Add scalarizeWaterfallLoads to PipelineShaderOptions                                                  |
 //  |     53.5 | Add forceCsThreadIdSwizzling for thread id swizzle in 8*4                                             |
@@ -304,6 +303,7 @@ struct ResourceMappingNode {
       unsigned binding; ///< Descriptor binding
       unsigned reserv0;
       unsigned reserv1;
+      unsigned reserv2;
     } srdRange;
     /// Info for hierarchical nodes (DescriptorTableVaPtr)
     struct {
@@ -330,6 +330,7 @@ struct StaticDescriptorValue {
   unsigned binding;             ///< ID of descriptor binding
   unsigned reserv0;
   unsigned reserv1;
+  unsigned reserv2;
   unsigned arraySize;           ///< Element count for arrayed binding
   const unsigned *pValue;       ///< Static SRDs
   unsigned visibility;          ///< Mask composed of ShaderStageBit values

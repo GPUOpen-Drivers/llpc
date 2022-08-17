@@ -363,7 +363,7 @@ public:
   llvm::Value *CreateGetDescPtr(ResourceNodeType descType, unsigned descSet, unsigned binding,
                                 const llvm::Twine &instName) override final;
 
-  llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *pushConstantsTy, const llvm::Twine &instName) override final;
+  llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName) override final;
 
   llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc, llvm::Value *offset,
                                          const llvm::Twine &instName = "") override final;

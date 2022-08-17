@@ -103,7 +103,7 @@ private:
     return static_cast<void *>(&castedObj->m_state.userDataPtr.sizeInDwords);
   }
 
-  static const unsigned MemberCount = 10;
+  static const unsigned MemberCount = 11;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   std::vector<SectionResourceMappingNode> m_next; // Next resource mapping node
@@ -366,7 +366,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 15;
+  static const unsigned MemberCount = 16;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;

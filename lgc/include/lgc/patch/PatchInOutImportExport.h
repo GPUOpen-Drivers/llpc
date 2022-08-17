@@ -186,7 +186,7 @@ private:
 
   llvm::Value *adjustCentroidIj(llvm::Value *centroidIj, llvm::Value *centerIj, llvm::Instruction *insertPos);
 
-  llvm::Value *getSubgroupLocalInvocationId(llvm::Instruction *insertPos);
+  llvm::Value *getSubgroupLocalInvocationId(BuilderBase &builder);
 
   WorkgroupLayout calculateWorkgroupLayout();
   llvm::Value *reconfigWorkgroup(llvm::Value *localInvocationId, llvm::Instruction *insertPos);

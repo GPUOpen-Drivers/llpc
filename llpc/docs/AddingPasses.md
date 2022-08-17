@@ -22,12 +22,10 @@ Once the pass is created, it needs to be registered to LLPC.
 
 To register a front-end pass, you need to add an entry to the LLPC front-end pass registry (`llpc/lower/PassRegistry.inc`). For example:
 
-`LLPC_PASS("short-name", MyPass())`
+`LLPC_PASS("short-name", MyPass)`
 
 * `short-name` is a unique dash-separated short name used to identify the pass. This short name is for example used for the `--print-after` option to print LLVM IR after a given pass short name (e.g. `--print-after=short-name`).
-* `MyPass` is the constructor of your pass. You must provide a constructor with no argument to be able to register the pass.
-
-This `PassRegistry.inc` file is included in `llpcSpirvLower.cpp`, so you may need to include the header containing your pass declaration there to make the constructor available.
+* `MyPass` is the name of the pass class.
 
 ## Register a middle-end pass
 

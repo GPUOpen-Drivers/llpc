@@ -66,17 +66,16 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
     set(LLVM_ENABLE_ZLIB OFF CACHE BOOL Force)
-#if _WIN32
     if (NOT WIN32)
-#endif
-    set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
-#if _WIN32
+        # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
+        #
+        # Don't turn this on on Windows, because the required "cross compile" setup doesn't work in the internal CMake
+        # setup on Windows.
+        set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
     endif()
 
     # This will greatly speed up debug builds because we won't be listing all the symbols with llvm-nm.
-    # Not supported on Linux so we can keep it inside Windows ifdef.
     set(LLVM_BUILD_LLVM_C_DYLIB OFF CACHE BOOL Force)
-#endif
 
     if(EXISTS ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm)
         set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
@@ -89,32 +88,41 @@ if(ICD_BUILD_LLPC)
     # Export the LLVM build path so that it's available in XGL.
     set(XGL_LLVM_BUILD_PATH ${XGL_LLVM_BUILD_PATH} PARENT_SCOPE)
 
-    llvm_map_components_to_libnames(llvm_libs
-        lgc
-        AMDGPUAsmParser
-        AMDGPUCodeGen
-        AMDGPUDisassembler
-        AMDGPUInfo
-        Analysis
-        BinaryFormat
-        Core
-        Coroutines
-        LTO
-        ipo
-        BitReader
-        BitWriter
-        CodeGen
-        InstCombine
-        IRReader
-        Linker
-        MC
-        Passes
-        ScalarOpts
-        Support
-        Target
-        TransformUtils
-    )
-    target_link_libraries(llpc PUBLIC ${llvm_libs})
+    if (LLVM_LINK_LLVM_DYLIB)
+        # Link dynamically against libLLVM-${version}.so
+        target_link_libraries(llpc PUBLIC LLVM)
+    else()
+        # Link statically against the required component libraries
+        llvm_map_components_to_libnames(llvm_libs
+            AMDGPUAsmParser
+            AMDGPUCodeGen
+            AMDGPUDisassembler
+            AMDGPUInfo
+            Analysis
+            BinaryFormat
+            Core
+            Coroutines
+            LTO
+            ipo
+            BitReader
+            BitWriter
+            CodeGen
+            InstCombine
+            IRReader
+            Linker
+            MC
+            Passes
+            ScalarOpts
+            Support
+            Target
+            TransformUtils
+        )
+        target_link_libraries(llpc PUBLIC ${llvm_libs})
+    endif()
+
+    # Always link statically against libLLVMlgc
+    llvm_map_components_to_libnames(extra_llvm_libs lgc)
+    target_link_libraries(llpc PUBLIC ${extra_llvm_libs})
 endif()
 
 ### Compiler Options ###################################################################################################
@@ -196,7 +204,6 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerInstMetaRemove.cpp
         lower/llpcSpirvLowerMath.cpp
         lower/llpcSpirvLowerMemoryOp.cpp
-        lower/llpcSpirvLowerResourceCollect.cpp
         lower/llpcSpirvLowerTerminator.cpp
         lower/llpcSpirvLowerTranslator.cpp
         lower/llpcSpirvLowerUtil.cpp
@@ -327,33 +334,9 @@ target_include_directories(llpc_standalone_compiler PUBLIC
     ${LLVM_INCLUDE_DIRS}
 )
 
-llvm_map_components_to_libnames(llvm_libs
-    lgc
-    aggressiveinstcombine
-    amdgpuasmparser
-    amdgpucodegen
-    amdgpudisassembler
-    amdgpuinfo
-    analysis
-    asmparser
-    bitreader
-    bitwriter
-    codegen
-    coroutines
-    ipo
-    irreader
-    linker
-    LTO
-    mc
-    passes
-    support
-    target
-    transformutils
-)
 target_link_libraries(llpc_standalone_compiler PUBLIC
     cwpack
     llpc
-    ${llvm_libs}
     metrohash
     spvgen_static
     vfx

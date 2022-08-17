@@ -185,12 +185,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
   }
 
-  // Patch buffer operations (must be after optimizations)
-  FunctionPassManager fpm;
-  fpm.addPass(PatchBufferOp());
-  fpm.addPass(InstCombinePass(2));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
-
   // Fully prepare the pipeline ABI (must be after optimizations)
   passMgr.addPass(PatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
@@ -206,18 +200,24 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
     // Extra optimizations after NGG primitive shader creation
     passMgr.addPass(AlwaysInlinerPass());
     passMgr.addPass(GlobalDCEPass());
-    FunctionPassManager fpm2;
-    fpm2.addPass(PromotePass());
-    fpm2.addPass(ADCEPass());
-    fpm2.addPass(InstCombinePass());
-    fpm2.addPass(SimplifyCFGPass());
-    passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm2)));
+    FunctionPassManager fpm;
+    fpm.addPass(PromotePass());
+    fpm.addPass(ADCEPass());
+    fpm.addPass(PatchBufferOp());
+    fpm.addPass(InstCombinePass());
+    fpm.addPass(SimplifyCFGPass());
+    passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
 
     // Stop timer for optimization passes and restart timer for patching passes.
     if (patchTimer) {
       LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
       LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
     }
+  } else {
+    FunctionPassManager fpm;
+    fpm.addPass(PatchBufferOp());
+    fpm.addPass(InstCombinePass(2));
+    passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   }
 
   // Set up target features in shader entry-points.
@@ -247,7 +247,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
 //
 // @param [in/out] passMgr : Pass manager
 void Patch::registerPasses(lgc::PassManager &passMgr) {
-#define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, decltype(CLASS)::name());
+#define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, CLASS::name());
 #include "PassRegistry.inc"
 }
 

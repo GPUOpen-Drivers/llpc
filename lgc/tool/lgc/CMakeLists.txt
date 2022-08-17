@@ -25,7 +25,6 @@
 
 ### LGC Standalone Compiler ############################################################################################
 set(LLVM_LINK_COMPONENTS
-    lgc
     Core
     AMDGPUAsmParser
     AMDGPUCodeGen
@@ -38,7 +37,10 @@ add_llvm_tool(lgc
     lgc.cpp
 )
 
-add_dependencies(lgc LLVMlgc)
+# lgc is linked in separately to account for both static and dynamic library
+# builds.
+llvm_map_components_to_libnames(extra_llvm_libs lgc)
+target_link_libraries(lgc PRIVATE ${extra_llvm_libs})
 
 target_compile_definitions(lgc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 

@@ -230,7 +230,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   }
 
   if (m_pipelineState->isGsOnChip())
-    m_lds = LegacyPatch::getLdsVariable(m_pipelineState, &module);
+    m_lds = Patch::getLdsVariable(m_pipelineState, &module);
   else
     m_gsVsRingBufDesc = loadGsVsRingBufferDescriptor(builder);
 

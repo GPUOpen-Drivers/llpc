@@ -131,10 +131,13 @@ private:
                              SymbolPool &symbols, ArrayRef<object::RelocationRef> relocs);
   bool disasmInstSeq(SmallVectorImpl<InstOrDirective> &seq, uint64_t offset, bool outputting, StringRef contents,
                      SymbolPool &symbols);
+  bool disasmLongJump(SmallVectorImpl<InstOrDirective> &seq, const InstOrDirective &inst, bool outputting,
+                      StringRef contents, SymbolPool &symbols);
   bool disasmTableJump(SmallVectorImpl<InstOrDirective> &seq, const InstOrDirective &inst, bool outputting,
                        StringRef contents, SymbolPool &symbols);
   InstOrDirective disasmInst(uint64_t offset, StringRef contents);
   void addBinaryEncodingComment(raw_ostream &stream, unsigned instAlignment, ArrayRef<uint8_t> instBytes);
+  void outputInst(InstOrDirective inst, unsigned instAlignment);
   void outputData(bool outputting, uint64_t offset, StringRef data, ArrayRef<object::RelocationRef> &relocs);
   void outputRelocs(bool outputting, uint64_t offset, uint64_t size, ArrayRef<object::RelocationRef> &relocs);
   size_t decodeNote(StringRef data);
@@ -456,24 +459,9 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
     // Output reloc.
     outputRelocs(outputting, offset, inst.bytes.size(), relocs);
 
-    if (outputting) {
-      // Output the binary encoding as a comment.
-      if (inst.status == MCDisassembler::SoftFail)
-        m_streamer->AddComment("Illegal instruction encoding ");
-      std::string comment = inst.comment.str();
-      raw_string_ostream commentStream(comment);
-      if (!comment.empty())
-        commentStream << " ";
-      commentStream << format("%06x:", inst.offset);
-      addBinaryEncodingComment(commentStream, instAlignment, inst.bytes);
-      // Output the instruction to the streamer.
-      if (!comment.empty())
-        m_streamer->AddComment(comment);
-      if (const MCExpr *expr = inst.valueDirectiveExpr)
-        m_streamer->emitValue(expr, inst.bytes.size());
-      else
-        m_streamer->emitInstruction(inst.mcInst, *m_subtargetInfo);
-    }
+    if (outputting)
+      outputInst(inst, instAlignment);
+
     offset += inst.bytes.size();
     lastOffset = offset;
   }
@@ -496,10 +484,54 @@ bool ObjDisassembler::disasmInstSeq(SmallVectorImpl<InstOrDirective> &seq, uint6
   if (inst.status == MCDisassembler::Fail)
     return false;
 
-  if (disasmTableJump(seq, inst, outputting, contents, symbols))
+  if (disasmLongJump(seq, inst, outputting, contents, symbols) ||
+      disasmTableJump(seq, inst, outputting, contents, symbols))
     return true;
 
   seq.emplace_back(inst);
+  return true;
+}
+
+// =====================================================================================================================
+// Try disassembling a long jump sequence.
+//
+// @param [out] seq : The sequence of instructions or directives
+// @param inst : The first instruction of the potential sequence
+// @param outputting : True to actually stream the disassembly output
+// @param contents : The bytes of the section
+// @param symbols : The symbols of the section
+// @returns : Return true on success.
+bool ObjDisassembler::disasmLongJump(SmallVectorImpl<InstOrDirective> &seq, const InstOrDirective &inst,
+                                     bool outputting, StringRef contents, SymbolPool &symbols) {
+  InstOrDirective getpc = inst;
+  if (getpc.mnemonic != "s_getpc_b64")
+    return false;
+
+  InstOrDirective add = disasmInst(getpc.getEndOffset(), contents);
+  if (add.mnemonic != "s_add_u32" || *add.op0.sReg != *getpc.op0.sReg || *add.op1.sReg != *getpc.op0.sReg ||
+      !add.op2.imm)
+    return false;
+
+  InstOrDirective addc = disasmInst(add.getEndOffset(), contents);
+  if (addc.mnemonic != "s_addc_u32" || *addc.op0.sReg != *getpc.op0.sReg + 1 || *addc.op1.sReg != *getpc.op0.sReg + 1 ||
+      !addc.op2.imm || *addc.op2.imm != 0)
+    return false;
+
+  InstOrDirective setpc = disasmInst(addc.getEndOffset(), contents);
+  if (setpc.mnemonic != "s_setpc_b64" || *setpc.op0.sReg != *getpc.op0.sReg)
+    return false;
+
+  MCSymbol *getpcLabel = getOrCreateSymbol(symbols, getpc.getEndOffset());
+  MCSymbol *targetLabel = getOrCreateSymbol(symbols, getpc.getEndOffset() + *add.op2.imm);
+  if (outputting) {
+    const MCExpr *targetOffsetExpr = MCBinaryExpr::createSub(
+        MCSymbolRefExpr::create(targetLabel, *m_context), MCSymbolRefExpr::create(getpcLabel, *m_context), *m_context);
+    add.mcInst.getOperand(2) = MCOperand::createExpr(targetOffsetExpr);
+  }
+
+  for (const InstOrDirective &i : {getpc, add, addc, setpc})
+    seq.emplace_back(i);
+
   return true;
 }
 
@@ -661,6 +693,30 @@ void ObjDisassembler::addBinaryEncodingComment(raw_ostream &stream, unsigned ins
       byte = instBytes[subOffset ^ (instAlignment - 1)];
     stream << format("%02x", byte);
   }
+}
+
+// =====================================================================================================================
+// Outputs a given instruction or directive.
+//
+// @param inst : The instruction or directive to output.
+// @param instAlignment : Alignment (instruction unit size in bytes)
+void ObjDisassembler::outputInst(InstOrDirective inst, unsigned instAlignment) {
+  // Output the binary encoding as a comment.
+  if (inst.status == MCDisassembler::SoftFail)
+    m_streamer->AddComment("Illegal instruction encoding ");
+  std::string comment = inst.comment.str();
+  raw_string_ostream commentStream(comment);
+  if (!comment.empty())
+    commentStream << " ";
+  commentStream << format("%06x:", inst.offset);
+  addBinaryEncodingComment(commentStream, instAlignment, inst.bytes);
+  // Output the instruction to the streamer.
+  if (!comment.empty())
+    m_streamer->AddComment(comment);
+  if (const MCExpr *expr = inst.valueDirectiveExpr)
+    m_streamer->emitValue(expr, inst.bytes.size());
+  else
+    m_streamer->emitInstruction(inst.mcInst, *m_subtargetInfo);
 }
 
 // =====================================================================================================================

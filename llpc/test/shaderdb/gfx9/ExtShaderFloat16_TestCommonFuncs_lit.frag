@@ -48,7 +48,6 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: = call reassoc nsz arcp contract afn <3 x half> @llvm.fabs.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nsz arcp contract afn <3 x half> (...) @lgc.create.fsign.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nsz arcp contract afn <3 x half> @llvm.floor.v3f16(<3 x half>
@@ -69,6 +68,7 @@ void main()
 ; SHADERTEST: = call <3 x i16> (...) @lgc.create.extract.exponent.v3i16(<3 x half>
 ; SHADERTEST: = call reassoc nsz arcp contract afn <3 x half> (...) @lgc.create.ldexp.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fmax.v3f16(<3 x half>
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS

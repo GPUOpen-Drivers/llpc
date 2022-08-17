@@ -41,7 +41,6 @@
 #include "llpcGraphicsContext.h"
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLower.h"
-#include "llpcSpirvLowerResourceCollect.h"
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
 #include "llpcTimerProfiler.h"

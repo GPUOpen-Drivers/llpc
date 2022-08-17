@@ -111,7 +111,7 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
         vertexIndex,
     });
     addTypeMangling(resultTy, args, callName);
-    return emitCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn}, &*GetInsertPoint());
+    return CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn});
   };
 
   unsigned oddOffset = 0, evenOffset = 0;
@@ -286,7 +286,7 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
 
   std::string callName(baseCallName);
   addTypeMangling(resultTy, args, callName);
-  Value *result = emitCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn}, &*GetInsertPoint());
+  Value *result = CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn});
 
   result->setName(instName);
   return result;
@@ -376,7 +376,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
 
   std::string llpcCallName = lgcName::OutputExportGeneric;
   addTypeMangling(nullptr, args, llpcCallName);
-  return emitCall(llpcCallName, getVoidTy(), args, {}, &*GetInsertPoint());
+  return CreateNamedCall(llpcCallName, getVoidTy(), args, {});
 }
 
 // =====================================================================================================================
@@ -573,8 +573,8 @@ Value *InOutBuilder::modifyAuxInterpValue(Value *auxInterpValue, InOutInfo input
         resUsage->builtInUsage.fs.centroid = true;
       }
 
-      auxInterpValue = emitCall(evalInstName, FixedVectorType::get(getFloatTy(), 2), {evalArg}, Attribute::ReadOnly,
-                                &*GetInsertPoint());
+      auxInterpValue =
+          CreateNamedCall(evalInstName, FixedVectorType::get(getFloatTy(), 2), {evalArg}, Attribute::ReadOnly);
     } else {
       // Generate code to evaluate the I,J coordinates.
       if (inputInfo.getInterpLoc() == InOutInfo::InterpLocSample)
@@ -741,7 +741,7 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
   args.push_back(getInt32(streamId));
   args.push_back(valueToWrite);
   addTypeMangling(nullptr, args, instName);
-  return emitCall(instName, getVoidTy(), args, {}, &*GetInsertPoint());
+  return CreateNamedCall(instName, getVoidTy(), args, {});
 }
 
 // =====================================================================================================================
@@ -850,7 +850,9 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
       Value *sampleNum = vertexIndex;
       vertexIndex = nullptr;
       args.push_back(sampleNum);
-    }
+    } else if (builtIn == BuiltInBaryCoord || builtIn == BuiltInBaryCoordNoPerspKHR)
+      // BuiltInBaryCoord requires interpolate mode.
+      args.push_back(getInt32(inOutInfo.getInterpLoc()));
     assert(!index && !vertexIndex);
     break;
   default:
@@ -861,7 +863,7 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
   std::string callName = isOutput ? lgcName::OutputImportBuiltIn : lgcName::InputImportBuiltIn;
   callName += PipelineState::getBuiltInName(builtIn);
   addTypeMangling(resultTy, args, callName);
-  Value *result = emitCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn}, &*GetInsertPoint());
+  Value *result = CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn});
 
   if (instName.isTriviallyEmpty())
     result->setName(PipelineState::getBuiltInName(builtIn));
@@ -1149,7 +1151,7 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
   std::string callName = lgcName::OutputExportBuiltIn;
   callName += PipelineState::getBuiltInName(builtIn);
   addTypeMangling(nullptr, args, callName);
-  return cast<Instruction>(emitCall(callName, getVoidTy(), args, {}, &*GetInsertPoint()));
+  return cast<Instruction>(CreateNamedCall(callName, getVoidTy(), args, {}));
 }
 
 // =====================================================================================================================
@@ -1165,7 +1167,7 @@ Value *InOutBuilder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset, co
 
   std::string callName = lgcName::MeshTaskReadTaskPayload;
   addTypeMangling(resultTy, byteOffset, callName);
-  return emitCall(callName, resultTy, byteOffset, {}, &*GetInsertPoint());
+  return CreateNamedCall(callName, resultTy, byteOffset, {});
 }
 
 // =====================================================================================================================
@@ -1180,7 +1182,7 @@ Instruction *InOutBuilder::CreateWriteTaskPayload(Value *valueToWrite, Value *by
 
   std::string callName = lgcName::MeshTaskWriteTaskPayload;
   addTypeMangling(nullptr, {byteOffset, valueToWrite}, callName);
-  return emitCall(callName, getVoidTy(), {byteOffset, valueToWrite}, {}, &*GetInsertPoint());
+  return CreateNamedCall(callName, getVoidTy(), {byteOffset, valueToWrite}, {});
 }
 
 // =====================================================================================================================

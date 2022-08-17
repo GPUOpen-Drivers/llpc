@@ -34,6 +34,10 @@
 #include <array>
 #include <cstdint>
 
+// TODO: Remove this when LLPC will switch fully to opaque pointers.
+#define IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(pointerType, typeToCompare)                                                  \
+  (cast<PointerType>(pointerType)->isOpaqueOrPointeeTypeMatches(typeToCompare))
+
 namespace lgc {
 
 // Type used to hold a 128-bit hash value in LGC and LLPC.
