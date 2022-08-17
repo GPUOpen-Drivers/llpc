@@ -749,17 +749,20 @@ const ResourceNode *PipelineState::findPushConstantResourceNode() const {
 // Returns true when type nodeType is compatible with candidateType.
 // A node type is compatible with a candidate type iff (nodeType) <= (candidateType) in the ResourceNodeType lattice:
 //
-//                                                        DescriptorCombinedTexture
-//                                                                   +
-// DescriptorBufferCompact   InlineBuffer                            |
-//                   +         +                 +-------------------+--------------------+
-//                   |         |                 |                   |                    |
-//                   v         v                 v                   v                    v
-//                 DescriptorBuffer     DescriptorResource  DescriptorTexelBuffer  DescriptorSampler
-//                         +                     +                   +                    +
-//                         |                     |                   |                    |
-//                         |                     v                   |                    |
-//                         +----------------> Unknown <--------------+--------------------+
+// DescriptorBufferCompact
+//        +                                               DescriptorCombinedTexture
+//        |         DescriptorConstBufferCompact                     +
+//        |             +                                            |
+//        |             |    InlineBuffer                            |
+//        |             |      +                 +-------------------+--------------------+
+//        |             |      |                 |                   |                    |
+//        v             v      v                 v                   v                    v
+// DescriptorBuffer  DescriptorConstBuffer  DescriptorResource  DescriptorTexelBuffer  DescriptorSampler
+//          +            +                       +                   +                    +
+//          |            |                       |                   |                    |
+//          v            v                       |                   |                    |
+//       DescriptorAnyBuffer                     v                   |                    |
+//                +-------------------------> Unknown <--------------+--------------------+
 //
 // @param nodeType : Resource node type
 // @param candidateType : Resource node candidate type
@@ -767,8 +770,14 @@ static bool isNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType can
   if (nodeType == ResourceNodeType::Unknown || candidateType == nodeType)
     return true;
 
-  if (nodeType == ResourceNodeType::DescriptorBuffer &&
-      (candidateType == ResourceNodeType::DescriptorBufferCompact || candidateType == ResourceNodeType::InlineBuffer))
+  if ((nodeType == ResourceNodeType::DescriptorConstBuffer || nodeType == DescriptorAnyBuffer) &&
+      (candidateType == ResourceNodeType::DescriptorConstBufferCompact ||
+       candidateType == ResourceNodeType::DescriptorConstBuffer || candidateType == ResourceNodeType::InlineBuffer))
+    return true;
+
+  if ((nodeType == ResourceNodeType::DescriptorBuffer || nodeType == DescriptorAnyBuffer) &&
+      (candidateType == ResourceNodeType::DescriptorBufferCompact ||
+       candidateType == ResourceNodeType::DescriptorBuffer))
     return true;
 
   if ((nodeType == ResourceNodeType::DescriptorResource || nodeType == ResourceNodeType::DescriptorTexelBuffer ||
@@ -793,7 +802,10 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
   case ResourceNodeType::DescriptorTableVaPtr:
   case ResourceNodeType::DescriptorBufferCompact:
   case ResourceNodeType::InlineBuffer:
+  case ResourceNodeType::DescriptorConstBuffer:
+  case ResourceNodeType::DescriptorConstBufferCompact:
     return true;
+
   case ResourceNodeType::IndirectUserDataVaPtr:
   case ResourceNodeType::PushConst:
   case ResourceNodeType::StreamOutTableVaPtr:
@@ -1432,7 +1444,7 @@ const char *PipelineState::getResourceNodeTypeName(ResourceNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved13)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, InlineBuffer)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorConstBuffer)
-    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorReserved16)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorConstBufferCompact)
     break;
   default:
     llvm_unreachable("Should never be called!");

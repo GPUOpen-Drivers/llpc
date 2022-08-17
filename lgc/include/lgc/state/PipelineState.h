@@ -74,6 +74,9 @@ inline static void initializeStatePasses(llvm::PassRegistry &passRegistry) {
   initializeLegacyPipelineStateWrapperPass(passRegistry);
 }
 
+// Resource node type used to ask to find any buffer node, whether constant or not.
+static constexpr ResourceNodeType DescriptorAnyBuffer = ResourceNodeType::Count;
+
 // =====================================================================================================================
 // Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
 

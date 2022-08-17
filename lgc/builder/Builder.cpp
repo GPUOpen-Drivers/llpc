@@ -188,10 +188,12 @@ VectorType *Builder::getDescTy(ResourceNodeType descType) {
   unsigned byteSize = 0;
   switch (descType) {
   case ResourceNodeType::DescriptorBuffer:
+  case ResourceNodeType::DescriptorConstBuffer:
   case ResourceNodeType::DescriptorTexelBuffer:
     byteSize = DescriptorSizeBuffer;
     break;
   case ResourceNodeType::DescriptorBufferCompact:
+  case ResourceNodeType::DescriptorConstBufferCompact:
     byteSize = DescriptorSizeBufferCompact;
     break;
   case ResourceNodeType::DescriptorSampler:

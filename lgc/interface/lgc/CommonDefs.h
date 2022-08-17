@@ -88,10 +88,10 @@ enum class ResourceNodeType : unsigned {
   StreamOutTableVaPtr,       ///< Stream-out buffer table VA pointer
   DescriptorReserved12,
   DescriptorReserved13,
-  InlineBuffer,          ///< Inline buffer, with descriptor set and binding
-  DescriptorConstBuffer, ///< Generic descriptor: constant buffer
-  DescriptorReserved16,
-  Count, ///< Count of resource mapping node types.
+  InlineBuffer,                 ///< Inline buffer, with descriptor set and binding
+  DescriptorConstBuffer,        ///< Generic descriptor: constant buffer
+  DescriptorConstBufferCompact, ///< Compact buffer descriptor, only contains the buffer address
+  Count,                        ///< Count of resource mapping node types.
 };
 
 // Represents mapping layout of the resources used in shaders
