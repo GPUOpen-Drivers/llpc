@@ -307,6 +307,7 @@ struct ResourceMappingNode {
       unsigned binding; ///< Descriptor binding
       unsigned reserv0;
       unsigned reserv1;
+      unsigned reserv2;
     } srdRange;
     /// Info for hierarchical nodes (DescriptorTableVaPtr)
     struct {
@@ -333,6 +334,7 @@ struct StaticDescriptorValue {
   unsigned binding;             ///< ID of descriptor binding
   unsigned reserv0;
   unsigned reserv1;
+  unsigned reserv2;
   unsigned arraySize;           ///< Element count for arrayed binding
   const unsigned *pValue;       ///< Static SRDs
   unsigned visibility;          ///< Mask composed of ShaderStageBit values
