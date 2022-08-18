@@ -1433,7 +1433,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       }
 
       if (hasPrimitiveIdExport) {
-        assert(builtInOutLocs.find(BuiltInPrimitiveId) != inOutUsage.gs.builtInOutLocs.end());
+        assert(builtInOutLocs.find(BuiltInPrimitiveId) != builtInOutLocs.end());
         const unsigned loc = builtInOutLocs.find(BuiltInPrimitiveId)->second;
 
         assert(m_primitiveId);
