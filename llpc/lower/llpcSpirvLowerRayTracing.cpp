@@ -1027,7 +1027,7 @@ Value *SpirvLowerRayTracing::processBuiltIn(unsigned builtInId, Instruction *ins
 // Create shader table variable
 //
 // @param tableKind : Kind of shader table variable to create
-Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind) {
+GlobalVariable *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind) {
   assert(tableKind < ShaderTable::Count);
   if (!m_shaderTable[tableKind]) {
     bool tableAddr = (tableKind == ShaderTable::RayGenTableAddr || tableKind == ShaderTable::MissTableAddr ||
@@ -1295,7 +1295,7 @@ void SpirvLowerRayTracing::createAnyHitFunc(Value *shaderIdentifier) {
 // Create global built-in variable
 //
 // @param builtInId : ID of the global built-in  variable
-Value *SpirvLowerRayTracing::createGlobalBuiltIn(unsigned builtInId) {
+GlobalVariable *SpirvLowerRayTracing::createGlobalBuiltIn(unsigned builtInId) {
   assert(builtInId == BuiltInLaunchSizeKHR);
 
   GlobalVariable *global = new GlobalVariable(*m_module, FixedVectorType::get(m_builder->getInt32Ty(), 3), false,
@@ -1368,11 +1368,11 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
 
   lgc::Pipeline::markShaderEntryPoint(func, lgc::ShaderStageCompute);
 
-  Value *launchSize = createGlobalBuiltIn(BuiltInLaunchSizeKHR);
+  GlobalVariable *global = createGlobalBuiltIn(BuiltInLaunchSizeKHR);
 
   // Construct entry block guard the launchId from launchSize
   m_builder->SetInsertPoint(entryBlock);
-  launchSize = m_builder->CreateLoad(launchSize->getType()->getPointerElementType(), launchSize);
+  Value *launchSize = m_builder->CreateLoad(global->getValueType(), global);
   auto builtIn = lgc::BuiltInGlobalInvocationId;
   lgc::InOutInfo inputInfo = {};
   auto launchlId = m_builder->CreateReadBuiltInInput(builtIn, inputInfo, nullptr, nullptr, "");
@@ -1796,7 +1796,7 @@ FunctionType *SpirvLowerRayTracing::getShaderEntryFuncTy(ShaderStage stage) {
     argTys.push_back(m_traceParamsTys[param]);
   }
 
-  argTys.push_back(createShaderTableVariable(ShaderTable::ShaderRecordIndex)->getType()->getPointerElementType());
+  argTys.push_back(createShaderTableVariable(ShaderTable::ShaderRecordIndex)->getValueType());
 
   return FunctionType::get(retTy, argTys, false);
 }
@@ -1942,7 +1942,7 @@ FunctionType *SpirvLowerRayTracing::getCallableShaderEntryFuncTy() {
   auto callableDataTy = rayTracingContext->getCallableDataType(m_builder);
   argTys.push_back(callableDataTy);
 
-  argTys.push_back(createShaderTableVariable(ShaderTable::ShaderRecordIndex)->getType()->getPointerElementType());
+  argTys.push_back(createShaderTableVariable(ShaderTable::ShaderRecordIndex)->getValueType());
 
   return FunctionType::get(callableDataTy, argTys, false);
 }
