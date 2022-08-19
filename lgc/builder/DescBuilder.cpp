@@ -68,7 +68,17 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     // We have the user data layout. Find the node.
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorBuffer, descSet, binding);
+    ResourceNodeType abstractType = DescriptorAnyBuffer;
+    if (flags & BufferFlagConst)
+      abstractType = ResourceNodeType::DescriptorConstBuffer;
+    else if (flags & BufferFlagNonConst)
+      abstractType = ResourceNodeType::DescriptorBuffer;
+    else if (flags & BufferFlagShaderResource)
+      abstractType = ResourceNodeType::DescriptorResource;
+    else if (flags & BufferFlagSampler)
+      abstractType = ResourceNodeType::DescriptorSampler;
+
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     if (!node) {
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getBufferDescTy(pointeeTy));
@@ -104,6 +114,8 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   if (!desc) {
     // Not handled by either of the special cases above...
     // Get a pointer to the descriptor, as a pointer to i8.
+    // For shader compilation with no user data layout provided, we assume we want a DescriptorBuffer, as
+    // DescriptorConstBuffer is not used in that case.
     ResourceNodeType resType = node ? node->concreteType : ResourceNodeType::DescriptorBuffer;
     Value *descPtr = getDescPtr(resType, descSet, binding, topNode, node);
     // Index it.
@@ -120,6 +132,8 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   // If it is a compact buffer descriptor, expand it. (That can only happen when user data layout is available;
   // compact buffer descriptors are disallowed when using shader compilation with no user data layout).
   if (node && node->concreteType == ResourceNodeType::DescriptorBufferCompact)
+    desc = buildBufferCompactDesc(desc);
+  else if (node && node->concreteType == ResourceNodeType::DescriptorConstBufferCompact)
     desc = buildBufferCompactDesc(desc);
 
   if (!instName.isTriviallyEmpty())
