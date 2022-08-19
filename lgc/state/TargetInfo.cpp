@@ -188,6 +188,7 @@ static void setGfx705Info(TargetInfo *targetInfo) {
 // @param [in/out] targetInfo : Target info
 static void setGfx8BaseInfo(TargetInfo *targetInfo) {
   setGfx7BaseInfo(targetInfo);
+  targetInfo->getGpuProperty().maxSgprsAvailable = 102;
 }
 
 // gfx8
@@ -293,6 +294,7 @@ static void setGfx906Info(TargetInfo *targetInfo) {
 // @param [in/out] targetInfo : Target info
 static void setGfx10Info(TargetInfo *targetInfo) {
   setGfx9BaseInfo(targetInfo);
+  targetInfo->getGpuProperty().maxSgprsAvailable = 106;
 
   // Compiler is free to choose wave mode if forced wave size is not specified.
   if (NativeWaveSize != 0) {
