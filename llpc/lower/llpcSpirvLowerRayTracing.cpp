@@ -911,7 +911,10 @@ void SpirvLowerRayTracing::createSetTriangleInsection(Function *func) {
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
   Value *barycentrics = func->arg_begin();
-  Type *barycentricsEltTy = barycentrics->getType()->getScalarType()->getPointerElementType();
+  // barycentrics type for AmdTraceRaySetTriangleIntersectionAttributes from gpurt/src/shaders/Extensions.hlsl
+  Type *barycentricsEltTy = FixedVectorType::get(m_builder->getFloatTy(), 2);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(barycentrics->getType()->getScalarType(), barycentricsEltTy));
   auto zero = m_builder->getInt32(0);
   auto one = m_builder->getInt32(1);
   Value *attribSrcPtr = m_builder->CreateGEP(barycentricsEltTy, barycentrics, {zero, zero});
@@ -1918,7 +1921,10 @@ void SpirvLowerRayTracing::updateGlobalFromCallShaderFunc(Function *func, Shader
   if (stage == ShaderStageRayTracingAnyHit) {
     // Third function parameter attribute
     Value *attrib = func->arg_begin() + 2;
-    Type *attribEltTy = attrib->getType()->getScalarType()->getPointerElementType();
+    // attribute type from gpurt/src/shaders/Common.hlsl
+    Type *attribEltTy = StructType::get(*m_context, FixedVectorType::get(m_builder->getFloatTy(), 2), false);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(attrib->getType()->getScalarType(), attribEltTy));
 
     Value *attribSrcPtr = m_builder->CreateGEP(attribEltTy, attrib, {zero, zero, zero});
     Value *attribValue = m_builder->CreateLoad(m_builder->getFloatTy(), attribSrcPtr);
