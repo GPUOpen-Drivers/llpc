@@ -252,7 +252,7 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpExecuteCallableKHR
     shaderIdentifier = m_builder->CreateTrunc(shaderIdentifier, m_builder->getInt32Ty());
     // Create Shader selection
     createShaderSelection(func, entryBlock, endBlock, shaderIdentifier, RayTracingContext::InvalidShaderId,
-                          ShaderStageRayTracingCallable, args, inputResult);
+                          ShaderStageRayTracingCallable, args, inputResult, inputResultTy);
   }
   m_builder->SetInsertPoint(funcRet);
   m_builder->CreateMemCpy(callableData, align, inputResult, align, callableDataSize);
@@ -891,9 +891,12 @@ void SpirvLowerRayTracing::createCallShader(Function *func, ShaderStage stage, u
   } else {
     initInputResult(stage, payload, traceParams, inputResult);
     shaderId = m_builder->CreateTrunc(shaderId, m_builder->getInt32Ty());
-    createShaderSelection(func, entryBlock, endBlock, shaderId, intersectId, stage, args, inputResult);
+    Type *inputResultTy = getShaderReturnTy(stage);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(inputResult->getType(), inputResultTy));
+    createShaderSelection(func, entryBlock, endBlock, shaderId, intersectId, stage, args, inputResult, inputResultTy);
     m_builder->SetInsertPoint(endBlock);
-    inputResult = m_builder->CreateLoad(inputResult->getType()->getPointerElementType(), inputResult);
+    inputResult = m_builder->CreateLoad(inputResultTy, inputResult);
     storeFunctionCallResult(stage, inputResult);
   }
 }
@@ -1075,10 +1078,12 @@ GlobalVariable *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tabl
 // @param intersectId : Module ID of intersection shader
 // @param stage : Shader stage
 // @param args : Argument list of function call
-// @param inReults : Allocated value to store function return value
+// @param inResult : Allocated value to store function return value
+// @param inResultTy : Base type of inResult param
 void SpirvLowerRayTracing::createShaderSelection(Function *func, BasicBlock *entryBlock, BasicBlock *endBlock,
                                                  Value *shaderId, unsigned intersectId, ShaderStage stage,
-                                                 const SmallVector<Value *, 8> &args, Value *inResult) {
+                                                 const SmallVector<Value *, 8> &args, Value *inResult,
+                                                 Type *inResultTy) {
   // .entry:
   // switch i32 %shaderId, label % .end[
   //    i32 2, label % .shader2
@@ -1110,8 +1115,10 @@ void SpirvLowerRayTracing::createShaderSelection(Function *func, BasicBlock *ent
     pSwitch->addCase(m_builder->getInt32(moduleIds[i]), shaderBlock);
     m_builder->SetInsertPoint(shaderBlock);
     auto funcName = std::string("_") + getShaderStageAbbreviation(stage) + "_" + moduleIdStr;
-    Type *retType = (inResult != nullptr) ? inResult->getType()->getPointerElementType() : m_builder->getVoidTy();
-    Value *result = m_builder->CreateNamedCall(funcName, retType, args, {Attribute::NoUnwind, Attribute::AlwaysInline});
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(!inResult || IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(inResult->getType(), inResultTy));
+    Value *result =
+        m_builder->CreateNamedCall(funcName, inResultTy, args, {Attribute::NoUnwind, Attribute::AlwaysInline});
     if (inResult)
       m_builder->CreateStore(result, inResult);
 
@@ -1420,7 +1427,7 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
     // Create Shader selection
     rayGenId = m_builder->CreateTrunc(rayGenId, m_builder->getInt32Ty());
     createShaderSelection(func, mainBlock, endBlock, rayGenId, RayTracingContext::InvalidShaderId, m_shaderStage, {},
-                          nullptr);
+                          nullptr, m_builder->getVoidTy());
   } else {
     auto funcTy = FunctionType::get(m_builder->getVoidTy(), {}, false);
     auto funcPtrTy = PointerType::get(funcTy, SPIRAS_Generic);
