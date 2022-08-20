@@ -302,6 +302,17 @@ void ConfigBuilderBase::setNggSubgroupSize(unsigned value) {
 }
 
 // =====================================================================================================================
+// Set thread group dimensions
+//
+// @param values : Values to set
+void ConfigBuilderBase::setThreadgroupDimensions(llvm::ArrayRef<unsigned> values) {
+  auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Cs);
+  auto &arrayNode = hwShaderNode[Util::Abi::HardwareStageMetadataKey::ThreadgroupDimensions].getArray(true);
+  for (unsigned i = 0; i < values.size(); ++i)
+    arrayNode[i] = values[i];
+}
+
+// =====================================================================================================================
 /// Append a single entry to the PAL register metadata.
 ///
 /// @param [in] key : The metadata key (usually a register address).

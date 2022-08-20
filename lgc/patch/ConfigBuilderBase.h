@@ -82,6 +82,7 @@ protected:
   void setLdsSizeByteSize(Util::Abi::HardwareStage hwStage, unsigned value);
   void setEsGsLdsSize(unsigned value);
   void setNggSubgroupSize(unsigned value);
+  void setThreadgroupDimensions(llvm::ArrayRef<unsigned> values);
   unsigned setupFloatingPointMode(ShaderStage shaderStage);
 
   void appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config);

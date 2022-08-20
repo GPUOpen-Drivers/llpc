@@ -993,7 +993,7 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
   const auto &builtInUsage = resUsage->builtInUsage.cs;
   const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
-  unsigned workgroupSizes[3];
+  unsigned workgroupSizes[3] = {};
 
   switch (static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout)) {
   case WorkgroupLayout::Unknown:
@@ -1033,6 +1033,8 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   SET_REG_FIELD(config, COMPUTE_NUM_THREAD_X, NUM_THREAD_FULL, workgroupSizes[0]);
   SET_REG_FIELD(config, COMPUTE_NUM_THREAD_Y, NUM_THREAD_FULL, workgroupSizes[1]);
   SET_REG_FIELD(config, COMPUTE_NUM_THREAD_Z, NUM_THREAD_FULL, workgroupSizes[2]);
+
+  setThreadgroupDimensions(workgroupSizes);
 
   setNumAvailSgprs(Util::Abi::HardwareStage::Cs, resUsage->numSgprsAvailable);
   setNumAvailVgprs(Util::Abi::HardwareStage::Cs, resUsage->numVgprsAvailable);
