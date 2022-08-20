@@ -137,11 +137,13 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   if (!retTy)
     retTy = oldFuncTy->getReturnType();
   auto newFuncTy = FunctionType::get(retTy, allArgTys, false);
-  Function *newFunc = Function::Create(newFuncTy, oldFunc->getLinkage(), "", oldFunc->getParent());
+  Function *newFunc = Function::Create(newFuncTy, oldFunc->getLinkage());
   newFunc->setCallingConv(oldFunc->getCallingConv());
   newFunc->takeName(oldFunc);
   newFunc->setSubprogram(oldFunc->getSubprogram());
   newFunc->setDLLStorageClass(oldFunc->getDLLStorageClass());
+  // Always insert the new function after the old function
+  oldFunc->getParent()->getFunctionList().insertAfter(oldFunc->getIterator(), newFunc);
 
   // Transfer code from old function to new function.
   while (!oldFunc->empty()) {
