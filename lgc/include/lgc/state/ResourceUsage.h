@@ -571,6 +571,7 @@ struct InterfaceData {
         unsigned dispatchDims;       // Dispatch dimensions
         unsigned baseRingEntryIndex; // Base entry index (first workgroup) of mesh/task shader ring for current dispatch
         unsigned pipeStatsBuf;       // Pipeline statistics buffer
+        unsigned flatWorkgroupId;    // Flat workgroup ID (emulated by HW vertex ID)
       } mesh;
 
       // Fragment shader

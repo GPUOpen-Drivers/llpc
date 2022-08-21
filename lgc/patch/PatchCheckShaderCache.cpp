@@ -148,6 +148,11 @@ bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState
       // NOTE: For geometry shader, copy shader will use this special map info (from built-in outputs to
       // locations of generic outputs). We have to add it to shader hash calculation.
       streamMapEntries(resUsage->inOutUsage.gs.builtInOutLocs, stream);
+    } else if (stage == ShaderStageMesh) {
+      // NOTE: For mesh shader, those two special map info (from built-in IDs to export locations of vertex/primitive
+      // attributes) is used to export vertex/primitive attributes.
+      streamMapEntries(resUsage->inOutUsage.mesh.builtInExportLocs, stream);
+      streamMapEntries(resUsage->inOutUsage.mesh.perPrimitiveBuiltInExportLocs, stream);
     }
 
     // Store the result of the hash for this shader stage.
