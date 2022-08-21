@@ -31,6 +31,7 @@
 #include "lgc/patch/PatchResourceCollect.h"
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
+#include "MeshTaskShader.h"
 #include "NggLdsManager.h"
 #include "NggPrimShader.h"
 #include "lgc/Builder.h"
@@ -630,7 +631,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
       const unsigned ldsSizeDwordGranularity =
           1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
-      unsigned ldsSizeDwords = 0; // TODO: Get used LDS size from mesh shader
+      auto ldsSizeDwords =
+          MeshTaskShader::layoutMeshShaderLds(m_pipelineState, m_pipelineShaders->getEntryPoint(ShaderStageMesh));
       ldsSizeDwords = alignTo(ldsSizeDwords, ldsSizeDwordGranularity);
 
       // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
