@@ -88,7 +88,6 @@
 #include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
-#include "llvm/Transforms/Scalar/Sink.h"
 #include "llvm/Transforms/Scalar/SpeculativeExecution.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
@@ -181,7 +180,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
     fpm.addPass(PromotePass());
     fpm.addPass(ADCEPass());
     fpm.addPass(PatchBufferOp());
-    fpm.addPass(SinkingPass());
     fpm.addPass(InstCombinePass());
     fpm.addPass(SimplifyCFGPass());
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
@@ -193,7 +191,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   } else {
     FunctionPassManager fpm;
     fpm.addPass(PatchBufferOp());
-    fpm.addPass(SinkingPass());
     fpm.addPass(InstCombinePass(2));
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   }
@@ -323,7 +320,6 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
 
   // Patch buffer operations (must be after optimizations)
   passMgr.add(createLegacyPatchBufferOp());
-  passMgr.add(createSinkingPass());
   passMgr.add(createInstructionCombiningPass(2));
 
   // Fully prepare the pipeline ABI (must be after optimizations)
