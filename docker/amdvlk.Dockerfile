@@ -54,11 +54,9 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
 WORKDIR /vulkandriver
 RUN wget -P /usr/bin/ https://storage.googleapis.com/git-repo-downloads/repo \
     && chmod +x /usr/bin/repo \
-    && repo init -u https://github.com/GPUOpen-Drivers/AMDVLK.git -b "$BRANCH" \
+    && repo init -u https://github.com/GPUOpen-Drivers/AMDVLK.git -b "$BRANCH" -m build_with_tools.xml \
     && repo sync -c --no-clone-bundle -j$(nproc) \
-    && touch ./env.sh \
-    && cd /vulkandriver/drivers/spvgen/external \
-    && python3 fetch_external_sources.py
+    && touch ./env.sh
 
 # Copy update script into container
 COPY docker/update-llpc.sh /vulkandriver/
