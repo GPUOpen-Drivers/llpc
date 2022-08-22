@@ -1,7 +1,6 @@
 ; Test that the DescSet relocation is generated.  If this starts to fail we need to change the test to make sure it
 ; is generated.
 ; BEGIN_SHADERTEST
-; REQUIRES: do-not-run-me
 ; RUN: amdllpc \
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %gfxip %s %s -v | FileCheck -check-prefix=SHADERTEST %s
