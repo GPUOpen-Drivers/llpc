@@ -159,7 +159,7 @@ Function *NggPrimShader::generate(Function *esEntryPoint, Function *gsEntryPoint
   if (esEntryPoint) {
     module = esEntryPoint->getParent();
     esEntryPoint->setName(lgcName::NggEsEntryPoint);
-    esEntryPoint->setCallingConv(CallingConv::C);
+    esEntryPoint->setCallingConv(CallingConv::AMDGPU_ES);
     esEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     esEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
     esEntryPoint->addFnAttr(Attribute::AlwaysInline);
@@ -168,14 +168,14 @@ Function *NggPrimShader::generate(Function *esEntryPoint, Function *gsEntryPoint
   if (gsEntryPoint) {
     module = gsEntryPoint->getParent();
     gsEntryPoint->setName(lgcName::NggGsEntryPoint);
-    gsEntryPoint->setCallingConv(CallingConv::C);
+    gsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
     gsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     gsEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
     gsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
     assert(copyShaderEntryPoint); // Copy shader must be present
     copyShaderEntryPoint->setName(lgcName::NggCopyShaderEntryPoint);
-    copyShaderEntryPoint->setCallingConv(CallingConv::C);
+    copyShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_VS);
     copyShaderEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     copyShaderEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
     copyShaderEntryPoint->addFnAttr(Attribute::AlwaysInline);
@@ -2636,7 +2636,8 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
 
   assert(args.size() == esArgCount); // Must have visit all arguments of ES entry point
 
-  m_builder->CreateCall(esEntry, args);
+  CallInst *esCall = m_builder->CreateCall(esEntry, args);
+  esCall->setCallingConv(CallingConv::AMDGPU_ES);
 }
 
 // =====================================================================================================================
@@ -2879,7 +2880,9 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
 
   assert(args.size() == esPartialArgCount); // Must have visit all arguments of ES-partial entry point
 
-  return m_builder->CreateCall(esPartialEntry, args);
+  CallInst *esPartialCall = m_builder->CreateCall(esPartialEntry, args);
+  esPartialCall->setCallingConv(CallingConv::AMDGPU_ES);
+  return esPartialCall;
 }
 
 // =====================================================================================================================
@@ -3167,7 +3170,8 @@ void NggPrimShader::runGs(Module *module, Argument *sysValueStart) {
 
   assert(args.size() == gsArgCount); // Must have visit all arguments of ES entry point
 
-  m_builder->CreateCall(gsEntry, args);
+  CallInst *gsCall = m_builder->CreateCall(gsEntry, args);
+  gsCall->setCallingConv(CallingConv::AMDGPU_GS);
 }
 
 // =====================================================================================================================
@@ -3342,7 +3346,8 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
   // Vertex ID in sub-group
   args.push_back(vertexId);
 
-  m_builder->CreateCall(copyShaderEntry, args);
+  CallInst *copyShaderCall = m_builder->CreateCall(copyShaderEntry, args);
+  copyShaderCall->setCallingConv(CallingConv::AMDGPU_VS);
 }
 
 // =====================================================================================================================
