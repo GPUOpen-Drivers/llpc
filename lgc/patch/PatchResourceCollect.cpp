@@ -3058,7 +3058,8 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   };
 
   // Collect ElementsInfo in each packed location
-  std::vector<ElementsInfo> elementsInfoArray(m_outputCalls.size());
+  const unsigned locCount = m_locationInfoMapManager->getMap().size();
+  std::vector<ElementsInfo> elementsInfoArray(locCount);
 
   for (auto call : m_outputCalls) {
     InOutLocationInfo origLocInfo;
@@ -3104,8 +3105,8 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   // Re-assemble XX' output export calls for each packed location
   for (auto &elementsInfo : elementsInfoArray) {
     if (elementsInfo.elemCountOf16bit + elementsInfo.elemCountOf32bit == 0) {
-      // It's the end of the packed location
-      break;
+      // Invalid elements
+      continue;
     }
 
     // Construct the output value - a scalar or a vector
