@@ -661,6 +661,14 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
                                            outputInfo);
   }
 
+  case BuilderRecorder::Opcode::ReadBaryCoord: {
+    auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
+    InOutInfo inputInfo(cast<ConstantInt>(args[1])->getZExtValue());
+    return m_builder->CreateReadBaryCoord(builtIn,                                         // BuiltIn
+                                          inputInfo,                                       // Input info
+                                          isa<UndefValue>(args[2]) ? nullptr : &*args[2]); // auxInterpValue
+  }
+
   case BuilderRecorder::Opcode::ReadBuiltInInput: {
     auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
     InOutInfo inputInfo(cast<ConstantInt>(args[1])->getZExtValue());

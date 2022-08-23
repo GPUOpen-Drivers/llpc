@@ -1089,6 +1089,11 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
       lgc::InOutInfo inOutInfo;
       inOutInfo.setArraySize(maxLocOffset);
       inOutInfo.setInterpLoc(interpLoc);
+
+      if (builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR) {
+        return m_builder->CreateReadBaryCoord(builtIn, inOutInfo, auxInterpValue);
+      }
+
       if (addrSpace == SPIRAS_Input)
         inOutValue = m_builder->CreateReadBuiltInInput(builtIn, inOutInfo, vertexIdx, elemIdx);
       else

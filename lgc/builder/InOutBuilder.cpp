@@ -768,6 +768,76 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
 }
 
 // =====================================================================================================================
+// Create a read of barycoord input value.
+// The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
+//
+// @param builtIn : Built-in kind, BuiltInBaryCoord or BuiltInBaryCoordNoPerspKHR
+// @param inputInfo : Extra input info
+// @param auxInterpValue : Auxiliary value of interpolation
+// @param instName : Name to give instruction(s)
+Value *InOutBuilder::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *auxInterpValue,
+                                         const llvm::Twine &instName) {
+  assert(builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR);
+
+  markBuiltInInputUsage(builtIn, 0);
+  if (getPipelineState()->getOptions().enableInterpModePatch && !auxInterpValue &&
+      inputInfo.getInterpLoc() != InOutInfo::InterpLocCentroid) {
+    auxInterpValue = readBuiltIn(false, BuiltInSampleId, {}, nullptr, nullptr, "");
+    inputInfo.setInterpLoc(InOutInfo::InterpLocSample);
+  }
+
+  bool isPersp = builtIn == lgc::BuiltInBaryCoord;
+  Value *evalArg = nullptr;
+  // Adjust ijCoord
+  switch (inputInfo.getInterpLoc()) {
+  case InOutInfo::InterpLocCentroid: {
+    std::string evalInstName = lgcName::InputImportBuiltIn;
+    if (isPersp) {
+      evalInstName += "InterpPerspCentroid";
+      evalArg = getInt32(BuiltInInterpPerspCentroid);
+    } else {
+      evalInstName += "InterpLinearCentroid";
+      evalArg = getInt32(BuiltInInterpLinearCentroid);
+    }
+    auxInterpValue =
+        CreateNamedCall(evalInstName, FixedVectorType::get(getFloatTy(), 2), {evalArg}, Attribute::ReadOnly);
+    break;
+  }
+  case InOutInfo::InterpLocSample: {
+    assert(auxInterpValue != nullptr);
+    auxInterpValue = readBuiltIn(false, BuiltInSamplePosOffset, {}, auxInterpValue, nullptr, "");
+    if (isPersp)
+      auxInterpValue = evalIjOffsetSmooth(auxInterpValue);
+    else
+      auxInterpValue = evalIjOffsetNoPersp(auxInterpValue);
+    break;
+  }
+  case InOutInfo::InterpLocCenter:
+  case InOutInfo::InterpLocUnknown: {
+    // When calling InterpolateAtOffset, auxInterpValue != nullptr
+    if (auxInterpValue) {
+      if (isPersp) {
+        auxInterpValue = evalIjOffsetSmooth(auxInterpValue);
+      } else {
+        auxInterpValue = evalIjOffsetNoPersp(auxInterpValue);
+      }
+    } else {
+      if (isPersp)
+        auxInterpValue = readBuiltIn(false, BuiltInInterpPerspCenter, {}, nullptr, nullptr, "");
+      else
+        auxInterpValue = readBuiltIn(false, BuiltInInterpLinearCenter, {}, nullptr, nullptr, "");
+    }
+    break;
+  }
+  default: {
+    llvm_unreachable("Should never be called!");
+  }
+  }
+
+  return normalizeBaryCoord(auxInterpValue);
+}
+
+// =====================================================================================================================
 // Create a read of (part of) a built-in input value.
 // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
 // or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
@@ -877,9 +947,7 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
       Value *sampleNum = vertexIndex;
       vertexIndex = nullptr;
       args.push_back(sampleNum);
-    } else if (builtIn == BuiltInBaryCoord || builtIn == BuiltInBaryCoordNoPerspKHR)
-      // BuiltInBaryCoord requires interpolate mode.
-      args.push_back(getInt32(inOutInfo.getInterpLoc()));
+    }
     assert(!index && !vertexIndex);
     break;
   default:
@@ -898,6 +966,93 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
     result->setName(instName);
 
   return result;
+}
+
+// =====================================================================================================================
+// Reorder and normalize the barycoord
+//
+// @param iJCoord : IJ coordinates provided for the HW interpolation view
+// @returns : gl_Barycoord
+Value *InOutBuilder::normalizeBaryCoord(Value *iJCoord) {
+  auto baryType = FixedVectorType::get(getFloatTy(), 3);
+  Value *barycoord = UndefValue::get(baryType);
+  auto one = ConstantFP::get(getFloatTy(), 1.0);
+  auto zero = ConstantFP::get(getFloatTy(), 0.0);
+
+  auto iCoord = CreateExtractElement(iJCoord, uint64_t(0));
+  auto jCoord = CreateExtractElement(iJCoord, 1);
+  auto kCoord = CreateFSub(ConstantFP::get(getFloatTy(), 1.0), iCoord);
+  kCoord = CreateFSub(kCoord, jCoord);
+
+  auto primType = m_pipelineState->getPrimitiveType();
+  auto provokingVertexMode = m_pipelineState->getRasterizerState().provokingVertexMode;
+  switch (primType) {
+  case PrimitiveType::Point: {
+    // Points
+    barycoord = ConstantVector::get({one, zero, zero});
+  }
+  case PrimitiveType::LineList:
+  case PrimitiveType::LineStrip: {
+    // Lines
+    // The weight of vertex0 is (1 - i - j), the weight of vertex1 is (i + j).
+    auto yCoord = CreateFAdd(iCoord, jCoord);
+    barycoord = CreateInsertElement(barycoord, kCoord, uint64_t(0));
+    barycoord = CreateInsertElement(barycoord, yCoord, 1);
+    barycoord = CreateInsertElement(barycoord, zero, 2);
+    break;
+  }
+  case PrimitiveType::TriangleList: {
+    // Triangles
+    // V0 ==> Attr_indx2
+    // V1 ==> Attr_indx0
+    // V2 ==> Attr_indx1
+    barycoord = CreateInsertElement(barycoord, iCoord, 2);
+    barycoord = CreateInsertElement(barycoord, jCoord, uint64_t(0));
+    barycoord = CreateInsertElement(barycoord, kCoord, 1);
+    break;
+  }
+  default: {
+    unsigned oddOffset = 0, evenOffset = 0;
+    Value *odd = UndefValue::get(baryType);
+    Value *even = UndefValue::get(baryType);
+    switch (primType) {
+    case PrimitiveType::TriangleFan: {
+      oddOffset = provokingVertexMode == ProvokingVertexLast ? 0 : 2;
+      evenOffset = provokingVertexMode == ProvokingVertexLast ? 2 : 1;
+      break;
+    }
+    case PrimitiveType::TriangleStrip:
+    case PrimitiveType::TriangleStripAdjacency: {
+      oddOffset = provokingVertexMode == ProvokingVertexLast ? 0 : 2;
+      evenOffset = 1;
+      break;
+    }
+    case PrimitiveType::TriangleListAdjacency: {
+      oddOffset = 0;
+      evenOffset = 1;
+      break;
+    }
+    default: {
+      llvm_unreachable("Should never be called!");
+      break;
+    }
+    }
+    odd = CreateInsertElement(odd, iCoord, oddOffset % 3);
+    odd = CreateInsertElement(odd, jCoord, (1 + oddOffset) % 3);
+    odd = CreateInsertElement(odd, kCoord, (2 + oddOffset) % 3);
+
+    even = CreateInsertElement(even, iCoord, evenOffset % 3);
+    even = CreateInsertElement(even, jCoord, (1 + evenOffset) % 3);
+    even = CreateInsertElement(even, kCoord, (2 + evenOffset) % 3);
+
+    // Select between them.
+    Value *primitiveId = readBuiltIn(false, BuiltInPrimitiveId, {}, nullptr, nullptr, "");
+    Value *parity = CreateTrunc(primitiveId, Type::getInt1Ty(getContext()));
+    barycoord = CreateSelect(parity, odd, even);
+    break;
+  }
+  }
+  return barycoord;
 }
 
 // =====================================================================================================================
@@ -1243,7 +1398,10 @@ Instruction *InOutBuilder::CreateWriteTaskPayload(Value *valueToWrite, Value *by
 Type *InOutBuilder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
   switch (static_cast<unsigned>(builtIn)) {
   case BuiltInSamplePosOffset:
+  case BuiltInInterpPerspCenter:
   case BuiltInInterpLinearCenter:
+  case BuiltInInterpPerspCentroid:
+  case BuiltInInterpLinearCentroid:
     return FixedVectorType::get(getFloatTy(), 2);
   case BuiltInInterpPullMode:
     return FixedVectorType::get(getFloatTy(), 3);

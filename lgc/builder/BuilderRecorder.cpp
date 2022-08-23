@@ -168,6 +168,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "write.generic.output";
   case Opcode::WriteXfbOutput:
     return "write.xfb.output";
+  case Opcode::ReadBaryCoord:
+    return "read.bary.coord";
   case Opcode::ReadBuiltInInput:
     return "read.builtin.input";
   case Opcode::ReadBuiltInOutput:
@@ -1518,6 +1520,26 @@ Instruction *BuilderRecorder::CreateWriteXfbOutput(Value *valueToWrite, bool isB
 }
 
 // =====================================================================================================================
+// Create a read of barycoord input value.
+// The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
+//
+// @param builtIn : Built-in kind, BuiltInBaryCoord or BuiltInBaryCoordNoPerspKHR
+// @param inputInfo : Extra input info
+// @param auxInterpValue : Auxiliary value of interpolation
+// @param instName : Name to give instruction(s)
+llvm::Value *BuilderRecorder::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *auxInterpValue,
+                                                  const llvm::Twine &instName) {
+  Type *resultTy = getBuiltInTy(builtIn, inputInfo);
+  return record(Opcode::ReadBaryCoord, resultTy,
+                {
+                    getInt32(builtIn),
+                    getInt32(inputInfo.getData()),
+                    auxInterpValue ? auxInterpValue : PoisonValue::get(getInt32Ty()),
+                },
+                instName);
+}
+
+// =====================================================================================================================
 // Create a read of (part of) a built-in input value.
 // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
@@ -2062,6 +2084,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ImageSampleConvert:
     case Opcode::LoadBufferDesc:
     case Opcode::LoadPushConstantsPtr:
+    case Opcode::ReadBaryCoord:
     case Opcode::ReadBuiltInInput:
     case Opcode::ReadBuiltInOutput:
     case Opcode::ReadGenericInput:
