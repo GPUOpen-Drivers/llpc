@@ -50,7 +50,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
 
 # Update the VulkanSDK 1.3.216 or higher, install the shader compiler tools for gpurt.
-RUN apt-get install -yqq --no-install-recommends gnupg \
+RUN apt-get install -yqq --no-install-recommends gpg \
     && wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | apt-key add - \
     && wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.216-focal.list https://packages.lunarg.com/vulkan/1.3.216/lunarg-vulkan-1.3.216-focal.list \
     && apt-get update \
