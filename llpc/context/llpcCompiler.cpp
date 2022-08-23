@@ -1037,11 +1037,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   bool hasError = false;
   context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
 
-  // Set a couple of pipeline options for front-end use.
-  // TODO: The front-end should not be using pipeline options.
-  context->setScalarBlockLayout(context->getPipelineContext()->getPipelineOptions()->scalarBlockLayout);
-  context->setRobustBufferAccess(context->getPipelineContext()->getPipelineOptions()->robustBufferAccess);
-
   // Set up middle-end objects.
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());

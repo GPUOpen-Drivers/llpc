@@ -1642,7 +1642,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     loadPointer = getBuilder()->CreateBitCast(loadPointer, castType);
     loadType = vectorType;
 
-    const bool scalarBlockLayout = static_cast<Llpc::Context &>(getBuilder()->getContext()).getScalarBlockLayout();
+    const bool scalarBlockLayout = getPipelineOptions()->scalarBlockLayout;
 
     if (!scalarBlockLayout)
       alignmentType = vectorType;
@@ -1780,7 +1780,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
       Type *const castType = storeType->getPointerTo(storePointer->getType()->getPointerAddressSpace());
       storePointer = getBuilder()->CreateBitCast(storePointer, castType);
 
-      const bool scalarBlockLayout = static_cast<Llpc::Context &>(getBuilder()->getContext()).getScalarBlockLayout();
+      const bool scalarBlockLayout = getPipelineOptions()->scalarBlockLayout;
 
       if (!scalarBlockLayout)
         alignmentType = storeType;

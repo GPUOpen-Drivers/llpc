@@ -332,7 +332,7 @@ void SpirvLowerMemoryOp::recordStoreExpandInfo(StoreInst *storeInst, ArrayRef<Ge
 // @param dynIndex : Dynamic index
 void SpirvLowerMemoryOp::expandStoreInst(StoreInst *storeInst, ArrayRef<GetElementPtrInst *> getElemPtrs,
                                          Value *dynIndex) {
-  const bool robustBufferAccess = m_context->getRobustBufferAccess();
+  const bool robustBufferAccess = m_context->getPipelineContext()->getPipelineOptions()->robustBufferAccess;
   const unsigned getElemPtrCount = getElemPtrs.size();
   bool isType64 = (dynIndex->getType()->getPrimitiveSizeInBits() == 64);
   Value *firstStoreDest = getElemPtrs[0];
