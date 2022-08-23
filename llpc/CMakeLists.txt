@@ -346,6 +346,13 @@ if(UNIX)
     target_link_libraries(llpc_standalone_compiler PUBLIC dl)
 endif()
 
+if (NOT LLVM_LINK_LLVM_DYLIB)
+    llvm_map_components_to_libnames(llvm_libs
+        AsmParser
+    )
+    target_link_libraries(llpc_standalone_compiler PUBLIC ${llvm_libs})
+endif()
+
 set_compiler_options(llpc_standalone_compiler ${LLPC_ENABLE_WERROR})
 
 # Add an executable for the amdllpc standalone compiler.
