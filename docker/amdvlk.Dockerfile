@@ -40,6 +40,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
        libwayland-dev \
        git curl wget openssh-client \
+       gpg \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir --upgrade cmake \
@@ -50,10 +51,11 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
 
 # Update the VulkanSDK 1.3.216 or higher, install the shader compiler tools for gpurt.
-RUN apt-get install -yqq --no-install-recommends software-properties-common dirmngr gpg-agent \
-    && apt-key adv --fetch-keys https://packages.lunarg.com/lunarg-signing-key-pub.asc \
-    && apt-add-repository 'deb https://packages.lunarg.com/vulkan/1.3.216 focal main' \
+RUN wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | apt-key add - \
+    && wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.216-focal.list https://packages.lunarg.com/vulkan/1.3.216/lunarg-vulkan-1.3.216-focal.list \
+    && apt-get update \
     && apt-get install -yqq --no-install-recommends dxc glslang-tools \
+    && rm -rf /var/lib/apt/lists/* \
     && dxc --version \
     && spirv-remap --version
 
