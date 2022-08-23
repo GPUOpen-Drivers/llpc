@@ -109,7 +109,6 @@ bool PatchPreparePipelineAbi::runImpl(Module &module, PipelineShadersResult &pip
 
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
-  // If we've only to set the calling conventions, do that now.
   if (m_gfxIp.major >= 9)
     mergeShader(module);
 
