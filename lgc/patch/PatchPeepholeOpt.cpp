@@ -137,11 +137,6 @@ void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
 
   auto *const user = cast<Instruction>(intToPtr.user_back());
 
-  const unsigned userOpcode = user->getOpcode();
-  // Check if user is Load or GEP instruction (right now only these two instructions are used).
-  if (userOpcode != Instruction::Load && userOpcode != Instruction::GetElementPtr)
-    return;
-
   Type *elementType = nullptr;
   if (auto loadInst = dyn_cast<LoadInst>(user)) {
     elementType = loadInst->getType();
@@ -150,7 +145,8 @@ void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
     elementType = getElemPtr->getSourceElementType();
 
   } else {
-    llvm_unreachable("Should never be called!");
+    // Exit if user is not Load or GEP instruction
+    // (right now only these two instructions are used).
     return;
   }
 
