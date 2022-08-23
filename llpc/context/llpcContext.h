@@ -82,27 +82,6 @@ public:
 
   llvm::CodeGenOpt::Level getOptimizationLevel() const;
 
-  // Set value of scalarBlockLayout option. This gets called with the value from PipelineOptions when
-  // starting a pipeline compile.
-  void setScalarBlockLayout(bool scalarBlockLayout) { m_scalarBlockLayout = scalarBlockLayout; }
-
-  // Get value of scalarBlockLayout for front-end use. If there have been any pipeline compiles in this context,
-  // then it returns the value from the most recent one. If there have not been any pipeline compiles in this
-  // context yet, then it returns false.
-  // TODO: This is not correct behavior. The front-end should not be using pipeline options. Possibly
-  // scalarBlockLayout is a whole-device option that should be passed into LLPC in a different way.
-  bool getScalarBlockLayout() const { return m_scalarBlockLayout; }
-
-  // Set value of robustBufferAccess option. This gets called with the value from PipelineOptions when
-  // starting a pipeline compile.
-  void setRobustBufferAccess(bool robustBufferAccess) { m_robustBufferAccess = robustBufferAccess; }
-
-  // Get value of robustBufferAccess for front-end use. If there have been any pipeline compiles in this context,
-  // then it returns the value from the most recent one. If there have not been any pipeline compiles in this
-  // context yet, then it returns false.
-  // TODO: This is not correct behavior. The front-end should not be using pipeline options.
-  bool getRobustBufferAccess() const { return m_robustBufferAccess; }
-
   std::unique_ptr<llvm::Module> loadLibrary(const BinaryData *lib);
 
   // Wrappers of interfaces of pipeline context
@@ -146,8 +125,6 @@ private:
   std::unique_ptr<lgc::LgcContext> m_builderContext; // Builder context
 
   std::unique_ptr<llvm::TargetMachine> m_targetMachine; // Target machine
-  bool m_scalarBlockLayout = false;                     // scalarBlockLayout option from last pipeline compile
-  bool m_robustBufferAccess = false;                    // robustBufferAccess option from last pipeline compile
 
   unsigned m_useCount = 0; // Number of times this context is used.
 };
