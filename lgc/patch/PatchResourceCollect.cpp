@@ -2895,14 +2895,17 @@ bool PatchResourceCollect::canChangeOutputLocationsForGs() {
 // =====================================================================================================================
 // Update inputLocInfoMap based on {TCS, GS, FS} input import calls
 void PatchResourceCollect::updateInputLocInfoMapWithPack() {
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
+  inputLocInfoMap.clear();
+
   if (m_inputCalls.empty())
     return;
+
   const bool isTcs = m_shaderStage == ShaderStageTessControl;
   const bool isFs = m_shaderStage == ShaderStageFragment;
   const bool isGs = m_shaderStage == ShaderStageGeometry;
   assert(isTcs || isFs || isGs);
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
-  auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
 
   // TCS: @lgc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
   // GS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
@@ -2914,7 +2917,6 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   // NOTE: Dynamic indexing in FS is processed to be constant in the lower pass.
   std::vector<CallInst *> packableCalls;
   packableCalls = std::move(m_inputCalls);
-  inputLocInfoMap.clear();
 
   // LDS load/store copes with dword. For 8-bit/16-bit data type, we will extend them to 32-bit
   bool partPipelineHasGs = m_pipelineState->isPartPipeline() && m_pipelineState->getPreRasterHasGs();
@@ -2960,11 +2962,12 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
 // =====================================================================================================================
 // Update outputLocInfoMap based on inputLocInfoMap of next stage or GS output export calls for copy shader
 void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
-  if (m_outputCalls.empty())
-    return;
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
   outputLocInfoMap.clear();
+
+  if (m_outputCalls.empty())
+    return;
 
   if (m_shaderStage != ShaderStageGeometry) {
     assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval);
