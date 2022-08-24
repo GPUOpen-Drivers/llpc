@@ -137,8 +137,8 @@ Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
   pipelineInfo->options.overrideThreadGroupSizeY = compileInfo.compPipelineInfo.options.overrideThreadGroupSizeY;
   pipelineInfo->options.overrideThreadGroupSizeZ = compileInfo.compPipelineInfo.options.overrideThreadGroupSizeZ;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
-  if (compileInfo.optimizationLevel.hasValue()) {
-    pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.getValue();
+  if (compileInfo.optimizationLevel.has_value()) {
+    pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.value();
   }
 #endif
   pipelineInfo->options.threadGroupSwizzleMode = compileInfo.compPipelineInfo.options.threadGroupSwizzleMode;

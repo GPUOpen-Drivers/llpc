@@ -1502,7 +1502,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
   // table pointer, even if it is not needed, because library code does not know whether a spill table pointer is
   // needed in the pipeline. Thus we cannot use s15 for anything else. Using the single-arg UserDataArg
   // constructor like this means that the arg is not used, so it will not be set up in PAL metadata.
-  if (m_computeWithCalls && !spillTableArg.hasValue())
+  if (m_computeWithCalls && !spillTableArg.has_value())
     spillTableArg = UserDataArg(builder.getInt32Ty(), "spillTable", UserDataMapping::SpillTable,
                                 &userDataUsage->spillTable.entryArgIdx);
 
@@ -1520,7 +1520,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
   for (auto &userDataArg : specialUserDataArgs)
     userDataEnd -= userDataArg.argDwordSize;
   // ... and the one used by the spill table if already added.
-  if (spillTableArg.hasValue())
+  if (spillTableArg.has_value())
     userDataEnd -= 1;
 
   // See if we need to spill any user data nodes in userDataArgs, copying the unspilled ones across to unspilledArgs.
@@ -1530,7 +1530,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
     unsigned afterUserDataIdx = userDataIdx + userDataArg.argDwordSize;
     if (afterUserDataIdx > userDataEnd) {
       // Spill this node. Allocate the spill table arg.
-      if (!spillTableArg.hasValue()) {
+      if (!spillTableArg.has_value()) {
         spillTableArg = UserDataArg(builder.getInt32Ty(), "spillTable", UserDataMapping::SpillTable,
                                     &userDataUsage->spillTable.entryArgIdx);
         --userDataEnd;
@@ -1576,7 +1576,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
   // Add the special args and the spill table pointer (if any) to unspilledArgs.
   // (specialUserDataArgs is empty for compute, and thus for compute-with-calls.)
   unspilledArgs.insert(unspilledArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
-  if (spillTableArg.hasValue())
+  if (spillTableArg.has_value())
     unspilledArgs.insert(unspilledArgs.end(), *spillTableArg);
 }
 

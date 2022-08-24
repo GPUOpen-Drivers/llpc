@@ -1688,6 +1688,7 @@ void InOutBuilder::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySiz
     default:
       break;
     }
+    break;
   }
 
   case ShaderStageFragment: {
