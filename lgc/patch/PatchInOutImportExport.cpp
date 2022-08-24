@@ -4281,7 +4281,7 @@ void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned lo
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
       auto ldsType = m_lds->getValueType();
       Value *storePtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
-      new StoreInst(storeValue, storePtr, false, m_lds->getAlign().getValue(), insertPos);
+      new StoreInst(storeValue, storePtr, false, m_lds->getAlign().value(), insertPos);
     } else {
       Value *esGsRingBufDesc = m_pipelineSysValues.get(m_entryPoint)->getEsGsRingBufDesc();
 
@@ -4351,7 +4351,7 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
       auto ldsType = m_lds->getValueType();
       auto *loadPtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
       auto loadInst =
-          new LoadInst(loadPtr->getResultElementType(), loadPtr, "", false, m_lds->getAlign().getValue(), insertPos);
+          new LoadInst(loadPtr->getResultElementType(), loadPtr, "", false, m_lds->getAlign().value(), insertPos);
       loadValue = loadInst;
 
       if (bitWidth == 8)
@@ -4474,7 +4474,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
       auto ldsType = m_lds->getValueType();
       Value *storePtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
-      new StoreInst(storeValue, storePtr, false, m_lds->getAlign().getValue(), insertPos);
+      new StoreInst(storeValue, storePtr, false, m_lds->getAlign().value(), insertPos);
     } else {
       // NOTE: Here we use tbuffer_store instruction instead of buffer_store because we have to do explicit
       // control of soffset. This is required by swizzle enabled mode when address range checking should be
@@ -4712,7 +4712,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool offChip, Type *readTy, Valu
       auto ldsType = m_lds->getValueType();
       auto *loadPtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
       auto loadTy = loadPtr->getResultElementType();
-      auto loadInst = new LoadInst(loadTy, loadPtr, "", false, m_lds->getAlign().getValue(), insertPos);
+      auto loadInst = new LoadInst(loadTy, loadPtr, "", false, m_lds->getAlign().value(), insertPos);
       loadValues[i] = loadInst;
 
       if (bitWidth == 8)
@@ -4811,7 +4811,7 @@ void PatchInOutImportExport::writeValueToLds(bool offChip, Value *writeValue, Va
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ldsOffset};
       auto ldsType = m_lds->getValueType();
       Value *storePtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
-      new StoreInst(storeValues[i], storePtr, false, m_lds->getAlign().getValue(), insertPos);
+      new StoreInst(storeValues[i], storePtr, false, m_lds->getAlign().value(), insertPos);
 
       ldsOffset =
           BinaryOperator::CreateAdd(ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);

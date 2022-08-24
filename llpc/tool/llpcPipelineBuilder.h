@@ -101,7 +101,7 @@ public:
   // Returns true iff pipeline dumps are requested.
   //
   // @returns : `true` is pipeline dumps were requested, `false` if not.
-  LLPC_NODISCARD bool shouldDumpPipelines() const { return m_dumpOptions.hasValue(); }
+  LLPC_NODISCARD bool shouldDumpPipelines() const { return m_dumpOptions.has_value(); }
 
   // Runs optional pre-build code (pipeline dumping, pipeline info printing).
   LLPC_NODISCARD void *runPreBuildActions(Vkgc::PipelineBuildInfo buildInfo);
