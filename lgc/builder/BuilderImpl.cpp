@@ -348,8 +348,36 @@ BranchInst *BuilderImplBase::createIf(Value *condition, bool wantElse, const Twi
 // @return : Value representing the non-uniform index
 static Value *traceNonUniformIndex(Value *nonUniformVal) {
   auto load = dyn_cast<LoadInst>(nonUniformVal);
-  if (!load)
-    return nonUniformVal;
+  if (!load) {
+    // Workarounds that modify image descriptor can be peeped through, i.e.
+    //   %baseValue = load <8 x i32>, <8 x i32> addrspace(4)* %..., align 16
+    //   %rawElement = extractelement <8 x i32> %baseValue, i64 6
+    //   %updatedElement = and i32 %rawElement, -1048577
+    //   %nonUniform = insertelement <8 x i32> %baseValue, i32 %updatedElement, i64 6
+    auto insert = dyn_cast<InsertElementInst>(nonUniformVal);
+    if (!insert)
+      return nonUniformVal;
+
+    load = dyn_cast<LoadInst>(insert->getOperand(0));
+    if (!load)
+      return nonUniformVal;
+
+    // We found the load, but must verify the chain.
+    // Consider updatedElement as a generic instruction or constant.
+    if (auto updatedElement = dyn_cast<Instruction>(insert->getOperand(1))) {
+      for (Value *operand : updatedElement->operands()) {
+        if (auto extract = dyn_cast<ExtractElementInst>(operand)) {
+          // Only dynamic value must be ExtractElementInst based on load.
+          if (dyn_cast<LoadInst>(extract->getOperand(0)) != load)
+            return nonUniformVal;
+        } else if (!isa<Constant>(operand)) {
+          return nonUniformVal;
+        }
+      }
+    } else if (!isa<Constant>(insert->getOperand(1))) {
+      return nonUniformVal;
+    }
+  }
 
   SmallVector<Value *, 2> worklist;
   Value *base = load->getOperand(0);
@@ -537,11 +565,13 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
                                   {waterfallBegin, nonUniformVal}, nullptr, instName);
 
     // Replace all references to shared index within the waterfall loop with scalarized index.
+    // (Note: this includes the non-uniform instruction itself.)
     // Loads using scalarized index will become scalar loads.
     for (Value *otherNonUniformVal : nonUniformIndices) {
       otherNonUniformVal->replaceUsesWithIf(desc, [desc, waterfallBegin, nonUniformInst](Use &U) {
         Instruction *userInst = cast<Instruction>(U.getUser());
-        return U.getUser() != waterfallBegin && U.getUser() != desc && userInst->comesBefore(nonUniformInst);
+        return U.getUser() != waterfallBegin && U.getUser() != desc &&
+               (userInst->comesBefore(nonUniformInst) || userInst == nonUniformInst);
       });
     }
   } else {
