@@ -4165,7 +4165,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
                          GlobalVariable::NotThreadLocal, addrSpace);
 
   if (addrSpace == SPIRAS_Local) {
-    globalVar->setAlignment(MaybeAlign(16));
+    globalVar->setAlignment(MaybeAlign(4));
 
     // NOTE: Give shared variable a name to skip "global optimize pass".
     // The pass will change constant store operations to initializerand this
