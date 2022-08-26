@@ -28,13 +28,42 @@
  * @brief LLPC source file: implementation of BuilderBase
  ***********************************************************************************************************************
  */
+
 #include "lgc/util/BuilderBase.h"
+#include "lgc/LgcDialect.h"
+#include "lgc/state/IntrinsDefs.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 using namespace lgc;
 using namespace llvm;
+
+// =====================================================================================================================
+// Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
+// For buffer fat pointers, delays the translation to patch phase.
+//
+// @param ty : Element type of the pointers.
+// @param lhs : Left hand side of the subtraction.
+// @param rhs : Reft hand side of the subtraction.
+// @param instName : Name to give instruction(s)
+// @return : the difference between the two pointers, in units of the given type
+Value *BuilderCommon::CreatePtrDiff(Type *ty, Value *lhs, Value *rhs, const Twine &instName) {
+  Type *const lhsType = lhs->getType();
+  Type *const rhsType = rhs->getType();
+  if (!lhsType->isPointerTy() || lhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER ||
+      !rhsType->isPointerTy() || rhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 412285
+    // Old version of the code
+    return IRBuilderBase::CreatePtrDiff(lhs, rhs, instName);
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    return IRBuilderBase::CreatePtrDiff(ty, lhs, rhs, instName);
+#endif
+
+  Value *difference = create<BufferPtrDiffOp>(lhs, rhs);
+  return CreateExactSDiv(difference, ConstantExpr::getSizeOf(ty), instName);
+}
 
 // =====================================================================================================================
 // Create an LLVM function call to the named function. The callee is built automatically based on return

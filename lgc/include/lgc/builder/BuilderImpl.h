@@ -305,14 +305,6 @@ public:
   // Create a load of the push constants pointer.
   llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName) override final;
 
-  // Create a buffer length query based on the specified descriptor.
-  llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc, llvm::Value *offset,
-                                         const llvm::Twine &instName = "") override final;
-
-  // Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
-  llvm::Value *CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs,
-                             const llvm::Twine &instName = "") override final;
-
 private:
   DescBuilder() = delete;
   DescBuilder(const DescBuilder &) = delete;

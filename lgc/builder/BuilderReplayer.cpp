@@ -423,17 +423,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateLoadPushConstantsPtr(call->getType()); // returnTy
   }
 
-  case BuilderRecorder::Opcode::GetBufferDescLength: {
-    return m_builder->CreateGetBufferDescLength(args[0],  // buffer descriptor
-                                                args[1]); // offset
-  }
-
-  case BuilderRecorder::Opcode::PtrDiff: {
-    return m_builder->CreatePtrDiff(args[0]->getType(), // ty
-                                    args[1],            // lhs
-                                    args[2]);           // rhs
-  }
-
   // Replayer implementations of ImageBuilder methods
   case BuilderRecorder::Opcode::ImageLoad: {
     unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();

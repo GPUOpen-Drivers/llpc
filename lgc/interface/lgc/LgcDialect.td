@@ -36,3 +36,51 @@ def V4I32 : FixedVectorType<4, I32>;
 
 class LgcOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcDialect, mnemonic_, traits_ # [NoUnwind]>;
+
+// TODO: Enable this once we have made the switch to opaque pointers.
+//def BufferDescToPtrOp : LgcOp<"buffer.desc.to.ptr", [ReadNone, WillReturn]> {
+//  let arguments = (ins V4I32:$desc);
+//  let results = (outs BufferPointer:$result);
+//
+//  let summary = "convert a buffer descriptor into a buffer pointer";
+//  let description = [{
+//    Given a buffer descriptor for a storage buffer, returns a fat buffer pointer to the start of the buffer.
+//
+//    The descriptor must be a null descriptor or a valid descriptor for a storage buffer aka raw buffer, i.e. a buffer
+//    for which the indexing feature of BUFFER_LOAD_* instructions is never used.
+//  }];
+//}
+
+def BufferLengthOp : LgcOp<"buffer.length", [Memory<[]>, WillReturn]> {
+  // TODO: Change to BufferPointer after we switch to opaque pointers.
+  let arguments = (ins AnyPointerType:$pointer, I32:$offset);
+  let results = (outs I32:$result);
+
+  let summary = "return the size of a buffer";
+  let description = [{
+    Return the number of bytes available in the buffer pointed to by `pointer`, starting at a byte `offset` from the
+    pointer.
+
+    `offset` is interpreted as an unsigned integer. If `offset` is greater than the total size of the buffer, or if the
+    buffer is a null buffer, behavior depends on the `allowNullDescriptors` setting:
+    - if null descriptors are allowed, the offset is properly clamped and 0 is returned.
+    - if null descriptors are *not* allowed, the return value is poison.
+  }];
+}
+
+def BufferPtrDiffOp : LgcOp<"buffer.ptr.diff", [Memory<[]>, WillReturn]> {
+  // TODO: Change to BufferPointer after we switch to opaque pointers.
+  let arguments = (ins AnyPointerType:$lhs, AnyPointerType:$rhs);
+  let results = (outs I64:$result);
+
+  let verifier = [(SameTypes $lhs, $rhs)];
+
+  let summary = "return the difference between buffer pointers in bytes";
+  let description = [{
+    Return the (signed) distance `lhs - rhs` from rhs to lhs in bytes.
+
+    If `lhs` and `rhs` have different pointer provenance, the result is poison.
+
+    If `lhs` and `rhs` are both null, the result is 0.
+  }];
+}

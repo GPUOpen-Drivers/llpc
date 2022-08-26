@@ -156,10 +156,6 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "get.desc.ptr";
   case Opcode::LoadPushConstantsPtr:
     return "load.push.constants.ptr";
-  case Opcode::GetBufferDescLength:
-    return "get.buffer.desc.length";
-  case Opcode::PtrDiff:
-    return "buffer.ptrdiff";
   case Opcode::ReadGenericInput:
     return "read.generic.input";
   case Opcode::ReadPerVertexInput:
@@ -1139,27 +1135,6 @@ Value *BuilderRecorder::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &
 }
 
 // =====================================================================================================================
-// Create a buffer length query based on the specified descriptor.
-//
-// @param bufferDesc : The buffer descriptor to query.
-// @param instName : Name to give instruction(s).
-Value *BuilderRecorder::CreateGetBufferDescLength(Value *const bufferDesc, Value *offset, const Twine &instName) {
-  return record(Opcode::GetBufferDescLength, getInt32Ty(), {bufferDesc, offset}, instName);
-}
-
-// =====================================================================================================================
-// Return the i64 difference between two buffer fat pointer values, dividing out the size of the pointed-to objects.
-//
-// @param ty : Element type of the pointers.
-// @param lhs : Left hand side of the subtraction.
-// @param rhs : Reft hand side of the subtraction.
-// @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName) {
-  // We can't store a type, so store a zero value of the type instead
-  return record(Opcode::PtrDiff, getInt64Ty(), {Constant::getNullValue(ty), lhs, rhs}, instName);
-}
-
-// =====================================================================================================================
 // Create an image load.
 //
 // @param resultTy : Result type
@@ -2119,7 +2094,6 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::Fma:
     case Opcode::FpTruncWithRounding:
     case Opcode::Fract:
-    case Opcode::GetBufferDescLength:
     case Opcode::GetDescPtr:
     case Opcode::GetDescStride:
     case Opcode::GetWaveSize:
@@ -2133,7 +2107,6 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::MatrixTimesVector:
     case Opcode::NormalizeVector:
     case Opcode::OuterProduct:
-    case Opcode::PtrDiff:
     case Opcode::QuantizeToFp16:
     case Opcode::Reflect:
     case Opcode::Refract:

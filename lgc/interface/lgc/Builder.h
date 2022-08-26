@@ -766,25 +766,6 @@ public:
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName = "") = 0;
 
-  // Create a buffer length query based on the specified descriptor, subtracting an offset from the length. The result
-  // is 0 for a null descriptor when allowNullDescriptor is enabled.
-  //
-  // @param bufferDesc : The buffer descriptor to query.
-  // @param offset: The offset to subtract from the buffer length.
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc, llvm::Value *offset,
-                                                 const llvm::Twine &instName = "") = 0;
-
-  // Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
-  // For buffer fat pointers, delays the translation to patch phase.
-  //
-  // @param ty : Element type of the pointers.
-  // @param lhs : Left hand side of the subtraction.
-  // @param rhs : Reft hand side of the subtraction.
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs,
-                                     const llvm::Twine &instName = "") = 0;
-
   // -----------------------------------------------------------------------------------------------------------------
   // Image operations
 

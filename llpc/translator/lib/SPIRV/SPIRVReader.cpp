@@ -48,6 +48,7 @@
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcPipelineContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -2836,7 +2837,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
   const StructLayout *const structLayout = m_m->getDataLayout().getStructLayout(structType);
   const unsigned offset = static_cast<unsigned>(structLayout->getElementOffset(remappedMemberIndex));
   Value *const offsetVal = getBuilder()->getInt32(offset);
-  Value *const arrayBytes = getBuilder()->CreateGetBufferDescLength(structure, offsetVal);
+  Value *const arrayBytes = getBuilder()->create<BufferLengthOp>(structure, offsetVal);
 
   Type *const memberType = structType->getStructElementType(remappedMemberIndex)->getArrayElementType();
   const unsigned stride = static_cast<unsigned>(m_m->getDataLayout().getTypeSizeInBits(memberType) / 8);

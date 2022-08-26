@@ -1,33 +1,7 @@
-; BEGIN_SHADERTEST
-; REQUIRES: do-not-run-me
-; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call i64 (...) @lgc.create.buffer.ptrdiff.i64(i32 0, ptr addrspace(7) {{@[0-9]+}}, ptr addrspace(7) {{%[0-9]+}})
-; SHADERTEST: call i64 (...) @lgc.create.buffer.ptrdiff.i64(i64 0, ptr addrspace(7) {{@[0-9]+}}, ptr addrspace(7) {{%[0-9]+}})
+; RUN: amdllpc -emit-lgc -gfxip 11.0 -o - %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-
-; SHADERTEST: call i64 @lgc.late.buffer.ptrdiff.i32.p7.p7(i32 0, ptr addrspace(7) {{%[0-9]+}}, ptr addrspace(7) {{%[0-9]+}})
-; SHADERTEST: call i64 @lgc.late.buffer.ptrdiff.i64.p7.p7(i64 0, ptr addrspace(7) {{%[0-9]+}}, ptr addrspace(7) {{%[0-9]+}})
-
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-
-; SHADERTEST: [[a:%[0-9a-zA-Z.]+]] = shl i32 {{%[0-9a-zA-Z.]+}}, 2
-; SHADERTEST: [[b:%[0-9]+]] = zext i32 [[a]] to i64
-; SHADERTEST: [[c:%[0-9]+]] = sub nsw i64 0, [[b]]
-; SHADERTEST: [[d1:%[0-9]+]] = ashr exact i64 [[c]], 2
-
-; SHADERTEST: [[a:%[0-9a-zA-Z.]+]] = shl i32 {{%[0-9a-zA-Z.]+}}, 3
-; SHADERTEST: [[b:%[0-9]+]] = zext i32 [[a]] to i64
-; SHADERTEST: [[c:%[0-9]+]] = sub nsw i64 0, [[b]]
-; SHADERTEST: [[d:%[0-9]+]] = ashr exact i64 [[c]], 3
-; SHADERTEST: [[e:%[0-9]+]] = trunc i64 [[d]] to i32
-
-; SHADERTEST: [[e1:%[0-9a-zA-Z.]+]] = bitcast i64 [[d1]] to <2 x i32>
-; SHADERTEST: {{%[0-9]+}} = insertelement <2 x i32> [[e1]], i32 [[e]], i64 1
-
-; SHADERTEST: AMDLLPC SUCCESS
-; END_SHADERTEST
+; SHADERTEST: call i64 {{.*}}@lgc.buffer.ptr.diff(ptr addrspace(7) {{%[0-9]+}}, ptr addrspace(7) {{%[0-9]+}})
+; SHADERTEST: call i64 {{.*}}@lgc.buffer.ptr.diff(ptr addrspace(7) {{%[0-9]+}}, ptr addrspace(7) {{%[0-9]+}})
 
 ; SPIR-V
 ; Version: 1.4

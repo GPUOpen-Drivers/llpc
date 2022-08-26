@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PalMetadata.h"
@@ -512,39 +513,6 @@ Value *DescBuilder::scalarizeIfUniform(Value *value, bool isNonUniform) {
       value = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, value);
   }
   return value;
-}
-
-// =====================================================================================================================
-// Create a buffer length query based on the specified descriptor.
-//
-// @param bufferDesc : The buffer descriptor to query.
-// @param instName : Name to give instruction(s).
-Value *DescBuilder::CreateGetBufferDescLength(Value *const bufferDesc, Value *offset, const Twine &instName) {
-  // In future this should become a full LLVM intrinsic, but for now we patch in a late intrinsic that is cleaned up
-  // in patch buffer op.
-  return CreateNamedCall(lgcName::LateBufferLength, getInt32Ty(), {bufferDesc, offset}, Attribute::ReadNone);
-}
-
-// =====================================================================================================================
-// Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
-// For buffer fat pointers, delays the translation to patch phase.
-//
-// @param ty : Element type of the pointers.
-// @param lhs : Left hand side of the subtraction.
-// @param rhs : Reft hand side of the subtraction.
-// @param instName : Name to give instruction(s)
-Value *DescBuilder::CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName) {
-  Type *const lhsType = lhs->getType();
-  Type *const rhsType = rhs->getType();
-  if (!lhsType->isPointerTy() || lhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER ||
-      !rhsType->isPointerTy() || rhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    return IRBuilderBase::CreatePtrDiff(ty, lhs, rhs, instName);
-
-  // Add a dummy value of the pointer element type so we can later determine its size
-  Value *dummyValue = Constant::getNullValue(ty);
-  std::string callName = lgcName::LateBufferPtrDiff;
-  addTypeMangling(getVoidTy(), {dummyValue, lhs, rhs}, callName);
-  return CreateNamedCall(callName, getInt64Ty(), {dummyValue, lhs, rhs}, Attribute::ReadNone);
 }
 
 // =====================================================================================================================

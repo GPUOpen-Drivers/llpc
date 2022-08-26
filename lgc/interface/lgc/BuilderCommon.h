@@ -46,6 +46,15 @@ public:
   BuilderCommon(llvm::BasicBlock *block) : llvm_dialects::Builder(block) {}
   BuilderCommon(llvm::Instruction *inst) : llvm_dialects::Builder(inst) {}
 
+  // Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
+  // For buffer fat pointers, delays the translation to patch phase.
+  //
+  // @param ty : Element type of the pointers.
+  // @param lhs : Left hand side of the subtraction.
+  // @param rhs : Reft hand side of the subtraction.
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs, const llvm::Twine &instName = "");
+
   // Create an LLVM function call to the named function. The callee is built automatically based on return
   // type and its parameters.
   //
