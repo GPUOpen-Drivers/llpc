@@ -31,6 +31,7 @@
 #include "lgc/patch/PatchBufferOp.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -465,10 +466,6 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
 
   const StringRef callName(calledFunc->getName());
 
-  // If the call is not a late intrinsic call we need to replace, bail.
-  if (!callName.startswith(lgcName::LaterCallPrefix))
-    return;
-
   m_builder->SetInsertPoint(&callInst);
 
   if (callName.equals(lgcName::LateLaunderFatPointer)) {
@@ -482,13 +479,13 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     // If the incoming index to the fat pointer launder was divergent, remember it.
     if (m_isDivergent(*callInst.getArgOperand(0)))
       m_divergenceSet.insert(callInst.getArgOperand(0));
-  } else if (callName.startswith(lgcName::LateBufferLength)) {
-    Replacement pointer = getRemappedValue(callInst.getArgOperand(0));
+  } else if (auto *bufferLength = dyn_cast<BufferLengthOp>(&callInst)) {
+    Replacement pointer = getRemappedValue(bufferLength->getPointer());
 
     // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
     Value *const bufferDesc = pointer.first;
     Value *numRecords = m_builder->CreateExtractElement(bufferDesc, 2);
-    Value *offset = callInst.getArgOperand(1);
+    Value *offset = bufferLength->getOffset();
 
     // If null descriptors are allowed, we must guarantee a 0 result for a null buffer descriptor.
     //
@@ -502,13 +499,12 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     numRecords = m_builder->CreateSub(numRecords, offset);
 
     // Record the call instruction so we remember to delete it later.
-    m_replacementMap[&callInst] = std::make_pair(nullptr, nullptr);
+    m_replacementMap[bufferLength] = std::make_pair(nullptr, nullptr);
 
-    callInst.replaceAllUsesWith(numRecords);
-  } else if (callName.startswith(lgcName::LateBufferPtrDiff)) {
-    Type *const ty = callInst.getArgOperand(0)->getType();
-    Value *const lhs = callInst.getArgOperand(1);
-    Value *const rhs = callInst.getArgOperand(2);
+    bufferLength->replaceAllUsesWith(numRecords);
+  } else if (auto *ptrDiff = dyn_cast<BufferPtrDiffOp>(&callInst)) {
+    Value *const lhs = ptrDiff->getLhs();
+    Value *const rhs = ptrDiff->getRhs();
 
     assert(lhs->getType()->isPointerTy() && lhs->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
            rhs->getType()->isPointerTy() && rhs->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
@@ -521,15 +517,12 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     copyMetadata(rhsPtrToInt, rhs);
 
     Value *const difference = m_builder->CreateSub(lhsPtrToInt, rhsPtrToInt);
-    Constant *const size = ConstantExpr::getSizeOf(ty);
-    Value *const elementDifference = m_builder->CreateExactSDiv(difference, size);
 
     // Record the call instruction so we remember to delete it later.
-    m_replacementMap[&callInst] = std::make_pair(nullptr, nullptr);
+    m_replacementMap[ptrDiff] = std::make_pair(nullptr, nullptr);
 
-    callInst.replaceAllUsesWith(elementDifference);
-  } else
-    llvm_unreachable("Should never be called!");
+    ptrDiff->replaceAllUsesWith(difference);
+  }
 }
 
 // =====================================================================================================================

@@ -127,8 +127,6 @@ public:
     GetDescStride,
     GetDescPtr,
     LoadPushConstantsPtr,
-    GetBufferDescLength,
-    PtrDiff,
 
     // Image
     ImageLoad,
@@ -366,12 +364,6 @@ public:
                                 unsigned binding, const llvm::Twine &instName) override final;
 
   llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName) override final;
-
-  llvm::Value *CreateGetBufferDescLength(llvm::Value *const bufferDesc, llvm::Value *offset,
-                                         const llvm::Twine &instName = "") override final;
-
-  llvm::Value *CreatePtrDiff(llvm::Type *ty, llvm::Value *lhs, llvm::Value *rhs,
-                             const llvm::Twine &instName = "") override final;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Image operations
