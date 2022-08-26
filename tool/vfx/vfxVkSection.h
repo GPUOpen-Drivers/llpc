@@ -132,6 +132,7 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, sgprLimit, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveSize, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, subgroupSize, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, wgpMode, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveBreakSize, MemberTypeEnum, false);
 
@@ -164,7 +165,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 31;
+  static const unsigned MemberCount = 32;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
