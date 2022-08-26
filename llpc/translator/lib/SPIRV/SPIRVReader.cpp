@@ -7192,7 +7192,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       std::vector<Metadata *> resMDs;
       resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, descSet)));
       resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, binding)));
-      resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, blockTy->getOpCode())));
       auto resMdNode = MDNode::get(*m_context, resMDs);
       gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
 
@@ -7264,7 +7263,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       std::vector<Metadata *> mDs;
       mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, descSet)));
       mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, binding)));
-      mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, opaqueTy->getOpCode())));
       auto mdNode = MDNode::get(*m_context, mDs);
       gv->addMetadata(gSPIRVMD::Resource, *mdNode);
     } else if (as == SPIRAS_Local) {
