@@ -159,6 +159,7 @@ public:
     ReadPerVertexInput,
     WriteGenericOutput,
     WriteXfbOutput,
+    ReadBaryCoord,
     ReadBuiltInInput,
     ReadBuiltInOutput,
     WriteBuiltInOutput,
@@ -454,6 +455,10 @@ public:
   llvm::Instruction *CreateWriteXfbOutput(llvm::Value *valueToWrite, bool isBuiltIn, unsigned location,
                                           unsigned xfbBuffer, unsigned xfbStride, llvm::Value *xfbOffset,
                                           InOutInfo outputInfo) override final;
+
+  // Create a read of barycoord input value.
+  llvm::Value *CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *auxInterpValue,
+                                   const llvm::Twine &instName = "") override final;
 
   // Create a read of (part of) a built-in input value.
   llvm::Value *CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *vertexIndex,

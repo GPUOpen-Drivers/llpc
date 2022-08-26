@@ -501,6 +501,10 @@ public:
                                           unsigned xfbBuffer, unsigned xfbStride, llvm::Value *xfbOffset,
                                           InOutInfo outputInfo) override final;
 
+  // Create a read of barycoord input value.
+  llvm::Value *CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *auxInterpValue,
+                                   const llvm::Twine &instName = "") override final;
+
   // Create a read of (part of) a built-in input value.
   llvm::Value *CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *vertexIndex,
                                       llvm::Value *index, const llvm::Twine &instName = "") override final;
@@ -550,6 +554,9 @@ private:
   // Read (part of) a built-in value
   llvm::Value *readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo inOutInfo, llvm::Value *vertexIndex,
                            llvm::Value *index, const llvm::Twine &instName);
+
+  // Reorder the barycoord
+  llvm::Value *normalizeBaryCoord(llvm::Value *ijCoord);
 
   // Read and directly handle certain built-ins that are common between shader stages
   llvm::Value *readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy, const llvm::Twine &instName = "");

@@ -9,7 +9,7 @@
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; The second argument (i32 32) respects that interpLoc is InterpLocCentroid.
-; SHADERTEST: call <3 x float> (...) @lgc.create.read.builtin.input.v3f32(i32 5287, i32 32, i32 undef, i32 undef)
+; SHADERTEST: call <3 x float> (...) @lgc.create.read.bary.coord.v3f32(i32 5287, i32 32,
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %[[InterpCenter0:[^ ]*]] = extractelement <2 x float> %LinearInterpCenter, i64 0

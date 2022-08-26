@@ -3,9 +3,6 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: define dllexport spir_func void @lgc.shader.FS.main()
-; SHADERTEST: call <3 x float> @lgc.input.import.builtin.BaryCoord.v3f32.i32.i32(i32 5286, i32 0)
-
 // barycentric coordinate: (i ,j , 1 - i - j).
 // Triangle_Fan depends the parity of primitive.
 ; SHADERTEST-LABEL: define dllexport amdgpu_ps void @_amdgpu_ps_main(i32 inreg %globalTable, i32 inreg %perShaderTable,
@@ -16,10 +13,10 @@
 ; SHADERTEST: %[[P:[0-9]*]] = call float @llvm.amdgcn.interp.mov(i32 immarg 2, i32 immarg 0, i32 immarg 0, i32 %PrimMask)
 ; SHADERTEST: %[[primID:[0-9]*]] = bitcast float %[[P]] to i32
 ; SHADERTEST: %[[and:[0-9]*]] = and i32 %[[primID]], 1
-; SHADERTEST: %[[even:[0-9]*]] = icmp eq i32 %[[and]], 0
-; SHADERTEST: select i1 %[[even]], float %[[kCoord]], float %[[jCoord]]
-; SHADERTEST: select i1 %[[even]], float %[[iCoord]], float %[[kCoord]]
-; SHADERTEST: select i1 %[[even]], float %[[jCoord]], float %[[iCoord]]
+; SHADERTEST: %[[not:[^,]*]] = icmp eq i32 %[[and]], 0
+; SHADERTEST: select i1 %[[not]], float %[[kCoord]], float %[[jCoord]]
+; SHADERTEST: select i1 %[[not]], float %[[iCoord]], float %[[kCoord]]
+; SHADERTEST: select i1 %[[not]], float %[[jCoord]], float %[[iCoord]]
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

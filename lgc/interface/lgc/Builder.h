@@ -1207,6 +1207,16 @@ public:
   // @param inOutInfo : Extra input/output info (shader-defined array length)
   llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 
+  // Create a read of barycoord input value.
+  // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
+  //
+  // @param builtIn : Built-in kind, BuiltInBaryCoord or BuiltInBaryCoordNoPerspKHR
+  // @param inputInfo : Extra input info
+  // @param auxInterpValue : Auxiliary value of interpolation
+  // @param instName : Name to give instruction(s)
+  virtual llvm::Value *CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *auxInterpValue,
+                                           const llvm::Twine &instName = "") = 0;
+
   // Create a read of (part of) a built-in input value.
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
   // or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
