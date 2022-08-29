@@ -232,13 +232,13 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
       pipeline->setPreRasterHasGs(true);
   }
 
-  // Give the pipeline options to the middle-end, and/or hash them.
-  setOptionsInPipeline(pipeline, hasher);
-
   if (!unlinked) {
     // Give the user data nodes to the middle-end, and/or hash them.
     setUserDataInPipeline(pipeline, hasher, stageMask);
   }
+
+  // Give the pipeline options to the middle-end, and/or hash them.
+  setOptionsInPipeline(pipeline, hasher);
 
   if (isGraphics()) {
     if ((stageMask & ~shaderStageToMask(ShaderStageFragment)) && (!unlinked || DisableFetchShader)) {
