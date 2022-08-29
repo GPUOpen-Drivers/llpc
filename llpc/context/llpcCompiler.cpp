@@ -2300,8 +2300,6 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
   context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
 
   context->attachPipelineContext(helperThreadPayload->rayTracingContext);
-  context->setScalarBlockLayout(helperThreadPayload->rayTracingContext->getPipelineOptions()->scalarBlockLayout);
-  context->setRobustBufferAccess(helperThreadPayload->rayTracingContext->getPipelineOptions()->robustBufferAccess);
 
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
@@ -2393,11 +2391,6 @@ Result Compiler::buildRayTracingPipelineInternal(Context *context, ArrayRef<cons
   // Old version of the code
   context->setInlineAsmDiagnosticHandler(InlineAsmDiagHandler, &hasError);
 #endif
-
-  // Set a couple of pipeline options for front-end use.
-  // TODO: The front-end should not be using pipeline options.
-  context->setScalarBlockLayout(rayTracingContext->getPipelineOptions()->scalarBlockLayout);
-  context->setRobustBufferAccess(rayTracingContext->getPipelineOptions()->robustBufferAccess);
 
   // Set up middle-end objects.
   LgcContext *builderContext = context->getLgcContext();
