@@ -523,6 +523,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.sgprLimit = " << shaderInfo->options.sgprLimit << "\n";
   dumpFile << "options.maxThreadGroupsPerComputeUnit = " << shaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
   dumpFile << "options.waveSize = " << shaderInfo->options.waveSize << "\n";
+  dumpFile << "options.subgroupSize = " << shaderInfo->options.subgroupSize << "\n";
   dumpFile << "options.wgpMode = " << shaderInfo->options.wgpMode << "\n";
   dumpFile << "options.waveBreakSize = " << shaderInfo->options.waveBreakSize << "\n";
   dumpFile << "options.forceLoopUnrollCount = " << shaderInfo->options.forceLoopUnrollCount << "\n";
@@ -1181,6 +1182,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.vgprLimit);
       hasher->Update(options.maxThreadGroupsPerComputeUnit);
       hasher->Update(options.waveSize);
+      hasher->Update(options.subgroupSize);
       hasher->Update(options.wgpMode);
 
       if (!isRelocatableShader)
