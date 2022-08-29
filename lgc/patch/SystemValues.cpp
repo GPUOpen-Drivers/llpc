@@ -398,7 +398,9 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
     auto streamOutTableType = streamOutTablePair.first;
     auto streamOutBufDescPtr = GetElementPtrInst::Create(streamOutTableType, streamOutTablePtr, idxs, "", insertPos);
     streamOutBufDescPtr->setMetadata(MetaNameUniform, MDNode::get(streamOutBufDescPtr->getContext(), {}));
-    auto streamOutBufDescTy = streamOutBufDescPtr->getType()->getPointerElementType();
+    auto streamOutBufDescTy = GetElementPtrInst::getIndexedType(streamOutTableType, idxs);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(streamOutBufDescPtr->getType(), streamOutBufDescTy));
 
     auto streamOutBufDesc = new LoadInst(streamOutBufDescTy, streamOutBufDescPtr, "", false, Align(16), insertPos);
     streamOutBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(streamOutBufDesc->getContext(), {}));
