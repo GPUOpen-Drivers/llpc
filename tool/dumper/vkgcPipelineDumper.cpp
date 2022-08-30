@@ -714,6 +714,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.optimizationLevel = " << options->optimizationLevel << "\n";
 #endif
   dumpFile << "options.threadGroupSwizzleMode = " << options->threadGroupSwizzleMode << "\n";
+  dumpFile << "options.reverseThreadGroup = " << options->reverseThreadGroup << "\n";
 }
 
 // =====================================================================================================================
@@ -1133,6 +1134,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->optimizationLevel);
 #endif
   hasher->Update(options->threadGroupSwizzleMode);
+  hasher->Update(options->reverseThreadGroup);
 }
 
 // =====================================================================================================================

@@ -298,9 +298,10 @@ bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipel
 // @param [in/out] resNodeSets : Resource map, will have user data nodes added to it
 // @param [in/out] pushConstSize : Cumulative push constant node size
 // @param autoLayoutDesc : Whether to automatically create descriptor layout based on resource usages
+// @param reverseThreadGroup : Whether reverse thread group optimization is enabled.
 void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipelineBuildInfo *pipelineInfo,
                       PipelineShaderInfo *shaderInfo, ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
-                      bool autoLayoutDesc) {
+                      bool autoLayoutDesc, bool reverseThreadGroup) {
   // Read the SPIR-V.
   std::string spirvCode(static_cast<const char *>(spirvBin.pCode), spirvBin.codeSize);
   std::istringstream spirvStream(spirvCode);
@@ -566,8 +567,9 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
     }
   }
 
-  // Only auto-layout descriptors if -auto-layout-desc is on.
-  if (!autoLayoutDesc)
+  // Only auto-layout descriptors if -auto-layout-desc is on, or reverse thread group is enabled (we need to insert
+  // an internal buffer descriptor in this case).
+  if (!autoLayoutDesc && !reverseThreadGroup)
     return;
 
   // Collect ResourceMappingNode entries in sets.
@@ -675,6 +677,22 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
       break;
     }
     }
+  }
+
+  if (reverseThreadGroup) {
+    ResourceNodeSet &resNodeSet = resNodeSets[Vkgc::InternalDescriptorSetId];
+    auto ret = resNodeSet.bindingMap.insert({Vkgc::ReverseThreadGroupControlBinding, resNodeSet.nodes.size()});
+    unsigned nodesIndex = ret.first->second;
+    if (ret.second) {
+      resNodeSet.nodes.push_back({});
+      resNodeSet.nodes.back().type = ResourceMappingNodeType::Unknown;
+    }
+    resNodeSet.visibility |= shaderStageToMask(ShaderStageCompute);
+    ResourceMappingNode *node = &resNodeSet.nodes[nodesIndex];
+    node->type = ResourceMappingNodeType::DescriptorBufferCompact;
+    node->sizeInDwords = 2;
+    node->srdRange.set = Vkgc::InternalDescriptorSetId;
+    node->srdRange.binding = Vkgc::ReverseThreadGroupControlBinding;
   }
 
   // Allocate dword offset to each node.

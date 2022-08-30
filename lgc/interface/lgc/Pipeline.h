@@ -143,6 +143,9 @@ struct Options {
   unsigned pageMigrationEnabled;  // Enable page migration
   ResourceLayoutScheme resourceLayoutScheme; // Resource layout scheme
   ThreadGroupSwizzleMode threadGroupSwizzleMode; // Thread group swizzle mode
+  unsigned reverseThreadGroupBufferDescSet;      // Descriptor set ID of the internal buffer for reverse thread group
+                                                 // optimization
+  unsigned reverseThreadGroupBufferBinding; // Binding ID of the internal buffer for reverse thread group optimization
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

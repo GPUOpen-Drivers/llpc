@@ -359,6 +359,7 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizationLevel, MemberTypeInt, false);
 #endif
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, threadGroupSwizzleMode, MemberTypeEnum, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reverseThreadGroup, MemberTypeBool, false);
     INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_extendedRobustness, MemberTypeExtendedRobustness, true);
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
@@ -370,7 +371,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 16;
+  static const unsigned MemberCount = 17;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;

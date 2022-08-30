@@ -286,6 +286,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
   options.threadGroupSwizzleMode =
       static_cast<lgc::ThreadGroupSwizzleMode>(getPipelineOptions()->threadGroupSwizzleMode);
 
+  if (getPipelineOptions()->reverseThreadGroup) {
+    options.reverseThreadGroupBufferDescSet = Vkgc::InternalDescriptorSetId;
+    options.reverseThreadGroupBufferBinding = Vkgc::ReverseThreadGroupControlBinding;
+  }
+
   switch (getPipelineOptions()->shadowDescriptorTableUsage) {
   case Vkgc::ShadowDescriptorTableUsage::Auto:
     // Use default of 2 for standalone amdllpc.

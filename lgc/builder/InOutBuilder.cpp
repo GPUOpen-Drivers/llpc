@@ -1159,12 +1159,31 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     // WorkgroupId is a v3i32 shader input (three SGPRs set up by hardware).
     Value *workgroupId = ShaderInputs::getInput(ShaderInput::WorkgroupId, BuilderBase::get(*this), *getLgcContext());
 
+    auto options = m_pipelineState->getOptions();
+
     // If thread group swizzle is enabled, we insert a call here and later lower it to code.
-    if (m_pipelineState->getOptions().threadGroupSwizzleMode != ThreadGroupSwizzleMode::Default) {
+    if (options.threadGroupSwizzleMode != ThreadGroupSwizzleMode::Default) {
       // The calculation requires NumWorkgroups and WorkgroupId.
       workgroupId = CreateNamedCall(lgcName::SwizzleWorkgroupId, workgroupId->getType(),
                                     {readCsBuiltIn(BuiltInNumWorkgroups), workgroupId}, {});
     }
+
+    // If the buffer descriptor set and binding are given, it means that we will do the reverse thread group
+    // optimization.
+    if (options.reverseThreadGroupBufferBinding && options.reverseThreadGroupBufferDescSet) {
+      Value *reversedWorkgroupId = CreateSub(CreateSub(readCsBuiltIn(BuiltInNumWorkgroups), workgroupId),
+                                             ConstantVector::get({getInt32(1), getInt32(1), getInt32(1)}));
+
+      // Load control bit from internal buffer
+      auto bufferDesc = CreateLoadBufferDesc(options.reverseThreadGroupBufferDescSet,
+                                             options.reverseThreadGroupBufferBinding, getInt32(0), 0, getInt8Ty());
+      auto controlBitPtr = CreateInBoundsGEP(getInt8Ty(), bufferDesc, getInt32(0));
+      auto controlBit = CreateTrunc(
+          CreateLoad(getInt32Ty(), CreateBitCast(controlBitPtr, getBufferDescTy(getInt32Ty()))), getInt1Ty());
+
+      workgroupId = CreateSelect(controlBit, reversedWorkgroupId, workgroupId);
+    }
+
     return workgroupId;
   }
 

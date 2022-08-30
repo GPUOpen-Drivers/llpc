@@ -118,10 +118,11 @@ Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
     ResourceMappingNodeMap nodeSets;
     unsigned pushConstSize = 0;
     doAutoLayoutDesc(ShaderStageCompute, moduleData.spirvBin, nullptr, shaderInfo, nodeSets, pushConstSize,
-                     /*autoLayoutDesc =*/compileInfo.autoLayoutDesc);
+                     /*autoLayoutDesc =*/compileInfo.autoLayoutDesc,
+                     compileInfo.compPipelineInfo.options.reverseThreadGroup);
 
     buildTopLevelMapping(ShaderStageComputeBit, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
-                         compileInfo.autoLayoutDesc);
+                         compileInfo.autoLayoutDesc | compileInfo.compPipelineInfo.options.reverseThreadGroup);
   }
 
   pipelineInfo->pInstance = nullptr; // Placeholder, unused.
@@ -142,6 +143,7 @@ Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
   }
 #endif
   pipelineInfo->options.threadGroupSwizzleMode = compileInfo.compPipelineInfo.options.threadGroupSwizzleMode;
+  pipelineInfo->options.reverseThreadGroup = compileInfo.compPipelineInfo.options.reverseThreadGroup;
 
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pComputeInfo = pipelineInfo;
