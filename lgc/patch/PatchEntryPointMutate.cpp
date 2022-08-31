@@ -354,8 +354,9 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
       for (User *user : func.users()) {
         CallInst *call = cast<CallInst>(user);
         ResourceNodeType resType = ResourceNodeType(cast<ConstantInt>(call->getArgOperand(0))->getZExtValue());
-        unsigned set = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
-        unsigned binding = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
+        ResourceNodeType searchType = ResourceNodeType(cast<ConstantInt>(call->getArgOperand(1))->getZExtValue());
+        unsigned set = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
+        unsigned binding = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
         ShaderStage stage = getShaderStage(call->getFunction());
         assert(stage != ShaderStageCopyShader);
         auto &descriptorTable = getUserDataUsage(stage)->descriptorTables;
@@ -379,7 +380,7 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
           // The user data nodes are available, so we use the offset of the node as the
           // index.
           const ResourceNode *node;
-          node = m_pipelineState->findResourceNode(resType, set, binding).first;
+          node = m_pipelineState->findResourceNode(searchType, set, binding).first;
           assert(node && "Could not find resource node");
           uint32_t descTableIndex = node - &m_pipelineState->getUserDataNodes().front();
           descriptorTable.resize(std::max(descriptorTable.size(), size_t(descTableIndex + 1)));
@@ -578,7 +579,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
 
           // The address extension code only depends on descriptorTable (which is constant for the lifetime of the map)
           // and highHalf. Use map with highHalf keys to avoid creating redundant nodes for the extensions.
-          Value *highHalf = call->getArgOperand(3);
+          Value *highHalf = call->getArgOperand(4);
           auto it = addrExtMap[isDescTableSpilled].find(highHalf);
           if (it != addrExtMap[isDescTableSpilled].end()) {
             descTableVal = it->second;
