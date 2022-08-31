@@ -125,7 +125,7 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
     // If not compiling from pipeline, lay out user data now.
     if (compileInfo.doAutoLayout)
       doAutoLayoutDesc(stage, moduleData.spirvBin, pipelineInfo, shaderInfo, nodeSets, pushConstSize,
-                       /*autoLayoutDesc = */ compileInfo.autoLayoutDesc);
+                       /*autoLayoutDesc = */ compileInfo.autoLayoutDesc, false);
   }
 
   if (compileInfo.doAutoLayout)

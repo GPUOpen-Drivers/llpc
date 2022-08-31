@@ -266,6 +266,9 @@ cl::opt<unsigned> OverrideThreadGroupSizeZ("override-threadGroupSizeZ",
                                                        "0x01 - Override threadGroupSizeZ with Value:1 in wave32 or wave64\n"),
                                               cl::init(0));
 
+// -reverse-thread-group
+cl::opt<bool> ReverseThreadGroup("reverse-thread-group", cl::desc("Reverse thread group ID\n"), cl::init(false));
+
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 cl::opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
                                            cl::desc("Filter which types of pipeline dump are disabled\n"
@@ -468,6 +471,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->compPipelineInfo.options.overrideThreadGroupSizeY = OverrideThreadGroupSizeY;
   compileInfo->compPipelineInfo.options.overrideThreadGroupSizeZ = OverrideThreadGroupSizeZ;
   compileInfo->compPipelineInfo.options.threadGroupSwizzleMode = ThreadGroupSwizzleModeSetting;
+  compileInfo->compPipelineInfo.options.reverseThreadGroup = ReverseThreadGroup;
 
   // Set NGG control settings
   if (ParsedGfxIp.major >= 10) {

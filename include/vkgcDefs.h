@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 54
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 3
+#define LLPC_INTERFACE_MINOR_VERSION 6
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ------------------------------------------------------------------------------------------------------|
+//  |     54.6 | Add reverseThreadGroup to PipelineOptions                                                             |
 //  |     54.3 | Add usePointSize to ShaderModuleUsage                                                                 |
 //  |     54.2 | Add subgroupSize to PipelineShaderOptions                                                             |
 //  |     54.1 | Add overrideForceThreadIdSwizzling overrideShaderThreadGroupSizeX, overrideShaderThreadGroupSizeY     |
@@ -165,6 +166,7 @@ static const unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
 static const unsigned MaxVertexAttribs = 64;
 static const unsigned MaxColorTargets = 8;
 static const unsigned FetchShaderInternalBufferBinding = 5;
+static const unsigned ReverseThreadGroupControlBinding = 7;
 static const unsigned MaxFetchShaderInternalBufferSize = 16 * MaxVertexAttribs;
 
 // Forward declarations
@@ -445,6 +447,7 @@ struct PipelineOptions {
   unsigned overrideThreadGroupSizeZ;             ///< Override value for ThreadGroupSizeZ
   ResourceLayoutScheme resourceLayoutScheme;     ///< Resource layout scheme
   ThreadGroupSwizzleMode threadGroupSwizzleMode; ///< Controls thread group swizzle mode for compute shader.
+  bool reverseThreadGroup;                       ///< If set, enable thread group reversing
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

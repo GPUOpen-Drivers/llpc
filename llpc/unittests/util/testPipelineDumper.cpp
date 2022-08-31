@@ -341,5 +341,16 @@ TEST(PipelineDumperTest, TestThreadGroupSwizzleModeCompute) {
   }
 }
 
+// =====================================================================================================================
+// Test the reverseThreadGroup option.
+
+TEST(PipelineDumperTest, TestReverseThreadGroupCompute) {
+  ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
+    buildInfo->options.reverseThreadGroup = true;
+  };
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
+  runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
 } // namespace
 } // namespace Llpc
