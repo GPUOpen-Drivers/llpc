@@ -1761,10 +1761,9 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             // has been clever enough to realise that doing a GEP of 0, 0 is actually a no-op (because the pointer
             // does not change!), and has removed it.
             m_builder->SetInsertPoint(replaceInstsInfo.bitCastInst);
-
-            Value *const bufferDesc = m_builder->CreateLoadBufferDesc(
-                descSet, binding, m_builder->getInt32(0), global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten,
-                m_builder->getInt8Ty());
+            unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
+            Value *const bufferDesc = m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0),
+                                                                      bufferFlags, m_builder->getInt8Ty());
 
             // If the global variable is a constant, the data it points to is invariant.
             if (global.isConstant())
@@ -1899,10 +1898,9 @@ void SpirvLowerGlobal::lowerBufferBlock() {
         }
       } else {
         m_builder->setInsertPointPastAllocas(*func);
-
-        Value *const bufferDesc = m_builder->CreateLoadBufferDesc(
-            descSet, binding, m_builder->getInt32(0), global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten,
-            m_builder->getInt8Ty());
+        unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
+        Value *const bufferDesc = m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags,
+                                                                  m_builder->getInt8Ty());
 
         // If the global variable is a constant, the data it points to is invariant.
         if (global.isConstant())
