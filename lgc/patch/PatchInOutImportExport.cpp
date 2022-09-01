@@ -666,9 +666,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
         if (m_shaderStage == ShaderStageTessEval ||
             (m_shaderStage == ShaderStageFragment &&
-             m_pipelineState->getPrevShaderStage(m_shaderStage) == ShaderStageMesh)) {
+             (m_pipelineState->getPrevShaderStage(m_shaderStage) == ShaderStageMesh ||
+              m_pipelineState->isUnlinked()))) {
           // NOTE: For generic inputs of tessellation evaluation shader or fragment shader whose previous shader stage
-          // is mesh shader, they could be per-patch ones or per-primitive ones.
+          // is mesh shader or is in unlinked pipeline, they could be per-patch ones or per-primitive ones.
           if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
             loc = locInfoMapIt->second.getLocation();
           } else if (resUsage->inOutUsage.perPatchInputLocMap.find(value) !=
