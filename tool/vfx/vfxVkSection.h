@@ -165,7 +165,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 32;
+  static const unsigned MemberCount = 33;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
