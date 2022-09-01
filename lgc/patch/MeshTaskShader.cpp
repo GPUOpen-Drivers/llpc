@@ -1272,6 +1272,18 @@ void MeshTaskShader::setMeshOutputs(Value *vertexCount, Value *primitiveCount) {
   {
     m_builder->SetInsertPoint(setMeshOutputsBlock->getTerminator());
 
+    // Promote vertex/primitive count to SGPRs
+    vertexCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
+    primitiveCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
+
+    // Check if vertex count or primitive count is zero. If so, set both to zero in order to disable vertex/primitive
+    // exporting.
+    auto zeroVertexCount = m_builder->CreateICmpEQ(vertexCount, m_builder->getInt32(0));
+    auto zeroPrimitiveCount = m_builder->CreateICmpEQ(primitiveCount, m_builder->getInt32(0));
+    auto hasZeroCount = m_builder->CreateOr(zeroVertexCount, zeroPrimitiveCount);
+    vertexCount = m_builder->CreateSelect(hasZeroCount, m_builder->getInt32(0), vertexCount);
+    primitiveCount = m_builder->CreateSelect(hasZeroCount, m_builder->getInt32(0), primitiveCount);
+
     // M0[10:0] = vertexCount, M0[22:12] = primitiveCount
     Value *m0 = m_builder->CreateShl(primitiveCount, 12);
     m0 = m_builder->CreateOr(m0, vertexCount);
