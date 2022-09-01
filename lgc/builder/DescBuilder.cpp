@@ -117,7 +117,8 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
     // For shader compilation with no user data layout provided, we assume we want a DescriptorBuffer, as
     // DescriptorConstBuffer is not used in that case.
     ResourceNodeType resType = node ? node->concreteType : ResourceNodeType::DescriptorBuffer;
-    Value *descPtr = getDescPtr(resType, node->abstractType, descSet, binding, topNode, node);
+    ResourceNodeType abstractType = node ? node->abstractType : resType;
+    Value *descPtr = getDescPtr(resType, abstractType, descSet, binding, topNode, node);
     // Index it.
     if (descIndex != getInt32(0)) {
       descIndex = CreateMul(descIndex, getStride(resType, descSet, binding, node));
