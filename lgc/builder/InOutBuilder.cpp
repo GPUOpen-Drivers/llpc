@@ -238,6 +238,7 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
   case ShaderStageTessEval: {
     // TCS: @lgc.{input|output}.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
     // TES: @lgc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+    assert(!isOutput || m_shaderStage == ShaderStageTessControl);
     args.push_back(getInt32(location));
     args.push_back(locationOffset);
     args.push_back(elemIdx);
