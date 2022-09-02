@@ -38,6 +38,9 @@
 
 namespace lgc {
 
+class GenericLocationOp;
+class OutputImportGenericOp;
+
 class InOutLocationInfoMapManager;
 typedef std::map<InOutLocationInfo, InOutLocationInfo> InOutLocationInfoMap;
 
@@ -92,7 +95,7 @@ private:
 
   // Input/output scalarizing
   void scalarizeForInOutPacking(llvm::Module *module);
-  void scalarizeGenericInput(llvm::CallInst *call);
+  void scalarizeGenericInput(GenericLocationOp *input);
   void scalarizeGenericOutput(llvm::CallInst *call);
 
   PipelineShadersResult *m_pipelineShaders; // Pipeline shaders
@@ -105,9 +108,9 @@ private:
 
   std::unordered_set<unsigned> m_importedOutputBuiltIns; // IDs of imported built-in outputs
 
-  std::vector<llvm::CallInst *> m_importedOutputCalls; // The output import calls
-  std::vector<llvm::CallInst *> m_inputCalls;          // The input import calls
-  std::vector<llvm::CallInst *> m_outputCalls;         // The output export calls
+  std::vector<OutputImportGenericOp *> m_importedOutputCalls; // The output import calls
+  std::vector<GenericLocationOp *> m_inputCalls;              // The input import calls
+  std::vector<llvm::CallInst *> m_outputCalls;                // The output export calls
 
   ResourceUsage *m_resUsage; // Pointer to shader resource usage
   std::unique_ptr<InOutLocationInfoMapManager>
@@ -135,7 +138,7 @@ class InOutLocationInfoMapManager {
 public:
   InOutLocationInfoMapManager() {}
 
-  void createMap(const std::vector<llvm::CallInst *> &calls, ShaderStage shaderStage, bool requireDword);
+  void createMap(llvm::ArrayRef<GenericLocationOp *> calls, ShaderStage shaderStage, bool requireDword);
   void createMap(const std::vector<InOutLocationInfo> &locInfos, ShaderStage shaderStage);
   void deserializeMap(llvm::ArrayRef<std::pair<unsigned, unsigned>> serializedMap);
   bool findMap(const InOutLocationInfo &origLocInfo, InOutLocationInfoMap::const_iterator &mapIt);

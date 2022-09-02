@@ -18,7 +18,7 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-COUNT-4: call <4 x float> @lgc.input.import.interpolant.v4f32{{.*}}
+; SHADERTEST-COUNT-4: call <4 x float> (...) @lgc.input.import.interpolated.v4f32{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-COUNT-16: call float @llvm.amdgcn.interp.mov
 ; SHADERTEST: AMDLLPC SUCCESS

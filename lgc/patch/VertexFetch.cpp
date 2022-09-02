@@ -30,6 +30,7 @@
  */
 #include "lgc/patch/VertexFetch.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
@@ -39,6 +40,7 @@
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/BuilderBase.h"
 #include "lgc/util/Internal.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -545,20 +547,22 @@ PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &a
 // @param pipelineState : Pipeline state
 // @returns : True if the module was modified by the transformation and false otherwise
 bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
-  std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(pipelineState->getLgcContext()));
-
   // Gather vertex fetch calls. We can assume they're all in one function, the vertex shader.
   // We can assume that multiple fetches of the same location, component and type have been CSEd.
-  SmallVector<CallInst *, 8> vertexFetches;
-  BuilderBase builder(module.getContext());
-  for (auto &func : module) {
-    if (!func.isDeclaration() || !func.getName().startswith(lgcName::InputImportVertex))
-      continue;
-    for (auto user : func.users())
-      vertexFetches.push_back(cast<CallInst>(user));
-  }
+  SmallVector<InputImportGenericOp *, 8> vertexFetches;
+  static const auto fetchVisitor = llvm_dialects::VisitorBuilder<SmallVectorImpl<InputImportGenericOp *>>()
+                                       .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                                       .add<InputImportGenericOp>([](auto &fetches, InputImportGenericOp &op) {
+                                         if (lgc::getShaderStage(op.getFunction()) == ShaderStageVertex)
+                                           fetches.push_back(&op);
+                                       })
+                                       .build();
+  fetchVisitor.visit(vertexFetches, module);
   if (vertexFetches.empty())
     return false;
+
+  std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(pipelineState->getLgcContext()));
+  BuilderBase builder(module.getContext());
 
   if (pipelineState->getOptions().enableUberFetchShader) {
     // NOTE: The 10_10_10_2 formats are not supported by the uber fetch shader on gfx9 and older.
@@ -586,26 +590,30 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
   if (!pipelineState->isUnlinked() || !pipelineState->getVertexInputDescriptions().empty()) {
     // Whole-pipeline compilation (or shader compilation where we were given the vertex input descriptions).
     // Lower each vertex fetch.
-    for (CallInst *call : vertexFetches) {
+    for (InputImportGenericOp *fetch : vertexFetches) {
       Value *vertex = nullptr;
 
       // Find the vertex input description.
-      unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-      unsigned component = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+      unsigned location = fetch->getLocation();
+      unsigned component = cast<ConstantInt>(fetch->getElemIdx())->getZExtValue();
+
+      assert(!fetch->getPerPrimitive());
+      assert(cast<ConstantInt>(fetch->getLocOffset())->isZero());
+
       const VertexInputDescription *description = pipelineState->findVertexInputDescription(location);
 
       if (!description) {
         // If we could not find vertex input info matching this location, just return undefined value.
-        vertex = UndefValue::get(call->getType());
+        vertex = UndefValue::get(fetch->getType());
       } else {
         // Fetch the vertex.
-        builder.SetInsertPoint(call);
-        vertex = vertexFetch->fetchVertex(call->getType(), description, location, component, builder);
+        builder.SetInsertPoint(fetch);
+        vertex = vertexFetch->fetchVertex(fetch->getType(), description, location, component, builder);
       }
 
       // Replace and erase this call.
-      call->replaceAllUsesWith(vertex);
-      call->eraseFromParent();
+      fetch->replaceAllUsesWith(vertex);
+      fetch->eraseFromParent();
     }
 
     return true;
@@ -619,12 +627,16 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
   SmallVector<VertexFetchInfo, 8> info;
   SmallVector<Type *, 8> argTys;
   SmallVector<std::string, 8> argNames;
-  for (CallInst *call : vertexFetches) {
-    unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-    unsigned component = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
-    info.push_back({location, component, call->getType()});
+  for (InputImportGenericOp *fetch : vertexFetches) {
+    unsigned location = fetch->getLocation();
+    unsigned component = cast<ConstantInt>(fetch->getElemIdx())->getZExtValue();
 
-    Type *ty = call->getType();
+    assert(!fetch->getPerPrimitive());
+    assert(cast<ConstantInt>(fetch->getLocOffset())->isZero());
+
+    info.push_back({location, component, fetch->getType()});
+
+    Type *ty = fetch->getType();
     // The return value from the fetch shader needs to use all floats, as the back-end maps an int in the
     // return value as an SGPR rather than a VGPR. For symmetry, we also use all floats here, in the input
     // args to the fetchless vertex shader.
@@ -637,21 +649,21 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
   // Mutate the vertex shader function to add the new args.
   Function *newFunc = addFunctionArgs(vertexFetches[0]->getFunction(), nullptr, argTys, argNames);
 
-  // Hook up each vertex fetch call to the corresponding arg.
+  // Hook up each vertex fetch to the corresponding arg.
   for (unsigned idx = 0; idx != vertexFetches.size(); ++idx) {
-    CallInst *call = vertexFetches[idx];
+    InputImportGenericOp *fetch = vertexFetches[idx];
     Value *vertex = newFunc->getArg(idx);
-    if (call->getType() != vertex->getType()) {
+    if (fetch->getType() != vertex->getType()) {
       // We changed to an all-float type above.
-      builder.SetInsertPoint(call);
-      Type *elementTy = call->getType()->getScalarType();
+      builder.SetInsertPoint(fetch);
+      Type *elementTy = fetch->getType()->getScalarType();
       unsigned numElements = vertex->getType()->getPrimitiveSizeInBits() / elementTy->getPrimitiveSizeInBits();
       vertex =
           builder.CreateBitCast(vertex, numElements == 1 ? elementTy : FixedVectorType::get(elementTy, numElements));
-      if (call->getType() != vertex->getType()) {
-        // The types are now vectors of the same element type but different element counts, or call->getType()
+      if (fetch->getType() != vertex->getType()) {
+        // The types are now vectors of the same element type but different element counts, or fetch->getType()
         // is scalar.
-        if (auto vecTy = dyn_cast<FixedVectorType>(call->getType())) {
+        if (auto vecTy = dyn_cast<FixedVectorType>(fetch->getType())) {
           int indices[] = {0, 1, 2, 3};
           vertex =
               builder.CreateShuffleVector(vertex, vertex, ArrayRef<int>(indices).slice(0, vecTy->getNumElements()));
@@ -661,8 +673,8 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
       }
     }
     vertex->setName("vertex" + Twine(info[idx].location) + "." + Twine(info[idx].component));
-    call->replaceAllUsesWith(vertex);
-    call->eraseFromParent();
+    fetch->replaceAllUsesWith(vertex);
+    fetch->eraseFromParent();
   }
 
   return true;

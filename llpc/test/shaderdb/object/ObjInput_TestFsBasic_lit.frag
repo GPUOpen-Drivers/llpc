@@ -19,9 +19,9 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-DAG: call <2 x i32> @lgc.input.import.interpolant.v2i32{{.*}}
-; SHADERTEST-DAG: call i32 @lgc.input.import.interpolant.{{.*}}
-; SHADERTEST-DAG: call <4 x float> @lgc.input.import.interpolant.v4f32{{.*}}
+; SHADERTEST-DAG: call <2 x i32> (...) @lgc.input.import.interpolated.v2i32{{.*}}
+; SHADERTEST-DAG: call i32 (...) @lgc.input.import.interpolated.{{.*}}
+; SHADERTEST-DAG: call <4 x float> (...) @lgc.input.import.interpolated.v4f32{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

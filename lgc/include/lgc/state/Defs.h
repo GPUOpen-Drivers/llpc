@@ -57,12 +57,8 @@ static const BuiltInKind BuiltInUnswizzledLocalInvocationIndex = static_cast<Bui
 namespace lgcName {
 const static char InternalCallPrefix[] = "lgc.";
 const static char InputCallPrefix[] = "lgc.input.";
-const static char InputImportVertex[] = "lgc.input.import.vertex.";
-const static char InputImportGeneric[] = "lgc.input.import.generic.";
 const static char InputImportBuiltIn[] = "lgc.input.import.builtin.";
-const static char InputImportInterpolant[] = "lgc.input.import.interpolant.";
 const static char OutputCallPrefix[] = "lgc.output.";
-const static char OutputImportGeneric[] = "lgc.output.import.generic.";
 const static char OutputImportBuiltIn[] = "lgc.output.import.builtin.";
 const static char OutputExportGeneric[] = "lgc.output.export.generic.";
 const static char OutputExportBuiltIn[] = "lgc.output.export.builtin.";

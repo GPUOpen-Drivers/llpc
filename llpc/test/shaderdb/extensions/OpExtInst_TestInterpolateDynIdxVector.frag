@@ -21,15 +21,15 @@ void main()
 ; SHADERTEST-DAG: = call <2 x float> @lgc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
 ; SHADERTEST-DAG: = call <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST-DAG: = call <2 x float> @lgc.input.import.interpolant.v2f32.i32.i32.i32.i32.v2f32(i32 0, i32 0, i32 0, i32 0,
+; SHADERTEST-DAG: = call <2 x float> (...) @lgc.input.import.interpolated.v2f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 0,
 ; SHADERTEST-DAG: = call <2 x float> @lgc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
 ; SHADERTEST-DAG: = call <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST-DAG: = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 1, i32 0, i32 0, i32 0, <2 x float>
+; SHADERTEST-DAG: = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 0, <2 x float>
 ; SHADERTEST-DAG: = call <2 x float> @lgc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
 ; SHADERTEST-DAG: = call <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST-DAG: = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 0, i32 0, <2 x float>
+; SHADERTEST-DAG: = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 2, i32 0, i32 0, i32 poison, i32 0, <2 x float>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -34,6 +34,7 @@
 #include "Gfx9Chip.h"
 #include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/util/Debug.h"
@@ -554,19 +555,16 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
   auto mangledName = callee->getName();
 
-  auto importGenericInput = lgcName::InputImportGeneric;
   auto importBuiltInInput = lgcName::InputImportBuiltIn;
-  auto importInterpolantInput = lgcName::InputImportInterpolant;
-  auto importGenericOutput = lgcName::OutputImportGeneric;
   auto importBuiltInOutput = lgcName::OutputImportBuiltIn;
 
-  const bool isGenericInputImport = mangledName.startswith(importGenericInput);
+  const bool isGenericInputImport = isa<InputImportGenericOp>(callInst);
   const bool isBuiltInInputImport = mangledName.startswith(importBuiltInInput);
-  const bool isInterpolantInputImport = mangledName.startswith(importInterpolantInput);
-  const bool isGenericOutputImport = mangledName.startswith(importGenericOutput);
+  const bool isInterpolatedInputImport = isa<InputImportInterpolatedOp>(callInst);
+  const bool isGenericOutputImport = isa<OutputImportGenericOp>(callInst);
   const bool isBuiltInOutputImport = mangledName.startswith(importBuiltInOutput);
 
-  const bool isImport = (isGenericInputImport || isBuiltInInputImport || isInterpolantInputImport ||
+  const bool isImport = (isGenericInputImport || isBuiltInInputImport || isInterpolatedInputImport ||
                          isGenericOutputImport || isBuiltInOutputImport);
 
   auto exportGenericOutput = lgcName::OutputExportGeneric;
@@ -579,7 +577,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
   const bool isExport = (isGenericOutputExport || isBuiltInOutputExport || isXfbOutputExport);
 
-  const bool isInput = (isGenericInputImport || isBuiltInInputImport || isInterpolantInputImport);
+  const bool isInput = (isGenericInputImport || isBuiltInInputImport || isInterpolatedInputImport);
   const bool isOutput = (isGenericOutputImport || isBuiltInOutputImport || isGenericOutputExport ||
                          isBuiltInOutputExport || isXfbOutputExport);
 
@@ -588,15 +586,12 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
     Value *input = nullptr;
     Type *inputTy = callInst.getType();
 
-    // Generic value (location or SPIR-V built-in ID)
-    unsigned value = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-
-    LLVM_DEBUG(dbgs() << "Find input import call: builtin = " << isBuiltInInputImport << " value = " << value << "\n");
-
     m_importCalls.push_back(&callInst);
 
     if (isBuiltInInputImport) {
-      const unsigned builtInId = value;
+      const unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+
+      LLVM_DEBUG(dbgs() << "Find input import call: builtin = " << builtInId << "\n");
 
       switch (m_shaderStage) {
       case ShaderStageVertex:
@@ -656,27 +651,28 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
     } else {
       assert(m_shaderStage != ShaderStageVertex && "vertex fetch is handled by LowerVertexFetch");
-      assert(isGenericInputImport || isInterpolantInputImport);
 
+      auto &genericLocationOp = cast<GenericLocationOp>(callInst);
+      assert(isGenericInputImport || isInterpolatedInputImport);
+
+      LLVM_DEBUG(dbgs() << "Find input import call: generic location = " << genericLocationOp.getLocation() << "\n");
+
+      unsigned origLoc = genericLocationOp.getLocation();
       unsigned loc = InvalidValue;
-      Value *locOffset = nullptr;
+      Value *locOffset = genericLocationOp.getLocOffset();
       Value *elemIdx = nullptr;
       bool highHalf = false;
 
-      if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval ||
-          (m_shaderStage == ShaderStageFragment && isInterpolantInputImport)) {
-        // NOTE: If location offset is present and is a constant, we have to add it to the unmapped
-        // location before querying the mapped location. Meanwhile, we have to adjust the location
-        // offset to 0 (rebase it).
-        locOffset = callInst.getOperand(1);
-        if (isa<ConstantInt>(locOffset)) {
-          value += cast<ConstantInt>(locOffset)->getZExtValue();
-          locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-        }
+      if (auto *constLocOffset = dyn_cast<ConstantInt>(locOffset)) {
+        origLoc += constLocOffset->getZExtValue();
+        locOffset = nullptr;
+      } else {
+        assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval ||
+               m_shaderStage == ShaderStageFragment);
       }
 
       InOutLocationInfo origLocInfo;
-      origLocInfo.setLocation(value);
+      origLocInfo.setLocation(origLoc);
       auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
       if (m_shaderStage == ShaderStageTessEval ||
           (m_shaderStage == ShaderStageFragment &&
@@ -685,22 +681,23 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         // is mesh shader or is in unlinked pipeline, they could be per-patch ones or per-primitive ones.
         if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
           loc = locInfoMapIt->second.getLocation();
-        } else if (resUsage->inOutUsage.perPatchInputLocMap.find(value) !=
+        } else if (resUsage->inOutUsage.perPatchInputLocMap.find(origLoc) !=
                    resUsage->inOutUsage.perPatchInputLocMap.end()) {
-          loc = resUsage->inOutUsage.perPatchInputLocMap[value];
+          loc = resUsage->inOutUsage.perPatchInputLocMap[origLoc];
         } else {
-          assert(resUsage->inOutUsage.perPrimitiveInputLocMap.find(value) !=
+          assert(resUsage->inOutUsage.perPrimitiveInputLocMap.find(origLoc) !=
                  resUsage->inOutUsage.perPrimitiveInputLocMap.end());
-          loc = resUsage->inOutUsage.perPrimitiveInputLocMap[value];
+          loc = resUsage->inOutUsage.perPrimitiveInputLocMap[origLoc];
         }
       } else {
         if (m_pipelineState->canPackInput(m_shaderStage)) {
           // The inputLocInfoMap of {TCS, GS, FS} maps original InOutLocationInfo to tightly compact InOutLocationInfo
           const bool isTcs = m_shaderStage == ShaderStageTessControl;
-          const uint32_t elemIdxArgIdx = (isInterpolantInputImport || isTcs) ? 2 : 1;
+          (void)isTcs;
           // All packing of the VS-TCS interface is disabled if dynamic indexing is detected
-          assert(!isTcs || (isa<ConstantInt>(callInst.getOperand(1)) && isa<ConstantInt>(callInst.getOperand(2))));
-          origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
+          assert(!isTcs || (isa<ConstantInt>(genericLocationOp.getLocOffset()) &&
+                            isa<ConstantInt>(genericLocationOp.getElemIdx())));
+          origLocInfo.setComponent(cast<ConstantInt>(genericLocationOp.getElemIdx())->getZExtValue());
           locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
           assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
 
@@ -714,41 +711,34 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       assert(loc != InvalidValue);
 
+      if (!elemIdx)
+        elemIdx = genericLocationOp.getElemIdx();
+      assert(isDontCareValue(elemIdx) == false);
+
       switch (m_shaderStage) {
       case ShaderStageTessControl: {
-        assert(callInst.arg_size() == 4);
-
-        if (!elemIdx) {
-          elemIdx = callInst.getOperand(2);
-          assert(isDontCareValue(elemIdx) == false);
-        }
-
-        auto vertexIdx = callInst.getOperand(3);
+        auto &inputOp = cast<InputImportGenericOp>(genericLocationOp);
+        auto vertexIdx = inputOp.getArrayIndex();
         assert(isDontCareValue(vertexIdx) == false);
 
         input = patchTcsGenericInputImport(inputTy, loc, locOffset, elemIdx, vertexIdx, builder);
         break;
       }
       case ShaderStageTessEval: {
-        assert(callInst.arg_size() == 4);
+        auto &inputOp = cast<InputImportGenericOp>(genericLocationOp);
 
-        auto elemIdx = callInst.getOperand(2);
-        assert(isDontCareValue(elemIdx) == false);
-
-        auto vertexIdx = isDontCareValue(callInst.getOperand(3)) ? nullptr : callInst.getOperand(3);
+        Value *vertexIdx = nullptr;
+        if (!inputOp.getPerPrimitive())
+          vertexIdx = inputOp.getArrayIndex();
 
         input = patchTesGenericInputImport(inputTy, loc, locOffset, elemIdx, vertexIdx, builder);
         break;
       }
       case ShaderStageGeometry: {
-        assert(callInst.arg_size() == 3);
-        if (!elemIdx)
-          elemIdx = cast<ConstantInt>(callInst.getOperand(1));
-
         const unsigned compIdx = cast<ConstantInt>(elemIdx)->getZExtValue();
-        assert(isDontCareValue(elemIdx) == false);
 
-        Value *vertexIdx = callInst.getOperand(2);
+        auto &inputOp = cast<InputImportGenericOp>(genericLocationOp);
+        Value *vertexIdx = inputOp.getArrayIndex();
         assert(isDontCareValue(vertexIdx) == false);
 
         input = patchGsGenericInputImport(inputTy, loc, compIdx, vertexIdx, builder);
@@ -756,24 +746,16 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       case ShaderStageFragment: {
         unsigned interpMode = InOutInfo::InterpModeSmooth;
+        Value *interpValue = nullptr;
         bool isPerPrimitive = false;
 
-        if (!elemIdx)
-          elemIdx = callInst.getOperand(isInterpolantInputImport ? 2 : 1);
-        assert(isDontCareValue(elemIdx) == false);
-
-        Value *interpValue = nullptr;
-
-        if (isGenericInputImport) {
-          assert(callInst.arg_size() == 2);
+        if (auto *inputImportInterpolated = dyn_cast<InputImportInterpolatedOp>(&genericLocationOp)) {
+          interpMode = inputImportInterpolated->getInterpMode();
+          interpValue = inputImportInterpolated->getInterpValue();
+        } else {
+          assert(isa<InputImportGenericOp>(genericLocationOp));
           isPerPrimitive = true;
           interpMode = InOutInfo::InterpModeFlat;
-        } else {
-          assert(isInterpolantInputImport);
-          assert(callInst.arg_size() == 5);
-
-          interpMode = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
-          interpValue = callInst.getOperand(4);
         }
 
         input = patchFsGenericInputImport(inputTy, loc, locOffset, elemIdx, isPerPrimitive, interpMode, interpValue,
@@ -795,16 +777,12 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
     Value *output = nullptr;
     Type *outputTy = callInst.getType();
 
-    // Generic value (location or SPIR-V built-in ID)
-    unsigned value = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-
-    LLVM_DEBUG(dbgs() << "Find output import call: builtin = " << isBuiltInOutputImport << " value = " << value
-                      << "\n");
-
     m_importCalls.push_back(&callInst);
 
     if (isBuiltInOutputImport) {
-      const unsigned builtInId = value;
+      const unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+
+      LLVM_DEBUG(dbgs() << "Find output import call: builtin = " << builtInId << "\n");
 
       assert(callInst.arg_size() == 3);
       Value *elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
@@ -812,35 +790,37 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
       output = patchTcsBuiltInOutputImport(outputTy, builtInId, elemIdx, vertexIdx, builder);
     } else {
-      assert(isGenericOutputImport);
+      auto &outputImportGeneric = cast<OutputImportGenericOp>(callInst);
 
+      LLVM_DEBUG(dbgs() << "Find output import call: generic location = " << outputImportGeneric.getLocation() << "\n");
+
+      unsigned origLoc = outputImportGeneric.getLocation();
       unsigned loc = InvalidValue;
 
       // NOTE: If location offset is a constant, we have to add it to the unmapped location before querying
       // the mapped location. Meanwhile, we have to adjust the location offset to 0 (rebase it).
-      Value *locOffset = callInst.getOperand(1);
+      Value *locOffset = outputImportGeneric.getLocOffset();
       if (isa<ConstantInt>(locOffset)) {
-        value += cast<ConstantInt>(locOffset)->getZExtValue();
+        origLoc += cast<ConstantInt>(locOffset)->getZExtValue();
         locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
       }
 
       // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
       InOutLocationInfo origLocInfo;
-      origLocInfo.setLocation(value);
+      origLocInfo.setLocation(origLoc);
       auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
       if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
         loc = locInfoMapIt->second.getLocation();
       } else {
-        assert(resUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
+        assert(resUsage->inOutUsage.perPatchOutputLocMap.find(origLoc) !=
                resUsage->inOutUsage.perPatchOutputLocMap.end());
-        loc = resUsage->inOutUsage.perPatchOutputLocMap[value];
+        loc = resUsage->inOutUsage.perPatchOutputLocMap[origLoc];
       }
       assert(loc != InvalidValue);
 
-      assert(callInst.arg_size() == 4);
-      auto elemIdx = callInst.getOperand(2);
+      auto elemIdx = outputImportGeneric.getElemIdx();
       assert(isDontCareValue(elemIdx) == false);
-      auto vertexIdx = isDontCareValue(callInst.getOperand(3)) ? nullptr : callInst.getOperand(3);
+      auto vertexIdx = outputImportGeneric.getPerPrimitive() ? nullptr : outputImportGeneric.getArrayIndex();
 
       output = patchTcsGenericOutputImport(outputTy, loc, locOffset, elemIdx, vertexIdx, builder);
     }

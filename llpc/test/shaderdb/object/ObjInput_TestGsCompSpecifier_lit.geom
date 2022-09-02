@@ -22,12 +22,12 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call float @lgc.input.import.generic.f32.i32.i32.i32(i32 0, i32 0, i32 0)
-; SHADERTEST: call float @lgc.input.import.generic.f32.i32.i32.i32(i32 0, i32 0, i32 1)
-; SHADERTEST: call float @lgc.input.import.generic.f32.i32.i32.i32(i32 0, i32 0, i32 2)
-; SHADERTEST: call <3 x float> @lgc.input.import.generic.v3f32.i32.i32.i32(i32 0, i32 1, i32 0)
-; SHADERTEST: call <3 x float> @lgc.input.import.generic.v3f32.i32.i32.i32(i32 0, i32 1, i32 1)
-; SHADERTEST: call <3 x float> @lgc.input.import.generic.v3f32.i32.i32.i32(i32 0, i32 1, i32 2)
+; SHADERTEST: call float @lgc.input.import.generic.f32(i1 false, i32 0, i32 0, i32 0, i32 0)
+; SHADERTEST: call float @lgc.input.import.generic.f32(i1 false, i32 0, i32 0, i32 0, i32 1)
+; SHADERTEST: call float @lgc.input.import.generic.f32(i1 false, i32 0, i32 0, i32 0, i32 2)
+; SHADERTEST: call <3 x float> @lgc.input.import.generic.v3f32(i1 false, i32 0, i32 0, i32 1, i32 0)
+; SHADERTEST: call <3 x float> @lgc.input.import.generic.v3f32(i1 false, i32 0, i32 0, i32 1, i32 1)
+; SHADERTEST: call <3 x float> @lgc.input.import.generic.v3f32(i1 false, i32 0, i32 0, i32 1, i32 2)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

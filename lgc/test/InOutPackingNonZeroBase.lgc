@@ -41,7 +41,7 @@ target triple = "amdgcn--amdpal"
 define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !9 !lgc.shaderstage !10 {
 ; IR-LABEL: @lgc.shader.VS.main(
 ; IR-NEXT:  .entry:
-; IR-NEXT:    [[TMP0:%.*]] = call <3 x float> @lgc.input.import.vertex.v3f32.i32.i32(i32 1, i32 0) #[[ATTR1:[0-9]+]]
+; IR-NEXT:    [[TMP0:%.*]] = call <3 x float> @lgc.input.import.generic.v3f32(i1 false, i32 1, i32 0, i32 0, i32 poison)
 ; IR-NEXT:    [[TMP1:%.*]] = extractelement <3 x float> [[TMP0]], i64 0
 ; IR-NEXT:    [[TMP2:%.*]] = extractelement <3 x float> [[TMP0]], i64 1
 ; IR-NEXT:    [[TMP3:%.*]] = extractelement <3 x float> [[TMP0]], i64 2
@@ -81,26 +81,26 @@ declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
 define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spirv.ExecutionModel !11 !lgc.shaderstage !12 {
 ; IR-LABEL: @lgc.shader.FS.main(
 ; IR-NEXT:  .entry:
-; IR-NEXT:    [[INTERPPERSPCENTER:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP0:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 9, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER]]) #[[ATTR1]]
-; IR-NEXT:    [[INTERPPERSPCENTER1:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP1:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 8, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER1]]) #[[ATTR1]]
-; IR-NEXT:    [[INTERPPERSPCENTER2:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP2:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 7, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER2]]) #[[ATTR1]]
-; IR-NEXT:    [[INTERPPERSPCENTER3:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP3:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 6, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER3]]) #[[ATTR1]]
-; IR-NEXT:    [[INTERPPERSPCENTER4:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP4:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 5, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER4]]) #[[ATTR1]]
-; IR-NEXT:    [[INTERPPERSPCENTER5:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP5:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 4, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER5]]) #[[ATTR1]]
-; IR-NEXT:    [[INTERPPERSPCENTER6:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP6:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 3, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER6]]) #[[ATTR1]]
-; IR-NEXT:    [[INTERPPERSPCENTER7:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP7:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER7]]) #[[ATTR1]]
-; IR-NEXT:    [[INTERPPERSPCENTER8:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP8:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 1, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER8]]) #[[ATTR1]]
-; IR-NEXT:    [[INTERPPERSPCENTER9:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1]]
-; IR-NEXT:    [[TMP9:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 0, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER9]]) #[[ATTR1]]
+; IR-NEXT:    [[INTERPPERSPCENTER:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2:[0-9]+]]
+; IR-NEXT:    [[TMP0:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 9, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER]])
+; IR-NEXT:    [[INTERPPERSPCENTER1:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2]]
+; IR-NEXT:    [[TMP1:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 8, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER1]])
+; IR-NEXT:    [[INTERPPERSPCENTER2:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2]]
+; IR-NEXT:    [[TMP2:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 7, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER2]])
+; IR-NEXT:    [[INTERPPERSPCENTER3:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2]]
+; IR-NEXT:    [[TMP3:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 6, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER3]])
+; IR-NEXT:    [[INTERPPERSPCENTER4:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2]]
+; IR-NEXT:    [[TMP4:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 5, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER4]])
+; IR-NEXT:    [[INTERPPERSPCENTER5:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2]]
+; IR-NEXT:    [[TMP5:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 4, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER5]])
+; IR-NEXT:    [[INTERPPERSPCENTER6:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2]]
+; IR-NEXT:    [[TMP6:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 3, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER6]])
+; IR-NEXT:    [[INTERPPERSPCENTER7:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2]]
+; IR-NEXT:    [[TMP7:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 2, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER7]])
+; IR-NEXT:    [[INTERPPERSPCENTER8:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2]]
+; IR-NEXT:    [[TMP8:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER8]])
+; IR-NEXT:    [[INTERPPERSPCENTER9:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR2]]
+; IR-NEXT:    [[TMP9:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER9]])
 ; IR-NEXT:    [[TMP10:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[TMP9]], [[TMP8]]
 ; IR-NEXT:    [[TMP11:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[TMP10]], [[TMP7]]
 ; IR-NEXT:    [[TMP12:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[TMP11]], [[TMP6]]

@@ -30,13 +30,13 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !lgc
 ; CHECK-LABEL: @lgc.shader.FS.main(
 ; CHECK-NEXT:  .entry:
 ; CHECK-NEXT:    [[INTERPPERSPCENTER:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR1:[0-9]+]]
-; CHECK-NEXT:    [[TMP0:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 0, i32 0, <2 x float> [[INTERPPERSPCENTER]]) #[[ATTR3:[0-9]+]]
-; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <4 x float> undef, float [[TMP0]], i64 0
-; CHECK-NEXT:    [[TMP2:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 1, i32 0, <2 x float> [[INTERPPERSPCENTER]]) #[[ATTR3]]
+; CHECK-NEXT:    [[TMP0:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 2, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER]])
+; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <4 x float> poison, float [[TMP0]], i64 0
+; CHECK-NEXT:    [[TMP2:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 2, i32 0, i32 1, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER]])
 ; CHECK-NEXT:    [[TMP3:%.*]] = insertelement <4 x float> [[TMP1]], float [[TMP2]], i64 1
-; CHECK-NEXT:    [[TMP4:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 2, i32 0, <2 x float> [[INTERPPERSPCENTER]]) #[[ATTR3]]
+; CHECK-NEXT:    [[TMP4:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 2, i32 0, i32 2, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER]])
 ; CHECK-NEXT:    [[TMP5:%.*]] = insertelement <4 x float> [[TMP3]], float [[TMP4]], i64 2
-; CHECK-NEXT:    [[TMP6:%.*]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 3, i32 0, <2 x float> [[INTERPPERSPCENTER]]) #[[ATTR3]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 2, i32 0, i32 3, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <4 x float> [[TMP5]], float [[TMP6]], i64 3
 ; CHECK-NEXT:    [[TMP8:%.*]] = call i32 @llvm.amdgcn.ubfe.i32(i32 12816, i32 0, i32 4)
 ; CHECK-NEXT:    [[TMP9:%.*]] = select i1 false, i32 12816, i32 [[TMP8]]
