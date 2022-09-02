@@ -70,11 +70,11 @@ private:
   void visitReturnInsts();
 
   llvm::Value *patchTcsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
-                                          llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                          llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
   llvm::Value *patchTesGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
-                                          llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                          llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
   llvm::Value *patchGsGenericInputImport(llvm::Type *inputTy, unsigned location, unsigned compIdx,
-                                         llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                         llvm::Value *vertexIdx, BuilderBase &builder);
 
   llvm::Value *performFsFloatInterpolation(BuilderBase &builder, llvm::Value *attr, llvm::Value *channel,
                                            llvm::Value *coordI, llvm::Value *coordJ, llvm::Value *primMask);
@@ -87,40 +87,37 @@ private:
 
   llvm::Value *patchFsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
                                          llvm::Value *compIdx, bool isPerPrimitive, llvm::Value *auxInterpValue,
-                                         unsigned interpMode, unsigned interpLoc, bool highHalf,
-                                         llvm::Instruction *insertPos);
+                                         unsigned interpMode, unsigned interpLoc, bool highHalf, BuilderBase &builder);
 
   llvm::Value *patchTcsGenericOutputImport(llvm::Type *outputTy, unsigned location, llvm::Value *locOffset,
-                                           llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                           llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
 
-  void patchVsGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx,
-                                  llvm::Instruction *insertPos);
+  void patchVsGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx, BuilderBase &builder);
   void patchTcsGenericOutputExport(llvm::Value *output, unsigned location, llvm::Value *locOffset, llvm::Value *compIdx,
-                                   llvm::Value *vertexIdx, llvm::Instruction *insertPos);
-  void patchTesGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx,
-                                   llvm::Instruction *insertPos);
+                                   llvm::Value *vertexIdx, BuilderBase &builder);
+  void patchTesGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx, BuilderBase &builder);
   void patchGsGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
-                                  llvm::Instruction *insertPos);
+                                  BuilderBase &builder);
   void patchMeshGenericOutputExport(llvm::Value *output, unsigned location, llvm::Value *locOffset,
                                     llvm::Value *compIdx, llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
-                                    llvm::Instruction *insertPos);
+                                    BuilderBase &builder);
 
-  llvm::Value *patchVsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Instruction *insertPos);
+  llvm::Value *patchVsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, BuilderBase &builder);
   llvm::Value *patchTcsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
-                                          llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                          llvm::Value *vertexIdx, BuilderBase &builder);
   llvm::Value *patchTesBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
-                                          llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                          llvm::Value *vertexIdx, BuilderBase &builder);
   llvm::Value *patchGsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *vertexIdx,
-                                         llvm::Instruction *insertPos);
+                                         BuilderBase &builder);
   llvm::Value *patchMeshBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
-                                           llvm::Instruction *insertPos);
+                                           BuilderBase &builder);
   llvm::Value *patchFsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *sampleId,
-                                         llvm::Instruction *insertPos);
-  llvm::Value *getSamplePosOffset(llvm::Type *inputTy, llvm::Value *sampleId, llvm::Instruction *insertPos);
-  llvm::Value *getSamplePosition(llvm::Type *inputTy, llvm::Instruction *insertPos);
+                                         BuilderBase &builder);
+  llvm::Value *getSamplePosOffset(llvm::Type *inputTy, llvm::Value *sampleId, BuilderBase &builder);
+  llvm::Value *getSamplePosition(llvm::Type *inputTy, BuilderBase &builder);
 
   llvm::Value *patchTcsBuiltInOutputImport(llvm::Type *outputTy, unsigned builtInId, llvm::Value *elemIdx,
-                                           llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                           llvm::Value *vertexIdx, BuilderBase &builder);
 
   void patchVsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
   void patchTcsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
@@ -146,11 +143,11 @@ private:
 
   unsigned combineBufferStore(const std::vector<llvm::Value *> &storeValues, unsigned startIdx, unsigned valueOffset,
                               llvm::Value *bufDesc, llvm::Value *storeOffset, llvm::Value *bufBase,
-                              CoherentFlag coherent, llvm::Instruction *insertPos);
+                              CoherentFlag coherent, BuilderBase &builder);
 
   unsigned combineBufferLoad(std::vector<llvm::Value *> &loadValues, unsigned startIdx, llvm::Value *bufDesc,
                              llvm::Value *loadOffset, llvm::Value *bufBase, CoherentFlag coherent,
-                             llvm::Instruction *insertPos);
+                             BuilderBase &builder);
 
   void storeValueToEsGsRing(llvm::Value *storeValue, unsigned location, unsigned compIdx, llvm::Instruction *insertPos);
 
@@ -170,30 +167,30 @@ private:
                                            llvm::Value *vertexIdx, llvm::Value *gsVsOffset,
                                            llvm::Instruction *insertPos);
 
-  llvm::Value *readValueFromLds(bool offChip, llvm::Type *readTy, llvm::Value *ldsOffset, llvm::Instruction *insertPos);
-  void writeValueToLds(bool offChip, llvm::Value *writeValue, llvm::Value *ldsOffset, llvm::Instruction *insertPos);
+  llvm::Value *readValueFromLds(bool offChip, llvm::Type *readTy, llvm::Value *ldsOffset, BuilderBase &builder);
+  void writeValueToLds(bool offChip, llvm::Value *writeValue, llvm::Value *ldsOffset, BuilderBase &builder);
 
   unsigned calcPatchCountPerThreadGroup(unsigned inVertexCount, unsigned inVertexStride, unsigned outVertexCount,
                                         unsigned outVertexStride, unsigned patchConstCount,
                                         unsigned tessFactorStride) const;
 
   llvm::Value *calcLdsOffsetForVsOutput(llvm::Type *outputTy, unsigned location, unsigned compIdx,
-                                        llvm::Instruction *insertPos);
+                                        BuilderBase &builder);
 
   llvm::Value *calcLdsOffsetForTcsInput(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
-                                        llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                        llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
 
   llvm::Value *calcLdsOffsetForTcsOutput(llvm::Type *outputTy, unsigned location, llvm::Value *locOffset,
-                                         llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                         llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
 
   llvm::Value *calcLdsOffsetForTesInput(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
-                                        llvm::Value *compIdx, llvm::Value *vertexIdx, llvm::Instruction *insertPos);
+                                        llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
 
   void addExportInstForGenericOutput(llvm::Value *output, unsigned location, unsigned compIdx,
                                      llvm::Instruction *insertPos);
   void addExportInstForBuiltInOutput(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
 
-  llvm::Value *adjustCentroidIj(llvm::Value *centroidIj, llvm::Value *centerIj, llvm::Instruction *insertPos);
+  llvm::Value *adjustCentroidIj(llvm::Value *centroidIj, llvm::Value *centerIj, BuilderBase &builder);
 
   llvm::Value *getSubgroupLocalInvocationId(BuilderBase &builder);
 
