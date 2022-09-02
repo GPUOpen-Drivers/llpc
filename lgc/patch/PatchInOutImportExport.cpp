@@ -638,6 +638,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       }
     } else {
+      assert(m_shaderStage != ShaderStageVertex && "vertex fetch is handled by LowerVertexFetch");
       assert(isGenericInputImport || isInterpolantInputImport);
 
       unsigned loc = InvalidValue;
@@ -645,77 +646,71 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       Value *elemIdx = nullptr;
       bool highHalf = false;
 
-      if (m_shaderStage == ShaderStageVertex) {
-        // NOTE: For vertex shader, generic inputs are not mapped.
-        loc = value;
-      } else {
-        if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval ||
-            (m_shaderStage == ShaderStageFragment && isInterpolantInputImport)) {
-          // NOTE: If location offset is present and is a constant, we have to add it to the unmapped
-          // location before querying the mapped location. Meanwhile, we have to adjust the location
-          // offset to 0 (rebase it).
-          locOffset = callInst.getOperand(1);
-          if (isa<ConstantInt>(locOffset)) {
-            value += cast<ConstantInt>(locOffset)->getZExtValue();
-            locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-          }
+      if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval ||
+          (m_shaderStage == ShaderStageFragment && isInterpolantInputImport)) {
+        // NOTE: If location offset is present and is a constant, we have to add it to the unmapped
+        // location before querying the mapped location. Meanwhile, we have to adjust the location
+        // offset to 0 (rebase it).
+        locOffset = callInst.getOperand(1);
+        if (isa<ConstantInt>(locOffset)) {
+          value += cast<ConstantInt>(locOffset)->getZExtValue();
+          locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
         }
+      }
 
-        InOutLocationInfo origLocInfo;
-        origLocInfo.setLocation(value);
-        auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
-        if (m_shaderStage == ShaderStageTessEval ||
-            (m_shaderStage == ShaderStageFragment &&
-             (m_pipelineState->getPrevShaderStage(m_shaderStage) == ShaderStageMesh ||
-              m_pipelineState->isUnlinked()))) {
-          // NOTE: For generic inputs of tessellation evaluation shader or fragment shader whose previous shader stage
-          // is mesh shader or is in unlinked pipeline, they could be per-patch ones or per-primitive ones.
-          if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
-            loc = locInfoMapIt->second.getLocation();
-          } else if (resUsage->inOutUsage.perPatchInputLocMap.find(value) !=
-                     resUsage->inOutUsage.perPatchInputLocMap.end()) {
-            loc = resUsage->inOutUsage.perPatchInputLocMap[value];
-          } else {
-            assert(resUsage->inOutUsage.perPrimitiveInputLocMap.find(value) !=
-                   resUsage->inOutUsage.perPrimitiveInputLocMap.end());
-            loc = resUsage->inOutUsage.perPrimitiveInputLocMap[value];
-          }
+      InOutLocationInfo origLocInfo;
+      origLocInfo.setLocation(value);
+      auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+      if (m_shaderStage == ShaderStageTessEval ||
+          (m_shaderStage == ShaderStageFragment &&
+           (m_pipelineState->getPrevShaderStage(m_shaderStage) == ShaderStageMesh || m_pipelineState->isUnlinked()))) {
+        // NOTE: For generic inputs of tessellation evaluation shader or fragment shader whose previous shader stage
+        // is mesh shader or is in unlinked pipeline, they could be per-patch ones or per-primitive ones.
+        if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
+          loc = locInfoMapIt->second.getLocation();
+        } else if (resUsage->inOutUsage.perPatchInputLocMap.find(value) !=
+                   resUsage->inOutUsage.perPatchInputLocMap.end()) {
+          loc = resUsage->inOutUsage.perPatchInputLocMap[value];
         } else {
-          if (m_pipelineState->canPackInput(m_shaderStage)) {
-            // The inputLocInfoMap of {TCS, GS, FS} maps original InOutLocationInfo to tightly compact InOutLocationInfo
-            const bool isTcs = m_shaderStage == ShaderStageTessControl;
-            const uint32_t elemIdxArgIdx = (isInterpolantInputImport || isTcs) ? 2 : 1;
-            bool hasDynIndex = false;
-            if (isTcs) {
-              hasDynIndex = !isa<ConstantInt>(callInst.getOperand(1)) || !isa<ConstantInt>(callInst.getOperand(2));
-              if (!hasDynIndex) {
-                // TCS input calls at the same location may have dynamic indexing or not
-                // Try the key as combination of location and component at first
-                origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
-                locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
-                if (locInfoMapIt == resUsage->inOutUsage.inputLocInfoMap.end()) {
-                  // Try the key as the plain location
-                  origLocInfo.setComponent(0);
-                  locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
-                  hasDynIndex = true;
-                }
-              } else {
-                locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
-              }
-            } else {
+          assert(resUsage->inOutUsage.perPrimitiveInputLocMap.find(value) !=
+                 resUsage->inOutUsage.perPrimitiveInputLocMap.end());
+          loc = resUsage->inOutUsage.perPrimitiveInputLocMap[value];
+        }
+      } else {
+        if (m_pipelineState->canPackInput(m_shaderStage)) {
+          // The inputLocInfoMap of {TCS, GS, FS} maps original InOutLocationInfo to tightly compact InOutLocationInfo
+          const bool isTcs = m_shaderStage == ShaderStageTessControl;
+          const uint32_t elemIdxArgIdx = (isInterpolantInputImport || isTcs) ? 2 : 1;
+          bool hasDynIndex = false;
+          if (isTcs) {
+            hasDynIndex = !isa<ConstantInt>(callInst.getOperand(1)) || !isa<ConstantInt>(callInst.getOperand(2));
+            if (!hasDynIndex) {
+              // TCS input calls at the same location may have dynamic indexing or not
+              // Try the key as combination of location and component at first
               origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
               locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+              if (locInfoMapIt == resUsage->inOutUsage.inputLocInfoMap.end()) {
+                // Try the key as the plain location
+                origLocInfo.setComponent(0);
+                locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+                hasDynIndex = true;
+              }
+            } else {
+              locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
             }
-            assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
-
-            loc = locInfoMapIt->second.getLocation();
-            if (!hasDynIndex)
-              elemIdx = builder.getInt32(locInfoMapIt->second.getComponent());
-            highHalf = locInfoMapIt->second.isHighHalf();
           } else {
-            assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
-            loc = locInfoMapIt->second.getLocation();
+            origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
+            locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
           }
+          assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
+
+          loc = locInfoMapIt->second.getLocation();
+          if (!hasDynIndex)
+            elemIdx = builder.getInt32(locInfoMapIt->second.getComponent());
+          highHalf = locInfoMapIt->second.isHighHalf();
+        } else {
+          assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
+          loc = locInfoMapIt->second.getLocation();
         }
       }
       assert(loc != InvalidValue);
