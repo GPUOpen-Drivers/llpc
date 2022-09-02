@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/AbiUnlinked.h"
@@ -102,16 +103,8 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
 
   // Lambda to do the actual input read.
   auto readInput = [&](Value *vertexIndex) {
-    std::string callName = lgcName::InputImportInterpolant;
-    SmallVector<Value *, 5> args({
-        getInt32(location),
-        locationOffset,
-        elemIdx,
-        getInt32(InOutInfo::InterpModeCustom),
-        vertexIndex,
-    });
-    addTypeMangling(resultTy, args, callName);
-    return CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn});
+    return create<InputImportInterpolatedOp>(resultTy, false, location, locationOffset, elemIdx,
+                                             PoisonValue::get(getInt32Ty()), InOutInfo::InterpModeCustom, vertexIndex);
   };
 
   unsigned oddOffset = 0, evenOffset = 0;
@@ -222,75 +215,53 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
   markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex);
 
   // Generate LLPC call for reading the input/output.
-  StringRef baseCallName = lgcName::InputImportGeneric;
-  SmallVector<Value *, 6> args;
+  Value *result = nullptr;
   switch (m_shaderStage) {
   case ShaderStageVertex: {
-    // VS:  @lgc.input.import.vertex.%Type%(i32 location, i32 elemIdx)
     assert(locationOffset == getInt32(0));
-    baseCallName = lgcName::InputImportVertex;
-    args.push_back(getInt32(location));
-    args.push_back(elemIdx);
+    result =
+        create<InputImportGenericOp>(resultTy, false, location, getInt32(0), elemIdx, PoisonValue::get(getInt32Ty()));
     break;
   }
 
   case ShaderStageTessControl:
   case ShaderStageTessEval: {
-    // TCS: @lgc.{input|output}.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-    // TES: @lgc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
     assert(!isOutput || m_shaderStage == ShaderStageTessControl);
-    args.push_back(getInt32(location));
-    args.push_back(locationOffset);
-    args.push_back(elemIdx);
-    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    bool isPerPrimitive = vertexIndex == nullptr;
+
+    if (!vertexIndex)
+      vertexIndex = PoisonValue::get(getInt32Ty());
+
     if (isOutput)
-      baseCallName = lgcName::OutputImportGeneric;
+      result = create<OutputImportGenericOp>(resultTy, isPerPrimitive, location, locationOffset, elemIdx, vertexIndex);
+    else
+      result = create<InputImportGenericOp>(resultTy, isPerPrimitive, location, locationOffset, elemIdx, vertexIndex);
     break;
   }
 
   case ShaderStageGeometry: {
-    // GS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-    assert(locationOffset == getInt32(0));
-    args.push_back(getInt32(location));
-    args.push_back(elemIdx);
-    args.push_back(vertexIndex ? vertexIndex : getInt32(InvalidValue));
+    assert(cast<ConstantInt>(locationOffset)->isZero());
+    assert(vertexIndex);
+    result = create<InputImportGenericOp>(resultTy, false, location, locationOffset, elemIdx, vertexIndex);
     break;
   }
 
   case ShaderStageFragment: {
-    // FS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx) -- for per-primitive
-    //      @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-    //                                           i32 interpMode, <2 x float> | i32 interpValue) -- for per-vertex
-    //        interpMode is one of:
-    //         - InterpModeSmooth: interpValue is I,J
-    //         - InterpModeCustom: interpValue is vertex index
-    //         - InterpModeFlat: interpValue is ignored
     if (inOutInfo.isPerPrimitive()) {
       assert(locationOffset == getInt32(0));
-      args.push_back(getInt32(location));
-      args.push_back(elemIdx);
+      result = create<InputImportGenericOp>(resultTy, true, location, locationOffset, elemIdx,
+                                            PoisonValue::get(getInt32Ty()));
     } else {
-      baseCallName = lgcName::InputImportInterpolant;
-
-      args.push_back(getInt32(location));
-      args.push_back(locationOffset);
-      args.push_back(elemIdx);
-
       auto [interpMode, interpValue] = getInterpModeAndValue(inOutInfo, vertexIndex);
-      args.push_back(getInt32(interpMode));
-      args.push_back(interpValue);
+      result = create<InputImportInterpolatedOp>(resultTy, false, location, locationOffset, elemIdx,
+                                                 PoisonValue::get(getInt32Ty()), interpMode, interpValue);
     }
     break;
   }
 
   default:
     llvm_unreachable("Should never be called!");
-    break;
   }
-
-  std::string callName(baseCallName);
-  addTypeMangling(resultTy, args, callName);
-  Value *result = CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn});
 
   result->setName(instName);
   return result;

@@ -34,6 +34,7 @@
 #include "MeshTaskShader.h"
 #include "NggPrimShader.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
@@ -41,6 +42,7 @@
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/BuilderBase.h"
 #include "lgc/util/Debug.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -1273,12 +1275,11 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
 
   auto mangledName = callee->getName();
 
-  if (mangledName.startswith(lgcName::InputImportGeneric) || mangledName.startswith(lgcName::InputImportInterpolant) ||
-      mangledName.startswith(lgcName::InputImportVertex)) {
+  if (isa<InputImportGenericOp>(callInst) || isa<InputImportInterpolatedOp>(callInst)) {
     if (isDeadCall)
       m_deadCalls.push_back(&callInst);
     else
-      m_inputCalls.push_back(&callInst);
+      m_inputCalls.push_back(cast<GenericLocationOp>(&callInst));
   } else if (mangledName.startswith(lgcName::InputImportBuiltIn)) {
     // Built-in input import
     if (isDeadCall)
@@ -1287,13 +1288,13 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
       m_activeInputBuiltIns.insert(builtInId);
     }
-  } else if (mangledName.startswith(lgcName::OutputImportGeneric)) {
+  } else if (auto *outputImport = dyn_cast<OutputImportGenericOp>(&callInst)) {
     // Generic output import
     assert(m_shaderStage == ShaderStageTessControl);
-    auto outputTy = callInst.getType();
+    auto outputTy = outputImport->getType();
     assert(outputTy->isSingleValueType());
     (void)(outputTy);
-    m_importedOutputCalls.push_back(&callInst);
+    m_importedOutputCalls.push_back(outputImport);
   } else if (mangledName.startswith(lgcName::OutputImportBuiltIn)) {
     // Built-in output import
     assert(m_shaderStage == ShaderStageTessControl);
@@ -2670,7 +2671,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
   if (eraseUnusedLocInfo) {
     for (auto call : m_inputCalls) {
       InOutLocationInfo origLocInfo;
-      origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
+      origLocInfo.setLocation(call->getLocation());
       auto mapIt = inputLocInfoMap.find(origLocInfo);
       if (mapIt == inputLocInfoMap.end())
         inputLocInfoMap.erase(mapIt);
@@ -2734,15 +2735,15 @@ void PatchResourceCollect::clearUnusedOutput() {
         }
       }
       // Imported output calls
-      for (auto &call : m_importedOutputCalls) {
-        unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-        Value *const locOffset = call->getOperand(1);
-        Value *const compIdx = call->getOperand(2);
+      for (auto &outputImport : m_importedOutputCalls) {
+        unsigned loc = outputImport->getLocation();
+        Value *const locOffset = outputImport->getLocOffset();
+        Value *const compIdx = outputImport->getElemIdx();
         dynIndexedOrImportOutputLocs.insert(loc);
         // Location offset and component index are both constant
         if (isa<ConstantInt>(locOffset) && isa<ConstantInt>(compIdx)) {
           loc += cast<ConstantInt>(locOffset)->getZExtValue();
-          auto bitWidth = call->getType()->getScalarSizeInBits();
+          auto bitWidth = outputImport->getType()->getScalarSizeInBits();
           if (bitWidth == 64 && cast<ConstantInt>(compIdx)->getZExtValue() >= 2) {
             // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
             // occupied locations are two.
@@ -2942,13 +2943,8 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   const bool isGs = m_shaderStage == ShaderStageGeometry;
   assert(isTcs || isFs || isGs);
 
-  // TCS: @lgc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-  // GS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-  // FS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i1 perPrimitive, i32 interpMode, i32 interpLoc)
-  //     @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-  //                                          i32 interpMode, <2 x float> | i32 auxInterpValue)
-  // NOTE: Dynamic indexing in FS is processed to be constant in the lower pass and TCS has dynamic indexing will go
-  // through unpacked path
+  // The locations of TCS with dynamic indexing (locOffset/elemIdx) cannot be unpacked
+  // NOTE: Dynamic indexing in FS is processed to be constant in the lower pass.
 
   // LDS load/store copes with dword. For 8-bit/16-bit data type, we will extend them to 32-bit
   bool partPipelineHasGs = m_pipelineState->isPartPipeline() && m_pipelineState->getPreRasterHasGs();
@@ -2959,21 +2955,13 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
 
   // Fill inputLocInfoMap of {TCS, GS, FS} for the packable calls
   unsigned newLocIdx = 0;
-  for (auto call : m_inputCalls) {
-    const bool isInterpolant = call->getCalledFunction()->getName().startswith(lgcName::InputImportInterpolant);
-    unsigned locOffset = 0;
-    unsigned compIdxArgIdx = 1;
-    if (isInterpolant || isTcs) {
-      assert(isa<ConstantInt>(call->getOperand(1)));
-      locOffset = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
-      compIdxArgIdx = 2;
-    }
-    assert(isa<ConstantInt>(call->getOperand(compIdxArgIdx)));
+  for (auto input : m_inputCalls) {
+    unsigned locOffset = cast<ConstantInt>(input->getLocOffset())->getZExtValue();
 
     // Get the packed InOutLocationInfo from locationInfoMap
     InOutLocationInfo origLocInfo;
-    origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset);
-    origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue());
+    origLocInfo.setLocation(input->getLocation() + locOffset);
+    origLocInfo.setComponent(cast<ConstantInt>(input->getElemIdx())->getZExtValue());
     InOutLocationInfoMap::const_iterator mapIter;
     assert(m_locationInfoMapManager->findMap(origLocInfo, mapIter));
     m_locationInfoMapManager->findMap(origLocInfo, mapIter);
@@ -3219,33 +3207,39 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
 void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
   // First gather the input/output calls that need scalarizing.
   SmallVector<CallInst *, 4> outputCalls;
-  SmallVector<CallInst *, 4> inputCalls;
-  for (Function &func : *module) {
-    const bool isInterpolant = func.getName().startswith(lgcName::InputImportInterpolant);
-    if (func.getName().startswith(lgcName::InputImportGeneric) || isInterpolant) {
-      // This is a generic (possibly interpolated) input. Find its uses in {TCS, GS, FS}.
-      for (User *user : func.users()) {
-        auto call = cast<CallInst>(user);
-        ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
-        if (m_pipelineState->canPackInput(shaderStage)) {
-          // NOTE: Dynamic indexing (location offset or component) in FS is processed to be constant in lower pass.
-          assert(!isInterpolant ||
-                 (isInterpolant && isa<ConstantInt>(call->getOperand(1)) && isa<ConstantInt>(call->getOperand(2))));
+  SmallVector<GenericLocationOp *, 4> inputCalls;
 
-          // Collect input calls without dynamic indexing that need scalarize
-          const bool hasDynIndex = shaderStage == ShaderStageTessControl ? (!isa<ConstantInt>(call->getOperand(1)) ||
-                                                                            !isa<ConstantInt>(call->getOperand(2)))
-                                                                         : false;
-          if (hasDynIndex) {
-            // Conservatively disable all packing of the VS-TCS interface if dynamic indexing is detected.
-            m_tcsInputHasDynamicIndexing = true;
-          }
-          if (!hasDynIndex &&
-              (isa<FixedVectorType>(call->getType()) || call->getType()->getPrimitiveSizeInBits() == 64))
-            inputCalls.push_back(call);
-        }
+  struct Payload {
+    PatchResourceCollect *self;
+    SmallVectorImpl<GenericLocationOp *> &inputCalls;
+  };
+  Payload payload = {this, inputCalls};
+
+  static auto visitInput = [](Payload &payload, GenericLocationOp &input) {
+    ShaderStage shaderStage = payload.self->m_pipelineShaders->getShaderStage(input.getFunction());
+    if (payload.self->m_pipelineState->canPackInput(shaderStage)) {
+      // Collect input calls without dynamic indexing that need scalarize
+      const bool hasDynIndex = !isa<ConstantInt>(input.getLocOffset()) || !isa<ConstantInt>(input.getElemIdx());
+      if (hasDynIndex) {
+        // NOTE: Dynamic indexing (location offset or component) in FS is processed to be constant in lower pass.
+        assert(shaderStage == ShaderStageTessControl);
+
+        // Conservatively disable all packing of the VS-TCS interface if dynamic indexing is detected.
+        payload.self->m_tcsInputHasDynamicIndexing = true;
       }
-    } else if (func.getName().startswith(lgcName::OutputExportGeneric)) {
+      if (!hasDynIndex && (isa<FixedVectorType>(input.getType()) || input.getType()->getPrimitiveSizeInBits() == 64))
+        payload.inputCalls.push_back(&input);
+    }
+  };
+  static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<InputImportGenericOp>([](auto &payload, auto &op) { visitInput(payload, op); })
+                            .add<InputImportInterpolatedOp>([](auto &payload, auto &op) { visitInput(payload, op); })
+                            .build();
+  visitor.visit(payload, *module);
+
+  for (Function &func : *module) {
+    if (func.getName().startswith(lgcName::OutputExportGeneric)) {
       // This is a generic output. Find its uses in VS/TES/GS.
       for (User *user : func.users()) {
         auto call = cast<CallInst>(user);
@@ -3260,7 +3254,7 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
     }
   }
   // Scalarize the gathered inputs and outputs.
-  for (CallInst *call : inputCalls) {
+  for (GenericLocationOp *call : inputCalls) {
     // Don't scalarize TCS inputs if dynamic indexing is used.
     if (m_tcsInputHasDynamicIndexing) {
       ShaderStage shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
@@ -3284,39 +3278,38 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
 // Scalarize a generic input.
 // This is known to be an FS generic or interpolant input or TCS input that is either a vector or 64 bit.
 //
-// @param call : Call that represents importing the generic or interpolant input
-void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
-  BuilderBase builder(call->getContext());
-  builder.SetInsertPoint(call);
-  // TCS: @lgc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-  // GS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-  // FS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx)
-  //     @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-  //                                          i32 interpMode, <2 x float> | i32 auxInterpValue)
-  SmallVector<Value *, 5> args;
-  for (unsigned i = 0, end = call->arg_size(); i != end; ++i)
-    args.push_back(call->getArgOperand(i));
+// @param input : The input import op
+void PatchResourceCollect::scalarizeGenericInput(GenericLocationOp *input) {
+  BuilderBase builder(input);
+  auto *interpolatedInput = dyn_cast<InputImportInterpolatedOp>(input);
+  assert(interpolatedInput || isa<InputImportGenericOp>(input));
 
-  const auto shaderStage = m_pipelineShaders->getShaderStage(call->getFunction());
-  bool isInterpolant = call->getCalledFunction()->getName().startswith(lgcName::InputImportInterpolant);
-  unsigned elemIdxArgIdx = shaderStage == ShaderStageTessControl || isInterpolant ? 2 : 1;
-  unsigned elemIdx = cast<ConstantInt>(args[elemIdxArgIdx])->getZExtValue();
-  Type *resultTy = call->getType();
+  unsigned elemIdx = cast<ConstantInt>(input->getElemIdx())->getZExtValue();
+  Type *resultTy = input->getType();
 
   if (!isa<VectorType>(resultTy)) {
     // Handle the case of splitting a 64 bit scalar in two.
     assert(resultTy->getPrimitiveSizeInBits() == 64);
-    std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
-    addTypeMangling(builder.getInt32Ty(), args, callName);
-    Value *result = UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 2));
+    Value *result = PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 2));
     for (unsigned i = 0; i != 2; ++i) {
-      args[elemIdxArgIdx] = builder.getInt32(elemIdx * 2 + i);
-      result = builder.CreateInsertElement(
-          result, builder.CreateNamedCall(callName, builder.getInt32Ty(), args, Attribute::ReadOnly), i);
+      Value *subElemIdx = builder.getInt32(elemIdx * 2 + i);
+      Value *subElem;
+      if (interpolatedInput) {
+        assert(!interpolatedInput->getPerPrimitive());
+        subElem = builder.create<InputImportInterpolatedOp>(
+            builder.getInt32Ty(), false, interpolatedInput->getLocation(), interpolatedInput->getLocOffset(),
+            subElemIdx, PoisonValue::get(builder.getInt32Ty()), interpolatedInput->getInterpMode(),
+            interpolatedInput->getInterpValue());
+      } else {
+        subElem =
+            builder.create<InputImportGenericOp>(builder.getInt32Ty(), input->getPerPrimitive(), input->getLocation(),
+                                                 input->getLocOffset(), subElemIdx, input->getArrayIndex());
+      }
+      result = builder.CreateInsertElement(result, subElem, i);
     }
-    result = builder.CreateBitCast(result, call->getType());
-    call->replaceAllUsesWith(result);
-    call->eraseFromParent();
+    result = builder.CreateBitCast(result, resultTy);
+    input->replaceAllUsesWith(result);
+    input->eraseFromParent();
     return;
   }
 
@@ -3333,7 +3326,7 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   assert(scalarizeBy <= MaxScalarizeBy);
   bool elementUsed[MaxScalarizeBy] = {};
   bool unknownElementsUsed = false;
-  for (User *user : call->users()) {
+  for (User *user : input->users()) {
     if (auto extract = dyn_cast<ExtractElementInst>(user)) {
       // NOTE: The extracted index is allowed to be constant or not. For non-constant, we just break the loop and mark
       // as unknownElementsUsed.
@@ -3343,18 +3336,17 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
         elementUsed[idx] = true;
         continue;
       }
-    }
-    if (auto shuffle = dyn_cast<ShuffleVectorInst>(user)) {
+    } else if (auto shuffle = dyn_cast<ShuffleVectorInst>(user)) {
       SmallVector<int, 4> mask;
       shuffle->getShuffleMask(mask);
       for (int maskElement : mask) {
         if (maskElement >= 0) {
           if (maskElement < scalarizeBy) {
-            if (shuffle->getOperand(0) == call)
+            if (shuffle->getOperand(0) == input)
               elementUsed[maskElement] = true;
           } else {
             assert(maskElement < 2 * scalarizeBy);
-            if (shuffle->getOperand(1) == call)
+            if (shuffle->getOperand(1) == input)
               elementUsed[maskElement - scalarizeBy] = true;
           }
         }
@@ -3366,31 +3358,41 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   }
 
   // Load the individual elements and insert into a vector.
-  Value *result = UndefValue::get(resultTy);
-  std::string callName = isInterpolant ? lgcName::InputImportInterpolant : lgcName::InputImportGeneric;
-  addTypeMangling(elementTy, args, callName);
-  const unsigned nextLocIdx = cast<ConstantInt>(args[0])->getZExtValue() + 1;
+  Value *result = PoisonValue::get(resultTy);
+  const unsigned location = input->getLocation();
   const bool is64Bit = elementTy->getPrimitiveSizeInBits() == 64;
   for (unsigned i = 0; i != scalarizeBy; ++i) {
     if (!unknownElementsUsed && !elementUsed[i])
       continue; // Omit trivially unused element
-    unsigned newElemIdx = elemIdx + i;
-    if (is64Bit && i > 1) {
-      args[0] = builder.getInt32(nextLocIdx);
-      newElemIdx = newElemIdx - 2;
-    }
-    args[elemIdxArgIdx] = builder.getInt32(newElemIdx);
 
-    CallInst *element = builder.CreateNamedCall(callName, elementTy, args, Attribute::ReadOnly);
+    unsigned newElemIdx = elemIdx + i;
+    unsigned newLocation = location;
+    if (is64Bit && i >= 2) {
+      newLocation++;
+      newElemIdx -= 2;
+    }
+
+    Value *element;
+    if (interpolatedInput) {
+      assert(!interpolatedInput->getPerPrimitive());
+      element = builder.create<InputImportInterpolatedOp>(
+          elementTy, false, newLocation, interpolatedInput->getLocOffset(), builder.getInt32(newElemIdx),
+          PoisonValue::get(builder.getInt32Ty()), interpolatedInput->getInterpMode(),
+          interpolatedInput->getInterpValue());
+    } else {
+      element =
+          builder.create<InputImportGenericOp>(elementTy, input->getPerPrimitive(), newLocation, input->getLocOffset(),
+                                               builder.getInt32(newElemIdx), input->getArrayIndex());
+    }
     result = builder.CreateInsertElement(result, element, i);
     if (elementTy->getPrimitiveSizeInBits() == 64) {
       // If scalarizing with 64 bit elements, further split each element.
-      scalarizeGenericInput(element);
+      scalarizeGenericInput(cast<GenericLocationOp>(element));
     }
   }
 
-  call->replaceAllUsesWith(result);
-  call->eraseFromParent();
+  input->replaceAllUsesWith(result);
+  input->eraseFromParent();
 }
 
 // =====================================================================================================================
@@ -3457,7 +3459,7 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
 // @param call : Call to process
 // @param shaderStage : Shader stage
 // @param requireDword : Whether need extend 8-bit/16-bit data to dword
-void InOutLocationInfoMapManager::createMap(const std::vector<CallInst *> &calls, ShaderStage shaderStage,
+void InOutLocationInfoMapManager::createMap(ArrayRef<GenericLocationOp *> calls, ShaderStage shaderStage,
                                             bool requireDword) {
   for (auto call : calls)
     addSpan(call, shaderStage, requireDword);
@@ -3496,36 +3498,57 @@ void InOutLocationInfoMapManager::deserializeMap(ArrayRef<std::pair<unsigned, un
 // @param requireDword : Whether need extend to dword
 void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStage, bool requireDword) {
   const bool isFs = shaderStage == ShaderStageFragment;
-  const bool isInterpolant = call->getCalledFunction()->getName().startswith(lgcName::InputImportInterpolant);
-  unsigned locOffset = 0;
-  unsigned compIdxArgIdx = 1;
-  if (isInterpolant || shaderStage == ShaderStageTessControl) {
-    assert(isa<ConstantInt>(call->getOperand(1)));
-    locOffset = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
-    compIdxArgIdx = 2;
-  }
-
-  LocationSpan span = {};
-  span.firstLocationInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset);
-  span.firstLocationInfo.setComponent(cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue());
-
+  unsigned interpMode = InOutInfo::InterpModeCustom;
+  bool isInterpolated = false;
+  unsigned location = InvalidValue;
+  unsigned elemIdx = InvalidValue;
+  std::optional<unsigned> streamId;
   unsigned bitWidth = call->getType()->getScalarSizeInBits();
-  if (shaderStage == ShaderStageGeometry &&
-      call->getCalledFunction()->getName().startswith(lgcName::OutputExportGeneric)) {
-    // Set streamId and output bitWidth of a GS output export for copy shader use
-    span.firstLocationInfo.setStreamId(cast<ConstantInt>(call->getOperand(2))->getZExtValue());
-    bitWidth = call->getOperand(3)->getType()->getScalarSizeInBits();
+
+  if (auto *genericLocationOp = dyn_cast<GenericLocationOp>(call)) {
+    location = genericLocationOp->getLocation() + cast<ConstantInt>(genericLocationOp->getLocOffset())->getZExtValue();
+    elemIdx = cast<ConstantInt>(genericLocationOp->getElemIdx())->getZExtValue();
+
+    if (auto *interpolated = dyn_cast<InputImportInterpolatedOp>(genericLocationOp)) {
+      isInterpolated = true;
+      interpMode = interpolated->getInterpMode();
+    }
+  } else {
+    location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+
+    unsigned compIdxArgIdx = 1;
+    if (shaderStage == ShaderStageTessControl) {
+      location += cast<ConstantInt>(call->getOperand(1))->getZExtValue();
+      compIdxArgIdx = 2;
+    }
+
+    elemIdx = cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue();
+
+    if (shaderStage == ShaderStageGeometry &&
+        call->getCalledFunction()->getName().startswith(lgcName::OutputExportGeneric)) {
+      // Set streamId and output bitWidth of a GS output export for copy shader use
+      streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
+      bitWidth = call->getOperand(3)->getType()->getScalarSizeInBits();
+    }
   }
+
   if (requireDword && bitWidth < 32)
     bitWidth = 32;
   else if (bitWidth == 8)
     bitWidth = 16;
+
+  LocationSpan span = {};
+  span.firstLocationInfo.setLocation(location);
+  span.firstLocationInfo.setComponent(elemIdx);
+
   span.compatibilityInfo.halfComponentCount = bitWidth / 16;
   // For VS/TES-FS, 32-bit and 16-bit are packed separately; For VS-TCS, VS/TES-GS and GS-FS, they are packed together
   span.compatibilityInfo.is16Bit = bitWidth == 16;
 
-  if (isFs && isInterpolant) {
-    const unsigned interpMode = cast<ConstantInt>(call->getOperand(3))->getZExtValue();
+  if (streamId.has_value())
+    span.firstLocationInfo.setStreamId(*streamId);
+
+  if (isFs && isInterpolated) {
     span.compatibilityInfo.isFlat = interpMode == InOutInfo::InterpModeFlat;
     span.compatibilityInfo.isCustom = interpMode == InOutInfo::InterpModeCustom;
   }

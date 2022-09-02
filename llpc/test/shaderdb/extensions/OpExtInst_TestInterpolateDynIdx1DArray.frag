@@ -19,10 +19,10 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: = call <3 x float> @lgc.input.import.builtin.InterpPullMode
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST-DAG: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 17, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST-DAG: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 18, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST-DAG: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 19, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
-; SHADERTEST-DAG: %{{[0-9]*}} = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 20, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
+; SHADERTEST-DAG: %{{[0-9]*}} = call <4 x float> (...) @lgc.input.import.interpolated.v4f32(i1 false, i32 17, i32 0, i32 0, i32 poison, i32 0, <2 x float> %{{.*}})
+; SHADERTEST-DAG: %{{[0-9]*}} = call <4 x float> (...) @lgc.input.import.interpolated.v4f32(i1 false, i32 18, i32 0, i32 0, i32 poison, i32 0, <2 x float> %{{.*}})
+; SHADERTEST-DAG: %{{[0-9]*}} = call <4 x float> (...) @lgc.input.import.interpolated.v4f32(i1 false, i32 19, i32 0, i32 0, i32 poison, i32 0, <2 x float> %{{.*}})
+; SHADERTEST-DAG: %{{[0-9]*}} = call <4 x float> (...) @lgc.input.import.interpolated.v4f32(i1 false, i32 20, i32 0, i32 0, i32 poison, i32 0, <2 x float> %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

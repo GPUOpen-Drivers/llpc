@@ -22,13 +22,13 @@ void main()
 ; RUN: amdllpc -auto-layout-desc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.vertex.v4f64{{.*}}
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.vertex.v4f64{{.*}}
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.vertex.v4f64{{.*}}
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.vertex.v4f64{{.*}}
-; SHADERTEST-DAG: call <4 x double> @lgc.input.import.vertex.v4f64{{.*}}
-; SHADERTEST-DAG: call <3 x double> @lgc.input.import.vertex.v3f64{{.*}}
-; SHADERTEST-DAG: call <3 x double> @lgc.input.import.vertex.v3f64{{.*}}
+; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
+; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
+; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
+; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
+; SHADERTEST-DAG: call <4 x double> @lgc.input.import.generic.v4f64{{.*}}
+; SHADERTEST-DAG: call <3 x double> @lgc.input.import.generic.v3f64{{.*}}
+; SHADERTEST-DAG: call <3 x double> @lgc.input.import.generic.v3f64{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-COUNT-3: call <4 x i32> @llvm.amdgcn.struct.tbuffer.load.v4i32
 ; SHADERTEST: AMDLLPC SUCCESS

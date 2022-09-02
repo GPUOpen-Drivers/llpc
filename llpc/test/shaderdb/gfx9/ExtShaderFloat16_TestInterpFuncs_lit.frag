@@ -20,7 +20,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: %{{[A-Za-z0-9]*}} = call <2 x float> @lgc.input.import.builtin.InterpPerspCentroid.v2f32.i32(i32 {{.*}})
-; SHADERTEST: %{{[0-9]*}} = call <4 x half> @lgc.input.import.interpolant.v4f16.i32.i32.i32.i32.v2f32(i32 0, i32 0, i32 0, i32 0, <2 x float> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call <4 x half> (...) @lgc.input.import.interpolated.v4f16(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 0, <2 x float> %{{.*}})
 ; SHADERTEST: = call <2 x float> @lgc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
 ; SHADERTEST: = call <3 x float> @lgc.input.import.builtin.InterpPullMode
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
