@@ -2766,27 +2766,16 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
   const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
-  case BuiltInPosition: {
-    assert(builtInUsage.position);
+  case BuiltInPosition:
+  case BuiltInPointSize: {
+    assert(builtInId != BuiltInPosition || builtInUsage.position);
+    assert(builtInId != BuiltInPointSize || (builtInUsage.pointSize && !elemIdx));
     (void(builtInUsage)); // unused
 
     assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
     unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    output = readValueFromLds(m_pipelineState->isTessOffChip(), outputTy, ldsOffset, builder);
-
-    break;
-  }
-  case BuiltInPointSize: {
-    assert(builtInUsage.pointSize);
-    (void(builtInUsage)); // unused
-
-    assert(!elemIdx);
-    assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-    unsigned loc = builtInOutLocMap.find(builtInId)->second;
-
-    auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, nullptr, vertexIdx, builder);
     output = readValueFromLds(m_pipelineState->isTessOffChip(), outputTy, ldsOffset, builder);
 
     break;
@@ -2823,54 +2812,33 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
 
     break;
   }
-  case BuiltInTessLevelOuter: {
-    assert(builtInUsage.tessLevelOuter);
+  case BuiltInTessLevelOuter:
+  case BuiltInTessLevelInner: {
+    assert(builtInId != BuiltInTessLevelOuter || builtInUsage.tessLevelOuter);
+    assert(builtInId != BuiltInTessLevelInner || builtInUsage.tessLevelInner);
     (void(builtInUsage)); // Unused
 
     const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
-    auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
     // tessLevelOuter (float[4]) + tessLevelInner (float[2])
     // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + elemIdx
-    if (outputTy->isArrayTy()) {
-      // Import the whole tessLevelOuter array
-      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        Value *ldsOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
-        ldsOffset = builder.CreateAdd(builder.getInt32(calcFactor.onChip.tessFactorStart + i), ldsOffset);
-        auto elem = readValueFromLds(false, Type::getFloatTy(*m_context), ldsOffset, builder);
-        output = builder.CreateInsertValue(output, elem, {i});
-      }
-    } else {
-      // Import a single element of tessLevelOuter array
-      Value *ldsOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
-      ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(calcFactor.onChip.tessFactorStart));
-      ldsOffset = builder.CreateAdd(ldsOffset, elemIdx);
-      output = readValueFromLds(false, outputTy, ldsOffset, builder);
-    }
+    uint32_t tessFactorStart = calcFactor.onChip.tessFactorStart;
+    if (builtInId == BuiltInTessLevelInner)
+      tessFactorStart += 4;
 
-    break;
-  }
-  case BuiltInTessLevelInner: {
-    assert(builtInUsage.tessLevelInner);
-    (void(builtInUsage)); // Unused
-
-    const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
     auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
+    Value *baseOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
 
-    // tessLevelOuter (float[4]) + tessLevelInner (float[2])
-    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + 4 + elemIdx
     if (outputTy->isArrayTy()) {
-      // Import the whole tessLevelInner array
+      // Import the whole tessLevel array
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        Value *ldsOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
-        ldsOffset = builder.CreateAdd(builder.getInt32(calcFactor.onChip.tessFactorStart + 4 + i), ldsOffset);
+        Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart + i));
         auto elem = readValueFromLds(false, Type::getFloatTy(*m_context), ldsOffset, builder);
         output = builder.CreateInsertValue(output, elem, {i});
       }
     } else {
-      // Import a single element of tessLevelInner array
-      Value *ldsOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
-      ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(calcFactor.onChip.tessFactorStart + 4));
+      // Import a single element of tessLevel array
+      Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart));
       ldsOffset = builder.CreateAdd(ldsOffset, elemIdx);
       output = readValueFromLds(false, outputTy, ldsOffset, builder);
     }
@@ -2902,32 +2870,13 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
   const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
-  case BuiltInPosition: {
-    if (!static_cast<bool>(builtInUsage.position))
-      return;
-
-    if (m_hasTs) {
-      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-      unsigned loc = builtInOutLocMap.find(builtInId)->second;
-      auto ldsOffset = calcLdsOffsetForVsOutput(outputTy, loc, 0, builder);
-      writeValueToLds(false, output, ldsOffset, builder);
-    } else {
-      if (m_hasGs) {
-        assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-        unsigned loc = builtInOutLocMap.find(builtInId)->second;
-
-        storeValueToEsGsRing(output, loc, 0, insertPos);
-      } else
-        addExportInstForBuiltInOutput(output, builtInId, insertPos);
-    }
-
-    break;
-  }
+  case BuiltInPosition:
   case BuiltInPointSize: {
-    if (!static_cast<bool>(builtInUsage.pointSize))
+    if ((builtInId == BuiltInPosition && !builtInUsage.position) ||
+        (builtInId == BuiltInPointSize && !builtInUsage.pointSize))
       return;
 
-    if (isa<UndefValue>(output)) {
+    if (builtInId == BuiltInPointSize && isa<UndefValue>(output)) {
       // NOTE: gl_PointSize is always declared as a field of gl_PerVertex. We have to check the output
       // value to determine if it is actually referenced in shader.
       builtInUsage.pointSize = false;
@@ -2951,53 +2900,19 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
 
     break;
   }
-  case BuiltInClipDistance: {
-    if (builtInUsage.clipDistance == 0)
-      return;
-
-    if (isa<UndefValue>(output)) {
-      // NOTE: gl_ClipDistance[] is always declared as a field of gl_PerVertex. We have to check the output
-      // value to determine if it is actually referenced in shader.
-      builtInUsage.clipDistance = 0;
-      return;
-    }
-
-    if (m_hasTs) {
-      assert(outputTy->isArrayTy());
-
-      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-      unsigned loc = builtInOutLocMap.find(builtInId)->second;
-      auto ldsOffset = calcLdsOffsetForVsOutput(outputTy->getArrayElementType(), loc, 0, builder);
-
-      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
-        writeValueToLds(false, elem, ldsOffset, builder);
-
-        ldsOffset =
-            BinaryOperator::CreateAdd(ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
-      }
-    } else {
-      if (m_hasGs) {
-        assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-        unsigned loc = builtInOutLocMap.find(builtInId)->second;
-
-        storeValueToEsGsRing(output, loc, 0, insertPos);
-      } else {
-        // NOTE: The export of gl_ClipDistance[] is delayed and is done before entry-point returns.
-        m_clipDistance = output;
-      }
-    }
-
-    break;
-  }
+  case BuiltInClipDistance:
   case BuiltInCullDistance: {
-    if (builtInUsage.cullDistance == 0)
+    if ((builtInId == BuiltInClipDistance && builtInUsage.clipDistance == 0) ||
+        (builtInId == BuiltInCullDistance && builtInUsage.cullDistance == 0))
       return;
 
     if (isa<UndefValue>(output)) {
-      // NOTE: gl_CullDistance[] is always declared as a field of gl_PerVertex. We have to check the output
+      // NOTE: gl_{Clip,Cull}Distance[] is always declared as a field of gl_PerVertex. We have to check the output
       // value to determine if it is actually referenced in shader.
-      builtInUsage.cullDistance = 0;
+      if (builtInId == BuiltInClipDistance)
+        builtInUsage.clipDistance = 0;
+      else
+        builtInUsage.cullDistance = 0;
       return;
     }
 
@@ -3022,8 +2937,11 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
 
         storeValueToEsGsRing(output, loc, 0, insertPos);
       } else {
-        // NOTE: The export of gl_CullDistance[] is delayed and is done before entry-point returns.
-        m_cullDistance = output;
+        // NOTE: The export of gl_{Clip,Cull}Distance[] is delayed and is done before entry-point returns.
+        if (builtInId == BuiltInClipDistance)
+          m_clipDistance = output;
+        else
+          m_cullDistance = output;
       }
     }
 
@@ -3091,27 +3009,18 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
   const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
-  case BuiltInPosition: {
-    if (!static_cast<bool>(builtInUsage.position))
+  case BuiltInPosition:
+  case BuiltInPointSize: {
+    if ((builtInId == BuiltInPosition && !builtInUsage.position) ||
+        (builtInId == BuiltInPointSize && !builtInUsage.pointSize))
       return;
+
+    assert(builtInId != BuiltInPointSize || !elemIdx);
 
     assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
     unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
-
-    break;
-  }
-  case BuiltInPointSize: {
-    if (!static_cast<bool>(builtInUsage.pointSize))
-      return;
-
-    assert(!elemIdx);
-    assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-    unsigned loc = builtInOutLocMap.find(builtInId)->second;
-
-    auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, nullptr, vertexIdx, builder);
     writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
 
     break;
@@ -3142,60 +3051,29 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
 
     break;
   }
-  case BuiltInTessLevelOuter: {
-    const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
-    auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
-
-    // tessLevelOuter (float[4]) + tessLevelInner (float[2])
-    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + elemIdx
-    if (outputTy->isArrayTy()) {
-      // Export the whole tessLevelOuter array
-      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        Value *ldsOffset = BinaryOperator::CreateMul(
-            relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
-        ldsOffset = BinaryOperator::CreateAdd(
-            ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart + i), ldsOffset, "",
-            insertPos);
-        auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
-        writeValueToLds(false, elem, ldsOffset, builder);
-      }
-    } else {
-      // Export a single element of tessLevelOuter array
-      Value *ldsOffset = BinaryOperator::CreateMul(
-          relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
-      ldsOffset = BinaryOperator::CreateAdd(
-          ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart), "", insertPos);
-      ldsOffset = BinaryOperator::CreateAdd(ldsOffset, elemIdx, "", insertPos);
-      writeValueToLds(false, output, ldsOffset, builder);
-    }
-
-    break;
-  }
+  case BuiltInTessLevelOuter:
   case BuiltInTessLevelInner: {
     const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
     auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
     // tessLevelOuter (float[4]) + tessLevelInner (float[2])
-    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + 4 + elemIdx
+    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + elemIdx
+    uint32_t tessFactorStart = calcFactor.onChip.tessFactorStart;
+    if (builtInId == BuiltInTessLevelInner)
+      tessFactorStart += 4;
+
+    Value *baseOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
     if (outputTy->isArrayTy()) {
-      // Export the whole tessLevelInner array
+      // Export the whole tessLevelOuter array
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        Value *ldsOffset = BinaryOperator::CreateMul(
-            relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
-        ldsOffset = BinaryOperator::CreateAdd(
-            ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart + 4 + i), ldsOffset, "",
-            insertPos);
-        auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
+        Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart + i));
+        auto elem = builder.CreateExtractValue(output, {i});
         writeValueToLds(false, elem, ldsOffset, builder);
       }
     } else {
-      // Export a single element of tessLevelInner array
-      Value *ldsOffset = BinaryOperator::CreateMul(
-          relativeId, ConstantInt::get(Type::getInt32Ty(*m_context), MaxTessFactorsPerPatch), "", insertPos);
-      ldsOffset = BinaryOperator::CreateAdd(
-          ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.onChip.tessFactorStart + 4), "",
-          insertPos);
-      ldsOffset = BinaryOperator::CreateAdd(ldsOffset, elemIdx, "", insertPos);
+      // Export a single element of tessLevelOuter array
+      Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart));
+      ldsOffset = builder.CreateAdd(ldsOffset, elemIdx, "", insertPos);
       writeValueToLds(false, output, ldsOffset, builder);
     }
 
@@ -3220,73 +3098,33 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
   const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
-  case BuiltInPosition: {
-    if (!static_cast<bool>(builtInUsage.position))
-      return;
-
-    if (m_hasGs) {
-      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-      unsigned loc = builtInOutLocMap.find(builtInId)->second;
-
-      storeValueToEsGsRing(output, loc, 0, insertPos);
-    } else
-      addExportInstForBuiltInOutput(output, builtInId, insertPos);
-
-    break;
-  }
-  case BuiltInPointSize: {
-    if (!static_cast<bool>(builtInUsage.pointSize))
-      return;
-
-    if (isa<UndefValue>(output)) {
-      // NOTE: gl_PointSize is always declared as a field of gl_PerVertex. We have to check the output
-      // value to determine if it is actually referenced in shader.
-      builtInUsage.pointSize = false;
-      return;
-    }
-
-    if (m_hasGs) {
-      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-      unsigned loc = builtInOutLocMap.find(builtInId)->second;
-
-      storeValueToEsGsRing(output, loc, 0, insertPos);
-    } else
-      addExportInstForBuiltInOutput(output, builtInId, insertPos);
-
-    break;
-  }
-  case BuiltInClipDistance: {
-    if (builtInUsage.clipDistance == 0)
-      return;
-
-    if (isa<UndefValue>(output)) {
-      // NOTE: gl_ClipDistance[] is always declared as a field of gl_PerVertex. We have to check the output
-      // value to determine if it is actually referenced in shader.
-      builtInUsage.clipDistance = 0;
-      return;
-    }
-
-    if (m_hasGs) {
-      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-      unsigned loc = builtInOutLocMap.find(builtInId)->second;
-
-      storeValueToEsGsRing(output, loc, 0, insertPos);
-    } else {
-      // NOTE: The export of gl_ClipDistance[] is delayed and is done before entry-point returns.
-      m_clipDistance = output;
-    }
-
-    break;
-  }
+  case BuiltInPosition:
+  case BuiltInPointSize:
+  case BuiltInClipDistance:
   case BuiltInCullDistance: {
-    if (builtInUsage.cullDistance == 0)
+    if ((builtInId == BuiltInPosition && !builtInUsage.position) ||
+        (builtInId == BuiltInPointSize && !builtInUsage.pointSize))
       return;
 
     if (isa<UndefValue>(output)) {
-      // NOTE: gl_CullDistance[] is always declared as a field of gl_PerVertex. We have to check the output
+      // NOTE: gl_* builtins are always declared as a field of gl_PerVertex. We have to check the output
       // value to determine if it is actually referenced in shader.
-      builtInUsage.cullDistance = 0;
-      return;
+      switch (builtInId) {
+      case BuiltInPosition:
+        builtInUsage.position = false;
+        return;
+      case BuiltInPointSize:
+        builtInUsage.pointSize = false;
+        return;
+      case BuiltInClipDistance:
+        builtInUsage.clipDistance = 0;
+        return;
+      case BuiltInCullDistance:
+        builtInUsage.cullDistance = 0;
+        return;
+      default:
+        llvm_unreachable("unhandled builtInId");
+      }
     }
 
     if (m_hasGs) {
@@ -3295,8 +3133,22 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 
       storeValueToEsGsRing(output, loc, 0, insertPos);
     } else {
-      // NOTE: The export of gl_CullDistance[] is delayed and is done before entry-point returns.
-      m_cullDistance = output;
+      switch (builtInId) {
+      case BuiltInPosition:
+      case BuiltInPointSize:
+        addExportInstForBuiltInOutput(output, builtInId, insertPos);
+        break;
+      case BuiltInClipDistance:
+        // NOTE: The export of gl_ClipDistance[] is delayed and is done before entry-point returns.
+        m_clipDistance = output;
+        break;
+      case BuiltInCullDistance:
+        // NOTE: The export of gl_CullDistance[] is delayed and is done before entry-point returns.
+        m_cullDistance = output;
+        break;
+      default:
+        llvm_unreachable("unhandled builtInId");
+      }
     }
 
     break;
