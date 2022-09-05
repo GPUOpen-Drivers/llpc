@@ -244,6 +244,12 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
     // Run the codegen passes
     codegenPassMgr->run(*pipelineModule);
   }
+
+  if (!m_noReplayer) {
+    PipelineState *pipelineState =
+        passMgr->getAnalysisManager()->getResult<PipelineStateWrapper>(*pipelineModule).getPipelineState();
+    setError(pipelineState->getLastError());
+  }
 }
 
 void PipelineState::generateWithLegacyPassManager(std::unique_ptr<Module> pipelineModule, raw_pwrite_stream &outStream,

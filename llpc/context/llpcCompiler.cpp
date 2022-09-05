@@ -1225,7 +1225,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   if (result == Result::Success) {
 #if LLPC_ENABLE_EXCEPTION
-    result = Result::ErrorInvalidShader;
     try
 #endif
     {
@@ -1235,13 +1234,15 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
           timerProfiler.getTimer(TimerCodeGen),
       };
 
-      pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers, cl::NewPassManager == 2);
-#if LLPC_ENABLE_EXCEPTION
-      result = Result::Success;
-#endif
+      if (pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers,
+                             cl::NewPassManager == 2))
+        result = Result::Success;
+      else
+        result = Result::ErrorInvalidShader;
     }
 #if LLPC_ENABLE_EXCEPTION
     catch (const char *) {
+      result = Result::ErrorInvalidShader;
     }
 #endif
   }

@@ -80,6 +80,8 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
 
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     if (!node) {
+      if (!m_pipelineState->isUnlinked() && abstractType != DescriptorAnyBuffer)
+        getPipelineState()->setError("Resource node is not found!");
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getBufferDescTy(pointeeTy));
     }
