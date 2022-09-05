@@ -63,6 +63,8 @@ public:
   virtual void run(llvm::Module &module) = 0;
   virtual void setPassIndex(unsigned *passIndex) = 0;
 
+  llvm::ModuleAnalysisManager *getAnalysisManager() { return &m_moduleAnalysisManager; }
+
 protected:
   llvm::FunctionAnalysisManager m_functionAnalysisManager;
   llvm::ModuleAnalysisManager m_moduleAnalysisManager;

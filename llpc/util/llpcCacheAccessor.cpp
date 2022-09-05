@@ -177,7 +177,7 @@ bool CacheAccessor::lookUpInShaderCache(const MetroHash::Hash &hash, bool alloca
 //
 // @param elf : The binary encoding of the elf to place in the cache.
 void CacheAccessor::setElfInCache(BinaryData elf) {
-  if (m_shaderCacheEntryState == ShaderEntryState::Compiling && m_shaderCacheEntry) {
+  if (m_shaderCacheEntryState == ShaderEntryState::Compiling && m_shaderCacheEntry && elf.codeSize != 0) {
     updateShaderCache(elf);
     mustSucceed(m_shaderCache->retrieveShader(m_shaderCacheEntry, &m_elf.pCode, &m_elf.codeSize),
                 "Failed to retrieve shader");

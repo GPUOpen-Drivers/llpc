@@ -80,6 +80,8 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
 
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     if (!node) {
+      if (!m_pipelineState->isUnlinked())
+        getPipelineState()->setError("Resource node is not found!");
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getBufferDescTy(pointeeTy));
     }
@@ -163,6 +165,8 @@ Value *DescBuilder::CreateGetDescStride(ResourceNodeType descType, unsigned desc
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(descType, descSet, binding);
     if (!node) {
+      if (!m_pipelineState->isUnlinked())
+        m_pipelineState->setError("Resource node is not found!");
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getInt32Ty());
     }
@@ -189,6 +193,8 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     if (!node) {
+      if (!m_pipelineState->isUnlinked())
+        m_pipelineState->setError("Resource node is not found!");
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getDescPtrTy(concreteType));
     }
