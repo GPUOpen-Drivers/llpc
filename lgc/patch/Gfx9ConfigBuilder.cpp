@@ -2139,6 +2139,10 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
     paClVsOutCntl |= clipDistanceMask;
     paClVsOutCntl |= (cullDistanceMask << 8);
     SET_REG(config, PA_CL_VS_OUT_CNTL, paClVsOutCntl);
+
+    // On 10.3+ all auxiliary position exports are optimized, not just the misc exports.
+    if (gfxIp >= GfxIpVersion{10, 3})
+      SET_REG_FIELD(config, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
   }
 
   unsigned posCount = 1; // gl_Position is always exported

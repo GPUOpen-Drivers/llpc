@@ -1,0 +1,28 @@
+; Test that VS_OUT_MISC_SIDE_BUS_ENA (0x1000000) is set correctly.
+
+; RUN: amdllpc  -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: LLPC final ELF info
+; SHADERTEST: PA_CL_VS_OUT_CNTL 0x0000000001400001
+; SHADERTEST: AMDLLPC SUCCESS
+
+[VsGlsl]
+#version 450
+
+out float gl_ClipDistance[1];
+
+void main() {
+	gl_Position = vec4(1.0);
+	gl_ClipDistance[0] = 1.0;
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+
+void main() { }
+
+[FsInfo]
+entryPoint = main
+
