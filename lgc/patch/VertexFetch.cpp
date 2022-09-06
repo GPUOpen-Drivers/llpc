@@ -422,19 +422,15 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
   // 1. add metadata giving the location, component, type of each vertex fetch;
   // 2. add an input arg for each vertex fetch.
   //
-  // First add the metadata.
+  // First add the metadata and mutate the vertex shader function.
   SmallVector<VertexFetchInfo, 8> info;
+  SmallVector<Type *, 8> argTys;
+  SmallVector<std::string, 8> argNames;
   for (CallInst *call : vertexFetches) {
     unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
     unsigned component = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
     info.push_back({location, component, call->getType()});
-  }
-  pipelineState->getPalMetadata()->addVertexFetchInfo(info);
 
-  // Gather the input arg types.
-  SmallVector<Type *, 8> argTys;
-  SmallVector<std::string, 8> argNames;
-  for (CallInst *call : vertexFetches) {
     Type *ty = call->getType();
     // The return value from the fetch shader needs to use all floats, as the back-end maps an int in the
     // return value as an SGPR rather than a VGPR. For symmetry, we also use all floats here, in the input
@@ -443,6 +439,7 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     argTys.push_back(ty);
     argNames.push_back("");
   }
+  pipelineState->getPalMetadata()->addVertexFetchInfo(info);
 
   // Mutate the vertex shader function to add the new args.
   Function *newFunc = addFunctionArgs(vertexFetches[0]->getFunction(), nullptr, argTys, argNames);
@@ -470,9 +467,7 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
         }
       }
     }
-    unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-    unsigned component = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
-    vertex->setName("vertex" + Twine(location) + "." + Twine(component));
+    vertex->setName("vertex" + Twine(info[idx].location) + "." + Twine(info[idx].component));
     call->replaceAllUsesWith(vertex);
     call->eraseFromParent();
   }
