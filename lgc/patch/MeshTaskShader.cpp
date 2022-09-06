@@ -354,7 +354,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
           assert(call->arg_size() == 1);
           auto byteOffset = call->getOperand(0);
 
-          auto readValue = readTaskPayload(entryPoint, call->getType(), byteOffset);
+          auto readValue = readTaskPayload(call->getType(), byteOffset);
           call->replaceAllUsesWith(readValue);
           m_accessTaskPayload = true;
         } else if (func.getName().startswith(lgcName::MeshTaskWriteTaskPayload)) {
@@ -363,7 +363,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
           auto byteOffset = call->getOperand(0);
           auto writeValue = call->getOperand(1);
 
-          writeTaskPayload(entryPoint, writeValue, byteOffset);
+          writeTaskPayload(writeValue, byteOffset);
           m_accessTaskPayload = true;
         } else if (func.getName().startswith(lgcName::MeshTaskEmitMeshTasks)) {
           // Emit mesh tasks
@@ -372,7 +372,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
           auto groupCountY = call->getOperand(1);
           auto groupCountZ = call->getOperand(2);
 
-          emitTaskMeshs(entryPoint, groupCountX, groupCountY, groupCountZ);
+          emitTaskMeshs(groupCountX, groupCountY, groupCountZ);
         } else {
           llvm_unreachable("Unknown task shader call!");
         }
@@ -696,10 +696,11 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 // =====================================================================================================================
 // Process the read of task payload.
 //
-// @param entryPoint : Entry-point of task shader
 // @param readTy : Type of value to read
 // @param byteOffset : Byte offset within the payload entry
-Value *MeshTaskShader::readTaskPayload(Function *entryPoint, Type *readTy, Value *byteOffset) {
+Value *MeshTaskShader::readTaskPayload(Type *readTy, Value *byteOffset) {
+  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+
   auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
   auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
 
@@ -718,13 +719,13 @@ Value *MeshTaskShader::readTaskPayload(Function *entryPoint, Type *readTy, Value
     // 64vec3 -> vec4 + vec2
     // 64vec4 -> vec4 + vec4
     Type *readTy1 = FixedVectorType::get(m_builder->getInt32Ty(), std::min(2 * numElements, 4u));
-    Value *readValue1 = readTaskPayload(entryPoint, readTy1, byteOffset);
+    Value *readValue1 = readTaskPayload(readTy1, byteOffset);
 
     Value *readValue = nullptr;
     if (numElements > 2) {
       Type *readTy2 = FixedVectorType::get(m_builder->getInt32Ty(), 2 * numElements - 4);
       byteOffset = m_builder->CreateAdd(byteOffset, m_builder->getInt32(4 * sizeof(unsigned)));
-      Value *readValue2 = readTaskPayload(entryPoint, readTy2, byteOffset);
+      Value *readValue2 = readTaskPayload(readTy2, byteOffset);
 
       if (numElements == 3) {
         readValue2 = m_builder->CreateShuffleVector(readValue2, PoisonValue::get(readValue2->getType()),
@@ -744,7 +745,7 @@ Value *MeshTaskShader::readTaskPayload(Function *entryPoint, Type *readTy, Value
       for (unsigned i = 0; i < numElements; ++i) {
         auto elemByteOffset =
             i > 0 ? m_builder->CreateAdd(byteOffset, m_builder->getInt32(i * bitWidth / 8)) : byteOffset;
-        auto elem = readTaskPayload(entryPoint, readTy->getScalarType(), elemByteOffset);
+        auto elem = readTaskPayload(readTy->getScalarType(), elemByteOffset);
         readValue = m_builder->CreateInsertElement(readValue, elem, i);
       }
       return readValue;
@@ -759,10 +760,10 @@ Value *MeshTaskShader::readTaskPayload(Function *entryPoint, Type *readTy, Value
 // =====================================================================================================================
 // Process the write of task payload.
 //
-// @param entryPoint : Entry-point of task shader
 // @param writeValue : Value to write
 // @param byteOffset : Byte offset within the payload entry
-void MeshTaskShader::writeTaskPayload(Function *entryPoint, Value *writeValue, Value *byteOffset) {
+void MeshTaskShader::writeTaskPayload(Value *writeValue, Value *byteOffset) {
+  auto entryPoint = m_builder->GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageTask);
 
   auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
@@ -791,13 +792,13 @@ void MeshTaskShader::writeTaskPayload(Function *entryPoint, Value *writeValue, V
       writeValue1 = m_builder->CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
                                                    ArrayRef<int>({0, 1, 2, 3}));
     }
-    writeTaskPayload(entryPoint, writeValue1, byteOffset);
+    writeTaskPayload(writeValue1, byteOffset);
 
     if (numElements > 2) {
       auto writeValue2 = m_builder->CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
                                                         ArrayRef<int>({4, 5, 6, 7}).slice(0, 2 * numElements - 4));
       byteOffset = m_builder->CreateAdd(byteOffset, m_builder->getInt32(4 * sizeof(unsigned)));
-      writeTaskPayload(entryPoint, writeValue2, byteOffset);
+      writeTaskPayload(writeValue2, byteOffset);
     }
 
     return;
@@ -808,7 +809,7 @@ void MeshTaskShader::writeTaskPayload(Function *entryPoint, Value *writeValue, V
         auto elem = m_builder->CreateExtractElement(writeValue, i);
         auto elemByteOffset =
             i > 0 ? m_builder->CreateAdd(byteOffset, m_builder->getInt32(i * bitWidth / 8)) : byteOffset;
-        writeTaskPayload(entryPoint, elem, elemByteOffset);
+        writeTaskPayload(elem, elemByteOffset);
       }
       return;
     }
@@ -987,11 +988,11 @@ Value *MeshTaskShader::getDrawDataReadyBit(Function *entryPoint) {
 // Emit mesh tasks. Defines the dimension size of subsequent mesh shader workgroups to generate upon completion of the
 // task shader workgroup
 //
-// @param entryPoint : Entry-point of task shader
 // @param groupCountX : Number of local workgroups in X dimension for the launch of child mesh tasks
 // @param groupCountX : Number of local workgroups in Y dimension for the launch of child mesh tasks
 // @param groupCountX : Number of local workgroups in Z dimension for the launch of child mesh tasks
-void MeshTaskShader::emitTaskMeshs(Function *entryPoint, Value *groupCountX, Value *groupCountY, Value *groupCountZ) {
+void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value *groupCountZ) {
+  auto entryPoint = m_builder->GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
 
   auto emitMeshsCall = m_builder->GetInsertPoint();
@@ -1213,7 +1214,7 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *beginMeshShaderBlock) {
           assert(call->arg_size() == 1);
 
           auto byteOffset = call->getOperand(0);
-          auto readValue = readTaskPayload(entryPoint, call->getType(), byteOffset);
+          auto readValue = readTaskPayload(call->getType(), byteOffset);
           call->replaceAllUsesWith(readValue);
         } else if (func.getName().startswith(lgcName::MeshTaskWriteVertexOutput)) {
           // Write vertex output
