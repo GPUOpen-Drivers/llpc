@@ -117,6 +117,12 @@ if(ICD_BUILD_LLPC)
             Target
             TransformUtils
         )
+        # Some of the games using old versions of the tcmalloc lib are crashing
+        # when allocating aligned memory. C++17 enables aligned new by default,
+        # so we need to disable it to prevent those crashes.
+        foreach (lib ${llvm_libs})
+          target_compile_options(${lib} PRIVATE "-fno-aligned-new")
+        endforeach()
         target_link_libraries(llpc PUBLIC ${llvm_libs})
     endif()
 
