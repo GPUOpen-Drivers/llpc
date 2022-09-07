@@ -1386,7 +1386,7 @@ Instruction *InOutBuilder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltIn
 // @param resultTy : Type of value to read
 // @param byteOffset : Byte offset within the payload structure
 // @param instName : Name to give instruction(s)
-// @returns Value read from the task payload
+// @returns : Value read from the task payload
 Value *InOutBuilder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset, const Twine &instName) {
   assert(m_shaderStage == ShaderStageTask || m_shaderStage == ShaderStageMesh); // Only valid for task/mesh shader
 
@@ -1401,13 +1401,53 @@ Value *InOutBuilder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset, co
 // @param valueToWrite : Value to write
 // @param byteOffset : Byte offset within the payload structure
 // @param instName : Name to give instruction(s)
-// @returns Instruction to write value to task payload
+// @returns : Instruction to write value to task payload
 Instruction *InOutBuilder::CreateWriteTaskPayload(Value *valueToWrite, Value *byteOffset, const Twine &instName) {
   assert(m_shaderStage == ShaderStageTask); // Only valid for task shader
 
   std::string callName = lgcName::MeshTaskWriteTaskPayload;
   addTypeMangling(nullptr, {byteOffset, valueToWrite}, callName);
   return CreateNamedCall(callName, getVoidTy(), {byteOffset, valueToWrite}, {});
+}
+
+// =====================================================================================================================
+// Create a task payload atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
+// of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
+//
+// @param atomicOp : Atomic op to create
+// @param ordering : Atomic ordering
+// @param inputValue : Input value
+// @param byteOffset : Byte offset within the payload structure
+// @param instName : Name to give instruction(s)
+// @returns : Original value read from the task payload
+Value *InOutBuilder::CreateTaskPayloadAtomic(unsigned atomicOp, AtomicOrdering ordering, Value *inputValue,
+                                             Value *byteOffset, const Twine &instName) {
+  assert(m_shaderStage == ShaderStageTask); // Only valid for task shader
+
+  std::string callName = lgcName::MeshTaskAtomicTaskPayload;
+  addTypeMangling(nullptr, inputValue, callName);
+  return CreateNamedCall(callName, inputValue->getType(),
+                         {getInt32(atomicOp), getInt32(static_cast<unsigned>(ordering)), inputValue, byteOffset}, {});
+}
+
+// =====================================================================================================================
+// Create a task payload atomic compare-and-swap.
+//
+// @param ordering : Atomic ordering
+// @param inputValue : Input value
+// @param comparatorValue : Value to compare against
+// @param byteOffset : Byte offset within the payload structure
+// @param instName : Name to give instruction(s)
+// @returns : Original value read from the task payload
+Value *InOutBuilder::CreateTaskPayloadAtomicCompareSwap(AtomicOrdering ordering, Value *inputValue,
+                                                        Value *comparatorValue, Value *byteOffset,
+                                                        const Twine &instName) {
+  assert(m_shaderStage == ShaderStageTask); // Only valid for task shader
+
+  std::string callName = lgcName::MeshTaskAtomicCompareSwapTaskPayload;
+  addTypeMangling(nullptr, inputValue, callName);
+  return CreateNamedCall(callName, inputValue->getType(),
+                         {getInt32(static_cast<unsigned>(ordering)), inputValue, comparatorValue, byteOffset}, {});
 }
 
 // =====================================================================================================================
