@@ -77,6 +77,10 @@ private:
 
   llvm::Value *readTaskPayload(llvm::Type *readTy, llvm::Value *byteOffset);
   void writeTaskPayload(llvm::Value *writeValue, llvm::Value *byteOffset);
+  llvm::Value *taskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, llvm::Value *inputValue,
+                                 llvm::Value *byteOffset);
+  llvm::Value *taskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, llvm::Value *inputValue,
+                                            llvm::Value *comparatorValue, llvm::Value *byteOffset);
 
   void initWaveThreadInfo(llvm::Function *entryPoint);
   llvm::Value *getShaderRingEntryIndex(llvm::Function *entryPoint);

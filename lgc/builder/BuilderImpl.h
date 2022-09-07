@@ -525,6 +525,15 @@ public:
   llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset,
                                             const llvm::Twine &instName = "") override final;
 
+  // Create a task payload atomic operation other than compare-and-swap.
+  llvm::Value *CreateTaskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, llvm::Value *inputValue,
+                                       llvm::Value *byteOffset, const llvm::Twine &instName = "") override final;
+
+  // Create a task payload atomic compare-and-swap.
+  llvm::Value *CreateTaskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, llvm::Value *inputValue,
+                                                  llvm::Value *comparatorValue, llvm::Value *byteOffset,
+                                                  const llvm::Twine &instName = "") override final;
+
 private:
   InOutBuilder() = delete;
   InOutBuilder(const InOutBuilder &) = delete;

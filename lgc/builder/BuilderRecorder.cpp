@@ -180,6 +180,10 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "read.task.payload";
   case Opcode::WriteTaskPayload:
     return "write.task.payload";
+  case Opcode::TaskPayloadAtomic:
+    return "task.payload.atomic";
+  case Opcode::TaskPayloadAtomicCompareSwap:
+    return "task.payload.compare.swap";
   case Opcode::TransposeMatrix:
     return "transpose.matrix";
   case Opcode::MatrixTimesScalar:
@@ -1626,7 +1630,7 @@ Instruction *BuilderRecorder::CreateWriteBuiltInOutput(Value *valueToWrite, Buil
 // @param resultTy : Type of value to read
 // @param byteOffset : Byte offset within the payload structure
 // @param instName : Name to give instruction(s)
-// @returns Value read from the task payload
+// @returns : Value read from the task payload
 Value *BuilderRecorder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset, const Twine &instName) {
   return record(Opcode::ReadTaskPayload, resultTy, byteOffset, instName);
 }
@@ -1637,9 +1641,41 @@ Value *BuilderRecorder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset,
 // @param valueToWrite : Value to write
 // @param byteOffset : Byte offset within the payload structure
 // @param instName : Name to give instruction(s)
-// @returns Instruction to write value to task payload
+// @returns : Instruction to write value to task payload
 Instruction *BuilderRecorder::CreateWriteTaskPayload(Value *valueToWrite, Value *byteOffset, const Twine &instName) {
   return record(Opcode::WriteTaskPayload, nullptr, {valueToWrite, byteOffset}, instName);
+}
+
+// =====================================================================================================================
+// Create a task payload atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
+// of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
+//
+// @param atomicOp : Atomic op to create
+// @param ordering : Atomic ordering
+// @param inputValue : Input value
+// @param byteOffset : Byte offset within the payload structure
+// @param instName : Name to give instruction(s)
+// @returns : Original value read from the task payload
+Value *BuilderRecorder::CreateTaskPayloadAtomic(unsigned atomicOp, AtomicOrdering ordering, Value *inputValue,
+                                                Value *byteOffset, const Twine &instName) {
+  return record(Opcode::TaskPayloadAtomic, inputValue->getType(),
+                {getInt32(atomicOp), getInt32(static_cast<unsigned>(ordering)), inputValue, byteOffset}, instName);
+}
+
+// =====================================================================================================================
+// Create a task payload atomic compare-and-swap.
+//
+// @param ordering : Atomic ordering
+// @param inputValue : Input value
+// @param comparatorValue : Value to compare against
+// @param byteOffset : Byte offset within the payload structure
+// @param instName : Name to give instruction(s)
+// @returns : Original value read from the task payload
+Value *BuilderRecorder::CreateTaskPayloadAtomicCompareSwap(AtomicOrdering ordering, Value *inputValue,
+                                                           Value *comparatorValue, Value *byteOffset,
+                                                           const Twine &instName) {
+  return record(Opcode::TaskPayloadAtomicCompareSwap, inputValue->getType(),
+                {getInt32(static_cast<unsigned>(ordering)), inputValue, comparatorValue, byteOffset}, instName);
 }
 
 // =====================================================================================================================
@@ -2104,6 +2140,8 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ImageAtomicCompareSwap:
     case Opcode::WriteXfbOutput:
     case Opcode::WriteTaskPayload:
+    case Opcode::TaskPayloadAtomic:
+    case Opcode::TaskPayloadAtomicCompareSwap:
       // Functions that read and write memory.
       break;
     case Opcode::SubgroupAll:

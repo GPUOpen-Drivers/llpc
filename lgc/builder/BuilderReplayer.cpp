@@ -707,6 +707,22 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
                                              args[1]); // Byte offset within the payload structure
   }
 
+  case BuilderRecorder::Opcode::TaskPayloadAtomic: {
+    unsigned atomicOp = cast<ConstantInt>(args[0])->getZExtValue();
+    auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[1])->getZExtValue());
+    Value *inputValue = args[2];
+    Value *byteOffset = args[3];
+    return m_builder->CreateTaskPayloadAtomic(atomicOp, ordering, inputValue, byteOffset);
+  }
+
+  case BuilderRecorder::Opcode::TaskPayloadAtomicCompareSwap: {
+    auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[0])->getZExtValue());
+    Value *inputValue = args[1];
+    Value *comparatorValue = args[2];
+    Value *byteOffset = args[3];
+    return m_builder->CreateTaskPayloadAtomicCompareSwap(ordering, inputValue, comparatorValue, byteOffset);
+  }
+
   // Replayer implementations of MiscBuilder methods
   case BuilderRecorder::Opcode::EmitVertex: {
     return m_builder->CreateEmitVertex(cast<ConstantInt>(args[0])->getZExtValue());
