@@ -991,6 +991,7 @@ Value *InOutBuilder::normalizeBaryCoord(Value *iJCoord) {
   case PrimitiveType::Point: {
     // Points
     barycoord = ConstantVector::get({one, zero, zero});
+    break;
   }
   case PrimitiveType::LineList:
   case PrimitiveType::LineStrip: {
