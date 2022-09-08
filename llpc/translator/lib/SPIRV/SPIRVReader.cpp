@@ -2650,7 +2650,7 @@ Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned d
   if (resType != ResourceNodeType::DescriptorSampler) {
     // Image/f-mask/texel buffer, where a pointer is represented by a struct {pointer,stride}.
     Value *descPtr = getBuilder()->CreateGetDescPtr(resType, searchType, descriptorSet, binding);
-    Value *descStride = getBuilder()->CreateGetDescStride(resType, descriptorSet, binding);
+    Value *descStride = getBuilder()->CreateGetDescStride(resType, searchType, descriptorSet, binding);
     descPtr = getBuilder()->CreateInsertValue(
         UndefValue::get(StructType::get(*m_context, {descPtr->getType(), descStride->getType()})), descPtr, 0);
     descPtr = getBuilder()->CreateInsertValue(descPtr, descStride, 1);
@@ -2678,7 +2678,7 @@ Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned d
     samplerDescPtr = getBuilder()->CreateInsertValue(
         samplerDescPtr, getBuilder()->CreateGetDescPtr(resType, searchType, descriptorSet, binding), 0);
     samplerDescPtr = getBuilder()->CreateInsertValue(
-        samplerDescPtr, getBuilder()->CreateGetDescStride(resType, descriptorSet, binding), 1);
+        samplerDescPtr, getBuilder()->CreateGetDescStride(resType, searchType, descriptorSet, binding), 1);
   } else {
     // It is a converting sampler. Return the struct with just the converting sampler index.
     samplerDescPtr = getBuilder()->CreateInsertValue(samplerDescPtr, getBuilder()->getInt32(convertingSamplerIdx), 2);

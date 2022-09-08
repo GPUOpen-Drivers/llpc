@@ -729,13 +729,15 @@ public:
 
   // Create a get of the stride (in bytes) of a descriptor. Returns an i32 value.
   //
-  // @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+  // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+  //                   DescriptorTexelBuffer, DescriptorFmask.
+  // @param abstractType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
   //                   DescriptorTexelBuffer, DescriptorFmask.
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetDescStride(ResourceNodeType descType, unsigned descSet, unsigned binding,
-                                           const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType,
+                                           unsigned descSet, unsigned binding, const llvm::Twine &instName = "") = 0;
 
   // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
   // GetTexelBufferDescPtrTy or GetFmaskDescPtrTy, depending on descType.

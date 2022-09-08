@@ -149,25 +149,27 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
 // =====================================================================================================================
 // Create a get of the stride (in bytes) of a descriptor. Returns an i32 value.
 //
-// @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+// @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+//                   DescriptorTexelBuffer, DescriptorFmask.
+// @param abstractType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
 //                   DescriptorTexelBuffer, DescriptorFmask.
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *DescBuilder::CreateGetDescStride(ResourceNodeType descType, unsigned descSet, unsigned binding,
-                                        const Twine &instName) {
+Value *DescBuilder::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+                                        unsigned binding, const Twine &instName) {
   // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
   // look; we will use relocs instead.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(descType, descSet, binding);
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     if (!node) {
       // We did not find the resource node. Return an undef value.
       return UndefValue::get(getInt32Ty());
     }
   }
-  return getStride(descType, descSet, binding, node);
+  return getStride(concreteType, descSet, binding, node);
 }
 
 // =====================================================================================================================

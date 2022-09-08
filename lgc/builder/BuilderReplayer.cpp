@@ -442,8 +442,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
 
   case BuilderRecorder::Opcode::GetDescStride:
     return m_builder->CreateGetDescStride(static_cast<ResourceNodeType>(cast<ConstantInt>(args[0])->getZExtValue()),
-                                          cast<ConstantInt>(args[1])->getZExtValue(),  // descSet
-                                          cast<ConstantInt>(args[2])->getZExtValue()); // binding
+                                          static_cast<ResourceNodeType>(cast<ConstantInt>(args[1])->getZExtValue()),
+                                          cast<ConstantInt>(args[2])->getZExtValue(),  // descSet
+                                          cast<ConstantInt>(args[3])->getZExtValue()); // binding
 
   case BuilderRecorder::Opcode::GetDescPtr:
     return m_builder->CreateGetDescPtr(
