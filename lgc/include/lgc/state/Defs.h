@@ -159,6 +159,15 @@ static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
 // Maximum tess factors per patch
 static const unsigned MaxTessFactorsPerPatch = 6; // 4 outer factors + 2 inner factors
 
+#if VKI_RAY_TRACING
+static const char RayQueryLdsStackName[] = "LdsStack";
+// NOTE: Currently, we restrict the max thread count of ray query to be 64 and make sure the wave size is 64. This is
+// because we don't provide the capability of querying thread ID in group for ray query in vertex processing shaders.
+// In the future, if such is done, we could consider to remove this restriction.
+static const unsigned MaxRayQueryThreadsPerGroup = 64; // Max number of ray query threads per group
+static const unsigned MaxRayQueryLdsStackEntries = 16; // Max number of ray query LDS stack entries
+#endif
+
 // Internal resource table's virtual descriptor sets
 static const unsigned InternalResourceTable = 0x10000000;
 static const unsigned InternalPerShaderTable = 0x10000001;

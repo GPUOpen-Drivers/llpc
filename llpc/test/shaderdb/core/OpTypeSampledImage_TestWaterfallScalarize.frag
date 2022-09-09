@@ -19,6 +19,9 @@ void main()
 // BEGIN_SHADERTEST
 //
 // RUN: amdllpc -scalarize-waterfall-descriptor-loads -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+// Explicitly check GFX10.3 ASIC variants:
+// RUN: amdllpc -scalarize-waterfall-descriptor-loads -v --gfxip=10.3.0 %s | FileCheck -check-prefix=SHADERTEST %s
+// RUN: amdllpc -scalarize-waterfall-descriptor-loads -v --gfxip=10.3.2 %s | FileCheck -check-prefix=SHADERTEST %s
 // SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 // SHADERTEST: call i32 @llvm.amdgcn.waterfall.begin.i32
 // SHADERTEST-NOT: call i32 @llvm.amdgcn.waterfall.begin.i32

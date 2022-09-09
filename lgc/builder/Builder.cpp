@@ -435,3 +435,25 @@ CallInst *Builder::CreateIntrinsic(Intrinsic::ID id, ArrayRef<Type *> types, Arr
   return result;
 }
 
+#if VKI_RAY_TRACING
+// =====================================================================================================================
+// Create a ray intersect result with specified node in BVH buffer.
+// pNodePtr is the combination of BVH node offset type.
+//
+// @param nodePtr : BVH node pointer
+// @param extent : The valid range on which intersections can occur
+// @param origin : Intersect ray origin
+// @param direction : Intersect ray direction
+// @param invDirection : The inverse of direction
+// @param imageDesc : Image descriptor
+// @param instName : Name to give instruction(s)
+Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value *origin, Value *direction,
+                                           Value *invDirection, Value *imageDesc, const Twine &instName) {
+  if (m_isBuilderRecorder) {
+    return static_cast<BuilderRecorder *>(this)->CreateImageBvhIntersectRay(nodePtr, extent, origin, direction,
+                                                                            invDirection, imageDesc, instName);
+  }
+  return static_cast<BuilderImplBase *>(this)->CreateImageBvhIntersectRay(nodePtr, extent, origin, direction,
+                                                                          invDirection, imageDesc, instName);
+}
+#endif

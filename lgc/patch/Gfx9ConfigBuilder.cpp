@@ -968,6 +968,9 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
 
   unsigned ldsSizeInDwords = calcFactor.tessOnChipLdsSize;
+#if VKI_RAY_TRACING
+  ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
+#endif
   ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
   const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
@@ -1091,6 +1094,9 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
 
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
+#if VKI_RAY_TRACING
+  ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
+#endif
   ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
   const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
@@ -1301,6 +1307,9 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
 
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
+#if VKI_RAY_TRACING
+  ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
+#endif
   ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
   const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;

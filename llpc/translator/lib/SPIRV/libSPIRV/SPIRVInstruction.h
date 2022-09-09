@@ -1486,6 +1486,9 @@ _SPIRV_OP(SConvert)
 _SPIRV_OP(FConvert)
 _SPIRV_OP(ConvertPtrToU)
 _SPIRV_OP(ConvertUToPtr)
+#if VKI_RAY_TRACING
+_SPIRV_OP(ConvertUToAccelerationStructureKHR)
+#endif
 _SPIRV_OP(Bitcast)
 _SPIRV_OP(SNegate)
 _SPIRV_OP(FNegate)
@@ -2549,6 +2552,51 @@ protected:
 _SPIRV_OP(SubgroupImageBlockReadINTEL, true, 5)
 _SPIRV_OP(SubgroupImageBlockWriteINTEL, false, 4)
 #undef _SPIRV_OP
+
+#if VKI_RAY_TRACING
+class SPIRVRayTracingInstBase : public SPIRVInstTemplateBase {
+protected:
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilityRayTracingProvisionalKHR); }
+};
+
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVRayTracingInstBase, Op##x, __VA_ARGS__> SPIRV##x;
+
+_SPIRV_OP(ReportIntersectionKHR, true, 5)
+_SPIRV_OP(IgnoreIntersectionKHR, false, 1)
+_SPIRV_OP(IgnoreIntersectionNV, false, 1)
+_SPIRV_OP(TerminateRayKHR, false, 1)
+_SPIRV_OP(TerminateRayNV, false, 1)
+_SPIRV_OP(TraceRayKHR, false, 12)
+_SPIRV_OP(TraceNV, false, 12)
+_SPIRV_OP(TraceRayKHR, false, 12)
+_SPIRV_OP(ExecuteCallableKHR, false, 3)
+_SPIRV_OP(ExecuteCallableKHR, false, 3)
+_SPIRV_OP(RayQueryInitializeKHR, false, 9)
+_SPIRV_OP(RayQueryTerminateKHR, false, 2)
+_SPIRV_OP(RayQueryGenerateIntersectionKHR, false, 3)
+_SPIRV_OP(RayQueryConfirmIntersectionKHR, false, 2)
+_SPIRV_OP(RayQueryProceedKHR, true, 4)
+_SPIRV_OP(RayQueryGetIntersectionTypeKHR, true, 5)
+_SPIRV_OP(RayQueryGetRayTMinKHR, true, 4)
+_SPIRV_OP(RayQueryGetRayFlagsKHR, true, 4)
+_SPIRV_OP(RayQueryGetIntersectionTKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionInstanceCustomIndexKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionInstanceIdKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionGeometryIndexKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionPrimitiveIndexKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionBarycentricsKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionFrontFaceKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionCandidateAABBOpaqueKHR, true, 4)
+_SPIRV_OP(RayQueryGetIntersectionObjectRayDirectionKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionObjectRayOriginKHR, true, 5)
+_SPIRV_OP(RayQueryGetWorldRayDirectionKHR, true, 4)
+_SPIRV_OP(RayQueryGetWorldRayOriginKHR, true, 4)
+_SPIRV_OP(RayQueryGetIntersectionObjectToWorldKHR, true, 5)
+_SPIRV_OP(RayQueryGetIntersectionWorldToObjectKHR, true, 5)
+
+#undef _SPIRV_OP
+#endif
 
 class SPIRVIntegerDotProductInstBase : public SPIRVInstTemplateBase {
 public:

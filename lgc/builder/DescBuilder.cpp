@@ -418,8 +418,8 @@ Value *DescBuilder::getDescPtr(ResourceNodeType resType, unsigned descSet, unsig
     // add on the size of the first part.
     unsigned offsetInDwords = node->offsetInDwords;
     offsetInDwords += (binding - node->binding) * node->stride;
-    unsigned offsetInBytes = offsetInDwords * 4;
 
+    unsigned offsetInBytes = offsetInDwords * 4;
     if (resType == ResourceNodeType::DescriptorSampler &&
         node->concreteType == ResourceNodeType::DescriptorCombinedTexture)
       offsetInBytes += DescriptorSizeResource;

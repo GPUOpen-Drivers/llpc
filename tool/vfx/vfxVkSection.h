@@ -417,6 +417,212 @@ private:
   SubState m_state;
 };
 
+#if VKI_RAY_TRACING
+// =====================================================================================================================
+// Represents the sub section IndirectCalleeSavedRegs state
+class SectionIndirectCalleeSavedRegs : public Section {
+public:
+  typedef Vkgc::RayTracingShaderExportConfig SubState;
+  SectionIndirectCalleeSavedRegs() : Section(m_addrTable, MemberCount, SectionTypeUnset, "exportConfig") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  static void initialAddrTable() {
+    StrToMemberAddr *tableItem = m_addrTable;
+
+    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, raygen, raygen,
+                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.raygen)>,
+                                           MemberTypeInt, false);
+    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, miss, miss,
+                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.miss)>,
+                                           MemberTypeInt, false);
+    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, closestHit, closestHit,
+                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.closestHit)>,
+                                           MemberTypeInt, false);
+    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, anyHit, anyHit,
+                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.anyHit)>,
+                                           MemberTypeInt, false);
+    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+        SectionIndirectCalleeSavedRegs, intersection, intersection,
+        SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
+                                                                       indirectCalleeSavedRegs.intersection)>,
+        MemberTypeInt, false);
+    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, callable, callable,
+                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.callable)>,
+                                           MemberTypeInt, false);
+    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, traceRays, traceRays,
+                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.traceRays)>,
+                                           MemberTypeInt, false);
+    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
+  }
+
+  void getSubState(SubState &state) { state.indirectCalleeSavedRegs = m_state.indirectCalleeSavedRegs; }
+
+  SubState &getSubStateRef() { return m_state; }
+
+private:
+  template <size_t Offset> static void *GetExportConfigMember(void *pObj) {
+    constexpr size_t ExportConfigOffset = offsetof(SectionIndirectCalleeSavedRegs, m_state);
+    return reinterpret_cast<uint8_t *>(pObj) + ExportConfigOffset + Offset;
+  }
+
+  static const unsigned MemberCount = 7;
+  static StrToMemberAddr m_addrTable[MemberCount];
+
+  SubState m_state;
+};
+
+// =====================================================================================================================
+// Represents the sub section RayTracingShaderExportConfig state
+class SectionRayTracingShaderExportConfig : public Section {
+public:
+  typedef Vkgc::RayTracingShaderExportConfig SubState;
+  SectionRayTracingShaderExportConfig() : Section(m_addrTable, MemberCount, SectionTypeUnset, "exportConfig") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  static void initialAddrTable() {
+    StrToMemberAddr *tableItem = m_addrTable;
+
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, indirectCallingConvention, MemberTypeInt,
+                                   false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableUniformNoReturn, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableTraceRayArgsInLds, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, readsDispatchRaysIndex, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableDynamicLaunch, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, emitRaytracingShaderDataToken, MemberTypeBool,
+                                   false);
+    INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, m_indirectCalleeSavedRegs,
+                             MemberTypeIndirectCalleeSavedRegs, true);
+    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
+  }
+
+  void getSubState(SubState &state) {
+    state = m_state;
+    m_indirectCalleeSavedRegs.getSubState(state);
+  }
+
+  SubState &getSubStateRef() { return m_state; }
+
+private:
+  static const unsigned MemberCount = 7;
+  static StrToMemberAddr m_addrTable[MemberCount];
+
+  SubState m_state;
+  SectionIndirectCalleeSavedRegs m_indirectCalleeSavedRegs;
+};
+
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
+// =====================================================================================================================
+// Represents the sub section GpurtFuncTable state
+class SectionGpurtFuncTable : public Section {
+public:
+  typedef Vkgc::GpurtFuncTable SubState;
+  SectionGpurtFuncTable() : Section(m_addrTable, MemberCount, SectionTypeUnset, "gpurtFuncTable") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  static void initAddrTable() {
+    StrToMemberAddr *tableItem = m_addrTable;
+    INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGpurtFuncTable, m_pFunc, MemberTypeString, Vkgc::RT_ENTRY_FUNC_COUNT, false);
+    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
+  }
+
+  void getSubState(SubState &state) {
+    for (unsigned i = 0; i < Vkgc::RT_ENTRY_FUNC_COUNT; i++)
+      strcpy(state.pFunc[i], m_pFunc[i].c_str());
+  }
+
+  SubState &getSubStateRef() { return m_state; }
+
+private:
+  static const unsigned MemberCount = 1;
+  static StrToMemberAddr m_addrTable[MemberCount];
+
+  SubState m_state;
+  std::string m_pFunc[Vkgc::RT_ENTRY_FUNC_COUNT];
+};
+#endif
+
+// =====================================================================================================================
+// Represents the sub section RtState state
+class SectionRtState : public Section {
+public:
+  typedef Vkgc::RtState SubState;
+  SectionRtState() : Section(m_addrTable, MemberCount, SectionTypeUnset, "rtState") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  static void initialAddrTable() {
+    StrToMemberAddr *tableItem = m_addrTable;
+    INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_bvhResDescSize, MemberTypeInt, false);
+    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRtState, m_bvhResDesc, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, nodeStrideShift, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, staticPipelineFlags, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, triCompressMode, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, pipelineFlags, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, threadGroupSizeX, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, threadGroupSizeY, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, threadGroupSizeZ, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, boxSortHeuristicMode, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, counterMode, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, counterMask, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, rayQueryCsSwizzle, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, ldsStackSize, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, dispatchRaysThreadGroupSize, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, ldsSizePerThreadGroup, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, outerTileSize, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, dispatchDimSwizzleMode, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayQueryCsSwizzle, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableDispatchRaysInnerSwizzle, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableDispatchRaysOuterSwizzle, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, forceInvalidAccelStruct, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayTracingCounters, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForIndirect, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForUnified, MemberTypeInt, false);
+    INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_exportConfig, MemberTypeRayTracingShaderExportConfig, true);
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
+    INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_gpurtFuncTable, MemberTypeGpurtFuncTable, true);
+#endif
+    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
+  }
+  void getSubState(SubState &state) {
+    state = m_state;
+    state.bvhResDesc.dataSizeInDwords = m_bvhResDescSize;
+    for (unsigned i = 0; i < m_bvhResDesc.size(); ++i)
+      state.bvhResDesc.descriptorData[i] = m_bvhResDesc[i];
+    m_exportConfig.getSubState(state.exportConfig);
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
+    m_gpurtFuncTable.getSubState(state.gpurtFuncTable);
+#endif
+  }
+
+  SubState &getSubStateRef() { return m_state; }
+
+private:
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
+  static const unsigned MemberCount = 28;
+#else
+  static const unsigned MemberCount = 27;
+#endif
+  static StrToMemberAddr m_addrTable[MemberCount];
+
+  SubState m_state;
+  SectionRayTracingShaderExportConfig m_exportConfig;
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
+  SectionGpurtFuncTable m_gpurtFuncTable;
+#endif
+  unsigned m_bvhResDescSize;
+  std::vector<unsigned> m_bvhResDesc;
+};
+#endif
+
 // =====================================================================================================================
 // Represents the section graphics state
 class SectionGraphicsState : public Section {
@@ -454,6 +660,10 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableUberFetchShader, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableEarlyCompile, MemberTypeBool, false);
 
+#if VKI_RAY_TRACING
+    INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
+    INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
+#endif
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
@@ -463,6 +673,17 @@ public:
     m_options.getSubState(m_state.options);
     m_nggState.getSubState(m_state.nggState);
     state = m_state;
+#if VKI_RAY_TRACING
+    std::string dummySource;
+    if (!m_shaderLibrary.empty()) {
+      bool ret = readFile(docFilename, m_shaderLibrary, true, &m_shaderLibraryBytes, &dummySource, errorMsg);
+      if (ret) {
+        state.shaderLibrary.codeSize = m_shaderLibraryBytes.size();
+        state.shaderLibrary.pCode = &m_shaderLibraryBytes[0];
+      }
+      m_rtState.getSubState(state.rtState);
+    }
+#endif
   };
   SubState &getSubStateRef() { return m_state; };
 
@@ -473,6 +694,11 @@ private:
   SubState m_state;
   SectionColorBuffer m_colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
   SectionPipelineOption m_options;
+#if VKI_RAY_TRACING
+  std::string m_shaderLibrary;
+  std::vector<uint8_t> m_shaderLibraryBytes;
+  SectionRtState m_rtState;
+#endif
 };
 
 // =====================================================================================================================
@@ -489,12 +715,27 @@ public:
     StrToMemberAddr *tableItem = m_addrTable;
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
     INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_options, MemberTypePipelineOption, true);
+#if VKI_RAY_TRACING
+    INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_shaderLibrary, MemberTypeString, false);
+    INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_rtState, MemberTypeRtState, true);
+#endif
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   void getSubState(const std::string &docFilename, SubState &state, std::string *errorMsg) {
     m_options.getSubState(m_state.options);
     state = m_state;
+#if VKI_RAY_TRACING
+    std::string dummySource;
+    if (!m_shaderLibrary.empty()) {
+      bool ret = readFile(docFilename, m_shaderLibrary, true, &m_shaderLibraryBytes, &dummySource, errorMsg);
+      if (ret) {
+        state.shaderLibrary.codeSize = m_shaderLibraryBytes.size();
+        state.shaderLibrary.pCode = &m_shaderLibraryBytes[0];
+      }
+      m_rtState.getSubState(state.rtState);
+    }
+#endif
   };
   SubState &getSubStateRef() { return m_state; };
 
@@ -504,6 +745,73 @@ private:
 
   SubState m_state;
   SectionPipelineOption m_options;
+#if VKI_RAY_TRACING
+  std::string m_shaderLibrary;
+  std::vector<uint8_t> m_shaderLibraryBytes;
+  SectionRtState m_rtState;
+#endif
 };
+
+#if VKI_RAY_TRACING
+// =====================================================================================================================
+// Represents the section ray tracing state
+class SectionRayTracingState : public Section {
+public:
+  typedef RayTracingPipelineState SubState;
+
+  SectionRayTracingState() : Section(m_addrTable, MemberCount, SectionTypeComputeState, nullptr) {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  static void initialAddrTable() {
+    StrToMemberAddr *tableItem = m_addrTable;
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, deviceIndex, MemberTypeInt, false);
+    INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_options, MemberTypePipelineOption, true);
+    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRayTracingState, m_groups, MemberTypeShaderGroup, true);
+    INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_shaderTraceRay, MemberTypeString, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, maxRecursionDepth, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, indirectStageMask, MemberTypeInt, false);
+    INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_rtState, MemberTypeRtState, true);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, payloadSizeMaxInLib, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, attributeSizeMaxInLib, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, hasPipelineLibrary, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, pipelineLibStageMask, MemberTypeInt, false);
+    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
+  }
+
+  void getSubState(const std::string &docFilename, SubState &state, std::string *errorMsg) {
+    m_options.getSubState(m_state.options);
+    m_state.shaderGroupCount = static_cast<unsigned>(m_groups.size());
+    m_vkShaderGroups.resize(m_state.shaderGroupCount);
+    for (unsigned i = 0; i < m_state.shaderGroupCount; ++i)
+      m_groups[i].getSubState(m_vkShaderGroups[i]);
+
+    m_state.pShaderGroups = (m_state.shaderGroupCount) > 0 ? &m_vkShaderGroups[0] : nullptr;
+    std::string dummySource;
+    if (!m_shaderTraceRay.empty()) {
+      bool ret = readFile(docFilename, m_shaderTraceRay, true, &m_traceRayBinary, &dummySource, errorMsg);
+      if (ret) {
+        m_state.shaderTraceRay.codeSize = m_traceRayBinary.size();
+        m_state.shaderTraceRay.pCode = &m_traceRayBinary[0];
+      }
+    }
+    m_rtState.getSubState(m_state.rtState);
+    state = m_state;
+  };
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static const unsigned MemberCount = 11;
+  static StrToMemberAddr m_addrTable[MemberCount];
+
+  SubState m_state;
+  SectionPipelineOption m_options;
+  SectionRtState m_rtState;
+  std::string m_shaderTraceRay;
+  std::vector<SectionShaderGroup> m_groups;
+  std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_vkShaderGroups;
+  std::vector<uint8_t> m_traceRayBinary;
+};
+#endif
 
 } // namespace Vfx

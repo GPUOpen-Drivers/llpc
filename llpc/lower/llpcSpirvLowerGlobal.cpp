@@ -397,6 +397,7 @@ void SpirvLowerGlobal::handleLoadInstGlobal(LoadInst &loadInst, const unsigned a
 
   Value *loadValue = UndefValue::get(inOutTy);
 
+  // If the input/output is arrayed, the outermost index might be used for vertex indexing
   if (inOutTy->isArrayTy() && hasVertexIdx(*inOutMetaVal)) {
     auto elemTy = inOutTy->getArrayElementType();
     auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
@@ -510,15 +511,16 @@ void SpirvLowerGlobal::handleStoreInstGlobal(StoreInst &storeInst) {
   assert(metaNode);
   auto outputMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
-  // If the input/output is arrayed, the outermost dimension might for vertex indexing
+  // If the output is arrayed, the outermost dimension might for vertex indexing
   if (outputy->isArrayTy() && hasVertexIdx(*outputMetaVal)) {
     auto elemMeta = cast<Constant>(outputMetaVal->getOperand(1));
 
     const unsigned elemCount = outputy->getArrayNumElements();
     for (unsigned i = 0; i < elemCount; ++i) {
       auto elemValue = ExtractValueInst::Create(storeValue, {i}, "", &storeInst);
-      Value *vertexIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
-      addCallInstForOutputExport(elemValue, elemMeta, nullptr, 0, InvalidValue, 0, nullptr, vertexIdx, InvalidValue);
+      Value *vertexOrPrimitiveIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
+      addCallInstForOutputExport(elemValue, elemMeta, nullptr, 0, InvalidValue, 0, nullptr, vertexOrPrimitiveIdx,
+                                 InvalidValue);
     }
   } else {
     addCallInstForOutputExport(storeValue, outputMetaVal, nullptr, 0, InvalidValue, 0, nullptr, nullptr, InvalidValue);
@@ -547,7 +549,7 @@ void SpirvLowerGlobal::handleStoreInstGEP(GetElementPtrInst *const getElemPtr, S
   for (auto &index : drop_begin(getElemPtr->indices()))
     indexOperands.push_back(m_builder->CreateZExtOrTrunc(index, m_builder->getInt32Ty()));
 
-  Value *vertexIdx = nullptr;
+  Value *vertexOrPrimitiveIdx = nullptr;
   auto outputTy = output->getValueType();
 
   MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
@@ -557,12 +559,12 @@ void SpirvLowerGlobal::handleStoreInstGEP(GetElementPtrInst *const getElemPtr, S
   // If the output is arrayed, the outermost index might be used for vertex indexing
   if (outputTy->isArrayTy() && hasVertexIdx(*outputMetaVal)) {
     outputTy = outputTy->getArrayElementType();
-    vertexIdx = indexOperands.front();
+    vertexOrPrimitiveIdx = indexOperands.front();
     indexOperands.erase(indexOperands.begin());
     outputMetaVal = cast<Constant>(outputMetaVal->getOperand(1));
   }
 
-  storeOutputMember(outputTy, storeValue, indexOperands, 0, outputMetaVal, nullptr, vertexIdx);
+  storeOutputMember(outputTy, storeValue, indexOperands, 0, outputMetaVal, nullptr, vertexOrPrimitiveIdx);
   m_storeInsts.insert(&storeInst);
 }
 
@@ -772,6 +774,11 @@ void SpirvLowerGlobal::lowerInput() {
 // =====================================================================================================================
 // Does lowering operations for SPIR-V outputs, replaces outputs with proxy variables.
 void SpirvLowerGlobal::lowerOutput() {
+#if VKI_RAY_TRACING
+  // Note: indirect raytracing does not have output to lower and must return payload value
+  if (m_context->isRayTracing())
+    return;
+#endif
 
   m_retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
   // Invoke handling of "return" instructions or "emit" calls
@@ -1164,11 +1171,11 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
 // @param xfbBufferAdjust : Adjustment of transform feedback buffer ID (for array type, default is 0)
 // @param elemIdx : Element index used for element indexing, valid for tessellation control shader (usually, it is
 // vector component index, for built-in input/output, it could be element index of scalar array)
-// @param vertexIdx : Output array outermost index used for vertex indexing, valid for tessellation control shader
+// @param vertexOrPrimitiveIdx : Output array outermost index used for vertex indexing
 // @param emitStreamId : ID of emitted vertex stream, valid for geometry shader (0xFFFFFFFF for others)
 void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *outputMetaVal, Value *locOffset,
                                                   unsigned maxLocOffset, unsigned xfbOffsetAdjust,
-                                                  unsigned xfbBufferAdjust, Value *elemIdx, Value *vertexIdx,
+                                                  unsigned xfbBufferAdjust, Value *elemIdx, Value *vertexOrPrimitiveIdx,
                                                   unsigned emitStreamId) {
   Type *outputTy = outputValue->getType();
 
@@ -1201,7 +1208,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       if (emitStreamId != InvalidValue)
         outputInfo.setStreamId(emitStreamId);
       outputInfo.setArraySize(outputTy->getArrayNumElements());
-      m_builder->CreateWriteBuiltInOutput(outputValue, builtInId, outputInfo, vertexIdx, nullptr);
+      m_builder->CreateWriteBuiltInOutput(outputValue, builtInId, outputInfo, vertexOrPrimitiveIdx, nullptr);
 
       if (outputMeta.IsXfb) {
         // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
@@ -1267,7 +1274,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
         addCallInstForOutputExport(elem, elemMeta, elemLocOffset, maxLocOffset,
                                    xfbOffsetAdjust + (blockArray ? 0 : outputMeta.XfbArrayStride * idx),
                                    xfbBufferAdjust + (blockArray ? outputMeta.XfbArrayStride * idx : 0), nullptr,
-                                   vertexIdx, emitStreamId);
+                                   vertexOrPrimitiveIdx, emitStreamId);
       }
     }
   } else if (outputTy->isStructTy()) {
@@ -1280,7 +1287,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       auto memberMeta = cast<Constant>(outputMetaVal->getOperand(memberIdx));
       Value *member = m_builder->CreateExtractValue(outputValue, {memberIdx});
       addCallInstForOutputExport(member, memberMeta, locOffset, maxLocOffset, xfbOffsetAdjust, xfbBufferAdjust, nullptr,
-                                 vertexIdx, emitStreamId);
+                                 vertexOrPrimitiveIdx, emitStreamId);
     }
   } else {
     // Normal scalar or vector type
@@ -1325,7 +1332,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
                                           << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
       }
 
-      m_builder->CreateWriteBuiltInOutput(outputValue, builtInId, outputInfo, vertexIdx, elemIdx);
+      m_builder->CreateWriteBuiltInOutput(outputValue, builtInId, outputInfo, vertexOrPrimitiveIdx, elemIdx);
       return;
     }
 
@@ -1365,7 +1372,8 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
                                         << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
     }
 
-    m_builder->CreateWriteGenericOutput(outputValue, location, locOffset, elemIdx, maxLocOffset, outputInfo, vertexIdx);
+    m_builder->CreateWriteGenericOutput(outputValue, location, locOffset, elemIdx, maxLocOffset, outputInfo,
+                                        vertexOrPrimitiveIdx);
   }
 }
 
@@ -1487,7 +1495,7 @@ Value *SpirvLowerGlobal::loadDynamicIndexedMembers(Type *inOutTy, unsigned addrS
 // @param maxLocOffset : Max+1 location offset if variable index has been encountered
 // @param inOutMetaVal : Metadata of this input/output member
 // @param locOffset : Relative location offset of this input/output member
-// @param vertexIdx : Input array outermost index used for vertex indexing
+// @param vertexIdx : Input/output array outermost index used for vertex indexing
 // @param interpLoc : Interpolation location, valid for fragment shader (use "InterpLocUnknown" as don't-care value)
 // @param auxInterpValue : Auxiliary value of interpolation (valid for fragment shader): - Sample ID for
 // "InterpLocSample" - Offset from the center of the pixel for "InterpLocCenter" - Vertex no. (0 ~ 2) for
@@ -1587,16 +1595,16 @@ Value *SpirvLowerGlobal::loadInOutMember(Type *inOutTy, unsigned addrSpace, Arra
 // @param maxLocOffset : Max+1 location offset if variable index has been encountered
 // @param outputMetaVal : Metadata of this output member
 // @param locOffset : Relative location offset of this output member
-// @param vertexIdx : Input array outermost index used for vertex indexing
+// @param vertexOrPrimitiveIdx : Input array outermost index used for vertex indexing
 void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, ArrayRef<Value *> indexOperands,
                                          unsigned maxLocOffset, Constant *outputMetaVal, Value *locOffset,
-                                         Value *vertexIdx) {
+                                         Value *vertexOrPrimitiveIdx) {
   assert(m_shaderStage == ShaderStageTessControl);
 
   if (indexOperands.empty()) {
     // All indices have been processed
     return addCallInstForOutputExport(storeValue, outputMetaVal, locOffset, maxLocOffset, InvalidValue, 0, nullptr,
-                                      vertexIdx, InvalidValue);
+                                      vertexOrPrimitiveIdx, InvalidValue);
   }
 
   if (outputTy->isArrayTy()) {
@@ -1615,7 +1623,7 @@ void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, Arra
 
       auto elemIdx = indexOperands.front();
       return addCallInstForOutputExport(storeValue, elemMeta, nullptr, outputTy->getArrayNumElements(), InvalidValue, 0,
-                                        elemIdx, vertexIdx, InvalidValue);
+                                        elemIdx, vertexOrPrimitiveIdx, InvalidValue);
     }
 
     // NOTE: If the relative location offset is not specified, initialize it.
@@ -1635,7 +1643,7 @@ void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, Arra
     }
 
     return storeOutputMember(elemTy, storeValue, indexOperands.drop_front(), maxLocOffset, elemMeta, elemLocOffset,
-                             vertexIdx);
+                             vertexOrPrimitiveIdx);
   }
 
   if (outputTy->isStructTy()) {
@@ -1646,7 +1654,7 @@ void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, Arra
     auto memberMeta = cast<Constant>(outputMetaVal->getOperand(memberIdx));
 
     return storeOutputMember(memberTy, storeValue, indexOperands.drop_front(), maxLocOffset, memberMeta, locOffset,
-                             vertexIdx);
+                             vertexOrPrimitiveIdx);
   }
 
   if (outputTy->isVectorTy()) {
@@ -1655,7 +1663,7 @@ void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Value *storeValue, Arra
     auto compIdx = indexOperands.front();
 
     return addCallInstForOutputExport(storeValue, outputMetaVal, locOffset, maxLocOffset, InvalidValue, 0, compIdx,
-                                      vertexIdx, InvalidValue);
+                                      vertexOrPrimitiveIdx, InvalidValue);
   }
 
   llvm_unreachable("Should never be called!");

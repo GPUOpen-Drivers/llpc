@@ -519,6 +519,10 @@ struct GraphicsPipelineState {
   Vkgc::NggState nggState; // NGG state
 
   ColorBuffer colorBuffer[Vkgc::MaxColorTargets]; // Color target state.
+#if VKI_RAY_TRACING
+  Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
+  Vkgc::RtState rtState;          // Ray tracing state
+#endif
   bool dynamicVertexStride; // Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader; // Use uber fetch shader
   bool enableEarlyCompile;    // Enable early compile
@@ -529,7 +533,30 @@ struct GraphicsPipelineState {
 struct ComputePipelineState {
   unsigned deviceIndex;          // Device index for device group
   Vkgc::PipelineOptions options; // Pipeline options
+#if VKI_RAY_TRACING
+  Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
+  Vkgc::RtState rtState;          // Ray tracing state
+#endif
 };
+
+#if VKI_RAY_TRACING
+// =====================================================================================================================
+// Represents RayTracingPipelineState section.
+struct RayTracingPipelineState {
+  unsigned deviceIndex;                                // Device index for device group
+  Vkgc::PipelineOptions options;                       // Pipeline options
+  unsigned shaderGroupCount;                           // Count of shader groups
+  VkRayTracingShaderGroupCreateInfoKHR *pShaderGroups; // An array of shader groups
+  Vkgc::BinaryData shaderTraceRay;                     // Trace-ray SPIR-V binary
+  unsigned maxRecursionDepth;                          // Ray tracing max recursion depth
+  unsigned indirectStageMask;                          // Trace-ray indirect stage mask
+  Vkgc::RtState rtState;                               // Ray tracing state
+  unsigned payloadSizeMaxInLib;                        // Pipeline library maxPayloadSize
+  unsigned attributeSizeMaxInLib;                      // Pipeline library maxAttributeSize
+  bool hasPipelineLibrary;                             // Whether has pipeline library
+  unsigned pipelineLibStageMask;                       // Pipeline library stage mask
+};
+#endif
 
 #endif
 
@@ -562,6 +589,9 @@ typedef void *VfxRenderStatePtr;
 enum VfxPipelineType : unsigned {
   VfxPipelineTypeGraphics = 0,
   VfxPipelineTypeCompute,
+#if VKI_RAY_TRACING
+  VfxPipelineTypeRayTracing,
+#endif
 };
 
 // =====================================================================================================================
@@ -571,6 +601,9 @@ struct VfxPipelineState {
   VfxPipelineType pipelineType;                    // Pipeline type
   Vkgc::GraphicsPipelineBuildInfo gfxPipelineInfo; // Vkgc graphics pipeline build info
   Vkgc::ComputePipelineBuildInfo compPipelineInfo; // Vkgc compute pipeline build info
+#if VKI_RAY_TRACING
+  Vkgc::RayTracingPipelineBuildInfo rayPipelineInfo; // Vkgc ray tracing pipeline build info
+#endif
   unsigned numStages;        // Number of shader source sections
   Vfx::ShaderSource *stages; // Shader source sections
 };

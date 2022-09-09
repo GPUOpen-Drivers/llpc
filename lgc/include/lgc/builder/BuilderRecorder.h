@@ -151,7 +151,11 @@ public:
     ImageQuerySamples,
     ImageQuerySize,
     ImageGetLod,
+#if VKI_RAY_TRACING
+    ImageBvhIntersectRayAMD,
+#else
     Reserved1,
+#endif
 
     // Input/output
     ReadGenericInput,
@@ -431,6 +435,13 @@ public:
   // and implicit LOD.
   llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
                                  llvm::Value *coord, const llvm::Twine &instName = "") override final;
+
+#if VKI_RAY_TRACING
+  // Create a ray intersect result with specified node in BVH buffer
+  llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
+                                          llvm::Value *direction, llvm::Value *invDirection, llvm::Value *imageDesc,
+                                          const llvm::Twine &instName = "") override final;
+#endif
 
   // -----------------------------------------------------------------------------------------------------------------
   // Shader input/output methods

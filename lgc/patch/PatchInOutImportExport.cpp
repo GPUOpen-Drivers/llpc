@@ -411,6 +411,16 @@ void PatchInOutImportExport::processShader() {
 
       calcFactor.tessOnChipLdsSize = calcFactor.onChip.tessFactorStart + tessFactorTotalSize;
 
+#if VKI_RAY_TRACING
+      // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
+      // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
+      // restriction by providing the capability of querying thread ID in group rather than in wave.
+      const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+      const auto tcsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
+      if (vsResUsage->useRayQueryLdsStack || tcsResUsage->useRayQueryLdsStack)
+        calcFactor.rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
+#endif
+
       LLPC_OUTS("===============================================================================\n");
       LLPC_OUTS("// LLPC tessellation calculation factor results\n\n");
       LLPC_OUTS("Patch count per thread group: " << calcFactor.patchCountPerThreadGroup << "\n");
@@ -456,6 +466,12 @@ void PatchInOutImportExport::processShader() {
       }
       LLPC_OUTS(")\n\n");
       LLPC_OUTS("Tess on-chip LDS total size (in dwords): " << calcFactor.tessOnChipLdsSize << "\n");
+#if VKI_RAY_TRACING
+      if (calcFactor.rayQueryLdsStackSize > 0) {
+        LLPC_OUTS("Ray query LDS stack size (in dwords): " << calcFactor.rayQueryLdsStackSize
+                                                           << " (start = " << calcFactor.tessOnChipLdsSize << ")\n");
+      }
+#endif
       LLPC_OUTS("\n");
     }
   }
@@ -1550,7 +1566,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     }
   } else if (m_shaderStage == ShaderStageGeometry) {
     if (m_gfxIp.major >= 10) {
-      // NOTE: Per programming guide, we should do a “s_waitcnt 0,0,0 + s_waitcnt_vscnt 0” before issuing a "done", so
+      // NOTE: Per programming guide, we should do a "s_waitcnt 0,0,0 + s_waitcnt_vscnt 0" before issuing a "done", so
       // we use fence release to generate s_waitcnt vmcnt lgkmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
       SyncScope::ID scope =
           m_pipelineState->isGsOnChip() ? m_context->getOrInsertSyncScopeID("workgroup") : SyncScope::System;
@@ -5078,6 +5094,19 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
   unsigned maxThreadCountPerThreadGroup =
       m_gfxIp.major >= 9 ? Gfx9::MaxHsThreadsPerSubgroup : Gfx6::MaxHsThreadsPerSubgroup;
 
+#if VKI_RAY_TRACING
+  // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
+  // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
+  // restriction by providing the capability of querying thread ID in the group rather than in wave.
+  unsigned rayQueryLdsStackSize = 0;
+  const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+  const auto tcsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
+  if (vsResUsage->useRayQueryLdsStack || tcsResUsage->useRayQueryLdsStack) {
+    maxThreadCountPerThreadGroup = std::min(MaxRayQueryThreadsPerGroup, maxThreadCountPerThreadGroup);
+    rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
+  }
+#endif
+
   const unsigned maxThreadCountPerPatch = std::max(inVertexCount, outVertexCount);
   const unsigned patchCountLimitedByThread = maxThreadCountPerThreadGroup / maxThreadCountPerPatch;
 
@@ -5089,6 +5118,9 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
   unsigned ldsSizePerPatch = inPatchSize + MaxTessFactorsPerPatch;
 
   unsigned ldsSizePerThreadGroup = m_pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup;
+#if VKI_RAY_TRACING
+  ldsSizePerThreadGroup -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
+#endif
   unsigned patchCountLimitedByLds = ldsSizePerThreadGroup / ldsSizePerPatch;
 
   unsigned patchCountPerThreadGroup = std::min(patchCountLimitedByThread, patchCountLimitedByLds);

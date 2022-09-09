@@ -62,6 +62,10 @@ public:
   // Gets subgroup size usage
   virtual unsigned getSubgroupSizeUsage() const override;
 
+#if VKI_RAY_TRACING
+  virtual bool hasRayQuery() const override { return (m_pipelineInfo->shaderLibrary.codeSize > 0); }
+#endif
+
 private:
   ComputeContext() = delete;
   ComputeContext(const ComputeContext &) = delete;

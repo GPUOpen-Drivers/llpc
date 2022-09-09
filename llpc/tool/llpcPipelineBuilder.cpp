@@ -62,6 +62,9 @@
 #include "llpcComputePipelineBuilder.h"
 #include "llpcDebug.h"
 #include "llpcGraphicsPipelineBuilder.h"
+#if VKI_RAY_TRACING
+#include "llpcRayTracingPipelineBuilder.h"
+#endif
 #include "llpcUtil.h"
 #include "vkgcUtil.h"
 #include "llvm/ADT/StringExtras.h"
@@ -87,13 +90,23 @@ std::unique_ptr<PipelineBuilder> createPipelineBuilder(ICompiler &compiler, Comp
                                                        bool printPipelineInfo) {
   const unsigned stageMask = compileInfo.stageMask;
 
+#if VKI_RAY_TRACING
+  assert(!(isGraphicsPipeline(stageMask) && isComputePipeline(stageMask) && isRayTracingPipeline(stageMask)) &&
+         "Invalid stage mask");
+#else
   assert(!(isGraphicsPipeline(stageMask) && isComputePipeline(stageMask)) && "Invalid stage mask");
+#endif
 
   if (isGraphicsPipeline(stageMask))
     return std::make_unique<GraphicsPipelineBuilder>(compiler, compileInfo, dumpOptions, printPipelineInfo);
 
   if (isComputePipeline(stageMask))
     return std::make_unique<ComputePipelineBuilder>(compiler, compileInfo, dumpOptions, printPipelineInfo);
+
+#if VKI_RAY_TRACING
+  if (isRayTracingPipeline(stageMask))
+    return std::make_unique<RayTracingPipelineBuilder>(compiler, compileInfo, dumpOptions, printPipelineInfo);
+#endif
 
   llvm_unreachable("Unknown pipeline kind");
   return nullptr;

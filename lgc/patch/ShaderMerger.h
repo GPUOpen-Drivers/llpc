@@ -109,6 +109,10 @@ private:
   void appendVertexFetchTypes(std::vector<llvm::Type *> &argTys) const;
   void appendArguments(llvm::SmallVectorImpl<llvm::Value *> &args, llvm::Argument *begin, llvm::Argument *end) const;
 
+#if VKI_RAY_TRACING
+  void processRayQueryLdsStack(llvm::Function *entryPoint1, llvm::Function *entryPoint2) const;
+#endif
+
   PipelineState *m_pipelineState; // Pipeline state
   llvm::LLVMContext *m_context;   // LLVM context
   GfxIpVersion m_gfxIp;           // Graphics IP version info

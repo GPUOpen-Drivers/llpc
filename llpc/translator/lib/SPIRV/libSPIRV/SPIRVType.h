@@ -104,6 +104,10 @@ public:
   bool isTypeVectorOrScalarInt(unsigned Bits = 0) const;
   bool isTypeVectorOrScalarFloat(unsigned Bits = 0) const;
   bool isTypeVectorOrScalarBool() const;
+#if VKI_RAY_TRACING
+  bool isTypeAccelerationStructureKHR() const;
+  bool isTypeRayQueryKHR() const;
+#endif
 };
 
 class SPIRVTypeVoid : public SPIRVType {
@@ -670,6 +674,33 @@ public:
   // Incomplete constructor
   SPIRVOpaqueGenericType() : SPIRVTypeOpaqueGeneric(TheOpCode) {}
 };
+
+#if VKI_RAY_TRACING
+class SPIRVTypeAccelerationStructureKHR : public SPIRVType {
+public:
+  // Complete constructor
+  SPIRVTypeAccelerationStructureKHR(SPIRVModule *M, SPIRVId TheId)
+      : SPIRVType(M, 2, OpTypeAccelerationStructureKHR, TheId) {}
+  // Incomplete constructor
+  SPIRVTypeAccelerationStructureKHR() : SPIRVType(OpTypeAccelerationStructureKHR) {}
+  SPIRVType *getComponentType() const { return static_cast<SPIRVType *>(getEntry(OpTypeInt)); }
+
+protected:
+  _SPIRV_DEF_DECODE1(Id)
+};
+
+class SPIRVTypeRayQueryKHR : public SPIRVType {
+public:
+  // Compile constructor
+  SPIRVTypeRayQueryKHR(SPIRVModule *M, SPIRVId TheId) : SPIRVType(M, 2, OpTypeRayQueryKHR, TheId) {}
+  // Incomplete constructor
+  SPIRVTypeRayQueryKHR() : SPIRVType(OpTypeRayQueryKHR) {}
+  SPIRVType *getComponentType() const { return static_cast<SPIRVType *>(getEntry(OpTypeInt)); }
+
+protected:
+  _SPIRV_DEF_DECODE1(Id)
+};
+#endif
 
 template <typename T2, typename T1>
 bool isType(const T1 *Ty, unsigned Bits = 0) {

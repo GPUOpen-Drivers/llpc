@@ -38,5 +38,12 @@ LLPC_PASS("llpc-spirv-lower-global", SpirvLowerGlobal)
 LLPC_PASS("llpc-spirv-lower-math-const-folding", SpirvLowerMathConstFolding)
 LLPC_PASS("llpc-spirv-lower-math-float-op", SpirvLowerMathFloatOp)
 LLPC_PASS("llpc-spirv-lower-memory-op", SpirvLowerMemoryOp)
+#if VKI_RAY_TRACING
+LLPC_PASS("llpc-spirv-lower-ray-tracing-intrinsics", SpirvLowerRayTracingIntrinsics)
+LLPC_PASS("llpc-spirv-lower-ray-query", SpirvLowerRayQuery)
+LLPC_PASS("llpc-spirv-lower-ray-tracing", SpirvLowerRayTracing)
+LLPC_PASS("llpc-spirv-lower-ray-query-post-inline", SpirvLowerRayQueryPostInline)
+LLPC_PASS("llpc-spirv-lower-ray-tracing-builtin", SpirvLowerRayTracingBuiltIn)
+#endif
 
 #undef LLPC_PASS

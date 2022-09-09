@@ -117,6 +117,12 @@ PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/imported
 )
 
+#if VKI_RAY_TRACING
+if(VKI_RAY_TRACING)
+  target_compile_definitions(LLVMlgc PRIVATE VKI_RAY_TRACING=1)
+endif()
+#endif
+
 # lgc/builder
 target_sources(LLVMlgc PRIVATE
     builder/ArithBuilder.cpp

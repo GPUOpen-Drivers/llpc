@@ -49,8 +49,13 @@ namespace Llpc {
 // @param cacheHash : Cache hash code
 GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuildInfo *pipelineInfo,
                                  MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_stageMask(0),
-      m_preRasterHasGs(false), m_activeStageCount(0) {
+    : PipelineContext(gfxIp, pipelineHash, cacheHash
+#if VKI_RAY_TRACING
+                      ,
+                      &pipelineInfo->rtState
+#endif
+                      ),
+      m_pipelineInfo(pipelineInfo), m_stageMask(0), m_preRasterHasGs(false), m_activeStageCount(0) {
 
   setUnlinked(pipelineInfo->unlinked);
   // clang-format off
