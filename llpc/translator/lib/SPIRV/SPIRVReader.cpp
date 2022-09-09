@@ -2579,10 +2579,9 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   // generating the code to get the descriptor pointer(s).
   SPIRVWord binding = 0;
   unsigned descriptorSet = 0;
-  ResourceNodeType searchType = ResourceNodeType::Unknown;
-  spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
 
   spvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
+  spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
 
   SPIRVType *spvTy = spvImagePtr->getType()->getPointerElementType();
   while (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
@@ -2601,12 +2600,12 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
     auto desc = &static_cast<SPIRVTypeImage *>(spvImageTy)->getDescriptor();
     auto resType =
         desc->Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer : ResourceNodeType::DescriptorResource;
-    searchType = resType;
+    auto searchType = resType;
     imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding, searchType);
 
     if (desc->MS) {
       // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
-      searchType = ResourceNodeType::DescriptorFmask;
+      auto searchType = ResourceNodeType::DescriptorFmask;
       Value *fmaskDescPtr =
           getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding, searchType);
       imageDescPtr = getBuilder()->CreateInsertValue(
@@ -2618,7 +2617,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
 
   if (spvTy->getOpCode() != OpTypeImage) {
     // Sampler or sampledimage -- need to get the sampler {pointer,stride,convertingSamplerIdx}
-    searchType = ResourceNodeType::DescriptorSampler;
+    auto searchType = ResourceNodeType::DescriptorSampler;
     samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding, searchType);
 
     if (spvTy->getOpCode() == OpTypeSampler)
