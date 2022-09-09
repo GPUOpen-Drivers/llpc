@@ -112,6 +112,13 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       shaderModuleUsage.useSpecConstant = true;
       break;
     }
+#if VKI_RAY_TRACING
+    case OpTraceNV:
+    case OpTraceRayKHR: {
+      shaderModuleUsage.hasTraceRay = true;
+      break;
+    }
+#endif
     case OpIsNan: {
       shaderModuleUsage.useIsNan = true;
       break;
@@ -128,6 +135,11 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
 
   if (capabilities.find(CapabilityVariablePointers) != capabilities.end())
     shaderModuleUsage.enableVarPtr = true;
+
+#if VKI_RAY_TRACING
+  if (capabilities.find(CapabilityRayQueryKHR) != capabilities.end())
+    shaderModuleUsage.enableRayQuery = true;
+#endif
 
   if ((!shaderModuleUsage.useSubgroupSize) &&
       ((capabilities.count(CapabilityGroupNonUniform) > 0) || (capabilities.count(CapabilityGroupNonUniformVote) > 0) ||
@@ -393,6 +405,9 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
   if (moduleData.binType == BinaryType::Spirv) {
     moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderBinary);
     moduleData.binCode = getShaderCode(shaderInfo, codeBuffer);
+#if VKI_RAY_TRACING
+    moduleData.usage.isInternalRtShader = shaderInfo->options.isInternalRtShader;
+#endif
     // Calculate SPIR-V cache hash
     Hash cacheHash = {};
     MetroHash64::Hash(reinterpret_cast<const uint8_t *>(moduleData.binCode.pCode), moduleData.binCode.codeSize,
@@ -418,7 +433,11 @@ BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shader
                                              MutableArrayRef<unsigned int> &codeBuffer) {
   BinaryData code;
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
+#if VKI_RAY_TRACING
+  bool trimDebugInfo = cl::TrimDebugInfo && !(shaderInfo->options.isInternalRtShader);
+#else
   bool trimDebugInfo = cl::TrimDebugInfo;
+#endif
   if (trimDebugInfo) {
     code.codeSize = trimSpirvDebugInfo(&shaderBinary, codeBuffer);
   } else {
@@ -435,7 +454,11 @@ BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shader
 // @return : The number of bytes need to hold the code for this shader module.
 unsigned ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo) {
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
+#if VKI_RAY_TRACING
+  bool trimDebugInfo = cl::TrimDebugInfo && !(shaderInfo->options.isInternalRtShader);
+#else
   bool trimDebugInfo = cl::TrimDebugInfo;
+#endif
   if (!trimDebugInfo)
     return shaderBinary.codeSize;
   return ShaderModuleHelper::trimSpirvDebugInfo(&shaderBinary, {});

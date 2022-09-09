@@ -86,6 +86,9 @@ public:
 
   // Wrappers of interfaces of pipeline context
   bool isGraphics() const { return m_pipelineContext->isGraphics(); }
+#if VKI_RAY_TRACING
+  bool isRayTracing() const { return m_pipelineContext->isRayTracing(); }
+#endif
   const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const {
     return m_pipelineContext->getPipelineShaderInfo(shaderStage);
   }

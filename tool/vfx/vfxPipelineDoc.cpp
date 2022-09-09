@@ -55,6 +55,11 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
   case SectionTypeComputeState:
     maxSectionCount = 1;
     break;
+#if VKI_RAY_TRACING
+  case SectionTypeRayTracingState:
+    maxSectionCount = 1;
+    break;
+#endif
   case SectionTypeVertexInputState:
     maxSectionCount = 1;
     break;
@@ -131,6 +136,10 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->dynamicVertexStride = graphicState.dynamicVertexStride;
     gfxPipelineInfo->enableUberFetchShader = graphicState.enableUberFetchShader;
     gfxPipelineInfo->enableEarlyCompile = graphicState.enableEarlyCompile;
+#if VKI_RAY_TRACING
+    gfxPipelineInfo->shaderLibrary = graphicState.shaderLibrary;
+    gfxPipelineInfo->rtState = graphicState.rtState;
+#endif
   }
 
   // Section "ComputePipelineState"
@@ -143,7 +152,34 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     computePipelineInfo->deviceIndex = computeState.deviceIndex;
     computePipelineInfo->options = computeState.options;
     computePipelineInfo->cs.entryStage = Vkgc::ShaderStageCompute;
+#if VKI_RAY_TRACING
+    computePipelineInfo->shaderLibrary = computeState.shaderLibrary;
+    computePipelineInfo->rtState = computeState.rtState;
+#endif
   }
+
+#if VKI_RAY_TRACING
+  // Section "RayTracingPipelineState"
+  if (m_sections[SectionTypeRayTracingState].size() > 0) {
+    RayTracingPipelineState rayTracingState;
+    m_pipelineState.pipelineType = VfxPipelineTypeRayTracing;
+    reinterpret_cast<SectionRayTracingState *>(m_sections[SectionTypeRayTracingState][0])
+        ->getSubState(m_fileName, rayTracingState, &m_errorMsg);
+    auto rayTracingPipelineInfo = &m_pipelineState.rayPipelineInfo;
+    rayTracingPipelineInfo->deviceIndex = rayTracingState.deviceIndex;
+    rayTracingPipelineInfo->options = rayTracingState.options;
+    rayTracingPipelineInfo->shaderGroupCount = rayTracingState.shaderGroupCount;
+    rayTracingPipelineInfo->pShaderGroups = rayTracingState.pShaderGroups;
+    rayTracingPipelineInfo->shaderTraceRay = rayTracingState.shaderTraceRay;
+    rayTracingPipelineInfo->maxRecursionDepth = rayTracingState.maxRecursionDepth;
+    rayTracingPipelineInfo->indirectStageMask = rayTracingState.indirectStageMask;
+    rayTracingPipelineInfo->rtState = rayTracingState.rtState;
+    rayTracingPipelineInfo->payloadSizeMaxInLib = rayTracingState.payloadSizeMaxInLib;
+    rayTracingPipelineInfo->attributeSizeMaxInLib = rayTracingState.attributeSizeMaxInLib;
+    rayTracingPipelineInfo->hasPipelineLibrary = rayTracingState.hasPipelineLibrary;
+    rayTracingPipelineInfo->pipelineLibStageMask = rayTracingState.pipelineLibStageMask;
+  }
+#endif
 
   // Section "VertexInputState"
   if (m_sections[SectionTypeVertexInputState].size() > 0) {
@@ -186,6 +222,39 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       pShaderInfoSection->getSubState(m_descriptorRangeValues);
     }
   }
+#if VKI_RAY_TRACING
+  else if (m_pipelineState.pipelineType == VfxPipelineTypeRayTracing) {
+    m_pipelineState.numStages = static_cast<unsigned>(m_sections[SectionTypeShader].size());
+    m_shaderSources.resize(m_pipelineState.numStages);
+    m_shaderInfos.resize(m_pipelineState.numStages);
+    m_pipelineState.stages = &m_shaderSources[0];
+    m_pipelineState.rayPipelineInfo.shaderCount = m_pipelineState.numStages;
+    m_pipelineState.rayPipelineInfo.pShaders = &m_shaderInfos[0];
+
+    unsigned stageIndex = 0;
+    std::map<unsigned, std::pair<SectionShader *, SectionShaderInfo *>> shaderSections;
+    VFX_ASSERT(m_sections[SectionTypeShader].size() == m_sections[SectionTypeShaderInfo].size());
+
+    for (size_t i = 0; i < m_sections[SectionTypeShader].size(); ++i) {
+      auto pShaderSection = reinterpret_cast<SectionShader *>(m_sections[SectionTypeShader][i]);
+      auto pShaderInfoSection = reinterpret_cast<SectionShaderInfo *>(m_sections[SectionTypeShaderInfo][i]);
+      VFX_ASSERT(pShaderSection->getShaderStage() == pShaderInfoSection->getShaderStage());
+      auto stage = pShaderSection->getShaderStage();
+
+      shaderSections[m_sections[SectionTypeShader][i]->getLineNum()] =
+          std::pair<SectionShader *, SectionShaderInfo *>(pShaderSection, pShaderInfoSection);
+    }
+
+    for (auto mapIt : shaderSections) {
+      mapIt.second.first->getSubState(m_pipelineState.stages[stageIndex]);
+      // Shader info Section "XXInfo"
+      mapIt.second.second->getSubState(m_shaderInfos[stageIndex]);
+      mapIt.second.second->getSubState(m_resourceMappingNodes);
+      mapIt.second.second->getSubState(m_descriptorRangeValues);
+      stageIndex++;
+    }
+  }
+#endif
   else {
     VFX_NEVER_CALLED();
   }
@@ -198,6 +267,11 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
   case VfxPipelineTypeCompute:
       resourceMapping = &m_pipelineState.compPipelineInfo.resourceMapping;
       break;
+#if VKI_RAY_TRACING
+  case VfxPipelineTypeRayTracing:
+    resourceMapping = &m_pipelineState.rayPipelineInfo.resourceMapping;
+    break;
+#endif
   default:
       VFX_NEVER_CALLED();
       break;
@@ -248,8 +322,15 @@ bool PipelineDocument::validate() {
 
   const unsigned graphicsStageMask = ShaderStageBit::ShaderStageAllGraphicsBit;
   const unsigned computeStageMask = ShaderStageBit::ShaderStageComputeBit;
+#if VKI_RAY_TRACING
+  const unsigned rayTracingStageMask = ShaderStageAllRayTracingBit;
+#endif
 
   if (((stageMask & graphicsStageMask) && (stageMask & computeStageMask))
+#if VKI_RAY_TRACING
+      || ((stageMask & graphicsStageMask) && (stageMask & rayTracingStageMask)) ||
+      ((stageMask & computeStageMask) && (stageMask & rayTracingStageMask))
+#endif
   ) {
     PARSE_ERROR(m_errorMsg, 0, "Stage Conflict! Different pipeline stage can't in same pipeline file.\n");
     return false;
@@ -261,6 +342,13 @@ bool PipelineDocument::validate() {
                   "Section ComputePipelineState conflict with graphic shader stages\n");
       return false;
     }
+#if VKI_RAY_TRACING
+    if (m_sections[SectionTypeRayTracingState].size() != 0) {
+      PARSE_ERROR(m_errorMsg, m_sections[SectionTypeRayTracingState][0]->getLineNum(),
+                  "Section RayTracingPipelineState conflict with graphic shader stages\n");
+      return false;
+    }
+#endif
   }
 
   if (stageMask & computeStageMask) {
@@ -269,7 +357,30 @@ bool PipelineDocument::validate() {
                   "Section GraphicsPipelineState conflict with compute shader stages\n");
       return false;
     }
+#if VKI_RAY_TRACING
+    if (m_sections[SectionTypeRayTracingState].size() != 0) {
+      PARSE_ERROR(m_errorMsg, m_sections[SectionTypeRayTracingState][0]->getLineNum(),
+                  "Section RayTracingPipelineState conflict with compute shader stages\n");
+      return false;
+    }
+#endif
   }
+
+#if VKI_RAY_TRACING
+  if (stageMask & rayTracingStageMask) {
+    if (m_sections[SectionTypeComputeState].size() != 0) {
+      PARSE_ERROR(m_errorMsg, m_sections[SectionTypeComputeState][0]->getLineNum(),
+                  "Section ComputePipelineState conflict with ray tracing shader stages\n");
+      return false;
+    }
+
+    if (m_sections[SectionTypeGraphicsState].size() != 0) {
+      PARSE_ERROR(m_errorMsg, m_sections[SectionTypeGraphicsState][0]->getLineNum(),
+                  "Section GraphicsPipelineState conflict with ray tracing shader stages\n");
+      return false;
+    }
+  }
+#endif
 
   return true;
 }
@@ -290,6 +401,14 @@ Section *PipelineDocument::createSection(const char *sectionName) {
   case SectionTypeComputeState:
     section = new SectionComputeState();
     break;
+#if VKI_RAY_TRACING
+  case SectionTypeRayTracingState:
+    section = new SectionRayTracingState();
+    break;
+  case SectionTypeRtState:
+    section = new SectionRtState();
+    break;
+#endif
   case SectionTypeVertexInputState:
     section = new SectionVertexInput();
     break;
@@ -328,6 +447,15 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
     CASE_SUBSECTION(MemberTypePipelineOption, SectionPipelineOption)
     CASE_SUBSECTION(MemberTypeShaderOption, SectionShaderOption)
     CASE_SUBSECTION(MemberTypeNggState, SectionNggState)
+#if VKI_RAY_TRACING
+    CASE_SUBSECTION(MemberTypeShaderGroup, SectionShaderGroup)
+    CASE_SUBSECTION(MemberTypeRtState, SectionRtState)
+    CASE_SUBSECTION(MemberTypeRayTracingShaderExportConfig, SectionRayTracingShaderExportConfig)
+    CASE_SUBSECTION(MemberTypeIndirectCalleeSavedRegs, SectionIndirectCalleeSavedRegs)
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
+    CASE_SUBSECTION(MemberTypeGpurtFuncTable, SectionGpurtFuncTable)
+#endif
+#endif
     CASE_SUBSECTION(MemberTypeExtendedRobustness, SectionExtendedRobustness)
   default:
     result = Document::getPtrOfSubSection(section, lineNum, memberName, memberType, isWriteAccess, arrayIndex, ptrOut,

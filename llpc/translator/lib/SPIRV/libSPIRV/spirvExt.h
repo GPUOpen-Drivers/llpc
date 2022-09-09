@@ -52,7 +52,7 @@ namespace spv
   static const Op OpForward = static_cast<Op>(1024);
 
   // Built-ins for per-vertex structure
-  static const BuiltIn BuiltInPerVertex             = static_cast<BuiltIn>(1024);
+  static const BuiltIn BuiltInPerVertex = static_cast<BuiltIn>(1024);
 
   // Execution model: copy shader
   static const ExecutionModel ExecutionModelCopyShader = static_cast<ExecutionModel>(1024);

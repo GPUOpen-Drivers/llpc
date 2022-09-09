@@ -139,6 +139,9 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, EsGs::Specia
 // @param copyShaderEntryPoint : Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 Function *ShaderMerger::buildPrimShader(Function *esEntryPoint, Function *gsEntryPoint,
                                         Function *copyShaderEntryPoint) {
+#if VKI_RAY_TRACING
+  processRayQueryLdsStack(esEntryPoint, gsEntryPoint);
+#endif
 
   NggPrimShader primShader(m_pipelineState);
   return primShader.generate(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
@@ -212,6 +215,10 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   assert(hsEntryPoint);
   hsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
   hsEntryPoint->addFnAttr(Attribute::AlwaysInline);
+
+#if VKI_RAY_TRACING
+  processRayQueryLdsStack(lsEntryPoint, hsEntryPoint);
+#endif
 
   uint64_t inRegMask = 0;
   auto entryPointTy = generateLsHsEntryPointType(&inRegMask);
@@ -510,6 +517,10 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   assert(gsEntryPoint);
   gsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
   gsEntryPoint->addFnAttr(Attribute::AlwaysInline);
+
+#if VKI_RAY_TRACING
+  processRayQueryLdsStack(esEntryPoint, gsEntryPoint);
+#endif
 
   auto module = gsEntryPoint->getParent();
   const bool hasTs = (m_hasTcs || m_hasTes);
@@ -872,3 +883,69 @@ void ShaderMerger::appendArguments(SmallVectorImpl<Value *> &args, Argument *beg
     args.push_back(&fetch);
   }
 }
+
+#if VKI_RAY_TRACING
+// =====================================================================================================================
+// Process ray query LDS stack lowering by incorporating it to the LDS of merged shader. For merged HS, we place the
+// LDS stack after the use of tessellation on-chip LDS; for merged GS, we place it after the use of GS on-chip LDS.
+//
+// @param entryPoint1 : The first entry-point of the shader pair (could be LS or ES)
+// @param entryPoint2 : The second entry-point of the shader pair (could be HS or GS)
+void ShaderMerger::processRayQueryLdsStack(Function *entryPoint1, Function *entryPoint2) const {
+  if (m_gfxIp.major < 10)
+    return; // Must be GFX10+
+
+  Module *module = nullptr;
+  if (entryPoint1)
+    module = entryPoint1->getParent();
+  else if (entryPoint2)
+    module = entryPoint2->getParent();
+  assert(module);
+
+  auto ldsStack = module->getNamedGlobal(RayQueryLdsStackName);
+  if (ldsStack) {
+    unsigned ldsStackBase = 0;
+
+    ShaderStage shaderStage2 = ShaderStageInvalid;
+    if (entryPoint2)
+      shaderStage2 = lgc::getShaderStage(entryPoint2);
+
+    if (shaderStage2 == ShaderStageTessControl) {
+      // Must be LS-HS merged shader
+      const auto &calcFactor =
+          m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+      if (calcFactor.rayQueryLdsStackSize > 0)
+        ldsStackBase = calcFactor.tessOnChipLdsSize;
+    } else {
+      // Must be ES-GS merged shader or NGG primitive shader
+      const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+      if (calcFactor.rayQueryLdsStackSize > 0)
+        ldsStackBase = calcFactor.gsOnChipLdsSize;
+    }
+
+    if (ldsStackBase > 0) {
+      auto lds = Patch::getLdsVariable(m_pipelineState, module);
+      auto newLdsStack = ConstantExpr::getGetElementPtr(
+          lds->getValueType(), lds,
+          ArrayRef<Constant *>({ConstantInt::get(Type::getInt32Ty(*m_context), 0),
+                                ConstantInt::get(Type::getInt32Ty(*m_context), ldsStackBase)}));
+      newLdsStack = ConstantExpr::getBitCast(newLdsStack, ldsStack->getType());
+
+      SmallVector<Instruction *, 4> ldsStackInsts;
+      for (auto user : ldsStack->users()) {
+        auto inst = cast<Instruction>(user);
+        assert(inst);
+        if (inst->getFunction() == entryPoint1 || inst->getFunction() == entryPoint2)
+          ldsStackInsts.push_back(inst);
+      }
+
+      for (auto inst : ldsStackInsts) {
+        inst->replaceUsesOfWith(ldsStack, newLdsStack);
+      }
+    }
+
+    if (ldsStack->user_empty())
+      ldsStack->eraseFromParent();
+  }
+}
+#endif

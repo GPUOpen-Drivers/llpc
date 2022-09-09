@@ -54,6 +54,13 @@ void initializeLegacySpirvLowerConstImmediateStorePass(PassRegistry &);
 void initializeLegacySpirvLowerMemoryOpPass(PassRegistry &);
 void initializeLegacySpirvLowerGlobalPass(PassRegistry &);
 void initializeLegacySpirvLowerInstMetaRemovePass(PassRegistry &);
+#if VKI_RAY_TRACING
+void initializeLegacySpirvLowerRayTracingPass(PassRegistry &);
+void initializeLegacySpirvLowerRayTracingBuiltInPass(PassRegistry &);
+void initializeLegacySpirvLowerRayQueryPass(PassRegistry &);
+void initializeLegacySpirvLowerRayQueryPostInlinePass(PassRegistry &);
+void initializeLegacySpirvLowerRayTracingIntrinsicsPass(PassRegistry &);
+#endif
 void initializeLegacySpirvLowerTerminatorPass(PassRegistry &);
 void initializeLegacySpirvLowerTranslatorPass(PassRegistry &);
 } // namespace llvm
@@ -78,6 +85,13 @@ inline void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
   initializeLegacySpirvLowerMemoryOpPass(passRegistry);
   initializeLegacySpirvLowerGlobalPass(passRegistry);
   initializeLegacySpirvLowerInstMetaRemovePass(passRegistry);
+#if VKI_RAY_TRACING
+  initializeLegacySpirvLowerRayTracingPass(passRegistry);
+  initializeLegacySpirvLowerRayTracingBuiltInPass(passRegistry);
+  initializeLegacySpirvLowerRayQueryPass(passRegistry);
+  initializeLegacySpirvLowerRayQueryPostInlinePass(passRegistry);
+  initializeLegacySpirvLowerRayTracingIntrinsicsPass(passRegistry);
+#endif
   initializeLegacySpirvLowerTerminatorPass(passRegistry);
   initializeLegacySpirvLowerTranslatorPass(passRegistry);
 }
@@ -91,6 +105,13 @@ llvm::ModulePass *createLegacySpirvLowerMathFloatOp();
 llvm::ModulePass *createLegacySpirvLowerMemoryOp();
 llvm::ModulePass *createLegacySpirvLowerGlobal();
 llvm::ModulePass *createLegacySpirvLowerInstMetaRemove();
+#if VKI_RAY_TRACING
+llvm::ModulePass *createLegacySpirvLowerRayTracing(bool rayQueryLibrary);
+llvm::ModulePass *createLegacySpirvLowerRayTracingBuiltIn();
+llvm::ModulePass *createLegacySpirvLowerRayQuery(bool rayQueryLibrary);
+llvm::ModulePass *createLegacySpirvLowerRayQueryPostInline();
+llvm::ModulePass *createLegacySpirvLowerRayTracingIntrinsics();
+#endif
 llvm::ModulePass *createSpirvLowerResourceCollect(bool collectDetailUsage);
 llvm::ModulePass *createLegacySpirvLowerTerminator();
 llvm::ModulePass *createSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo);
@@ -103,6 +124,10 @@ public:
 
   // Add per-shader lowering passes to pass manager
   static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer
+#if VKI_RAY_TRACING
+                        ,
+                        bool rayTracing, bool rayQuery, bool isInternalRtShader
+#endif
   );
   // Register all the lowering passes into the given pass manager
   static void registerPasses(lgc::PassManager &passMgr);
@@ -129,8 +154,11 @@ public:
   explicit LegacySpirvLower(char &pid) : llvm::ModulePass(pid) {}
 
   // Add per-shader lowering passes to pass manager
-  static void addPasses(Context *context, ShaderStage stage, llvm::legacy::PassManager &passMgr,
-                        llvm::Timer *lowerTimer
+  static void addPasses(Context *context, ShaderStage stage, llvm::legacy::PassManager &passMgr, llvm::Timer *lowerTimer
+#if VKI_RAY_TRACING
+                        ,
+                        bool rayTracing, bool rayQuery, bool isInternalRtShader
+#endif
   );
 
 private:

@@ -64,6 +64,11 @@ class ComputeContext;
 class Context;
 class GraphicsContext;
 
+#if VKI_RAY_TRACING
+class RayTracingContext;
+class TimerProfiler;
+#endif
+
 // =====================================================================================================================
 // Object to manage checking and updating shader cache for graphics pipeline.
 class GraphicsShaderCacheChecker {
@@ -117,6 +122,11 @@ public:
 
   virtual Result BuildComputePipeline(const ComputePipelineBuildInfo *pipelineInfo,
                                       ComputePipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr);
+#if VKI_RAY_TRACING
+  virtual Result BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipelineInfo,
+                                         RayTracingPipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr,
+                                         IHelperThreadProvider *pHelperThreadProvider = nullptr);
+#endif
 
   Result buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                        llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
@@ -160,6 +170,16 @@ public:
   Context *acquireContext() const;
   void releaseContext(Context *context) const;
 
+#if VKI_RAY_TRACING
+  Result buildRayTracingPipelineElf(Context *context, llvm::Module *module, ElfPackage &pipelineElf,
+                                    std::vector<Vkgc::RayTracingShaderProperty> &shaderProps,
+                                    std::vector<bool> &moduleCallsTraceRay, unsigned moduleIndex,
+                                    std::unique_ptr<lgc::Pipeline> &pipeline, TimerProfiler &timerProfiler);
+  llvm::sys::Mutex &getHelperThreadMutex() { return m_helperThreadMutex; }
+  std::condition_variable_any &getHelperThreadConditionVariable() { return m_helperThreadConditionVariable; }
+
+#endif
+
 private:
   Compiler() = delete;
   Compiler(const Compiler &) = delete;
@@ -173,6 +193,13 @@ private:
   bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo,
                                           const GraphicsPipelineBuildInfo *pipelineInfo);
   bool canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo);
+#if VKI_RAY_TRACING
+  Result buildRayTracingPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
+                                         bool unlinked, std::vector<ElfPackage> &pipelineElfs,
+                                         std::vector<Vkgc::RayTracingShaderProperty> &shaderProps,
+                                         IHelperThreadProvider *helperThreadProvider);
+  void addRayTracingIndirectPipelineMetadata(ElfPackage *pipelineElf);
+#endif
   Result buildUnlinkedShaderInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
                                      Vkgc::UnlinkedShaderStage stage, ElfPackage &elfPackage,
                                      llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
@@ -188,6 +215,11 @@ private:
   static llvm::sys::Mutex m_contextPoolMutex;   // Mutex for context pool access
   static std::vector<Context *> *m_contextPool; // Context pool
   unsigned m_relocatablePipelineCompilations;   // The number of pipelines compiled using relocatable shader elf
+#if VKI_RAY_TRACING
+  static llvm::sys::Mutex m_helperThreadMutex;                        // Mutex for helper thread
+  static std::condition_variable_any m_helperThreadConditionVariable; // Condition variable used by helper thread to
+                                                                      // wait for main thread switching context
+#endif
 };
 
 // Convert front-end LLPC shader stage to middle-end LGC shader stage

@@ -55,7 +55,9 @@ cmake --build build --target check-lgc check-lgc-units check-amdllpc check-amdll
 ```
 
 See above if this gives an error due to not finding an include file from glslang or SPIRV-Tools.
-If you want to make amdllpc compatible with driver, you could get `<pal_interface_version>` from the `ICD_PAL_CLIENT_MAJOR_VERSION` defined in `xgl/icd/make/importdefs` and add it in the build option. If the build option is not added, the latest PAL interface version will be used.
+If you want to make amdllpc compatible with driver, you could get `<pal_interface_version>` from the
+`ICD_PAL_CLIENT_MAJOR_VERSION` defined in `xgl/cmake/XglVersions.cmake` and add it in the build option.
+If the build option is not added, the latest PAL interface version will be used.
 
 ## Usage
 ```

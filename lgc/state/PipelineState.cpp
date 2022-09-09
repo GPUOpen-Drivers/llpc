@@ -805,7 +805,6 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
   case ResourceNodeType::DescriptorConstBuffer:
   case ResourceNodeType::DescriptorConstBufferCompact:
     return true;
-
   case ResourceNodeType::IndirectUserDataVaPtr:
   case ResourceNodeType::PushConst:
   case ResourceNodeType::StreamOutTableVaPtr:

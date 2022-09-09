@@ -88,6 +88,11 @@ struct CompileInfo {
   Llpc::GraphicsPipelineBuildOut gfxPipelineOut;                             // Output of building graphics pipeline
   Llpc::ComputePipelineBuildInfo compPipelineInfo;                           // Info to build compute pipeline
   Llpc::ComputePipelineBuildOut compPipelineOut;                             // Output of building compute pipeline
+#if VKI_RAY_TRACING
+  RayTracingPipelineBuildInfo rayTracePipelineInfo; // Info to build ray tracing pipeline
+  RayTracingPipelineBuildOut rayTracingPipelineOut; // Output of building ray tracing pipeline
+  unsigned bvhNodeStride;
+#endif
   void *pipelineBuf;                                                         // Allocation buffer of building pipeline
   void *pipelineInfoFile;                                                    // VFX-style file containing pipeline info
   bool unlinked;                  // Whether to generate unlinked shader/part-pipeline ELF

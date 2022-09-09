@@ -46,7 +46,13 @@ namespace Llpc {
 // @param cacheHash : Cache hash code
 ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInfo *pipelineInfo,
                                MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {
+    : PipelineContext(gfxIp, pipelineHash, cacheHash
+#if VKI_RAY_TRACING
+                      ,
+                      &pipelineInfo->rtState
+#endif
+                      ),
+      m_pipelineInfo(pipelineInfo) {
   setUnlinked(pipelineInfo->unlinked);
   m_resourceMapping = pipelineInfo->resourceMapping;
 }

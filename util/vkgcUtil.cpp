@@ -70,6 +70,14 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
         "GS",
         "FS",
         "CS",
+#if VKI_RAY_TRACING
+        "RGEN",
+        "SECT",
+        "AHIT",
+        "CHIT",
+        "MISS",
+        "CALL"
+#endif
       };
 
       abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
@@ -81,6 +89,14 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
         "Gs",
         "Fs",
         "Cs",
+#if VKI_RAY_TRACING
+        "rgen",
+        "sect",
+        "ahit",
+        "chit",
+        "miss",
+        "call"
+#endif
       };
 
       abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];

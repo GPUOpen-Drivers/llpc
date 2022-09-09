@@ -56,6 +56,13 @@ else()
     target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=LLPC_INTERFACE_MAJOR_VERSION)
 endif()
 
+#if VKI_RAY_TRACING
+if(VKI_RAY_TRACING)
+    target_compile_definitions(vkgc_headers INTERFACE VKI_RAY_TRACING)
+    target_compile_definitions(vkgc_headers INTERFACE GPURT_CLIENT_INTERFACE_MAJOR_VERSION=${GPURT_CLIENT_INTERFACE_MAJOR_VERSION})
+endif()
+#endif
+
 target_link_libraries(vkgc INTERFACE vkgc_headers)
 
 ### Expose header files ################################################################################################

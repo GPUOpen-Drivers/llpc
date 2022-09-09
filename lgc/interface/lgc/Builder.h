@@ -1087,6 +1087,22 @@ public:
   virtual llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
                                          llvm::Value *coord, const llvm::Twine &instName = "") = 0;
 
+#if VKI_RAY_TRACING
+  // Create a ray intersect result with specified node in BVH buffer.
+  // pNodePtr is the combination of BVH node offset type.
+  //
+  // @param nodePtr : BVH node pointer
+  // @param extent : The valid range on which intersections can occur
+  // @param origin : Intersect ray origin
+  // @param direction : Intersect ray direction
+  // @param invDirection : The inverse of direction
+  // @param imageDesc : Image descriptor
+  // @param instName : Name to give instruction(s)
+  virtual llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
+                                                  llvm::Value *direction, llvm::Value *invDirection,
+                                                  llvm::Value *imageDesc, const llvm::Twine &instName = "");
+#endif
+
   // -----------------------------------------------------------------------------------------------------------------
   // Shader input/output methods
 
