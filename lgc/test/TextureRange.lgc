@@ -56,10 +56,10 @@ define dllexport spir_func void @lgc.shader.FS.PSMain() local_unnamed_addr #0 !s
   %14 = load float, float addrspace(7)* %13, align 4
   %15 = fmul reassoc nnan nsz arcp contract afn float %11, %14
   %16 = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 -1073741824, i32 1)
-  %17 = call i32 (...) @lgc.create.get.desc.stride.i32(i32 1, i32 -1073741824, i32 1)
+  %17 = call i32 (...) @lgc.create.get.desc.stride.i32(i32 1, i32 1, i32 -1073741824, i32 1)
   %18 = load <8 x i32>, <8 x i32> addrspace(4)* %16, align 32
   %19 = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 2, i32 -2147483648, i32 0)
-  %20 = call i32 (...) @lgc.create.get.desc.stride.i32(i32 2, i32 -2147483648, i32 0)
+  %20 = call i32 (...) @lgc.create.get.desc.stride.i32(i32 2, i32 2, i32 -2147483648, i32 0)
   %21 = load <4 x i32>, <4 x i32> addrspace(4)* %19, align 16
   %22 = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 512, <8 x i32> %18, <4 x i32> %21, i32 1, <2 x float> %6)
   %.splatinsert = insertelement <4 x float> poison, float %15, i64 0

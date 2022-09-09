@@ -1076,15 +1076,19 @@ Value *BuilderRecorder::CreateLoadBufferDesc(unsigned descSet, unsigned binding,
 // =====================================================================================================================
 // Create a get of the stride (in bytes) of a descriptor. Returns an i32 value.
 //
-// @param descType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+// @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+//                   DescriptorTexelBuffer, DescriptorFmask.
+// @param abstractType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
 //                   DescriptorTexelBuffer, DescriptorFmask.
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *BuilderRecorder::CreateGetDescStride(ResourceNodeType descType, unsigned descSet, unsigned binding,
-                                            const Twine &instName) {
+Value *BuilderRecorder::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType,
+                                            unsigned descSet, unsigned binding, const Twine &instName) {
   return record(Opcode::GetDescStride, getInt32Ty(),
-                {getInt32(static_cast<unsigned>(descType)), getInt32(descSet), getInt32(binding)}, instName);
+                {getInt32(static_cast<unsigned>(concreteType)), getInt32(static_cast<unsigned>(abstractType)),
+                 getInt32(descSet), getInt32(binding)},
+                instName);
 }
 
 // =====================================================================================================================
