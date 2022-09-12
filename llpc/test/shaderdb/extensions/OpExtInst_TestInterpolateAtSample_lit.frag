@@ -29,7 +29,7 @@ void main()
 ; SHADERTEST-DAG: = call <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
 ; SHADERTEST-DAG: = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 0, i32 0, i32 0, i32 0, <2 x float>
-; SHADERTEST-DAG: = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.v2f32(i32 1, i32 0, i32 0, i32 1, <2 x float>
+; SHADERTEST-DAG: = call <4 x float> @lgc.input.import.interpolant.v4f32.i32.i32.i32.i32.i32(i32 1, i32 0, i32 0, i32 1, i32 poison
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p1(float %{{.*}}, i32 immarg 0, i32 immarg 0, i32 %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p2(float %{{.*}}, float %{{.*}}, i32 immarg 0, i32 immarg 0, i32 %{{.*}})

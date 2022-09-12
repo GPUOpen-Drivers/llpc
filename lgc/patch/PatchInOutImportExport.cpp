@@ -774,33 +774,28 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       case ShaderStageFragment: {
         unsigned interpMode = InOutInfo::InterpModeSmooth;
-        unsigned interpLoc = InOutInfo::InterpLocCenter;
         bool isPerPrimitive = false;
 
         if (!elemIdx)
           elemIdx = callInst.getOperand(isInterpolantInputImport ? 2 : 1);
         assert(isDontCareValue(elemIdx) == false);
 
-        Value *auxInterpValue = nullptr;
+        Value *interpValue = nullptr;
 
         if (isGenericInputImport) {
-          assert(callInst.arg_size() == 5);
-
-          isPerPrimitive = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue() != 0;
-          interpMode = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
-          interpLoc = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue();
+          assert(callInst.arg_size() == 2);
+          isPerPrimitive = true;
+          interpMode = InOutInfo::InterpModeFlat;
         } else {
           assert(isInterpolantInputImport);
           assert(callInst.arg_size() == 5);
 
           interpMode = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
-          interpLoc = InOutInfo::InterpLocUnknown;
-
-          auxInterpValue = callInst.getOperand(4);
+          interpValue = callInst.getOperand(4);
         }
 
-        input = patchFsGenericInputImport(inputTy, loc, locOffset, elemIdx, isPerPrimitive, auxInterpValue, interpMode,
-                                          interpLoc, highHalf, builder);
+        input = patchFsGenericInputImport(inputTy, loc, locOffset, elemIdx, isPerPrimitive, interpMode, interpValue,
+                                          highHalf, builder);
         break;
       }
       default: {
@@ -1754,16 +1749,14 @@ Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Valu
 // @param locOffset : Relative location offset
 // @param compIdx : Index used for vector element indexing (could be null)
 // @param isPerPrimitive : Whether the input is per-primitive
-// @param auxInterpValue : Auxiliary value of interpolation: for non "custom" interpolation, it is the explicitly
-// calculated I/J; for "custom" interpolation, it is vertex no. (could be null)
 // @param interpMode : Interpolation mode
-// @param interpLoc : Interpolation location
+// @param interpValue : interpolation value: for "smooth" mode, holds the I,J coordinates; for "custom" mode, holds the
+// vertex index; unused for "flat" mode or if the input is per-primitive
 // @param highHalf : Whether it is a high half in a 16-bit attribute
 // @param builder : The IR builder to create and insert IR instruction
 Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned location, Value *locOffset,
-                                                         Value *compIdx, bool isPerPrimitive, Value *auxInterpValue,
-                                                         unsigned interpMode, unsigned interpLoc, bool highHalf,
-                                                         BuilderBase &builder) {
+                                                         Value *compIdx, bool isPerPrimitive, unsigned interpMode,
+                                                         Value *interpValue, bool highHalf, BuilderBase &builder) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
   auto &interpInfo = resUsage->inOutUsage.fs.interpInfo;
 
@@ -1812,43 +1805,18 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   Value *coordJ = nullptr;
 
   // Not "flat" and "custom" interpolation
-  if (interpMode != InOutInfo::InterpModeFlat && interpMode != InOutInfo::InterpModeCustom) {
-    auto ij = auxInterpValue;
-    if (!ij) {
-      if (interpMode == InOutInfo::InterpModeSmooth) {
-        if (interpLoc == InOutInfo::InterpLocCentroid) {
-          ij = adjustCentroidIj(getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.centroid),
-                                getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.center), builder);
-        } else if (interpLoc == InOutInfo::InterpLocSample)
-          ij = getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.sample);
-        else {
-          assert(interpLoc == InOutInfo::InterpLocCenter);
-          ij = getFunctionArgument(m_entryPoint, entryArgIdxs.perspInterp.center);
-        }
-      } else {
-        assert(interpMode == InOutInfo::InterpModeNoPersp);
-        if (interpLoc == InOutInfo::InterpLocCentroid) {
-          ij = adjustCentroidIj(getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.centroid),
-                                getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center), builder);
-        } else if (interpLoc == InOutInfo::InterpLocSample)
-          ij = getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.sample);
-        else {
-          assert(interpLoc == InOutInfo::InterpLocCenter);
-          ij = getFunctionArgument(m_entryPoint, entryArgIdxs.linearInterp.center);
-        }
-      }
-    }
-    coordI = builder.CreateExtractElement(ij, uint64_t(0));
-    coordJ = builder.CreateExtractElement(ij, 1);
+  if (interpMode == InOutInfo::InterpModeSmooth) {
+    coordI = builder.CreateExtractElement(interpValue, uint64_t(0));
+    coordJ = builder.CreateExtractElement(interpValue, 1);
   }
 
   Type *basicTy = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getElementType() : inputTy;
 
-  const unsigned compCout = inputTy->isVectorTy() ? cast<FixedVectorType>(inputTy)->getNumElements() : 1;
+  const unsigned compCount = inputTy->isVectorTy() ? cast<FixedVectorType>(inputTy)->getNumElements() : 1;
   const unsigned bitWidth = inputTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
-  const unsigned numChannels = (bitWidth == 64 ? 2 : 1) * compCout;
+  const unsigned numChannels = (bitWidth == 64 ? 2 : 1) * compCount;
 
   Type *interpTy = nullptr;
   if (bitWidth == 8) {
@@ -1863,21 +1831,23 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   Value *interp = UndefValue::get(interpTy);
 
   unsigned startChannel = 0;
-  if (compIdx)
+  if (compIdx) {
     startChannel = cast<ConstantInt>(compIdx)->getZExtValue();
-
-  Value *loc = nullptr;
-  if (locOffset) {
-    loc = builder.getInt32(location + cast<ConstantInt>(locOffset)->getZExtValue());
-    assert((startChannel + numChannels) <= 4);
-  } else {
-    loc = builder.getInt32(location);
+    assert((startChannel + numChannels) <= (bitWidth == 64 ? 8 : 4));
   }
+
+  if (locOffset)
+    location += cast<ConstantInt>(locOffset)->getZExtValue();
+
+  Value *loc = builder.getInt32(location);
 
   for (unsigned i = startChannel; i < startChannel + numChannels; ++i) {
     Value *compValue = nullptr;
 
-    if (interpMode != InOutInfo::InterpModeFlat && interpMode != InOutInfo::InterpModeCustom) {
+    if (i == 4)
+      loc = builder.getInt32(location + 1);
+
+    if (interpMode == InOutInfo::InterpModeSmooth) {
       assert((basicTy->isHalfTy() || basicTy->isFloatTy()) && numChannels <= 4);
       (void(basicTy)); // unused
 
@@ -1892,8 +1862,8 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
       InterpParam interpParam = INTERP_PARAM_P0;
 
       if (interpMode == InOutInfo::InterpModeCustom) {
-        assert(isa<ConstantInt>(auxInterpValue));
-        unsigned vertexNo = cast<ConstantInt>(auxInterpValue)->getZExtValue();
+        assert(isa<ConstantInt>(interpValue));
+        unsigned vertexNo = cast<ConstantInt>(interpValue)->getZExtValue();
 
         switch (vertexNo) {
         case 0:
@@ -1913,9 +1883,8 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
         assert(interpMode == InOutInfo::InterpModeFlat);
       }
 
-      Value *attr = locOffset ? loc : builder.getInt32(location + i / 4);
       compValue =
-          performFsParameterLoad(builder, attr, builder.getInt32(i % 4), interpParam, primMask, bitWidth, highHalf);
+          performFsParameterLoad(builder, loc, builder.getInt32(i % 4), interpParam, primMask, bitWidth, highHalf);
     }
 
     if (numChannels == 1)
@@ -2552,10 +2521,12 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     const unsigned loc = inOutUsage.builtInInputLocMap[BuiltInPointCoord];
 
     // Emulation for "in vec2 gl_PointCoord"
-    const bool perSampleShading = m_pipelineState->getRasterizerState().perSampleShading;
-    input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, false, nullptr, InOutInfo::InterpModeSmooth,
-                                      perSampleShading ? InOutInfo::InterpLocSample : InOutInfo::InterpLocCenter, false,
-                                      builder);
+    const unsigned builtInId =
+        m_pipelineState->getRasterizerState().perSampleShading ? BuiltInInterpPerspSample : BuiltInInterpPerspCenter;
+    Value *interpValue =
+        patchFsBuiltInInputImport(FixedVectorType::get(builder.getFloatTy(), 2), builtInId, nullptr, builder);
+    input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, false, InOutInfo::InterpModeSmooth, interpValue,
+                                      false, builder);
     break;
   }
   case BuiltInHelperInvocation: {
@@ -2583,8 +2554,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 
     // Emulation for "in int gl_PrimitiveID" or "in int gl_Layer" or "in int gl_ViewportIndex"
     // or "in int gl_ViewIndex".
-    input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, isPerPrimitive, nullptr,
-                                      InOutInfo::InterpModeFlat, InOutInfo::InterpLocCenter, false, builder);
+    input = patchFsGenericInputImport(inputTy, loc, nullptr, nullptr, isPerPrimitive, InOutInfo::InterpModeFlat,
+                                      nullptr, false, builder);
     break;
   }
   case BuiltInClipDistance:

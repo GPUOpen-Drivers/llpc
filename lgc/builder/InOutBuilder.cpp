@@ -107,7 +107,7 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
         getInt32(location),
         locationOffset,
         elemIdx,
-        getInt32(inputInfo.getInterpMode()),
+        getInt32(InOutInfo::InterpModeCustom),
         vertexIndex,
     });
     addTypeMangling(resultTy, args, callName);
@@ -258,25 +258,27 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
   }
 
   case ShaderStageFragment: {
-    // FS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 perPrimitive, i32 interpMode, i32 interpLoc)
+    // FS:  @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx) -- for per-primitive
     //      @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-    //                                           i32 interpMode, <2 x float> | i32 auxInterpValue)
-    if (inOutInfo.hasInterpAux()) {
-      // Prepare arguments for import interpolant call
-      Value *auxInterpValue = modifyAuxInterpValue(vertexIndex, inOutInfo);
-      baseCallName = lgcName::InputImportInterpolant;
-      args.push_back(getInt32(location));
-      args.push_back(locationOffset);
-      args.push_back(elemIdx);
-      args.push_back(getInt32(inOutInfo.getInterpMode()));
-      args.push_back(auxInterpValue);
-    } else {
+    //                                           i32 interpMode, <2 x float> | i32 interpValue) -- for per-vertex
+    //        interpMode is one of:
+    //         - InterpModeSmooth: interpValue is I,J
+    //         - InterpModeCustom: interpValue is vertex index
+    //         - InterpModeFlat: interpValue is ignored
+    if (inOutInfo.isPerPrimitive()) {
       assert(locationOffset == getInt32(0));
       args.push_back(getInt32(location));
       args.push_back(elemIdx);
-      args.push_back(getInt1(inOutInfo.isPerPrimitive()));
-      args.push_back(getInt32(inOutInfo.getInterpMode()));
-      args.push_back(getInt32(inOutInfo.getInterpLoc()));
+    } else {
+      baseCallName = lgcName::InputImportInterpolant;
+
+      args.push_back(getInt32(location));
+      args.push_back(locationOffset);
+      args.push_back(elemIdx);
+
+      auto [interpMode, interpValue] = getInterpModeAndValue(inOutInfo, vertexIndex);
+      args.push_back(getInt32(interpMode));
+      args.push_back(interpValue);
     }
     break;
   }
@@ -571,56 +573,88 @@ void InOutBuilder::markFsOutputType(Type *outputTy, unsigned location, InOutInfo
 }
 
 // =====================================================================================================================
-// Modify auxiliary interp value according to custom interp mode
+// Get the mode and interp value for an FS "interpolated" (per-vertex attribute) read.
 //
-// @param auxInterpValue : Aux interp value from CreateReadInput (ignored for centroid location)
 // @param inputInfo : InOutInfo containing interp mode and location
-Value *InOutBuilder::modifyAuxInterpValue(Value *auxInterpValue, InOutInfo inputInfo) {
-  if (inputInfo.getInterpLoc() != InOutInfo::InterpLocExplicit) {
-    // Add intrinsic to calculate I/J for interpolation function
-    std::string evalInstName;
-    auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
-
-    if (inputInfo.getInterpLoc() == InOutInfo::InterpLocCentroid) {
-      Value *evalArg = nullptr;
-
-      evalInstName = lgcName::InputImportBuiltIn;
-      if (inputInfo.getInterpMode() == InOutInfo::InterpModeNoPersp) {
-        evalInstName += "InterpLinearCentroid";
-        evalArg = getInt32(BuiltInInterpLinearCentroid);
-        resUsage->builtInUsage.fs.noperspective = true;
-        resUsage->builtInUsage.fs.centroid = true;
-      } else {
-        evalInstName += "InterpPerspCentroid";
-        evalArg = getInt32(BuiltInInterpPerspCentroid);
-        resUsage->builtInUsage.fs.smooth = true;
-        resUsage->builtInUsage.fs.centroid = true;
-      }
-
-      auxInterpValue =
-          CreateNamedCall(evalInstName, FixedVectorType::get(getFloatTy(), 2), {evalArg}, Attribute::ReadOnly);
-    } else {
-      // Generate code to evaluate the I,J coordinates.
-      if (inputInfo.getInterpLoc() == InOutInfo::InterpLocSample)
-        auxInterpValue = readBuiltIn(false, BuiltInSamplePosOffset, {}, auxInterpValue, nullptr, "");
-      if (inputInfo.getInterpMode() == InOutInfo::InterpModeNoPersp)
-        auxInterpValue = evalIjOffsetNoPersp(auxInterpValue);
-      else
-        auxInterpValue = evalIjOffsetSmooth(auxInterpValue);
-    }
-  } else {
+// @param auxInterpValue : Optional aux interp value from CreateReadInput (ignored for centroid location)
+std::tuple<unsigned, llvm::Value *> InOutBuilder::getInterpModeAndValue(InOutInfo inputInfo,
+                                                                        llvm::Value *auxInterpValue) {
+  if (inputInfo.getInterpLoc() == InOutInfo::InterpLocExplicit) {
+    // Pass-through explicit HW vertex index.
+    assert(inputInfo.hasInterpAux());
     assert(inputInfo.getInterpMode() == InOutInfo::InterpModeCustom);
+    return {InOutInfo::InterpModeCustom, auxInterpValue};
   }
-  return auxInterpValue;
-}
 
-// =====================================================================================================================
-// Evaluate I,J for interpolation: center offset, linear (no perspective) version
-//
-// @param offset : Offset value, <2 x float> or <2 x half>
-Value *InOutBuilder::evalIjOffsetNoPersp(Value *offset) {
-  Value *center = readBuiltIn(false, BuiltInInterpLinearCenter, {}, nullptr, nullptr, "");
-  return adjustIj(center, offset);
+  if (inputInfo.getInterpMode() == InOutInfo::InterpModeFlat)
+    return {InOutInfo::InterpModeFlat, PoisonValue::get(getInt32Ty())};
+
+  unsigned interpLoc = inputInfo.getInterpLoc();
+
+  if (auxInterpValue && inputInfo.getInterpLoc() == InOutInfo::InterpLocSample) {
+    // auxInterpValue is the explicit sample ID, convert to an offset from the center
+    auxInterpValue = readBuiltIn(false, BuiltInSamplePosOffset, {}, auxInterpValue, nullptr, "");
+    interpLoc = InOutInfo::InterpLocCenter;
+  }
+
+  auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
+
+  if (inputInfo.getInterpMode() == InOutInfo::InterpModeSmooth) {
+    if (auxInterpValue) {
+      assert(interpLoc == InOutInfo::InterpLocCenter);
+      return {InOutInfo::InterpModeSmooth, evalIjOffsetSmooth(auxInterpValue)};
+    }
+
+    BuiltInKind builtInId;
+    switch (interpLoc) {
+    case InOutInfo::InterpLocCentroid:
+      builtInId = BuiltInInterpPerspCentroid;
+      resUsage->builtInUsage.fs.centroid = true;
+      break;
+    case InOutInfo::InterpLocSample:
+      builtInId = BuiltInInterpPerspSample;
+      resUsage->builtInUsage.fs.sample = true;
+      break;
+    case InOutInfo::InterpLocCenter:
+      builtInId = BuiltInInterpPerspCenter;
+      resUsage->builtInUsage.fs.center = true;
+      break;
+    default:
+      llvm_unreachable("unexpected interpLoc");
+    }
+    resUsage->builtInUsage.fs.smooth = true;
+
+    return {InOutInfo::InterpModeSmooth, readBuiltIn(false, builtInId, {}, nullptr, nullptr, "")};
+  }
+
+  assert(inputInfo.getInterpMode() == InOutInfo::InterpModeNoPersp);
+
+  BuiltInKind builtInId;
+
+  switch (interpLoc) {
+  case InOutInfo::InterpLocCentroid:
+    assert(!auxInterpValue);
+    builtInId = BuiltInInterpLinearCentroid;
+    resUsage->builtInUsage.fs.centroid = true;
+    break;
+  case InOutInfo::InterpLocSample:
+    assert(!auxInterpValue);
+    builtInId = BuiltInInterpLinearSample;
+    resUsage->builtInUsage.fs.sample = true;
+    break;
+  case InOutInfo::InterpLocCenter:
+    builtInId = BuiltInInterpLinearCenter;
+    resUsage->builtInUsage.fs.center = true;
+    break;
+  default:
+    llvm_unreachable("unexpected interpLoc");
+  }
+  resUsage->builtInUsage.fs.noperspective = true;
+
+  Value *interpValue = readBuiltIn(false, builtInId, {}, nullptr, nullptr, "");
+  if (auxInterpValue)
+    interpValue = adjustIj(interpValue, auxInterpValue);
+  return {InOutInfo::InterpModeSmooth, interpValue};
 }
 
 // =====================================================================================================================
@@ -781,61 +815,22 @@ Value *InOutBuilder::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInf
   assert(builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR);
 
   markBuiltInInputUsage(builtIn, 0);
+
+  // Force override to per-sample interpolation.
   if (getPipelineState()->getOptions().enableInterpModePatch && !auxInterpValue &&
       inputInfo.getInterpLoc() != InOutInfo::InterpLocCentroid) {
     auxInterpValue = readBuiltIn(false, BuiltInSampleId, {}, nullptr, nullptr, "");
     inputInfo.setInterpLoc(InOutInfo::InterpLocSample);
   }
 
-  bool isPersp = builtIn == lgc::BuiltInBaryCoord;
-  Value *evalArg = nullptr;
-  // Adjust ijCoord
-  switch (inputInfo.getInterpLoc()) {
-  case InOutInfo::InterpLocCentroid: {
-    std::string evalInstName = lgcName::InputImportBuiltIn;
-    if (isPersp) {
-      evalInstName += "InterpPerspCentroid";
-      evalArg = getInt32(BuiltInInterpPerspCentroid);
-    } else {
-      evalInstName += "InterpLinearCentroid";
-      evalArg = getInt32(BuiltInInterpLinearCentroid);
-    }
-    auxInterpValue =
-        CreateNamedCall(evalInstName, FixedVectorType::get(getFloatTy(), 2), {evalArg}, Attribute::ReadOnly);
-    break;
-  }
-  case InOutInfo::InterpLocSample: {
-    assert(auxInterpValue != nullptr);
-    auxInterpValue = readBuiltIn(false, BuiltInSamplePosOffset, {}, auxInterpValue, nullptr, "");
-    if (isPersp)
-      auxInterpValue = evalIjOffsetSmooth(auxInterpValue);
-    else
-      auxInterpValue = evalIjOffsetNoPersp(auxInterpValue);
-    break;
-  }
-  case InOutInfo::InterpLocCenter:
-  case InOutInfo::InterpLocUnknown: {
-    // When calling InterpolateAtOffset, auxInterpValue != nullptr
-    if (auxInterpValue) {
-      if (isPersp) {
-        auxInterpValue = evalIjOffsetSmooth(auxInterpValue);
-      } else {
-        auxInterpValue = evalIjOffsetNoPersp(auxInterpValue);
-      }
-    } else {
-      if (isPersp)
-        auxInterpValue = readBuiltIn(false, BuiltInInterpPerspCenter, {}, nullptr, nullptr, "");
-      else
-        auxInterpValue = readBuiltIn(false, BuiltInInterpLinearCenter, {}, nullptr, nullptr, "");
-    }
-    break;
-  }
-  default: {
-    llvm_unreachable("Should never be called!");
-  }
-  }
+  inputInfo.setInterpMode(builtIn == lgc::BuiltInBaryCoord ? InOutInfo::InterpModeSmooth
+                                                           : InOutInfo::InterpModeNoPersp);
 
-  return normalizeBaryCoord(auxInterpValue);
+  auto [interpMode, interpValue] = getInterpModeAndValue(inputInfo, auxInterpValue);
+  assert(interpMode == InOutInfo::InterpModeSmooth);
+  (void)interpMode;
+
+  return normalizeBaryCoord(interpValue);
 }
 
 // =====================================================================================================================
@@ -1465,6 +1460,8 @@ Type *InOutBuilder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
   case BuiltInInterpLinearCenter:
   case BuiltInInterpPerspCentroid:
   case BuiltInInterpLinearCentroid:
+  case BuiltInInterpPerspSample:
+  case BuiltInInterpLinearSample:
     return FixedVectorType::get(getFloatTy(), 2);
   case BuiltInInterpPullMode:
     return FixedVectorType::get(getFloatTy(), 3);

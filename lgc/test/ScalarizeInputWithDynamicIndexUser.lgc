@@ -10,13 +10,13 @@ target triple = "amdgcn--amdpal"
 ; CHECK: define dllexport spir_func void @lgc.shader.VS.main()
 ; CHECK: call void @lgc.output.export.generic.i32.i32.v4f32(i32 2, i32 0, <4 x float> %[[#]])
 ; CHECK: define dllexport spir_func void @lgc.shader.FS.main()
-; CHECK: [[IMPORT0:%[0-9]+]] = call float @lgc.input.import.generic.f32.i32.i32.i1.i32.i32(i32 2, i32 0, i1 false, i32 0, i32 1)
+; CHECK: [[IMPORT0:%[0-9]+]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 0, i32 0, <2 x float> %InterpPerspCenter)
 ; CHECK-NEXT: [[INSERTELEMENT0:%[0-9]+]] = insertelement <4 x float> undef, float [[IMPORT0]], i64 0
-; CHECK-NEXT: [[IMPORT1:%[0-9]+]] = call float @lgc.input.import.generic.f32.i32.i32.i1.i32.i32(i32 2, i32 1, i1 false, i32 0, i32 1)
+; CHECK-NEXT: [[IMPORT1:%[0-9]+]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 1, i32 0, <2 x float> %InterpPerspCenter)
 ; CHECK-NEXT: [[INSERTELEMENT1:%[0-9]+]] = insertelement <4 x float> [[INSERTELEMENT0]], float [[IMPORT1]], i64 1
-; CHECK-NEXT: [[IMPORT2:%[0-9]+]] = call float @lgc.input.import.generic.f32.i32.i32.i1.i32.i32(i32 2, i32 2, i1 false, i32 0, i32 1)
+; CHECK-NEXT: [[IMPORT2:%[0-9]+]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 2, i32 0, <2 x float> %InterpPerspCenter)
 ; CHECK-NEXT: [[INSERTELEMENT2:%[0-9]+]] = insertelement <4 x float> [[INSERTELEMENT1]], float [[IMPORT2]], i64 2
-; CHECK-NEXT: [[IMPORT3:%[0-9]+]] = call float @lgc.input.import.generic.f32.i32.i32.i1.i32.i32(i32 2, i32 3, i1 false, i32 0, i32 1)
+; CHECK-NEXT: [[IMPORT3:%[0-9]+]] = call float @lgc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 2, i32 0, i32 3, i32 0, <2 x float> %InterpPerspCenter)
 ; CHECK-NEXT: [[INSERTELEMENT3:%[0-9]+]] = insertelement <4 x float> [[INSERTELEMENT2]], float [[IMPORT3]], i64 3
 ; CHECK-NEXT: [[UBFE:%[0-9]+]] = call i32 @llvm.amdgcn.ubfe.i32(i32 12816, i32 0, i32 4)
 ; CHECK-NEXT: [[SELECT:%[0-9]+]] = select i1 false, i32 12816, i32 [[UBFE]]
