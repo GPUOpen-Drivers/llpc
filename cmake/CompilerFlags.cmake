@@ -34,6 +34,10 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
             -fno-rtti
             -fPIC
             -std=c++17
+            # Some of the games using old versions of the tcmalloc lib are
+            # crashing when allocating aligned memory. C++17 enables aligned new
+            # by default, so we need to disable it to prevent those crashes.
+            -fno-aligned-new
             -Wno-ignored-qualifiers
             -Wno-missing-field-initializers
             -Wno-invalid-offsetof           # offsetof within non-standard-layout type 'x' is undefined
