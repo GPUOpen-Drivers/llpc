@@ -8257,8 +8257,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
 
   case GLSLstd450InverseSqrt: {
     // Inverse square root
-    auto sqrt = getBuilder()->CreateSqrt(args[0]);
-    return getBuilder()->CreateFDiv(ConstantFP::get(sqrt->getType(), 1.0), sqrt);
+    return getBuilder()->CreateInverseSqrt(args[0]);
   }
 
   case GLSLstd450Determinant:
