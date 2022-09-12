@@ -3346,7 +3346,7 @@ void PatchResourceCollect::scalarizeGenericInput(CallInst *call) {
   builder.SetInsertPoint(call);
   // TCS: @lgc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
   // GS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-  // FS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i1 perPrimitive, i32 interpMode, i32 interpLoc)
+  // FS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx)
   //     @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
   //                                          i32 interpMode, <2 x float> | i32 auxInterpValue)
   SmallVector<Value *, 5> args;
@@ -3567,7 +3567,7 @@ void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStag
   // For VS/TES-FS, 32-bit and 16-bit are packed separately; For VS-TCS, VS/TES-GS and GS-FS, they are packed together
   span.compatibilityInfo.is16Bit = bitWidth == 16;
 
-  if (isFs) {
+  if (isFs && isInterpolant) {
     const unsigned interpMode = cast<ConstantInt>(call->getOperand(3))->getZExtValue();
     span.compatibilityInfo.isFlat = interpMode == InOutInfo::InterpModeFlat;
     span.compatibilityInfo.isCustom = interpMode == InOutInfo::InterpModeCustom;

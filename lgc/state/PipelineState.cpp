@@ -1476,8 +1476,11 @@ StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
   case BuiltInInterpPerspCentroid:
     return "InterpPerspCentroid";
   case BuiltInInterpLinearCentroid:
-    return "InterpLinearCenteroid";
-
+    return "InterpLinearCentroid";
+  case BuiltInInterpPerspSample:
+    return "InterpPerspSample";
+  case BuiltInInterpLinearSample:
+    return "InterpLinearSample";
   default:
     llvm_unreachable("Should never be called!");
     return "unknown";

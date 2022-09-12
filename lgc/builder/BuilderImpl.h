@@ -562,9 +562,7 @@ private:
   // Mark fragment output type
   void markFsOutputType(llvm::Type *outputTy, unsigned location, InOutInfo outputInfo);
 
-  // Modify aux interp value according to custom interp mode, and its helper functions.
-  llvm::Value *modifyAuxInterpValue(llvm::Value *auxInterpValue, InOutInfo inputInfo);
-  llvm::Value *evalIjOffsetNoPersp(llvm::Value *offset);
+  std::tuple<unsigned, llvm::Value *> getInterpModeAndValue(InOutInfo inputInfo, llvm::Value *auxInterpValue);
   llvm::Value *evalIjOffsetSmooth(llvm::Value *offset);
   llvm::Value *adjustIj(llvm::Value *value, llvm::Value *offset);
 

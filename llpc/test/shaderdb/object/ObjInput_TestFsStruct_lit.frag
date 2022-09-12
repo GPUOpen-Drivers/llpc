@@ -29,10 +29,10 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-DAG: call i32 @lgc.input.import.generic{{.*}}
-; SHADERTEST-DAG: call <3 x float> @lgc.input.import.generic.v3f32{{.*}}
-; SHADERTEST-DAG: call <4 x float> @lgc.input.import.generic.v4f32{{.*}}
-; SHADERTEST-DAG: call <4 x float> @lgc.input.import.generic.v4f32{{.*}}
+; SHADERTEST-DAG: call i32 @lgc.input.import.interpolant{{.*}}
+; SHADERTEST-DAG: call <3 x float> @lgc.input.import.interpolant.v3f32{{.*}}
+; SHADERTEST-DAG: call <4 x float> @lgc.input.import.interpolant.v4f32{{.*}}
+; SHADERTEST-DAG: call <4 x float> @lgc.input.import.interpolant.v4f32{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-COUNT-20: call float @llvm.amdgcn.interp.mov
 ; SHADERTEST: AMDLLPC SUCCESS
