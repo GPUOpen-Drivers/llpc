@@ -2289,9 +2289,12 @@ Value *SpirvLowerGlobal::atomicOpWithValueInTaskPayload(Instruction *atomicInstT
 void SpirvLowerGlobal::lowerBufferBlock() {
   SmallVector<GlobalVariable *, 8> globalsToRemove;
 
-  // Represent the users of the global variables, expect a bitCast, a GEP or a select used by GEPs
+  // Represent the users of the global variables, expect a bitCast, a load, a store, a GEP or a select used by GEPs
   struct ReplaceInstsInfo {
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    // remove bitCastInst.
     BitCastInst *bitCastInst;                         // The user is a bitCast
+    Instruction *loadStoreInst;                       // The user is a load or a store.
     SelectInst *selectInst;                           // The user is a select
     SmallVector<GetElementPtrInst *> getElemPtrInsts; // The user is a GEP. If the user is a select, we store its users.
   };
@@ -2352,10 +2355,14 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             // We have a user of the global, expect a GEP, a bitcast or a select.
             if (auto *getElemPtr = dyn_cast<GetElementPtrInst>(inst)) {
               replaceInstsInfo.getElemPtrInsts.push_back(getElemPtr);
+              // TODO: Remove this when LLPC will switch fully to opaque pointers.
+              // Remove else if with bitcast
             } else if (auto *bitCast = dyn_cast<BitCastInst>(inst)) {
               // We need to modify the bitcast if we did not find a GEP.
               assert(bitCast->getOperand(0) == &global);
               replaceInstsInfo.bitCastInst = bitCast;
+            } else if (isa<LoadInst>(inst) || isa<StoreInst>(inst)) {
+              replaceInstsInfo.loadStoreInst = inst;
             } else {
               // The users of the select must be a GEP.
               SelectInst *selectInst = cast<SelectInst>(inst);
@@ -2374,6 +2381,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
         }
 
         for (const auto &replaceInstsInfo : instructionsToReplace) {
+          // TODO: Remove this when LLPC will switch fully to opaque pointers.
+          // For opaque pointers BitCast Instruction will not be created.
           if (replaceInstsInfo.bitCastInst) {
             // All bitcasts recorded here are for GEPs that indexed by 0, 0 into the arrayed resource, and LLVM
             // has been clever enough to realise that doing a GEP of 0, 0 is actually a no-op (because the pointer
@@ -2388,6 +2397,20 @@ void SpirvLowerGlobal::lowerBufferBlock() {
               m_builder->CreateInvariantStart(bufferDesc);
 
             replaceInstsInfo.bitCastInst->replaceUsesOfWith(&global, m_builder->CreateBitCast(bufferDesc, blockType));
+          } else if (replaceInstsInfo.loadStoreInst) {
+            // All load or store recorded here are for GEPs that indexed by 0, 0 into the arrayed resource. Opaque
+            // pointers are removing zero-index GEPs and BitCast with pointer to pointer cast.
+            m_builder->SetInsertPoint(replaceInstsInfo.loadStoreInst);
+            unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
+
+            Value *const bufferDesc = m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0),
+                                                                      bufferFlags, m_builder->getInt8Ty());
+
+            // If the global variable is a constant, the data it points to is invariant.
+            if (global.isConstant())
+              m_builder->CreateInvariantStart(bufferDesc);
+
+            replaceInstsInfo.loadStoreInst->replaceUsesOfWith(&global, bufferDesc);
           } else {
             assert(!replaceInstsInfo.getElemPtrInsts.empty());
 
