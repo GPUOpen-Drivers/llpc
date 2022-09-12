@@ -104,6 +104,7 @@ public:
     Exp,
     Log,
     Sqrt,
+    InverseSqrt,
     SAbs,
     FSign,
     SSign,
@@ -298,6 +299,7 @@ public:
   llvm::Value *CreateExp(llvm::Value *x, const llvm::Twine &instName = "") override final;
   llvm::Value *CreateLog(llvm::Value *x, const llvm::Twine &instName = "") override final;
   llvm::Value *CreateSqrt(llvm::Value *x, const llvm::Twine &instName = "") override final;
+  llvm::Value *CreateInverseSqrt(llvm::Value *x, const llvm::Twine &instName = "") override final;
 
   // General arithmetic operations.
   llvm::Value *CreateSAbs(llvm::Value *x, const llvm::Twine &instName = "") override final;

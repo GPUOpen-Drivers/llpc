@@ -324,6 +324,10 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateSqrt(args[0]);
   }
 
+  case BuilderRecorder::InverseSqrt: {
+    return m_builder->CreateInverseSqrt(args[0]);
+  }
+
   case BuilderRecorder::SAbs: {
     return m_builder->CreateSAbs(args[0]);
   }
