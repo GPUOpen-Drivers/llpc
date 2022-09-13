@@ -30,21 +30,6 @@ ARG FEATURES
 # Use bash instead of sh in this docker file.
 SHELL ["/bin/bash", "-c"]
 
-RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
-    && apt-get update \
-    && apt-get install -yqq --no-install-recommends \
-       gpg gpg-agent \
-    && rm -rf /var/lib/apt/lists/*
-
-# Update the VulkanSDK 1.3.216 or higher, install the shader compiler tools for gpurt.
-RUN wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | apt-key add - \
-    && wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.216-focal.list https://packages.lunarg.com/vulkan/1.3.216/lunarg-vulkan-1.3.216-focal.list \
-    && apt-get update \
-    && apt-get install -yqq --no-install-recommends dxc glslang-tools \
-    && rm -rf /var/lib/apt/lists/* \
-    && dxc --version \
-    && spirv-remap --version
-
 # Copy helper scripts into container.
 COPY docker/*.sh /vulkandriver/
 
