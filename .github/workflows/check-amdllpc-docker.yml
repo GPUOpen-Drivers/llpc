@@ -20,8 +20,6 @@ jobs:
         feature-set:         ["+gcc", "+gcc+assertions",
                               "+clang", "+clang+coverage",
                               "+clang+shadercache+coverage+assertions",
-                              "+clang+shadercache+ubsan+asan",
-                              "+clang+shadercache+ubsan+asan+assertions",
                               "+clang+shadercache+tsan"]
     steps:
       - name: Free up disk space
