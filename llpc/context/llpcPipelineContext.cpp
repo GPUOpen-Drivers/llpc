@@ -166,16 +166,14 @@ PipelineContext::PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHa
 #if VKI_RAY_TRACING
                                  ,
                                  const Vkgc::RtState *rtState
-
 #endif
                                  )
-    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash),
+    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash)
 #if VKI_RAY_TRACING
-
-      m_rtState(rtState),
-
+      ,
+      m_rtState(rtState)
 #endif
-      m_resourceMapping() {
+{
 }
 
 // =====================================================================================================================
