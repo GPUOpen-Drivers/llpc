@@ -1736,18 +1736,11 @@ void MeshTaskShader::exportPrimitive() {
       primitivePayload = hwShadingRateMaskAndShift;
   }
 
-  auto undef = PoisonValue::get(m_builder->getInt32Ty());
-  m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getInt32Ty(),
-                             {
-                                 m_builder->getInt32(EXP_TARGET_PRIM),              // tgt
-                                 m_builder->getInt32(primitivePayload ? 0x3 : 0x1), // en
-                                 // src0 ~ src3
-                                 primitiveIndices, (primitivePayload ? primitivePayload : undef), undef, undef,
-                                 m_builder->getTrue(),  // done, must be set
-                                 m_builder->getFalse(), // vm
-                             });
+  doExport(ExportKind::Prim, ExportInfo{0, {primitiveIndices, primitivePayload}});
 
   // Primitive attribute export follows vertex attribute export
+  SmallVector<ExportInfo, 32> primAttrExports;
+
   unsigned startLoc = inOutUsage.mesh.genericOutputMapLocCount;
   for (auto &builtInExport : inOutUsage.mesh.builtInExportLocs) {
     const unsigned exportLoc = builtInExport.second;
@@ -1768,15 +1761,7 @@ void MeshTaskShader::exportPrimitive() {
     for (unsigned j = 0; j < 4; ++j)
       exportValues[j] = m_builder->CreateExtractElement(exportValue, j);
 
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
-                               {
-                                   m_builder->getInt32(EXP_TARGET_PARAM_0 + startLoc + loc), // tgt
-                                   m_builder->getInt32(0xF),                                 // en
-                                   // src0 ~ src3
-                                   exportValues[0], exportValues[1], exportValues[2], exportValues[3],
-                                   m_builder->getFalse(), // done
-                                   m_builder->getFalse(), // vm
-                               });
+    primAttrExports.push_back({startLoc + loc, exportValues});
     ++inOutUsage.primExpCount;
   }
 
@@ -1784,18 +1769,8 @@ void MeshTaskShader::exportPrimitive() {
   if (builtInUsage.primitiveId) {
     if (inOutUsage.mesh.perPrimitiveBuiltInExportLocs.count(BuiltInPrimitiveId) > 0) {
       assert(primitiveId);
-      auto undef = PoisonValue::get(m_builder->getInt32Ty());
       const unsigned exportLoc = inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInPrimitiveId];
-
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getInt32Ty(),
-                                 {
-                                     m_builder->getInt32(EXP_TARGET_PARAM_0 + startLoc + exportLoc), // tgt
-                                     m_builder->getInt32(0x1),                                       // en
-                                     // src0 ~ src3
-                                     primitiveId, undef, undef, undef,
-                                     m_builder->getFalse(), // done
-                                     m_builder->getFalse(), // vm
-                                 });
+      primAttrExports.push_back({startLoc + exportLoc, primitiveId});
       ++inOutUsage.primExpCount;
     }
   }
@@ -1819,18 +1794,8 @@ void MeshTaskShader::exportPrimitive() {
   if (exportLayer) {
     if (inOutUsage.mesh.perPrimitiveBuiltInExportLocs.count(BuiltInLayer) > 0) {
       assert(layer);
-      auto undef = PoisonValue::get(m_builder->getInt32Ty());
       const unsigned exportLoc = inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInLayer];
-
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getInt32Ty(),
-                                 {
-                                     m_builder->getInt32(EXP_TARGET_PARAM_0 + startLoc + exportLoc), // tgt
-                                     m_builder->getInt32(0x1),                                       // en
-                                     // src0 ~ src3
-                                     layer, undef, undef, undef,
-                                     m_builder->getFalse(), // done
-                                     m_builder->getFalse(), // vm
-                                 });
+      primAttrExports.push_back({startLoc + exportLoc, layer});
       ++inOutUsage.primExpCount;
     }
   }
@@ -1838,18 +1803,8 @@ void MeshTaskShader::exportPrimitive() {
   if (enableMultiView) {
     if (inOutUsage.mesh.perPrimitiveBuiltInExportLocs.count(BuiltInViewIndex) > 0) {
       assert(viewIndex);
-      auto undef = PoisonValue::get(m_builder->getInt32Ty());
       const unsigned exportLoc = inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInViewIndex];
-
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getInt32Ty(),
-                                 {
-                                     m_builder->getInt32(EXP_TARGET_PARAM_0 + startLoc + exportLoc), // tgt
-                                     m_builder->getInt32(0x1),                                       // en
-                                     // src0 ~ src3
-                                     viewIndex, undef, undef, undef,
-                                     m_builder->getFalse(), // done
-                                     m_builder->getFalse(), // vm
-                                 });
+      primAttrExports.push_back({startLoc + exportLoc, viewIndex});
       ++inOutUsage.primExpCount;
     }
   }
@@ -1873,21 +1828,13 @@ void MeshTaskShader::exportPrimitive() {
   if (exportViewportIndex) {
     if (inOutUsage.mesh.perPrimitiveBuiltInExportLocs.count(BuiltInViewportIndex) > 0) {
       assert(viewportIndex);
-      auto undef = PoisonValue::get(m_builder->getInt32Ty());
       const unsigned exportLoc = inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInViewportIndex];
-
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getInt32Ty(),
-                                 {
-                                     m_builder->getInt32(EXP_TARGET_PARAM_0 + startLoc + exportLoc), // tgt
-                                     m_builder->getInt32(0x1),                                       // en
-                                     // src0 ~ src3
-                                     viewportIndex, undef, undef, undef,
-                                     m_builder->getFalse(), // done
-                                     m_builder->getFalse(), // vm
-                                 });
+      primAttrExports.push_back({startLoc + exportLoc, viewportIndex});
       ++inOutUsage.primExpCount;
     }
   }
+
+  doExport(ExportKind::PrimAttr, primAttrExports);
 }
 
 // =====================================================================================================================
@@ -1897,7 +1844,8 @@ void MeshTaskShader::exportVertex() {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage;
 
   // Export vertex position data
-  CallInst *lastBuiltInExport = nullptr;
+  SmallVector<ExportInfo, 8> posExports;
+
   if (builtInUsage.position) {
     auto position = readMeshBuiltInFromLds(BuiltInPosition);
     std::array<Value *, 4> positions = {m_builder->CreateExtractElement(position, static_cast<uint64_t>(0)),
@@ -1905,30 +1853,12 @@ void MeshTaskShader::exportVertex() {
                                         m_builder->CreateExtractElement(position, 2),
                                         m_builder->CreateExtractElement(position, 3)};
 
-    lastBuiltInExport = m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
-                                                   {
-                                                       m_builder->getInt32(EXP_TARGET_POS_0), // tgt
-                                                       m_builder->getInt32(0xF),              // en
-                                                       // src0 ~ src3
-                                                       positions[0], positions[1], positions[2], positions[3],
-                                                       m_builder->getFalse(), // done
-                                                       m_builder->getFalse(), // vm
-                                                   });
+    posExports.push_back({0, positions});
   }
 
   if (builtInUsage.pointSize) {
     auto pointSize = readMeshBuiltInFromLds(BuiltInPointSize);
-    auto undef = PoisonValue::get(m_builder->getFloatTy());
-
-    lastBuiltInExport = m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
-                                                   {
-                                                       m_builder->getInt32(EXP_TARGET_POS_1), // tgt
-                                                       m_builder->getInt32(0x1),              // en
-                                                       // src0 ~ src3
-                                                       pointSize, undef, undef, undef,
-                                                       m_builder->getFalse(), // done
-                                                       m_builder->getFalse(), // vm
-                                                   });
+    posExports.push_back({1, pointSize});
   }
 
   SmallVector<Value *, 8> clipDistances;
@@ -1966,36 +1896,20 @@ void MeshTaskShader::exportVertex() {
         clipCullDistances.push_back(undef);
     }
 
-    unsigned pos = builtInUsage.pointSize ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
-    lastBuiltInExport = m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
-                                                   {
-                                                       m_builder->getInt32(pos), // tgt
-                                                       m_builder->getInt32(0xF), // en
-                                                       // src0 ~ src3
-                                                       clipCullDistances[0], clipCullDistances[1], clipCullDistances[2],
-                                                       clipCullDistances[3],
-                                                       m_builder->getFalse(), // done
-                                                       m_builder->getFalse(), // vm
-                                                   });
+    unsigned pos = builtInUsage.pointSize ? 2 : 1;
+    posExports.push_back(
+        {pos, {clipCullDistances[0], clipCullDistances[1], clipCullDistances[2], clipCullDistances[3]}});
+
     if (clipCullDistances.size() > 4) {
       // Do the second exporting
-      lastBuiltInExport = m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
-                                                     {
-                                                         m_builder->getInt32(pos + 1), // tgt
-                                                         m_builder->getInt32(0xF),     // en
-                                                         // src0 ~ src3
-                                                         clipCullDistances[4], clipCullDistances[5],
-                                                         clipCullDistances[6], clipCullDistances[7],
-                                                         m_builder->getFalse(), // done
-                                                         m_builder->getFalse(), // vm
-                                                     });
+      posExports.push_back(
+          {pos + 1, {clipCullDistances[4], clipCullDistances[5], clipCullDistances[6], clipCullDistances[7]}});
     }
   }
 
-  if (lastBuiltInExport) {
-    // Set "done" flag
-    lastBuiltInExport->setArgOperand(6, m_builder->getTrue());
-  }
+  doExport(ExportKind::Pos, posExports);
+
+  SmallVector<ExportInfo, 32> vertAttrExports;
 
   // Export vertex attributes (from generic outputs)
   Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
@@ -2012,15 +1926,7 @@ void MeshTaskShader::exportVertex() {
                                            m_builder->CreateExtractElement(exportValue, 2),
                                            m_builder->CreateExtractElement(exportValue, 3)};
 
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
-                               {
-                                   m_builder->getInt32(EXP_TARGET_PARAM_0 + i), // tgt
-                                   m_builder->getInt32(0xF),                    // en
-                                   // src0 ~ src3
-                                   exportValues[0], exportValues[1], exportValues[2], exportValues[3],
-                                   m_builder->getFalse(), // done
-                                   m_builder->getFalse(), // vm
-                               });
+    vertAttrExports.push_back({i, exportValues});
     ++inOutUsage.expCount;
   }
 
@@ -2071,34 +1977,20 @@ void MeshTaskShader::exportVertex() {
       }
       assert(exportLoc != InvalidValue);
 
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
-                                 {
-                                     m_builder->getInt32(EXP_TARGET_PARAM_0 + exportLoc), // tgt
-                                     m_builder->getInt32(0xF),                            // en
-                                     // src0 ~ src3
-                                     clipCullDistances[0], clipCullDistances[1], clipCullDistances[2],
-                                     clipCullDistances[3],
-                                     m_builder->getFalse(), // done
-                                     m_builder->getFalse(), // vm
-                                 });
+      vertAttrExports.push_back(
+          {exportLoc, {clipCullDistances[0], clipCullDistances[1], clipCullDistances[2], clipCullDistances[3]}});
       ++inOutUsage.expCount;
 
       if (clipCullDistances.size() > 4) {
         // Do the second exporting
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getFloatTy(),
-                                   {
-                                       m_builder->getInt32(EXP_TARGET_PARAM_0 + exportLoc + 1), // tgt
-                                       m_builder->getInt32(0xF),                                // en
-                                       // src0 ~ src3
-                                       clipCullDistances[4], clipCullDistances[5], clipCullDistances[6],
-                                       clipCullDistances[7],
-                                       m_builder->getFalse(), // done
-                                       m_builder->getFalse(), // vm
-                                   });
+        vertAttrExports.push_back(
+            {exportLoc + 1, {clipCullDistances[4], clipCullDistances[5], clipCullDistances[6], clipCullDistances[7]}});
         ++inOutUsage.expCount;
       }
     }
   }
+
+  doExport(ExportKind::VertAttr, vertAttrExports);
 }
 
 // =====================================================================================================================
@@ -2161,6 +2053,62 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
 
     m_builder->CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
                                AtomicOrdering::Monotonic, SyncScope::System);
+  }
+}
+
+// =====================================================================================================================
+// Do exporting. The array of values for certain export kind are all exported.
+//
+// @param kind : Export kind (positions, primitive, or parameters)
+// @param exports : Array of exports
+void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
+  for (unsigned i = 0; i < exports.size(); ++i) {
+    auto &values = exports[i].values;
+    assert(values.size() == 4); // Must be at most 4 export values
+
+    assert(values[0]); // Must at least have one value
+    auto valueTy = values[0]->getType();
+    assert(valueTy->isFloatTy() || valueTy->isIntegerTy(32)); // Must be float or i32
+
+    auto undef = PoisonValue::get(valueTy);
+    unsigned validMask = 0;
+    for (unsigned j = 0; j < 4; ++j) {
+      if (values[j])
+        validMask |= (1U << j);
+    }
+
+    unsigned target = InvalidValue;
+    switch (kind) {
+    case ExportKind::Pos:
+      target = EXP_TARGET_POS_0;
+      break;
+    case ExportKind::Prim:
+      target = EXP_TARGET_PRIM;
+      break;
+    case ExportKind::VertAttr:
+    case ExportKind::PrimAttr:
+      target = EXP_TARGET_PARAM_0;
+      break;
+    default:
+      llvm_unreachable("Unexpected export target!");
+      break;
+    }
+
+    bool exportDone = false;
+    if ((kind == ExportKind::Pos || kind == ExportKind::Prim) && i == exports.size() - 1)
+      exportDone = true; // Last export
+
+    m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, valueTy,
+                               {
+                                   m_builder->getInt32(target + exports[i].index), // tgt
+                                   m_builder->getInt32(validMask),                 // en
+                                   values[0],                                      // src0
+                                   values[1] ? values[1] : undef,                  // src1
+                                   values[2] ? values[2] : undef,                  // src2
+                                   values[3] ? values[3] : undef,                  // src3
+                                   m_builder->getInt1(exportDone),                 // done
+                                   m_builder->getFalse(),                          // vm
+                               });
   }
 }
 

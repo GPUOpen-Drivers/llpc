@@ -105,6 +105,20 @@ private:
   void exportVertex();
   void collectMeshStatsInfo(llvm::Function *entryPoint, llvm::Value *numMeshPrimitives);
 
+  // Export kind
+  enum class ExportKind : unsigned {
+    Pos = 0,
+    Prim = 1,
+    VertAttr = 2,
+    PrimAttr = 3,
+  };
+  // Export info of a single entry
+  struct ExportInfo {
+    unsigned index;
+    std::array<llvm::Value *, 4> values;
+  };
+  void doExport(ExportKind kind, llvm::ArrayRef<ExportInfo> exports);
+
   llvm::Value *getMeshFlatWorkgroupId();
   llvm::Value *getMeshNumWorkgroups();
   llvm::Value *getMeshWorkgroupId();
