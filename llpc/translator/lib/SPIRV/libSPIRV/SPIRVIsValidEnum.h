@@ -74,6 +74,14 @@ inline bool isValid(spv::ExecutionModel V) {
   case ExecutionModelGeometry:
   case ExecutionModelFragment:
   case ExecutionModelGLCompute:
+#if VKI_RAY_TRACING
+  case ExecutionModelRayGenerationKHR:
+  case ExecutionModelIntersectionKHR:
+  case ExecutionModelAnyHitKHR:
+  case ExecutionModelClosestHitKHR:
+  case ExecutionModelMissKHR:
+  case ExecutionModelCallableKHR:
+#endif
     return true;
   default:
     return false;
@@ -183,6 +191,14 @@ inline bool isValid(spv::StorageClass V) {
   case StorageClassPhysicalStorageBuffer:
 #else
   case StorageClassPhysicalStorageBufferEXT:
+#endif
+#if VKI_RAY_TRACING
+  case StorageClassCallableDataKHR:
+  case StorageClassIncomingCallableDataKHR:
+  case StorageClassRayPayloadKHR:
+  case StorageClassHitAttributeKHR:
+  case StorageClassIncomingRayPayloadKHR:
+  case StorageClassShaderRecordBufferKHR:
 #endif
     return true;
   default:
@@ -524,6 +540,10 @@ inline bool isValid(spv::Capability V) {
   case CapabilityRoundingModeRTZ:
   case CapabilityImageGatherBiasLodAMD:
   case CapabilityFragmentMaskAMD:
+#if VKI_RAY_TRACING
+  case CapabilityRayQueryProvisionalKHR:
+  case CapabilityRayTraversalPrimitiveCullingKHR:
+#endif
   case CapabilityFloat16ImageAMD:
   case CapabilityShaderClockKHR:
   case CapabilityVariablePointersStorageBuffer:
@@ -872,6 +892,15 @@ inline bool isValid(spv::Op V) {
   case OpSubgroupBallotKHR:
   case OpSubgroupFirstInvocationKHR:
   case OpSubgroupReadInvocationKHR:
+#if VKI_RAY_TRACING
+  case OpTypeRayQueryKHR:
+  case OpRayQueryInitializeKHR:
+  case OpRayQueryTerminateKHR:
+  case OpRayQueryGenerateIntersectionKHR:
+  case OpRayQueryConfirmIntersectionKHR:
+  case OpRayQueryProceedKHR:
+  case OpRayQueryGetIntersectionTypeKHR:
+#endif
   case OpSubgroupAllKHR:
   case OpSubgroupAnyKHR:
   case OpSubgroupAllEqualKHR:
@@ -892,6 +921,18 @@ inline bool isValid(spv::Op V) {
   case OpGroupUMaxNonUniformAMD:
   case OpGroupSMaxNonUniformAMD:
   case OpReadClockKHR:
+#if VKI_RAY_TRACING
+  case OpReportIntersectionKHR:
+  case OpIgnoreIntersectionKHR:
+  case OpIgnoreIntersectionNV:
+  case OpTerminateRayKHR:
+  case OpTerminateRayNV:
+  case OpTraceNV:
+  case OpTypeAccelerationStructureKHR:
+  case OpExecuteCallableKHR:
+  case OpTraceRayKHR:
+  case OpConvertUToAccelerationStructureKHR:
+#endif
   case OpSubgroupShuffleINTEL:
   case OpSubgroupShuffleDownINTEL:
   case OpSubgroupShuffleUpINTEL:
@@ -902,6 +943,25 @@ inline bool isValid(spv::Op V) {
   case OpSubgroupImageBlockWriteINTEL:
   case OpDemoteToHelperInvocationEXT:
   case OpIsHelperInvocationEXT:
+#if VKI_RAY_TRACING
+  case OpRayQueryGetRayTMinKHR:
+  case OpRayQueryGetRayFlagsKHR:
+  case OpRayQueryGetIntersectionTKHR:
+  case OpRayQueryGetIntersectionInstanceCustomIndexKHR:
+  case OpRayQueryGetIntersectionInstanceIdKHR:
+  case OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR:
+  case OpRayQueryGetIntersectionGeometryIndexKHR:
+  case OpRayQueryGetIntersectionPrimitiveIndexKHR:
+  case OpRayQueryGetIntersectionBarycentricsKHR:
+  case OpRayQueryGetIntersectionFrontFaceKHR:
+  case OpRayQueryGetIntersectionCandidateAABBOpaqueKHR:
+  case OpRayQueryGetIntersectionObjectRayDirectionKHR:
+  case OpRayQueryGetIntersectionObjectRayOriginKHR:
+  case OpRayQueryGetWorldRayDirectionKHR:
+  case OpRayQueryGetWorldRayOriginKHR:
+  case OpRayQueryGetIntersectionObjectToWorldKHR:
+  case OpRayQueryGetIntersectionWorldToObjectKHR:
+#endif
     return true;
   default:
     return false;

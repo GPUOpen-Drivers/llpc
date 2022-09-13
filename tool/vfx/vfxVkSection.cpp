@@ -17,6 +17,16 @@ StrToMemberAddr SectionComputeState::m_addrTable[SectionComputeState::MemberCoun
 StrToMemberAddr SectionPipelineOption::m_addrTable[SectionPipelineOption::MemberCount];
 StrToMemberAddr SectionShaderOption::m_addrTable[SectionShaderOption::MemberCount];
 StrToMemberAddr SectionNggState::m_addrTable[SectionNggState::MemberCount];
+#if VKI_RAY_TRACING
+StrToMemberAddr SectionRayTracingState::m_addrTable[SectionRayTracingState::MemberCount];
+StrToMemberAddr SectionShaderGroup::m_addrTable[SectionShaderGroup::MemberCount];
+StrToMemberAddr SectionRtState::m_addrTable[SectionRtState::MemberCount];
+StrToMemberAddr SectionRayTracingShaderExportConfig::m_addrTable[SectionRayTracingShaderExportConfig::MemberCount];
+StrToMemberAddr SectionIndirectCalleeSavedRegs::m_addrTable[SectionIndirectCalleeSavedRegs::MemberCount];
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
+StrToMemberAddr SectionGpurtFuncTable::m_addrTable[SectionGpurtFuncTable::MemberCount];
+#endif
+#endif
 StrToMemberAddr SectionExtendedRobustness::m_addrTable[SectionExtendedRobustness::MemberCount];
 
 // =====================================================================================================================
@@ -29,6 +39,10 @@ public:
     // Sections for PipelineDocument
     INIT_SECTION_INFO("GraphicsPipelineState", SectionTypeGraphicsState, 0)
     INIT_SECTION_INFO("ComputePipelineState", SectionTypeComputeState, 0)
+#if VKI_RAY_TRACING
+    INIT_SECTION_INFO("RayTracingPipelineState", SectionTypeRayTracingState, 0)
+    INIT_SECTION_INFO("RtState", SectionTypeRtState, 0)
+#endif
     INIT_SECTION_INFO("VertexInputState", SectionTypeVertexInputState, 0)
     INIT_SECTION_INFO("VsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageVertex)
     INIT_SECTION_INFO("TcsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageTessControl)
@@ -36,6 +50,14 @@ public:
     INIT_SECTION_INFO("GsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageGeometry)
     INIT_SECTION_INFO("FsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageFragment)
     INIT_SECTION_INFO("CsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageCompute)
+#if VKI_RAY_TRACING
+    INIT_SECTION_INFO("rgenInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingRayGen)
+    INIT_SECTION_INFO("sectInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingIntersect)
+    INIT_SECTION_INFO("ahitInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingAnyHit)
+    INIT_SECTION_INFO("chitInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingClosestHit)
+    INIT_SECTION_INFO("missInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingMiss)
+    INIT_SECTION_INFO("callInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingCallable)
+#endif
     INIT_SECTION_INFO("ResourceMapping", SectionTypeResourceMapping, 0)
 
     SectionGraphicsState::initialAddrTable();
@@ -47,6 +69,16 @@ public:
     SectionPipelineOption::initialAddrTable();
     SectionShaderOption::initialAddrTable();
     SectionNggState::initialAddrTable();
+#if VKI_RAY_TRACING
+    SectionRayTracingState::initialAddrTable();
+    SectionShaderGroup::initialAddrTable();
+    SectionRtState::initialAddrTable();
+    SectionRayTracingShaderExportConfig::initialAddrTable();
+    SectionIndirectCalleeSavedRegs::initialAddrTable();
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
+    SectionGpurtFuncTable::initAddrTable();
+#endif
+#endif
     SectionExtendedRobustness::initialAddrTable();
   };
 

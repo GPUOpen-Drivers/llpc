@@ -1151,6 +1151,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     }
 
     // For compute shader, NumWorkgroups is a v3i32 loaded from an address pointed to by a special user data item.
+    assert(m_shaderStage == ShaderStageCompute);
     Value *numWorkgroupPtr = ShaderInputs::getSpecialUserData(UserDataMapping::Workgroup, BuilderBase::get(*this));
     LoadInst *load = CreateLoad(FixedVectorType::get(getInt32Ty(), 3), numWorkgroupPtr);
     load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
@@ -1263,6 +1264,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   }
 
   case BuiltInDrawIndex: {
+    assert(m_shaderStage == ShaderStageTask); // Task shader only
     return ShaderInputs::getSpecialUserData(UserDataMapping::DrawIndex, BuilderBase::get(*this));
   }
 

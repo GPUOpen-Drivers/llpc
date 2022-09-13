@@ -72,6 +72,12 @@ public:
 
   static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline, bool isCacheHash,
                                                         bool isRelocatableShader);
+#if VKI_RAY_TRACING
+  static MetroHash::Hash generateHashForRayTracingPipeline(const RayTracingPipelineBuildInfo *pipeline,
+                                                           bool isCacheHash);
+  static void dumpRayTracingRtState(const RtState *rtState, std::ostream &dumpFile);
+  static void dumpRayTracingPipelineMetadata(PipelineDumpFile *binaryFile, const BinaryData *pipelineBin);
+#endif
 
   static std::string getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const uint64_t hashCode64);
 
@@ -115,6 +121,14 @@ private:
                                       const ComputePipelineBuildInfo *pipelineInfo);
   static void dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char *dumpDir,
                                        const GraphicsPipelineBuildInfo *pipelineInfo);
+#if VKI_RAY_TRACING
+  static void dumpRayTracingPipelineInfo(std::ostream *dumpFile, const char *dumpDir,
+                                         const RayTracingPipelineBuildInfo *pipelineInfo);
+
+  static void dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *pipelineInfo, const char *dumpDir,
+                                      std::ostream &dumpFile);
+  static void updateHashForRtState(const RtState *rtState, MetroHash64 *hasher);
+#endif
 
   static void dumpVersionInfo(std::ostream &dumpFile);
   static void dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo, std::ostream &dumpFile);

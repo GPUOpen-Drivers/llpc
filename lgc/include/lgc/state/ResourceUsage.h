@@ -156,6 +156,10 @@ struct ResourceUsage {
   unsigned numVgprsAvailable = UINT32_MAX; // Number of available VGPRs
   bool useImages = false;                  // Whether images are used
 
+#if VKI_RAY_TRACING
+  bool useRayQueryLdsStack = false; // Whether ray query uses LDS stack
+#endif
+
   // Usage of built-ins
   struct {
     // Per-stage built-in usage
@@ -397,6 +401,9 @@ struct ResourceUsage {
         unsigned tessFactorStride; // Size of tess factor stride (in dword)
 
         unsigned tessOnChipLdsSize; // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
+#if VKI_RAY_TRACING
+        unsigned rayQueryLdsStackSize; // Ray query LDS stack size
+#endif
 
         bool initialized; // Whether calcFactor has been initialized
       } calcFactor;
@@ -428,6 +435,9 @@ struct ResourceUsage {
         unsigned inputVertices;      // Number of GS input vertices
         unsigned primAmpFactor;      // GS primitive amplification factor
         bool enableMaxVertOut;       // Whether to allow each GS instance to emit maximum vertices (NGG)
+#if VKI_RAY_TRACING
+        unsigned rayQueryLdsStackSize; // Ray query LDS stack size
+#endif
       } calcFactor = {};
 
       unsigned outLocCount[MaxGsStreams] = {};

@@ -97,6 +97,7 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
       assert((shaderStageMask & (1 << stage)) == 0);
       shaderStageMask |= 1 << stage;
 #endif
+
       // Rename the entry-point to ensure there is no clash on linking.
       func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
                    "." + func.getName());

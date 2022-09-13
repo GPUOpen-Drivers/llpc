@@ -61,6 +61,14 @@ const char *getShaderStageName(ShaderStage shaderStage) {
       "geometry",
       "fragment",
       "compute",
+#if VKI_RAY_TRACING
+      "raygen",
+      "intersect",
+      "anyhit",
+      "closesthit",
+      "miss",
+      "callable"
+#endif
     };
 
     name = ShaderStageNames[static_cast<unsigned>(shaderStage)];
@@ -90,6 +98,20 @@ ShaderStage convertToShaderStage(unsigned execModel) {
     return ShaderStageCompute;
   case spv::ExecutionModelCopyShader:
     return ShaderStageCopyShader;
+#if VKI_RAY_TRACING
+  case spv::ExecutionModelRayGenerationKHR:
+    return ShaderStageRayTracingRayGen;
+  case spv::ExecutionModelIntersectionKHR:
+    return ShaderStageRayTracingIntersect;
+  case spv::ExecutionModelAnyHitKHR:
+    return ShaderStageRayTracingAnyHit;
+  case spv::ExecutionModelClosestHitKHR:
+    return ShaderStageRayTracingClosestHit;
+  case spv::ExecutionModelMissKHR:
+    return ShaderStageRayTracingMiss;
+  case spv::ExecutionModelCallableKHR:
+    return ShaderStageRayTracingCallable;
+#endif
   default:
     llvm_unreachable("Unknown execution model");
     return ShaderStageInvalid;
@@ -116,11 +138,43 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
     return spv::ExecutionModelGLCompute;
   case ShaderStageCopyShader:
     return spv::ExecutionModelCopyShader;
+#if VKI_RAY_TRACING
+  case ShaderStageRayTracingRayGen:
+    return spv::ExecutionModelRayGenerationKHR;
+  case ShaderStageRayTracingIntersect:
+    return spv::ExecutionModelIntersectionKHR;
+  case ShaderStageRayTracingAnyHit:
+    return spv::ExecutionModelAnyHitKHR;
+  case ShaderStageRayTracingClosestHit:
+    return spv::ExecutionModelClosestHitKHR;
+  case ShaderStageRayTracingMiss:
+    return spv::ExecutionModelMissKHR;
+  case ShaderStageRayTracingCallable:
+    return spv::ExecutionModelCallableKHR;
+#endif
   default:
     llvm_unreachable("Unknown shader stage");
     return spv::ExecutionModelMax;
   }
 }
+
+#if VKI_RAY_TRACING
+// =====================================================================================================================
+// Checks whether a specified shader stage is for ray tracing.
+//
+// @param stage : Shader stage to check
+bool isRayTracingShaderStage(ShaderStage stage) {
+  return stage >= ShaderStageRayTracingRayGen && stage <= ShaderStageRayTracingCallable;
+}
+
+// =====================================================================================================================
+// Checks whether a specified shader stage mask contains ray tracing shader stages
+//
+// @param shageMask : Shader stage mask to check
+bool hasRayTracingShaderStage(unsigned shageMask) {
+  return (shageMask & ShaderStageAllRayTracingBit) != 0;
+}
+#endif
 
 // =====================================================================================================================
 // Returns true if shaderInfo has the information required to compile an unlinked shader of the given type.

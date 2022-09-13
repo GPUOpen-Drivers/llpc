@@ -244,8 +244,13 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "image.query.size";
   case Opcode::ImageGetLod:
     return "image.get.lod";
+#if VKI_RAY_TRACING
+  case Opcode::ImageBvhIntersectRayAMD:
+    return "image.bvh.intersect.ray";
+#else
   case Opcode::Reserved1:
     return "reserved1";
+#endif
   case GetWaveSize:
     return "get.wave.size";
   case GetSubgroupSize:
@@ -1627,6 +1632,24 @@ Instruction *BuilderRecorder::CreateWriteBuiltInOutput(Value *valueToWrite, Buil
                 "");
 }
 
+#if VKI_RAY_TRACING
+// =====================================================================================================================
+// Create a ray intersect result with specified node in BVH buffer
+//
+// @param nodePtr : BVH node pointer
+// @param extent : The valid range on which intersections can occur
+// @param origin : Intersect ray origin
+// @param direction : Intersect ray direction
+// @param invDirection : The inverse of direction
+// @param imageDesc : Image descriptor
+// @param instName : Name to give instruction(s)
+Value *BuilderRecorder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value *origin, Value *direction,
+                                                   Value *invDirection, Value *imageDesc, const Twine &instName) {
+  return record(Opcode::ImageBvhIntersectRayAMD, FixedVectorType::get(getInt32Ty(), 4),
+                {nodePtr, extent, origin, direction, invDirection, imageDesc}, instName);
+}
+
+#endif
 // =====================================================================================================================
 // Create a read from (part of) a task payload.
 // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
@@ -2191,6 +2214,9 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ReadClock:
     case Opcode::WriteBuiltInOutput:
     case Opcode::WriteGenericOutput:
+#if VKI_RAY_TRACING
+    case Opcode::ImageBvhIntersectRayAMD:
+#endif
       // TODO: These functions have not been classified yet.
       break;
     default:

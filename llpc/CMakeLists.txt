@@ -188,6 +188,12 @@ target_include_directories(llpc
         ${LLVM_INCLUDE_DIRS}
 )
 
+#if VKI_RAY_TRACING
+if(VKI_RAY_TRACING)
+  target_include_directories(llpc PRIVATE ${XGL_GPURT_PATH})
+endif()
+#endif
+
 if(WIN32)
     target_compile_definitions(llpc PRIVATE VK_USE_PLATFORM_WIN32_KHR)
 endif()
@@ -203,6 +209,13 @@ if(ICD_BUILD_LLPC)
         context/llpcPipelineContext.cpp
         context/llpcShaderCacheManager.cpp
     )
+#if VKI_RAY_TRACING
+if(VKI_RAY_TRACING)
+    target_sources(llpc PRIVATE
+         context/llpcRayTracingContext.cpp
+         )
+endif()
+#endif
 
 # llpc/lower
     target_sources(llpc PRIVATE
@@ -217,6 +230,18 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerTranslator.cpp
         lower/llpcSpirvLowerUtil.cpp
     )
+
+#if VKI_RAY_TRACING
+if(VKI_RAY_TRACING)
+    target_sources(llpc PRIVATE
+        lower/llpcSpirvLowerRayQuery.cpp
+        lower/llpcSpirvLowerRayQueryPostInline.cpp
+        lower/llpcSpirvLowerRayTracing.cpp
+        lower/llpcSpirvLowerRayTracingBuiltIn.cpp
+        lower/llpcSpirvLowerRayTracingIntrinsics.cpp
+    )
+endif()
+#endif
 
 # llpc/translator
     target_sources(llpc PRIVATE
@@ -312,6 +337,14 @@ add_library(llpc_standalone_compiler
     tool/llpcInputUtils.cpp
     tool/llpcPipelineBuilder.cpp
 )
+
+#if VKI_RAY_TRACING
+if(VKI_RAY_TRACING)
+    target_sources(llpc_standalone_compiler PRIVATE
+        tool/llpcRayTracingPipelineBuilder.cpp
+        )
+endif()
+#endif
 
 add_dependencies(llpc_standalone_compiler llpc)
 

@@ -193,6 +193,14 @@ template <> inline void SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>::init(
   add(SPIRAS_Constant, StorageClassPushConstant);
   add(SPIRAS_Uniform, StorageClassStorageBuffer);
   add(SPIRAS_Global, StorageClassPhysicalStorageBufferEXT);
+#if VKI_RAY_TRACING
+  add(SPIRAS_Private, StorageClassCallableDataKHR);
+  add(SPIRAS_Private, StorageClassIncomingCallableDataKHR);
+  add(SPIRAS_Private, StorageClassRayPayloadKHR);
+  add(SPIRAS_Private, StorageClassHitAttributeKHR);
+  add(SPIRAS_Private, StorageClassIncomingRayPayloadKHR);
+  add(SPIRAS_Global, StorageClassShaderRecordBufferKHR);
+#endif
 }
 typedef SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind> SPIRSPIRVAddrSpaceMap;
 

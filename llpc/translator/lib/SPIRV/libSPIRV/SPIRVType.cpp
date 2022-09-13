@@ -257,6 +257,16 @@ bool SPIRVType::isTypeVector() const { return OpCode == OpTypeVector; }
 
 bool SPIRVType::isTypeMatrix() const { return OpCode == OpTypeMatrix; }
 
+#if VKI_RAY_TRACING
+bool SPIRVType::isTypeAccelerationStructureKHR() const {
+  return OpCode == OpTypeAccelerationStructureKHR;
+}
+
+bool SPIRVType::isTypeRayQueryKHR() const {
+  return OpCode == OpTypeRayQueryKHR;
+}
+#endif
+
 bool SPIRVType::isTypeVectorBool() const {
   return isTypeVector() && getVectorComponentType()->isTypeBool();
 }

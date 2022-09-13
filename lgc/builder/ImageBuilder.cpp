@@ -1540,6 +1540,37 @@ Value *ImageBuilder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imag
   return result;
 }
 
+#if VKI_RAY_TRACING
+// =====================================================================================================================
+// Create a ray intersect result with specified node in BVH buffer
+//
+// @param nodePtr : BVH node pointer
+// @param extent : The valid range on which intersections can occur
+// @param origin : Intersect ray origin
+// @param direction : Intersect ray direction
+// @param invDirection : The inverse of direction
+// @param imageDesc : Image descriptor
+// @param instName : Name to give instruction(s)
+Value *ImageBuilder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value *origin, Value *direction,
+                                                Value *invDirection, Value *imageDesc, const Twine &instName) {
+  imageDesc = fixImageDescForRead(imageDesc);
+  SmallVector<Value *, 6> args;
+  args.push_back(nodePtr);
+  args.push_back(extent);
+  args.push_back(origin);
+  args.push_back(direction);
+  args.push_back(invDirection);
+  args.push_back(imageDesc);
+
+  // NOTE: llvm.amdgcn.image.bvh.intersect.ray* intrinsics are define in amd-vulkan-npi
+  // Use hardcode to avoid compile-error when using non-npi llvm
+  std::string callName = "llvm.amdgcn.image.bvh.intersect.ray";
+  addTypeMangling(nullptr, {nodePtr, direction}, callName);
+
+  return emitCall(callName, FixedVectorType::get(getInt32Ty(), 4), args, {}, &*GetInsertPoint());
+}
+#endif
+
 // =====================================================================================================================
 // Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
 //

@@ -97,7 +97,7 @@ private:
 
   void storeOutputMember(llvm::Type *outputTy, llvm::Value *storeValue, llvm::ArrayRef<llvm::Value *> indexOperands,
                          unsigned maxLocOffset, llvm::Constant *outputMeta, llvm::Value *locOffset,
-                         llvm::Value *vertexIdx);
+                         llvm::Value *vertexOrPrimitiveIdx);
 
   void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst);
 
