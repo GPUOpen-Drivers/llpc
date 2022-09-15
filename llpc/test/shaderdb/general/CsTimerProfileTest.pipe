@@ -41,3 +41,13 @@ void main()
 
 [CsInfo]
 entryPoint = main
+userDataNode[0].type = DescriptorBuffer
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 4
+userDataNode[0].set = 0
+userDataNode[0].binding = 0
+userDataNode[1].type = DescriptorBuffer
+userDataNode[1].offsetInDwords = 4
+userDataNode[1].sizeInDwords = 4
+userDataNode[1].set = 0
+userDataNode[1].binding = 1
