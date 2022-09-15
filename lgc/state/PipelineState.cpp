@@ -1292,6 +1292,12 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
 }
 
 // =====================================================================================================================
+// Checks if SW-emulated mesh pipeline statistics is needed
+bool PipelineState::needSwMeshPipelineStats() const {
+  return getTargetInfo().getGfxIpVersion().major < 11;
+}
+
+// =====================================================================================================================
 // Gets resource usage of the specified shader stage
 //
 // @param shaderStage : Shader stage

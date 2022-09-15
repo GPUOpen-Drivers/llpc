@@ -1197,29 +1197,32 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
     //
     // Collect task statistics info
     //
-    auto &computeMode =
-        m_pipelineState->getShaderModes()->getComputeShaderMode(); // Task shader is actually a compute shader
-    const uint64_t numTaskThreads =
-        computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
+    if (m_pipelineState->needSwMeshPipelineStats()) {
+      auto &computeMode =
+          m_pipelineState->getShaderModes()->getComputeShaderMode(); // Task shader is actually a compute shader
+      const uint64_t numTaskThreads =
+          computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
 
-    Value *meshPipeStatsBufPtr = m_pipelineSysValues.get(entryPoint)->getMeshPipeStatsBufPtr();
-    Value *meshPipeStatsBufEntryPtr = m_builder->CreateGEP(
-        m_builder->getInt8Ty(), meshPipeStatsBufPtr, m_builder->getInt32(offsetof(MeshPipeStatsEntry, numTaskThreads)));
-    meshPipeStatsBufEntryPtr = m_builder->CreateBitCast(meshPipeStatsBufEntryPtr,
-                                                        PointerType::get(m_builder->getInt64Ty(), ADDR_SPACE_GLOBAL));
+      Value *meshPipeStatsBufPtr = m_pipelineSysValues.get(entryPoint)->getMeshPipeStatsBufPtr();
+      Value *meshPipeStatsBufEntryPtr =
+          m_builder->CreateGEP(m_builder->getInt8Ty(), meshPipeStatsBufPtr,
+                               m_builder->getInt32(offsetof(MeshPipeStatsEntry, numTaskThreads)));
+      meshPipeStatsBufEntryPtr = m_builder->CreateBitCast(meshPipeStatsBufEntryPtr,
+                                                          PointerType::get(m_builder->getInt64Ty(), ADDR_SPACE_GLOBAL));
 
-    // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
-    // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
-    // move the added value to VGPR to mark it as "divergent".
-    Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 2));
-    valueToAdd = m_builder->CreateInsertElement(valueToAdd, convertToDivergent(m_builder->getInt32(numTaskThreads)),
-                                                static_cast<uint64_t>(0));
-    valueToAdd =
-        m_builder->CreateInsertElement(valueToAdd, convertToDivergent(m_builder->getInt32(numTaskThreads >> 32)), 1);
-    valueToAdd = m_builder->CreateBitCast(valueToAdd, m_builder->getInt64Ty());
+      // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
+      // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
+      // move the added value to VGPR to mark it as "divergent".
+      Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 2));
+      valueToAdd = m_builder->CreateInsertElement(valueToAdd, convertToDivergent(m_builder->getInt32(numTaskThreads)),
+                                                  static_cast<uint64_t>(0));
+      valueToAdd =
+          m_builder->CreateInsertElement(valueToAdd, convertToDivergent(m_builder->getInt32(numTaskThreads >> 32)), 1);
+      valueToAdd = m_builder->CreateBitCast(valueToAdd, m_builder->getInt64Ty());
 
-    m_builder->CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
-                               AtomicOrdering::Monotonic, SyncScope::System);
+      m_builder->CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
+                                 AtomicOrdering::Monotonic, SyncScope::System);
+    }
 
     //
     // Write draw data
@@ -2111,6 +2114,9 @@ void MeshTaskShader::exportVertex() {
 // @param entryPoint : Entry-point of mesh shader
 // @param numMeshPrimitives : Actual number of primitives emitted by mesh shader
 void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPrimitives) {
+  if (!m_pipelineState->needSwMeshPipelineStats())
+    return;
+
   auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
   const uint64_t numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
 

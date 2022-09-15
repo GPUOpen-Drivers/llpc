@@ -305,6 +305,9 @@ public:
   // Get NGG control settings
   NggControl *getNggControl() { return &m_nggControl; }
 
+  // Checks if SW-emulated mesh pipeline statistics is needed
+  bool needSwMeshPipelineStats() const;
+
   // Gets resource usage of the specified shader stage
   ResourceUsage *getShaderResourceUsage(ShaderStage shaderStage);
 
