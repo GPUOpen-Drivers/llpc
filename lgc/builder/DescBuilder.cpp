@@ -79,10 +79,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       abstractType = ResourceNodeType::DescriptorSampler;
 
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
-    if (!node) {
-      // We did not find the resource node. Return an undef value.
-      return UndefValue::get(getBufferDescTy(pointeeTy));
-    }
+    assert(node && "missing resource node");
 
     if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
@@ -163,11 +160,12 @@ Value *DescBuilder::CreateGetDescStride(ResourceNodeType concreteType, ResourceN
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
-    if (!node) {
-      // We did not find the resource node. Return an undef value.
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
+    // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
+    // The unused DescriptorSampler may need to be found, in this case we will return undefined value.
+    if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second)
       return UndefValue::get(getInt32Ty());
-    }
+    assert(node && "missing resource node");
   }
   return getStride(concreteType, descSet, binding, node);
 }
@@ -189,11 +187,12 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
-    if (!node) {
-      // We did not find the resource node. Return an undef value.
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
+    // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
+    // The unused DescriptorSampler may need to be found, in this case we will return undefined value.
+    if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second)
       return UndefValue::get(getDescPtrTy(concreteType));
-    }
+    assert(node && "missing resource node");
   }
 
   Value *descPtr = nullptr;
