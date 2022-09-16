@@ -215,4 +215,7 @@ target_sources(LLVMlgc PRIVATE
 add_subdirectory(disassembler)
 add_subdirectory(tool/lgc)
 add_subdirectory(test)
-add_subdirectory(unittests)
+
+if (LGC_BUILD_UNITTESTS)
+  add_subdirectory(unittests)
+endif()
