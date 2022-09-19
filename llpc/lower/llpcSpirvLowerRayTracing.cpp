@@ -102,6 +102,12 @@ static unsigned TraceParamsTySize[] = {
     8, // 15, hit attribute
 };
 
+// ====================================================================================================================
+// Get payload idx for TraceRayKHR instruction.
+unsigned getTraceRayParamPayloadIdx(void) {
+  return TraceRayParam::Payload;
+}
+
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering ray operations.
 // @param rayQueryLibrary : ray query library
@@ -145,8 +151,13 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpTraceRayKHR>(Funct
 
     // Copy payload variable to the global payload variable
     auto payloadArg = func->getArg(TraceRayParam::Payload);
-    const DataLayout &dataLayout = m_module->getDataLayout();
-    unsigned payloadArgSize = alignTo(dataLayout.getTypeAllocSize(payloadArg->getType()->getPointerElementType()), 4);
+    auto payloadTypeArg = func->arg_end() - 1;
+    unsigned payloadArgSize = alignTo(m_module->getDataLayout().getTypeAllocSize(payloadTypeArg->getType()), 4);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(payloadArg->getType()->isOpaquePointerTy() ||
+           (payloadArgSize == (alignTo(m_module->getDataLayout().getTypeAllocSize(
+                                           payloadArg->getType()->getNonOpaquePointerElementType()),
+                                       4))));
     const Align align = Align(4);
     // type conversion
     m_builder->CreateMemCpy(payload, align, payloadArg, align, payloadArgSize);
@@ -207,11 +218,16 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpExecuteCallableKHR
   Value *shaderRecordIndexValue = func->arg_begin();
 
   // Copy callable data variable to the global callable variable
-  Value *lastArg = func->arg_end() - 1;
-  const DataLayout &dataLayout = m_module->getDataLayout();
-  unsigned lastArgSize = alignTo(dataLayout.getTypeAllocSize(lastArg->getType()->getPointerElementType()), 4);
+  Value *callableData = func->arg_end() - 2;
+  Value *callableTypeArg = func->arg_end() - 1;
+  unsigned callableDataSize = alignTo(m_module->getDataLayout().getTypeAllocSize(callableTypeArg->getType()), 4);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(callableData->getType()->isOpaquePointerTy() ||
+         (callableDataSize == (alignTo(m_module->getDataLayout().getTypeAllocSize(
+                                           callableData->getType()->getNonOpaquePointerElementType()),
+                                       4))));
   const Align align = Align(4);
-  m_builder->CreateMemCpy(inputResult, align, lastArg, align, lastArgSize);
+  m_builder->CreateMemCpy(inputResult, align, callableData, align, callableDataSize);
   SmallVector<Value *, 8> args;
   // Assemble the argument from callabledata
   args.push_back(m_builder->CreateLoad(inputResultTy, inputResult));
@@ -239,7 +255,7 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpExecuteCallableKHR
                           ShaderStageRayTracingCallable, args, inputResult);
   }
   m_builder->SetInsertPoint(funcRet);
-  m_builder->CreateMemCpy(lastArg, align, inputResult, align, lastArgSize);
+  m_builder->CreateMemCpy(callableData, align, inputResult, align, callableDataSize);
 }
 
 // =====================================================================================================================

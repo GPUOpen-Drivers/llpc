@@ -94,6 +94,7 @@ using namespace Llpc;
 #if VKI_RAY_TRACING
 namespace Llpc {
 Type *getRayQueryInternalTy(lgc::Builder *builder);
+unsigned getTraceRayParamPayloadIdx(void);
 } // namespace Llpc
 
 #endif
@@ -5746,6 +5747,34 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
     if (isa<FunctionType>(i))
       i = PointerType::get(i, SPIRAS_Private);
   }
+
+#if VKI_RAY_TRACING
+  // This is the last place where we know the base type of the payload data. Opaque pointers are
+  // removing ability to get base type from pointer type.
+  // Base type of payload data will be added as last argument to the function.
+  SPIRVValue *payload = nullptr;
+  switch (bi->getOpCode()) {
+  case spv::OpTraceRayKHR:
+    payload = ops[getTraceRayParamPayloadIdx()];
+    break;
+  case spv::OpExecuteCallableKHR:
+    payload = ops.back();
+    break;
+  default:
+    payload = nullptr;
+    break;
+  }
+
+  if (payload) {
+    Type *payloadBaseType = transType(payload->getType()->getPointerElementType());
+
+    Value *dummyValue = Constant::getNullValue(payloadBaseType);
+
+    argTys.push_back(payloadBaseType);
+    args.push_back(dummyValue);
+  }
+#endif
+
   std::string mangledName(funcName);
   appendTypeMangling(nullptr, args, mangledName);
   Function *func = m_m->getFunction(mangledName);
