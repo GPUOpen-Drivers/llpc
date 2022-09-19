@@ -216,6 +216,6 @@ add_subdirectory(disassembler)
 add_subdirectory(tool/lgc)
 add_subdirectory(test)
 
-if (LGC_BUILD_UNITTESTS)
+if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
