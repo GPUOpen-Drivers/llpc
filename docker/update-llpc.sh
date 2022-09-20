@@ -9,3 +9,4 @@ cat /vulkandriver/build_info.txt
 git -C /vulkandriver/drivers/llpc remote add origin https://github.com/"$LLPC_REPO_NAME".git
 git -C /vulkandriver/drivers/llpc fetch origin +"$LLPC_REPO_SHA":"$LLPC_REPO_REF" --update-head-ok
 git -C /vulkandriver/drivers/llpc checkout "$LLPC_REPO_SHA"
+git -C /vulkandriver/drivers/llpc submodule update --init
