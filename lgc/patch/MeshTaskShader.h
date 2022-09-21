@@ -114,7 +114,7 @@ private:
   llvm::Value *getGlobalInvocationIndex();
 
   llvm::Value *readMeshBuiltInFromLds(BuiltInKind builtIn);
-  std::pair<llvm::Value *, llvm::Value *> convertToHwShadingRate(llvm::Value *primitiveShadingRate);
+  llvm::Value *convertToHwShadingRate(llvm::Value *primitiveShadingRate);
 
   unsigned getMeshShaderLdsRegionStart(MeshLdsRegion region) {
     assert(m_ldsLayout.count(region) > 0);

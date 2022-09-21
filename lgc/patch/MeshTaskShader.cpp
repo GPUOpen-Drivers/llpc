@@ -1720,24 +1720,17 @@ void MeshTaskShader::exportPrimitive() {
   }
 
   if (builtInUsage.primitiveShadingRate) {
-    // [31:30] = VRS rate Y
-    // [29:28] = VRS rate X
+    // [31:28] = VRS rate
     auto primitiveShadingRate = readMeshBuiltInFromLds(BuiltInPrimitiveShadingRate);
-    auto hwRate = convertToHwShadingRate(primitiveShadingRate);
+    auto hwShadingRateMaskAndShift = convertToHwShadingRate(primitiveShadingRate);
 
-    Value *hwXRateMaskAndShift = hwRate.first;
-    hwXRateMaskAndShift = m_builder->CreateAnd(hwXRateMaskAndShift, 0x3);
-    hwXRateMaskAndShift = m_builder->CreateShl(hwXRateMaskAndShift, 28);
-
-    Value *hwYRateMaskAndShift = hwRate.second;
-    hwYRateMaskAndShift = m_builder->CreateAnd(hwYRateMaskAndShift, 0x3);
-    hwYRateMaskAndShift = m_builder->CreateShl(hwYRateMaskAndShift, 30);
+    hwShadingRateMaskAndShift = m_builder->CreateAnd(hwShadingRateMaskAndShift, 0xF);
+    hwShadingRateMaskAndShift = m_builder->CreateShl(hwShadingRateMaskAndShift, 28);
 
     if (primitivePayload)
-      primitivePayload =
-          m_builder->CreateOr(m_builder->CreateOr(primitivePayload, hwXRateMaskAndShift), hwYRateMaskAndShift);
+      primitivePayload = m_builder->CreateOr(primitivePayload, hwShadingRateMaskAndShift);
     else
-      primitivePayload = m_builder->CreateOr(hwXRateMaskAndShift, hwYRateMaskAndShift);
+      primitivePayload = hwShadingRateMaskAndShift;
   }
 
   auto undef = PoisonValue::get(m_builder->getInt32Ty());
@@ -2432,15 +2425,8 @@ Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
 // Change primitive shading rate from API to HW-specific shading rate.
 //
 // @param primitiveShadingRate : Primitive shading rate from API
-// @returns : HW-specific shading rate <X, Y>
-std::pair<Value *, Value *> MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
-#if LLPC_BUILD_GFX11
-  if (m_gfxIp.major >= 11) {
-    llvm_unreachable("Not implemented!");
-    return std::make_pair(nullptr, nullptr);
-  }
-#endif
-
+// @returns : HW-specific shading rate
+Value *MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
   assert(m_gfxIp == GfxIpVersion({10, 3})); // Must be GFX10.3
 
   // NOTE: The shading rates have different meanings in HW and LGC interface. GFX10.3 HW supports 2-pixel mode
@@ -2462,7 +2448,11 @@ std::pair<Value *, Value *> MeshTaskShader::convertToHwShadingRate(Value *primit
   yRate2Pixels = m_builder->CreateICmpNE(yRate2Pixels, m_builder->getInt32(0));
   Value *hwYRate = m_builder->CreateSelect(yRate2Pixels, m_builder->getInt32(1), m_builder->getInt32(0));
 
-  return std::make_pair(hwXRate, hwYRate);
+  // hwShadingRate = (hwYRate << 2) | hwXRate
+  auto hwShadingRate = m_builder->CreateShl(hwYRate, 2);
+  hwShadingRate = m_builder->CreateOr(hwShadingRate, hwXRate);
+
+  return hwShadingRate;
 }
 
 // =====================================================================================================================
