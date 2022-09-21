@@ -131,7 +131,7 @@ public:
 
 private:
   void createGlobalTraceParams();
-  llvm::Value *createGlobalBuiltIn(unsigned builtInId);
+  llvm::GlobalVariable *createGlobalBuiltIn(unsigned builtInId);
   void createRayGenEntryFunc();
   void replaceGlobal(llvm::GlobalVariable *global, llvm::GlobalVariable *replacedGlobal);
   void processShaderRecordBuffer(llvm::GlobalVariable *global, llvm::Instruction *insertPos);
@@ -150,7 +150,7 @@ private:
   void createShaderSelection(llvm::Function *func, llvm::BasicBlock *entryBlock, llvm::BasicBlock *endBlock,
                              llvm::Value *shaderId, unsigned intersectId, ShaderStage stage,
                              const llvm::SmallVector<llvm::Value *, 8> &args, llvm::Value *result);
-  llvm::Value *createShaderTableVariable(ShaderTable tableKind);
+  llvm::GlobalVariable *createShaderTableVariable(ShaderTable tableKind);
   llvm::Value *getShaderIdentifier(ShaderStage stage, llvm::Value *shaderRecordIndex);
   void createDbgInfo(llvm::Module &module, llvm::Function *func);
   void processTerminalFunc(llvm::Function *func, llvm::CallInst *inst, RayHitStatus hitStatus);
