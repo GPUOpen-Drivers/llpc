@@ -713,6 +713,9 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       case ResourceMappingNodeType::DescriptorCombinedTexture:
         destNode.stride = (DescriptorSizeResource + DescriptorSizeSampler) / sizeof(uint32_t);
         break;
+#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50)
+      case ResourceMappingNodeType::InlineBuffer:
+#endif
       case ResourceMappingNodeType::DescriptorYCbCrSampler:
         // Current node.sizeInDwords = resourceDescSizeInDwords * M * N (M means plane count, N means array count)
         // TODO: Desired destNode.stride = resourceDescSizeInDwords * M
