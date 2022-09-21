@@ -389,7 +389,7 @@ Value *FragColorExport::convertToInt(Value *value, bool signedness, BuilderBase 
     }
   } else {
     assert(bitWidth == 32); // The valid bit width is 16 or 32
-    if (valueTy->isFloatingPointTy()) {
+    if (valueTy->isFPOrFPVectorTy()) {
       // %value = bitcast float %value to i32
       value = builder.CreateBitCast(value, int32Ty);
     }
