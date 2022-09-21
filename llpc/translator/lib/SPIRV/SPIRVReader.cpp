@@ -7282,7 +7282,9 @@ bool SPIRVToLLVM::checkContains64BitType(SPIRVType *bt) {
 
 bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
   auto gv = dyn_cast<GlobalVariable>(v);
-  if (gv) {
+  // Some SPIR-V instructions (e.g. OpAccessChain) can become no-ops in LLVM IR,
+  // so we must explicitly check both the SPIR-V opcode and the LLVM type.
+  if (gv && bv->getOpCode() == OpVariable) {
     auto as = gv->getType()->getAddressSpace();
     if (as == SPIRAS_Input || as == SPIRAS_Output) {
       // Translate decorations of inputs and outputs
