@@ -1,0 +1,193 @@
+// This test is to verify that exports using A2R10G10B10_UINT_PACK32 are generated
+// correctly.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc %gfxip -v %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: _amdgpu_ps_main:
+; SHADERTEST: v_cvt_pk_u16_u32 v[[RES1:[0-9]*]], v{{[0-9]*}}, v{{[0-9]*}}
+; SHADERTEST: v_cvt_pk_u16_u32 v[[RES2:[0-9]*]], v{{[0-9]*}}, v{{[0-9]*}}
+; SHADERTEST: exp mrt0 v[[RES1]], v[[RES1]], v[[RES2]], v[[RES2]] done compr vm
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 46
+
+[VsGlsl]
+#version 450
+
+layout(binding = 0, std140) uniform _37_39
+{
+    float _m0;
+    float _m1;
+} _39;
+
+layout(location = 0) in float _29;
+layout(location = 0) out vec4 _36;
+vec4 _68;
+
+void main()
+{
+    gl_PointSize = 1.0;
+    vec2 _21 = vec2(0.0);
+    vec3 _26 = vec3(1.0);
+    _21 += vec2(_29, _29);
+    _36 = (vec4(_26 * _39._m1, 1.0) * 0.5) + vec4(0.5);
+    gl_Position = vec4(_21 * _39._m0, 1.0, 1.0);
+    gl_Position = vec4(gl_Position.xy, (gl_Position.z + gl_Position.w) * 0.5, gl_Position.w);
+}
+
+[VsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[FsGlsl]
+#version 450
+layout(early_fragment_tests) in;
+
+layout(location = 0, component = 0) out vec4 _9;
+layout(location = 0) in vec4 _11;
+
+void main()
+{
+    _9 = _11;
+}
+
+[FsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[ResourceMapping]
+userDataNode[0].visibility = 1
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 17
+userDataNode[1].type = DescriptorBuffer
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 4
+userDataNode[1].set = 0
+userDataNode[1].binding = 0
+userDataNode[2].visibility = 17
+userDataNode[2].type = DescriptorBuffer
+userDataNode[2].offsetInDwords = 5
+userDataNode[2].sizeInDwords = 4
+userDataNode[2].set = 1
+userDataNode[2].binding = 0
+userDataNode[3].visibility = 17
+userDataNode[3].type = DescriptorBuffer
+userDataNode[3].offsetInDwords = 9
+userDataNode[3].sizeInDwords = 4
+userDataNode[3].set = 1
+userDataNode[3].binding = 1
+userDataNode[4].visibility = 1
+userDataNode[4].type = IndirectUserDataVaPtr
+userDataNode[4].offsetInDwords = 13
+userDataNode[4].sizeInDwords = 1
+userDataNode[4].indirectUserDataCount = 4
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST
+patchControlPoints = 0
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 1
+rasterizerDiscardEnable = 0
+perSampleShading = 0
+numSamples = 1
+samplePatternIdx = 0
+usrClipPlaneMask = 0
+polygonMode = VK_POLYGON_MODE_FILL
+cullMode = VK_CULL_MODE_NONE
+frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE
+depthBiasEnable = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+colorBuffer[0].format = VK_FORMAT_A2B10G10R10_UINT_PACK32
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+nggState.enableNgg = 0
+nggState.enableGsUse = 0
+nggState.forceCullingMode = 0
+nggState.alwaysUsePrimShaderTable = 1
+nggState.compactMode = NggCompactDisable
+nggState.enableVertexReuse = 0
+nggState.enableBackfaceCulling = 0
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 0
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 256
+nggState.vertsPerSubgroup = 256
+options.includeDisassembly = 0
+options.scalarBlockLayout = 0
+options.includeIr = 0
+options.robustBufferAccess = 1
+options.reconfigWorkgroupLayout = 0
+options.shadowDescriptorTableUsage = Enable
+options.shadowDescriptorTablePtrHigh = 2
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 0
+options.extendedRobustness.nullDescriptor = 0
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 2
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R8G8_SNORM
+attribute[0].offset = 0
+dynamicVertexStride = 0
