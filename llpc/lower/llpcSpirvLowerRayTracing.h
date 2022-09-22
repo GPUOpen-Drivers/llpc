@@ -71,6 +71,8 @@ enum : unsigned {
   RayDir,          // Ray direction
   RayTMax,         // Ray Tmax
   Payload,         // Payload
+  PayloadType,     // PayloadType - This parameter is not specify in SPIRV API. This was added only to keep base type
+                   //               of the Payload.
   TraceRayCount,   // OpTraceRay params count
 };
 } // namespace TraceRayParam
