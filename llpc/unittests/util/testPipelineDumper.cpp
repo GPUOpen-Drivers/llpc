@@ -351,6 +351,26 @@ TEST(PipelineDumperTest, TestReverseThreadGroupCompute) {
   HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
+#if VKI_RAY_TRACING
+// =====================================================================================================================
+// Test the internalRtShaders option.
+
+TEST(PipelineDumperTest, TestInternalRTShadersGraphics) {
+  ModifyGraphicsBuildInfo modifyBuildInfo = [](GraphicsPipelineBuildInfo *buildInfo) {
+    buildInfo->options.internalRtShaders = true;
+  };
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &) { return false; };
+  runGraphicsPipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
+TEST(PipelineDumperTest, TestInternalRTShadersCompute) {
+  ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
+    buildInfo->options.internalRtShaders = true;
+  };
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &) { return false; };
+  runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+#endif
 
 } // namespace
 } // namespace Llpc

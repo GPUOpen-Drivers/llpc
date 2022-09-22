@@ -112,7 +112,9 @@ struct ShaderModuleOptions {
   bool enableOpt; ///< Enable translate & lower phase in build shader module
 #endif
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 55
   bool isInternalRtShader; ///< Whether this shader is an internal raytracing shader
+#endif
 #endif
 };
 

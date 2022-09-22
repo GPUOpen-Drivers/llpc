@@ -104,6 +104,9 @@ struct CompileInfo {
   bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
   VfxPipelineType pipelineType;   // Pipeline type
   llvm::Optional<llvm::CodeGenOpt::Level> optimizationLevel; // The optimization level to pass the compiler
+#if VKI_RAY_TRACING
+  bool internalRtShaders; // Whether to enable intrinsics for internal RT shaders
+#endif
 };
 
 // Callback function to allocate buffer for building shader module and building pipeline.

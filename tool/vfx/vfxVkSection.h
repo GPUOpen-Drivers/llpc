@@ -361,6 +361,9 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, threadGroupSwizzleMode, MemberTypeEnum, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reverseThreadGroup, MemberTypeBool, false);
     INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_extendedRobustness, MemberTypeExtendedRobustness, true);
+#if VKI_RAY_TRACING
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, internalRtShaders, MemberTypeBool, false);
+#endif
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 

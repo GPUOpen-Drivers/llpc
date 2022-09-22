@@ -406,7 +406,12 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
     moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderBinary);
     moduleData.binCode = getShaderCode(shaderInfo, codeBuffer);
 #if VKI_RAY_TRACING
-    moduleData.usage.isInternalRtShader = shaderInfo->options.isInternalRtShader;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 55
+    moduleData.usage.isInternalRtShader =
+        shaderInfo->options.isInternalRtShader || shaderInfo->options.pipelineOptions.internalRtShaders;
+#else
+    moduleData.usage.isInternalRtShader = shaderInfo->options.pipelineOptions.internalRtShaders;
+#endif
 #endif
     // Calculate SPIR-V cache hash
     Hash cacheHash = {};
@@ -433,10 +438,10 @@ BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shader
                                              MutableArrayRef<unsigned int> &codeBuffer) {
   BinaryData code;
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
-#if VKI_RAY_TRACING
-  bool trimDebugInfo = cl::TrimDebugInfo && !(shaderInfo->options.isInternalRtShader);
-#else
   bool trimDebugInfo = cl::TrimDebugInfo;
+#if VKI_RAY_TRACING
+  trimDebugInfo = trimDebugInfo &&
+                  !(shaderInfo->options.pipelineOptions.internalRtShaders || shaderInfo->options.isInternalRtShader);
 #endif
   if (trimDebugInfo) {
     code.codeSize = trimSpirvDebugInfo(&shaderBinary, codeBuffer);
@@ -454,10 +459,10 @@ BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shader
 // @return : The number of bytes need to hold the code for this shader module.
 unsigned ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo) {
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
-#if VKI_RAY_TRACING
-  bool trimDebugInfo = cl::TrimDebugInfo && !(shaderInfo->options.isInternalRtShader);
-#else
   bool trimDebugInfo = cl::TrimDebugInfo;
+#if VKI_RAY_TRACING
+  trimDebugInfo = trimDebugInfo &&
+                  !(shaderInfo->options.pipelineOptions.internalRtShaders || shaderInfo->options.isInternalRtShader);
 #endif
   if (!trimDebugInfo)
     return shaderBinary.codeSize;

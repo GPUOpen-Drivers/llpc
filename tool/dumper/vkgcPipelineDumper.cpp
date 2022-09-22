@@ -791,6 +791,10 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
 #endif
   dumpFile << "options.threadGroupSwizzleMode = " << options->threadGroupSwizzleMode << "\n";
   dumpFile << "options.reverseThreadGroup = " << options->reverseThreadGroup << "\n";
+
+#if VKI_RAY_TRACING
+  dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
+#endif
 }
 
 // =====================================================================================================================
@@ -1501,6 +1505,10 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 #endif
   hasher->Update(options->threadGroupSwizzleMode);
   hasher->Update(options->reverseThreadGroup);
+
+#if VKI_RAY_TRACING
+  hasher->Update(options->internalRtShaders);
+#endif
 }
 
 // =====================================================================================================================

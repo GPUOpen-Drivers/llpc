@@ -150,6 +150,9 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
     pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.value();
   }
 #endif
+#if VKI_RAY_TRACING
+  pipelineInfo->options.internalRtShaders = compileInfo.internalRtShaders;
+#endif
 
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pGraphicsInfo = pipelineInfo;

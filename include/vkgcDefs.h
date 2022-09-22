@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 54
+#define LLPC_INTERFACE_MAJOR_VERSION 55
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 6
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -81,7 +81,9 @@
 //  @page VersionHistory
 //  %Version History
 //  | %Version | Change Description                                                                                    |
-//  | -------- | ------------------------------------------------------------------------------------------------------|
+//  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     55.0 | Remove isInternalRtShader from module options                                                         |
+//  |     54.9 | Add internalRtShaders to PipelineOptions to allow for dumping this data                               |
 //  |     54.6 | Add reverseThreadGroup to PipelineOptions                                                             |
 #if VKI_RAY_TRACING
 //  |     54.4 | Add isReplay to RayTracingPipelineBuildInfo for ray tracing capture replay feature                    |
@@ -482,6 +484,12 @@ struct PipelineOptions {
   ResourceLayoutScheme resourceLayoutScheme;     ///< Resource layout scheme
   ThreadGroupSwizzleMode threadGroupSwizzleMode; ///< Controls thread group swizzle mode for compute shader.
   bool reverseThreadGroup;                       ///< If set, enable thread group reversing
+
+#if VKI_RAY_TRACING
+  bool internalRtShaders; ///< Whether this pipeline has internal raytracing shaders
+#else
+  bool reserved15;
+#endif
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

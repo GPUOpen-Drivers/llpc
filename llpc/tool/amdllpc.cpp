@@ -316,6 +316,13 @@ cl::opt<ResourceLayoutScheme> LayoutScheme("resource-layout-scheme", cl::desc("T
 cl::opt<bool> AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when assert is hit"));
 #endif
 
+#if VKI_RAY_TRACING
+// -enable-internal-rt-shaders: enable intrinsics for internal RT shaders
+cl::opt<bool> EnableInternalRtShaders("enable-internal-rt-shaders",
+                                      cl::desc("Enable intrinsics for internal RT shaders"),
+                                      cl::init(false));
+#endif
+
 } // namespace
 // clang-format on
 namespace llvm {
@@ -502,6 +509,10 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
     nggState.primsPerSubgroup = NggPrimsPerSubgroup;
     nggState.vertsPerSubgroup = NggVertsPerSubgroup;
   }
+
+#if VKI_RAY_TRACING
+  compileInfo->internalRtShaders = EnableInternalRtShaders;
+#endif
 
   return Result::Success;
 }
