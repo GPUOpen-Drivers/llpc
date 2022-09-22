@@ -1239,13 +1239,17 @@ void SpirvLowerRayQuery::createReadLdsStack(Function *func) {
     m_builder->CreateCondBr(isLds, ldsArrayBlock, tempArrayBlock);
     m_builder->SetInsertPoint(tempArrayBlock);
     auto stackArrayIdx = getStackArrayIndex(stackOffset);
-    Type *stackArrayEltTy = m_stackArray->getType()->getScalarType()->getPointerElementType();
+    Type *stackArrayEltTy = m_stackArray->getValueType();
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_stackArray->getType()->getScalarType(), stackArrayEltTy));
     auto stackArrayAddr = m_builder->CreateGEP(stackArrayEltTy, m_stackArray, {m_builder->getInt32(0), stackArrayIdx});
     Value *stackArrayData = m_builder->CreateLoad(m_builder->getInt32Ty(), stackArrayAddr);
     m_builder->CreateRet(stackArrayData);
     m_builder->SetInsertPoint(ldsArrayBlock);
   }
-  Type *ldsStackEltTy = m_ldsStack->getType()->getScalarType()->getPointerElementType();
+  Type *ldsStackEltTy = m_ldsStack->getValueType();
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_ldsStack->getType()->getScalarType(), ldsStackEltTy));
   Value *stackAddr = m_builder->CreateGEP(ldsStackEltTy, m_ldsStack, {m_builder->getInt32(0), stackOffset});
   Value *stackData = m_builder->CreateLoad(m_builder->getInt32Ty(), stackAddr);
   m_builder->CreateRet(stackData);
@@ -1276,14 +1280,18 @@ void SpirvLowerRayQuery::createWriteLdsStack(Function *func) {
     m_builder->CreateCondBr(isLds, ldsArrayBlock, tempArrayBlock);
     m_builder->SetInsertPoint(tempArrayBlock);
     auto stackArrayIdx = getStackArrayIndex(stackOffset);
-    Type *stackArrayEltTy = m_stackArray->getType()->getScalarType()->getPointerElementType();
+    Type *stackArrayEltTy = m_stackArray->getValueType();
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_stackArray->getType()->getScalarType(), stackArrayEltTy));
     auto stackArrayAddr = m_builder->CreateGEP(stackArrayEltTy, m_stackArray, {m_builder->getInt32(0), stackArrayIdx});
     m_builder->CreateStore(stackData, stackArrayAddr);
     m_builder->CreateRet(m_builder->getInt32(0));
     m_builder->SetInsertPoint(ldsArrayBlock);
   }
 
-  Type *ldsStackEltTy = m_ldsStack->getType()->getScalarType()->getPointerElementType();
+  Type *ldsStackEltTy = m_ldsStack->getValueType();
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_ldsStack->getType()->getScalarType(), ldsStackEltTy));
   Value *stackAddr = m_builder->CreateGEP(ldsStackEltTy, m_ldsStack, {m_builder->getInt32(0), stackOffset});
   m_builder->CreateStore(stackData, stackAddr);
   m_builder->CreateRet(m_builder->getInt32(0));
