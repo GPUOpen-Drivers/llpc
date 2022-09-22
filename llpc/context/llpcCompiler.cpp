@@ -935,13 +935,11 @@ static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *no
         // The code to handle a compact descriptor cannot be easily patched, so relocatable shaders assume there are
         // no compact descriptors.
         return true;
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50)
       if (innerNode->type == ResourceMappingNodeType::InlineBuffer) {
         // The code to handle an inline buffer cannot be easily patched, so relocatable shaders
         // assume there are no inline buffers.
         return true;
       }
-#endif
     }
     break;
   }
@@ -952,11 +950,9 @@ static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *no
   case ResourceMappingNodeType::DescriptorBufferCompact:
     // Generic descriptors in the top level are not handled by the linker.
     return true;
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50)
   case ResourceMappingNodeType::InlineBuffer:
     // Loading from an inline buffer requires building a descriptor that is not handled by the linker.
     return true;
-#endif
   default:
     break;
   }
