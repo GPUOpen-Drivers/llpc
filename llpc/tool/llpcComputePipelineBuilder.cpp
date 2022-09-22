@@ -144,6 +144,9 @@ Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
 #endif
   pipelineInfo->options.threadGroupSwizzleMode = compileInfo.compPipelineInfo.options.threadGroupSwizzleMode;
   pipelineInfo->options.reverseThreadGroup = compileInfo.compPipelineInfo.options.reverseThreadGroup;
+#if VKI_RAY_TRACING
+  pipelineInfo->options.internalRtShaders = compileInfo.internalRtShaders;
+#endif
 
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pComputeInfo = pipelineInfo;

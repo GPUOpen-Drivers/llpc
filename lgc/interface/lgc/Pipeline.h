@@ -146,6 +146,11 @@ struct Options {
   unsigned reverseThreadGroupBufferDescSet;      // Descriptor set ID of the internal buffer for reverse thread group
                                                  // optimization
   unsigned reverseThreadGroupBufferBinding; // Binding ID of the internal buffer for reverse thread group optimization
+#if VKI_RAY_TRACING
+  bool internalRtShaders; // Enable internal RT shader intrinsics
+#else
+  bool reserved15;
+#endif
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.

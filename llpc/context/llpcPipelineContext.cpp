@@ -480,6 +480,9 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
       shaderOptions.waveSize = getRayTracingWaveSize();
     }
 #endif
+#if VKI_RAY_TRACING
+    options.internalRtShaders = getPipelineOptions()->internalRtShaders;
+#endif
 
     // Use a static cast from Vkgc WaveBreakSize to LGC WaveBreak, and static assert that
     // that is valid.
