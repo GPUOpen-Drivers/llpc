@@ -676,12 +676,8 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       static_assert(ResourceNodeType::DescriptorBufferCompact ==
                         static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBufferCompact),
                     "Mismatch");
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50
+
       if (node.type == ResourceMappingNodeType::InlineBuffer)
-#else
-      // A "PushConst" is in fact an InlineBuffer when it appears in a non-root table.
-      if (node.type == ResourceMappingNodeType::PushConst && !isRoot)
-#endif
         destNode.concreteType = ResourceNodeType::InlineBuffer;
       else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
         destNode.concreteType = ResourceNodeType::DescriptorResource;
@@ -713,9 +709,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       case ResourceMappingNodeType::DescriptorCombinedTexture:
         destNode.stride = (DescriptorSizeResource + DescriptorSizeSampler) / sizeof(uint32_t);
         break;
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 50)
       case ResourceMappingNodeType::InlineBuffer:
-#endif
       case ResourceMappingNodeType::DescriptorYCbCrSampler:
         // Current node.sizeInDwords = resourceDescSizeInDwords * M * N (M means plane count, N means array count)
         // TODO: Desired destNode.stride = resourceDescSizeInDwords * M

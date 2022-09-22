@@ -313,12 +313,7 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorConstBufferCompact, ///< Generic descriptor: constBuffer,including dynamic storage buffer
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
-                                // clang-format off
-#if  (LLPC_CLIENT_INTERFACE_MAJOR_VERSION>= 50)
   InlineBuffer,                 ///< Push constant with binding
-                                // clang-format on
-#endif
-
   Count, ///< Count of resource mapping node types.
 };
 
