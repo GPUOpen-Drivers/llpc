@@ -935,7 +935,10 @@ void SpirvLowerRayTracing::createSetTriangleInsection(Function *func) {
   auto one = m_builder->getInt32(1);
   Value *attribSrcPtr = m_builder->CreateGEP(barycentricsEltTy, barycentrics, {zero, zero});
   Value *attribValue = m_builder->CreateLoad(m_builder->getFloatTy(), attribSrcPtr);
-  Type *attribHitEltTy = m_traceParams[TraceParam::HitAttributes]->getType()->getScalarType()->getPointerElementType();
+  Type *attribHitEltTy = m_traceParamsTys[TraceParam::HitAttributes];
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_traceParams[TraceParam::HitAttributes]->getType()->getScalarType(),
+                                           attribHitEltTy));
   Value *attribDestPtr = m_builder->CreateGEP(attribHitEltTy, m_traceParams[TraceParam::HitAttributes], {zero, zero});
   m_builder->CreateStore(attribValue, attribDestPtr);
 
@@ -1944,8 +1947,10 @@ void SpirvLowerRayTracing::updateGlobalFromCallShaderFunc(Function *func, Shader
 
     Value *attribSrcPtr = m_builder->CreateGEP(attribEltTy, attrib, {zero, zero, zero});
     Value *attribValue = m_builder->CreateLoad(m_builder->getFloatTy(), attribSrcPtr);
-    Type *hitAttribEltTy =
-        m_traceParams[TraceParam::HitAttributes]->getType()->getScalarType()->getPointerElementType();
+    Type *hitAttribEltTy = m_traceParamsTys[TraceParam::HitAttributes];
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_traceParams[TraceParam::HitAttributes]->getType()->getScalarType(),
+                                             hitAttribEltTy));
     Value *attribDestPtr = m_builder->CreateGEP(hitAttribEltTy, m_traceParams[TraceParam::HitAttributes], {zero, zero});
     m_builder->CreateStore(attribValue, attribDestPtr);
 
