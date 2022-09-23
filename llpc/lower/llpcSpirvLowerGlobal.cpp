@@ -606,7 +606,7 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   const auto &dataLayout = m_module->getDataLayout();
   Type *globalVarTy = globalVar->getValueType();
 
-  m_builder->setInsertPointPastAllocas(*m_entryPoint);
+  m_builder->SetInsertPointPastAllocas(m_entryPoint);
 
   auto proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
                                        Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
@@ -632,7 +632,7 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
     return;
   }
 
-  m_builder->setInsertPointPastAllocas(*m_entryPoint);
+  m_builder->SetInsertPointPastAllocas(m_entryPoint);
 
   const auto &dataLayout = m_module->getDataLayout();
   Type *inputTy = input->getValueType();
@@ -659,7 +659,7 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
 //
 // @param output : Output to be mapped
 void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
-  m_builder->setInsertPointPastAllocas(*m_entryPoint);
+  m_builder->SetInsertPointPastAllocas(m_entryPoint);
 
   // NOTE: For tessellation control shader, we do not map outputs to real proxy variables. Instead, we directly
   // replace "store" instructions with export calls in the lowering operation.
@@ -1907,7 +1907,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
           }
         }
       } else {
-        m_builder->setInsertPointPastAllocas(*func);
+        m_builder->SetInsertPointPastAllocas(func);
         unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
         Value *const bufferDesc = m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags,
                                                                   m_builder->getInt8Ty());
@@ -2016,7 +2016,7 @@ void SpirvLowerGlobal::lowerPushConsts() {
     }
 
     for (Function *const func : funcsUsedIn) {
-      m_builder->setInsertPointPastAllocas(*func);
+      m_builder->SetInsertPointPastAllocas(func);
 
       MDNode *metaNode = global.getMetadata(gSPIRVMD::PushConst);
       auto pushConstSize = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();

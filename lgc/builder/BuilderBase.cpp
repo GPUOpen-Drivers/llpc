@@ -37,18 +37,6 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
-// Set the insert point to be just past the initial block of allocas in the given function's entry block.
-//
-// Use this method if you need to insert code to define values that are accessible in the entire function.
-void BuilderCommon::setInsertPointPastAllocas(Function &fn) {
-  BasicBlock &bb = fn.getEntryBlock();
-  auto it = bb.begin(), end = bb.end();
-  while (it != end && (isa<AllocaInst>(*it) || isa<DbgInfoIntrinsic>(*it)))
-    ++it;
-  SetInsertPoint(&bb, it);
-}
-
-// =====================================================================================================================
 // Create an LLVM function call to the named function. The callee is built automatically based on return
 // type and its parameters.
 //

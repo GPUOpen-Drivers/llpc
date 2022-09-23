@@ -331,7 +331,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
   //   }
   // }
   //
-  m_builder->SetInsertPoint(&*entryPoint->front().getFirstInsertionPt());
+  m_builder->SetInsertPointPastAllocas(entryPoint);
   initWaveThreadInfo(entryPoint);
 
   SmallVector<CallInst *, 8> removedCalls;
@@ -1062,7 +1062,7 @@ Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
       // NOTE: The calculation of shader ring entry index should be done at the beginning of the entry block. And the
       // value could be reused in subsequent operations.
       IRBuilder<>::InsertPointGuard guard(*m_builder);
-      m_builder->SetInsertPoint(&*entryPoint->getEntryBlock().getFirstInsertionPt());
+      m_builder->SetInsertPointPastAllocas(entryPoint);
 
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
 

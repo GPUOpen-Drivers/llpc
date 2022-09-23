@@ -3188,7 +3188,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
 
   std::vector<Instruction *> removeCalls;
 
-  m_builder->SetInsertPoint(&*gsEntryPoint->front().getFirstInsertionPt());
+  m_builder->SetInsertPointPastAllocas(gsEntryPoint);
 
   // Initialize counters of GS emitted vertices and GS output vertices of current primitive
   Value *emitVertsPtrs[MaxGsStreams] = {};
