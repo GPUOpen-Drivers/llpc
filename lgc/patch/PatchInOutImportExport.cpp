@@ -311,7 +311,7 @@ void PatchInOutImportExport::processShader() {
   if (useThreadId) {
     // Calculate and store thread ID
     BuilderBase builder(*m_context);
-    builder.setInsertPointPastAllocas(*m_entryPoint);
+    builder.SetInsertPointPastAllocas(m_entryPoint);
     m_threadId = getSubgroupLocalInvocationId(builder);
   }
 
