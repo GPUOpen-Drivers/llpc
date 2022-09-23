@@ -1467,18 +1467,25 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   // }
 
   auto argIt = func->arg_begin();
-  Value *address = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getInt32Ty(), 2)));
+  Value *address = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), argIt);
   argIt++;
 
   // Address int64 type
   address = m_builder->CreateBitCast(address, m_builder->getInt64Ty());
 
   // Ray extent float Type
-  Value *extent = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getFloatTy()));
+  Value *extent = m_builder->CreateLoad(m_builder->getFloatTy(), argIt);
   argIt++;
 
   // Ray origin vec3 Type
-  Value *origin = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
+  Value *origin = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
   argIt++;
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
@@ -1491,7 +1498,9 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   origin = m_builder->CreateShuffleVector(origin, constVec, ArrayRef<int>{0, 1, 2, 4});
 #endif
   // Ray dir vec3 type
-  Value *dir = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
+  Value *dir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
   argIt++;
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
@@ -1499,7 +1508,9 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   dir = m_builder->CreateShuffleVector(dir, constVec, ArrayRef<int>{0, 1, 2, 3});
 #endif
   // Ray inv_dir vec3 type
-  Value *invDir = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
+  Value *invDir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
   // vec4 inDir = vec4(invDir, 0.0)
   invDir = m_builder->CreateShuffleVector(invDir, constVec, ArrayRef<int>{0, 1, 2, 3});
@@ -1507,11 +1518,15 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   argIt++;
 
   // uint flag
-  Value *flags = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getInt32Ty()));
+  Value *flags = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
   argIt++;
 
   // uint expansion
-  Value *expansion = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getInt32Ty()));
+  Value *expansion = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
   const unsigned boxExpansionShift = 23;
   expansion = m_builder->CreateShl(expansion, boxExpansionShift);
 
