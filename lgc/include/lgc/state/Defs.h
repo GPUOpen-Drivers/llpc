@@ -49,6 +49,10 @@ static const BuiltInKind BuiltInNumSamples = static_cast<BuiltInKind>(0x10000008
 static const BuiltInKind BuiltInSamplePatternIdx = static_cast<BuiltInKind>(0x10000009);
 static const BuiltInKind BuiltInGsWaveId = static_cast<BuiltInKind>(0x1000000A);
 
+// Internal builts-ins for compute input when thread id is swizzled
+static const BuiltInKind BuiltInHwLocalInvocationId = static_cast<BuiltInKind>(0x1000000B);
+static const BuiltInKind BuiltInHwLocalInvocationIndex = static_cast<BuiltInKind>(0x1000000C);
+
 // Names used for calls added to IR to represent various actions internally.
 namespace lgcName {
 const static char InternalCallPrefix[] = "lgc.";
