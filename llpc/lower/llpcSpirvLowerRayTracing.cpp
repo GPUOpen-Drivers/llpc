@@ -547,7 +547,9 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
 
       ShaderInOutMetadata inputMeta = {};
       MDNode *metaNode = global->getMetadata(gSPIRVMD::InOut);
-      Type *globalTy = global->getType()->getPointerElementType();
+      Type *globalTy = global->getValueType();
+      // TODO: Remove this when LLPC will switch fully to opaque pointers.
+      assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(global->getType(), globalTy));
       auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
       unsigned startOperand = 0;
@@ -1675,7 +1677,9 @@ void SpirvLowerRayTracing::createTraceRay() {
                                  m_builder->getVoidTy(), traceRaysArgs, {Attribute::NoUnwind, Attribute::AlwaysInline});
 
   (void(result)); // unused
-  m_builder->CreateRet(m_builder->CreateLoad(m_globalPayload->getType()->getPointerElementType(), m_globalPayload));
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_globalPayload->getType(), m_globalPayload->getValueType()));
+  m_builder->CreateRet(m_builder->CreateLoad(m_globalPayload->getValueType(), m_globalPayload));
 }
 
 // =====================================================================================================================
@@ -1891,7 +1895,9 @@ void SpirvLowerRayTracing::createEntryFunc(Function *func) {
   getFuncRets(newFunc, rets);
   for (auto ret : rets) {
     m_builder->SetInsertPoint(ret);
-    Value *retVal = m_builder->CreateLoad(m_globalPayload->getType()->getPointerElementType(), m_globalPayload);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_globalPayload->getType(), m_globalPayload->getValueType()));
+    Value *retVal = m_builder->CreateLoad(m_globalPayload->getValueType(), m_globalPayload);
 
     const auto rets = getShaderExtraRets(m_shaderStage);
     unsigned payloadSizeInDword = rayTracingContext->getPayloadSizeInDword();
@@ -2048,8 +2054,10 @@ void SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func) {
   getFuncRets(newFunc, rets);
   for (auto ret : rets) {
     m_builder->SetInsertPoint(ret);
-    Instruction *newfuncEnd = m_builder->CreateRet(
-        m_builder->CreateLoad(m_globalCallableData->getType()->getPointerElementType(), m_globalCallableData));
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_globalCallableData->getType(), m_globalCallableData->getValueType()));
+    Instruction *newfuncEnd =
+        m_builder->CreateRet(m_builder->CreateLoad(m_globalCallableData->getValueType(), m_globalCallableData));
     ret->replaceAllUsesWith(newfuncEnd);
     ret->eraseFromParent();
   }
