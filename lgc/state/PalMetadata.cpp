@@ -433,19 +433,32 @@ void PalMetadata::fixUpRegisters() {
   }
 
   // First find the descriptor sets and push const nodes.
+  bool isIndirect = m_pipelineState->getOptions().resourceLayoutScheme == ResourceLayoutScheme::Indirect;
   SmallVector<const ResourceNode *, 4> descSetNodes;
   const ResourceNode *pushConstNode = nullptr;
   for (const auto &node : m_pipelineState->getUserDataNodes()) {
-    if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
-      size_t descSet = node.innerTable[0].set;
-      descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
-      descSetNodes[descSet] = &node;
-    } else if (node.concreteType == ResourceNodeType::DescriptorBuffer) {
-      size_t descSet = node.set;
-      descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
-      descSetNodes[descSet] = &node;
-    } else if (node.concreteType == ResourceNodeType::PushConst) {
-      pushConstNode = &node;
+    if (isIndirect) {
+      if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
+        if (node.innerTable[0].concreteType == ResourceNodeType::PushConst) {
+          descSetNodes.resize(std::max(descSetNodes.size(), size_t(1)));
+          descSetNodes[0] = &node;
+        } else {
+          descSetNodes.resize(std::max(descSetNodes.size(), size_t(node.innerTable[0].set + 2)));
+          descSetNodes[node.innerTable[0].set + 1] = &node;
+        }
+      }
+    } else {
+      if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
+        size_t descSet = node.innerTable[0].set;
+        descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
+        descSetNodes[descSet] = &node;
+      } else if (node.concreteType == ResourceNodeType::DescriptorBuffer) {
+        size_t descSet = node.set;
+        descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
+        descSetNodes[descSet] = &node;
+      } else if (node.concreteType == ResourceNodeType::PushConst) {
+        pushConstNode = &node;
+      }
     }
   }
 
