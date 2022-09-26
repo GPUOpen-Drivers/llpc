@@ -1099,7 +1099,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
 
       if (builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR) {
         if (inOutInfo.getInterpLoc() == InterpLocUnknown)
-          inOutInfo.setInterpLoc(InterpLocCenter);
+          inOutInfo.setInterpLoc(inOutMeta.InterpLoc);
         return m_builder->CreateReadBaryCoord(builtIn, inOutInfo, auxInterpValue);
       }
 
