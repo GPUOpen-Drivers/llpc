@@ -41,5 +41,8 @@ void main()
 
 [FsInfo]
 entryPoint = main
-
-
+userDataNode[0].type = DescriptorBuffer
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 4
+userDataNode[0].set = 0
+userDataNode[0].binding = 0
