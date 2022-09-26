@@ -46,7 +46,7 @@ public:
   static llvm::StringRef name() { return "Lower SPIR-V RayTracing intrinsics"; }
 
 protected:
-  void createLoadDwordAtAddr(llvm::Function *func, llvm::Type *loadPtrTy);
+  void createLoadDwordAtAddr(llvm::Function *func, llvm::Type *loadTy);
   void createConvertF32toF16(llvm::Function *func, unsigned roundingMode);
 
 private:

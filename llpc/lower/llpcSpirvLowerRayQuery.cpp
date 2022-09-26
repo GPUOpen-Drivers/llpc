@@ -391,14 +391,14 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
     func->setLinkage(GlobalValue::ExternalLinkage);
   } else if (mangledName.startswith(RtName::LoadDwordAtAddrx4)) {
     auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
-    createLoadDwordAtAddr(func, int32x4Ty->getPointerTo(SPIRAS_Global));
+    createLoadDwordAtAddr(func, int32x4Ty);
     func->setName(RtName::LoadDwordAtAddrx4);
   } else if (mangledName.startswith(RtName::LoadDwordAtAddrx2)) {
     auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-    createLoadDwordAtAddr(func, int32x2Ty->getPointerTo(SPIRAS_Global));
+    createLoadDwordAtAddr(func, int32x2Ty);
     func->setName(RtName::LoadDwordAtAddrx2);
   } else if (mangledName.startswith(RtName::LoadDwordAtAddr)) {
-    createLoadDwordAtAddr(func, Type::getInt32PtrTy(*m_context, SPIRAS_Global));
+    createLoadDwordAtAddr(func, m_builder->getInt32Ty());
     func->setName(RtName::LoadDwordAtAddr);
   } else if (mangledName.startswith(RtName::IntersectBvh)) {
     createIntersectBvh(func);
