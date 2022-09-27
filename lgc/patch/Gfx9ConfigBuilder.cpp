@@ -56,7 +56,7 @@ void ConfigBuilder::buildPalMetadata() {
     const bool enableNgg = m_pipelineState->getNggControl()->enableNgg;
 
     if (!m_pipelineState->isWholePipeline() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
-      // FS-only shader or part-pipeline compilation
+      // FS-only shader (part-pipeline compilation)
       buildPipelineVsFsRegConfig();
     } else if (m_hasTask) {
       // Task-Mesh-FS pipeline
@@ -98,7 +98,9 @@ void ConfigBuilder::buildPalMetadata() {
 // Builds register configuration for graphics pipeline (VS-FS), or FS-only shader compilation
 void ConfigBuilder::buildPipelineVsFsRegConfig() {
   GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major <= 10);
+  const bool partPipeline = !m_pipelineState->isWholePipeline() && m_pipelineState->hasShaderStage(ShaderStageFragment);
+  assert(gfxIp.major <= 10 || partPipeline); // Must be GFX10 or below, or part-pipeline compilation
+  (void(partPipeline));                      // Unused
 
   PipelineVsFsRegConfig config(gfxIp);
 
