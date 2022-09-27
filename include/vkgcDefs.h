@@ -179,6 +179,9 @@ static const unsigned MaxFetchShaderInternalBufferSize = 16 * MaxVertexAttribs;
 class IShaderCache;
 class ICache;
 class EntryHandle;
+#if VKI_RAY_TRACING
+class ITraceRayLibMgr;
+#endif
 
 /// Enumerates result codes of LLPC operations.
 enum class Result : int {
@@ -988,7 +991,7 @@ struct RtState {
   bool enableRayTracingCounters;                 ///< Enable using ray tracing counters
   bool enableOptimalLdsStackSizeForIndirect;     ///< Enable optimal LDS stack size for indirect shaders
   bool enableOptimalLdsStackSizeForUnified;      ///< Enable optimal LDS stack size for unified shaders
-
+  bool enableTraceRaySpecialization;             ///< Enable compiling specialized TraceRay shader
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
   GpurtFuncTable gpurtFuncTable; ///< GPURT function table
 #endif
@@ -1113,6 +1116,7 @@ struct RayTracingPipelineBuildInfo {
   bool hasPipelineLibrary;                                   ///< Whether include pipeline library
   unsigned pipelineLibStageMask;                             ///< Pipeline library stage mask
   bool isReplay;                                             ///< Pipeline is created for replaying
+  ITraceRayLibMgr *traceRayLibMgr;                           ///< Trace ray library manager
 };
 
 /// Ray tracing max shader name length
@@ -1525,5 +1529,29 @@ private:
   void *m_rawHandle = nullptr;
   bool m_mustPopulate = false;
 };
+
+#if VKI_RAY_TRACING
+/// Represents the parameters used by OpTraceRayKHR
+union TraceRayParams {
+  struct {
+    uint64_t maxPayloadSize : 12;   ///< Maximum payload size in byte.
+    uint64_t maxAttributeSize : 12; ///< Maximum attribute size in byte.
+    uint64_t shaderUsage : 6;       ///< Ray tracing shader usage, the first bit represents ray generation shader stage.
+    uint64_t needRayQuery : 1;      ///< Whether the caller needs ray query.
+    uint64_t reserved : 1;          ///< Reserved.
+    uint64_t rayFlags : 32;         ///< Constant ray flags value, 0xFFFFFFFF for non-constant.
+  };
+  uint64_t u64all;
+};
+
+// =====================================================================================================================
+// Trace ray library manager interfaces, client needs to inherit and impelent it.
+class ITraceRayLibMgr {
+public:
+  // Get trace ray library index by given trace ray parameters. This should be called by compiler to obtain an index to
+  // the trace ray table.
+  virtual uint32_t GetTraceRayIndex(TraceRayParams traceRayParams) = 0;
+};
+#endif
 
 } // namespace Vkgc

@@ -588,6 +588,7 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayTracingCounters, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForIndirect, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForUnified, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableTraceRaySpecialization, MemberTypeBool, false);
     INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_exportConfig, MemberTypeRayTracingShaderExportConfig, true);
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
     INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_gpurtFuncTable, MemberTypeGpurtFuncTable, true);
@@ -609,9 +610,9 @@ public:
 
 private:
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
-  static const unsigned MemberCount = 28;
+  static const unsigned MemberCount = 29;
 #else
-  static const unsigned MemberCount = 27;
+  static const unsigned MemberCount = 28;
 #endif
   static StrToMemberAddr m_addrTable[MemberCount];
 

@@ -1076,6 +1076,7 @@ void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, std::ostream 
              << "\n";
   dumpStream << "rtState.enableOptimalLdsStackSizeForUnified = " << rtState->enableOptimalLdsStackSizeForUnified
              << "\n";
+  dumpStream << "rtState.enableTraceRaySpecialization = " << rtState->enableTraceRaySpecialization << "\n";
 
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
   for (unsigned i = 0; i < RT_ENTRY_FUNC_COUNT; ++i) {
@@ -1148,6 +1149,7 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
   hasher->Update(rtState->enableRayTracingCounters);
   hasher->Update(rtState->enableOptimalLdsStackSizeForIndirect);
   hasher->Update(rtState->enableOptimalLdsStackSizeForUnified);
+  hasher->Update(rtState->enableTraceRaySpecialization);
 
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
   for (unsigned i = 0; i < RT_ENTRY_FUNC_COUNT; ++i) {
