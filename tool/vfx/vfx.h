@@ -523,7 +523,7 @@ struct GraphicsPipelineState {
   Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
   Vkgc::RtState rtState;          // Ray tracing state
 #endif
-  bool dynamicVertexStride; // Dynamic Vertex input Stride is enabled.
+  bool dynamicVertexStride;   // Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader; // Use uber fetch shader
   bool enableEarlyCompile;    // Enable early compile
 };

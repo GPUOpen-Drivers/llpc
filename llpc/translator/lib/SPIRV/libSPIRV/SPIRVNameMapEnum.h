@@ -46,8 +46,8 @@
 #ifndef SPIRV_LIBSPIRV_SPIRVNAMEMAPENUM_H
 #define SPIRV_LIBSPIRV_SPIRVNAMEMAPENUM_H
 
-#include "spirvExt.h"
 #include "SPIRVEnum.h"
+#include "spirvExt.h"
 
 using namespace spv;
 
@@ -405,14 +405,10 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityGeometryPointSize, "GeometryPointSize");
   add(CapabilityImageGatherExtended, "ImageGatherExtended");
   add(CapabilityStorageImageMultisample, "StorageImageMultisample");
-  add(CapabilityUniformBufferArrayDynamicIndexing,
-      "UniformBufferArrayDynamicIndexing");
-  add(CapabilitySampledImageArrayDynamicIndexing,
-      "SampledImageArrayDynamicIndexing");
-  add(CapabilityStorageBufferArrayDynamicIndexing,
-      "StorageBufferArrayDynamicIndexing");
-  add(CapabilityStorageImageArrayDynamicIndexing,
-      "StorageImageArrayDynamicIndexing");
+  add(CapabilityUniformBufferArrayDynamicIndexing, "UniformBufferArrayDynamicIndexing");
+  add(CapabilitySampledImageArrayDynamicIndexing, "SampledImageArrayDynamicIndexing");
+  add(CapabilityStorageBufferArrayDynamicIndexing, "StorageBufferArrayDynamicIndexing");
+  add(CapabilityStorageImageArrayDynamicIndexing, "StorageImageArrayDynamicIndexing");
   add(CapabilityClipDistance, "ClipDistance");
   add(CapabilityCullDistance, "CullDistance");
   add(CapabilityImageCubeArray, "ImageCubeArray");
@@ -437,8 +433,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityTransformFeedback, "TransformFeedback");
   add(CapabilityGeometryStreams, "GeometryStreams");
   add(CapabilityStorageImageReadWithoutFormat, "StorageImageReadWithoutFormat");
-  add(CapabilityStorageImageWriteWithoutFormat,
-      "StorageImageWriteWithoutFormat");
+  add(CapabilityStorageImageWriteWithoutFormat, "StorageImageWriteWithoutFormat");
   add(CapabilityMultiViewport, "MultiViewport");
   add(CapabilityStencilExportEXT, "StencilExportEXT");
   add(CapabilityShaderViewportIndexLayerEXT, "ShaderViewportIndexLayerEXT");

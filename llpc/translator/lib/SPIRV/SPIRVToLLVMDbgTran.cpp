@@ -340,13 +340,13 @@ DINode *SPIRVToLLVMDbgTran::transTypeEnum(const SPIRVExtInst *DebugInst) {
     StringRef Name = getString(Ops[I + 1]);
     Elts.push_back(Builder.createEnumerator(Name, Val));
   }
-    DINodeArray Enumerators = Builder.getOrCreateArray(Elts);
-    DIType *UnderlyingType = nullptr;
-    SPIRVEntry *E = BM->getEntry(Ops[UnderlyingTypeIdx]);
-    if (!isa<OpTypeVoid>(E))
-      UnderlyingType = transDebugInst<DIType>(static_cast<SPIRVExtInst *>(E));
-    return Builder.createEnumerationType(Scope, Name, File, LineNo, SizeInBits, AlignInBits, Enumerators,
-                                         UnderlyingType, "", UnderlyingType);
+  DINodeArray Enumerators = Builder.getOrCreateArray(Elts);
+  DIType *UnderlyingType = nullptr;
+  SPIRVEntry *E = BM->getEntry(Ops[UnderlyingTypeIdx]);
+  if (!isa<OpTypeVoid>(E))
+    UnderlyingType = transDebugInst<DIType>(static_cast<SPIRVExtInst *>(E));
+  return Builder.createEnumerationType(Scope, Name, File, LineNo, SizeInBits, AlignInBits, Enumerators, UnderlyingType,
+                                       "", UnderlyingType);
 }
 
 DINode *SPIRVToLLVMDbgTran::transTypeFunction(const SPIRVExtInst *DebugInst) {

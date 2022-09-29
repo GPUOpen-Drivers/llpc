@@ -454,7 +454,7 @@ std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
 // @param ptrTy : Type that result pointer needs to be
 // @param highValue : Value to use for high part, or InvalidValue to use PC
 Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsigned highValue) {
-  // Insert extending code after pLowValue if it is an instruction.
+  // Insert extending code after lowValue if it is an instruction.
   Instruction *insertPos = nullptr;
   auto lowValueInst = dyn_cast<Instruction>(lowValue);
   if (lowValueInst)
@@ -468,11 +468,11 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
     if (!m_pc || isa<Instruction>(lowValue)) {
       // Either
       // 1. there is no existing code to s_getpc and cast it, or
-      // 2. there is existing code, but pLowValue is an instruction, so it is more complex to figure
-      //    out whether it is before or after pLowValue in the code. We generate new s_getpc code anyway
+      // 2. there is existing code, but lowValue is an instruction, so it is more complex to figure
+      //    out whether it is before or after lowValue in the code. We generate new s_getpc code anyway
       //    and rely on subsequent CSE to common it up.
       // Insert the s_getpc code at the start of the function, so a later call into here knows it can
-      // reuse this PC if its pLowValue is an arg rather than an instruction.
+      // reuse this PC if its lowValue is an arg rather than an instruction.
       auto pcInsertPos = &*m_entryPoint->front().getFirstInsertionPt();
       Value *pc = emitCall("llvm.amdgcn.s.getpc", Type::getInt64Ty(*m_context), ArrayRef<Value *>(), {}, pcInsertPos);
       m_pc = new BitCastInst(pc, FixedVectorType::get(Type::getInt32Ty(*m_context), 2), "", insertPos);

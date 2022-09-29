@@ -41,8 +41,8 @@ struct CompileInfo; // Defined in llpcCompilationUtils.h.
 
 struct ResourceNodeSet {
   std::vector<Llpc::ResourceMappingNode> nodes; // Vector of resource mapping nodes
-  std::map<unsigned, unsigned> bindingMap; // Map from binding to index in nodes vector
-  unsigned visibility = 0;                 // Mask of shader stages which this set is visible to
+  std::map<unsigned, unsigned> bindingMap;      // Map from binding to index in nodes vector
+  unsigned visibility = 0;                      // Mask of shader stages which this set is visible to
 };
 
 using ResourceMappingNodeMap = std::map<unsigned, ResourceNodeSet>;

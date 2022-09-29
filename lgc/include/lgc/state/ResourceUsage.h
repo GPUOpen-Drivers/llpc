@@ -282,20 +282,20 @@ struct ResourceUsage {
         unsigned pullMode : 1;      // Whether pull mode interpolation is used
         unsigned custom : 1;        // Whether custom interpolation is used
         // Input
-        unsigned fragCoord : 1;        // Whether gl_FragCoord is used
-        unsigned frontFacing : 1;      // Whether gl_FrontFacing is used
-        unsigned clipDistance : 4;     // Array size of gl_ClipDistance[] (0 means unused)
-        unsigned cullDistance : 4;     // Array size of gl_CullDistance[] (0 means unused)
-        unsigned pointCoord : 1;       // Whether gl_PointCoord is used
-        unsigned primitiveId : 1;      // Whether gl_PrimitiveID is used
-        unsigned sampleId : 1;         // Whether gl_SampleID is used
-        unsigned samplePosition : 1;   // Whether gl_SamplePosition is used
-        unsigned sampleMaskIn : 1;     // Whether gl_SampleMaskIn[] is used
-        unsigned layer : 1;            // Whether gl_Layer is used
-        unsigned viewportIndex : 1;    // Whether gl_ViewportIndex is used
-        unsigned helperInvocation : 1; // Whether gl_HelperInvocation is used
-        unsigned viewIndex : 1;        // Whether gl_ViewIndex is used
-        unsigned shadingRate : 1;      // Whether gl_ShadingRate is used
+        unsigned fragCoord : 1;                // Whether gl_FragCoord is used
+        unsigned frontFacing : 1;              // Whether gl_FrontFacing is used
+        unsigned clipDistance : 4;             // Array size of gl_ClipDistance[] (0 means unused)
+        unsigned cullDistance : 4;             // Array size of gl_CullDistance[] (0 means unused)
+        unsigned pointCoord : 1;               // Whether gl_PointCoord is used
+        unsigned primitiveId : 1;              // Whether gl_PrimitiveID is used
+        unsigned sampleId : 1;                 // Whether gl_SampleID is used
+        unsigned samplePosition : 1;           // Whether gl_SamplePosition is used
+        unsigned sampleMaskIn : 1;             // Whether gl_SampleMaskIn[] is used
+        unsigned layer : 1;                    // Whether gl_Layer is used
+        unsigned viewportIndex : 1;            // Whether gl_ViewportIndex is used
+        unsigned helperInvocation : 1;         // Whether gl_HelperInvocation is used
+        unsigned viewIndex : 1;                // Whether gl_ViewIndex is used
+        unsigned shadingRate : 1;              // Whether gl_ShadingRate is used
         unsigned baryCoordNoPersp : 1;         // Whether gl_BaryCoordNoPersp is used (AMD extension)
         unsigned baryCoordNoPerspCentroid : 1; // Whether gl_BaryCoordNoPerspCentroid is used (AMD extension)
         unsigned baryCoordNoPerspSample : 1;   // Whether gl_BaryCoordNoPerspSample is used (AMD extension)
@@ -479,7 +479,7 @@ struct ResourceUsage {
 
 // Represents stream-out data
 struct StreamOutData {
-  unsigned tablePtr; // Table pointer for stream-out
+  unsigned tablePtr;                                   // Table pointer for stream-out
   unsigned streamInfo;                                 // Stream-out info (ID, vertex count, enablement)
   unsigned writeIndex;                                 // Write index for stream-out
   unsigned streamOffsets[MaxTransformFeedbackBuffers]; // Stream-out Offset
@@ -497,10 +497,10 @@ struct InterfaceData {
   static const unsigned MaxEsGsOffsetCount = 6;
   static const unsigned MaxCsUserDataCount = 16;
 
-  unsigned userDataCount = 0;                  // User data count
+  unsigned userDataCount = 0; // User data count
 
   struct {
-    unsigned sizeInDwords = 0;              // Spill table size in dwords
+    unsigned sizeInDwords = 0; // Spill table size in dwords
   } spillTable;
 
   // Usage of user data registers for internal-use variables
@@ -622,8 +622,8 @@ struct InterfaceData {
       } cs;
     };
 
-    bool initialized;                          // Whether entryArgIdxs has been initialized
-                                               //   by PatchEntryPointMutate
+    bool initialized; // Whether entryArgIdxs has been initialized
+                      //   by PatchEntryPointMutate
   } entryArgIdxs = {};
 
   InterfaceData();

@@ -44,39 +44,35 @@
 
 namespace SPIRV {
 
-SPIRVDecorateGeneric::SPIRVDecorateGeneric(Op OC, SPIRVWord WC,
-                                           Decoration TheDec,
-                                           SPIRVEntry *TheTarget)
-    : SPIRVAnnotationGeneric(TheTarget->getModule(), WC, OC,
-                             TheTarget->getId()),
-      Dec(TheDec), Owner(nullptr) {
+SPIRVDecorateGeneric::SPIRVDecorateGeneric(Op OC, SPIRVWord WC, Decoration TheDec, SPIRVEntry *TheTarget)
+    : SPIRVAnnotationGeneric(TheTarget->getModule(), WC, OC, TheTarget->getId()), Dec(TheDec), Owner(nullptr) {
   validate();
   updateModuleVersion();
 }
 
-SPIRVDecorateGeneric::SPIRVDecorateGeneric(Op OC, SPIRVWord WC,
-                                           Decoration TheDec,
-                                           SPIRVEntry *TheTarget, SPIRVWord V)
-    : SPIRVAnnotationGeneric(TheTarget->getModule(), WC, OC,
-                             TheTarget->getId()),
-      Dec(TheDec), Owner(nullptr) {
+SPIRVDecorateGeneric::SPIRVDecorateGeneric(Op OC, SPIRVWord WC, Decoration TheDec, SPIRVEntry *TheTarget, SPIRVWord V)
+    : SPIRVAnnotationGeneric(TheTarget->getModule(), WC, OC, TheTarget->getId()), Dec(TheDec), Owner(nullptr) {
   Literals.push_back(V);
   validate();
   updateModuleVersion();
 }
 
 SPIRVDecorateGeneric::SPIRVDecorateGeneric(Op OC)
-    : SPIRVAnnotationGeneric(OC), Dec(DecorationRelaxedPrecision),
-      Owner(nullptr) {}
+    : SPIRVAnnotationGeneric(OC), Dec(DecorationRelaxedPrecision), Owner(nullptr) {
+}
 
-Decoration SPIRVDecorateGeneric::getDecorateKind() const { return Dec; }
+Decoration SPIRVDecorateGeneric::getDecorateKind() const {
+  return Dec;
+}
 
 SPIRVWord SPIRVDecorateGeneric::getLiteral(size_t I) const {
   assert(I <= Literals.size() && "Out of bounds");
   return Literals[I];
 }
 
-size_t SPIRVDecorateGeneric::getLiteralCount() const { return Literals.size(); }
+size_t SPIRVDecorateGeneric::getLiteralCount() const {
+  return Literals.size();
+}
 
 void SPIRVDecorate::setWordCount(SPIRVWord Count) {
   WordCount = Count;
@@ -114,9 +110,9 @@ void SPIRVGroupDecorate::decode(std::istream &I) {
 }
 
 void SPIRVGroupDecorate::decorateTargets() {
-  for(auto &I:Targets) {
+  for (auto &I : Targets) {
     auto Target = getOrCreate(I);
-    for (auto &Dec:DecorationGroup->getDecorations()) {
+    for (auto &Dec : DecorationGroup->getDecorations()) {
       assert(Dec->isDecorate());
       Target->addDecorate(static_cast<const SPIRVDecorate *const>(Dec));
     }
@@ -138,22 +134,20 @@ void SPIRVGroupMemberDecorate::decorateTargets() {
   assert(Targets.size() == MemberNumbers.size());
   for (uint32_t I = 0, E = Targets.size(); I < E; ++I) {
     auto Target = getOrCreate(Targets[I]);
-    for (auto &Dec:DecorationGroup->getDecorations()) {
+    for (auto &Dec : DecorationGroup->getDecorations()) {
       assert(Dec->isDecorate());
-      auto TheDec = static_cast<const SPIRVDecorate*>(Dec);
+      auto TheDec = static_cast<const SPIRVDecorate *>(Dec);
       if (TheDec->getLiteralCount() == 0)
         Target->addMemberDecorate(MemberNumbers[I], TheDec->getDecorateKind());
       else {
         assert(TheDec->getLiteralCount() == 1);
-        Target->addMemberDecorate(MemberNumbers[I], TheDec->getDecorateKind(),
-          TheDec->getLiteral(0));
+        Target->addMemberDecorate(MemberNumbers[I], TheDec->getDecorateKind(), TheDec->getLiteral(0));
       }
     }
   }
 }
 
-bool SPIRVDecorateGeneric::Comparator::
-operator()(const SPIRVDecorateGeneric *A, const SPIRVDecorateGeneric *B) const {
+bool SPIRVDecorateGeneric::Comparator::operator()(const SPIRVDecorateGeneric *A, const SPIRVDecorateGeneric *B) const {
   auto Action = [=]() {
     if (A->getOpCode() < B->getOpCode())
       return true;

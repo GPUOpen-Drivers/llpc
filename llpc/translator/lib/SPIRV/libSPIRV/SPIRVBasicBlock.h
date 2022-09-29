@@ -49,14 +49,12 @@ class SPIRVInstruction;
 class SPIRVDecoder;
 class SPIRVLoopMerge;
 
-class SPIRVBasicBlock: public SPIRVValue {
+class SPIRVBasicBlock : public SPIRVValue {
 
 public:
   SPIRVBasicBlock(SPIRVId TheId, SPIRVFunction *Func);
 
-  SPIRVBasicBlock():SPIRVValue(OpLabel), ParentF(NULL), LoopMerge(NULL){
-    setAttr();
-  }
+  SPIRVBasicBlock() : SPIRVValue(OpLabel), ParentF(NULL), LoopMerge(NULL) { setAttr(); }
 
   SPIRVDecoder getDecoder(std::istream &IS) override;
   SPIRVFunction *getParent() const { return ParentF; }
@@ -96,14 +94,14 @@ public:
 
   void setLoopMerge(SPIRVLoopMerge *LM) { LoopMerge = LM; }
   SPIRVLoopMerge *getLoopMerge() { return LoopMerge; }
+
 private:
   SPIRVFunction *ParentF;
   typedef std::vector<SPIRVInstruction *> SPIRVInstructionVector;
   SPIRVInstructionVector InstVec;
   SPIRVLoopMerge *LoopMerge;
 
-  SPIRVInstructionVector::const_iterator
-  find(const SPIRVInstruction *Inst) const {
+  SPIRVInstructionVector::const_iterator find(const SPIRVInstruction *Inst) const {
     return std::find(InstVec.begin(), InstVec.end(), Inst);
   }
 

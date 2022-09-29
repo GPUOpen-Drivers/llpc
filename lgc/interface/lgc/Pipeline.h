@@ -89,10 +89,10 @@ enum class DenormalMode : unsigned {
 // will force end of vector in the compiler to shader wavefront.
 // All of these values correspond to settings of WAVE_BREAK_REGION_SIZE in PA_SC_SHADER_CONTROL.
 enum class WaveBreak : unsigned {
-  None = 0x0,     ///< No wave break by region
-  _8x8 = 0x1,     ///< Outside a 8x8 pixel region
-  _16x16 = 0x2,   ///< Outside a 16x16 pixel region
-  _32x32 = 0x3,   ///< Outside a 32x32 pixel region
+  None = 0x0,   ///< No wave break by region
+  _8x8 = 0x1,   ///< Outside a 8x8 pixel region
+  _16x16 = 0x2, ///< Outside a 16x16 pixel region
+  _32x32 = 0x3, ///< Outside a 32x32 pixel region
 };
 
 // Enumerate the thread group swizzle modes.
@@ -109,6 +109,7 @@ static const unsigned ShadowDescriptorTableDisable = ~0U;
 
 // Middle-end per-pipeline options to pass to SetOptions.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
+// Note: new fields must be added to the end of this structure to maintain test compatibility.
 struct Options {
   uint64_t hash[2];                    // Pipeline hash to set in ELF PAL metadata
   unsigned includeDisassembly;         // If set, the disassembly for all compiled shaders will be included
@@ -138,10 +139,10 @@ struct Options {
   unsigned reserved0f;                 // Reserved for future functionality
   unsigned useResourceBindingRange;    // A resource node binding is the start of a range whose size is
                                        //  sizeInDwords/stride.
-  unsigned reserved1f;                // Reserved for future functionality
-  unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
-  unsigned pageMigrationEnabled;  // Enable page migration
-  ResourceLayoutScheme resourceLayoutScheme; // Resource layout scheme
+  unsigned reserved1f;                 // Reserved for future functionality
+  unsigned enableInterpModePatch;      // Enable to do per-sample interpolation for nonperspective and smooth input
+  unsigned pageMigrationEnabled;       // Enable page migration
+  ResourceLayoutScheme resourceLayoutScheme;     // Resource layout scheme
   ThreadGroupSwizzleMode threadGroupSwizzleMode; // Thread group swizzle mode
   unsigned reverseThreadGroupBufferDescSet;      // Descriptor set ID of the internal buffer for reverse thread group
                                                  // optimization
@@ -154,6 +155,7 @@ struct Options {
 };
 
 // Middle-end per-shader options to pass to SetShaderOptions.
+// Note: new fields must be added to the end of this structure to maintain test compatibility.
 struct ShaderOptions {
   uint64_t hash[2];     // Shader hash to set in ELF PAL metadata
   unsigned trapPresent; // Indicates a trap handler will be present when this pipeline is executed,
@@ -233,6 +235,15 @@ struct ShaderOptions {
 
   /// Override value for ThreadGroupSizeZ
   unsigned overrideShaderThreadGroupSizeZ;
+
+  // When there is a valid "feedback loop" in renderpass, lateZ needs to be enabled
+  // In Vulkan a "feedback loop" is described as a subpass where there is at least
+  // one input attachment that is also a color or depth/stencil attachment
+  // Feedback loops are allowed and their behavior is well defined under certain conditions.
+  // When there is a feedback loop it is possible for the shaders to read
+  // the contents of the color and depth/stencil attachments
+  // from the shader during draw. Because of that possibility you have to use late-z
+  bool forceLateZ;
 
   ShaderOptions() {
     // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from

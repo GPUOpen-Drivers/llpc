@@ -30,15 +30,14 @@
  */
 #pragma once
 
+#include "g_palPipelineAbiMetadata.h"
+#include "palPipelineAbi.h"
+#include "vkgcUtil.h"
+#include "llvm/BinaryFormat/MsgPackDocument.h"
 #include <functional>
 #include <map>
 #include <string>
 #include <vector>
-#include "llvm/BinaryFormat/MsgPackDocument.h"
-
-#include "g_palPipelineAbiMetadata.h"
-#include "palPipelineAbi.h"
-#include "vkgcUtil.h"
 
 namespace llvm {
 template <unsigned InternalLen> class SmallString;
@@ -156,10 +155,10 @@ static const uint32_t NT_AMD_AMDGPU_ISA = 11; // Note type of AMDGPU ISA version
 
 // Represents the layout of standard note header
 struct NoteHeader {
-  uint32_t nameSize;                   // Byte size of note name
-  uint32_t descSize;                   // Descriptor size in byte
-  uint32_t type;                       // Note type
-  char name[8];                        // Note name, include padding
+  uint32_t nameSize; // Byte size of note name
+  uint32_t descSize; // Descriptor size in byte
+  uint32_t type;     // Note type
+  char name[8];      // Note name, include padding
 };
 static_assert(sizeof(Util::Abi::AmdGpuVendorName) < 8, "");
 static_assert(sizeof(Util::Abi::AmdGpuArchName) < 8, "");
@@ -335,12 +334,12 @@ template <class ElfSectionHeader> struct ElfSectionBuffer {
 
 // Represents info of ELF symbol
 struct ElfSymbol {
-  const char *secName; // Name of the section this symbol's defined in
-  uint32_t secIdx;     // Index of the section this symbol's defined in
+  const char *secName;  // Name of the section this symbol's defined in
+  uint32_t secIdx;      // Index of the section this symbol's defined in
   const char *pSymName; // Name of this symbol
-  uint32_t nameOffset; // Symbol name offset in .strtab
-  uint64_t size;       // Size of this symbol
-  uint64_t value;      // Value associated with this symbol
+  uint32_t nameOffset;  // Symbol name offset in .strtab
+  uint64_t size;        // Size of this symbol
+  uint64_t value;       // Value associated with this symbol
   union {
     struct {
       uint8_t type : 4;    // Symbol Table Type
@@ -353,9 +352,9 @@ struct ElfSymbol {
 
 // Represents info of ELF relocation
 struct ElfReloc {
-  uint64_t offset; // Location
-  uint32_t symIdx; // Index of this symbol in the symbol table
-  uint32_t type;   // Type of this relocation
+  uint64_t offset;        // Location
+  uint32_t symIdx;        // Index of this symbol in the symbol table
+  uint32_t type;          // Type of this relocation
   bool useExplicitAddend; // Whether an explicit addend is used
   uint32_t addend;        // The value of the explicit addend
 };
@@ -383,7 +382,7 @@ enum MsgPackIteratorStatus : uint32_t {
 
 // Represents the struct of message packer iterator
 struct MsgPackIterator {
-  MsgPackIteratorStatus status; // Iterator status
+  MsgPackIteratorStatus status;                            // Iterator status
   llvm::msgpack::MapDocNode::MapTy::iterator mapIt;        // Iterator of current map node
   llvm::msgpack::MapDocNode::MapTy::iterator mapEnd;       // End iterator of current map node
   llvm::msgpack::ArrayDocNode::ArrayTy::iterator arrayIt;  // Iterator of current array node
@@ -490,7 +489,7 @@ private:
   int32_t m_strtabSecIdx; // Index of string table section
   int32_t m_textSecIdx;   // Index of string table section
 
-  llvm::msgpack::Document m_document; // MsgPack document
+  llvm::msgpack::Document m_document;           // MsgPack document
   std::vector<MsgPackIterator> m_iteratorStack; // MsgPack iterator stack
   uint32_t m_msgPackMapLevel;                   // The map level of current message item
 };

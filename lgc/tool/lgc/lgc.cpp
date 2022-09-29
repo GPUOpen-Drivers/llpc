@@ -91,8 +91,8 @@ cl::opt<bool> OpaquePointers("enable-opaque-pointers", cl::desc("Enable opaque-p
 static bool isElfBinary(StringRef data) {
   bool isElfBin = false;
   if (data.size() >= sizeof(ELF::Elf64_Ehdr)) {
-    auto pHeader = reinterpret_cast<const ELF::Elf64_Ehdr *>(data.data());
-    isElfBin = pHeader->checkMagic();
+    auto header = reinterpret_cast<const ELF::Elf64_Ehdr *>(data.data());
+    isElfBin = header->checkMagic();
   }
   return isElfBin;
 }

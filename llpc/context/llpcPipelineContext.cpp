@@ -142,21 +142,6 @@ static cl::opt<bool> ScalarizeWaterfallDescriptorLoads("scalarize-waterfall-desc
 
 namespace Llpc {
 
-#if VKI_RAY_TRACING
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 15
-static const char *TraceRayFuncNames[Vkgc::RT_ENTRY_FUNC_COUNT] = {
-    "TraceRaysAmdInternal",       // RT_ENTRY_TRACE_RAY,
-    "TraceRayInlineAmdInternal",  // RT_ENTRY_TRACE_RAY_INLINE,
-    "",                           // RT_ENTRY_TRACE_RAY_HIT_TOKEN,
-    "RayQueryProceedAmdInternal", // RT_ENTRY_RAY_QUERY_PROCEED,
-    "",                           // RT_ENTRY_INSTANCE_INDEX,
-    "",                           // RT_ENTRY_INSTANCE_ID,
-    "",                           // RT_ENTRY_OBJECT_TO_WORLD_TRANSFORM,
-    "",                           // RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM,
-};
-#endif
-#endif
-
 // =====================================================================================================================
 //
 // @param gfxIp : Graphics IP version info
@@ -234,11 +219,7 @@ ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
 // @param funcType : function type
 const char *PipelineContext::getRayTracingFunctionName(unsigned funcType) {
   assert(funcType < Vkgc::RT_ENTRY_FUNC_COUNT);
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
   return getRayTracingState()->gpurtFuncTable.pFunc[funcType];
-#else
-  return TraceRayFuncNames[funcType];
-#endif
 }
 #endif
 
@@ -275,7 +256,6 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
     if (getPreRasterHasGs())
       pipeline->setPreRasterHasGs(true);
   }
-
   if (!unlinked) {
     // Give the user data nodes to the middle-end, and/or hash them.
     setUserDataInPipeline(pipeline, hasher, stageMask);
@@ -438,6 +418,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
     shaderOptions.trapPresent = shaderInfo->options.trapPresent;
     shaderOptions.debugMode = shaderInfo->options.debugMode;
     shaderOptions.allowReZ = shaderInfo->options.allowReZ;
+    shaderOptions.forceLateZ = shaderInfo->options.forceLateZ;
 
     if (shaderInfo->options.vgprLimit != 0 && shaderInfo->options.vgprLimit != UINT_MAX)
       shaderOptions.vgprLimit = shaderInfo->options.vgprLimit;

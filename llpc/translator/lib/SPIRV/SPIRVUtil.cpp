@@ -53,8 +53,7 @@ void addFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr) {
 #endif
 }
 
-void removeFnAttr(LLVMContext *Context, CallInst *Call,
-                  Attribute::AttrKind Attr) {
+void removeFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr) {
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596
   // Old version of the code
   Call->removeAttribute(AttributeList::FunctionIndex, Attr);
@@ -64,24 +63,20 @@ void removeFnAttr(LLVMContext *Context, CallInst *Call,
 #endif
 }
 
-Function *getOrCreateFunction(Module *M, Type *RetTy, ArrayRef<Type *> ArgTypes,
-                              StringRef Name, AttributeList *Attrs,
+Function *getOrCreateFunction(Module *M, Type *RetTy, ArrayRef<Type *> ArgTypes, StringRef Name, AttributeList *Attrs,
                               bool TakeName) {
   const std::string MangledName(Name);
   bool IsVarArg = false;
   FunctionType *FT = FunctionType::get(RetTy, ArgTypes, IsVarArg);
   Function *F = M->getFunction(MangledName);
   if (!F || F->getFunctionType() != FT) {
-    auto NewF =
-        Function::Create(FT, GlobalValue::ExternalLinkage, MangledName, M);
+    auto NewF = Function::Create(FT, GlobalValue::ExternalLinkage, MangledName, M);
     if (F && TakeName) {
       NewF->takeName(F);
-      LLVM_DEBUG(
-          dbgs() << "[getOrCreateFunction] Warning: taking function Name\n");
+      LLVM_DEBUG(dbgs() << "[getOrCreateFunction] Warning: taking function Name\n");
     }
     if (NewF->getName() != MangledName) {
-      LLVM_DEBUG(
-          dbgs() << "[getOrCreateFunction] Warning: function Name changed\n");
+      LLVM_DEBUG(dbgs() << "[getOrCreateFunction] Warning: function Name changed\n");
     }
     LLVM_DEBUG(dbgs() << "[getOrCreateFunction] ");
     if (F)

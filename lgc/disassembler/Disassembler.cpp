@@ -247,7 +247,7 @@ void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
       sectType == ELF::SHT_REL || sectType == ELF::SHT_RELA)
     return;
 
-  // Switch the streamer to the section.
+    // Switch the streamer to the section.
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 425813
   // Old version of code
   m_streamer->AddBlankLine();

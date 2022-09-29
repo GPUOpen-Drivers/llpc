@@ -632,7 +632,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
         auto cond =
             new FCmpInst(insertPos, FCmpInst::FCMP_UGT, alpha, ConstantFP::get(Type::getFloatTy(*m_context), 1.5f), "");
 
-        // %a = select %cond, -1.0f, pAlpha
+        // %a = select %cond, -1.0f, alpha
         alpha = SelectInst::Create(cond, ConstantFP::get(Type::getFloatTy(*m_context), -1.0f), alpha, "", insertPos);
 
         // %a = bitcast %a to i32

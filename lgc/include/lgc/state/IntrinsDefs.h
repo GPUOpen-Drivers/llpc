@@ -77,15 +77,15 @@ enum AddrSpace {
 
 // Enumerates the target for "export" instruction.
 enum ExportTarget {
-  EXP_TARGET_MRT_0 = 0,   // MRT 0..7
-  EXP_TARGET_Z = 8,       // Z
-  EXP_TARGET_PS_NULL = 9, // Null pixel shader export (no data)
-  EXP_TARGET_POS_0 = 12,  // Position 0
-  EXP_TARGET_POS_1 = 13,  // Position 1
-  EXP_TARGET_POS_2 = 14,  // Position 2
-  EXP_TARGET_POS_3 = 15,  // Position 3
-  EXP_TARGET_POS_4 = 16,  // Position 4
-  EXP_TARGET_PRIM = 20,   // NGG primitive data (connectivity data)
+  EXP_TARGET_MRT_0 = 0,     // MRT 0..7
+  EXP_TARGET_Z = 8,         // Z
+  EXP_TARGET_PS_NULL = 9,   // Null pixel shader export (no data)
+  EXP_TARGET_POS_0 = 12,    // Position 0
+  EXP_TARGET_POS_1 = 13,    // Position 1
+  EXP_TARGET_POS_2 = 14,    // Position 2
+  EXP_TARGET_POS_3 = 15,    // Position 3
+  EXP_TARGET_POS_4 = 16,    // Position 4
+  EXP_TARGET_PRIM = 20,     // NGG primitive data (connectivity data)
   EXP_TARGET_PARAM_0 = 32,  // Param 0
                             // Param 1..30
   EXP_TARGET_PARAM_31 = 63, // Param 31

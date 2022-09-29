@@ -77,7 +77,7 @@ Value *GfxRegHandler::getRegCombine(unsigned regIdLo, unsigned regIdHi) {
 
 // =====================================================================================================================
 // Set register value into two separate dwords
-// Note: The input pRegValue only supports one dword
+// Note: The input regValue only supports one dword
 //
 // @param regIdLo : The ID of low part register
 // @param regIdHi : Reg ID of high part register

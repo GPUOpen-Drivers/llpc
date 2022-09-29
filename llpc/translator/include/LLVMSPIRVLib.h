@@ -50,22 +50,22 @@ namespace llvm {
 // llvm::Pass initialization functions need to be declared before inclusion of
 // PassSupport.h.
 class PassRegistry;
-void initializeSPIRVLowerBoolPass(PassRegistry&);
-void initializeSPIRVLowerConstExprPass(PassRegistry&);
-void initializeSPIRVRegularizeLLVMPass(PassRegistry&);
-void initializeSPIRVLowerInputPass(PassRegistry&);
-void initializeSPIRVLowerOutputPass(PassRegistry&);
-void initializeSPIRVResourceCollectPass(PassRegistry&);
-void initializeLLVMInputPass(PassRegistry&);
-void initializeLLVMOutputPass(PassRegistry&);
-void initializeSPIRVLowerGlobalPass(PassRegistry&);
-void initializeSPIRVLowerBufferPass(PassRegistry&);
-void initializeSPIRVLowerFetchPass(PassRegistry&);
-void initializeLLVMDescriptorPass(PassRegistry&);
-void initializeLLVMBuiltInFuncPass(PassRegistry&);
-void initializeLLVMMutateEntryPass(PassRegistry&);
-void initializeSPIRVLowerMemmovePass(PassRegistry&);
-}
+void initializeSPIRVLowerBoolPass(PassRegistry &);
+void initializeSPIRVLowerConstExprPass(PassRegistry &);
+void initializeSPIRVRegularizeLLVMPass(PassRegistry &);
+void initializeSPIRVLowerInputPass(PassRegistry &);
+void initializeSPIRVLowerOutputPass(PassRegistry &);
+void initializeSPIRVResourceCollectPass(PassRegistry &);
+void initializeLLVMInputPass(PassRegistry &);
+void initializeLLVMOutputPass(PassRegistry &);
+void initializeSPIRVLowerGlobalPass(PassRegistry &);
+void initializeSPIRVLowerBufferPass(PassRegistry &);
+void initializeSPIRVLowerFetchPass(PassRegistry &);
+void initializeLLVMDescriptorPass(PassRegistry &);
+void initializeLLVMBuiltInFuncPass(PassRegistry &);
+void initializeLLVMMutateEntryPass(PassRegistry &);
+void initializeSPIRVLowerMemmovePass(PassRegistry &);
+} // namespace llvm
 
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
@@ -74,10 +74,9 @@ namespace SPIRV {
 class SPIRVModule;
 
 /// \brief Represents one entry in specialization constant map.
-struct SPIRVSpecConstEntry
-{
-  uint32_t    DataSize; // Data size of specilization constant (in bytes)
-  const void *Data;     // Data of specilization constant
+struct SPIRVSpecConstEntry {
+  uint32_t DataSize; // Data size of specilization constant (in bytes)
+  const void *Data;  // Data of specilization constant
 };
 
 /// \brief Represents the map from SpecId to specialization constant data.

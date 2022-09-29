@@ -37,46 +37,39 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "hex_float.h"
 #include "SPIRVInstruction.h"
 #include "SPIRVBasicBlock.h"
 #include "SPIRVFunction.h"
-
+#include "hex_float.h"
 #include <unordered_set>
 
 namespace SPIRV {
 
 // Complete constructor for instruction with type and id
-SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC,
-                                   SPIRVType *TheType, SPIRVId TheId,
+SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVType *TheType, SPIRVId TheId,
                                    SPIRVBasicBlock *TheBB)
-    : SPIRVValue(TheBB->getModule(), TheWordCount, TheOC, TheType, TheId),
-      BB(TheBB) {
+    : SPIRVValue(TheBB->getModule(), TheWordCount, TheOC, TheType, TheId), BB(TheBB) {
   validate();
 }
 
-SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC,
-                                   SPIRVType *TheType, SPIRVId TheId,
+SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVType *TheType, SPIRVId TheId,
                                    SPIRVBasicBlock *TheBB, SPIRVModule *TheBM)
     : SPIRVValue(TheBM, TheWordCount, TheOC, TheType, TheId), BB(TheBB) {
   validate();
 }
 
 // Complete constructor for instruction with id but no type
-SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC,
-                                   SPIRVId TheId, SPIRVBasicBlock *TheBB)
+SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVId TheId, SPIRVBasicBlock *TheBB)
     : SPIRVValue(TheBB->getModule(), TheWordCount, TheOC, TheId), BB(TheBB) {
   validate();
 }
 // Complete constructor for instruction without type and id
-SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC,
-                                   SPIRVBasicBlock *TheBB)
+SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVBasicBlock *TheBB)
     : SPIRVValue(TheBB->getModule(), TheWordCount, TheOC), BB(TheBB) {
   validate();
 }
 // Complete constructor for instruction with type but no id
-SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC,
-                                   SPIRVType *TheType, SPIRVBasicBlock *TheBB)
+SPIRVInstruction::SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVType *TheType, SPIRVBasicBlock *TheBB)
     : SPIRVValue(TheBB->getModule(), TheWordCount, TheOC, TheType), BB(TheBB) {
   validate();
 }
@@ -94,11 +87,9 @@ void SPIRVInstruction::setScope(SPIRVEntry *Scope) {
   setParent(static_cast<SPIRVBasicBlock *>(Scope));
 }
 
-SPIRVFunctionCall::SPIRVFunctionCall(SPIRVId TheId, SPIRVFunction *TheFunction,
-                                     const std::vector<SPIRVWord> &TheArgs,
+SPIRVFunctionCall::SPIRVFunctionCall(SPIRVId TheId, SPIRVFunction *TheFunction, const std::vector<SPIRVWord> &TheArgs,
                                      SPIRVBasicBlock *BB)
-    : SPIRVFunctionCallGeneric(TheFunction->getFunctionType()->getReturnType(),
-                               TheId, TheArgs, BB),
+    : SPIRVFunctionCallGeneric(TheFunction->getFunctionType()->getReturnType(), TheId, TheArgs, BB),
       FunctionId(TheFunction->getId()) {
   validate();
 }
@@ -114,8 +105,7 @@ std::vector<SPIRVValue *> SPIRVInstruction::getOperands() {
   return Empty;
 }
 
-std::vector<SPIRVType *>
-SPIRVInstruction::getOperandTypes(const std::vector<SPIRVValue *> &Ops) {
+std::vector<SPIRVType *> SPIRVInstruction::getOperandTypes(const std::vector<SPIRVValue *> &Ops) {
   std::vector<SPIRVType *> Tys;
   for (auto &I : Ops) {
     SPIRVType *Ty = nullptr;
@@ -193,51 +183,40 @@ bool isSpecConstantOpAllowedOp(Op OC) {
       OpPtrAccessChain,
       OpInBoundsPtrAccessChain,
   };
-  static std::unordered_set<SPIRVWord> Allow(std::begin(Table),
-                                             std::end(Table));
+  static std::unordered_set<SPIRVWord> Allow(std::begin(Table), std::end(Table));
   return Allow.count(OC);
 }
 
 SPIRVSpecConstantOp *createSpecConstantOpInst(SPIRVInstruction *Inst) {
   auto OC = Inst->getOpCode();
-  assert(isSpecConstantOpAllowedOp(OC) &&
-         "Op code not allowed for OpSpecConstantOp");
+  assert(isSpecConstantOpAllowedOp(OC) && "Op code not allowed for OpSpecConstantOp");
   auto Ops = Inst->getIds(Inst->getOperands());
   Ops.insert(Ops.begin(), OC);
-  return static_cast<SPIRVSpecConstantOp *>(SPIRVSpecConstantOp::create(
-      OpSpecConstantOp, Inst->getType(), Inst->getId(), Ops, nullptr,
-      Inst->getModule()));
+  return static_cast<SPIRVSpecConstantOp *>(
+      SPIRVSpecConstantOp::create(OpSpecConstantOp, Inst->getType(), Inst->getId(), Ops, nullptr, Inst->getModule()));
 }
 
 SPIRVInstruction *createInstFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
   assert(Inst->getOpCode() == OpSpecConstantOp && "Not OpSpecConstantOp");
   auto Ops = Inst->getOpWords();
   auto OC = static_cast<Op>(Ops[0]);
-  assert(isSpecConstantOpAllowedOp(OC) &&
-         "Op code not allowed for OpSpecConstantOp");
+  assert(isSpecConstantOpAllowedOp(OC) && "Op code not allowed for OpSpecConstantOp");
   Ops.erase(Ops.begin(), Ops.begin() + 1);
-  return SPIRVInstTemplateBase::create(OC, Inst->getType(),
-      Inst->getId(), Ops, nullptr, Inst->getModule());
+  return SPIRVInstTemplateBase::create(OC, Inst->getType(), Inst->getId(), Ops, nullptr, Inst->getModule());
 }
 
 uint64_t getConstantValue(SPIRVValue *BV, uint32_t I = 0) {
   assert(BV->getType()->isTypeScalar() || BV->getType()->isTypeVector());
   uint64_t ConstVal = 0;
-  if (BV->getOpCode() == OpConstant ||
-      BV->getOpCode() == OpSpecConstant)
+  if (BV->getOpCode() == OpConstant || BV->getOpCode() == OpSpecConstant)
     ConstVal = static_cast<SPIRVConstant *>(BV)->getZExtIntValue();
-  else if (BV->getOpCode() == OpConstantTrue ||
-           BV->getOpCode() == OpSpecConstantTrue)
+  else if (BV->getOpCode() == OpConstantTrue || BV->getOpCode() == OpSpecConstantTrue)
     ConstVal = static_cast<SPIRVConstantTrue *>(BV)->getBoolValue();
-  else if (BV->getOpCode() == OpConstantFalse ||
-           BV->getOpCode() == OpSpecConstantFalse)
+  else if (BV->getOpCode() == OpConstantFalse || BV->getOpCode() == OpSpecConstantFalse)
     ConstVal = static_cast<SPIRVConstantTrue *>(BV)->getBoolValue();
-  else if (BV->getOpCode() == OpConstantComposite ||
-           BV->getOpCode() == OpSpecConstantComposite)
-    ConstVal = getConstantValue(
-      static_cast<SPIRVConstantComposite *>(BV)->getElements()[I]);
-  else if (BV->getOpCode() == OpConstantNull ||
-           BV->getOpCode() == OpUndef)
+  else if (BV->getOpCode() == OpConstantComposite || BV->getOpCode() == OpSpecConstantComposite)
+    ConstVal = getConstantValue(static_cast<SPIRVConstantComposite *>(BV)->getElements()[I]);
+  else if (BV->getOpCode() == OpConstantNull || BV->getOpCode() == OpUndef)
     ConstVal = 0;
   else if (BV->getOpCode() == OpSpecConstantOp)
     ConstVal = getConstantValue(static_cast<SPIRVSpecConstantOp *>(BV)->getMappedConstant());
@@ -246,15 +225,12 @@ uint64_t getConstantValue(SPIRVValue *BV, uint32_t I = 0) {
   return ConstVal;
 }
 
-SPIRVValue * constantCompositeExtract(SPIRVValue *Composite,
-                                      SPIRVType *ObjectTy,
-                                      std::vector<uint32_t> &Indices) {
+SPIRVValue *constantCompositeExtract(SPIRVValue *Composite, SPIRVType *ObjectTy, std::vector<uint32_t> &Indices) {
   SPIRVModule *BM = Composite->getModule();
   assert(Composite->getType()->isTypeComposite());
 
   for (auto I : Indices) {
-    if (Composite->getOpCode() == OpUndef ||
-        Composite->getOpCode() == OpConstantNull)
+    if (Composite->getOpCode() == OpUndef || Composite->getOpCode() == OpConstantNull)
       return BM->addNullConstant(ObjectTy);
     assert(Composite->getOpCode() == OpConstantComposite || Composite->getOpCode() == OpSpecConstantComposite);
     Composite = static_cast<SPIRVConstantComposite *>(Composite)->getElements()[I];
@@ -263,8 +239,7 @@ SPIRVValue * constantCompositeExtract(SPIRVValue *Composite,
   return Composite;
 }
 
-SPIRVValue * constantCompositeInsert(SPIRVValue *Composite, SPIRVValue *Object,
-                                     std::vector<uint32_t> &Indices) {
+SPIRVValue *constantCompositeInsert(SPIRVValue *Composite, SPIRVValue *Object, std::vector<uint32_t> &Indices) {
   SPIRVModule *BM = Composite->getModule();
   SPIRVType *CompositeTy = Composite->getType();
   assert(CompositeTy->isTypeComposite());
@@ -278,14 +253,11 @@ SPIRVValue * constantCompositeInsert(SPIRVValue *Composite, SPIRVValue *Object,
     auto ElementTy = CompositeTy->getCompositeElementType(I);
     SPIRVValue *Element = nullptr;
 
-    if (Composite->getOpCode() == OpUndef ||
-        Composite->getOpCode() == OpConstantNull)
+    if (Composite->getOpCode() == OpUndef || Composite->getOpCode() == OpConstantNull)
       Element = BM->addNullConstant(ElementTy);
     else {
-      assert(Composite->getOpCode() == OpConstantComposite ||
-             Composite->getOpCode() == OpSpecConstantComposite);
-      Element =
-        static_cast<SPIRVConstantComposite *>(Composite)->getElements()[I];
+      assert(Composite->getOpCode() == OpConstantComposite || Composite->getOpCode() == OpSpecConstantComposite);
+      Element = static_cast<SPIRVConstantComposite *>(Composite)->getElements()[I];
     }
 
     if (I == Index) {
@@ -302,14 +274,11 @@ SPIRVValue * constantCompositeInsert(SPIRVValue *Composite, SPIRVValue *Object,
   return BM->addCompositeConstant(CompositeTy, Elements);
 }
 
-SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
-                                           uint32_t RoundingTypeMask) {
-  assert(Inst->getOpCode() == OpSpecConstantOp &&
-      "Not OpSpecConstantOp");
+SPIRVValue *createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst, uint32_t RoundingTypeMask) {
+  assert(Inst->getOpCode() == OpSpecConstantOp && "Not OpSpecConstantOp");
   auto Ops = Inst->getOpWords();
   auto OC = static_cast<Op>(Ops[0]);
-  assert(isSpecConstantOpAllowedOp(OC) &&
-      "Op code not allowed for OpSpecConstantOp");
+  assert(isSpecConstantOpAllowedOp(OC) && "Op code not allowed for OpSpecConstantOp");
   Ops.erase(Ops.begin(), Ops.begin() + 1);
 
   auto BM = Inst->getModule();
@@ -335,18 +304,18 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
   }
 
   union ConstValue {
-    bool      BoolVal;
-    int8_t    Int8Val;
-    uint8_t   Uint8Val;
-    int16_t   Int16Val;
-    uint16_t  Uint16Val;
-    int32_t   IntVal;
-    uint32_t  UintVal;
-    int64_t   Int64Val;
-    uint64_t  Uint64Val;
-    uint16_t  Float16Val;
-    float     FloatVal;
-    double    DoubleVal;
+    bool BoolVal;
+    int8_t Int8Val;
+    uint8_t Uint8Val;
+    int16_t Int16Val;
+    uint16_t Uint16Val;
+    int32_t IntVal;
+    uint32_t UintVal;
+    int64_t Int64Val;
+    uint64_t Uint64Val;
+    uint16_t Float16Val;
+    float FloatVal;
+    double DoubleVal;
   };
 
   auto DestTy = Inst->getType();
@@ -371,8 +340,7 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
       ConstValue DestVal = {};
       uint32_t CompSelect = Ops[2 + I];
       if (CompSelect != SPIRVID_INVALID) {
-        const uint32_t Vec1CompCount =
-          Vec1->getType()->getVectorComponentCount();
+        const uint32_t Vec1CompCount = Vec1->getType()->getVectorComponentCount();
         if (CompSelect < Vec1CompCount)
           // Select vector1 as source
           DestVal.Uint64Val = getConstantValue(Vec1, CompSelect);

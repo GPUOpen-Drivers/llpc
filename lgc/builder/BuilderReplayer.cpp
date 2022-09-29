@@ -191,7 +191,7 @@ void BuilderReplayer::replayCall(unsigned opcode, CallInst *call) {
     m_builder->setShaderStage(stage);
   }
 
-  // Set the insert point on the Builder. Also sets debug location to that of pCall.
+  // Set the insert point on the Builder. Also sets debug location to that of call.
   m_builder->SetInsertPoint(call);
 
   // Process the builder call.
@@ -213,7 +213,7 @@ void BuilderReplayer::replayCall(unsigned opcode, CallInst *call) {
 // =====================================================================================================================
 // Process one recorder builder call.
 // Returns the replacement value, or nullptr in the case that we do not want the caller to replace uses of
-// pCall with the new value.
+// call with the new value.
 //
 // @param opcode : The builder call opcode
 // @param call : The builder call to process
@@ -381,7 +381,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
 
   case BuilderRecorder::Opcode::Derivative: {
-    return m_builder->CreateDerivative(args[0],                                     // pInputValue
+    return m_builder->CreateDerivative(args[0],                                     // inputValue
                                        cast<ConstantInt>(args[1])->getZExtValue(),  // isY
                                        cast<ConstantInt>(args[2])->getZExtValue()); // isFine
   }
@@ -439,9 +439,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(call->getType(), m_builder->getInt8Ty()));
     return m_builder->CreateLoadBufferDesc(cast<ConstantInt>(args[0])->getZExtValue(), // descSet
                                            cast<ConstantInt>(args[1])->getZExtValue(), // binding
-                                           args[2],                                    // pDescIndex
+                                           args[2],                                    // descIndex
                                            cast<ConstantInt>(args[3])->getZExtValue(), // flags
-                                           m_builder->getInt8Ty());                    // pPointeeTy
+                                           m_builder->getInt8Ty());                    // pointeeTy
   }
 
   case BuilderRecorder::Opcode::GetDescStride:

@@ -1026,10 +1026,10 @@ Value *BuilderRecorder::CreateIsNaN(Value *x, const Twine &instName) {
 
 // =====================================================================================================================
 // Create an "insert bitfield" operation for a (vector of) integer type.
-// Returns a value where the "pCount" bits starting at bit "pOffset" come from the least significant "pCount"
-// bits in "pInsert", and remaining bits come from "pBase". The result is undefined if "pCount"+"pOffset" is
-// more than the number of bits (per vector element) in "pBase" and "pInsert".
-// If "pBase" and "pInsert" are vectors, "pOffset" and "pCount" can be either scalar or vector of the same
+// Returns a value where the "count" bits starting at bit "offset" come from the least significant "count"
+// bits in "insert", and remaining bits come from "base". The result is undefined if "count"+"offset" is
+// more than the number of bits (per vector element) in "base" and "insert".
+// If "base" and "insert" are vectors, "offset" and "count" can be either scalar or vector of the same
 // width.
 //
 // @param base : Base value
@@ -1044,9 +1044,9 @@ Value *BuilderRecorder::CreateInsertBitField(Value *base, Value *insert, Value *
 
 // =====================================================================================================================
 // Create an "extract bitfield " operation for a (vector of) i32.
-// Returns a value where the least significant "pCount" bits come from the "pCount" bits starting at bit
-// "pOffset" in "pBase", and that is zero- or sign-extended (depending on "isSigned") to the rest of the value.
-// If "pBase" and "pInsert" are vectors, "pOffset" and "pCount" can be either scalar or vector of the same
+// Returns a value where the least significant "count" bits come from the "count" bits starting at bit
+// "offset" in "base", and that is zero- or sign-extended (depending on "isSigned") to the rest of the value.
+// If "base" and "insert" are vectors, "offset" and "count" can be either scalar or vector of the same
 // width.
 //
 // @param base : Base value
@@ -1497,14 +1497,14 @@ Value *BuilderRecorder::CreateReadGenericOutput(Type *resultTy, unsigned locatio
 // The value to write must be a scalar or vector type with no more than four elements.
 // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
 // 64-bit components. Two locations together can contain up to a 4-vector of 64-bit components.
-// A non-constant pLocationOffset is currently only supported for TCS.
+// A non-constant locationOffset is currently only supported for TCS.
 //
 // @param valueToWrite : Value to write
 // @param location : Base location (row) of output
 // @param locationOffset : Location offset; must be within locationCount if variable
 // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
 // 64-bit elements.)
-// @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
+// @param locationCount : Count of locations taken by the output. Ignored if locationOffset is const
 // @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
 // @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
 //                                 output: primitive index; else nullptr
@@ -1566,7 +1566,7 @@ llvm::Value *BuilderRecorder::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo
 // =====================================================================================================================
 // Create a read of (part of) a built-in input value.
 // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
-// or the element type if pIndex is not nullptr.
+// or the element type if index is not nullptr.
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param inputInfo : Extra input info (shader-defined array length)
@@ -1595,7 +1595,7 @@ Value *BuilderRecorder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo in
 // =====================================================================================================================
 // Create a read of (part of) a built-in output value.
 // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
-// or the element type if pIndex is not nullptr.
+// or the element type if index is not nullptr.
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param outputInfo : Extra output info (shader-defined array length)

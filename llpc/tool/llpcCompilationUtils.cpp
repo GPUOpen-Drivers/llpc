@@ -66,6 +66,8 @@
 #include "llpcSpirvLowerUtil.h"
 #include "llpcThreading.h"
 #include "llpcUtil.h"
+#include "spvgen.h"
+#include "vfx.h"
 #include "vkgcElfReader.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/AsmParser/Parser.h"
@@ -74,9 +76,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include "spvgen.h"
-#include "vfx.h"
 #include <cassert>
 #include <mutex>
 
@@ -309,7 +308,7 @@ Expected<BinaryData> assembleSpirv(const std::string &inFilename) {
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool
 // @returns : Always returns Result::Success
 Result decodePipelineBinary(const BinaryData *pipelineBin, CompileInfo *compileInfo) {
-  // Ignore failure from ElfReader. It fails if pPipelineBin is not ELF, as happens with
+  // Ignore failure from ElfReader. It fails if pipelineBin is not ELF, as happens with
   // -filetype=asm.
   ElfReader<Elf64> reader(compileInfo->gfxIp);
   size_t readSize = 0;
@@ -426,13 +425,8 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
     assert(pipelineState->pipelineType == VfxPipelineTypeGraphics);
     shaderLibrary = &pipelineState->gfxPipelineInfo.shaderLibrary;
   }
-  if (shaderLibrary->codeSize > 0 && spvDisassembleSpirv) {
-    unsigned textSize = shaderLibrary->codeSize * 10 + 1024;
-    char *spvText = new char[textSize];
-    spvDisassembleSpirv(shaderLibrary->codeSize, shaderLibrary->pCode, textSize, spvText);
-    LLPC_OUTS(spvText << "\n");
-    delete[] spvText;
-  }
+  if (shaderLibrary->codeSize > 0 && EnableOuts())
+    disassembleSpirv(shaderLibrary->codeSize, shaderLibrary->pCode, "Ray tracing library");
 #endif
 
   const bool isGraphics = compileInfo.pipelineType == VfxPipelineTypeGraphics;

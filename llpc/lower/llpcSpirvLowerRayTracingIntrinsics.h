@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "SPIRVInternal.h"
 #include "llpcSpirvLower.h"
 #include "llvm/IR/PassManager.h"
 

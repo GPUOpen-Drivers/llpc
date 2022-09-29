@@ -49,10 +49,8 @@ class SPIRVDecoder;
 
 class SPIRVFunctionParameter : public SPIRVValue {
 public:
-  SPIRVFunctionParameter(SPIRVType *TheType, SPIRVId TheId,
-                         SPIRVFunction *TheParent, unsigned TheArgNo);
-  SPIRVFunctionParameter()
-      : SPIRVValue(OpFunctionParameter), ParentFunc(nullptr), ArgNo(0) {}
+  SPIRVFunctionParameter(SPIRVType *TheType, SPIRVId TheId, SPIRVFunction *TheParent, unsigned TheArgNo);
+  SPIRVFunctionParameter() : SPIRVValue(OpFunctionParameter), ParentFunc(nullptr), ArgNo(0) {}
   unsigned getArgNo() const { return ArgNo; }
   void setParent(SPIRVFunction *Parent) { ParentFunc = Parent; }
   SPIRVCapVec getRequiredCapability() const override {
@@ -76,25 +74,21 @@ class SPIRVFunction : public SPIRVValue, public SPIRVComponentExecutionModes {
 public:
   // Complete constructor. It does not construct basic blocks.
   SPIRVFunction(SPIRVModule *M, SPIRVTypeFunction *FunctionType, SPIRVId TheId)
-      : SPIRVValue(M, 5, OpFunction, FunctionType->getReturnType(), TheId),
-        FuncType(FunctionType), FCtrlMask(FunctionControlMaskNone) {
+      : SPIRVValue(M, 5, OpFunction, FunctionType->getReturnType(), TheId), FuncType(FunctionType),
+        FCtrlMask(FunctionControlMaskNone) {
     addAllArguments(TheId + 1);
     validate();
   }
 
   // Incomplete constructor
-  SPIRVFunction()
-      : SPIRVValue(OpFunction), FuncType(NULL),
-        FCtrlMask(FunctionControlMaskNone) {}
+  SPIRVFunction() : SPIRVValue(OpFunction), FuncType(NULL), FCtrlMask(FunctionControlMaskNone) {}
 
   SPIRVDecoder getDecoder(std::istream &IS) override;
   SPIRVTypeFunction *getFunctionType() const { return FuncType; }
   SPIRVWord getFuncCtlMask() const { return FCtrlMask; }
   size_t getNumBasicBlock() const { return BBVec.size(); }
   SPIRVBasicBlock *getBasicBlock(size_t I) const { return BBVec[I]; }
-  size_t getNumArguments() const {
-    return getFunctionType()->getNumParameters();
-  }
+  size_t getNumArguments() const { return getFunctionType()->getNumParameters(); }
   SPIRVId getArgumentId(size_t I) const { return Parameters[I]->getId(); }
   SPIRVFunctionParameter *getArgument(size_t I) const { return Parameters[I]; }
   void foreachArgument(std::function<void(SPIRVFunctionParameter *)> Func) {
@@ -104,9 +98,7 @@ public:
 
   void setFunctionControlMask(SPIRVWord Mask) { FCtrlMask = Mask; }
 
-  void takeExecutionModes(SPIRVForward *Forward) {
-    ExecModes = std::move(Forward->ExecModes);
-  }
+  void takeExecutionModes(SPIRVForward *Forward) { ExecModes = std::move(Forward->ExecModes); }
 
   // Assume BB contains valid Id.
   SPIRVBasicBlock *addBasicBlock(SPIRVBasicBlock *BB) {
@@ -124,8 +116,8 @@ public:
 
 private:
   SPIRVFunctionParameter *addArgument(unsigned TheArgNo, SPIRVId TheId) {
-    SPIRVFunctionParameter *Arg = new SPIRVFunctionParameter(
-        getFunctionType()->getParameterType(TheArgNo), TheId, this, TheArgNo);
+    SPIRVFunctionParameter *Arg =
+        new SPIRVFunctionParameter(getFunctionType()->getParameterType(TheArgNo), TheId, this, TheArgNo);
     Module->add(Arg);
     Parameters.push_back(Arg);
     return Arg;
