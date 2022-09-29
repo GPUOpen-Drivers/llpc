@@ -68,7 +68,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     // We have the user data layout. Find the node.
-    ResourceNodeType abstractType = DescriptorAnyBuffer;
+    ResourceNodeType abstractType = ResourceNodeType::Unknown;
     if (flags & BufferFlagConst)
       abstractType = ResourceNodeType::DescriptorConstBuffer;
     else if (flags & BufferFlagNonConst)
