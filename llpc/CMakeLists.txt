@@ -143,18 +143,6 @@ include(../cmake/CompilerFlags.cmake)
 set_compiler_options(llpc ${LLPC_ENABLE_WERROR})
 
 ### Defines/Includes/Sources ###########################################################################################
-if(ICD_BUILD_LLPC)
-    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm)
-    include(LLVMConfig)
-    message(STATUS "LLVM executables: " ${LLVM_TOOLS_BINARY_DIR})
-    message(STATUS "LLVM libraries: " ${LLVM_BUILD_LIBRARY_DIR})
-    execute_process(
-        COMMAND ${LLVM_TOOLS_BINARY_DIR}/llvm-config --libs amdgpu analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils
-        OUTPUT_VARIABLE LLVM_LINK_FLAGS
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    message(STATUS "LLVM link options:" ${LLVM_LINK_FLAGS})
-endif()
 target_compile_definitions(llpc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 target_compile_definitions(llpc PRIVATE _SPIRV_LLVM_API)
 target_compile_definitions(llpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
