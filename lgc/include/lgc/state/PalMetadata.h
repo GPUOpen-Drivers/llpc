@@ -253,8 +253,8 @@ private:
   llvm::msgpack::DocNode m_colorExports;      // MsgPack map node for amdpal.pipelines[0].colorExports
   // Mapping from ShaderStage to SPI user data register start, allowing for merged shaders and NGG.
   unsigned m_userDataRegMapping[ShaderStageCountInternal] = {};
-  llvm::msgpack::DocNode *m_userDataLimit;  // Maximum so far number of user data dwords used
-  llvm::msgpack::DocNode *m_spillThreshold; // Minimum so far dword offset used in user data spill table
+  llvm::msgpack::DocNode *m_userDataLimit;    // Maximum so far number of user data dwords used
+  llvm::msgpack::DocNode *m_spillThreshold;   // Minimum so far dword offset used in user data spill table
   llvm::SmallString<0> m_fsInputMappingsBlob; // Buffer for returning FS input mappings blob to LGC client
 };
 

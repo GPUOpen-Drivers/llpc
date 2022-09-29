@@ -1729,19 +1729,19 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       alignmentType = vectorType;
   }
 
-    LoadInst *const load = getBuilder()->CreateAlignedLoad(
-        loadType, loadPointer, m_m->getDataLayout().getABITypeAlign(alignmentType), isVolatile);
+  LoadInst *const load = getBuilder()->CreateAlignedLoad(
+      loadType, loadPointer, m_m->getDataLayout().getABITypeAlign(alignmentType), isVolatile);
 
-    if (isCoherent)
-      load->setAtomic(AtomicOrdering::Unordered);
+  if (isCoherent)
+    load->setAtomic(AtomicOrdering::Unordered);
 
-    if (isNonTemporal)
-      transNonTemporalMetadata(load);
+  if (isNonTemporal)
+    transNonTemporalMetadata(load);
 
-    // If the load was a bool or vector of bool, need to truncate the result.
-    if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool()))
-      return getBuilder()->CreateTruncOrBitCast(load, transType(spvType));
-    return load;
+  // If the load was a bool or vector of bool, need to truncate the result.
+  if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool()))
+    return getBuilder()->CreateTruncOrBitCast(load, transType(spvType));
+  return load;
 }
 
 // =====================================================================================================================
@@ -2055,6 +2055,7 @@ Value *SPIRVToLLVM::transAtomicRMW(SPIRVValue *const spvValue, const AtomicRMWIn
 
     return getBuilder()->CreateBitCast(atomicRes, getBuilder()->getDoubleTy());
   }
+
   return getBuilder()->CreateAtomicRMW(binOp, atomicPointer, atomicValue, MaybeAlign(), ordering, scope);
 }
 
@@ -2468,6 +2469,19 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     case OpTypeSampler:
     case OpTypeSampledImage:
       return transLoadImage(spvLoad->getSrc());
+#if VKI_RAY_TRACING
+    case OpTypeAccelerationStructureKHR: {
+      auto pipelineContext = (static_cast<Llpc::Context *>(m_context))->getPipelineContext();
+      if (pipelineContext->getRayTracingState()->forceInvalidAccelStruct) {
+        // Always return invalid AS address (0x0, 0x0) if the option is set.
+        auto loadType = cast_or_null<FixedVectorType>(getPointeeType(spvLoad->getSrc()));
+        assert(loadType && (loadType->getNumElements() == 2));
+        (void(loadType)); // unused
+        return ConstantVector::get({m_builder->getInt32(0), m_builder->getInt32(0)});
+      }
+      break;
+    }
+#endif
     default:
       break;
     }
@@ -2814,9 +2828,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
   SPIRVValue *const spvStruct = spvArrayLength->getStruct();
   assert(spvStruct->getType()->isTypePointer());
 
-  Value *const pStruct =
+  Value *const structure =
       transValue(spvStruct, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-  assert(pStruct->getType()->isPointerTy());
+  assert(structure->getType()->isPointerTy());
 
   const unsigned memberIndex = spvArrayLength->getMemberIndex();
   const unsigned remappedMemberIndex =
@@ -2824,11 +2838,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
 
   StructType *const structType = cast<StructType>(getPointeeType(spvStruct));
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(pStruct->getType(), structType));
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(structure->getType(), structType));
   const StructLayout *const structLayout = m_m->getDataLayout().getStructLayout(structType);
   const unsigned offset = static_cast<unsigned>(structLayout->getElementOffset(remappedMemberIndex));
   Value *const offsetVal = getBuilder()->getInt32(offset);
-  Value *const arrayBytes = getBuilder()->CreateGetBufferDescLength(pStruct, offsetVal);
+  Value *const arrayBytes = getBuilder()->CreateGetBufferDescLength(structure, offsetVal);
 
   Type *const memberType = structType->getStructElementType(remappedMemberIndex)->getArrayElementType();
   const unsigned stride = static_cast<unsigned>(m_m->getDataLayout().getTypeSizeInBits(memberType) / 8);

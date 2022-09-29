@@ -149,7 +149,8 @@ private:
   llvm::Value *processBuiltIn(unsigned builtInId, llvm::Instruction *insertPos);
   void createShaderSelection(llvm::Function *func, llvm::BasicBlock *entryBlock, llvm::BasicBlock *endBlock,
                              llvm::Value *shaderId, unsigned intersectId, ShaderStage stage,
-                             const llvm::SmallVector<llvm::Value *, 8> &args, llvm::Value *result);
+                             const llvm::SmallVector<llvm::Value *, 8> &args, llvm::Value *result,
+                             llvm::Type *inResultTy);
   llvm::Value *createShaderTableVariable(ShaderTable tableKind);
   llvm::Value *getShaderIdentifier(ShaderStage stage, llvm::Value *shaderRecordIndex);
   void createDbgInfo(llvm::Module &module, llvm::Function *func);

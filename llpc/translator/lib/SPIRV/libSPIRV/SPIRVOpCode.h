@@ -60,13 +60,11 @@ inline bool isAtomicOpCode(Op OpCode) {
          (OpCode == OpAtomicFMaxEXT) || (OpCode == OpAtomicFAddEXT);
 }
 inline bool isBinaryOpCode(Op OpCode) {
-  return ((unsigned)OpCode >= OpIAdd && (unsigned)OpCode <= OpFMod) ||
-         OpCode == OpDot;
+  return ((unsigned)OpCode >= OpIAdd && (unsigned)OpCode <= OpFMod) || OpCode == OpDot;
 }
 
 inline bool isShiftOpCode(Op OpCode) {
-  return (unsigned)OpCode >= OpShiftRightLogical &&
-         (unsigned)OpCode <= OpShiftLeftLogical;
+  return (unsigned)OpCode >= OpShiftRightLogical && (unsigned)OpCode <= OpShiftLeftLogical;
 }
 
 inline bool isLogicalOpCode(Op OpCode) {
@@ -78,14 +76,11 @@ inline bool isBitwiseOpCode(Op OpCode) {
 }
 
 inline bool isBinaryShiftLogicalBitwiseOpCode(Op OpCode) {
-  return (((unsigned)OpCode >= OpShiftRightLogical &&
-           (unsigned)OpCode <= OpBitwiseAnd) ||
-          isBinaryOpCode(OpCode));
+  return (((unsigned)OpCode >= OpShiftRightLogical && (unsigned)OpCode <= OpBitwiseAnd) || isBinaryOpCode(OpCode));
 }
 
 inline bool isCmpOpCode(Op OpCode) {
-  return ((unsigned)OpCode >= OpIEqual &&
-          (unsigned)OpCode <= OpFUnordGreaterThanEqual) ||
+  return ((unsigned)OpCode >= OpIEqual && (unsigned)OpCode <= OpFUnordGreaterThanEqual) ||
          (OpCode >= OpLogicalEqual && OpCode <= OpLogicalNotEqual)
 #if SPV_VERSION >= 0x10400
          || (OpCode == OpPtrEqual || OpCode == OpPtrNotEqual);
@@ -105,8 +100,7 @@ inline bool isCvtFromUnsignedOpCode(Op OpCode) {
 }
 
 inline bool isGenericNegateOpCode(Op OpCode) {
-  return (unsigned)OpCode == OpSNegate || (unsigned)OpCode == OpFNegate ||
-         (unsigned)OpCode == OpNot;
+  return (unsigned)OpCode == OpSNegate || (unsigned)OpCode == OpFNegate || (unsigned)OpCode == OpNot;
 }
 
 inline bool isAccessChainOpCode(Op OpCode) {
@@ -131,7 +125,7 @@ inline bool isGroupOpCode(Op OpCode) {
 inline bool isGroupNonUniformOpCode(Op OpCode) {
   unsigned OC = OpCode;
   return (OpGroupNonUniformIAdd <= OC && OC <= OpGroupNonUniformLogicalXor) ||
-    (OpGroupIAddNonUniformAMD <= OC && OC <= OpGroupSMaxNonUniformAMD);
+         (OpGroupIAddNonUniformAMD <= OC && OC <= OpGroupSMaxNonUniformAMD);
 }
 
 inline bool isGroupNonUniformAMDCode(Op OpCode) {
@@ -141,8 +135,7 @@ inline bool isGroupNonUniformAMDCode(Op OpCode) {
 
 inline bool isTypeOpCode(Op OpCode) {
   unsigned OC = OpCode;
-  return (OpTypeVoid <= OC && OC <= OpTypeStruct) ||
-         OC == OpTypePointer || OC == OpTypeFunction;
+  return (OpTypeVoid <= OC && OC <= OpTypeStruct) || OC == OpTypePointer || OC == OpTypeFunction;
 }
 
 inline bool isConstantOpCode(Op OpCode) {
@@ -155,8 +148,7 @@ inline bool isModuleScopeAllowedOpCode(Op OpCode) {
 }
 
 inline bool isMatrixOpCode(Op OpCode) {
-  return (unsigned)OpCode >= OpMatrixTimesScalar &&
-      (unsigned)OpCode <= OpOuterProduct;
+  return (unsigned)OpCode >= OpMatrixTimesScalar && (unsigned)OpCode <= OpOuterProduct;
 }
 
 inline bool isIntelSubgroupOpCode(Op OpCode) {

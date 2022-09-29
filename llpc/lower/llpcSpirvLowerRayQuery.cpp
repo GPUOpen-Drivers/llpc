@@ -120,17 +120,15 @@ enum : unsigned {
   Candidate,                       // 18, Candidate system info
   CommittedStatus,                 // 19, Committed status
   Committed,                       // 20, Committed system info
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
-  CurrNodePtr2, // 21, currNodePtr2
-#endif
-  NumRayBoxTest,         // 22, numRayBoxTest;
-  NumRayTriangleTest,    // 23, numRayTriangleTest;
-  NumIterations,         // 24, numIterations;
-  MaxStackDepth,         // 25, maxStackDepth;
-  Clocks,                // 26, clocks;
-  NumCandidateHits,      // 27, numCandidateHits;
-  UnstanceIntersections, // 28, instanceIntersections;
-  RayQueryObj            // 29, Internal ray query object handle
+  CurrNodePtr2,                    // 21, currNodePtr2
+  NumRayBoxTest,                   // 22, numRayBoxTest;
+  NumRayTriangleTest,              // 23, numRayTriangleTest;
+  NumIterations,                   // 24, numIterations;
+  MaxStackDepth,                   // 25, maxStackDepth;
+  Clocks,                          // 26, clocks;
+  NumCandidateHits,                // 27, numCandidateHits;
+  UnstanceIntersections,           // 28, instanceIntersections;
+  RayQueryObj                      // 29, Internal ray query object handle
 };
 } // namespace RayQueryParams
 
@@ -259,38 +257,36 @@ Type *getRayQueryInternalTy(lgc::Builder *builder) {
   // };
 
   Type *rayQueryInternalTys[] = {
-    builder->getInt32Ty(), // 0, bvhLo,
-    builder->getInt32Ty(), // 1, bvhHi,
-    builder->getInt32Ty(), // 2, topLevelBvhLo,
-    builder->getInt32Ty(), // 3, topLevelBvhHi,
-    builder->getInt32Ty(), // 4, stackPtr,
-    builder->getInt32Ty(), // 5, stackPtrTop,
-    builder->getInt32Ty(), // 6, stackNumEntries,
-    builder->getInt32Ty(), // 7, instNodePtr,
-    builder->getInt32Ty(), // 8, currNodePtr,
-    builder->getInt32Ty(), // 9, instanceHitContributionAndFlags,
-    builder->getInt32Ty(), // 10, prevNodePtr,
-    builder->getInt32Ty(), // 11, isGoingDown,
-    builder->getInt32Ty(), // 12, lastInstanceNode,
-    rayDescTy,             // 13, rayDesc,
-    builder->getFloatTy(), // 14, rayTMin,
-    builder->getInt32Ty(), // 15, rayFlags,
-    builder->getInt32Ty(), // 16, instanceInclusionMask,
-    builder->getInt32Ty(), // 17, candidateType;
-    raySystemDataTy,       // 18, candidate;
-    builder->getInt32Ty(), // 19, committedStatus;
-    raySystemDataTy,       // 20, committed;
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
-    builder->getInt32Ty(), // 21, currNodePtr2
-#endif
-    builder->getInt32Ty(), // 22, numRayBoxTest;
-    builder->getInt32Ty(), // 23, numRayTriangleTest;
-    builder->getInt32Ty(), // 24, numIterations;
-    builder->getInt32Ty(), // 25, maxStackDepth;
-    builder->getInt32Ty(), // 26, clocks;
-    builder->getInt32Ty(), // 27, numCandidateHits;
-    builder->getInt32Ty(), // 28, instanceIntersections;
-    builder->getInt32Ty(), // 29, rayqueryObj
+      builder->getInt32Ty(), // 0, bvhLo,
+      builder->getInt32Ty(), // 1, bvhHi,
+      builder->getInt32Ty(), // 2, topLevelBvhLo,
+      builder->getInt32Ty(), // 3, topLevelBvhHi,
+      builder->getInt32Ty(), // 4, stackPtr,
+      builder->getInt32Ty(), // 5, stackPtrTop,
+      builder->getInt32Ty(), // 6, stackNumEntries,
+      builder->getInt32Ty(), // 7, instNodePtr,
+      builder->getInt32Ty(), // 8, currNodePtr,
+      builder->getInt32Ty(), // 9, instanceHitContributionAndFlags,
+      builder->getInt32Ty(), // 10, prevNodePtr,
+      builder->getInt32Ty(), // 11, isGoingDown,
+      builder->getInt32Ty(), // 12, lastInstanceNode,
+      rayDescTy,             // 13, rayDesc,
+      builder->getFloatTy(), // 14, rayTMin,
+      builder->getInt32Ty(), // 15, rayFlags,
+      builder->getInt32Ty(), // 16, instanceInclusionMask,
+      builder->getInt32Ty(), // 17, candidateType;
+      raySystemDataTy,       // 18, candidate;
+      builder->getInt32Ty(), // 19, committedStatus;
+      raySystemDataTy,       // 20, committed;
+      builder->getInt32Ty(), // 21, currNodePtr2
+      builder->getInt32Ty(), // 22, numRayBoxTest;
+      builder->getInt32Ty(), // 23, numRayTriangleTest;
+      builder->getInt32Ty(), // 24, numIterations;
+      builder->getInt32Ty(), // 25, maxStackDepth;
+      builder->getInt32Ty(), // 26, clocks;
+      builder->getInt32Ty(), // 27, numCandidateHits;
+      builder->getInt32Ty(), // 28, instanceIntersections;
+      builder->getInt32Ty(), // 29, rayqueryObj
   };
   return StructType::get(context, rayQueryInternalTys, false);
 }
@@ -391,14 +387,14 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
     func->setLinkage(GlobalValue::ExternalLinkage);
   } else if (mangledName.startswith(RtName::LoadDwordAtAddrx4)) {
     auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
-    createLoadDwordAtAddr(func, int32x4Ty->getPointerTo(SPIRAS_Global));
+    createLoadDwordAtAddr(func, int32x4Ty);
     func->setName(RtName::LoadDwordAtAddrx4);
   } else if (mangledName.startswith(RtName::LoadDwordAtAddrx2)) {
     auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-    createLoadDwordAtAddr(func, int32x2Ty->getPointerTo(SPIRAS_Global));
+    createLoadDwordAtAddr(func, int32x2Ty);
     func->setName(RtName::LoadDwordAtAddrx2);
   } else if (mangledName.startswith(RtName::LoadDwordAtAddr)) {
-    createLoadDwordAtAddr(func, Type::getInt32PtrTy(*m_context, SPIRAS_Global));
+    createLoadDwordAtAddr(func, m_builder->getInt32Ty());
     func->setName(RtName::LoadDwordAtAddr);
   } else if (mangledName.startswith(RtName::IntersectBvh)) {
     createIntersectBvh(func);
@@ -693,9 +689,9 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   rayQuery = m_builder->CreateLoad(rayQueryTy, rayQuery);
-  auto pCandidateTy = m_builder->CreateExtractValue(rayQuery, RayQueryParams::CandidateType);
-  auto pCommittedStatus = m_builder->CreateExtractValue(rayQuery, RayQueryParams::CommittedStatus);
-  Value *result = m_builder->CreateSelect(committed, pCommittedStatus, pCandidateTy);
+  auto candidateTy = m_builder->CreateExtractValue(rayQuery, RayQueryParams::CandidateType);
+  auto committedStatus = m_builder->CreateExtractValue(rayQuery, RayQueryParams::CommittedStatus);
+  Value *result = m_builder->CreateSelect(committed, committedStatus, candidateTy);
 
   // if (!committed && (q.candidateType))
   //     result = Aabb
@@ -1239,13 +1235,17 @@ void SpirvLowerRayQuery::createReadLdsStack(Function *func) {
     m_builder->CreateCondBr(isLds, ldsArrayBlock, tempArrayBlock);
     m_builder->SetInsertPoint(tempArrayBlock);
     auto stackArrayIdx = getStackArrayIndex(stackOffset);
-    Type *stackArrayEltTy = m_stackArray->getType()->getScalarType()->getPointerElementType();
+    Type *stackArrayEltTy = m_stackArray->getValueType();
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_stackArray->getType()->getScalarType(), stackArrayEltTy));
     auto stackArrayAddr = m_builder->CreateGEP(stackArrayEltTy, m_stackArray, {m_builder->getInt32(0), stackArrayIdx});
     Value *stackArrayData = m_builder->CreateLoad(m_builder->getInt32Ty(), stackArrayAddr);
     m_builder->CreateRet(stackArrayData);
     m_builder->SetInsertPoint(ldsArrayBlock);
   }
-  Type *ldsStackEltTy = m_ldsStack->getType()->getScalarType()->getPointerElementType();
+  Type *ldsStackEltTy = m_ldsStack->getValueType();
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_ldsStack->getType()->getScalarType(), ldsStackEltTy));
   Value *stackAddr = m_builder->CreateGEP(ldsStackEltTy, m_ldsStack, {m_builder->getInt32(0), stackOffset});
   Value *stackData = m_builder->CreateLoad(m_builder->getInt32Ty(), stackAddr);
   m_builder->CreateRet(stackData);
@@ -1276,14 +1276,18 @@ void SpirvLowerRayQuery::createWriteLdsStack(Function *func) {
     m_builder->CreateCondBr(isLds, ldsArrayBlock, tempArrayBlock);
     m_builder->SetInsertPoint(tempArrayBlock);
     auto stackArrayIdx = getStackArrayIndex(stackOffset);
-    Type *stackArrayEltTy = m_stackArray->getType()->getScalarType()->getPointerElementType();
+    Type *stackArrayEltTy = m_stackArray->getValueType();
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_stackArray->getType()->getScalarType(), stackArrayEltTy));
     auto stackArrayAddr = m_builder->CreateGEP(stackArrayEltTy, m_stackArray, {m_builder->getInt32(0), stackArrayIdx});
     m_builder->CreateStore(stackData, stackArrayAddr);
     m_builder->CreateRet(m_builder->getInt32(0));
     m_builder->SetInsertPoint(ldsArrayBlock);
   }
 
-  Type *ldsStackEltTy = m_ldsStack->getType()->getScalarType()->getPointerElementType();
+  Type *ldsStackEltTy = m_ldsStack->getValueType();
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_ldsStack->getType()->getScalarType(), ldsStackEltTy));
   Value *stackAddr = m_builder->CreateGEP(ldsStackEltTy, m_ldsStack, {m_builder->getInt32(0), stackOffset});
   m_builder->CreateStore(stackData, stackAddr);
   m_builder->CreateRet(m_builder->getInt32(0));
@@ -1381,7 +1385,7 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
   instanceNodeOffsetVal = m_builder->CreateInsertElement(instanceNodeOffsetVal, zero, 1);
   Value *instanceNodeOffsetAddr = m_builder->CreateAdd(accelStruct, instanceNodeOffsetVal);
 
-  // Bitcast pInstanceNodeOffsetAddr to i64 integer
+  // Bitcast instanceNodeOffsetAddr to i64 integer
   instanceNodeOffsetAddr = m_builder->CreateBitCast(instanceNodeOffsetAddr, m_builder->getInt64Ty());
   Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
   auto instNodeOffsetAddrAsPtr = m_builder->CreateIntToPtr(instanceNodeOffsetAddr, gpuAddrAsPtrTy);
@@ -1467,18 +1471,25 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   // }
 
   auto argIt = func->arg_begin();
-  Value *address = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getInt32Ty(), 2)));
+  Value *address = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), argIt);
   argIt++;
 
   // Address int64 type
   address = m_builder->CreateBitCast(address, m_builder->getInt64Ty());
 
   // Ray extent float Type
-  Value *extent = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getFloatTy()));
+  Value *extent = m_builder->CreateLoad(m_builder->getFloatTy(), argIt);
   argIt++;
 
   // Ray origin vec3 Type
-  Value *origin = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
+  Value *origin = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
   argIt++;
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
@@ -1491,7 +1502,9 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   origin = m_builder->CreateShuffleVector(origin, constVec, ArrayRef<int>{0, 1, 2, 4});
 #endif
   // Ray dir vec3 type
-  Value *dir = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
+  Value *dir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
   argIt++;
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
@@ -1499,7 +1512,9 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   dir = m_builder->CreateShuffleVector(dir, constVec, ArrayRef<int>{0, 1, 2, 3});
 #endif
   // Ray inv_dir vec3 type
-  Value *invDir = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
+  Value *invDir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
   // vec4 inDir = vec4(invDir, 0.0)
   invDir = m_builder->CreateShuffleVector(invDir, constVec, ArrayRef<int>{0, 1, 2, 3});
@@ -1507,11 +1522,15 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   argIt++;
 
   // uint flag
-  Value *flags = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getInt32Ty()));
+  Value *flags = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
   argIt++;
 
   // uint expansion
-  Value *expansion = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getInt32Ty()));
+  Value *expansion = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
   const unsigned boxExpansionShift = 23;
   expansion = m_builder->CreateShl(expansion, boxExpansionShift);
 

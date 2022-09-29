@@ -190,7 +190,9 @@ Value *SpirvLowerRayTracingBuiltIn::processBuiltIn(GlobalVariable *global, Instr
   MDNode *metaNode = global->getMetadata(gSPIRVMD::InOut);
   auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
   unsigned startOperand = 0;
-  Type *globalTy = global->getType()->getPointerElementType();
+  Type *globalTy = global->getValueType();
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(global->getType(), globalTy));
   if (globalTy->isArrayTy()) {
     assert(meta->getNumOperands() == 4);
     startOperand += 2;
@@ -280,8 +282,7 @@ Value *SpirvLowerRayTracingBuiltIn::processBuiltIn(GlobalVariable *global, Instr
     // Note: allocate proxy for the BuiltInObjectToWorldKHR, BuiltInWorldToObjectKHR, BuiltInObjectRayOriginKHR,
     // BuiltInObjectRayDirectionKHR, BuiltInInstanceCustomIndexKHR, BuiltInInstanceId these builtIn are processed in the
     // previous ray-tracing pass
-    auto proxy = new AllocaInst(global->getType()->getPointerElementType(), dataLayout.getAllocaAddrSpace(),
-                                LlpcName::InputProxyPrefix, insertPos);
+    auto proxy = new AllocaInst(globalTy, dataLayout.getAllocaAddrSpace(), LlpcName::InputProxyPrefix, insertPos);
     input = proxy;
   } else if (!input->getType()->isPointerTy()) {
     Instruction *inst = dyn_cast<Instruction>(input);

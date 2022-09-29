@@ -45,7 +45,6 @@
 #include "SPIRVInstruction.h"
 #include "SPIRVStream.h"
 #include "SPIRVType.h"
-
 #include <algorithm>
 #include <map>
 #include <set>
@@ -57,16 +56,16 @@ using namespace SPIRV;
 
 namespace SPIRV {
 
-template <typename T> SPIRVEntry *create() { return new T(); }
+template <typename T> SPIRVEntry *create() {
+  return new T();
+}
 
 SPIRVEntry *SPIRVEntry::create(Op OpCode) {
   typedef SPIRVEntry *(*SPIRVFactoryTy)();
   struct TableEntry {
     Op Opn;
     SPIRVFactoryTy Factory;
-    operator std::pair<const Op, SPIRVFactoryTy>() {
-      return std::make_pair(Opn, Factory);
-    }
+    operator std::pair<const Op, SPIRVFactoryTy>() { return std::make_pair(Opn, Factory); }
   };
 
   static TableEntry Table[] = {
@@ -76,8 +75,7 @@ SPIRVEntry *SPIRVEntry::create(Op OpCode) {
   };
 
   typedef std::map<Op, SPIRVFactoryTy> OpToFactoryMapTy;
-  static const OpToFactoryMapTy OpToFactoryMap(std::begin(Table),
-                                               std::end(Table));
+  static const OpToFactoryMapTy OpToFactoryMap(std::begin(Table), std::end(Table));
 
   OpToFactoryMapTy::const_iterator Loc = OpToFactoryMap.find(OpCode);
   if (Loc != OpToFactoryMap.end())
@@ -91,14 +89,17 @@ std::unique_ptr<SPIRV::SPIRVEntry> SPIRVEntry::createUnique(Op OC) {
   return std::unique_ptr<SPIRVEntry>(create(OC));
 }
 
-std::unique_ptr<SPIRV::SPIRVExtInst>
-SPIRVEntry::createUnique(SPIRVExtInstSetKind Set, unsigned ExtOp) {
+std::unique_ptr<SPIRV::SPIRVExtInst> SPIRVEntry::createUnique(SPIRVExtInstSetKind Set, unsigned ExtOp) {
   return std::unique_ptr<SPIRVExtInst>(new SPIRVExtInst(Set, ExtOp));
 }
 
-SPIRVErrorLog &SPIRVEntry::getErrorLog() const { return Module->getErrorLog(); }
+SPIRVErrorLog &SPIRVEntry::getErrorLog() const {
+  return Module->getErrorLog();
+}
 
-bool SPIRVEntry::exist(SPIRVId TheId) const { return Module->exist(TheId); }
+bool SPIRVEntry::exist(SPIRVId TheId) const {
+  return Module->exist(TheId);
+}
 
 SPIRVEntry *SPIRVEntry::getOrCreate(SPIRVId TheId) const {
   SPIRVEntry *Entry = nullptr;
@@ -155,10 +156,11 @@ bool SPIRVEntry::isEndOfBlock() const {
 // The word count and op code has already been read before calling this
 // function for creating the SPIRVEntry. Therefore the input stream only
 // contains the remaining part of the words for the SPIRVEntry.
-void SPIRVEntry::decode(std::istream &I) { assert(0 && "Not implemented"); }
+void SPIRVEntry::decode(std::istream &I) {
+  assert(0 && "Not implemented");
+}
 
-std::vector<SPIRVValue *>
-SPIRVEntry::getValues(const std::vector<SPIRVId> &IdVec) const {
+std::vector<SPIRVValue *> SPIRVEntry::getValues(const std::vector<SPIRVId> &IdVec) const {
   std::vector<SPIRVValue *> ValueVec;
   ValueVec.reserve(IdVec.size());
   for (auto I : IdVec)
@@ -166,8 +168,7 @@ SPIRVEntry::getValues(const std::vector<SPIRVId> &IdVec) const {
   return ValueVec;
 }
 
-std::vector<SPIRVType *>
-SPIRVEntry::getValueTypes(const std::vector<SPIRVId> &IdVec) const {
+std::vector<SPIRVType *> SPIRVEntry::getValueTypes(const std::vector<SPIRVId> &IdVec) const {
   std::vector<SPIRVType *> TypeVec;
   TypeVec.reserve(IdVec.size());
   for (auto I : IdVec)
@@ -188,8 +189,7 @@ SPIRVEntry *SPIRVEntry::getEntry(SPIRVId TheId) const {
 }
 
 void SPIRVEntry::validateFunctionControlMask(SPIRVWord TheFCtlMask) const {
-  SPIRVCK(isValidFunctionControlMask(TheFCtlMask), InvalidFunctionControlMask,
-          "");
+  SPIRVCK(isValidFunctionControlMask(TheFCtlMask), InvalidFunctionControlMask, "");
 }
 
 void SPIRVEntry::validateValues(const std::vector<SPIRVId> &Ids) const {
@@ -198,8 +198,7 @@ void SPIRVEntry::validateValues(const std::vector<SPIRVId> &Ids) const {
 }
 
 void SPIRVEntry::validateBuiltin(SPIRVWord TheSet, SPIRVWord Index) const {
-  assert(TheSet != SPIRVWORD_MAX && Index != SPIRVWORD_MAX &&
-         "Invalid builtin");
+  assert(TheSet != SPIRVWORD_MAX && Index != SPIRVWORD_MAX && "Invalid builtin");
 }
 
 void SPIRVEntry::addDecorate(const SPIRVDecorate *Dec) {
@@ -220,7 +219,9 @@ void SPIRVEntry::addDecorate(Decoration Kind, SPIRVWord Literal) {
   addDecorate(new SPIRVDecorate(Kind, this, Literal));
 }
 
-void SPIRVEntry::eraseDecorate(Decoration Dec) { Decorates.erase(Dec); }
+void SPIRVEntry::eraseDecorate(Decoration Dec) {
+  Decorates.erase(Dec);
+}
 
 void SPIRVEntry::takeDecorates(SPIRVEntry *E) {
   assert(E);
@@ -231,7 +232,7 @@ void SPIRVEntry::setLine(const std::shared_ptr<const SPIRVLine> &L) {
   Line = L;
 }
 
-void SPIRVEntry::addMemberDecorate(const SPIRVMemberDecorate *Dec){
+void SPIRVEntry::addMemberDecorate(const SPIRVMemberDecorate *Dec) {
   assert(Dec);
   assert(canHaveMemberDecorates());
   MemberDecorates[Dec->getPair()] = Dec;
@@ -242,8 +243,7 @@ void SPIRVEntry::addMemberDecorate(SPIRVWord MemberNumber, Decoration Kind) {
   addMemberDecorate(new SPIRVMemberDecorate(Kind, MemberNumber, this));
 }
 
-void SPIRVEntry::addMemberDecorate(SPIRVWord MemberNumber, Decoration Kind,
-                                   SPIRVWord Literal) {
+void SPIRVEntry::addMemberDecorate(SPIRVWord MemberNumber, Decoration Kind, SPIRVWord Literal) {
   addMemberDecorate(new SPIRVMemberDecorate(Kind, MemberNumber, this, Literal));
 }
 
@@ -267,8 +267,7 @@ void SPIRVEntry::takeAnnotations(SPIRVForward *E) {
 
 // Check if an entry has Kind of decoration and get the literal of the
 // first decoration of such kind at Index.
-bool SPIRVEntry::hasDecorate(Decoration Kind, size_t Index,
-                             SPIRVWord *Result) const {
+bool SPIRVEntry::hasDecorate(Decoration Kind, size_t Index, SPIRVWord *Result) const {
   DecorateMapType::const_iterator Loc = Decorates.find(Kind);
   if (Loc == Decorates.end())
     return false;
@@ -287,10 +286,8 @@ const char *SPIRVEntry::getDecorateString(Decoration kind) const {
 
 // Check if an entry has Kind of member decoration at MemberIndex and get the
 // literal of the first decoration of such kind at Index.
-bool SPIRVEntry::hasMemberDecorate(SPIRVWord MemberIndex, Decoration Kind,
-                                   size_t Index, SPIRVWord *Result) const {
-  MemberDecorateMapType::const_iterator Loc =
-    MemberDecorates.find(std::make_pair(MemberIndex, Kind));
+bool SPIRVEntry::hasMemberDecorate(SPIRVWord MemberIndex, Decoration Kind, size_t Index, SPIRVWord *Result) const {
+  MemberDecorateMapType::const_iterator Loc = MemberDecorates.find(std::make_pair(MemberIndex, Kind));
   if (Loc == MemberDecorates.end())
     return false;
   if (Result)
@@ -299,8 +296,7 @@ bool SPIRVEntry::hasMemberDecorate(SPIRVWord MemberIndex, Decoration Kind,
 }
 
 // Get literals of all decorations of Kind at Index.
-std::set<SPIRVWord> SPIRVEntry::getDecorate(Decoration Kind,
-                                            size_t Index) const {
+std::set<SPIRVWord> SPIRVEntry::getDecorate(Decoration Kind, size_t Index) const {
   auto Range = Decorates.equal_range(Kind);
   std::set<SPIRVWord> Value;
   for (auto I = Range.first, E = Range.second; I != E; ++I) {
@@ -326,12 +322,10 @@ bool SPIRVEntry::isExtInst(const SPIRVExtInstSetKind InstSet, const SPIRVWord Ex
 
 SPIRVLinkageTypeKind SPIRVEntry::getLinkageType() const {
   assert(hasLinkageType());
-  DecorateMapType::const_iterator Loc =
-      Decorates.find(DecorationLinkageAttributes);
+  DecorateMapType::const_iterator Loc = Decorates.find(DecorationLinkageAttributes);
   if (Loc == Decorates.end())
     return LinkageTypeInternal;
-  return static_cast<const SPIRVDecorateLinkageAttr *>(Loc->second)
-      ->getLinkageType();
+  return static_cast<const SPIRVDecorateLinkageAttr *>(Loc->second)->getLinkageType();
 }
 
 void SPIRVEntry::setLinkageType(SPIRVLinkageTypeKind LT) {
@@ -352,12 +346,11 @@ std::istream &operator>>(std::istream &I, SPIRVEntry &E) {
   return I;
 }
 
-SPIRVEntryPoint::SPIRVEntryPoint(SPIRVModule *TheModule,
-                                 SPIRVExecutionModelKind TheExecModel,
-                                 SPIRVId TheId, const std::string &TheName)
-    : SPIRVAnnotation(TheModule->get<SPIRVFunction>(TheId),
-                      getSizeInWords(TheName) + 3),
-      ExecModel(TheExecModel), Name(TheName) {}
+SPIRVEntryPoint::SPIRVEntryPoint(SPIRVModule *TheModule, SPIRVExecutionModelKind TheExecModel, SPIRVId TheId,
+                                 const std::string &TheName)
+    : SPIRVAnnotation(TheModule->get<SPIRVFunction>(TheId), getSizeInWords(TheName) + 3), ExecModel(TheExecModel),
+      Name(TheName) {
+}
 
 void SPIRVEntryPoint::decode(std::istream &I) {
   uint32_t Start = I.tellg();
@@ -416,15 +409,15 @@ void SPIRVExecutionModeId::decode(std::istream &I) {
 SPIRVForward *SPIRVAnnotationGeneric::getOrCreateTarget() const {
   SPIRVEntry *Entry = nullptr;
   bool Found = Module->exist(Target, &Entry);
-  assert((!Found || Entry->getOpCode() == OpForward) &&
-         "Annotations only allowed on forward");
+  assert((!Found || Entry->getOpCode() == OpForward) && "Annotations only allowed on forward");
   if (!Found)
     Entry = Module->addForward(Target, nullptr);
   return static_cast<SPIRVForward *>(Entry);
 }
 
 SPIRVName::SPIRVName(const SPIRVEntry *TheTarget, const std::string &TheStr)
-    : SPIRVAnnotation(TheTarget, getSizeInWords(TheStr) + 2), Str(TheStr) {}
+    : SPIRVAnnotation(TheTarget, getSizeInWords(TheStr) + 2), Str(TheStr) {
+}
 
 void SPIRVName::decode(std::istream &I) {
   getDecoder(I) >> Target >> Str;
@@ -460,10 +453,8 @@ void SPIRVMemberName::validate() const {
   assert(MemberNumber < get<SPIRVTypeStruct>(Target)->getStructMemberCount());
 }
 
-SPIRVExtInstImport::SPIRVExtInstImport(SPIRVModule *TheModule, SPIRVId TheId,
-                                       const std::string &TheStr)
-    : SPIRVEntry(TheModule, 2 + getSizeInWords(TheStr), OC, TheId),
-      Str(TheStr) {
+SPIRVExtInstImport::SPIRVExtInstImport(SPIRVModule *TheModule, SPIRVId TheId, const std::string &TheStr)
+    : SPIRVEntry(TheModule, 2 + getSizeInWords(TheStr), OC, TheId), Str(TheStr) {
   validate();
 }
 
@@ -488,8 +479,7 @@ void SPIRVMemoryModel::decode(std::istream &I) {
 void SPIRVMemoryModel::validate() const {
   auto AM = Module->getAddressingModel();
   auto MM = Module->getMemoryModel();
-  SPIRVCK(isValid(AM), InvalidAddressingModel,
-          "Actual is " + std::to_string(AM));
+  SPIRVCK(isValid(AM), InvalidAddressingModel, "Actual is " + std::to_string(AM));
   SPIRVCK(isValid(MM), InvalidMemoryModel, "Actual is " + std::to_string(MM));
 }
 
@@ -506,17 +496,17 @@ void SPIRVSource::decode(std::istream &I) {
     getDecoder(I) >> Source;
 }
 
-SPIRVSourceContinued::SPIRVSourceContinued(SPIRVModule *M,
-    const std::string &SS)
-  :SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), Str(SS){}
+SPIRVSourceContinued::SPIRVSourceContinued(SPIRVModule *M, const std::string &SS)
+    : SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), Str(SS) {
+}
 
 void SPIRVSourceContinued::decode(std::istream &I) {
   getDecoder(I) >> Str;
 }
 
-SPIRVSourceExtension::SPIRVSourceExtension(SPIRVModule *M,
-                                           const std::string &SS)
-    : SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), S(SS) {}
+SPIRVSourceExtension::SPIRVSourceExtension(SPIRVModule *M, const std::string &SS)
+    : SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), S(SS) {
+}
 
 void SPIRVSourceExtension::decode(std::istream &I) {
   getDecoder(I) >> S;
@@ -524,15 +514,15 @@ void SPIRVSourceExtension::decode(std::istream &I) {
 }
 
 SPIRVExtension::SPIRVExtension(SPIRVModule *M, const std::string &SS)
-    : SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), S(SS) {}
+    : SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), S(SS) {
+}
 
 void SPIRVExtension::decode(std::istream &I) {
   getDecoder(I) >> S;
   Module->getExtension().insert(S);
 }
 
-SPIRVCapability::SPIRVCapability(SPIRVModule *M, SPIRVCapabilityKind K)
-    : SPIRVEntryNoId(M, 2), Kind(K) {
+SPIRVCapability::SPIRVCapability(SPIRVModule *M, SPIRVCapabilityKind K) : SPIRVEntryNoId(M, 2), Kind(K) {
   updateModuleVersion();
 }
 
@@ -541,9 +531,9 @@ void SPIRVCapability::decode(std::istream &I) {
   Module->addCapability(Kind);
 }
 
-SPIRVModuleProcessed::SPIRVModuleProcessed(SPIRVModule *M,
-    const std::string &SS)
-  :SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), Str(SS){}
+SPIRVModuleProcessed::SPIRVModuleProcessed(SPIRVModule *M, const std::string &SS)
+    : SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), Str(SS) {
+}
 
 void SPIRVModuleProcessed::decode(std::istream &I) {
   getDecoder(I) >> Str;

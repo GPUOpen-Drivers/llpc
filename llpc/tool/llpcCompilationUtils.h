@@ -93,8 +93,8 @@ struct CompileInfo {
   RayTracingPipelineBuildOut rayTracingPipelineOut; // Output of building ray tracing pipeline
   unsigned bvhNodeStride;
 #endif
-  void *pipelineBuf;                                                         // Allocation buffer of building pipeline
-  void *pipelineInfoFile;                                                    // VFX-style file containing pipeline info
+  void *pipelineBuf;              // Allocation buffer of building pipeline
+  void *pipelineInfoFile;         // VFX-style file containing pipeline info
   bool unlinked;                  // Whether to generate unlinked shader/part-pipeline ELF
   bool relocatableShaderElf;      // Whether to enable relocatable shader compilation
   bool scalarBlockLayout;         // Whether to enable scalar block layout

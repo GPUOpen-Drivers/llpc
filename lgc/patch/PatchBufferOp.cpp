@@ -1072,7 +1072,8 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     while (stride != 1) {
       // We only care about dword alignment (4 bytes) so clamp the max check here to that.
       const unsigned minStride = std::min(stride, 4u);
-      if (destAlignment.valueOrOne() >= minStride && srcAlignment.valueOrOne() >= minStride && (constantLength % stride) == 0)
+      if (destAlignment.valueOrOne() >= minStride && srcAlignment.valueOrOne() >= minStride &&
+          (constantLength % stride) == 0)
         break;
 
       stride /= 2;
@@ -1563,7 +1564,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
     }
   }
 
-  // The index in pStoreValue which we use next
+  // The index in storeValue which we use next
   unsigned storeIndex = 0;
 
   unsigned remainingBytes = bytesToHandle;

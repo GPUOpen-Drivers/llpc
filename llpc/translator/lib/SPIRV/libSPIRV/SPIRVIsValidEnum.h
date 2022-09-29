@@ -286,7 +286,7 @@ inline bool isValid(spv::FPRoundingMode V) {
 
 inline bool isValid(spv::LinkageType V) {
   uint32_t Ty = V;
-  switch(Ty) {
+  switch (Ty) {
   case LinkageTypeExport:
   case LinkageTypeImport:
   case LinkageTypeInternal:
@@ -457,7 +457,7 @@ inline bool isValid(spv::GroupOperation V) {
 
 inline bool isValid(spv::Capability V) {
   uint32_t Cap = V;
-  switch(Cap) {
+  switch (Cap) {
   case CapabilityMatrix:
   case CapabilityShader:
   case CapabilityGeometry:
@@ -598,7 +598,7 @@ inline bool isValid(spv::Capability V) {
 
 inline bool isValid(spv::Op V) {
   uint32_t Id = V;
-  switch(Id) {
+  switch (Id) {
   case OpNop:
   case OpUndef:
   case OpSourceContinued:

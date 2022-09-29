@@ -83,6 +83,7 @@
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ------------------------------------------------------------------------------------------------------|
 //  |     54.6 | Add reverseThreadGroup to PipelineOptions                                                             |
+//  |     54.5 | Add forceLateZ to PipelineShaderOptions                                                               |
 #if VKI_RAY_TRACING
 //  |     54.4 | Add isReplay to RayTracingPipelineBuildInfo for ray tracing capture replay feature                    |
 #endif
@@ -373,9 +374,9 @@ struct StaticDescriptorValue {
   unsigned reserv0;
   unsigned reserv1;
   unsigned reserv2;
-  unsigned arraySize;           ///< Element count for arrayed binding
-  const unsigned *pValue;       ///< Static SRDs
-  unsigned visibility;          ///< Mask composed of ShaderStageBit values
+  unsigned arraySize;     ///< Element count for arrayed binding
+  const unsigned *pValue; ///< Static SRDs
+  unsigned visibility;    ///< Mask composed of ShaderStageBit values
 };
 
 /// Represents the resource mapping data provided during pipeline creation
@@ -472,9 +473,10 @@ struct PipelineOptions {
   ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the
                                                          ///  features of VK_EXT_robustness2.
 #if VKI_RAY_TRACING
-  bool enableRayQuery; ///< If set, ray query is enabled
+  bool enableRayQuery;  ///< If set, ray query is enabled
+  float rtMaxRayLength; ///< Overrides the rayTMax value
 #endif
-  bool reserved1f;                                       /// Reserved for future functionality
+  bool reserved1f;            /// Reserved for future functionality
   bool enableInterpModePatch; ///< If set, per-sample interpolation for nonperspective and smooth input is enabled
   bool pageMigrationEnabled;  ///< If set, page migration is enabled
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
@@ -532,9 +534,9 @@ struct ShaderModuleUsage {
   bool isInternalRtShader; ///< Whether the shaderModule is a ray tracing internal shader
   bool hasTraceRay;        ///< Whether the shaderModule has OpTraceRayKHR;
 #endif
-  bool useIsNan;               ///< Whether IsNan is used
-  bool useInvariant;           ///< Whether invariant variable is used
-  bool usePointSize;           ///< Whether gl_PointSize is used in output
+  bool useIsNan;     ///< Whether IsNan is used
+  bool useInvariant; ///< Whether invariant variable is used
+  bool usePointSize; ///< Whether gl_PointSize is used in output
 };
 
 /// Represents common part of shader module data
@@ -645,10 +647,10 @@ inline unsigned compact32(ShaderHash hash) {
 
 /// Represents per shader stage options.
 struct PipelineShaderOptions {
-  ShaderHash clientHash; ///< Client-supplied unique shader hash. A value of zero indicates that LLPC should
-                         ///  calculate its own hash. This hash is used for dumping, shader replacement, SPP, etc.
-                         ///  If the client provides this hash, they are responsible for ensuring it is as stable
-                         ///  as possible.
+  ShaderHash clientHash;      ///< Client-supplied unique shader hash. A value of zero indicates that LLPC should
+                              ///  calculate its own hash. This hash is used for dumping, shader replacement, SPP, etc.
+                              ///  If the client provides this hash, they are responsible for ensuring it is as stable
+                              ///  as possible.
   bool trapPresent;           ///< Indicates a trap handler will be present when this pipeline is executed,
                               ///  and any trap conditions encountered in this shader should call the trap
                               ///  handler. This could include an arithmetic exception, an explicit trap
@@ -747,6 +749,15 @@ struct PipelineShaderOptions {
 
   /// Override value for ThreadGroupSizeZ
   unsigned overrideShaderThreadGroupSizeZ;
+
+  /// When there is a valid "feedback loop" in renderpass, lateZ needs to be enabled
+  /// In Vulkan a "feedback loop" is described as a subpass where there is at least
+  /// one input attachment that is also a color or depth/stencil attachment
+  /// Feedback loops are allowed and their behavior is well defined under certain conditions.
+  /// When there is a feedback loop it is possible for the shaders to read
+  /// the contents of the color and depth/stencil attachments
+  /// from the shader during draw. Because of that possibility you have to use late-z
+  bool forceLateZ;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -834,7 +845,7 @@ struct PipelineShaderInfo {
   const VkSpecializationInfo *pSpecializationInfo; ///< Specialization constant info
   const char *pEntryTarget;                        ///< Name of the target entry point (for multi-entry)
   ShaderStage entryStage;                          ///< Shader stage of the target entry point
-  PipelineShaderOptions options; ///< Per shader stage tuning/debugging options
+  PipelineShaderOptions options;                   ///< Per shader stage tuning/debugging options
 };
 
 /// Represents color target info
@@ -928,6 +939,8 @@ union RayTracingSystemValueUsage {
 
 /// Represents ray-tracing shader export configuration
 struct RayTracingShaderExportConfig {
+  float maxRayLength; // Raytracing rayDesc.tMax override
+
   unsigned indirectCallingConvention; ///< Indirect calling convention
   struct {
     unsigned raygen;         ///< Ray generation shader saved register
@@ -947,12 +960,10 @@ struct RayTracingShaderExportConfig {
   bool emitRaytracingShaderDataToken; // Emitting Raytracing ShaderData SQTT Token
 };
 
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
 /// Represents GPURT function table
 struct GpurtFuncTable {
   char pFunc[RT_ENTRY_FUNC_COUNT][256]; ///< Function names
 };
-#endif
 
 /// Enumerates the method of mapping from ray tracing launch ID to native thread ID
 enum DispatchDimSwizzleMode : unsigned {
@@ -994,9 +1005,7 @@ struct RtState {
   bool enableOptimalLdsStackSizeForIndirect;     ///< Enable optimal LDS stack size for indirect shaders
   bool enableOptimalLdsStackSizeForUnified;      ///< Enable optimal LDS stack size for unified shaders
 
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
   GpurtFuncTable gpurtFuncTable; ///< GPURT function table
-#endif
 };
 #endif
 
@@ -1013,7 +1022,7 @@ struct GraphicsPipelineBuildInfo {
   PipelineShaderInfo tcs; ///< Tessellation control shader
   PipelineShaderInfo tes; ///< Tessellation evaluation shader
   PipelineShaderInfo gs;  ///< Geometry shader
-  PipelineShaderInfo fs; ///< Fragment shader
+  PipelineShaderInfo fs;  ///< Fragment shader
 
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
 
@@ -1054,7 +1063,7 @@ struct GraphicsPipelineBuildInfo {
     VkProvokingVertexModeEXT provokingVertexMode; ///< Specifies which vertex of a primitive is the _provoking
                                                   ///  vertex_, this impacts which vertex's "flat" VS outputs
                                                   ///  are passed to the PS.
-  } rsState; ///< Rasterizer State
+  } rsState;                                      ///< Rasterizer State
   struct {
     bool alphaToCoverageEnable; ///< Enable alpha to coverage
     bool dualSourceBlendEnable; ///< Blend state bound at draw time will use a dual source blend mode
@@ -1062,12 +1071,12 @@ struct GraphicsPipelineBuildInfo {
     ColorTarget target[MaxColorTargets]; ///< Per-MRT color target info
   } cbState;                             ///< Color target state
 
-  NggState nggState;        ///< NGG state used for tuning and debugging
-  PipelineOptions options;  ///< Per pipeline tuning/debugging options
-  bool unlinked;            ///< True to build an "unlinked" half-pipeline ELF
-  bool dynamicVertexStride; ///< Dynamic Vertex input Stride is enabled.
+  NggState nggState;          ///< NGG state used for tuning and debugging
+  PipelineOptions options;    ///< Per pipeline tuning/debugging options
+  bool unlinked;              ///< True to build an "unlinked" half-pipeline ELF
+  bool dynamicVertexStride;   ///< Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader; ///< Use uber fetch shader
-  bool enableEarlyCompile;  ///< Whether enable early compile
+  bool enableEarlyCompile;    ///< Whether enable early compile
 #if VKI_RAY_TRACING
   BinaryData shaderLibrary; ///< SPIR-V library binary data
   RtState rtState;          ///< Ray tracing state
@@ -1083,11 +1092,11 @@ struct ComputePipelineBuildInfo {
 #if LLPC_ENABLE_SHADER_CACHE
   IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
 #endif
-  unsigned deviceIndex;  ///< Device index for device group
-  PipelineShaderInfo cs; ///< Compute shader
+  unsigned deviceIndex;                ///< Device index for device group
+  PipelineShaderInfo cs;               ///< Compute shader
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
-  PipelineOptions options; ///< Per pipeline tuning options
-  bool unlinked;           ///< True to build an "unlinked" half-pipeline ELF
+  PipelineOptions options;             ///< Per pipeline tuning options
+  bool unlinked;                       ///< True to build an "unlinked" half-pipeline ELF
 #if VKI_RAY_TRACING
   BinaryData shaderLibrary; ///< SPIR-V library binary data
   RtState rtState;          ///< Ray tracing state

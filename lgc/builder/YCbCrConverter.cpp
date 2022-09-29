@@ -85,11 +85,11 @@ Value *YCbCrConverter::wrappedSample(YCbCrWrappedSampleInfo &wrapInfo) {
     result = m_builder->CreateShuffleVector(imageOp, imageOp, ArrayRef<int>{0, 2});
   } else if (wrapInfo.planeCount == 3) {
     sampleInfo->imageDesc = wrapInfo.imageDesc2;
-    Instruction *pImageOp1 = cast<Instruction>(createImageSampleInternal(coordsChroma, sampleInfo));
+    Instruction *imageOp1 = cast<Instruction>(createImageSampleInternal(coordsChroma, sampleInfo));
 
     sampleInfo->imageDesc = wrapInfo.imageDesc3;
-    Instruction *pImageOp2 = cast<Instruction>(createImageSampleInternal(coordsChroma, sampleInfo));
-    result = m_builder->CreateShuffleVector(pImageOp2, pImageOp1, ArrayRef<int>{0, 6});
+    Instruction *imageOp2 = cast<Instruction>(createImageSampleInternal(coordsChroma, sampleInfo));
+    result = m_builder->CreateShuffleVector(imageOp2, imageOp1, ArrayRef<int>{0, 6});
   } else {
     llvm_unreachable("Out of ranged plane count!");
   }
@@ -130,15 +130,15 @@ Value *YCbCrConverter::reconstructLinearXChromaSample(XChromaSampleInfo &xChroma
   sampleInfo->imageDesc = xChromaInfo.imageDesc1;
   coordsChromaA.push_back(m_builder->CreateFDiv(subCoordI, xChromaInfo.chromaWidth));
   coordsChromaA.push_back(coordT);
-  Instruction *pImageOpA = cast<Instruction>(createImageSampleInternal(coordsChromaA, sampleInfo));
+  Instruction *imageOpA = cast<Instruction>(createImageSampleInternal(coordsChromaA, sampleInfo));
 
   SmallVector<Value *, 4> coordsChromaB;
   coordsChromaB.push_back(m_builder->CreateFDiv(
       m_builder->CreateFAdd(subCoordI, ConstantFP::get(m_builder->getFloatTy(), 1.0)), xChromaInfo.chromaWidth));
   coordsChromaB.push_back(coordT);
-  Instruction *pImageOpB = cast<Instruction>(createImageSampleInternal(coordsChromaB, sampleInfo));
+  Instruction *imageOpB = cast<Instruction>(createImageSampleInternal(coordsChromaB, sampleInfo));
 
-  Value *result = m_builder->createFMix(pImageOpB, pImageOpA, alpha);
+  Value *result = m_builder->createFMix(imageOpB, imageOpA, alpha);
 
   return m_builder->CreateShuffleVector(result, result, ArrayRef<int>{0, 2});
 }
@@ -385,10 +385,10 @@ void YCbCrConverter::genImgDescChroma() {
       break;
     }
     case 10: {
-      isGbGrFmt = m_builder->CreateICmpEQ(imgDataFmt,
-                                          m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_BG_RG_UNORM__GFX10CORE));
-      isBgRgFmt = m_builder->CreateICmpEQ(imgDataFmt,
-                                          m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_GB_GR_UNORM__GFX10CORE));
+      isGbGrFmt = m_builder->CreateICmpEQ(
+          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_BG_RG_UNORM__GFX10CORE));
+      isBgRgFmt = m_builder->CreateICmpEQ(
+          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_GB_GR_UNORM__GFX10CORE));
 
       proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format,
                                   m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_8_8_8_8_UNORM__GFX10CORE));

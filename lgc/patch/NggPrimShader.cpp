@@ -2399,13 +2399,13 @@ void NggPrimShader::doPrimitiveExportWithGs(Value *vertexId) {
 
   primData = m_builder->CreateSelect(primValid, newPrimData, primData);
 
-  auto pUndef = UndefValue::get(m_builder->getInt32Ty());
+  auto undef = UndefValue::get(m_builder->getInt32Ty());
 
   m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder->getInt32Ty(),
                              {
                                  m_builder->getInt32(EXP_TARGET_PRIM), // tgt
                                  m_builder->getInt32(0x1),             // en
-                                 primData, pUndef, pUndef, pUndef,     // src0 ~ src3
+                                 primData, undef, undef, undef,        // src0 ~ src3
                                  m_builder->getTrue(),                 // done, must be set
                                  m_builder->getFalse(),                // vm
                              });

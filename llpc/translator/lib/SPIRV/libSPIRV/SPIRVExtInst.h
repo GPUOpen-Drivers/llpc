@@ -54,7 +54,7 @@ inline bool isGLSLBuiltinSet(SPIRVExtInstSetKind Set) {
 
 typedef GLSLstd450 GLSLExtOpKind;
 
-template<> inline void SPIRVMap<GLSLExtOpKind, std::string>::init() {
+template <> inline void SPIRVMap<GLSLExtOpKind, std::string>::init() {
   add(GLSLstd450Round, "round");
   add(GLSLstd450RoundEven, "roundEven");
   add(GLSLstd450Trunc, "trunc");
@@ -151,7 +151,7 @@ SPIRV_DEF_NAMEMAP(GLSLExtOpKind, GLSLExtOpMap)
 
 typedef ShaderBallotAMD ShaderBallotAMDExtOpKind;
 
-template<> inline void SPIRVMap<ShaderBallotAMDExtOpKind, std::string>::init() {
+template <> inline void SPIRVMap<ShaderBallotAMDExtOpKind, std::string>::init() {
   add(SwizzleInvocationsAMD, "SwizzleInvocationsAMD");
   add(SwizzleInvocationsMaskedAMD, "SwizzleInvocationsMaskedAMD");
   add(WriteInvocationAMD, "WriteInvocationAMD");
@@ -159,19 +159,16 @@ template<> inline void SPIRVMap<ShaderBallotAMDExtOpKind, std::string>::init() {
 }
 SPIRV_DEF_NAMEMAP(ShaderBallotAMDExtOpKind, ShaderBallotAMDExtOpMap)
 
-typedef ShaderExplicitVertexParameterAMD
-  ShaderExplicitVertexParameterAMDExtOpKind;
+typedef ShaderExplicitVertexParameterAMD ShaderExplicitVertexParameterAMDExtOpKind;
 
-template<> inline void
-SPIRVMap<ShaderExplicitVertexParameterAMDExtOpKind, std::string>::init() {
+template <> inline void SPIRVMap<ShaderExplicitVertexParameterAMDExtOpKind, std::string>::init() {
   add(InterpolateAtVertexAMD, "InterpolateAtVertexAMD");
 }
-SPIRV_DEF_NAMEMAP(ShaderExplicitVertexParameterAMDExtOpKind,
-  ShaderExplicitVertexParameterAMDExtOpMap)
+SPIRV_DEF_NAMEMAP(ShaderExplicitVertexParameterAMDExtOpKind, ShaderExplicitVertexParameterAMDExtOpMap)
 
 typedef GcnShaderAMD GcnShaderAMDExtOpKind;
 
-template<> inline void SPIRVMap<GcnShaderAMDExtOpKind, std::string>::init() {
+template <> inline void SPIRVMap<GcnShaderAMDExtOpKind, std::string>::init() {
   add(CubeFaceIndexAMD, "CubeFaceIndexAMD");
   add(CubeFaceCoordAMD, "CubeFaceCoordAMD");
   add(TimeAMD, "TimeAMD");
@@ -181,8 +178,7 @@ SPIRV_DEF_NAMEMAP(GcnShaderAMDExtOpKind, GcnShaderAMDExtOpMap)
 
 typedef ShaderTrinaryMinMaxAMD ShaderTrinaryMinMaxAMDExtOpKind;
 
-template<> inline void
-SPIRVMap<ShaderTrinaryMinMaxAMDExtOpKind, std::string>::init() {
+template <> inline void SPIRVMap<ShaderTrinaryMinMaxAMDExtOpKind, std::string>::init() {
   add(FMin3AMD, "FMin3AMD");
   add(UMin3AMD, "UMin3AMD");
   add(SMin3AMD, "SMin3AMD");
@@ -194,8 +190,7 @@ SPIRVMap<ShaderTrinaryMinMaxAMDExtOpKind, std::string>::init() {
   add(SMid3AMD, "SMid3AMD");
 }
 
-SPIRV_DEF_NAMEMAP(ShaderTrinaryMinMaxAMDExtOpKind,
-  ShaderTrinaryMinMaxAMDExtOpMap)
+SPIRV_DEF_NAMEMAP(ShaderTrinaryMinMaxAMDExtOpKind, ShaderTrinaryMinMaxAMDExtOpMap)
 
 typedef uint32_t NonSemanticInfoExtOpKind;
 
@@ -237,6 +232,6 @@ template <> inline void SPIRVMap<SPIRVDebugExtOpKind, std::string>::init() {
   add(SPIRVDebug::Operation, "DebugOperation");
 }
 SPIRV_DEF_NAMEMAP(SPIRVDebugExtOpKind, SPIRVDebugExtOpMap)
-}
+} // namespace SPIRV
 
 #endif

@@ -28,12 +28,11 @@
 * @brief VKGC source file: contains implementation of VKGC pipeline dump utility.
 ***********************************************************************************************************************
 */
+#include "vkgcPipelineDumper.h"
+#include "vkgcElfReader.h"
+#include "vkgcUtil.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include "vkgcElfReader.h"
-#include "vkgcPipelineDumper.h"
-#include "vkgcUtil.h"
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
@@ -509,8 +508,7 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorConstBuffer:
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
-  case ResourceMappingNodeType::DescriptorConstTexelBuffer:
-  {
+  case ResourceMappingNodeType::DescriptorConstTexelBuffer: {
     char setHexvalue[64] = {};
     snprintf(setHexvalue, 64, "0x%08" PRIX32, userDataNode->srdRange.set);
     dumpFile << prefix << ".set = " << setHexvalue << "\n";
@@ -586,6 +584,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.debugMode = " << shaderInfo->options.debugMode << "\n";
   dumpFile << "options.enablePerformanceData = " << shaderInfo->options.enablePerformanceData << "\n";
   dumpFile << "options.allowReZ = " << shaderInfo->options.allowReZ << "\n";
+  dumpFile << "options.forceLateZ = " << shaderInfo->options.forceLateZ << "\n";
   dumpFile << "options.vgprLimit = " << shaderInfo->options.vgprLimit << "\n";
   dumpFile << "options.sgprLimit = " << shaderInfo->options.sgprLimit << "\n";
   dumpFile << "options.maxThreadGroupsPerComputeUnit = " << shaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
@@ -622,44 +621,44 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
 //
 // @param resourceMapping : Pipeline resource mapping data
 // @param [out] dumpFile : Dump file
-void PipelineDumper::dumpResourceMappingInfo(const ResourceMappingData* resourceMapping, std::ostream &dumpFile) {
-    dumpFile << "[ResourceMapping]\n";
+void PipelineDumper::dumpResourceMappingInfo(const ResourceMappingData *resourceMapping, std::ostream &dumpFile) {
+  dumpFile << "[ResourceMapping]\n";
 
-    // Output descriptor range value
-    if (resourceMapping->staticDescriptorValueCount > 0) {
-        for (unsigned i = 0; i < resourceMapping->staticDescriptorValueCount; ++i) {
-            auto staticDescriptorValue = &resourceMapping->pStaticDescriptorValues[i];
-            dumpFile << "descriptorRangeValue[" << i << "].visibility = " << staticDescriptorValue->visibility << "\n";
-            dumpFile << "descriptorRangeValue[" << i << "].type = " << staticDescriptorValue->type << "\n";
-            dumpFile << "descriptorRangeValue[" << i << "].set = " << staticDescriptorValue->set << "\n";
-            dumpFile << "descriptorRangeValue[" << i << "].binding = " << staticDescriptorValue->binding << "\n";
-            dumpFile << "descriptorRangeValue[" << i << "].arraySize = " << staticDescriptorValue->arraySize << "\n";
-            for (unsigned j = 0; j < staticDescriptorValue->arraySize; ++j) {
-                dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
-                const unsigned descriptorSizeInDw =
-                    4 + (staticDescriptorValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler
-                             ? (sizeof(SamplerYCbCrConversionMetaData) / 4)
-                             : 0);
+  // Output descriptor range value
+  if (resourceMapping->staticDescriptorValueCount > 0) {
+    for (unsigned i = 0; i < resourceMapping->staticDescriptorValueCount; ++i) {
+      auto staticDescriptorValue = &resourceMapping->pStaticDescriptorValues[i];
+      dumpFile << "descriptorRangeValue[" << i << "].visibility = " << staticDescriptorValue->visibility << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].type = " << staticDescriptorValue->type << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].set = " << staticDescriptorValue->set << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].binding = " << staticDescriptorValue->binding << "\n";
+      dumpFile << "descriptorRangeValue[" << i << "].arraySize = " << staticDescriptorValue->arraySize << "\n";
+      for (unsigned j = 0; j < staticDescriptorValue->arraySize; ++j) {
+        dumpFile << "descriptorRangeValue[" << i << "].uintData = ";
+        const unsigned descriptorSizeInDw =
+            4 + (staticDescriptorValue->type == ResourceMappingNodeType::DescriptorYCbCrSampler
+                     ? (sizeof(SamplerYCbCrConversionMetaData) / 4)
+                     : 0);
 
-                for (unsigned k = 0; k < descriptorSizeInDw - 1; ++k)
-                    dumpFile << staticDescriptorValue->pValue[k] << ", ";
-                dumpFile << staticDescriptorValue->pValue[descriptorSizeInDw - 1] << "\n";
-            }
-        }
-        dumpFile << "\n";
+        for (unsigned k = 0; k < descriptorSizeInDw - 1; ++k)
+          dumpFile << staticDescriptorValue->pValue[k] << ", ";
+        dumpFile << staticDescriptorValue->pValue[descriptorSizeInDw - 1] << "\n";
+      }
     }
+    dumpFile << "\n";
+  }
 
-    // Output resource node mapping
-    if (resourceMapping->userDataNodeCount > 0) {
-        char prefixBuff[64] = {};
-        for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
-            auto userDataNode = &resourceMapping->pUserDataNodes[i];
-            snprintf(prefixBuff, 64, "userDataNode[%u]", i);
-            dumpFile << prefixBuff << ".visibility = " << userDataNode->visibility << "\n";
-            dumpResourceMappingNode(&userDataNode->node, prefixBuff, dumpFile);
-        }
-        dumpFile << "\n";
+  // Output resource node mapping
+  if (resourceMapping->userDataNodeCount > 0) {
+    char prefixBuff[64] = {};
+    for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+      auto userDataNode = &resourceMapping->pUserDataNodes[i];
+      snprintf(prefixBuff, 64, "userDataNode[%u]", i);
+      dumpFile << prefixBuff << ".visibility = " << userDataNode->visibility << "\n";
+      dumpResourceMappingNode(&userDataNode->node, prefixBuff, dumpFile);
     }
+    dumpFile << "\n";
+  }
 }
 
 // =====================================================================================================================
@@ -918,7 +917,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
       dumpFile << "divisor[" << i << "].divisor = " << divisor->divisor << "\n";
     }
   }
-
 }
 
 // =====================================================================================================================
@@ -1081,11 +1079,9 @@ void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, std::ostream 
   dumpStream << "rtState.enableOptimalLdsStackSizeForUnified = " << rtState->enableOptimalLdsStackSizeForUnified
              << "\n";
 
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
   for (unsigned i = 0; i < RT_ENTRY_FUNC_COUNT; ++i) {
     dumpStream << "rtState.gpurtFuncTable.pFunc[" << i << "] = " << rtState->gpurtFuncTable.pFunc[i] << "\n";
   }
-#endif
 }
 
 // =====================================================================================================================
@@ -1153,7 +1149,6 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
   hasher->Update(rtState->enableOptimalLdsStackSizeForIndirect);
   hasher->Update(rtState->enableOptimalLdsStackSizeForUnified);
 
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
   for (unsigned i = 0; i < RT_ENTRY_FUNC_COUNT; ++i) {
     size_t funcNameLen = 0;
     if (rtState->gpurtFuncTable.pFunc[i]) {
@@ -1164,7 +1159,6 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
       hasher->Update(funcNameLen);
     }
   }
-#endif
 }
 
 #endif
@@ -1550,6 +1544,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.debugMode);
       hasher->Update(options.enablePerformanceData);
       hasher->Update(options.allowReZ);
+      hasher->Update(options.forceLateZ);
       hasher->Update(options.sgprLimit);
       hasher->Update(options.vgprLimit);
       hasher->Update(options.maxThreadGroupsPerComputeUnit);
@@ -1659,8 +1654,7 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   case ResourceMappingNodeType::DescriptorConstBuffer:
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
-  case ResourceMappingNodeType::DescriptorConstTexelBuffer:
-  {
+  case ResourceMappingNodeType::DescriptorConstTexelBuffer: {
     hasher->Update(userDataNode->srdRange);
     break;
   }
@@ -1952,8 +1946,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
     } else if (strncmp(section->name, Util::Abi::AmdGpuCommentName, sizeof(Util::Abi::AmdGpuCommentName) - 1) == 0) {
       auto name = section->name;
 
-      if (strncmp(name, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)
-      {
+      if (strncmp(name, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0) {
         // Output text based sections
         out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
 

@@ -101,6 +101,7 @@ public:
   void registerPass(StringRef passName, StringRef className) override;
   void run(Module &module) override;
   void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
+
 private:
   void registerCallbacks();
   TargetMachine *m_targetMachine;
@@ -111,8 +112,8 @@ private:
   CGSCCAnalysisManager m_cgsccAnalysisManager;             // CGSCC analysis manager used when running the passes.
   PassInstrumentationCallbacks m_instrumentationCallbacks; // Instrumentation callbacks ran when running the passes.
   StandardInstrumentations m_instrumentationStandard;      // LLVM's Standard instrumentations
-  unsigned *m_passIndex = nullptr;               // Pass Index.
-  bool initialized = false;                      // Whether the pass manager is initialized or not
+  unsigned *m_passIndex = nullptr;                         // Pass Index.
+  bool initialized = false;                                // Whether the pass manager is initialized or not
 };
 
 } // namespace

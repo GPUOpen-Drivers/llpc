@@ -477,9 +477,9 @@ private:
   void recordGraphicsState(llvm::Module *module);
   void readGraphicsState(llvm::Module *module);
 
-  std::string m_lastError;                              // Error to be reported by getLastError()
-  bool m_noReplayer = false;                            // True if no BuilderReplayer needed
-  bool m_emitLgc = false;                               // Whether -emit-lgc is on
+  std::string m_lastError;   // Error to be reported by getLastError()
+  bool m_noReplayer = false; // True if no BuilderReplayer needed
+  bool m_emitLgc = false;    // Whether -emit-lgc is on
   // Whether generating pipeline or unlinked part-pipeline
   PipelineLink m_pipelineLink = PipelineLink::WholePipeline;
   unsigned m_stageMask = 0;                             // Mask of active shader stages
@@ -562,7 +562,7 @@ public:
   static char ID; // ID of this pass
 
 private:
-  LgcContext *m_builderContext = nullptr;              // LgcContext for allocating PipelineState
+  LgcContext *m_builderContext = nullptr;                  // LgcContext for allocating PipelineState
   PipelineState *m_pipelineState = nullptr;                // Cached pipeline state
   std::unique_ptr<PipelineState> m_allocatedPipelineState; // Pipeline state allocated by this pass
 };

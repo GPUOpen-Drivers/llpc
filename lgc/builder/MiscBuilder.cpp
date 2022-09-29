@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 #include "BuilderImpl.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
-#include "lgc/state/TargetInfo.h"
 
 #define DEBUG_TYPE "lgc-builder-impl-misc"
 
@@ -152,7 +152,7 @@ Instruction *MiscBuilder::CreateSetMeshOutputs(Value *vertexCount, Value *primit
 Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) {
   CallInst *readClock = nullptr;
   if (realtime) {
-      readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
+    readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
   } else
     readClock = CreateIntrinsic(Intrinsic::readcyclecounter, {}, {}, nullptr, instName);
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596

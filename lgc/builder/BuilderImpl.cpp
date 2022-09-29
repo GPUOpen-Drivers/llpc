@@ -160,9 +160,7 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
       input1 = CreateBitCast(input1, getInt32Ty());
       input2 = CreateBitCast(input2, getInt32Ty());
       auto intrinsicDot4 = isSigned ? Intrinsic::amdgcn_sdot4 : Intrinsic::amdgcn_udot4;
-      {
-        scalar = CreateIntrinsic(intrinsicDot4, {}, {input1, input2, accumulator, clamp}, nullptr, instName);
-      }
+      { scalar = CreateIntrinsic(intrinsicDot4, {}, {input1, input2, accumulator, clamp}, nullptr, instName); }
     } else {
       auto intrinsicDot2 = isSigned ? Intrinsic::amdgcn_sdot2 : Intrinsic::amdgcn_udot2;
       if (compCount == 2) {
@@ -497,7 +495,7 @@ static bool instructionsEqual(Instruction *lhs, Instruction *rhs) {
 
 // =====================================================================================================================
 // Create a waterfall loop containing the specified instruction.
-// This does not use the current insert point; new code is inserted before and after pNonUniformInst.
+// This does not use the current insert point; new code is inserted before and after nonUniformInst.
 //
 // @param nonUniformInst : The instruction to put in a waterfall loop
 // @param operandIdxs : The operand index/indices for non-uniform inputs that need to be uniform
@@ -575,7 +573,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
       });
     }
   } else {
-    // Insert new code just before pNonUniformInst.
+    // Insert new code just before nonUniformInst.
     SetInsertPoint(nonUniformInst);
 
     // The first begin contains a null token for the previous token argument
@@ -604,7 +602,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
 
   Instruction *resultValue = nonUniformInst;
 
-  // End the waterfall loop (as long as pNonUniformInst is not a store with no result).
+  // End the waterfall loop (as long as nonUniformInst is not a store with no result).
   if (!nonUniformInst->getType()->isVoidTy()) {
     SetInsertPoint(nonUniformInst->getNextNode());
     SetCurrentDebugLocation(nonUniformInst->getDebugLoc());
@@ -629,7 +627,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
     if (waterfallEndTy != nonUniformInst->getType())
       resultValue = cast<Instruction>(CreateBitCast(resultValue, nonUniformInst->getType(), instName));
 
-    // Replace all uses of pNonUniformInst with the result of this code.
+    // Replace all uses of nonUniformInst with the result of this code.
     *useOfNonUniformInst = UndefValue::get(nonUniformInst->getType());
     nonUniformInst->replaceAllUsesWith(resultValue);
     *useOfNonUniformInst = nonUniformInst;

@@ -115,7 +115,7 @@ void GfxRegHandlerBase::setBits(const BitsInfo &bitsInfo, Value *newBits) {
 }
 
 // =====================================================================================================================
-// Return new dword which is replaced [offset, offset + count) with pNewBits
+// Return new dword which is replaced [offset, offset + count) with newBits
 //
 // @param dword : Target dword
 // @param offset : The first bit to be replaced

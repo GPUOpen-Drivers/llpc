@@ -116,9 +116,9 @@ struct PrimShaderScissorCb {
 
 /// Constant buffer used by the primitive shader generation for various render state not known until draw time
 struct PrimShaderRenderCb {
-  unsigned primitiveRestartEnable; ///< Enable resetting of a triangle strip using a special index.
-  unsigned primitiveRestartIndex;  ///< Value used to determine if a primitive restart is triggered
-  unsigned matchAllBits;           ///< When comparing restart indices, this limits number of bits
+  unsigned primitiveRestartEnable;          ///< Enable resetting of a triangle strip using a special index.
+  unsigned primitiveRestartIndex;           ///< Value used to determine if a primitive restart is triggered
+  unsigned matchAllBits;                    ///< When comparing restart indices, this limits number of bits
   unsigned enableConservativeRasterization; ///< Conservative rasterization is enabled, triggering special logic
                                             ///  for culling.
 };

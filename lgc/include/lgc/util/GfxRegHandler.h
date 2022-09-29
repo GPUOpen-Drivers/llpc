@@ -46,7 +46,7 @@ namespace lgc {
 // optimized llvm instruction sequences for these states.
 //
 //    -------------------------------------------------------------------------------
-//   | pValue    | isModified |                       state                          |
+//   | value     | isModified |                       state                          |
 //    -------------------------------------------------------------------------------
 //   | nullptr   | false/true | The value is never being touched, need load value    |
 //   | effective | true       | The value is being modified, need reload value       |
