@@ -236,7 +236,7 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpExecuteCallableKHR
     shaderIdentifier = m_builder->CreateTrunc(shaderIdentifier, m_builder->getInt32Ty());
     // Create Shader selection
     createShaderSelection(func, entryBlock, endBlock, shaderIdentifier, RayTracingContext::InvalidShaderId,
-                          ShaderStageRayTracingCallable, args, inputResult);
+                          ShaderStageRayTracingCallable, args, inputResult, inputResultTy);
   }
   m_builder->SetInsertPoint(funcRet);
   m_builder->CreateMemCpy(lastArg, align, inputResult, align, lastArgSize);
@@ -531,7 +531,9 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
 
       ShaderInOutMetadata inputMeta = {};
       MDNode *metaNode = global->getMetadata(gSPIRVMD::InOut);
-      Type *globalTy = global->getType()->getPointerElementType();
+      Type *globalTy = global->getValueType();
+      // TODO: Remove this when LLPC will switch fully to opaque pointers.
+      assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(global->getType(), globalTy));
       auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
 
       unsigned startOperand = 0;
@@ -875,9 +877,12 @@ void SpirvLowerRayTracing::createCallShader(Function *func, ShaderStage stage, u
   } else {
     initInputResult(stage, payload, traceParams, inputResult);
     shaderId = m_builder->CreateTrunc(shaderId, m_builder->getInt32Ty());
-    createShaderSelection(func, entryBlock, endBlock, shaderId, intersectId, stage, args, inputResult);
+    Type *inputResultTy = getShaderReturnTy(stage);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(inputResult->getType(), inputResultTy));
+    createShaderSelection(func, entryBlock, endBlock, shaderId, intersectId, stage, args, inputResult, inputResultTy);
     m_builder->SetInsertPoint(endBlock);
-    inputResult = m_builder->CreateLoad(inputResult->getType()->getPointerElementType(), inputResult);
+    inputResult = m_builder->CreateLoad(inputResultTy, inputResult);
     storeFunctionCallResult(stage, inputResult);
   }
 }
@@ -916,7 +921,10 @@ void SpirvLowerRayTracing::createSetTriangleInsection(Function *func) {
   auto one = m_builder->getInt32(1);
   Value *attribSrcPtr = m_builder->CreateGEP(barycentricsEltTy, barycentrics, {zero, zero});
   Value *attribValue = m_builder->CreateLoad(m_builder->getFloatTy(), attribSrcPtr);
-  Type *attribHitEltTy = m_traceParams[TraceParam::HitAttributes]->getType()->getScalarType()->getPointerElementType();
+  Type *attribHitEltTy = m_traceParamsTys[TraceParam::HitAttributes];
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_traceParams[TraceParam::HitAttributes]->getType()->getScalarType(),
+                                           attribHitEltTy));
   Value *attribDestPtr = m_builder->CreateGEP(attribHitEltTy, m_traceParams[TraceParam::HitAttributes], {zero, zero});
   m_builder->CreateStore(attribValue, attribDestPtr);
 
@@ -972,7 +980,7 @@ Value *SpirvLowerRayTracing::processBuiltIn(unsigned builtInId, Instruction *ins
     m_worldToObjMatrix =
         !m_worldToObjMatrix ? createLoadRayTracingMatrix(BuiltInWorldToObjectKHR, insertPos) : m_worldToObjMatrix;
 
-    // pOne = vec3(1.0f)
+    // one = vec3(1.0f)
     Value *one = ConstantFP::get(m_worldToObjMatrix->getType()->getArrayElementType(), 1.0);
     // vec3 -> vec4, origin = vec4(origin.xyz, 1.0>
     origin = m_builder->CreateShuffleVector(origin, one, ArrayRef<int>{0, 1, 2, 3});
@@ -1053,10 +1061,12 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind) {
 // @param intersectId : Module ID of intersection shader
 // @param stage : Shader stage
 // @param args : Argument list of function call
-// @param inReults : Allocated value to store function return value
+// @param inResult : Allocated value to store function return value
+// @param inResultTy : Base type of inResult param
 void SpirvLowerRayTracing::createShaderSelection(Function *func, BasicBlock *entryBlock, BasicBlock *endBlock,
                                                  Value *shaderId, unsigned intersectId, ShaderStage stage,
-                                                 const SmallVector<Value *, 8> &args, Value *inResult) {
+                                                 const SmallVector<Value *, 8> &args, Value *inResult,
+                                                 Type *inResultTy) {
   // .entry:
   // switch i32 %shaderId, label % .end[
   //    i32 2, label % .shader2
@@ -1080,16 +1090,18 @@ void SpirvLowerRayTracing::createShaderSelection(Function *func, BasicBlock *ent
     return;
   }
 
-  auto pSwitch = SwitchInst::Create(shaderId, endBlock, moduleIds.size(), entryBlock);
+  auto switchInst = SwitchInst::Create(shaderId, endBlock, moduleIds.size(), entryBlock);
   for (unsigned i = 0; i < moduleIds.size(); ++i) {
     auto moduleIdStr = std::to_string(moduleIds[i]);
     std::string branchName = ".shader" + moduleIdStr;
     BasicBlock *shaderBlock = BasicBlock::Create(*m_context, branchName, func, endBlock);
-    pSwitch->addCase(m_builder->getInt32(moduleIds[i]), shaderBlock);
+    switchInst->addCase(m_builder->getInt32(moduleIds[i]), shaderBlock);
     m_builder->SetInsertPoint(shaderBlock);
     auto funcName = std::string("_") + getShaderStageAbbreviation(stage) + "_" + moduleIdStr;
-    Type *retType = (inResult != nullptr) ? inResult->getType()->getPointerElementType() : m_builder->getVoidTy();
-    Value *result = m_builder->CreateNamedCall(funcName, retType, args, {Attribute::NoUnwind, Attribute::AlwaysInline});
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(!inResult || IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(inResult->getType(), inResultTy));
+    Value *result =
+        m_builder->CreateNamedCall(funcName, inResultTy, args, {Attribute::NoUnwind, Attribute::AlwaysInline});
     if (inResult)
       m_builder->CreateStore(result, inResult);
 
@@ -1398,7 +1410,7 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
     // Create Shader selection
     rayGenId = m_builder->CreateTrunc(rayGenId, m_builder->getInt32Ty());
     createShaderSelection(func, mainBlock, endBlock, rayGenId, RayTracingContext::InvalidShaderId, m_shaderStage, {},
-                          nullptr);
+                          nullptr, m_builder->getVoidTy());
   } else {
     auto funcTy = FunctionType::get(m_builder->getVoidTy(), {}, false);
     auto funcPtrTy = PointerType::get(funcTy, SPIRAS_Generic);
@@ -1637,7 +1649,12 @@ void SpirvLowerRayTracing::createTraceRay() {
   m_builder->CreateStore(elem2, traceRaysArgs[TraceRayLibFuncParam::DirZ]);
 
   // 14, TMax
-  arg = argIt;
+  const float rayTMax = m_context->getPipelineContext()->getPipelineOptions()->rtMaxRayLength;
+  if (rayTMax > 0.0) {
+    arg = ConstantFP::get(m_builder->getFloatTy(), rayTMax);
+  } else {
+    arg = argIt;
+  }
   m_builder->CreateStore(arg, traceRaysArgs[TraceRayLibFuncParam::TMax]);
 
   // Call TraceRay function from traceRays module
@@ -1646,7 +1663,9 @@ void SpirvLowerRayTracing::createTraceRay() {
                                  m_builder->getVoidTy(), traceRaysArgs, {Attribute::NoUnwind, Attribute::AlwaysInline});
 
   (void(result)); // unused
-  m_builder->CreateRet(m_builder->CreateLoad(m_globalPayload->getType()->getPointerElementType(), m_globalPayload));
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_globalPayload->getType(), m_globalPayload->getValueType()));
+  m_builder->CreateRet(m_builder->CreateLoad(m_globalPayload->getValueType(), m_globalPayload));
 }
 
 // =====================================================================================================================
@@ -1862,7 +1881,9 @@ void SpirvLowerRayTracing::createEntryFunc(Function *func) {
   getFuncRets(newFunc, rets);
   for (auto ret : rets) {
     m_builder->SetInsertPoint(ret);
-    Value *retVal = m_builder->CreateLoad(m_globalPayload->getType()->getPointerElementType(), m_globalPayload);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_globalPayload->getType(), m_globalPayload->getValueType()));
+    Value *retVal = m_builder->CreateLoad(m_globalPayload->getValueType(), m_globalPayload);
 
     const auto rets = getShaderExtraRets(m_shaderStage);
     unsigned payloadSizeInDword = rayTracingContext->getPayloadSizeInDword();
@@ -1922,8 +1943,10 @@ void SpirvLowerRayTracing::updateGlobalFromCallShaderFunc(Function *func, Shader
 
     Value *attribSrcPtr = m_builder->CreateGEP(attribEltTy, attrib, {zero, zero, zero});
     Value *attribValue = m_builder->CreateLoad(m_builder->getFloatTy(), attribSrcPtr);
-    Type *hitAttribEltTy =
-        m_traceParams[TraceParam::HitAttributes]->getType()->getScalarType()->getPointerElementType();
+    Type *hitAttribEltTy = m_traceParamsTys[TraceParam::HitAttributes];
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_traceParams[TraceParam::HitAttributes]->getType()->getScalarType(),
+                                             hitAttribEltTy));
     Value *attribDestPtr = m_builder->CreateGEP(hitAttribEltTy, m_traceParams[TraceParam::HitAttributes], {zero, zero});
     m_builder->CreateStore(attribValue, attribDestPtr);
 
@@ -2014,8 +2037,10 @@ void SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func) {
   getFuncRets(newFunc, rets);
   for (auto ret : rets) {
     m_builder->SetInsertPoint(ret);
-    Instruction *newfuncEnd = m_builder->CreateRet(
-        m_builder->CreateLoad(m_globalCallableData->getType()->getPointerElementType(), m_globalCallableData));
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(m_globalCallableData->getType(), m_globalCallableData->getValueType()));
+    Instruction *newfuncEnd =
+        m_builder->CreateRet(m_builder->CreateLoad(m_globalCallableData->getValueType(), m_globalCallableData));
     ret->replaceAllUsesWith(newfuncEnd);
     ret->eraseFromParent();
   }

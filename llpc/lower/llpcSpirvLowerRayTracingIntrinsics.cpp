@@ -105,15 +105,15 @@ bool SpirvLowerRayTracingIntrinsics::processIntrinsicsFunction(Function *func) {
   bool changed = false;
   auto mangledName = func->getName();
   if (mangledName.equals(RtName::LoadDwordAtAddr)) {
-    createLoadDwordAtAddr(func, Type::getInt32PtrTy(*m_context, SPIRAS_Global));
+    createLoadDwordAtAddr(func, m_builder->getInt32Ty());
     changed = true;
   } else if (mangledName.equals(RtName::LoadDwordAtAddrx2)) {
     auto int32x2Ty = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
-    createLoadDwordAtAddr(func, int32x2Ty->getPointerTo(SPIRAS_Global));
+    createLoadDwordAtAddr(func, int32x2Ty);
     changed = true;
   } else if (mangledName.equals(RtName::LoadDwordAtAddrx4)) {
     auto int32x4Ty = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
-    createLoadDwordAtAddr(func, int32x4Ty->getPointerTo(SPIRAS_Global));
+    createLoadDwordAtAddr(func, int32x4Ty);
     changed = true;
   } else if (mangledName.equals(RtName::ConvertF32toF16NegInf)) {
     // RM = fp::rmDownward;
@@ -134,10 +134,12 @@ bool SpirvLowerRayTracingIntrinsics::processIntrinsicsFunction(Function *func) {
 // Create AmdExtD3DShaderIntrinsics_LoadDwordAtAddr, LoadDwordAtAddrx2, LoadDwordAtAddrx4,
 //
 // @param func : Function to create
-// @param loadPtrTy : Pointer type of the load value
-void SpirvLowerRayTracingIntrinsics::createLoadDwordAtAddr(Function *func, Type *loadPtrTy) {
+// @param loadTy : Base type of the load value
+void SpirvLowerRayTracingIntrinsics::createLoadDwordAtAddr(Function *func, Type *loadTy) {
   assert(func->getBasicBlockList().size() == 1);
   (*func->begin()).eraseFromParent();
+
+  Type *loadPtrTy = loadTy->getPointerTo(SPIRAS_Global);
 
   BasicBlock *entryBlock = BasicBlock::Create(m_builder->getContext(), "", func);
   m_builder->SetInsertPoint(entryBlock);
@@ -161,7 +163,7 @@ void SpirvLowerRayTracingIntrinsics::createLoadDwordAtAddr(Function *func, Type 
   // Cast to the return type pointer
   loadValue = m_builder->CreateBitCast(loadValue, loadPtrTy);
 
-  loadValue = m_builder->CreateLoad(loadPtrTy->getPointerElementType(), loadValue);
+  loadValue = m_builder->CreateLoad(loadTy, loadValue);
   m_builder->CreateRet(loadValue);
 }
 
@@ -183,7 +185,10 @@ void SpirvLowerRayTracingIntrinsics::createConvertF32toF16(Function *func, unsig
   m_builder->SetInsertPoint(entryBlock);
   auto argIt = func->arg_begin();
 
-  Value *inVec = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  Type *convertInputType = FixedVectorType::get(m_builder->getFloatTy(), 3);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), convertInputType));
+  Value *inVec = m_builder->CreateLoad(convertInputType, argIt);
   // TODO: Backend currently does not support rounding mode correctly. LGC is also treating all rounding mode other than
   // RTE as RTZ. We need RTN and RTP here. LGC needs a change after backend confirm the support of rounding mode.
   Value *result = m_builder->CreateFpTruncWithRounding(inVec, FixedVectorType::get(m_builder->getHalfTy(), 3),

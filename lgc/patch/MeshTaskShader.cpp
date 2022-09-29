@@ -2434,12 +2434,6 @@ Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
 // @param primitiveShadingRate : Primitive shading rate from API
 // @returns : HW-specific shading rate <X, Y>
 std::pair<Value *, Value *> MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
-#if LLPC_BUILD_GFX11
-  if (m_gfxIp.major >= 11) {
-    llvm_unreachable("Not implemented!");
-    return std::make_pair(nullptr, nullptr);
-  }
-#endif
 
   assert(m_gfxIp == GfxIpVersion({10, 3})); // Must be GFX10.3
 

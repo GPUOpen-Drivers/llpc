@@ -42,21 +42,19 @@
 #include "GLSL.std.450.h"
 #include "khronos/spirv.hpp"
 
-namespace spv
-{
-  #include "GLSL.ext.AMD.h"
+namespace spv {
+#include "GLSL.ext.AMD.h"
 
-  static const LinkageType LinkageTypeInternal =
-      static_cast<LinkageType>(LinkageTypeImport + 1);
+static const LinkageType LinkageTypeInternal = static_cast<LinkageType>(LinkageTypeImport + 1);
 
-  static const Op OpForward = static_cast<Op>(1024);
+static const Op OpForward = static_cast<Op>(1024);
 
-  // Built-ins for per-vertex structure
-  static const BuiltIn BuiltInPerVertex = static_cast<BuiltIn>(1024);
+// Built-ins for per-vertex structure
+static const BuiltIn BuiltInPerVertex = static_cast<BuiltIn>(1024);
 
-  // Execution model: copy shader
-  static const ExecutionModel ExecutionModelCopyShader = static_cast<ExecutionModel>(1024);
+// Execution model: copy shader
+static const ExecutionModel ExecutionModelCopyShader = static_cast<ExecutionModel>(1024);
 
-}; // spv
+}; // namespace spv
 
 #endif

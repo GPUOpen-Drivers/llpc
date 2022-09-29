@@ -41,18 +41,14 @@
 #include "SPIRVEntry.h"
 #include "SPIRVInstruction.h"
 #include "SPIRVStream.h"
-
 #include <algorithm>
 #include <functional>
 using namespace SPIRV;
 
-SPIRVFunctionParameter::SPIRVFunctionParameter(SPIRVType *TheType,
-                                               SPIRVId TheId,
-                                               SPIRVFunction *TheParent,
+SPIRVFunctionParameter::SPIRVFunctionParameter(SPIRVType *TheType, SPIRVId TheId, SPIRVFunction *TheParent,
                                                unsigned TheArgNo)
-    : SPIRVValue(TheParent->getModule(), 3, OpFunctionParameter, TheType,
-                 TheId),
-      ParentFunc(TheParent), ArgNo(TheArgNo) {
+    : SPIRVValue(TheParent->getModule(), 3, OpFunctionParameter, TheType, TheId), ParentFunc(TheParent),
+      ArgNo(TheArgNo) {
   validate();
 }
 
@@ -113,14 +109,12 @@ void SPIRVFunction::decodeBB(SPIRVDecoder &Decoder) {
     if (Decoder.OpCode == OpNop)
       continue;
 
-    if (Decoder.OpCode == OpLine ||
-        Decoder.OpCode == OpNoLine) {
+    if (Decoder.OpCode == OpLine || Decoder.OpCode == OpNoLine) {
       Decoder.getEntry();
       continue;
     }
 
-    SPIRVInstruction *Inst =
-        static_cast<SPIRVInstruction *>(Decoder.getEntry());
+    SPIRVInstruction *Inst = static_cast<SPIRVInstruction *>(Decoder.getEntry());
     if ((Inst != nullptr) && Inst->getOpCode() != OpUndef) {
       if (Inst->isExtInst(SPIRVEIS_Debug, SPIRVDebug::Scope)) {
         DebugScope = Inst;

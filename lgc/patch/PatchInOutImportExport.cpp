@@ -2510,21 +2510,22 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     // adjustedFragCoordZ = gl_ShadingRate.x == 1? adjustedFragCoordZ : gl_FragCood.z
     if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waAdjustDepthImportVrs &&
         m_pipelineState->getShaderOptions(ShaderStageFragment).adjustDepthImportVrs) {
-      const unsigned firstDppCtrl = 0xF5; // FineX:   [0,1,2,3]->[1,1,3,3]
+      const unsigned firstDppCtrl = 0xF5;  // FineX:   [0,1,2,3]->[1,1,3,3]
       const unsigned secondDppCtrl = 0xA0; // FineX:  [0,1,2,3]->[0,0,2,2]
       Value *fragCoordZAsInt = builder.CreateBitCast(fragCoord[2], builder.getInt32Ty());
       Value *firstDppValue = builder.CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
-                                                {fragCoordZAsInt, builder.getInt32(firstDppCtrl), builder.getInt32(15),
-                                                 builder.getInt32(15), builder.getTrue()});
+                                                     {fragCoordZAsInt, builder.getInt32(firstDppCtrl),
+                                                      builder.getInt32(15), builder.getInt32(15), builder.getTrue()});
       firstDppValue = builder.CreateBitCast(firstDppValue, builder.getFloatTy());
       Value *secondDppValue = builder.CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
-                                                {fragCoordZAsInt, builder.getInt32(secondDppCtrl), builder.getInt32(15),
-                                                 builder.getInt32(15), builder.getTrue()});
+                                                      {fragCoordZAsInt, builder.getInt32(secondDppCtrl),
+                                                       builder.getInt32(15), builder.getInt32(15), builder.getTrue()});
       secondDppValue = builder.CreateBitCast(secondDppValue, builder.getFloatTy());
       Value *adjustedFragCoordZ = builder.CreateFSub(firstDppValue, secondDppValue);
       adjustedFragCoordZ = builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, adjustedFragCoordZ, nullptr);
       Value *sixteenth = ConstantFP::get(builder.getFloatTy(), 1.0 / 16.0f);
-      adjustedFragCoordZ = builder.CreateIntrinsic(Intrinsic::fma, builder.getFloatTy(), {adjustedFragCoordZ, sixteenth, fragCoord[2]});
+      adjustedFragCoordZ =
+          builder.CreateIntrinsic(Intrinsic::fma, builder.getFloatTy(), {adjustedFragCoordZ, sixteenth, fragCoord[2]});
       auto ancillary = getFunctionArgument(m_entryPoint, entryArgIdxs.ancillary);
       Value *xRate = builder.CreateAnd(ancillary, 0xC);
       xRate = builder.CreateLShr(xRate, 2);
@@ -4383,8 +4384,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool offChip, Type *readTy, Valu
     else if (m_gfxIp.major == 10) {
       coherent.bits.glc = true;
       coherent.bits.dlc = true;
-    }
-    else
+    } else
       llvm_unreachable("Not implemented!");
 
     for (unsigned i = 0, combineCount = 0; i < numChannels; i += combineCount)
@@ -5107,8 +5107,8 @@ Value *PatchInOutImportExport::adjustCentroidIj(Value *centroidIj, Value *center
 
   if (builtInUsage.centroid && builtInUsage.center) {
     // NOTE: If both centroid and center are enabled, centroid I/J provided by hardware natively may be invalid. We have
-    // to adjust it with center I/J on condition of bc_optimize flag. bc_optimize = pPrimMask[31], when bc_optimize is
-    // on, pPrimMask is less than zero
+    // to adjust it with center I/J on condition of bc_optimize flag. bc_optimize = primMask[31], when bc_optimize is
+    // on, primMask is less than zero
     auto cond = builder.CreateICmpSLT(primMask, builder.getInt32(0));
     ij = builder.CreateSelect(cond, centerIj, centroidIj);
   } else
@@ -5745,34 +5745,34 @@ void PatchInOutImportExport::exportShadingRate(Value *shadingRate, Instruction *
 
   assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
-  Value* hwShadingRate = nullptr;
+  Value *hwShadingRate = nullptr;
 
   {
-      // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
-      // and 4-pixel mode is not supported. But the spec requires us to accept unsupported rates and clamp them to
-      // maxFragmentSize of HW. The mapping is therefore as follow:
-      //
-      //   VRS X rate: MaskNone -> 0b00, Horizontal2Pixels | Horizontal4Pixels -> 0b01
-      //   VRS Y rate: MaskNone -> 0b00, Vertical2Pixels | Vertical4Pixels -> 0b01
-      //
-      // xRate = (shadingRate & (Horizontal2Pixels | Horizontal4Pixels) ? 0x1 : 0x0
-      Value *xRate2Pixels =
-          builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels));
-      xRate2Pixels = builder.CreateICmpNE(xRate2Pixels, builder.getInt32(0));
-      Value *xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(1), builder.getInt32(0));
+    // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
+    // and 4-pixel mode is not supported. But the spec requires us to accept unsupported rates and clamp them to
+    // maxFragmentSize of HW. The mapping is therefore as follow:
+    //
+    //   VRS X rate: MaskNone -> 0b00, Horizontal2Pixels | Horizontal4Pixels -> 0b01
+    //   VRS Y rate: MaskNone -> 0b00, Vertical2Pixels | Vertical4Pixels -> 0b01
+    //
+    // xRate = (shadingRate & (Horizontal2Pixels | Horizontal4Pixels) ? 0x1 : 0x0
+    Value *xRate2Pixels =
+        builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels));
+    xRate2Pixels = builder.CreateICmpNE(xRate2Pixels, builder.getInt32(0));
+    Value *xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(1), builder.getInt32(0));
 
-      // yRate = (shadingRate & (Vertical2Pixels | Vertical4Pixels)) ? 0x1 : 0x0
-      Value *yRate2Pixels =
-          builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
-      yRate2Pixels = builder.CreateICmpNE(yRate2Pixels, builder.getInt32(0));
-      Value *yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(1), builder.getInt32(0));
+    // yRate = (shadingRate & (Vertical2Pixels | Vertical4Pixels)) ? 0x1 : 0x0
+    Value *yRate2Pixels =
+        builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
+    yRate2Pixels = builder.CreateICmpNE(yRate2Pixels, builder.getInt32(0));
+    Value *yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(1), builder.getInt32(0));
 
-      // [5:4] = Y rate, [3:2] = X rate
-      // hwShadingRate = (xRate << 2) | (yRate << 4)
-      xRate = builder.CreateShl(xRate, 2);
-      yRate = builder.CreateShl(yRate, 4);
-      hwShadingRate = builder.CreateOr(xRate, yRate);
-      hwShadingRate = builder.CreateBitCast(hwShadingRate, builder.getFloatTy());
+    // [5:4] = Y rate, [3:2] = X rate
+    // hwShadingRate = (xRate << 2) | (yRate << 4)
+    xRate = builder.CreateShl(xRate, 2);
+    yRate = builder.CreateShl(yRate, 4);
+    hwShadingRate = builder.CreateOr(xRate, yRate);
+    hwShadingRate = builder.CreateBitCast(hwShadingRate, builder.getFloatTy());
   }
 
   auto undef = UndefValue::get(builder.getFloatTy());
@@ -5809,21 +5809,21 @@ Value *PatchInOutImportExport::getShadingRate(Instruction *insertPos) {
   yRate = builder.CreateLShr(yRate, 4);
 
   {
-      // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
-      // and 4-pixel mode is not supported. The mapping is as follow:
-      //
-      //   VRS X rate: 0b00 -> MaskNone, 0b01 -> Horizontal2Pixels
-      //   VRS Y rate: 0b00 -> MaskNone, 0b01 -> Vertical2Pixels
-      //
-      // xRate = xRate == 0x1 ? Horizontal2Pixels : None
-      auto xRate2Pixels = builder.CreateICmpEQ(xRate, builder.getInt32(1));
-      xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(ShadingRateHorizontal2Pixels),
-                                   builder.getInt32(ShadingRateNone));
+    // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
+    // and 4-pixel mode is not supported. The mapping is as follow:
+    //
+    //   VRS X rate: 0b00 -> MaskNone, 0b01 -> Horizontal2Pixels
+    //   VRS Y rate: 0b00 -> MaskNone, 0b01 -> Vertical2Pixels
+    //
+    // xRate = xRate == 0x1 ? Horizontal2Pixels : None
+    auto xRate2Pixels = builder.CreateICmpEQ(xRate, builder.getInt32(1));
+    xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(ShadingRateHorizontal2Pixels),
+                                 builder.getInt32(ShadingRateNone));
 
-      // yRate = yRate == 0x1 ? Vertical2Pixels : None
-      auto yRate2Pixels = builder.CreateICmpEQ(yRate, builder.getInt32(1));
-      yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(ShadingRateVertical2Pixels),
-                                   builder.getInt32(ShadingRateNone));
+    // yRate = yRate == 0x1 ? Vertical2Pixels : None
+    auto yRate2Pixels = builder.CreateICmpEQ(yRate, builder.getInt32(1));
+    yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(ShadingRateVertical2Pixels),
+                                 builder.getInt32(ShadingRateNone));
   }
 
   return builder.CreateOr(xRate, yRate);

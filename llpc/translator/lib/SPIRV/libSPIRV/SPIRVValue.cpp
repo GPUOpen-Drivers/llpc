@@ -43,7 +43,9 @@
 #include "SPIRVValue.h"
 #include "SPIRVEnum.h"
 namespace SPIRV {
-bool SPIRVValue::isVolatile() { return hasDecorate(DecorationVolatile); }
+bool SPIRVValue::isVolatile() {
+  return hasDecorate(DecorationVolatile);
+}
 
 void SPIRVValue::setVolatile(bool IsVolatile) {
   if (!IsVolatile) {
@@ -53,7 +55,9 @@ void SPIRVValue::setVolatile(bool IsVolatile) {
   addDecorate(new SPIRVDecorate(DecorationVolatile, this));
 }
 
-bool SPIRVValue::isCoherent() { return hasDecorate(DecorationCoherent); }
+bool SPIRVValue::isCoherent() {
+  return hasDecorate(DecorationCoherent);
+}
 
 void SPIRVValue::setCoherent(bool IsCoherent) {
   if (!IsCoherent) {

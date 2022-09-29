@@ -1628,7 +1628,8 @@ void PatchResourceCollect::clearInactiveBuiltInOutput() {
     if (builtInUsage.viewportIndex && m_activeOutputBuiltIns.find(BuiltInViewportIndex) == m_activeOutputBuiltIns.end())
       builtInUsage.viewportIndex = false;
 
-    if (builtInUsage.primitiveShadingRate && m_activeOutputBuiltIns.find(BuiltInPrimitiveShadingRate) == m_activeOutputBuiltIns.end())
+    if (builtInUsage.primitiveShadingRate &&
+        m_activeOutputBuiltIns.find(BuiltInPrimitiveShadingRate) == m_activeOutputBuiltIns.end())
       builtInUsage.primitiveShadingRate = false;
   }
 }

@@ -1554,6 +1554,7 @@ Value *ImageBuilder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imag
 Value *ImageBuilder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value *origin, Value *direction,
                                                 Value *invDirection, Value *imageDesc, const Twine &instName) {
   imageDesc = fixImageDescForRead(imageDesc);
+
   SmallVector<Value *, 6> args;
   args.push_back(nodePtr);
   args.push_back(extent);

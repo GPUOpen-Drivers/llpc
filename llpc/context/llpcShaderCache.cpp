@@ -155,8 +155,8 @@ void ShaderCache::resetRuntimeCache() {
 // NOTE: It is expected that the calling function has not used this shader cache since querying the size
 //
 // @param [out] blob : System memory pointer where the serialized data should be placed
-// @param [in/out] size : Size of the memory pointed to by pBlob. If the value stored in pSize is zero then no data will
-// be copied and instead the size required for serialization will be returned in pSize
+// @param [in/out] size : Size of the memory pointed to by blob. If the value stored in size is zero then no data will
+// be copied and instead the size required for serialization will be returned in size
 Result ShaderCache::Serialize(void *blob, size_t *size) {
   Result result = Result::Success;
 

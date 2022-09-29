@@ -46,7 +46,6 @@
 #include "SPIRVOpCode.h"
 #include "SPIRVStream.h"
 #include "SPIRVValue.h"
-
 #include <cassert>
 #include <cstdint>
 #include <functional>
@@ -68,25 +67,21 @@ bool isSpecConstantOpAllowedOp(Op OC);
 
 class SPIRVComponentExecutionScope {
 public:
-  SPIRVComponentExecutionScope(Scope TheScope = ScopeInvocation)
-      : ExecScope(TheScope) {}
+  SPIRVComponentExecutionScope(Scope TheScope = ScopeInvocation) : ExecScope(TheScope) {}
   Scope ExecScope;
 };
 
 class SPIRVComponentMemorySemanticsMask {
 public:
-  SPIRVComponentMemorySemanticsMask(SPIRVWord TheSema = SPIRVWORD_MAX)
-      : MemSema(TheSema) {}
+  SPIRVComponentMemorySemanticsMask(SPIRVWord TheSema = SPIRVWORD_MAX) : MemSema(TheSema) {}
   SPIRVWord MemSema;
 };
 
 class SPIRVComponentOperands {
 public:
   SPIRVComponentOperands(){};
-  SPIRVComponentOperands(const std::vector<SPIRVValue *> &TheOperands)
-      : Operands(TheOperands){};
-  SPIRVComponentOperands(std::vector<SPIRVValue *> &&TheOperands)
-      : Operands(std::move(TheOperands)){};
+  SPIRVComponentOperands(const std::vector<SPIRVValue *> &TheOperands) : Operands(TheOperands){};
+  SPIRVComponentOperands(std::vector<SPIRVValue *> &&TheOperands) : Operands(std::move(TheOperands)){};
   std::vector<SPIRVValue *> getCompOperands() { return Operands; }
   std::vector<SPIRVType *> getCompOperandTypes() {
     std::vector<SPIRVType *> Tys;
@@ -102,19 +97,16 @@ protected:
 class SPIRVInstruction : public SPIRVValue {
 public:
   // Complete constructor for instruction with type and id
-  SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVType *TheType,
-                   SPIRVId TheId, SPIRVBasicBlock *TheBB);
+  SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVType *TheType, SPIRVId TheId, SPIRVBasicBlock *TheBB);
   // Complete constructor for instruction with module, type and id
-  SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVType *TheType,
-                   SPIRVId TheId, SPIRVBasicBlock *TheBB, SPIRVModule *TheBM);
+  SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVType *TheType, SPIRVId TheId, SPIRVBasicBlock *TheBB,
+                   SPIRVModule *TheBM);
   // Complete constructor for instruction with id but no type
-  SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVId TheId,
-                   SPIRVBasicBlock *TheBB);
+  SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVId TheId, SPIRVBasicBlock *TheBB);
   // Complete constructor for instruction without type and id
   SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVBasicBlock *TheBB);
   // Complete constructor for instruction with type but no id
-  SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVType *TheType,
-                   SPIRVBasicBlock *TheBB);
+  SPIRVInstruction(unsigned TheWordCount, Op TheOC, SPIRVType *TheType, SPIRVBasicBlock *TheBB);
   // Incomplete constructor
   SPIRVInstruction(Op TheOC = OpNop) : SPIRVValue(TheOC), BB(NULL) {}
 
@@ -124,14 +116,11 @@ public:
   SPIRVInstruction *getNext() const { return BB->getNext(this); }
   virtual std::vector<SPIRVValue *> getOperands();
   std::vector<SPIRVType *> getOperandTypes();
-  static std::vector<SPIRVType *>
-  getOperandTypes(const std::vector<SPIRVValue *> &Ops);
+  static std::vector<SPIRVType *> getOperandTypes(const std::vector<SPIRVValue *> &Ops);
 
   void setParent(SPIRVBasicBlock *);
   void setScope(SPIRVEntry *) override;
-  void addFPRoundingMode(SPIRVFPRoundingModeKind Kind) {
-    addDecorate(DecorationFPRoundingMode, Kind);
-  }
+  void addFPRoundingMode(SPIRVFPRoundingModeKind Kind) { addDecorate(DecorationFPRoundingMode, Kind); }
   void eraseFPRoundingMode() { eraseDecorate(DecorationFPRoundingMode); }
   bool hasFPRoundingMode(SPIRVFPRoundingModeKind *Kind = nullptr) {
     SPIRVWord V;
@@ -172,18 +161,15 @@ public:
     return Inst;
   }
   /// Create a instruction without operands.
-  static SPIRVInstTemplateBase *create(Op TheOC, SPIRVType *TheType,
-                                       SPIRVId TheId, SPIRVBasicBlock *TheBB,
+  static SPIRVInstTemplateBase *create(Op TheOC, SPIRVType *TheType, SPIRVId TheId, SPIRVBasicBlock *TheBB,
                                        SPIRVModule *TheModule) {
     auto Inst = create(TheOC);
     Inst->init(TheType, TheId, TheBB, TheModule);
     return Inst;
   }
   /// Create a complete and valid instruction.
-  static SPIRVInstTemplateBase *create(Op TheOC, SPIRVType *TheType,
-                                       SPIRVId TheId,
-                                       const std::vector<SPIRVWord> &TheOps,
-                                       SPIRVBasicBlock *TheBB,
+  static SPIRVInstTemplateBase *create(Op TheOC, SPIRVType *TheType, SPIRVId TheId,
+                                       const std::vector<SPIRVWord> &TheOps, SPIRVBasicBlock *TheBB,
                                        SPIRVModule *TheModule) {
     auto Inst = create(TheOC);
     Inst->init(TheType, TheId, TheBB, TheModule);
@@ -191,13 +177,9 @@ public:
     Inst->validate();
     return Inst;
   }
-  SPIRVInstTemplateBase(Op OC = OpNop)
-      : SPIRVInstruction(OC), HasVariWC(false) {
-    init();
-  }
+  SPIRVInstTemplateBase(Op OC = OpNop) : SPIRVInstruction(OC), HasVariWC(false) { init(); }
   ~SPIRVInstTemplateBase() override {}
-  SPIRVInstTemplateBase *init(SPIRVType *TheType, SPIRVId TheId,
-                              SPIRVBasicBlock *TheBB, SPIRVModule *TheModule) {
+  SPIRVInstTemplateBase *init(SPIRVType *TheType, SPIRVId TheId, SPIRVBasicBlock *TheBB, SPIRVModule *TheModule) {
     assert((TheBB || TheModule) && "Invalid BB or Module");
     if (TheBB)
       setBasicBlock(TheBB);
@@ -209,8 +191,7 @@ public:
     return this;
   }
   virtual void init() {}
-  virtual void initImpl(Op OC, bool HasId = true, SPIRVWord WC = 0,
-                        bool VariWC = false, unsigned Lit1 = ~0U,
+  virtual void initImpl(Op OC, bool HasId = true, SPIRVWord WC = 0, bool VariWC = false, unsigned Lit1 = ~0U,
                         unsigned Lit2 = ~0U, unsigned Lit3 = ~0U) {
     OpCode = OC;
     if (!HasId) {
@@ -280,8 +261,7 @@ public:
   /// Get operand as value.
   /// If the operand is a literal, return it as a uint32 constant.
   SPIRVValue *getOpValue(int I) {
-    return isOperandLiteral(I) ? Module->getLiteralAsConstant(Ops[I])
-                               : getValue(Ops[I]);
+    return isOperandLiteral(I) ? Module->getLiteralAsConstant(Ops[I]) : getValue(Ops[I]);
   }
 
   // Get the offset of operands.
@@ -311,9 +291,7 @@ public:
     return Operands;
   }
 
-  virtual SPIRVValue *getOperand(unsigned I) {
-    return getOpValue(I + getOperandOffset());
-  }
+  virtual SPIRVValue *getOperand(unsigned I) { return getOpValue(I + getOperandOffset()); }
 
   bool hasExecScope() const { return SPIRV::hasExecScope(OpCode); }
 
@@ -329,8 +307,7 @@ public:
   Scope getExecutionScope() const {
     if (!hasExecScope())
       return ScopeInvocation;
-    return static_cast<Scope>(
-        static_cast<SPIRVConstant *>(getValue(Ops[0]))->getZExtIntValue());
+    return static_cast<Scope>(static_cast<SPIRVConstant *>(getValue(Ops[0]))->getZExtIntValue());
   }
 
   bool hasVariableWordCount() const { return HasVariWC; }
@@ -351,24 +328,19 @@ protected:
   std::unordered_set<unsigned> Lit; // Literal operand index
 };
 
-template <typename BT = SPIRVInstTemplateBase, Op OC = OpNop, bool HasId = true,
-          SPIRVWord WC = 0, bool HasVariableWC = false, unsigned Literal1 = ~0U,
-          unsigned Literal2 = ~0U, unsigned Literal3 = ~0U>
+template <typename BT = SPIRVInstTemplateBase, Op OC = OpNop, bool HasId = true, SPIRVWord WC = 0,
+          bool HasVariableWC = false, unsigned Literal1 = ~0U, unsigned Literal2 = ~0U, unsigned Literal3 = ~0U>
 class SPIRVInstTemplate : public BT {
 public:
   typedef BT BaseTy;
   SPIRVInstTemplate() { init(); }
   ~SPIRVInstTemplate() override {}
-  void init() override {
-    this->initImpl(OC, HasId, WC, HasVariableWC, Literal1, Literal2, Literal3);
-  }
+  void init() override { this->initImpl(OC, HasId, WC, HasVariableWC, Literal1, Literal2, Literal3); }
 };
 
 class SPIRVMemoryAccess {
 public:
-  SPIRVMemoryAccess(const std::vector<SPIRVWord> &TheMemoryAccess) {
-    memoryAccessUpdate(TheMemoryAccess);
-  }
+  SPIRVMemoryAccess(const std::vector<SPIRVWord> &TheMemoryAccess) { memoryAccessUpdate(TheMemoryAccess); }
 
   SPIRVMemoryAccess() {}
 
@@ -394,7 +366,8 @@ public:
 
     for (unsigned I = 0; I < 2; ++I) {
       unsigned MaskIdx = HasBothMasks ? (I * DestMaskCount) : 0;
-      unsigned Idx = MaskIdx + 1;;
+      unsigned Idx = MaskIdx + 1;
+      ;
       MemoryAccess[I].TheMemoryAccessMask = TheMemoryAccess[MaskIdx];
 
       if (TheMemoryAccess[MaskIdx] & MemoryAccessAlignedMask) {
@@ -412,29 +385,23 @@ public:
       }
     }
   }
-  SPIRVWord isVolatile(bool CheckSrcMask) const {
-    return getMemoryAccessMask(CheckSrcMask) & MemoryAccessVolatileMask;
-  }
+  SPIRVWord isVolatile(bool CheckSrcMask) const { return getMemoryAccessMask(CheckSrcMask) & MemoryAccessVolatileMask; }
   SPIRVWord isNonTemporal(bool CheckSrcMask) const {
     return getMemoryAccessMask(CheckSrcMask) & MemoryAccessNontemporalMask;
   }
   SPIRVWord getMemoryAccessMask(bool CheckSrcMask) const {
-    return CheckSrcMask ? MemoryAccess[1].TheMemoryAccessMask :
-                          MemoryAccess[0].TheMemoryAccessMask;
+    return CheckSrcMask ? MemoryAccess[1].TheMemoryAccessMask : MemoryAccess[0].TheMemoryAccessMask;
   }
   SPIRVWord getAlignment(bool CheckSrcMask) const {
-    return CheckSrcMask ? MemoryAccess[1].Alignment :
-                          MemoryAccess[0].Alignment;
+    return CheckSrcMask ? MemoryAccess[1].Alignment : MemoryAccess[0].Alignment;
   }
 
   SPIRVId getMakeAvailableScope(bool CheckSrcMask) const {
-    return CheckSrcMask ? MemoryAccess[1].MakeAvailableScope :
-                          MemoryAccess[0].MakeAvailableScope;
+    return CheckSrcMask ? MemoryAccess[1].MakeAvailableScope : MemoryAccess[0].MakeAvailableScope;
   }
 
   SPIRVId getMakeVisibleScope(bool CheckSrcMask) const {
-    return CheckSrcMask ? MemoryAccess[1].MakeVisibleScope :
-                          MemoryAccess[0].MakeVisibleScope;
+    return CheckSrcMask ? MemoryAccess[1].MakeVisibleScope : MemoryAccess[0].MakeVisibleScope;
   }
 
 protected:
@@ -449,12 +416,9 @@ protected:
 class SPIRVVariable : public SPIRVInstruction {
 public:
   // Complete constructor for integer constant
-  SPIRVVariable(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheInitializer,
-                const std::string &TheName,
-                SPIRVStorageClassKind TheStorageClass, SPIRVBasicBlock *TheBB,
-                SPIRVModule *TheM)
-      : SPIRVInstruction(TheInitializer ? 5 : 4, OpVariable, TheType, TheId,
-                         TheBB, TheM),
+  SPIRVVariable(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheInitializer, const std::string &TheName,
+                SPIRVStorageClassKind TheStorageClass, SPIRVBasicBlock *TheBB, SPIRVModule *TheM)
+      : SPIRVInstruction(TheInitializer ? 5 : 4, OpVariable, TheType, TheId, TheBB, TheM),
         StorageClass(TheStorageClass) {
     if (TheInitializer)
       Initializer.push_back(TheInitializer->getId());
@@ -462,8 +426,7 @@ public:
     validate();
   }
   // Incomplete constructor
-  SPIRVVariable()
-      : SPIRVInstruction(OpVariable), StorageClass(StorageClassFunction) {}
+  SPIRVVariable() : SPIRVInstruction(OpVariable), StorageClass(StorageClassFunction) {}
 
   SPIRVStorageClassKind getStorageClass() const { return StorageClass; }
   SPIRVValue *getInitializer() const {
@@ -512,20 +475,17 @@ class SPIRVImageTexelPointer : public SPIRVInstruction {
 public:
   const static Op OC = OpImageTexelPointer;
   // Complete constructor
-  SPIRVImageTexelPointer(SPIRVId TheId, SPIRVType *TheType,
-    SPIRVValue *TheImage, SPIRVValue *TheCoordinate, SPIRVValue *TheSample,
-    SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(6, OC, TheType, TheId, TheBB),
-        Image(TheImage->getId()), Coordinate(TheCoordinate->getId()),
+  SPIRVImageTexelPointer(SPIRVId TheId, SPIRVType *TheType, SPIRVValue *TheImage, SPIRVValue *TheCoordinate,
+                         SPIRVValue *TheSample, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(6, OC, TheType, TheId, TheBB), Image(TheImage->getId()), Coordinate(TheCoordinate->getId()),
         Sample(TheSample->getId()) {
-      validate();
-      assert(TheBB && "Invalid BB");
-    }
+    validate();
+    assert(TheBB && "Invalid BB");
+  }
 
   // Incomplete constructor
-  SPIRVImageTexelPointer() : SPIRVInstruction(OC), Image(SPIRVID_INVALID),
-      Coordinate(SPIRVID_INVALID), Sample(SPIRVID_INVALID)
-    {}
+  SPIRVImageTexelPointer()
+      : SPIRVInstruction(OC), Image(SPIRVID_INVALID), Coordinate(SPIRVID_INVALID), Sample(SPIRVID_INVALID) {}
 
   SPIRVValue *getImage() { return getValue(Image); }
   SPIRVValue *getCoordinate() { return getValue(Coordinate); }
@@ -533,19 +493,15 @@ public:
 
 protected:
   _SPIRV_DEF_DECODE5(Type, Id, Image, Coordinate, Sample)
-  void validate()const override {
+  void validate() const override {
     SPIRVInstruction::validate();
-    assert(Type->isTypePointer() &&
-           Type->getPointerStorageClass() == StorageClassImage &&
-           (Type->getPointerElementType()->isTypeScalar() ||
-            Type->getPointerElementType()->isTypeVoid()));
+    assert(Type->isTypePointer() && Type->getPointerStorageClass() == StorageClassImage &&
+           (Type->getPointerElementType()->isTypeScalar() || Type->getPointerElementType()->isTypeVoid()));
 
     auto ImagePointerTy = getValueType(Image);
-    assert(ImagePointerTy->isTypePointer() &&
-           ImagePointerTy->getPointerElementType()->isTypeImage());
+    assert(ImagePointerTy->isTypePointer() && ImagePointerTy->getPointerElementType()->isTypeImage());
 
-    auto ImageTy =
-      static_cast<SPIRVTypeImage *>(ImagePointerTy->getPointerElementType());
+    auto ImageTy = static_cast<SPIRVTypeImage *>(ImagePointerTy->getPointerElementType());
     assert((ImageTy->getSampledType() == Type->getPointerElementType()) &&
            (ImageTy->getDescriptor().Dim != DimSubpassData));
     (void)ImageTy;
@@ -561,15 +517,14 @@ public:
   const static Op OC = OpImageSparseTexelsResident;
 
   // Incomplete constructor
-  SPIRVImageSparseTexelsResident()
-      : SPIRVInstruction(OC), ResidentCode(SPIRVID_INVALID)
-    {}
+  SPIRVImageSparseTexelsResident() : SPIRVInstruction(OC), ResidentCode(SPIRVID_INVALID) {}
 
   SPIRVValue *getResidentCode() { return getValue(ResidentCode); }
+
 protected:
   _SPIRV_DEF_DECODE3(Type, Id, ResidentCode)
 
-  void validate()const override {
+  void validate() const override {
     assert(Type->isTypeBool() && Type->isTypeScalar());
 
     auto ResidentCodeTy = getValueType(ResidentCode);
@@ -584,20 +539,15 @@ class SPIRVStore : public SPIRVInstruction, public SPIRVMemoryAccess {
 public:
   const static SPIRVWord FixedWords = 3;
   // Complete constructor
-  SPIRVStore(SPIRVId PointerId, SPIRVId ValueId,
-             const std::vector<SPIRVWord> &TheMemoryAccess,
-             SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(FixedWords + TheMemoryAccess.size(), OpStore, TheBB),
-        SPIRVMemoryAccess(TheMemoryAccess), MemoryAccess(TheMemoryAccess),
-        PtrId(PointerId), ValId(ValueId) {
+  SPIRVStore(SPIRVId PointerId, SPIRVId ValueId, const std::vector<SPIRVWord> &TheMemoryAccess, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(FixedWords + TheMemoryAccess.size(), OpStore, TheBB), SPIRVMemoryAccess(TheMemoryAccess),
+        MemoryAccess(TheMemoryAccess), PtrId(PointerId), ValId(ValueId) {
     setAttr();
     validate();
     assert(TheBB && "Invalid BB");
   }
   // Incomplete constructor
-  SPIRVStore()
-      : SPIRVInstruction(OpStore), SPIRVMemoryAccess(), PtrId(SPIRVID_INVALID),
-        ValId(SPIRVID_INVALID) {
+  SPIRVStore() : SPIRVInstruction(OpStore), SPIRVMemoryAccess(), PtrId(SPIRVID_INVALID), ValId(SPIRVID_INVALID) {
     setAttr();
   }
 
@@ -610,6 +560,7 @@ public:
     Operands.push_back(getValue(PtrId));
     return Operands;
   }
+
 protected:
   void setAttr() {
     setHasNoType();
@@ -631,15 +582,16 @@ protected:
     if (getSrc()->isForward() || getDst()->isForward())
       return;
 
-    // NOTE: This is to workaround a glslang bug. Bool variable defined
-    // in a structure, which acts as a block member, will cause mismatch
-    // load/store when we visit this bool variable.
+      // NOTE: This is to workaround a glslang bug. Bool variable defined
+      // in a structure, which acts as a block member, will cause mismatch
+      // load/store when we visit this bool variable.
 #if 0
     assert(getValueType(PtrId)->getPointerElementType() == getValueType(ValId)
       && "Inconsistent operand types");
 
 #endif
   }
+
 private:
   std::vector<SPIRVWord> MemoryAccess;
   SPIRVId PtrId;
@@ -650,21 +602,15 @@ class SPIRVLoad : public SPIRVInstruction, public SPIRVMemoryAccess {
 public:
   const static SPIRVWord FixedWords = 4;
   // Complete constructor
-  SPIRVLoad(SPIRVId TheId, SPIRVId PointerId,
-            const std::vector<SPIRVWord> &TheMemoryAccess,
-            SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(
-            FixedWords + TheMemoryAccess.size(), OpLoad,
-            TheBB->getValueType(PointerId)->getPointerElementType(), TheId,
-            TheBB),
-        SPIRVMemoryAccess(TheMemoryAccess), PtrId(PointerId),
-        MemoryAccess(TheMemoryAccess) {
+  SPIRVLoad(SPIRVId TheId, SPIRVId PointerId, const std::vector<SPIRVWord> &TheMemoryAccess, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(FixedWords + TheMemoryAccess.size(), OpLoad,
+                         TheBB->getValueType(PointerId)->getPointerElementType(), TheId, TheBB),
+        SPIRVMemoryAccess(TheMemoryAccess), PtrId(PointerId), MemoryAccess(TheMemoryAccess) {
     validate();
     assert(TheBB && "Invalid BB");
   }
   // Incomplete constructor
-  SPIRVLoad()
-      : SPIRVInstruction(OpLoad), SPIRVMemoryAccess(), PtrId(SPIRVID_INVALID) {}
+  SPIRVLoad() : SPIRVInstruction(OpLoad), SPIRVMemoryAccess(), PtrId(SPIRVID_INVALID) {}
 
   SPIRVValue *getSrc() const { return Module->get<SPIRVValue>(PtrId); }
 
@@ -681,8 +627,7 @@ protected:
 
   void validate() const override {
     SPIRVInstruction::validate();
-    assert((getValue(PtrId)->isForward() ||
-            Type == getValueType(PtrId)->getPointerElementType()) &&
+    assert((getValue(PtrId)->isForward() || Type == getValueType(PtrId)->getPointerElementType()) &&
            "Inconsistent types");
   }
 
@@ -702,11 +647,9 @@ protected:
       return;
     if (getValueType(Op1)->isTypeVector()) {
       Op1Ty = getValueType(Op1)->getVectorComponentType();
-    }
-    else if (getValueType(Op1)->isTypeMatrix()) {
+    } else if (getValueType(Op1)->isTypeMatrix()) {
       Op1Ty = getValueType(Op1)->getMatrixColumnType()->getVectorComponentType();
-    }
-    else {
+    } else {
       Op1Ty = getValueType(Op1);
     }
 
@@ -720,35 +663,27 @@ protected:
     (void)Op1Ty;
     (void)Op2Ty;
     if (isBinaryOpCode(OpCode)) {
-      assert((getValueType(Op1) == getValueType(Op2) ||
-             (Op1Ty->isTypeInt() && Op2Ty->isTypeInt(Op1Ty->getBitWidth()))) &&
-             "Invalid type for binary instruction");
-      assert((Op1Ty->isTypeInt() || Op2Ty->isTypeFloat()) &&
-             "Invalid type for Binary instruction");
-      assert((Op1Ty->getBitWidth() == Op2Ty->getBitWidth()) &&
-             "Inconsistent BitWidth");
+      assert(
+          (getValueType(Op1) == getValueType(Op2) || (Op1Ty->isTypeInt() && Op2Ty->isTypeInt(Op1Ty->getBitWidth()))) &&
+          "Invalid type for binary instruction");
+      assert((Op1Ty->isTypeInt() || Op2Ty->isTypeFloat()) && "Invalid type for Binary instruction");
+      assert((Op1Ty->getBitWidth() == Op2Ty->getBitWidth()) && "Inconsistent BitWidth");
     } else if (isShiftOpCode(OpCode)) {
-      assert((Op1Ty->isTypeInt() || Op2Ty->isTypeInt()) &&
-             "Invalid type for shift instruction");
+      assert((Op1Ty->isTypeInt() || Op2Ty->isTypeInt()) && "Invalid type for shift instruction");
     } else if (isLogicalOpCode(OpCode)) {
-      assert((Op1Ty->isTypeBool() || Op2Ty->isTypeBool()) &&
-             "Invalid type for logical instruction");
+      assert((Op1Ty->isTypeBool() || Op2Ty->isTypeBool()) && "Invalid type for logical instruction");
     } else if (isBitwiseOpCode(OpCode)) {
       // Old shader compilers would sometimes emit bitwise opcodes when they
       // should have used logical, so accept either bool or int here.
-      assert((Op1Ty->isTypeInt() || Op1Ty->isTypeBool()) &&
-             (Op2Ty->isTypeInt() || Op2Ty->isTypeBool()) &&
+      assert((Op1Ty->isTypeInt() || Op1Ty->isTypeBool()) && (Op2Ty->isTypeInt() || Op2Ty->isTypeBool()) &&
              "Invalid type for bitwise instruction");
-      assert((Op1Ty->getIntegerBitWidth() == Op2Ty->getIntegerBitWidth()) &&
-             "Inconsistent BitWidth");
+      assert((Op1Ty->getIntegerBitWidth() == Op2Ty->getIntegerBitWidth()) && "Inconsistent BitWidth");
     } else if (isMatrixOpCode(OpCode)) {
-      assert((Op1Ty->getBitWidth() == Op2Ty->getBitWidth()) &&
-          "Inconsistent BitWidth");
+      assert((Op1Ty->getBitWidth() == Op2Ty->getBitWidth()) && "Inconsistent BitWidth");
     }
 #if SPV_VERSION >= 0x10400
     else if (OpCode == OpPtrDiff) {
-      assert(Op1Ty->isTypePointer() && Op2Ty->isTypePointer() &&
-            "Invalid type for ptr diff instruction");
+      assert(Op1Ty->isTypePointer() && Op2Ty->isTypePointer() && "Invalid type for ptr diff instruction");
       Op1Ty = Op1Ty->getPointerElementType();
       Op2Ty = Op2Ty->getPointerElementType();
       assert(Op1Ty == Op2Ty && "Inconsistent type");
@@ -760,9 +695,7 @@ protected:
   }
 };
 
-template <Op OC>
-class SPIRVBinaryInst
-    : public SPIRVInstTemplate<SPIRVBinary, OC, true, 5, false> {};
+template <Op OC> class SPIRVBinaryInst : public SPIRVInstTemplate<SPIRVBinary, OC, true, 5, false> {};
 
 #define _SPIRV_OP(x) typedef SPIRVBinaryInst<Op##x> SPIRV##x;
 _SPIRV_OP(IAdd)
@@ -802,8 +735,7 @@ _SPIRV_OP(PtrDiff)
 template <Op TheOpCode> class SPIRVInstNoOperand : public SPIRVInstruction {
 public:
   // Complete constructor
-  SPIRVInstNoOperand(SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(1, TheOpCode, TheBB) {
+  SPIRVInstNoOperand(SPIRVBasicBlock *TheBB) : SPIRVInstruction(1, TheOpCode, TheBB) {
     setAttr();
     validate();
   }
@@ -814,6 +746,7 @@ public:
     std::vector<SPIRVValue *> NoOperand;
     return NoOperand;
   }
+
 protected:
   void setAttr() {
     setHasNoId();
@@ -839,9 +772,7 @@ public:
     assert(TheBB && "Invalid BB");
   }
   // Incomplete constructor
-  SPIRVReturnValue() : SPIRVInstruction(OC), ReturnValueId(SPIRVID_INVALID) {
-    setAttr();
-  }
+  SPIRVReturnValue() : SPIRVInstruction(OC), ReturnValueId(SPIRVID_INVALID) { setAttr(); }
 
   SPIRVValue *getReturnValue() const { return getValue(ReturnValueId); }
 
@@ -886,18 +817,15 @@ class SPIRVBranchConditional : public SPIRVInstruction {
 public:
   static const Op OC = OpBranchConditional;
   // Complete constructor
-  SPIRVBranchConditional(SPIRVValue *TheCondition, SPIRVLabel *TheTrueLabel,
-                         SPIRVLabel *TheFalseLabel, SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(4, OC, TheBB), ConditionId(TheCondition->getId()),
-        TrueLabelId(TheTrueLabel->getId()),
+  SPIRVBranchConditional(SPIRVValue *TheCondition, SPIRVLabel *TheTrueLabel, SPIRVLabel *TheFalseLabel,
+                         SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(4, OC, TheBB), ConditionId(TheCondition->getId()), TrueLabelId(TheTrueLabel->getId()),
         FalseLabelId(TheFalseLabel->getId()) {
     validate();
   }
-  SPIRVBranchConditional(SPIRVValue *TheCondition, SPIRVLabel *TheTrueLabel,
-                         SPIRVLabel *TheFalseLabel, SPIRVBasicBlock *TheBB,
-                         SPIRVWord TrueWeight, SPIRVWord FalseWeight)
-      : SPIRVInstruction(6, OC, TheBB), ConditionId(TheCondition->getId()),
-        TrueLabelId(TheTrueLabel->getId()),
+  SPIRVBranchConditional(SPIRVValue *TheCondition, SPIRVLabel *TheTrueLabel, SPIRVLabel *TheFalseLabel,
+                         SPIRVBasicBlock *TheBB, SPIRVWord TrueWeight, SPIRVWord FalseWeight)
+      : SPIRVInstruction(6, OC, TheBB), ConditionId(TheCondition->getId()), TrueLabelId(TheTrueLabel->getId()),
         FalseLabelId(TheFalseLabel->getId()) {
     BranchWeights.push_back(TrueWeight);
     BranchWeights.push_back(FalseWeight);
@@ -906,8 +834,8 @@ public:
   }
   // Incomplete constructor
   SPIRVBranchConditional()
-      : SPIRVInstruction(OC), ConditionId(SPIRVID_INVALID),
-        TrueLabelId(SPIRVID_INVALID), FalseLabelId(SPIRVID_INVALID) {
+      : SPIRVInstruction(OC), ConditionId(SPIRVID_INVALID), TrueLabelId(SPIRVID_INVALID),
+        FalseLabelId(SPIRVID_INVALID) {
     setHasNoId();
     setHasNoType();
   }
@@ -926,10 +854,8 @@ protected:
     assert(WordCount == 4 || WordCount == 6);
     assert(WordCount == BranchWeights.size() + 4);
     assert(OpCode == OC);
-    assert(getCondition()->isForward() ||
-           getCondition()->getType()->isTypeBool() ||
-           getCondition()->getType()->isTypeFloat() ||
-           getCondition()->getType()->isTypeInt());
+    assert(getCondition()->isForward() || getCondition()->getType()->isTypeBool() ||
+           getCondition()->getType()->isTypeFloat() || getCondition()->getType()->isTypeInt());
     assert(getTrueLabel()->isForward() || getTrueLabel()->isLabel());
     assert(getFalseLabel()->isForward() || getFalseLabel()->isLabel());
 #if SPV_VERSION >= 0x10600
@@ -948,10 +874,8 @@ class SPIRVPhi : public SPIRVInstruction {
 public:
   static const Op OC = OpPhi;
   static const SPIRVWord FixedWordCount = 3;
-  SPIRVPhi(SPIRVType *TheType, SPIRVId TheId,
-           const std::vector<SPIRVValue *> &ThePairs, SPIRVBasicBlock *BB)
-      : SPIRVInstruction(ThePairs.size() + FixedWordCount, OC, TheType, TheId,
-                         BB) {
+  SPIRVPhi(SPIRVType *TheType, SPIRVId TheId, const std::vector<SPIRVValue *> &ThePairs, SPIRVBasicBlock *BB)
+      : SPIRVInstruction(ThePairs.size() + FixedWordCount, OC, TheType, TheId, BB) {
     Pairs = getIds(ThePairs);
     validate();
     assert(BB && "Invalid BB");
@@ -969,26 +893,20 @@ public:
     WordCount = Pairs.size() + FixedWordCount;
     validate();
   }
-  void foreachPair(
-      std::function<void(SPIRVValue *, SPIRVBasicBlock *, size_t)> Func) {
+  void foreachPair(std::function<void(SPIRVValue *, SPIRVBasicBlock *, size_t)> Func) {
     for (size_t I = 0, E = Pairs.size() / 2; I != E; ++I) {
       SPIRVEntry *Value, *BB;
-      if (!Module->exist(Pairs[2 * I], &Value) ||
-          !Module->exist(Pairs[2 * I + 1], &BB))
+      if (!Module->exist(Pairs[2 * I], &Value) || !Module->exist(Pairs[2 * I + 1], &BB))
         continue;
-      Func(static_cast<SPIRVValue *>(Value), static_cast<SPIRVBasicBlock *>(BB),
-           I);
+      Func(static_cast<SPIRVValue *>(Value), static_cast<SPIRVBasicBlock *>(BB), I);
     }
   }
-  void
-  foreachPair(std::function<void(SPIRVValue *, SPIRVBasicBlock *)> Func) const {
+  void foreachPair(std::function<void(SPIRVValue *, SPIRVBasicBlock *)> Func) const {
     for (size_t I = 0, E = Pairs.size() / 2; I != E; ++I) {
       SPIRVEntry *Value, *BB;
-      if (!Module->exist(Pairs[2 * I], &Value) ||
-          !Module->exist(Pairs[2 * I + 1], &BB))
+      if (!Module->exist(Pairs[2 * I], &Value) || !Module->exist(Pairs[2 * I + 1], &BB))
         continue;
-      Func(static_cast<SPIRVValue *>(Value),
-           static_cast<SPIRVBasicBlock *>(BB));
+      Func(static_cast<SPIRVValue *>(Value), static_cast<SPIRVBasicBlock *>(BB));
     }
   }
   void setWordCount(SPIRVWord TheWordCount) override {
@@ -1026,10 +944,8 @@ private:
   void propagateMemoryDecorates() {
     if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
       auto StorageClass = Type->getPointerStorageClass();
-      if (StorageClass == StorageClassStorageBuffer ||
-          StorageClass == StorageClassUniform ||
-          StorageClass == StorageClassPushConstant ||
-          StorageClass == StorageClassPhysicalStorageBufferEXT) {
+      if (StorageClass == StorageClassStorageBuffer || StorageClass == StorageClassUniform ||
+          StorageClass == StorageClassPushConstant || StorageClass == StorageClassPhysicalStorageBufferEXT) {
         // Handle buffer block pointer
         bool IsVolatile = false;
         bool IsCoherent = false;
@@ -1067,8 +983,7 @@ protected:
       Op1Ty = getValueType(Op1)->getVectorComponentType();
       Op2Ty = getValueType(Op2)->getVectorComponentType();
       ResTy = Type->getVectorComponentType();
-      assert(getValueType(Op1)->getVectorComponentCount() ==
-                 getValueType(Op2)->getVectorComponentCount() &&
+      assert(getValueType(Op1)->getVectorComponentCount() == getValueType(Op2)->getVectorComponentCount() &&
              "Inconsistent Vector component width");
     } else {
       Op1Ty = getValueType(Op1);
@@ -1076,25 +991,20 @@ protected:
       ResTy = Type;
 #if SPV_VERSION >= 0x10400
       if (Op1Ty->isTypePointer() || Op2Ty->isTypePointer()) {
-          assert(Op1Ty == Op2Ty && "Invalid type for ptr cmp inst");
-          Op1Ty = Op1Ty->getPointerElementType();
-          Op2Ty = Op2Ty->getPointerElementType();
+        assert(Op1Ty == Op2Ty && "Invalid type for ptr cmp inst");
+        Op1Ty = Op1Ty->getPointerElementType();
+        Op2Ty = Op2Ty->getPointerElementType();
       }
 #endif
     }
     assert(isCmpOpCode(OpCode) && "Invalid op code for cmp inst");
-    assert((ResTy->isTypeBool() || ResTy->isTypeInt()) &&
-        "Invalid type for compare instruction");
-    assert(((Op1Ty == Op2Ty) ||
-            (Op1Ty->isTypeInt(Op1Ty->getBitWidth()) &&
-            Op2Ty->isTypeInt(Op1Ty->getBitWidth()))) &&
-            "Inconsistent types");
+    assert((ResTy->isTypeBool() || ResTy->isTypeInt()) && "Invalid type for compare instruction");
+    assert(((Op1Ty == Op2Ty) || (Op1Ty->isTypeInt(Op1Ty->getBitWidth()) && Op2Ty->isTypeInt(Op1Ty->getBitWidth()))) &&
+           "Inconsistent types");
   }
 };
 
-template <Op OC>
-class SPIRVCmpInst
-    : public SPIRVInstTemplate<SPIRVCompare, OC, true, 5, false> {};
+template <Op OC> class SPIRVCmpInst : public SPIRVInstTemplate<SPIRVCompare, OC, true, 5, false> {};
 
 #define _SPIRV_OP(x) typedef SPIRVCmpInst<Op##x> SPIRV##x;
 _SPIRV_OP(IEqual)
@@ -1128,18 +1038,14 @@ _SPIRV_OP(PtrNotEqual)
 class SPIRVSelect : public SPIRVInstruction {
 public:
   // Complete constructor
-  SPIRVSelect(SPIRVId TheId, SPIRVId TheCondition, SPIRVId TheOp1,
-              SPIRVId TheOp2, SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(6, OpSelect, TheBB->getValueType(TheOp1), TheId,
-                         TheBB),
-        Condition(TheCondition), Op1(TheOp1), Op2(TheOp2) {
+  SPIRVSelect(SPIRVId TheId, SPIRVId TheCondition, SPIRVId TheOp1, SPIRVId TheOp2, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(6, OpSelect, TheBB->getValueType(TheOp1), TheId, TheBB), Condition(TheCondition), Op1(TheOp1),
+        Op2(TheOp2) {
     validate();
     assert(TheBB && "Invalid BB");
   }
   // Incomplete constructor
-  SPIRVSelect()
-      : SPIRVInstruction(OpSelect), Condition(SPIRVID_INVALID),
-        Op1(SPIRVID_INVALID), Op2(SPIRVID_INVALID) {}
+  SPIRVSelect() : SPIRVInstruction(OpSelect), Condition(SPIRVID_INVALID), Op1(SPIRVID_INVALID), Op2(SPIRVID_INVALID) {}
   SPIRVValue *getCondition() { return getValue(Condition); }
   SPIRVValue *getTrueValue() { return getValue(Op1); }
   SPIRVValue *getFalseValue() { return getValue(Op2); }
@@ -1160,17 +1066,14 @@ protected:
   _SPIRV_DEF_DECODE5(Type, Id, Condition, Op1, Op2)
   void validate() const override {
     SPIRVInstruction::validate();
-    if (getValue(Condition)->isForward() || getValue(Op1)->isForward() ||
-        getValue(Op2)->isForward())
+    if (getValue(Condition)->isForward() || getValue(Op1)->isForward() || getValue(Op2)->isForward())
       return;
 
-    SPIRVType *ConTy = getValueType(Condition)->isTypeVector()
-                           ? getValueType(Condition)->getVectorComponentType()
-                           : getValueType(Condition);
+    SPIRVType *ConTy = getValueType(Condition)->isTypeVector() ? getValueType(Condition)->getVectorComponentType()
+                                                               : getValueType(Condition);
     (void)ConTy;
     assert(ConTy->isTypeBool() && "Invalid type");
-    assert(getType() == getValueType(Op1) && getType() == getValueType(Op2) &&
-           "Inconsistent type");
+    assert(getType() == getValueType(Op1) && getType() == getValueType(Op2) && "Inconsistent type");
   }
   SPIRVId Condition;
   SPIRVId Op1;
@@ -1180,15 +1083,11 @@ private:
   void propagateMemoryDecorates() {
     if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
       auto StorageClass = Type->getPointerStorageClass();
-      if (StorageClass == StorageClassStorageBuffer ||
-          StorageClass == StorageClassUniform ||
-          StorageClass == StorageClassPushConstant ||
-          StorageClass == StorageClassPhysicalStorageBufferEXT) {
+      if (StorageClass == StorageClassStorageBuffer || StorageClass == StorageClassUniform ||
+          StorageClass == StorageClassPushConstant || StorageClass == StorageClassPhysicalStorageBufferEXT) {
         // Handle buffer block pointer
-        setVolatile(getTrueValue()->isVolatile() ||
-          getFalseValue()->isVolatile());
-        setCoherent(getTrueValue()->isCoherent() ||
-          getFalseValue()->isCoherent());
+        setVolatile(getTrueValue()->isVolatile() || getFalseValue()->isVolatile());
+        setCoherent(getTrueValue()->isCoherent() || getFalseValue()->isCoherent());
       }
     }
 
@@ -1203,17 +1102,13 @@ public:
   static const Op OC = OpSelectionMerge;
   static const SPIRVWord FixedWordCount = 3;
 
-  SPIRVSelectionMerge(SPIRVId TheMergeBlock, SPIRVWord TheSelectionControl,
-                      SPIRVBasicBlock *BB)
-      : SPIRVInstruction(3, OC, BB), MergeBlock(TheMergeBlock),
-        SelectionControl(TheSelectionControl) {
+  SPIRVSelectionMerge(SPIRVId TheMergeBlock, SPIRVWord TheSelectionControl, SPIRVBasicBlock *BB)
+      : SPIRVInstruction(3, OC, BB), MergeBlock(TheMergeBlock), SelectionControl(TheSelectionControl) {
     validate();
     assert(BB && "Invalid BB");
   }
 
-  SPIRVSelectionMerge()
-      : SPIRVInstruction(OC), MergeBlock(SPIRVID_INVALID),
-        SelectionControl(SPIRVWORD_MAX) {
+  SPIRVSelectionMerge() : SPIRVInstruction(OC), MergeBlock(SPIRVID_INVALID), SelectionControl(SPIRVWORD_MAX) {
     setHasNoId();
     setHasNoType();
   }
@@ -1233,20 +1128,15 @@ public:
   static const Op OC = OpLoopMerge;
   static const SPIRVWord FixedWordCount = 4;
 
-  SPIRVLoopMerge(SPIRVId TheMergeBlock, SPIRVId TheContinueTarget,
-                 SPIRVWord TheLoopControl,
-                 const std::vector<SPIRVWord> &TheLoopControlParameters,
-                 SPIRVBasicBlock *BB)
-      : SPIRVInstruction(TheLoopControlParameters.size() + FixedWordCount,
-                         OC, BB), MergeBlock(TheMergeBlock),
-      ContinueTarget(TheContinueTarget), LoopControl(TheLoopControl) {
+  SPIRVLoopMerge(SPIRVId TheMergeBlock, SPIRVId TheContinueTarget, SPIRVWord TheLoopControl,
+                 const std::vector<SPIRVWord> &TheLoopControlParameters, SPIRVBasicBlock *BB)
+      : SPIRVInstruction(TheLoopControlParameters.size() + FixedWordCount, OC, BB), MergeBlock(TheMergeBlock),
+        ContinueTarget(TheContinueTarget), LoopControl(TheLoopControl) {
     validate();
     assert(BB && "Invalid BB");
   }
 
-  SPIRVLoopMerge()
-      : SPIRVInstruction(OC), MergeBlock(SPIRVID_MAX),
-        LoopControl(SPIRVWORD_MAX) {
+  SPIRVLoopMerge() : SPIRVInstruction(OC), MergeBlock(SPIRVID_MAX), LoopControl(SPIRVWORD_MAX) {
     setHasNoId();
     setHasNoType();
   }
@@ -1254,15 +1144,12 @@ public:
   SPIRVId getMergeBlock() { return MergeBlock; }
   SPIRVId getContinueTarget() { return ContinueTarget; }
   SPIRVWord getLoopControl() { return LoopControl; }
-  std::vector<SPIRVWord>& getLoopControlParameters() {
-    return LoopControlParameters;
-  }
+  std::vector<SPIRVWord> &getLoopControlParameters() { return LoopControlParameters; }
   void setWordCount(SPIRVWord TheWordCount) override {
     SPIRVEntry::setWordCount(TheWordCount);
     LoopControlParameters.resize(TheWordCount - FixedWordCount);
   }
-  _SPIRV_DEF_DECODE4(MergeBlock, ContinueTarget, LoopControl,
-     LoopControlParameters)
+  _SPIRV_DEF_DECODE4(MergeBlock, ContinueTarget, LoopControl, LoopControlParameters)
 
 protected:
   SPIRVId MergeBlock;
@@ -1278,11 +1165,9 @@ public:
   typedef std::vector<SPIRVWord> LiteralTy;
   typedef std::pair<LiteralTy, SPIRVBasicBlock *> PairTy;
 
-  SPIRVSwitch(SPIRVValue *TheSelect, SPIRVBasicBlock *TheDefault,
-              const std::vector<PairTy> &ThePairs, SPIRVBasicBlock *BB)
-      : SPIRVInstruction(ThePairs.size() * (ThePairs.at(0).first.size() + 1) +
-                             FixedWordCount,
-                         OC, BB),
+  SPIRVSwitch(SPIRVValue *TheSelect, SPIRVBasicBlock *TheDefault, const std::vector<PairTy> &ThePairs,
+              SPIRVBasicBlock *BB)
+      : SPIRVInstruction(ThePairs.size() * (ThePairs.at(0).first.size() + 1) + FixedWordCount, OC, BB),
         Select(TheSelect->getId()), Default(TheDefault->getId()) {
 
     for (auto &I : ThePairs) {
@@ -1293,25 +1178,20 @@ public:
     validate();
     assert(BB && "Invalid BB");
   }
-  SPIRVSwitch()
-      : SPIRVInstruction(OC), Select(SPIRVWORD_MAX), Default(SPIRVWORD_MAX) {
+  SPIRVSwitch() : SPIRVInstruction(OC), Select(SPIRVWORD_MAX), Default(SPIRVWORD_MAX) {
     setHasNoId();
     setHasNoType();
   }
   std::vector<SPIRVValue *> getPairs() { return getValues(Pairs); }
   SPIRVValue *getSelect() const { return getValue(Select); }
-  SPIRVBasicBlock *getDefault() const {
-    return static_cast<SPIRVBasicBlock *>(getValue(Default));
-  }
+  SPIRVBasicBlock *getDefault() const { return static_cast<SPIRVBasicBlock *>(getValue(Default)); }
   size_t getLiteralsCount() const {
     auto SelectorBitSize = getSelect()->getType()->getBitWidth();
-    return SelectorBitSize < (sizeof(SPIRVWord) * 8) ? 1 :
-      SelectorBitSize / (sizeof(SPIRVWord) * 8);
+    return SelectorBitSize < (sizeof(SPIRVWord) * 8) ? 1 : SelectorBitSize / (sizeof(SPIRVWord) * 8);
   }
   size_t getPairSize() const { return getLiteralsCount() + 1; }
   size_t getNumPairs() const { return Pairs.size() / getPairSize(); }
-  void
-  foreachPair(std::function<void(LiteralTy, SPIRVBasicBlock *)> Func) const {
+  void foreachPair(std::function<void(LiteralTy, SPIRVBasicBlock *)> Func) const {
     unsigned PairSize = getPairSize();
     for (size_t I = 0, E = getNumPairs(); I != E; ++I) {
       SPIRVEntry *BB;
@@ -1334,9 +1214,7 @@ public:
     assert(WordCount == Pairs.size() + FixedWordCount);
     assert(OpCode == OC);
     assert(Pairs.size() % getPairSize() == 0);
-    foreachPair([=](LiteralTy Literals, SPIRVBasicBlock *BB) {
-      assert(BB->isBasicBlock() || BB->isForward());
-    });
+    foreachPair([=](LiteralTy Literals, SPIRVBasicBlock *BB) { assert(BB->isBasicBlock() || BB->isForward()); });
     SPIRVInstruction::validate();
   }
 
@@ -1351,17 +1229,13 @@ public:
   static const Op OC = OpFMod;
   static const SPIRVWord FixedWordCount = 4;
   // Complete constructor
-  SPIRVFMod(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheDividend,
-            SPIRVId TheDivisor, SPIRVBasicBlock *BB)
-      : SPIRVInstruction(5, OC, TheType, TheId, BB), Dividend(TheDividend),
-        Divisor(TheDivisor) {
+  SPIRVFMod(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheDividend, SPIRVId TheDivisor, SPIRVBasicBlock *BB)
+      : SPIRVInstruction(5, OC, TheType, TheId, BB), Dividend(TheDividend), Divisor(TheDivisor) {
     validate();
     assert(BB && "Invalid BB");
   }
   // Incomplete constructor
-  SPIRVFMod()
-      : SPIRVInstruction(OC), Dividend(SPIRVID_INVALID),
-        Divisor(SPIRVID_INVALID) {}
+  SPIRVFMod() : SPIRVInstruction(OC), Dividend(SPIRVID_INVALID), Divisor(SPIRVID_INVALID) {}
   SPIRVValue *getDividend() const { return getValue(Dividend); }
   SPIRVValue *getDivisor() const { return getValue(Divisor); }
 
@@ -1372,9 +1246,7 @@ public:
     return getValues(Operands);
   }
 
-  void setWordCount(SPIRVWord FixedWordCount) override {
-    SPIRVEntry::setWordCount(FixedWordCount);
-  }
+  void setWordCount(SPIRVWord FixedWordCount) override { SPIRVEntry::setWordCount(FixedWordCount); }
   _SPIRV_DEF_DECODE4(Type, Id, Dividend, Divisor)
   void validate() const override {
     SPIRVInstruction::validate();
@@ -1393,17 +1265,13 @@ public:
   static const Op OC = OpVectorTimesScalar;
   static const SPIRVWord FixedWordCount = 4;
   // Complete constructor
-  SPIRVVectorTimesScalar(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheVector,
-                         SPIRVId TheScalar, SPIRVBasicBlock *BB)
-      : SPIRVInstruction(5, OC, TheType, TheId, BB), Vector(TheVector),
-        Scalar(TheScalar) {
+  SPIRVVectorTimesScalar(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheVector, SPIRVId TheScalar, SPIRVBasicBlock *BB)
+      : SPIRVInstruction(5, OC, TheType, TheId, BB), Vector(TheVector), Scalar(TheScalar) {
     validate();
     assert(BB && "Invalid BB");
   }
   // Incomplete constructor
-  SPIRVVectorTimesScalar()
-      : SPIRVInstruction(OC), Vector(SPIRVID_INVALID), Scalar(SPIRVID_INVALID) {
-  }
+  SPIRVVectorTimesScalar() : SPIRVInstruction(OC), Vector(SPIRVID_INVALID), Scalar(SPIRVID_INVALID) {}
   SPIRVValue *getVector() const { return getValue(Vector); }
   SPIRVValue *getScalar() const { return getValue(Scalar); }
 
@@ -1414,25 +1282,19 @@ public:
     return getValues(Operands);
   }
 
-  void setWordCount(SPIRVWord FixedWordCount) override {
-    SPIRVEntry::setWordCount(FixedWordCount);
-  }
+  void setWordCount(SPIRVWord FixedWordCount) override { SPIRVEntry::setWordCount(FixedWordCount); }
   _SPIRV_DEF_DECODE4(Type, Id, Vector, Scalar)
   void validate() const override {
     SPIRVInstruction::validate();
     if (getValue(Vector)->isForward() || getValue(Scalar)->isForward())
       return;
 
-    assert(getValueType(Vector)->isTypeVector() &&
-           getValueType(Vector)->getVectorComponentType()->isTypeFloat() &&
+    assert(getValueType(Vector)->isTypeVector() && getValueType(Vector)->getVectorComponentType()->isTypeFloat() &&
            "First operand must be a vector of floating-point type");
-    assert(getValueType(getId())->isTypeVector() &&
-           getValueType(getId())->getVectorComponentType()->isTypeFloat() &&
+    assert(getValueType(getId())->isTypeVector() && getValueType(getId())->getVectorComponentType()->isTypeFloat() &&
            "Result type must be a vector of floating-point type");
-    assert(
-        getValueType(Vector)->getVectorComponentType() ==
-            getValueType(getId())->getVectorComponentType() &&
-        "Scalar must have the same type as the Component Type in Result Type");
+    assert(getValueType(Vector)->getVectorComponentType() == getValueType(getId())->getVectorComponentType() &&
+           "Scalar must have the same type as the Component Type in Result Type");
     SPIRVInstruction::validate();
   }
 
@@ -1459,22 +1321,16 @@ protected:
       (void)OpTy;
       // NOTE: SPIR-V spec only request OpFNegate to match the type between Operand and Result.
       assert((getType() == getValueType(Op) || static_cast<unsigned>(OpCode) != OpFNegate) && "Inconsistent type");
-      assert((ResTy->isTypeInt() || ResTy->isTypeFloat()) &&
-             "Invalid type for Generic Negate instruction");
-      assert((ResTy->getBitWidth() == OpTy->getBitWidth()) &&
-             "Invalid bitwidth for Generic Negate instruction");
-      assert((Type->isTypeVector()
-                  ? (Type->getVectorComponentCount() ==
-                     getValueType(Op)->getVectorComponentCount())
-                  : 1) &&
+      assert((ResTy->isTypeInt() || ResTy->isTypeFloat()) && "Invalid type for Generic Negate instruction");
+      assert((ResTy->getBitWidth() == OpTy->getBitWidth()) && "Invalid bitwidth for Generic Negate instruction");
+      assert((Type->isTypeVector() ? (Type->getVectorComponentCount() == getValueType(Op)->getVectorComponentCount())
+                                   : 1) &&
              "Invalid vector component Width for Generic Negate instruction");
     }
   }
 };
 
-template <Op OC>
-class SPIRVUnaryInst
-    : public SPIRVInstTemplate<SPIRVUnary, OC, true, 4, false> {};
+template <Op OC> class SPIRVUnaryInst : public SPIRVInstTemplate<SPIRVUnary, OC, true, 4, false> {};
 
 #define _SPIRV_OP(x) typedef SPIRVUnaryInst<Op##x> SPIRV##x;
 _SPIRV_OP(ConvertFToU)
@@ -1520,13 +1376,8 @@ public:
     std::vector<SPIRVWord> IndexWords(this->Ops.begin() + 1, this->Ops.end());
     return this->getValues(IndexWords);
   }
-  bool isInBounds() {
-    return OpCode == OpInBoundsAccessChain ||
-           OpCode == OpInBoundsPtrAccessChain;
-  }
-  bool hasPtrIndex() {
-    return OpCode == OpPtrAccessChain || OpCode == OpInBoundsPtrAccessChain;
-  }
+  bool isInBounds() { return OpCode == OpInBoundsAccessChain || OpCode == OpInBoundsPtrAccessChain; }
+  bool hasPtrIndex() { return OpCode == OpPtrAccessChain || OpCode == OpInBoundsPtrAccessChain; }
 
   virtual bool isVolatile() override {
     if (checkMemoryDecorates)
@@ -1547,10 +1398,8 @@ private:
     assert(BaseTy->isTypePointer() || BaseTy->isTypeForwardPointer());
 
     auto StorageClass = BaseTy->getPointerStorageClass();
-    if (StorageClass == StorageClassStorageBuffer ||
-        StorageClass == StorageClassUniform ||
-        StorageClass == StorageClassPushConstant ||
-        StorageClass == StorageClassPhysicalStorageBufferEXT) {
+    if (StorageClass == StorageClassStorageBuffer || StorageClass == StorageClassUniform ||
+        StorageClass == StorageClassPushConstant || StorageClass == StorageClassPhysicalStorageBufferEXT) {
       // Handle buffer block pointer
       std::vector<SPIRVValue *> Indices = getIndices();
 
@@ -1562,14 +1411,11 @@ private:
       for (unsigned I = hasPtrIndex() ? 1 : 0; I < Indices.size(); ++I) {
         switch (AccessTy->getOpCode()) {
         case OpTypeStruct: {
-          unsigned MemberIdx =
-            static_cast<SPIRVConstant *>(Indices[I])->getZExtIntValue();
+          unsigned MemberIdx = static_cast<SPIRVConstant *>(Indices[I])->getZExtIntValue();
 
           // Memory decorations of members overwrite those of base
-          IsVolatile |=
-            AccessTy->hasMemberDecorate(MemberIdx, DecorationVolatile);
-          IsCoherent |=
-            AccessTy->hasMemberDecorate(MemberIdx, DecorationCoherent);
+          IsVolatile |= AccessTy->hasMemberDecorate(MemberIdx, DecorationVolatile);
+          IsCoherent |= AccessTy->hasMemberDecorate(MemberIdx, DecorationCoherent);
 
           AccessTy = AccessTy->getStructMemberType(MemberIdx);
           break;
@@ -1598,34 +1444,24 @@ private:
 };
 
 template <Op OC, unsigned FixedWC>
-class SPIRVAccessChainGeneric
-    : public SPIRVInstTemplate<SPIRVAccessChainBase, OC, true, FixedWC, true> {
-};
+class SPIRVAccessChainGeneric : public SPIRVInstTemplate<SPIRVAccessChainBase, OC, true, FixedWC, true> {};
 
 typedef SPIRVAccessChainGeneric<OpAccessChain, 4> SPIRVAccessChain;
-typedef SPIRVAccessChainGeneric<OpInBoundsAccessChain, 4>
-    SPIRVInBoundsAccessChain;
+typedef SPIRVAccessChainGeneric<OpInBoundsAccessChain, 4> SPIRVInBoundsAccessChain;
 typedef SPIRVAccessChainGeneric<OpPtrAccessChain, 5> SPIRVPtrAccessChain;
-typedef SPIRVAccessChainGeneric<OpInBoundsPtrAccessChain, 5>
-    SPIRVInBoundsPtrAccessChain;
+typedef SPIRVAccessChainGeneric<OpInBoundsPtrAccessChain, 5> SPIRVInBoundsPtrAccessChain;
 
-template <Op OC, SPIRVWord FixedWordCount>
-class SPIRVFunctionCallGeneric : public SPIRVInstruction {
+template <Op OC, SPIRVWord FixedWordCount> class SPIRVFunctionCallGeneric : public SPIRVInstruction {
 public:
-  SPIRVFunctionCallGeneric(SPIRVType *TheType, SPIRVId TheId,
-                           const std::vector<SPIRVWord> &TheArgs,
+  SPIRVFunctionCallGeneric(SPIRVType *TheType, SPIRVId TheId, const std::vector<SPIRVWord> &TheArgs,
                            SPIRVBasicBlock *BB)
-      : SPIRVInstruction(TheArgs.size() + FixedWordCount, OC, TheType, TheId,
-                         BB),
-        Args(TheArgs) {
+      : SPIRVInstruction(TheArgs.size() + FixedWordCount, OC, TheType, TheId, BB), Args(TheArgs) {
     validate();
     assert(BB && "Invalid BB");
   }
-  SPIRVFunctionCallGeneric(SPIRVType *TheType, SPIRVId TheId,
-                           const std::vector<SPIRVValue *> &TheArgs,
+  SPIRVFunctionCallGeneric(SPIRVType *TheType, SPIRVId TheId, const std::vector<SPIRVValue *> &TheArgs,
                            SPIRVBasicBlock *BB)
-      : SPIRVInstruction(TheArgs.size() + FixedWordCount, OC, TheType, TheId,
-                         BB) {
+      : SPIRVInstruction(TheArgs.size() + FixedWordCount, OC, TheType, TheId, BB) {
     Args = getIds(TheArgs);
     validate();
     assert(BB && "Invalid BB");
@@ -1651,8 +1487,8 @@ protected:
 
 class SPIRVFunctionCall : public SPIRVFunctionCallGeneric<OpFunctionCall, 4> {
 public:
-  SPIRVFunctionCall(SPIRVId TheId, SPIRVFunction *TheFunction,
-                    const std::vector<SPIRVWord> &TheArgs, SPIRVBasicBlock *BB);
+  SPIRVFunctionCall(SPIRVId TheId, SPIRVFunction *TheFunction, const std::vector<SPIRVWord> &TheArgs,
+                    SPIRVBasicBlock *BB);
   SPIRVFunctionCall() : FunctionId(SPIRVID_INVALID) {}
   SPIRVFunction *getFunction() const { return get<SPIRVFunction>(FunctionId); }
   _SPIRV_DEF_DECODE4(Type, Id, FunctionId, Args)
@@ -1665,24 +1501,19 @@ protected:
 
 class SPIRVExtInst : public SPIRVFunctionCallGeneric<OpExtInst, 5> {
 public:
-  SPIRVExtInst(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheBuiltinSet,
-               SPIRVWord TheEntryPoint, const std::vector<SPIRVWord> &TheArgs,
-               SPIRVBasicBlock *BB)
-      : SPIRVFunctionCallGeneric(TheType, TheId, TheArgs, BB),
-        ExtSetId(TheBuiltinSet), ExtOp(TheEntryPoint) {
+  SPIRVExtInst(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheBuiltinSet, SPIRVWord TheEntryPoint,
+               const std::vector<SPIRVWord> &TheArgs, SPIRVBasicBlock *BB)
+      : SPIRVFunctionCallGeneric(TheType, TheId, TheArgs, BB), ExtSetId(TheBuiltinSet), ExtOp(TheEntryPoint) {
     setExtSetKindById();
     validate();
   }
-  SPIRVExtInst(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheBuiltinSet,
-               SPIRVWord TheEntryPoint,
+  SPIRVExtInst(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheBuiltinSet, SPIRVWord TheEntryPoint,
                const std::vector<SPIRVValue *> &TheArgs, SPIRVBasicBlock *BB)
-      : SPIRVFunctionCallGeneric(TheType, TheId, TheArgs, BB),
-        ExtSetId(TheBuiltinSet), ExtOp(TheEntryPoint) {
+      : SPIRVFunctionCallGeneric(TheType, TheId, TheArgs, BB), ExtSetId(TheBuiltinSet), ExtOp(TheEntryPoint) {
     setExtSetKindById();
     validate();
   }
-  SPIRVExtInst(SPIRVExtInstSetKind SetKind = SPIRVEIS_Count,
-               unsigned ExtOC = SPIRVWORD_MAX)
+  SPIRVExtInst(SPIRVExtInstSetKind SetKind = SPIRVEIS_Count, unsigned ExtOC = SPIRVWORD_MAX)
       : ExtSetId(SPIRVWORD_MAX), ExtOp(ExtOC), ExtSetKind(SetKind) {}
   void setExtSetId(unsigned Set) { ExtSetId = Set; }
   void setExtOp(unsigned ExtOC) { ExtOp = ExtOC; }
@@ -1741,8 +1572,7 @@ protected:
     SPIRVWord ExtOp;
     GLSLExtOpKind ExtOpGLSL;
     ShaderBallotAMDExtOpKind ExtOpShaderBallotAMD;
-    ShaderExplicitVertexParameterAMDExtOpKind
-      ExtOpShaderExplicitVertexParameterAMD;
+    ShaderExplicitVertexParameterAMDExtOpKind ExtOpShaderExplicitVertexParameterAMD;
     GcnShaderAMDExtOpKind ExtOpGcnShaderAMD;
     ShaderTrinaryMinMaxAMDExtOpKind ExtOpShaderTrinaryMinMaxAMD;
     NonSemanticInfoExtOpKind ExtOpNonSemanticInfo;
@@ -1756,11 +1586,9 @@ public:
   const static Op OC = OpCompositeConstruct;
   const static SPIRVWord FixedWordCount = 3;
   // Complete constructor
-  SPIRVCompositeConstruct(SPIRVType *TheType, SPIRVId TheId,
-                          const std::vector<SPIRVId> &TheConstituents,
+  SPIRVCompositeConstruct(SPIRVType *TheType, SPIRVId TheId, const std::vector<SPIRVId> &TheConstituents,
                           SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(TheConstituents.size() + FixedWordCount, OC, TheType,
-                         TheId, TheBB),
+      : SPIRVInstruction(TheConstituents.size() + FixedWordCount, OC, TheType, TheId, TheBB),
         Constituents(TheConstituents) {
     validate();
     assert(TheBB && "Invalid BB");
@@ -1768,9 +1596,7 @@ public:
   // Incomplete constructor
   SPIRVCompositeConstruct() : SPIRVInstruction(OC) {}
 
-  const std::vector<SPIRVValue *> getConstituents() const {
-    return getValues(Constituents);
-  }
+  const std::vector<SPIRVValue *> getConstituents() const { return getValues(Constituents); }
 
 protected:
   void setWordCount(SPIRVWord TheWordCount) override {
@@ -1782,8 +1608,7 @@ protected:
     SPIRVInstruction::validate();
     switch (getValueType(this->getId())->getOpCode()) {
     case OpTypeVector:
-      assert(getConstituents().size() > 1 &&
-             "There must be at least two Constituent operands in vector");
+      assert(getConstituents().size() > 1 && "There must be at least two Constituent operands in vector");
     case OpTypeArray:
     case OpTypeStruct:
       break;
@@ -1798,12 +1623,10 @@ class SPIRVCompositeExtract : public SPIRVInstruction {
 public:
   const static Op OC = OpCompositeExtract;
   // Complete constructor
-  SPIRVCompositeExtract(SPIRVType *TheType, SPIRVId TheId,
-                        SPIRVValue *TheComposite,
-                        const std::vector<SPIRVWord> &TheIndices,
-                        SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(TheIndices.size() + 4, OC, TheType, TheId, TheBB),
-        Composite(TheComposite->getId()), Indices(TheIndices) {
+  SPIRVCompositeExtract(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheComposite,
+                        const std::vector<SPIRVWord> &TheIndices, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(TheIndices.size() + 4, OC, TheType, TheId, TheBB), Composite(TheComposite->getId()),
+        Indices(TheIndices) {
     validate();
     assert(TheBB && "Invalid BB");
   }
@@ -1823,10 +1646,8 @@ protected:
   // need to trace through the base type for struct types
   void validate() const override {
     SPIRVInstruction::validate();
-    assert(getValueType(Composite)->isTypeArray() ||
-           getValueType(Composite)->isTypeStruct() ||
-           getValueType(Composite)->isTypeVector() ||
-           getValueType(Composite)->isTypeMatrix());
+    assert(getValueType(Composite)->isTypeArray() || getValueType(Composite)->isTypeStruct() ||
+           getValueType(Composite)->isTypeVector() || getValueType(Composite)->isTypeMatrix());
   }
   SPIRVId Composite;
   std::vector<SPIRVWord> Indices;
@@ -1837,21 +1658,15 @@ public:
   const static Op OC = OpCompositeInsert;
   const static SPIRVWord FixedWordCount = 5;
   // Complete constructor
-  SPIRVCompositeInsert(SPIRVId TheId, SPIRVValue *TheObject,
-                       SPIRVValue *TheComposite,
-                       const std::vector<SPIRVWord> &TheIndices,
-                       SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(TheIndices.size() + FixedWordCount, OC,
-                         TheComposite->getType(), TheId, TheBB),
-        Object(TheObject->getId()), Composite(TheComposite->getId()),
-        Indices(TheIndices) {
+  SPIRVCompositeInsert(SPIRVId TheId, SPIRVValue *TheObject, SPIRVValue *TheComposite,
+                       const std::vector<SPIRVWord> &TheIndices, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(TheIndices.size() + FixedWordCount, OC, TheComposite->getType(), TheId, TheBB),
+        Object(TheObject->getId()), Composite(TheComposite->getId()), Indices(TheIndices) {
     validate();
     assert(TheBB && "Invalid BB");
   }
   // Incomplete constructor
-  SPIRVCompositeInsert()
-      : SPIRVInstruction(OC), Object(SPIRVID_INVALID),
-        Composite(SPIRVID_INVALID) {}
+  SPIRVCompositeInsert() : SPIRVInstruction(OC), Object(SPIRVID_INVALID), Composite(SPIRVID_INVALID) {}
 
   SPIRVValue *getObject() { return getValue(Object); }
   SPIRVValue *getComposite() { return getValue(Composite); }
@@ -1869,10 +1684,8 @@ protected:
     SPIRVInstruction::validate();
     assert(OpCode == OC);
     assert(WordCount == Indices.size() + FixedWordCount);
-    assert(getValueType(Composite)->isTypeArray() ||
-        getValueType(Composite)->isTypeStruct() ||
-        getValueType(Composite)->isTypeVector() ||
-        getValueType(Composite)->isTypeMatrix());
+    assert(getValueType(Composite)->isTypeArray() || getValueType(Composite)->isTypeStruct() ||
+           getValueType(Composite)->isTypeVector() || getValueType(Composite)->isTypeMatrix());
     assert(Type == getValueType(Composite));
   }
   SPIRVId Object;
@@ -1883,10 +1696,8 @@ protected:
 class SPIRVCopyBase : public SPIRVInstruction {
 public:
   // Complete constructor
-  SPIRVCopyBase(Op OC, SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheOperand,
-    SPIRVBasicBlock *TheBB)
-    : SPIRVInstruction(4, OC, TheType, TheId, TheBB),
-    Operand(TheOperand->getId()) {
+  SPIRVCopyBase(Op OC, SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheOperand, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(4, OC, TheType, TheId, TheBB), Operand(TheOperand->getId()) {
     validate();
     assert(TheBB && "Invalid BB");
   }
@@ -1905,8 +1716,7 @@ public:
   const static Op OC = OpCopyObject;
 
   // Complete constructor
-  SPIRVCopyObject(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheOperand,
-                  SPIRVBasicBlock *TheBB)
+  SPIRVCopyObject(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheOperand, SPIRVBasicBlock *TheBB)
       : SPIRVCopyBase(OC, TheType, TheId, TheOperand, TheBB) {}
   // Incomplete constructor
   SPIRVCopyObject() : SPIRVCopyBase(OC) {}
@@ -1930,10 +1740,8 @@ private:
   void propagateMemoryDecorates() {
     if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
       auto StorageClass = Type->getPointerStorageClass();
-      if (StorageClass == StorageClassStorageBuffer ||
-          StorageClass == StorageClassUniform ||
-          StorageClass == StorageClassPushConstant ||
-          StorageClass == StorageClassPhysicalStorageBufferEXT) {
+      if (StorageClass == StorageClassStorageBuffer || StorageClass == StorageClassUniform ||
+          StorageClass == StorageClassPushConstant || StorageClass == StorageClassPhysicalStorageBufferEXT) {
         // Handle buffer block pointer
         setVolatile(getOperand()->isVolatile());
         setCoherent(getOperand()->isCoherent());
@@ -1952,18 +1760,15 @@ public:
   const static Op OC = OpCopyLogical;
 
   // Complete constructor
-  SPIRVCopyLogical(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheOperand,
-                   SPIRVBasicBlock *TheBB)
-    : SPIRVCopyBase(OC, TheType, TheId, TheOperand, TheBB) {}
+  SPIRVCopyLogical(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheOperand, SPIRVBasicBlock *TheBB)
+      : SPIRVCopyBase(OC, TheType, TheId, TheOperand, TheBB) {}
   // Incomplete constructor
   SPIRVCopyLogical() : SPIRVCopyBase(OC) {}
 
 protected:
   void validate() const override {
-    assert((Type->isTypeArray() || Type->isTypeStruct()) &&
-      "Must be array or structure");
-    assert(logicallyMatch(Type, getValue(Operand)->getType()) &&
-      "Logically mismatch");
+    assert((Type->isTypeArray() || Type->isTypeStruct()) && "Must be array or structure");
+    assert(logicallyMatch(Type, getValue(Operand)->getType()) && "Logically mismatch");
     SPIRVInstruction::validate();
   }
 
@@ -1977,8 +1782,7 @@ private:
       if (Type->getArrayLength() != CopyType->getArrayLength())
         return false;
 
-      Match = logicallyMatch(Type->getArrayElementType(),
-                             CopyType->getArrayElementType());
+      Match = logicallyMatch(Type->getArrayElementType(), CopyType->getArrayElementType());
     } else if (Type->isTypeStruct() && CopyType->isTypeStruct()) {
       // If structure:
       //  1. Must have the same number of members;
@@ -1988,8 +1792,7 @@ private:
 
       const unsigned MemberCount = Type->getStructMemberCount();
       for (unsigned I = 0; (I < MemberCount) && Match; ++I)
-        Match = logicallyMatch(Type->getStructMemberType(I),
-                               CopyType->getStructMemberType(I));
+        Match = logicallyMatch(Type->getStructMemberType(I), CopyType->getStructMemberType(I));
     } else
       Match = (Type == CopyType);
     return Match;
@@ -2002,20 +1805,16 @@ public:
   const static Op OC = OpCopyMemory;
   const static SPIRVWord FixedWords = 3;
   // Complete constructor
-  SPIRVCopyMemory(SPIRVValue *TheTarget, SPIRVValue *TheSource,
-                  const std::vector<SPIRVWord> &TheMemoryAccess,
+  SPIRVCopyMemory(SPIRVValue *TheTarget, SPIRVValue *TheSource, const std::vector<SPIRVWord> &TheMemoryAccess,
                   SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(FixedWords + TheMemoryAccess.size(), OC, TheBB),
-        SPIRVMemoryAccess(TheMemoryAccess), MemoryAccess(TheMemoryAccess),
-        Target(TheTarget->getId()), Source(TheSource->getId()) {
+      : SPIRVInstruction(FixedWords + TheMemoryAccess.size(), OC, TheBB), SPIRVMemoryAccess(TheMemoryAccess),
+        MemoryAccess(TheMemoryAccess), Target(TheTarget->getId()), Source(TheSource->getId()) {
     validate();
     assert(TheBB && "Invalid BB");
   }
 
   // Incomplete constructor
-  SPIRVCopyMemory()
-      : SPIRVInstruction(OC), SPIRVMemoryAccess(), Target(SPIRVID_INVALID),
-        Source(SPIRVID_INVALID) {
+  SPIRVCopyMemory() : SPIRVInstruction(OC), SPIRVMemoryAccess(), Target(SPIRVID_INVALID), Source(SPIRVID_INVALID) {
     setHasNoId();
     setHasNoType();
   }
@@ -2037,10 +1836,9 @@ protected:
   void validate() const override {
     assert(getValueType(Target)->isTypePointer() && "Invalid type");
     assert(getValueType(Source)->isTypePointer() && "Invalid type");
-    assert((getValueType(Target)->getPointerElementType() ==
-        getValueType(Source)->getPointerElementType()) && "Inconsistent type");
-    assert(!(getValueType(Target)->getPointerElementType()->isTypeVoid()) &&
-        "Invalid type");
+    assert((getValueType(Target)->getPointerElementType() == getValueType(Source)->getPointerElementType()) &&
+           "Inconsistent type");
+    assert(!(getValueType(Target)->getPointerElementType()->isTypeVoid()) && "Invalid type");
     SPIRVInstruction::validate();
   }
 
@@ -2054,21 +1852,16 @@ public:
   const static Op OC = OpCopyMemorySized;
   const static SPIRVWord FixedWords = 4;
   // Complete constructor
-  SPIRVCopyMemorySized(SPIRVValue *TheTarget, SPIRVValue *TheSource,
-                       SPIRVValue *TheSize,
-                       const std::vector<SPIRVWord> &TheMemoryAccess,
-                       SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(FixedWords + TheMemoryAccess.size(), OC, TheBB),
-        SPIRVMemoryAccess(TheMemoryAccess), MemoryAccess(TheMemoryAccess),
-        Target(TheTarget->getId()), Source(TheSource->getId()),
-        Size(TheSize->getId()) {
+  SPIRVCopyMemorySized(SPIRVValue *TheTarget, SPIRVValue *TheSource, SPIRVValue *TheSize,
+                       const std::vector<SPIRVWord> &TheMemoryAccess, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(FixedWords + TheMemoryAccess.size(), OC, TheBB), SPIRVMemoryAccess(TheMemoryAccess),
+        MemoryAccess(TheMemoryAccess), Target(TheTarget->getId()), Source(TheSource->getId()), Size(TheSize->getId()) {
     validate();
     assert(TheBB && "Invalid BB");
   }
   // Incomplete constructor
   SPIRVCopyMemorySized()
-      : SPIRVInstruction(OC), SPIRVMemoryAccess(), Target(SPIRVID_INVALID),
-        Source(SPIRVID_INVALID), Size(0) {
+      : SPIRVInstruction(OC), SPIRVMemoryAccess(), Target(SPIRVID_INVALID), Source(SPIRVID_INVALID), Size(0) {
     setHasNoId();
     setHasNoType();
   }
@@ -2100,18 +1893,14 @@ class SPIRVVectorExtractDynamic : public SPIRVInstruction {
 public:
   const static Op OC = OpVectorExtractDynamic;
   // Complete constructor
-  SPIRVVectorExtractDynamic(SPIRVId TheId, SPIRVValue *TheVector,
-                            SPIRVValue *TheIndex, SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(5, OC, TheVector->getType()->getVectorComponentType(),
-                         TheId, TheBB),
+  SPIRVVectorExtractDynamic(SPIRVId TheId, SPIRVValue *TheVector, SPIRVValue *TheIndex, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(5, OC, TheVector->getType()->getVectorComponentType(), TheId, TheBB),
         VectorId(TheVector->getId()), IndexId(TheIndex->getId()) {
     validate();
     assert(TheBB && "Invalid BB");
   }
   // Incomplete constructor
-  SPIRVVectorExtractDynamic()
-      : SPIRVInstruction(OC), VectorId(SPIRVID_INVALID),
-        IndexId(SPIRVID_INVALID) {}
+  SPIRVVectorExtractDynamic() : SPIRVInstruction(OC), VectorId(SPIRVID_INVALID), IndexId(SPIRVID_INVALID) {}
 
   SPIRVValue *getVector() { return getValue(VectorId); }
   SPIRVValue *getIndex() const { return getValue(IndexId); }
@@ -2132,20 +1921,16 @@ class SPIRVVectorInsertDynamic : public SPIRVInstruction {
 public:
   const static Op OC = OpVectorInsertDynamic;
   // Complete constructor
-  SPIRVVectorInsertDynamic(SPIRVId TheId, SPIRVValue *TheVector,
-                           SPIRVValue *TheComponent, SPIRVValue *TheIndex,
+  SPIRVVectorInsertDynamic(SPIRVId TheId, SPIRVValue *TheVector, SPIRVValue *TheComponent, SPIRVValue *TheIndex,
                            SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(6, OC, TheVector->getType()->getVectorComponentType(),
-                         TheId, TheBB),
-        VectorId(TheVector->getId()), IndexId(TheIndex->getId()),
-        ComponentId(TheComponent->getId()) {
+      : SPIRVInstruction(6, OC, TheVector->getType()->getVectorComponentType(), TheId, TheBB),
+        VectorId(TheVector->getId()), IndexId(TheIndex->getId()), ComponentId(TheComponent->getId()) {
     validate();
     assert(TheBB && "Invalid BB");
   }
   // Incomplete constructor
   SPIRVVectorInsertDynamic()
-      : SPIRVInstruction(OC), VectorId(SPIRVID_INVALID),
-        IndexId(SPIRVID_INVALID), ComponentId(SPIRVID_INVALID) {}
+      : SPIRVInstruction(OC), VectorId(SPIRVID_INVALID), IndexId(SPIRVID_INVALID), ComponentId(SPIRVID_INVALID) {}
 
   SPIRVValue *getVector() { return getValue(VectorId); }
   SPIRVValue *getIndex() const { return getValue(IndexId); }
@@ -2169,30 +1954,20 @@ public:
   const static Op OC = OpVectorShuffle;
   const static SPIRVWord FixedWordCount = 5;
   // Complete constructor
-  SPIRVVectorShuffle(SPIRVId TheId, SPIRVType *TheType, SPIRVValue *TheVector1,
-                     SPIRVValue *TheVector2,
-                     const std::vector<SPIRVWord> &TheComponents,
-                     SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(TheComponents.size() + FixedWordCount, OC, TheType,
-                         TheId, TheBB),
-        Vector1(TheVector1->getId()), Vector2(TheVector2->getId()),
-        Components(TheComponents) {
+  SPIRVVectorShuffle(SPIRVId TheId, SPIRVType *TheType, SPIRVValue *TheVector1, SPIRVValue *TheVector2,
+                     const std::vector<SPIRVWord> &TheComponents, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(TheComponents.size() + FixedWordCount, OC, TheType, TheId, TheBB),
+        Vector1(TheVector1->getId()), Vector2(TheVector2->getId()), Components(TheComponents) {
     validate();
     assert(TheBB && "Invalid BB");
   }
   // Incomplete constructor
-  SPIRVVectorShuffle()
-      : SPIRVInstruction(OC), Vector1(SPIRVID_INVALID),
-        Vector2(SPIRVID_INVALID) {}
+  SPIRVVectorShuffle() : SPIRVInstruction(OC), Vector1(SPIRVID_INVALID), Vector2(SPIRVID_INVALID) {}
 
   SPIRVValue *getVector1() { return getValue(Vector1); }
   SPIRVValue *getVector2() { return getValue(Vector2); }
-  SPIRVWord getVector1ComponentCount() const {
-    return getValueType(Vector1)->getVectorComponentCount();
-  }
-  SPIRVWord getVector2ComponentCount() const {
-    return getValueType(Vector2)->getVectorComponentCount();
-  }
+  SPIRVWord getVector1ComponentCount() const { return getValueType(Vector1)->getVectorComponentCount(); }
+  SPIRVWord getVector2ComponentCount() const { return getValueType(Vector2)->getVectorComponentCount(); }
   const std::vector<SPIRVWord> &getComponents() const { return Components; }
 
 protected:
@@ -2206,8 +1981,7 @@ protected:
     assert(OpCode == OC);
     assert(WordCount == Components.size() + FixedWordCount);
     assert(Type->isTypeVector());
-    assert(Type->getVectorComponentType() ==
-           getValueType(Vector1)->getVectorComponentType());
+    assert(Type->getVectorComponentType() == getValueType(Vector1)->getVectorComponentType());
     if (getValue(Vector1)->isForward() || getValue(Vector2)->isForward())
       return;
     assert(Components.size() == Type->getVectorComponentCount());
@@ -2222,10 +1996,9 @@ class SPIRVControlBarrier : public SPIRVInstruction {
 public:
   static const Op OC = OpControlBarrier;
   // Complete constructor
-  SPIRVControlBarrier(SPIRVValue *TheScope, SPIRVValue *TheMemScope,
-                      SPIRVValue *TheMemSema, SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(4, OC, TheBB), ExecScope(TheScope->getId()),
-        MemScope(TheMemScope->getId()), MemSema(TheMemSema->getId()) {
+  SPIRVControlBarrier(SPIRVValue *TheScope, SPIRVValue *TheMemScope, SPIRVValue *TheMemSema, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(4, OC, TheBB), ExecScope(TheScope->getId()), MemScope(TheMemScope->getId()),
+        MemSema(TheMemSema->getId()) {
     validate();
     assert(TheBB && "Invalid BB");
   }
@@ -2234,9 +2007,7 @@ public:
     setHasNoId();
     setHasNoType();
   }
-  void setWordCount(SPIRVWord TheWordCount) override {
-    SPIRVEntry::setWordCount(TheWordCount);
-  }
+  void setWordCount(SPIRVWord TheWordCount) override { SPIRVEntry::setWordCount(TheWordCount); }
   SPIRVValue *getExecScope() const { return getValue(ExecScope); }
   SPIRVValue *getMemScope() const { return getValue(MemScope); }
   SPIRVValue *getMemSemantic() const { return getValue(MemSema); }
@@ -2264,10 +2035,8 @@ class SPIRVArrayLength : public SPIRVInstruction {
 public:
   const static Op OC = OpArrayLength;
   // Complete constructor
-  SPIRVArrayLength(SPIRVId TheId, SPIRVType *TheType, SPIRVValue *TheStruct,
-                   SPIRVWord TheIndex, SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(5, OC, TheType, TheId, TheBB),
-        Struct(TheStruct->getId()), MemberIndex(TheIndex){
+  SPIRVArrayLength(SPIRVId TheId, SPIRVType *TheType, SPIRVValue *TheStruct, SPIRVWord TheIndex, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(5, OC, TheType, TheId, TheBB), Struct(TheStruct->getId()), MemberIndex(TheIndex) {
     validate();
     assert(TheBB && "Invalid BB");
   }
@@ -2282,13 +2051,14 @@ public:
     Operands.push_back(MemberIndex);
     return getValues(Operands);
   }
+
 protected:
   _SPIRV_DEF_DECODE4(Type, Id, Struct, MemberIndex)
   void validate() const override {
     SPIRVInstruction::validate();
     assert(Type->isTypeInt() && Type->getBitWidth() == 32);
-    SPIRVType* StructTy = getValueType(Struct)->isTypePointer() ?
-      getValueType(Struct)->getPointerElementType() : getValueType(Struct);
+    SPIRVType *StructTy =
+        getValueType(Struct)->isTypePointer() ? getValueType(Struct)->getPointerElementType() : getValueType(Struct);
     assert(StructTy->isTypeStruct());
     assert(StructTy->getStructMemberType(MemberIndex)->isTypeRuntimeArray());
     (void)StructTy;
@@ -2299,13 +2069,10 @@ protected:
 
 class SPIRVGroupInstBase : public SPIRVInstTemplateBase {
 public:
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityGroups);
-  }
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilityGroups); }
 };
 
-#define _SPIRV_OP(x, ...)                                                      \
-  typedef SPIRVInstTemplate<SPIRVGroupInstBase, Op##x, __VA_ARGS__> SPIRV##x;
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVGroupInstBase, Op##x, __VA_ARGS__> SPIRV##x;
 // Group instructions
 _SPIRV_OP(GroupAll, true, 5)
 _SPIRV_OP(GroupAny, true, 5)
@@ -2387,14 +2154,12 @@ public:
   void setOpWords(const std::vector<SPIRVWord> &TheOps) override {
     SPIRVInstTemplateBase::setOpWords(TheOps);
     static const unsigned ValueOperandIndex = 3;
-    if (getOpCode() == OpAtomicStore &&
-        getOperand(ValueOperandIndex)->getType()->isTypeInt(64))
+    if (getOpCode() == OpAtomicStore && getOperand(ValueOperandIndex)->getType()->isTypeInt(64))
       Module->addCapability(CapabilityInt64Atomics);
   }
 };
 
-#define _SPIRV_OP(x, ...)                                                      \
-  typedef SPIRVInstTemplate<SPIRVAtomicInstBase, Op##x, __VA_ARGS__> SPIRV##x;
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVAtomicInstBase, Op##x, __VA_ARGS__> SPIRV##x;
 // Atomic builtins
 _SPIRV_OP(AtomicLoad, true, 6)
 _SPIRV_OP(AtomicStore, false, 5)
@@ -2419,13 +2184,10 @@ _SPIRV_OP(MemoryBarrier, false, 3)
 
 class SPIRVImageInstBase : public SPIRVInstTemplateBase {
 public:
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityShader);
-  }
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilityShader); }
 };
 
-#define _SPIRV_OP(x, ...)                                                      \
-  typedef SPIRVInstTemplate<SPIRVImageInstBase, Op##x, __VA_ARGS__> SPIRV##x;
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVImageInstBase, Op##x, __VA_ARGS__> SPIRV##x;
 // Image instructions
 _SPIRV_OP(SampledImage, true, 5)
 _SPIRV_OP(Image, true, 4)
@@ -2460,11 +2222,9 @@ _SPIRV_OP(FragmentFetchAMD, true, 6)
 #undef _SPIRV_OP
 
 // SpecConstantOp instruction
-class SPIRVSpecConstantOp : public SPIRVInstTemplate<SPIRVInstTemplateBase,
-  OpSpecConstantOp, true, 4, true, 0> {
+class SPIRVSpecConstantOp : public SPIRVInstTemplate<SPIRVInstTemplateBase, OpSpecConstantOp, true, 4, true, 0> {
 public:
-  SPIRVSpecConstantOp()
-      : MappedConst(nullptr) {}
+  SPIRVSpecConstantOp() : MappedConst(nullptr) {}
   SPIRVValue *getMappedConstant() const {
     assert(MappedConst != nullptr && "OpSpecConstantOp not mapped");
     return MappedConst;
@@ -2473,15 +2233,14 @@ public:
     assert(!MappedConst && "OpSpecConstantOp mapped twice");
     MappedConst = Const;
   }
+
 protected:
   // NOTE: Mapped constant stores the value of OpSpecConstantOp after
   // evaluation by constant folding.
   SPIRVValue *MappedConst;
 };
 
-#define _SPIRV_OP(x, ...) \
-  typedef SPIRVInstTemplate<SPIRVInstTemplateBase, Op##x, __VA_ARGS__> \
-      SPIRV##x;
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVInstTemplateBase, Op##x, __VA_ARGS__> SPIRV##x;
 // Other instructions
 _SPIRV_OP(BitFieldInsert, true, 7, false)
 _SPIRV_OP(BitFieldSExtract, true, 6, false)
@@ -2503,17 +2262,12 @@ _SPIRV_OP(SubgroupAllEqualKHR, true, 4, false)
 _SPIRV_OP(ReadClockKHR, true, 4)
 _SPIRV_OP(IsHelperInvocationEXT, true, 3)
 #undef _SPIRV_OP
-class SPIRVSubgroupShuffleINTELInstBase:public SPIRVInstTemplateBase {
+class SPIRVSubgroupShuffleINTELInstBase : public SPIRVInstTemplateBase {
 protected:
-  SPIRVCapVec getRequiredCapability() const override {
-      return getVec(CapabilitySubgroupShuffleINTEL);
-  }
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilitySubgroupShuffleINTEL); }
 };
 
-#define _SPIRV_OP(x, ...)                                                      \
-  typedef SPIRVInstTemplate<SPIRVSubgroupShuffleINTELInstBase, Op##x,          \
-                            __VA_ARGS__>                                       \
-      SPIRV##x;
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVSubgroupShuffleINTELInstBase, Op##x, __VA_ARGS__> SPIRV##x;
 // Intel Subgroup Shuffle Instructions
 _SPIRV_OP(SubgroupShuffleINTEL, true, 5)
 _SPIRV_OP(SubgroupShuffleDownINTEL, true, 6)
@@ -2523,15 +2277,11 @@ _SPIRV_OP(SubgroupShuffleXorINTEL, true, 5)
 
 class SPIRVSubgroupBufferBlockIOINTELInstBase : public SPIRVInstTemplateBase {
 protected:
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilitySubgroupBufferBlockIOINTEL);
-  }
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilitySubgroupBufferBlockIOINTEL); }
 };
 
-#define _SPIRV_OP(x, ...)                                                      \
-  typedef SPIRVInstTemplate<SPIRVSubgroupBufferBlockIOINTELInstBase, Op##x,    \
-                            __VA_ARGS__>                                       \
-      SPIRV##x;
+#define _SPIRV_OP(x, ...)                                                                                              \
+  typedef SPIRVInstTemplate<SPIRVSubgroupBufferBlockIOINTELInstBase, Op##x, __VA_ARGS__> SPIRV##x;
 // Intel Subgroup Buffer Block Read and Write Instructions
 _SPIRV_OP(SubgroupBlockReadINTEL, true, 4)
 _SPIRV_OP(SubgroupBlockWriteINTEL, false, 3)
@@ -2539,15 +2289,11 @@ _SPIRV_OP(SubgroupBlockWriteINTEL, false, 3)
 
 class SPIRVSubgroupImageBlockIOINTELInstBase : public SPIRVInstTemplateBase {
 protected:
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilitySubgroupImageBlockIOINTEL);
-  }
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilitySubgroupImageBlockIOINTEL); }
 };
 
-#define _SPIRV_OP(x, ...)                                                      \
-  typedef SPIRVInstTemplate<SPIRVSubgroupImageBlockIOINTELInstBase, Op##x,     \
-                            __VA_ARGS__>                                       \
-      SPIRV##x;
+#define _SPIRV_OP(x, ...)                                                                                              \
+  typedef SPIRVInstTemplate<SPIRVSubgroupImageBlockIOINTELInstBase, Op##x, __VA_ARGS__> SPIRV##x;
 // Intel Subgroup Image Block Read and Write Instructions
 _SPIRV_OP(SubgroupImageBlockReadINTEL, true, 5)
 _SPIRV_OP(SubgroupImageBlockWriteINTEL, false, 4)

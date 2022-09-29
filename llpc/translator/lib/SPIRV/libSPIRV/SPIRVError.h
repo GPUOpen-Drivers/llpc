@@ -48,16 +48,13 @@ namespace SPIRV {
 
 // Check condition and set error code and error msg.
 // To use this macro, function checkError must be defined in the scope.
-#define SPIRVCK(Condition, ErrCode, ErrMsg)                                    \
-  getErrorLog().checkError(Condition, SPIRVEC_##ErrCode,                       \
-                           std::string() + (ErrMsg), #Condition, __FILE__,     \
-                           __LINE__)
+#define SPIRVCK(Condition, ErrCode, ErrMsg)                                                                            \
+  getErrorLog().checkError(Condition, SPIRVEC_##ErrCode, std::string() + (ErrMsg), #Condition, __FILE__, __LINE__)
 
 // Check condition and set error code and error msg. If fail returns false.
-#define SPIRVCKRT(Condition, ErrCode, ErrMsg)                                  \
-  if (!getErrorLog().checkError(Condition, SPIRVEC_##ErrCode,                  \
-                                std::string() + (ErrMsg), #Condition,          \
-                                __FILE__, __LINE__))                           \
+#define SPIRVCKRT(Condition, ErrCode, ErrMsg)                                                                          \
+  if (!getErrorLog().checkError(Condition, SPIRVEC_##ErrCode, std::string() + (ErrMsg), #Condition, __FILE__,          \
+                                __LINE__))                                                                             \
     return false;
 
 // Defines error code enum type SPIRVErrorCode.
@@ -89,19 +86,15 @@ public:
   }
   // Check if Condition is satisfied and set ErrCode and DetailedMsg
   // if not. Returns true if no error.
-  bool checkError(bool Condition, SPIRVErrorCode ErrCode,
-                  const std::string &DetailedMsg = "",
-                  const char *CondString = nullptr,
-                  const char *FileName = nullptr, unsigned LineNumber = 0);
+  bool checkError(bool Condition, SPIRVErrorCode ErrCode, const std::string &DetailedMsg = "",
+                  const char *CondString = nullptr, const char *FileName = nullptr, unsigned LineNumber = 0);
 
 protected:
   SPIRVErrorCode ErrorCode;
   std::string ErrorMsg;
 };
 
-inline bool SPIRVErrorLog::checkError(bool Cond, SPIRVErrorCode ErrCode,
-                                      const std::string &Msg,
-                                      const char *CondString,
+inline bool SPIRVErrorLog::checkError(bool Cond, SPIRVErrorCode ErrCode, const std::string &Msg, const char *CondString,
                                       const char *FileName, unsigned LineNo) {
   std::stringstream SS;
   if (Cond)

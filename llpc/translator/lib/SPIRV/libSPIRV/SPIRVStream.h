@@ -74,21 +74,18 @@ public:
   SPIRVEntry *Scope; // A function or basic block
 };
 
-template <typename T>
-const SPIRVDecoder &decodeBinary(const SPIRVDecoder &I, T &V) {
+template <typename T> const SPIRVDecoder &decodeBinary(const SPIRVDecoder &I, T &V) {
   uint32_t W;
   I.IS.read(reinterpret_cast<char *>(&W), sizeof(W));
   V = static_cast<T>(W);
   return I;
 }
 
-template <typename T>
-const SPIRVDecoder &operator>>(const SPIRVDecoder &I, T &V) {
+template <typename T> const SPIRVDecoder &operator>>(const SPIRVDecoder &I, T &V) {
   return decodeBinary(I, V);
 }
 
-template <typename T>
-const SPIRVDecoder &operator>>(const SPIRVDecoder &I, T *&P) {
+template <typename T> const SPIRVDecoder &operator>>(const SPIRVDecoder &I, T *&P) {
   SPIRVId Id;
   I >> Id;
   P = static_cast<T *>(I.M.getEntry(Id));
@@ -96,22 +93,19 @@ const SPIRVDecoder &operator>>(const SPIRVDecoder &I, T *&P) {
 }
 
 template <typename IterTy>
-const SPIRVDecoder &operator>>(const SPIRVDecoder &Decoder,
-                               const std::pair<IterTy, IterTy> &Range) {
+const SPIRVDecoder &operator>>(const SPIRVDecoder &Decoder, const std::pair<IterTy, IterTy> &Range) {
   for (IterTy I = Range.first, E = Range.second; I != E; ++I)
     Decoder >> *I;
   return Decoder;
 }
 
-template <typename T>
-const SPIRVDecoder &operator>>(const SPIRVDecoder &I, std::vector<T> &V) {
+template <typename T> const SPIRVDecoder &operator>>(const SPIRVDecoder &I, std::vector<T> &V) {
   for (size_t J = 0, E = V.size(); J != E; ++J)
     I >> V[J];
   return I;
 }
 
-#define SPIRV_DEC_ENCDEC(Type)                                                 \
-  const SPIRVDecoder &operator>>(const SPIRVDecoder &I, Type &V);
+#define SPIRV_DEC_ENCDEC(Type) const SPIRVDecoder &operator>>(const SPIRVDecoder &I, Type &V);
 
 SPIRV_DEC_ENCDEC(Op)
 SPIRV_DEC_ENCDEC(Capability)
