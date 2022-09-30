@@ -425,7 +425,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   // Mesh_Shader() {
   //   Initialize thread/wave info
   //
-  //   if (threadIdInSubgroup < maxPrimitives)
+  //   if (primitiveIndex < maxPrimitives)
   //     Zero primitive connectivity data
   //
   //   if (threadIdInSubgroup == 0) {
@@ -454,7 +454,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   //     return
   //   }
   //
-  //   if (threadIdInSubgroup < primitiveCount) {
+  //   if (primitiveIndex < primitiveCount) {
   //     Read primitive connectivity data from LDS
   //     Read primitive built-ins from LDS
   //     Export primitive
@@ -463,9 +463,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   //     Export primitive attributes
   //   }
   //
-  //   if (threadIdInSubgroup < vertexCount) {
+  //   if (vertexIndex < vertexCount) {
   //     Read vertex built-ins from LDS
-  //     Export vertex built-ins
+  //     Export vertex position data
   //
   //     Read vertex attributes from LDS
   //     Export vertex attributes
@@ -544,9 +544,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
     initWaveThreadInfo(entryPoint);
 
-    auto validPrim =
-        m_builder->CreateICmpULT(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(meshMode.outputPrimitives));
-    m_builder->CreateCondBr(validPrim, initPrimitiveIndicesBlock, endInitPrimitiveIndicesBlock);
+    auto validPrimitive =
+        m_builder->CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(meshMode.outputPrimitives));
+    m_builder->CreateCondBr(validPrimitive, initPrimitiveIndicesBlock, endInitPrimitiveIndicesBlock);
   }
 
   // Construct ".initPrimitiveIndices" block
@@ -554,7 +554,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
     m_builder->SetInsertPoint(initPrimitiveIndicesBlock);
 
     auto ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-    auto ldsOffset = m_builder->CreateAdd(ldsStart, m_waveThreadInfo.threadIdInSubgroup);
+    auto ldsOffset = m_builder->CreateAdd(ldsStart, m_waveThreadInfo.primOrVertexIndex);
 
     writeValueToLds(m_builder->getInt32(0), ldsOffset);
     m_builder->CreateBr(endInitPrimitiveIndicesBlock);
@@ -664,7 +664,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   {
     m_builder->SetInsertPoint(checkExportPrimitiveBlock);
 
-    auto validPrimitive = m_builder->CreateICmpULT(m_waveThreadInfo.threadIdInSubgroup, primitiveCount);
+    auto validPrimitive = m_builder->CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, primitiveCount);
     m_builder->CreateCondBr(validPrimitive, exportPrimitiveBlock, endExportPrimitiveBlock);
   }
 
@@ -680,7 +680,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   {
     m_builder->SetInsertPoint(endExportPrimitiveBlock);
 
-    auto validVertex = m_builder->CreateICmpULT(m_waveThreadInfo.threadIdInSubgroup, vertexCount);
+    auto validVertex = m_builder->CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, vertexCount);
     m_builder->CreateCondBr(validVertex, exportVertexBlock, endExportVertexBlock);
   }
 
@@ -1048,6 +1048,9 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
     m_waveThreadInfo.threadIdInSubgroup =
         m_builder->CreateAdd(m_builder->CreateMul(m_waveThreadInfo.waveIdInSubgroup, m_builder->getInt32(waveSize)),
                              m_waveThreadInfo.threadIdInWave, "threadIdInSubgroup");
+
+    m_waveThreadInfo.primOrVertexIndex =
+        m_waveThreadInfo.threadIdInSubgroup; // Primitive or vertex index is initialized to thread ID in subgroup
   }
 }
 
@@ -1663,7 +1666,7 @@ void MeshTaskShader::exportPrimitive() {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage;
 
   Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-  Value *ldsOffset = m_builder->CreateAdd(ldsStart, m_waveThreadInfo.threadIdInSubgroup);
+  Value *ldsOffset = m_builder->CreateAdd(ldsStart, m_waveThreadInfo.primOrVertexIndex);
 
   // The first dword is primitive connectivity data
   auto primitiveIndices = readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
@@ -1750,7 +1753,7 @@ void MeshTaskShader::exportPrimitive() {
   // Export primitive attributes (from generic outputs)
   ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
   auto primitiveStride = 4 * inOutUsage.perPrimitiveOutputMapLocCount;
-  auto ldsOffsetBase = m_builder->CreateMul(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(primitiveStride));
+  auto ldsOffsetBase = m_builder->CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(primitiveStride));
   ldsOffsetBase = m_builder->CreateAdd(ldsStart, ldsOffsetBase);
 
   for (unsigned loc = 0; loc < inOutUsage.mesh.perPrimitiveGenericOutputMapLocCount; ++loc) {
@@ -1914,7 +1917,7 @@ void MeshTaskShader::exportVertex() {
   // Export vertex attributes (from generic outputs)
   Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
   auto vertexStride = 4 * inOutUsage.outputMapLocCount;
-  auto ldsOffsetBase = m_builder->CreateMul(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(vertexStride));
+  auto ldsOffsetBase = m_builder->CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(vertexStride));
   ldsOffsetBase = m_builder->CreateAdd(ldsStart, ldsOffsetBase);
 
   for (unsigned i = 0; i < inOutUsage.mesh.genericOutputMapLocCount; ++i) {
@@ -2284,8 +2287,9 @@ Value *MeshTaskShader::getGlobalInvocationIndex() {
     unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
     auto flatWorkgroupId = getMeshFlatWorkgroupId();
 
+    Value *localInvocationIndex = getMeshLocalInvocationIndex();
     Value *globalInvocationIndex = m_builder->CreateMul(flatWorkgroupId, m_builder->getInt32(numMeshThreads));
-    globalInvocationIndex = m_builder->CreateAdd(globalInvocationIndex, m_waveThreadInfo.threadIdInSubgroup);
+    globalInvocationIndex = m_builder->CreateAdd(globalInvocationIndex, localInvocationIndex);
 
     m_meshGlobalInvocationIndex = globalInvocationIndex;
     m_meshGlobalInvocationIndex->setName("globalInvocationIndex");
@@ -2361,11 +2365,11 @@ Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
   Value *ldsOffset = nullptr;
   if (region == MeshLdsRegion::VertexOutput) {
     auto vertexStride = 4 * inOutUsage.outputMapLocCount;
-    ldsOffset = m_builder->CreateMul(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(vertexStride));
+    ldsOffset = m_builder->CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(vertexStride));
   } else {
     assert(region == MeshLdsRegion::PrimitiveOutput);
     auto primitiveStride = 4 * inOutUsage.perPrimitiveOutputMapLocCount;
-    ldsOffset = m_builder->CreateMul(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(primitiveStride));
+    ldsOffset = m_builder->CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(primitiveStride));
   }
   ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(4 * location));
 
