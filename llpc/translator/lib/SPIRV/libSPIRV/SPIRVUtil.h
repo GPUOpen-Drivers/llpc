@@ -73,11 +73,11 @@ namespace SPIRV {
 static llvm::sys::Mutex MapLock;
 #endif
 
-#define SPIRV_DEF_NAMEMAP(Type, MapType)                                       \
-  typedef SPIRVMap<Type, std::string>(MapType);                                \
-  inline MapType getNameMap(Type) {                                            \
-    MapType MT;                                                                \
-    return MT;                                                                 \
+#define SPIRV_DEF_NAMEMAP(Type, MapType)                                                                               \
+  typedef SPIRVMap<Type, std::string>(MapType);                                                                        \
+  inline MapType getNameMap(Type) {                                                                                    \
+    MapType MT;                                                                                                        \
+    return MT;                                                                                                         \
   }
 
 // A bi-way map
@@ -181,8 +181,7 @@ inline std::vector<std::string> getVec(const std::string &S, char Delim) {
   return Strs;
 }
 
-inline std::unordered_set<std::string> getUnordSet(const std::string &S,
-                                                   char Delim = ' ') {
+inline std::unordered_set<std::string> getUnordSet(const std::string &S, char Delim = ' ') {
   std::unordered_set<std::string> Strs;
   std::stringstream SS(S);
   std::string Item;
@@ -208,8 +207,7 @@ template <typename KT, typename VT> KT rmap(VT V) {
   return SPIRVMap<KT, VT>::rmap(V);
 }
 
-template <typename VT, typename KT>
-std::unordered_set<VT> map(const std::unordered_set<KT> &KSet) {
+template <typename VT, typename KT> std::unordered_set<VT> map(const std::unordered_set<KT> &KSet) {
   VT V;
   std::unordered_set<VT> VSet;
   for (auto &I : KSet)
@@ -227,8 +225,7 @@ template <typename VT, typename KT> std::set<VT> map(const std::set<KT> &KSet) {
   return VSet;
 }
 
-template <typename KT, typename VT>
-std::unordered_set<KT> rmap(const std::unordered_set<VT> &KSet) {
+template <typename KT, typename VT> std::unordered_set<KT> rmap(const std::unordered_set<VT> &KSet) {
   KT V;
   std::unordered_set<KT> VSet;
   for (auto &I : KSet)
@@ -237,8 +234,7 @@ std::unordered_set<KT> rmap(const std::unordered_set<VT> &KSet) {
   return VSet;
 }
 
-template <typename KT, typename VT>
-std::set<KT> rmap(const std::set<VT> &KSet) {
+template <typename KT, typename VT> std::set<KT> rmap(const std::set<VT> &KSet) {
   KT V;
   std::set<KT> VSet;
   for (auto &I : KSet)
@@ -247,8 +243,7 @@ std::set<KT> rmap(const std::set<VT> &KSet) {
   return VSet;
 }
 
-template <typename KT, typename VT, typename Any>
-std::set<KT> rmap(const std::map<VT, Any> &KMap) {
+template <typename KT, typename VT, typename Any> std::set<KT> rmap(const std::map<VT, Any> &KMap) {
   KT V;
   std::set<KT> VSet;
   for (auto &I : KMap)
@@ -276,8 +271,7 @@ template <class T> std::string concat(const std::string &S, const T &N) {
   return Ss.str();
 }
 
-inline std::string concat(const std::string &S1, const std::string &S2,
-                          char Delim = ' ') {
+inline std::string concat(const std::string &S1, const std::string &S2, char Delim = ' ') {
   std::string S;
   if (S1.empty())
     S = S2;
@@ -309,17 +303,15 @@ template <typename T> std::string getStr(const T &C, char Delim = ' ') {
 
 template <class MapTy> unsigned mapBitMask(unsigned BM) {
   unsigned Res = 0;
-  MapTy::foreach ([&](typename MapTy::KeyTy K, typename MapTy::ValueTy V) {
-    Res |= BM & (unsigned)K ? (unsigned)V : 0;
-  });
+  MapTy::foreach (
+      [&](typename MapTy::KeyTy K, typename MapTy::ValueTy V) { Res |= BM & (unsigned)K ? (unsigned)V : 0; });
   return Res;
 }
 
 template <class MapTy> unsigned rmapBitMask(unsigned BM) {
   unsigned Res = 0;
-  MapTy::foreach ([&](typename MapTy::KeyTy K, typename MapTy::ValueTy V) {
-    Res |= BM & (unsigned)V ? (unsigned)K : 0;
-  });
+  MapTy::foreach (
+      [&](typename MapTy::KeyTy K, typename MapTy::ValueTy V) { Res |= BM & (unsigned)V ? (unsigned)K : 0; });
   return Res;
 }
 
@@ -329,8 +321,7 @@ inline unsigned getSizeInWords(const std::string &Str) {
   return static_cast<unsigned>(Str.length() / 4 + 1);
 }
 
-inline std::string getString(std::vector<uint32_t>::const_iterator Begin,
-                             std::vector<uint32_t>::const_iterator End) {
+inline std::string getString(std::vector<uint32_t>::const_iterator Begin, std::vector<uint32_t>::const_iterator End) {
   std::string Str = std::string();
   for (auto I = Begin; I != End; ++I) {
     uint32_t Word = *I;
@@ -388,8 +379,7 @@ template <typename T> inline std::vector<T> getVec(T Op1, T Op2, T Op3) {
   return V;
 }
 
-template <typename T>
-inline std::vector<T> getVec(T Op1, const std::vector<T> &Ops2) {
+template <typename T> inline std::vector<T> getVec(T Op1, const std::vector<T> &Ops2) {
   std::vector<T> V;
   V.push_back(Op1);
   V.insert(V.end(), Ops2.begin(), Ops2.end());
@@ -397,8 +387,7 @@ inline std::vector<T> getVec(T Op1, const std::vector<T> &Ops2) {
 }
 
 template <typename MapTy, typename FuncTy>
-typename MapTy::mapped_type
-getOrInsert(MapTy &Map, typename MapTy::key_type Key, FuncTy Func) {
+typename MapTy::mapped_type getOrInsert(MapTy &Map, typename MapTy::key_type Key, FuncTy Func) {
   typename MapTy::iterator Loc = Map.find(Key);
   if (Loc != Map.end())
     return Loc->second;
@@ -407,8 +396,7 @@ getOrInsert(MapTy &Map, typename MapTy::key_type Key, FuncTy Func) {
   return NF;
 }
 
-template<typename T>
-inline T roundUpToMultiple(T Op, T Alignment) {
+template <typename T> inline T roundUpToMultiple(T Op, T Alignment) {
   return (((Op + (Alignment - 1)) / Alignment) * Alignment);
 }
 

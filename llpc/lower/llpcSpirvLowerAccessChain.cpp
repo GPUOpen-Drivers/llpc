@@ -132,8 +132,8 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
       ptrVal = cast<User>(next);
       continue;
     }
-    auto pConst = dyn_cast<ConstantExpr>(next);
-    if (!pConst || pConst->getOpcode() != Instruction::GetElementPtr)
+    auto constant = dyn_cast<ConstantExpr>(next);
+    if (!constant || constant->getOpcode() != Instruction::GetElementPtr)
       break;
     ptrVal = cast<User>(next);
   }

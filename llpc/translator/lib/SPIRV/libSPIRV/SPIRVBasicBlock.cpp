@@ -43,13 +43,12 @@
 #include "SPIRVInstruction.h"
 #include "SPIRVStream.h"
 #include "SPIRVValue.h"
-
 #include <iostream>
 
 using namespace SPIRV;
 
 SPIRVBasicBlock::SPIRVBasicBlock(SPIRVId TheId, SPIRVFunction *Func)
-  :SPIRVValue(Func->getModule(), 2, OpLabel, TheId), ParentF(Func), LoopMerge(NULL) {
+    : SPIRVValue(Func->getModule(), 2, OpLabel, TheId), ParentF(Func), LoopMerge(NULL) {
   setAttr();
   validate();
 }

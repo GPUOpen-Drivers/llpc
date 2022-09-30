@@ -150,8 +150,8 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
   SmallVector<Constant *, 8> constantUsers;
 
   for (User *const user : global->users()) {
-    if (Constant *const pConst = dyn_cast<Constant>(user))
-      constantUsers.push_back(pConst);
+    if (Constant *const constant = dyn_cast<Constant>(user))
+      constantUsers.push_back(constant);
   }
 
   for (Constant *const constVal : constantUsers)

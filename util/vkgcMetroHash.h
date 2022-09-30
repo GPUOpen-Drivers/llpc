@@ -48,7 +48,7 @@ struct Hash {
 
 // Compacts a 128-bit hash into a 64-bit one by XOR'ing the low and high 64-bits together.
 //
-// Takes input parameter pHash, which is 128-bit hash to be compacted.
+// Takes input parameter hash, which is 128-bit hash to be compacted.
 //
 // Returns 64-bit hash value based on the inputted 128-bit hash.
 inline uint64_t compact64(const Hash *hash) {
@@ -58,7 +58,7 @@ inline uint64_t compact64(const Hash *hash) {
 
 // Compacts a 64-bit hash checksum into a 32-bit one by XOR'ing each 32-bit chunk together.
 //
-// Takes input parameter pHash, which is 128-bit hash to be compacted.
+// Takes input parameter hash, which is 128-bit hash to be compacted.
 //
 // Returns 32-bit hash value based on the inputted 128-bit hash.
 inline unsigned compact32(const Hash *hash) {

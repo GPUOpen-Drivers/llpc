@@ -90,7 +90,7 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
   assert(inputInfo.getInterpMode() == InOutInfo::InterpModeCustom);
   assert(m_shaderStage == ShaderStageFragment);
 
-  // Fold constant pLocationOffset into location.
+  // Fold constant locationOffset into location.
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
     locationOffset = getInt32(0);
@@ -179,7 +179,7 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
 // @param locationOffset : Location offset; must be within locationCount if variable
 // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
 // 64-bit elements.)
-// @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
+// @param locationCount : Count of locations taken by the output. Ignored if locationOffset is const
 // @param outputInfo : Extra output info
 // @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
 // @param instName : Name to give instruction(s)
@@ -210,7 +210,7 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
   assert(resultTy->isAggregateType() == false);
   assert(isOutput == false || m_shaderStage == ShaderStageTessControl);
 
-  // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
+  // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
   // TCS, TES, and FS custom interpolation.)
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
@@ -301,14 +301,14 @@ Value *InOutBuilder::readGenericInputOutput(bool isOutput, Type *resultTy, unsig
 // The value to write must be a scalar or vector type with no more than four elements.
 // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
 // 64-bit components. Two locations together can contain up to a 4-vector of 64-bit components.
-// A non-constant pLocationOffset is currently only supported for TCS.
+// A non-constant locationOffset is currently only supported for TCS.
 //
 // @param valueToWrite : Value to write
 // @param location : Base location (row) of output
 // @param locationOffset : Location offset; must be within locationCount if variable
 // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
 // 64-bit elements.)
-// @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
+// @param locationCount : Count of locations taken by the output. Ignored if locationOffset is const
 // @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
 // @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
 //                                 output: primitive index; else nullptr
@@ -317,7 +317,7 @@ Instruction *InOutBuilder::CreateWriteGenericOutput(Value *valueToWrite, unsigne
                                                     Value *vertexOrPrimitiveIndex) {
   assert(valueToWrite->getType()->isAggregateType() == false);
 
-  // Fold constant pLocationOffset into location. (Currently a variable pLocationOffset is only supported in
+  // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
   // TCS.)
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
@@ -677,8 +677,8 @@ Value *InOutBuilder::evalIjOffsetSmooth(Value *offset) {
 
 // =====================================================================================================================
 // Adjust I,J values by offset.
-// This adjusts pValue by its X and Y derivatives times the X and Y components of pOffset.
-// If pValue is a vector, this is done component-wise.
+// This adjusts value by its X and Y derivatives times the X and Y components of offset.
+// If value is a vector, this is done component-wise.
 //
 // @param value : Value to adjust, float or vector of float
 // @param offset : Offset to adjust by, <2 x float> or <2 x half>
@@ -700,7 +700,7 @@ Value *InOutBuilder::adjustIj(Value *value, Value *offset) {
 // =====================================================================================================================
 // Create a write to an XFB (transform feedback / streamout) buffer.
 // The value to write must be a scalar or vector type with no more than four elements.
-// A non-constant pXfbOffset is not currently supported.
+// A non-constant xfbOffset is not currently supported.
 // The value is written to the XFB only if this is in the last-vertex-stage shader, i.e. VS (if no TCS/TES/GS),
 // TES (if no GS) or GS.
 //
@@ -836,7 +836,7 @@ Value *InOutBuilder::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInf
 // =====================================================================================================================
 // Create a read of (part of) a built-in input value.
 // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
-// or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
+// or the element type if index is not nullptr. For ClipDistance or CullDistance when index is nullptr,
 // the array size is determined by inputInfo.GetArraySize().
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
@@ -853,7 +853,7 @@ Value *InOutBuilder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo input
 // =====================================================================================================================
 // Create a read of (part of) a built-in output value.
 // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
-// or the element type if pIndex is not nullptr.
+// or the element type if index is not nullptr.
 //
 // @param builtIn : Built-in kind, one of the BuiltIn* constants
 // @param outputInfo : Extra output info (shader-defined array size)
@@ -938,7 +938,7 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
     break;
   case ShaderStageFragment:
     if (builtIn == BuiltInSamplePosOffset) {
-      // Special case for BuiltInSamplePosOffset: pVertexIndex is the sample number.
+      // Special case for BuiltInSamplePosOffset: vertexIndex is the sample number.
       // That special case only happens when ReadBuiltIn is called from ModifyAuxInterpValue.
       Value *sampleNum = vertexIndex;
       vertexIndex = nullptr;
@@ -1319,7 +1319,7 @@ Value *InOutBuilder::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
 // =====================================================================================================================
 // Create a write of (part of) a built-in output value.
 // The type of the value to write must be the fixed type of the specified built-in (see BuiltInDefs.h),
-// or the element type if pIndex is not nullptr.
+// or the element type if index is not nullptr.
 //
 // @param valueToWrite : Value to write
 // @param builtIn : Built-in kind, one of the BuiltIn* constants

@@ -1307,7 +1307,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         return graphicsShaderCacheChecker.check(module, stageMask, stageHashes, stageCacheAccesses);
       };
 
-  // Only enable per stage cache for full graphic pipeline
+  // Only enable per stage cache for full graphics pipeline (traditional pipeline or mesh pipeline)
   bool checkPerStageCache = cl::EnablePerStageCache && !cl::EnablePartPipeline && context->isGraphics() &&
                             !buildingRelocatableElf &&
                             (context->getShaderStageMask() & (ShaderStageVertexBit | ShaderStageFragmentBit));
@@ -1474,7 +1474,7 @@ void GraphicsShaderCacheChecker::updateAndMerge(Result result, ElfPackage *outpu
       nonFragmentElf.codeSize = compiledPipelineElf.size();
     }
 
-    // Merge and store the result in pPipelineElf
+    // Merge and store the result in pipelineElf
     ElfWriter<Elf64> writer(m_context->getGfxIpVersion());
     auto result = writer.ReadFromBuffer(nonFragmentElf.pCode, nonFragmentElf.codeSize);
     assert(result == Result::Success);
@@ -1977,7 +1977,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 // @param pipelineDumpFile : Handle of pipeline dump file
 Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipelineInfo,
                                          RayTracingPipelineBuildOut *pipelineOut, void *pipelineDumpFile,
-                                         IHelperThreadProvider *pHelperThreadProvider) {
+                                         IHelperThreadProvider *helperThreadProvider) {
   Result result = Result::Success;
 
   for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
@@ -2086,7 +2086,7 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     }
 
     result = buildRayTracingPipelineInternal(context, rayTracingShaderInfo, false, elfBinarys, shaderProps,
-                                             pHelperThreadProvider);
+                                             helperThreadProvider);
     releaseContext(context);
   }
 
@@ -2137,7 +2137,7 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
       allocBuf = voidPtrInc(allocBuf, shaderPropsSize);
     }
 
-    // Get to the address of pShaderGroupHandles pass elfCode size
+    // Get to the address of shaderGroupHandles pass elfCode size
     RayTracingShaderIdentifier *shaderHandles = reinterpret_cast<RayTracingShaderIdentifier *>(allocBuf);
     memset(shaderHandles, 0, shaderGroupHandleSize);
     pipelineOut->shaderGroupHandle.shaderHandles = shaderHandles;

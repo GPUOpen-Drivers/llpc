@@ -45,16 +45,15 @@
 namespace SPIRV {
 
 SPIRVDecoder::SPIRVDecoder(std::istream &InputStream, SPIRVFunction &F)
-    : IS(InputStream), M(*F.getModule()), WordCount(0), OpCode(OpNop),
-      Scope(&F) {}
+    : IS(InputStream), M(*F.getModule()), WordCount(0), OpCode(OpNop), Scope(&F) {
+}
 
 SPIRVDecoder::SPIRVDecoder(std::istream &InputStream, SPIRVBasicBlock &BB)
-    : IS(InputStream), M(*BB.getModule()), WordCount(0), OpCode(OpNop),
-      Scope(&BB) {}
+    : IS(InputStream), M(*BB.getModule()), WordCount(0), OpCode(OpNop), Scope(&BB) {
+}
 
 void SPIRVDecoder::setScope(SPIRVEntry *TheScope) {
-  assert(TheScope && (TheScope->getOpCode() == OpFunction ||
-                      TheScope->getOpCode() == OpLabel));
+  assert(TheScope && (TheScope->getOpCode() == OpFunction || TheScope->getOpCode() == OpLabel));
   Scope = TheScope;
 }
 
@@ -62,10 +61,8 @@ template <class T> const SPIRVDecoder &decode(const SPIRVDecoder &I, T &V) {
   return decodeBinary(I, V);
 }
 
-#define SPIRV_DEF_ENCDEC(Type)                                                 \
-  const SPIRVDecoder &operator>>(const SPIRVDecoder &I, Type &V) {             \
-    return decode(I, V);                                                       \
-  }                                                                            \
+#define SPIRV_DEF_ENCDEC(Type)                                                                                         \
+  const SPIRVDecoder &operator>>(const SPIRVDecoder &I, Type &V) { return decode(I, V); }
 
 SPIRV_DEF_ENCDEC(Op)
 SPIRV_DEF_ENCDEC(Capability)
@@ -123,7 +120,7 @@ SPIRVEntry *SPIRVDecoder::getEntry() {
   Entry->setWordCount(WordCount);
   Entry->setLine(M.getCurrentLine());
   IS >> *Entry;
-  if(Entry->isEndOfBlock() || OpCode == OpNoLine)
+  if (Entry->isEndOfBlock() || OpCode == OpNoLine)
     M.setCurrentLine(nullptr);
   assert(!IS.bad() && !IS.fail() && "SPIRV stream fails");
   M.add(Entry);

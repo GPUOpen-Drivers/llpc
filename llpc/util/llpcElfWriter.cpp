@@ -265,10 +265,8 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   assert(success);
   (void(success)); // unused
 
-  auto destPipeline =
-      destDocument.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
-  auto srcPipeline =
-      srcDocument.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
+  auto destPipeline = destDocument.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
+  auto srcPipeline = srcDocument.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
 
   // Copy .num_interpolants
   auto srcNumIterpIt = srcPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::NumInterpolants));

@@ -342,4 +342,3 @@ Value *MatrixBuilder::CreateMatrixInverse(Value *const matrix, const Twine &inst
   result->setName(instName);
   return result;
 }
-

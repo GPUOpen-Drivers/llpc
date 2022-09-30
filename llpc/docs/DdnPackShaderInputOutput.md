@@ -123,7 +123,7 @@ class InOutLocationMapManager {
 public:
   InOutLocationMapManager() {}
 
-  void addSpan(llvm::CallInst* pCall);
+  void addSpan(llvm::CallInst* call);
   void buildLocationMap();
 
   bool findMap(const InOutLocation &originalLocation, const InOutLocation *&newLocation);

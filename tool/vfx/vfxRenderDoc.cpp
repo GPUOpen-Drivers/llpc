@@ -115,9 +115,9 @@ VfxRenderStatePtr RenderDocument::getDocument() {
 
   // Shader sections
   for (auto &section : m_sections[SectionTypeShader]) {
-    auto pShaderSection = reinterpret_cast<SectionShader *>(&section);
-    auto shaderStage = pShaderSection->getShaderStage();
-    pShaderSection->getSubState(m_renderState.stages[shaderStage]);
+    auto shaderSection = reinterpret_cast<SectionShader *>(&section);
+    auto shaderStage = shaderSection->getShaderStage();
+    shaderSection->getSubState(m_renderState.stages[shaderStage]);
   }
 
   return &m_renderState;

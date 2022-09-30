@@ -120,17 +120,15 @@ enum : unsigned {
   Candidate,                       // 18, Candidate system info
   CommittedStatus,                 // 19, Committed status
   Committed,                       // 20, Committed system info
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
-  CurrNodePtr2, // 21, currNodePtr2
-#endif
-  NumRayBoxTest,         // 22, numRayBoxTest;
-  NumRayTriangleTest,    // 23, numRayTriangleTest;
-  NumIterations,         // 24, numIterations;
-  MaxStackDepth,         // 25, maxStackDepth;
-  Clocks,                // 26, clocks;
-  NumCandidateHits,      // 27, numCandidateHits;
-  UnstanceIntersections, // 28, instanceIntersections;
-  RayQueryObj            // 29, Internal ray query object handle
+  CurrNodePtr2,                    // 21, currNodePtr2
+  NumRayBoxTest,                   // 22, numRayBoxTest;
+  NumRayTriangleTest,              // 23, numRayTriangleTest;
+  NumIterations,                   // 24, numIterations;
+  MaxStackDepth,                   // 25, maxStackDepth;
+  Clocks,                          // 26, clocks;
+  NumCandidateHits,                // 27, numCandidateHits;
+  UnstanceIntersections,           // 28, instanceIntersections;
+  RayQueryObj                      // 29, Internal ray query object handle
 };
 } // namespace RayQueryParams
 
@@ -259,38 +257,36 @@ Type *getRayQueryInternalTy(lgc::Builder *builder) {
   // };
 
   Type *rayQueryInternalTys[] = {
-    builder->getInt32Ty(), // 0, bvhLo,
-    builder->getInt32Ty(), // 1, bvhHi,
-    builder->getInt32Ty(), // 2, topLevelBvhLo,
-    builder->getInt32Ty(), // 3, topLevelBvhHi,
-    builder->getInt32Ty(), // 4, stackPtr,
-    builder->getInt32Ty(), // 5, stackPtrTop,
-    builder->getInt32Ty(), // 6, stackNumEntries,
-    builder->getInt32Ty(), // 7, instNodePtr,
-    builder->getInt32Ty(), // 8, currNodePtr,
-    builder->getInt32Ty(), // 9, instanceHitContributionAndFlags,
-    builder->getInt32Ty(), // 10, prevNodePtr,
-    builder->getInt32Ty(), // 11, isGoingDown,
-    builder->getInt32Ty(), // 12, lastInstanceNode,
-    rayDescTy,             // 13, rayDesc,
-    builder->getFloatTy(), // 14, rayTMin,
-    builder->getInt32Ty(), // 15, rayFlags,
-    builder->getInt32Ty(), // 16, instanceInclusionMask,
-    builder->getInt32Ty(), // 17, candidateType;
-    raySystemDataTy,       // 18, candidate;
-    builder->getInt32Ty(), // 19, committedStatus;
-    raySystemDataTy,       // 20, committed;
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
-    builder->getInt32Ty(), // 21, currNodePtr2
-#endif
-    builder->getInt32Ty(), // 22, numRayBoxTest;
-    builder->getInt32Ty(), // 23, numRayTriangleTest;
-    builder->getInt32Ty(), // 24, numIterations;
-    builder->getInt32Ty(), // 25, maxStackDepth;
-    builder->getInt32Ty(), // 26, clocks;
-    builder->getInt32Ty(), // 27, numCandidateHits;
-    builder->getInt32Ty(), // 28, instanceIntersections;
-    builder->getInt32Ty(), // 29, rayqueryObj
+      builder->getInt32Ty(), // 0, bvhLo,
+      builder->getInt32Ty(), // 1, bvhHi,
+      builder->getInt32Ty(), // 2, topLevelBvhLo,
+      builder->getInt32Ty(), // 3, topLevelBvhHi,
+      builder->getInt32Ty(), // 4, stackPtr,
+      builder->getInt32Ty(), // 5, stackPtrTop,
+      builder->getInt32Ty(), // 6, stackNumEntries,
+      builder->getInt32Ty(), // 7, instNodePtr,
+      builder->getInt32Ty(), // 8, currNodePtr,
+      builder->getInt32Ty(), // 9, instanceHitContributionAndFlags,
+      builder->getInt32Ty(), // 10, prevNodePtr,
+      builder->getInt32Ty(), // 11, isGoingDown,
+      builder->getInt32Ty(), // 12, lastInstanceNode,
+      rayDescTy,             // 13, rayDesc,
+      builder->getFloatTy(), // 14, rayTMin,
+      builder->getInt32Ty(), // 15, rayFlags,
+      builder->getInt32Ty(), // 16, instanceInclusionMask,
+      builder->getInt32Ty(), // 17, candidateType;
+      raySystemDataTy,       // 18, candidate;
+      builder->getInt32Ty(), // 19, committedStatus;
+      raySystemDataTy,       // 20, committed;
+      builder->getInt32Ty(), // 21, currNodePtr2
+      builder->getInt32Ty(), // 22, numRayBoxTest;
+      builder->getInt32Ty(), // 23, numRayTriangleTest;
+      builder->getInt32Ty(), // 24, numIterations;
+      builder->getInt32Ty(), // 25, maxStackDepth;
+      builder->getInt32Ty(), // 26, clocks;
+      builder->getInt32Ty(), // 27, numCandidateHits;
+      builder->getInt32Ty(), // 28, instanceIntersections;
+      builder->getInt32Ty(), // 29, rayqueryObj
   };
   return StructType::get(context, rayQueryInternalTys, false);
 }
@@ -693,9 +689,9 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(rayQuery->getType(), rayQueryTy));
   rayQuery = m_builder->CreateLoad(rayQueryTy, rayQuery);
-  auto pCandidateTy = m_builder->CreateExtractValue(rayQuery, RayQueryParams::CandidateType);
-  auto pCommittedStatus = m_builder->CreateExtractValue(rayQuery, RayQueryParams::CommittedStatus);
-  Value *result = m_builder->CreateSelect(committed, pCommittedStatus, pCandidateTy);
+  auto candidateTy = m_builder->CreateExtractValue(rayQuery, RayQueryParams::CandidateType);
+  auto committedStatus = m_builder->CreateExtractValue(rayQuery, RayQueryParams::CommittedStatus);
+  Value *result = m_builder->CreateSelect(committed, committedStatus, candidateTy);
 
   // if (!committed && (q.candidateType))
   //     result = Aabb
@@ -1389,7 +1385,7 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
   instanceNodeOffsetVal = m_builder->CreateInsertElement(instanceNodeOffsetVal, zero, 1);
   Value *instanceNodeOffsetAddr = m_builder->CreateAdd(accelStruct, instanceNodeOffsetVal);
 
-  // Bitcast pInstanceNodeOffsetAddr to i64 integer
+  // Bitcast instanceNodeOffsetAddr to i64 integer
   instanceNodeOffsetAddr = m_builder->CreateBitCast(instanceNodeOffsetAddr, m_builder->getInt64Ty());
   Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
   auto instNodeOffsetAddrAsPtr = m_builder->CreateIntToPtr(instanceNodeOffsetAddr, gpuAddrAsPtrTy);

@@ -39,28 +39,23 @@
 
 #include "SPIRVType.h"
 #include "SPIRVDecorate.h"
-#include "SPIRVModule.h"
-#include "SPIRVValue.h"
 #include "SPIRVFunction.h"
 #include "SPIRVInstruction.h"
-
+#include "SPIRVModule.h"
+#include "SPIRVValue.h"
 #include <cassert>
 
 namespace SPIRV {
 
 SPIRVType *SPIRVType::getArrayElementType() const {
-  assert((OpCode == OpTypeArray || OpCode == OpTypeRuntimeArray) &&
-    "Not array type");
-  return (OpCode == OpTypeArray) ?
-    static_cast<const SPIRVTypeArray *const>(this)->getElementType() :
-    static_cast<const SPIRVTypeRuntimeArray *const>(this)->getElementType();
+  assert((OpCode == OpTypeArray || OpCode == OpTypeRuntimeArray) && "Not array type");
+  return (OpCode == OpTypeArray) ? static_cast<const SPIRVTypeArray *const>(this)->getElementType()
+                                 : static_cast<const SPIRVTypeRuntimeArray *const>(this)->getElementType();
 }
 
 uint64_t SPIRVType::getArrayLength() const {
   assert(OpCode == OpTypeArray && "Not array type");
-  return static_cast<const SPIRVTypeArray *const>(this)
-      ->getLength()
-      ->getZExtIntValue();
+  return static_cast<const SPIRVTypeArray *const>(this)->getLength()->getZExtIntValue();
 }
 
 unsigned SPIRVType::getDerivedArrayStride() const {
@@ -84,8 +79,7 @@ SPIRVWord SPIRVType::getFloatBitWidth() const {
 }
 
 SPIRVWord SPIRVType::getIntegerBitWidth() const {
-  assert((OpCode == OpTypeInt || OpCode == OpTypeBool) &&
-         "Not an integer type");
+  assert((OpCode == OpTypeInt || OpCode == OpTypeBool) && "Not an integer type");
   if (isTypeBool())
     return 1;
   return static_cast<const SPIRVTypeInt *const>(this)->getBitWidth();
@@ -171,7 +165,7 @@ SPIRVWord SPIRVType::getMatrixColumnCount() const {
   return static_cast<const SPIRVTypeMatrix *const>(this)->getColumnCount();
 }
 
-SPIRVType* SPIRVType::getMatrixColumnType() const {
+SPIRVType *SPIRVType::getMatrixColumnType() const {
   assert(OpCode == OpTypeMatrix && "Not matrix type");
   return static_cast<const SPIRVTypeMatrix *const>(this)->getColumnType();
 }
@@ -181,7 +175,7 @@ unsigned SPIRVType::getDerivedMatrixStride() const {
   return getMatrixColumnType()->getSizeInBytes();
 }
 
-SPIRVType* SPIRVType::getCompositeElementType(size_t Index) const {
+SPIRVType *SPIRVType::getCompositeElementType(size_t Index) const {
   if (OpCode == OpTypeStruct)
     return getStructMemberType(Index);
   if (OpCode == OpTypeArray)
@@ -235,27 +229,41 @@ bool SPIRVType::isTypeInt(unsigned Bits) const {
   return isType<SPIRVTypeInt>(this, Bits);
 }
 
-bool SPIRVType::isTypePointer() const { return OpCode == OpTypePointer; }
+bool SPIRVType::isTypePointer() const {
+  return OpCode == OpTypePointer;
+}
 
-bool SPIRVType::isTypeForwardPointer() const { return OpCode == OpTypeForwardPointer; }
+bool SPIRVType::isTypeForwardPointer() const {
+  return OpCode == OpTypeForwardPointer;
+}
 
-bool SPIRVType::isTypeSampler() const { return OpCode == OpTypeSampler; }
+bool SPIRVType::isTypeSampler() const {
+  return OpCode == OpTypeSampler;
+}
 
-bool SPIRVType::isTypeImage() const { return OpCode == OpTypeImage; }
+bool SPIRVType::isTypeImage() const {
+  return OpCode == OpTypeImage;
+}
 
 bool SPIRVType::isTypeSampledImage() const {
   return OpCode == OpTypeSampledImage;
 }
 
-bool SPIRVType::isTypeStruct() const { return OpCode == OpTypeStruct; }
+bool SPIRVType::isTypeStruct() const {
+  return OpCode == OpTypeStruct;
+}
 
 bool SPIRVType::isTypeScalar() const {
   return isTypeBool() || isTypeInt() || isTypeFloat();
 }
 
-bool SPIRVType::isTypeVector() const { return OpCode == OpTypeVector; }
+bool SPIRVType::isTypeVector() const {
+  return OpCode == OpTypeVector;
+}
 
-bool SPIRVType::isTypeMatrix() const { return OpCode == OpTypeMatrix; }
+bool SPIRVType::isTypeMatrix() const {
+  return OpCode == OpTypeMatrix;
+}
 
 #if VKI_RAY_TRACING
 bool SPIRVType::isTypeAccelerationStructureKHR() const {
@@ -291,18 +299,15 @@ bool SPIRVType::isTypeVectorOrScalarFloat(unsigned Bits) const {
   return isTypeFloat(Bits) || isTypeVectorFloat(Bits);
 }
 
-SPIRVTypeArray::SPIRVTypeArray(SPIRVModule *M, SPIRVId TheId,
-                               SPIRVType *TheElemType, SPIRVConstant *TheLength)
-    : SPIRVType(M, 4, OpTypeArray, TheId), ElemType(TheElemType),
-      Length(TheLength->getId()) {
+SPIRVTypeArray::SPIRVTypeArray(SPIRVModule *M, SPIRVId TheId, SPIRVType *TheElemType, SPIRVConstant *TheLength)
+    : SPIRVType(M, 4, OpTypeArray, TheId), ElemType(TheElemType), Length(TheLength->getId()) {
   validate();
 }
 
 void SPIRVTypeArray::validate() const {
   SPIRVEntry::validate();
   ElemType->validate();
-  assert(getValue(Length)->getType()->isTypeInt() &&
-      getLength()->getZExtIntValue() > 0);
+  assert(getValue(Length)->getType()->isTypeInt() && getLength()->getZExtIntValue() > 0);
 }
 
 SPIRVConstant *SPIRVTypeArray::getLength() const {
@@ -311,8 +316,7 @@ SPIRVConstant *SPIRVTypeArray::getLength() const {
     // NOTE: If the "length" is not a normal constant and is defined through
     // "OpSpecConstantOp", we have to get its literal value from the mapped
     // constant.
-    auto MappedConst =
-      static_cast<SPIRVSpecConstantOp *>(BV)->getMappedConstant();
+    auto MappedConst = static_cast<SPIRVSpecConstantOp *>(BV)->getMappedConstant();
     return static_cast<SPIRVConstant *>(MappedConst);
   }
   return get<SPIRVConstant>(Length);
@@ -320,14 +324,12 @@ SPIRVConstant *SPIRVTypeArray::getLength() const {
 
 _SPIRV_IMP_DECODE3(SPIRVTypeArray, Id, ElemType, Length)
 
-SPIRVTypeRuntimeArray::SPIRVTypeRuntimeArray(SPIRVModule *M, SPIRVId TheId,
-  SPIRVType *TheElemType)
-  :SPIRVType(M, 3, OpTypeRuntimeArray, TheId), ElemType(TheElemType){
-     validate();
+SPIRVTypeRuntimeArray::SPIRVTypeRuntimeArray(SPIRVModule *M, SPIRVId TheId, SPIRVType *TheElemType)
+    : SPIRVType(M, 3, OpTypeRuntimeArray, TheId), ElemType(TheElemType) {
+  validate();
 }
 
-void
-SPIRVTypeRuntimeArray::validate()const {
+void SPIRVTypeRuntimeArray::validate() const {
   SPIRVEntry::validate();
   ElemType->validate();
 }

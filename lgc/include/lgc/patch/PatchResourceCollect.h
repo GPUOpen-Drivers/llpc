@@ -96,7 +96,7 @@ private:
   void scalarizeGenericOutput(llvm::CallInst *call);
 
   PipelineShadersResult *m_pipelineShaders; // Pipeline shaders
-  PipelineState *m_pipelineState;     // Pipeline state
+  PipelineState *m_pipelineState;           // Pipeline state
 
   std::vector<llvm::CallInst *> m_deadCalls; // Dead calls
 
@@ -109,12 +109,12 @@ private:
   std::vector<llvm::CallInst *> m_inputCalls;          // The input import calls
   std::vector<llvm::CallInst *> m_outputCalls;         // The output export calls
 
-  ResourceUsage *m_resUsage;  // Pointer to shader resource usage
+  ResourceUsage *m_resUsage; // Pointer to shader resource usage
   std::unique_ptr<InOutLocationInfoMapManager>
       m_locationInfoMapManager; // Pointer to InOutLocationInfoMapManager instance
 
   bool m_tcsInputHasDynamicIndexing = false; // Whether there is a dynamically indexed TCS input.
-  bool m_processMissingFs = false; // Whether to process a missing FS (part-pipeline compilation).
+  bool m_processMissingFs = false;           // Whether to process a missing FS (part-pipeline compilation).
 };
 
 // =====================================================================================================================

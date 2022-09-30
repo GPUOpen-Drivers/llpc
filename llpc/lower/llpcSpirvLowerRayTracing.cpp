@@ -999,7 +999,7 @@ Value *SpirvLowerRayTracing::processBuiltIn(unsigned builtInId, Instruction *ins
     m_worldToObjMatrix =
         !m_worldToObjMatrix ? createLoadRayTracingMatrix(BuiltInWorldToObjectKHR, insertPos) : m_worldToObjMatrix;
 
-    // pOne = vec3(1.0f)
+    // one = vec3(1.0f)
     Value *one = ConstantFP::get(m_worldToObjMatrix->getType()->getArrayElementType(), 1.0);
     // vec3 -> vec4, origin = vec4(origin.xyz, 1.0>
     origin = m_builder->CreateShuffleVector(origin, one, ArrayRef<int>{0, 1, 2, 3});
@@ -1109,12 +1109,12 @@ void SpirvLowerRayTracing::createShaderSelection(Function *func, BasicBlock *ent
     return;
   }
 
-  auto pSwitch = SwitchInst::Create(shaderId, endBlock, moduleIds.size(), entryBlock);
+  auto switchInst = SwitchInst::Create(shaderId, endBlock, moduleIds.size(), entryBlock);
   for (unsigned i = 0; i < moduleIds.size(); ++i) {
     auto moduleIdStr = std::to_string(moduleIds[i]);
     std::string branchName = ".shader" + moduleIdStr;
     BasicBlock *shaderBlock = BasicBlock::Create(*m_context, branchName, func, endBlock);
-    pSwitch->addCase(m_builder->getInt32(moduleIds[i]), shaderBlock);
+    switchInst->addCase(m_builder->getInt32(moduleIds[i]), shaderBlock);
     m_builder->SetInsertPoint(shaderBlock);
     auto funcName = std::string("_") + getShaderStageAbbreviation(stage) + "_" + moduleIdStr;
     // TODO: Remove this when LLPC will switch fully to opaque pointers.
@@ -1668,7 +1668,12 @@ void SpirvLowerRayTracing::createTraceRay() {
   m_builder->CreateStore(elem2, traceRaysArgs[TraceRayLibFuncParam::DirZ]);
 
   // 14, TMax
-  arg = argIt;
+  const float rayTMax = m_context->getPipelineContext()->getPipelineOptions()->rtMaxRayLength;
+  if (rayTMax > 0.0) {
+    arg = ConstantFP::get(m_builder->getFloatTy(), rayTMax);
+  } else {
+    arg = argIt;
+  }
   m_builder->CreateStore(arg, traceRaysArgs[TraceRayLibFuncParam::TMax]);
 
   // Call TraceRay function from traceRays module

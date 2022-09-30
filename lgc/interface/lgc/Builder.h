@@ -49,7 +49,7 @@ struct TessellationMode;
 
 // =====================================================================================================================
 // Class that represents extra information on an input or output.
-// For an FS input, if HasInterpAux(), then CreateReadInput's pVertexIndex is actually an auxiliary value
+// For an FS input, if HasInterpAux(), then CreateReadInput's vertexIndex is actually an auxiliary value
 // for interpolation:
 //  - InterpLocCenter: auxiliary value is v2f32 offset from center of pixel
 //  - InterpLocSample: auxiliary value is i32 sample ID
@@ -139,7 +139,7 @@ public:
   static Builder *createBuilderImpl(LgcContext *context, Pipeline *pipeline);
   static Builder *createBuilderRecorder(LgcContext *context, Pipeline *pipeline, bool omitOpcodes);
 
-  // Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
+  // Get the type elementTy, turned into a vector of the same vector width as maybeVecTy if the latter
   // is a vector type.
   static llvm::Type *getConditionallyVectorizedTy(llvm::Type *elementTy, llvm::Type *maybeVecTy);
 
@@ -233,7 +233,7 @@ public:
 
   // Create a call to the specified intrinsic with one operand, mangled on its type.
   // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
-  // flags from the Builder if none are specified by pFmfSource.
+  // flags from the Builder if none are specified by fmfSource.
   //
   // @param id : Intrinsic ID
   // @param value : Input value
@@ -244,7 +244,7 @@ public:
 
   // Create a call to the specified intrinsic with two operands of the same type, mangled on that type.
   // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
-  // flags from the Builder if none are specified by pFmfSource.
+  // flags from the Builder if none are specified by fmfSource.
   //
   // @param id : Intrinsic ID
   // @param value1 : Input value 1
@@ -317,7 +317,7 @@ public:
   virtual llvm::Value *CreateQuantizeToFp16(llvm::Value *value, const llvm::Twine &instName = "") = 0;
 
   // Create signed integer modulo operation, where the sign of the result (if not zero) is the same as
-  // the sign of the divisor. The result is undefined if pDivisor is zero.
+  // the sign of the divisor. The result is undefined if divisor is zero.
   //
   // @param dividend : Dividend value
   // @param divisor : Divisor value
@@ -325,7 +325,7 @@ public:
   virtual llvm::Value *CreateSMod(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "") = 0;
 
   // Create FP modulo operation, where the sign of the result (if not zero) is the same as
-  // the sign of the divisor. The result is undefined if pDivisor is zero.
+  // the sign of the divisor. The result is undefined if divisor is zero.
   //
   // @param dividend : Dividend value
   // @param divisor : Divisor value
@@ -621,12 +621,12 @@ public:
   virtual llvm::Value *CreateIsNaN(llvm::Value *x, const llvm::Twine &instName = "") = 0;
 
   // Create an "insert bitfield" operation for a (vector of) integer type.
-  // Returns a value where the "pCount" bits starting at bit "pOffset" come from the least significant "pCount"
-  // bits in "pInsert", and remaining bits come from "pBase". The result is undefined if "pCount"+"pOffset" is
-  // more than the number of bits (per vector element) in "pBase" and "pInsert".
-  // If "pBase" and "pInsert" are vectors, "pOffset" and "pCount" can be either scalar or vector of the same
-  // width. The scalar type of "pOffset" and "pCount" must be integer, but can be different to that of "pBase"
-  // and "pInsert" (and different to each other too).
+  // Returns a value where the "count" bits starting at bit "offset" come from the least significant "count"
+  // bits in "insert", and remaining bits come from "base". The result is undefined if "count"+"offset" is
+  // more than the number of bits (per vector element) in "base" and "insert".
+  // If "base" and "insert" are vectors, "offset" and "count" can be either scalar or vector of the same
+  // width. The scalar type of "offset" and "count" must be integer, but can be different to that of "base"
+  // and "insert" (and different to each other too).
   //
   // @param base : Base value
   // @param insert : Value to insert (same type as base)
@@ -637,10 +637,10 @@ public:
                                             llvm::Value *count, const llvm::Twine &instName = "") = 0;
 
   // Create an "extract bitfield " operation for a (vector of) i32.
-  // Returns a value where the least significant "pCount" bits come from the "pCount" bits starting at bit
-  // "pOffset" in "pBase", and that is zero- or sign-extended (depending on "isSigned") to the rest of the value.
-  // If "pBase" and "pInsert" are vectors, "pOffset" and "pCount" can be either scalar or vector of the same
-  // width. The scalar type of "pOffset" and "pCount" must be integer, but can be different to that of "pBase"
+  // Returns a value where the least significant "count" bits come from the "count" bits starting at bit
+  // "offset" in "base", and that is zero- or sign-extended (depending on "isSigned") to the rest of the value.
+  // If "base" and "insert" are vectors, "offset" and "count" can be either scalar or vector of the same
+  // width. The scalar type of "offset" and "count" must be integer, but can be different to that of "base"
   // (and different to each other too).
   //
   // @param base : Base value
@@ -1018,8 +1018,8 @@ public:
 
   // Create an image atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
   // of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
-  // Normally pImageDesc is an image descriptor, as returned by CreateLoadImageDesc, and this method
-  // creates an image atomic instruction. But pImageDesc can instead be a texel buffer descriptor, as
+  // Normally imageDesc is an image descriptor, as returned by CreateLoadImageDesc, and this method
+  // creates an image atomic instruction. But imageDesc can instead be a texel buffer descriptor, as
   // returned by CreateLoadTexelBufferDesc, in which case the method creates a buffer atomic instruction.
   //
   // @param atomicOp : Atomic op to create
@@ -1035,8 +1035,8 @@ public:
                                          const llvm::Twine &instName = "") = 0;
 
   // Create an image atomic compare-and-swap.
-  // Normally pImageDesc is an image descriptor, as returned by CreateLoadImageDesc, and this method
-  // creates an image atomic instruction. But pImageDesc can instead be a texel buffer descriptor, as
+  // Normally imageDesc is an image descriptor, as returned by CreateLoadImageDesc, and this method
+  // creates an image atomic instruction. But imageDesc can instead be a texel buffer descriptor, as
   // returned by CreateLoadTexelBufferDesc, in which case the method creates a buffer atomic instruction.
   //
   // @param dim : Image dimension
@@ -1095,7 +1095,7 @@ public:
 
 #if VKI_RAY_TRACING
   // Create a ray intersect result with specified node in BVH buffer.
-  // pNodePtr is the combination of BVH node offset type.
+  // nodePtr is the combination of BVH node offset type.
   //
   // @param nodePtr : BVH node pointer
   // @param extent : The valid range on which intersections can occur
@@ -1116,7 +1116,7 @@ public:
   // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
   // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
   // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
-  // A non-constant pLocationOffset is currently only supported for TCS and TES, and for an FS custom-interpolated
+  // A non-constant locationOffset is currently only supported for TCS and TES, and for an FS custom-interpolated
   // input.
   //
   // @param resultTy : Type of value to read
@@ -1124,7 +1124,7 @@ public:
   // @param locationOffset : Location offset; must be within locationCount if variable
   // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
   // 64-bit elements.)
-  // @param locationCount : Count of locations taken by the input. Ignored if pLocationOffset is const
+  // @param locationCount : Count of locations taken by the input. Ignored if locationOffset is const
   // @param inputInfo : Extra input info (FS interp info)
   // @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index; for FS custom interpolated input: auxiliary
   // interpolation value; else nullptr
@@ -1140,7 +1140,7 @@ public:
   // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
   // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
   // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
-  // A non-constant pLocationOffset is currently only supported for TCS and TES, and for an FS custom-interpolated
+  // A non-constant locationOffset is currently only supported for TCS and TES, and for an FS custom-interpolated
   // input.
   //
   // @param resultTy : Type of value to read
@@ -1148,7 +1148,7 @@ public:
   // @param locationOffset : Location offset; must be within locationCount if variable
   // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
   //                  64-bit elements.)
-  // @param locationCount : Count of locations taken by the input. Ignored if pLocationOffset is const
+  // @param locationCount : Count of locations taken by the input. Ignored if locationOffset is const
   // @param inputInfo : Extra input info (FS interp info)
   // @param vertexIndex : Vertex index (For FS custom interpolated input: auxiliary interpolation value)
   // @param instName : Name to give instruction(s)
@@ -1170,7 +1170,7 @@ public:
   // @param locationOffset : Location offset; must be within locationCount if variable
   // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
   // 64-bit elements.)
-  // @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
+  // @param locationCount : Count of locations taken by the output. Ignored if locationOffset is const
   // @param outputInfo : Extra output info (GS stream ID)
   // @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
   // @param instName : Name to give instruction(s)
@@ -1182,14 +1182,14 @@ public:
   // The value to write must be a scalar or vector type with no more than four elements.
   // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
   // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
-  // A non-constant pLocationOffset is currently only supported for TCS.
+  // A non-constant locationOffset is currently only supported for TCS.
   //
   // @param valueToWrite : Value to write
   // @param location : Base location (row) of output
   // @param locationOffset : Location offset; must be within locationCount if variable
   // @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
   // 64-bit elements.)
-  // @param locationCount : Count of locations taken by the output. Ignored if pLocationOffset is const
+  // @param locationCount : Count of locations taken by the output. Ignored if locationOffset is const
   // @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
   // @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
   //                                 output: primitive index; else nullptr
@@ -1200,7 +1200,7 @@ public:
 
   // Create a write to an XFB (transform feedback / streamout) buffer.
   // The value to write must be a scalar or vector type with no more than four elements.
-  // A non-constant pXfbOffset is not currently supported.
+  // A non-constant xfbOffset is not currently supported.
   // The value is written to the XFB only if this is in the last-vertex-stage shader, i.e. VS (if no TCS/TES/GS),
   // TES (if no GS) or GS.
   //
@@ -1243,7 +1243,7 @@ public:
 
   // Create a read of (part of) a built-in input value.
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
-  // or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
+  // or the element type if index is not nullptr. For ClipDistance or CullDistance when index is nullptr,
   // the array size is determined by inputInfo.GetArraySize().
   //
   // @param builtIn : Built-in kind, one of the BuiltIn* constants
@@ -1256,7 +1256,7 @@ public:
 
   // Create a read of (part of) a built-in output value.
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
-  // or the element type if pIndex is not nullptr.
+  // or the element type if index is not nullptr.
   // This operation is only supported for TCS; other shader stages do not have per-vertex outputs, and
   // the frontend is expected to do its own caching of a written output if the shader wants to read it back again.
   //
@@ -1270,7 +1270,7 @@ public:
 
   // Create a write of (part of) a built-in output value.
   // The type of the value to write must be the fixed type of the specified built-in (see BuiltInDefs.h),
-  // or the element type if pIndex is not nullptr.
+  // or the element type if index is not nullptr.
   //
   // @param valueToWrite : Value to write
   // @param builtIn : Built-in kind, one of the BuiltIn* constants

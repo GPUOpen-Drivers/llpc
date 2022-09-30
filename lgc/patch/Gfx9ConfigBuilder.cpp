@@ -1504,7 +1504,9 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
 
   ZOrder zOrder = LATE_Z;
   bool execOnHeirFail = false;
-  if (fragmentMode.earlyFragmentTests)
+  if (shaderOptions.forceLateZ)
+    zOrder = LATE_Z;
+  else if (fragmentMode.earlyFragmentTests)
     zOrder = EARLY_Z_THEN_LATE_Z;
   else if (resUsage->resourceWrite) {
     zOrder = LATE_Z;
