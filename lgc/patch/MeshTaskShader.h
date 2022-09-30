@@ -153,6 +153,7 @@ private:
     llvm::Value *waveIdInSubgroup;
     llvm::Value *threadIdInWave;
     llvm::Value *threadIdInSubgroup;
+    llvm::Value *primOrVertexIndex;
   } m_waveThreadInfo = {};
 
   bool m_accessTaskPayload = false;                // Whether task shader has payload access operations
