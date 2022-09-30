@@ -79,6 +79,14 @@ const static char DescriptorTableOffset[] = "descset_";
 // be part of a combined texture descriptor.)
 const static char DescriptorStride[] = "dstride_";
 
+// The buffer type is "compactbuffer_X_Y" where:
+// * X is the descriptor set number
+// * Y is the binding number
+//
+
+// The value of the relocation is whether resource is ResourceNodeType::DescriptorBufferCompact.
+const static char CompactBuffer[] = "compactbuffer_";
+
 // Number of samples is "$numsamples".
 // The value of the relocation is numSamples from the rasterizer state.
 const static char NumSamples[] = "$numsamples";

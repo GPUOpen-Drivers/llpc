@@ -927,10 +927,6 @@ static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *no
     const ResourceMappingNode *startInnerNode = node->tablePtr.pNext;
     const ResourceMappingNode *endInnerNode = startInnerNode + node->tablePtr.nodeCount;
     for (const ResourceMappingNode *innerNode = startInnerNode; innerNode != endInnerNode; ++innerNode) {
-      if (innerNode->type == ResourceMappingNodeType::DescriptorBufferCompact)
-        // The code to handle a compact descriptor cannot be easily patched, so relocatable shaders assume there are
-        // no compact descriptors.
-        return true;
       if (innerNode->type == ResourceMappingNodeType::InlineBuffer) {
         // The code to handle an inline buffer cannot be easily patched, so relocatable shaders
         // assume there are no inline buffers.
@@ -939,11 +935,9 @@ static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *no
     }
     break;
   }
-  case ResourceMappingNodeType::DescriptorResource:
   case ResourceMappingNodeType::DescriptorSampler:
   case ResourceMappingNodeType::DescriptorCombinedTexture:
   case ResourceMappingNodeType::DescriptorTexelBuffer:
-  case ResourceMappingNodeType::DescriptorBufferCompact:
     // Generic descriptors in the top level are not handled by the linker.
     return true;
   case ResourceMappingNodeType::InlineBuffer:
