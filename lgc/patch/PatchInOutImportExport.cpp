@@ -41,6 +41,7 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cmath>
 
 #define DEBUG_TYPE "lgc-patch-in-out-import-export"
 
