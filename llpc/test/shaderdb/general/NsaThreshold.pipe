@@ -1,0 +1,19 @@
+; RUN: amdllpc -v -gfxip=10.1 %s | FileCheck -check-prefix=CHECK %s
+
+; CHECK-NOT: {{^}}attributes #0 {{.*}} "amdgpu-nsa-threshold"
+; CHECK: {{^}}attributes #1 {{.*}} "amdgpu-nsa-threshold"="2"
+
+[VsGlsl]
+#version 450 core
+void main() { }
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+void main() { }
+
+[FsInfo]
+entryPoint = main
+options.nsaThreshold = 2

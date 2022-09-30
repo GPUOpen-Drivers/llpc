@@ -928,6 +928,9 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
       builder.addAttribute("amdgpu-lds-spill-limit-dwords", std::to_string(shaderOptions->ldsSpillLimitDwords));
   }
 
+  if (shaderOptions->nsaThreshold != 0)
+    builder.addAttribute("amdgpu-nsa-threshold", std::to_string(shaderOptions->nsaThreshold));
+
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396807
   // Old version of the code
   AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);

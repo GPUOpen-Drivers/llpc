@@ -526,6 +526,8 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
     shaderOptions.overrideShaderThreadGroupSizeY = shaderInfo->options.overrideShaderThreadGroupSizeY;
     shaderOptions.overrideShaderThreadGroupSizeZ = shaderInfo->options.overrideShaderThreadGroupSizeZ;
 
+    shaderOptions.nsaThreshold = shaderInfo->options.nsaThreshold;
+
     pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
   }
 }

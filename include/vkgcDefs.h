@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 55
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     55.1 | Add nsaThreshold to PipelineShaderOptions
 //  |     55.0 | Remove isInternalRtShader from module options                                                         |
 //  |     54.9 | Add internalRtShaders to PipelineOptions to allow for dumping this data                               |
 //  |     54.6 | Add reverseThreadGroup to PipelineOptions                                                             |
@@ -761,6 +762,9 @@ struct PipelineShaderOptions {
   /// the contents of the color and depth/stencil attachments
   /// from the shader during draw. Because of that possibility you have to use late-z
   bool forceLateZ;
+
+  /// Minimum number of addresses to use NSA encoding on GFX10+ (0 = backend decides).
+  unsigned nsaThreshold;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
