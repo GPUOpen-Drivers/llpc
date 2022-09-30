@@ -1574,6 +1574,21 @@ void SPIRVToLLVM::updateDebugLoc(SPIRVValue *bv, Function *f) {
 }
 
 // =====================================================================================================================
+// This function will be removed when LLPC switch to opaque pointers
+//
+// Find function in the module with specific type and starting with name.
+Function *SPIRVToLLVM::findFunctionInModule(string name, FunctionType *funcType) {
+
+  for (Function &func : m_m->functions()) {
+    if (func.getName().startswith(name) && func.getFunctionType() == funcType) {
+      return &func;
+    }
+  }
+
+  return nullptr;
+}
+
+// =====================================================================================================================
 // Create a call to launder a row major matrix.
 //
 // @param pointerToMatrix : The pointer to matrix to launder.
@@ -1591,7 +1606,8 @@ std::pair<Type *, Value *> SPIRVToLLVM::createLaunderRowMajorMatrix(Type *const 
       FunctionType::get(newMatrixPointerType, {matrixPointerType, matrixType}, false);
   string mangledName(SpirvLaunderRowMajor);
   appendTypeMangling(nullptr, args, mangledName);
-  Function *rowMajorFunc = m_m->getFunction(mangledName);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  Function *rowMajorFunc = findFunctionInModule(mangledName, rowMajorFuncType);
   if (!rowMajorFunc) {
     rowMajorFunc = Function::Create(rowMajorFuncType, GlobalValue::ExternalLinkage, SpirvLaunderRowMajor, m_m);
   }
@@ -5688,8 +5704,7 @@ static void printTypeName(Type *ty, raw_ostream &nameStream) {
   for (;;) {
     if (auto pointerTy = dyn_cast<PointerType>(ty)) {
       nameStream << "p" << pointerTy->getAddressSpace();
-      ty = pointerTy->getPointerElementType();
-      continue;
+      return;
     }
     if (auto arrayTy = dyn_cast<ArrayType>(ty)) {
       nameStream << "a" << arrayTy->getNumElements();
@@ -5790,16 +5805,17 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
 #endif
 
   std::string mangledName(funcName);
-  appendTypeMangling(nullptr, args, mangledName);
-  Function *func = m_m->getFunction(mangledName);
+  appendTypeMangling(retTy, args, mangledName);
   FunctionType *ft = FunctionType::get(retTy, argTys, false);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  Function *func = findFunctionInModule(mangledName, ft);
   // ToDo: Some intermediate functions have duplicate names with
   // different function types. This is OK if the function name
   // is used internally and finally translated to unique function
   // names. However it is better to have a way to differentiate
   // between intermediate functions and final functions and make
   // sure final functions have unique names.
-  if (!func || func->getFunctionType() != ft) {
+  if (!func) {
     func = Function::Create(ft, GlobalValue::ExternalLinkage, mangledName, m_m);
     func->setCallingConv(CallingConv::SPIR_FUNC);
     if (isFuncNoUnwind())
@@ -7561,7 +7577,10 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       // needed.
       std::string mangledFuncName(gSPIRVMD::NonUniform);
       appendTypeMangling(nullptr, args, mangledFuncName);
-      auto f = getOrCreateFunction(m_m, voidTy, types, mangledFuncName);
+      // TODO: Remove this when LLPC will switch fully to opaque pointers.
+      Function *f = findFunctionInModule(mangledFuncName, FunctionType::get(voidTy, types, false));
+      if (!f)
+        f = getOrCreateFunction(m_m, voidTy, types, mangledFuncName);
       if (bb->getTerminator()) {
         // NOTE: For OpCopyObject, we use the operand value directly, which may be in another block that already has a
         // terminator. In this case, insert the call before the terminator.
@@ -8743,9 +8762,10 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *bc, BasicBlock *bb
 
   string mangledName(unmangledName);
   std::vector<Value *> args = transValue(bc->getArgumentValues(), bb->getParent(), bb);
-  appendTypeMangling(nullptr, args, mangledName);
+  appendTypeMangling(transType(bc->getType()), args, mangledName);
   FunctionType *funcTy = FunctionType::get(transType(bc->getType()), argTys, false);
-  Function *func = m_m->getFunction(mangledName);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  Function *func = findFunctionInModule(mangledName, funcTy);
   if (!func) {
     func = Function::Create(funcTy, GlobalValue::ExternalLinkage, mangledName, m_m);
     func->setCallingConv(CallingConv::SPIR_FUNC);

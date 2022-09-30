@@ -2,8 +2,8 @@
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @interpolateAtCentroid.p64f32(float addrspace(64)* @{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @interpolateAtCentroid.p64v4f32(<4 x float> addrspace(64)* @{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @interpolateAtCentroid.f32.p64(float addrspace(64)* @{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @interpolateAtCentroid.v4f32.p64(<4 x float> addrspace(64)* @{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{[A-Za-z0-9]*}} = call <2 x float> @lgc.input.import.builtin.InterpLinearCentroid.v2f32.i32(i32 268435462)
 ; SHADERTEST: %{{[A-Za-z0-9]*}} = call <2 x float> @lgc.input.import.builtin.InterpPerspCentroid.v2f32.i32(i32 268435458)

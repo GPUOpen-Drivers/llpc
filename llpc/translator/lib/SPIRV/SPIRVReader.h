@@ -185,6 +185,8 @@ public:
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
 
+  Function *findFunctionInModule(std::string name, FunctionType *funcType);
+
 private:
   class SPIRVTypeContext {
     SPIRVWord m_typeId;
