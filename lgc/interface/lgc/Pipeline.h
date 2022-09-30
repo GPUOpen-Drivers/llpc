@@ -245,6 +245,9 @@ struct ShaderOptions {
   // from the shader during draw. Because of that possibility you have to use late-z
   bool forceLateZ;
 
+  /// Minimum number of addresses to use NSA encoding on GFX10+ (0 = backend decides).
+  unsigned nsaThreshold;
+
   ShaderOptions() {
     // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from
     // being written, we force everything to 0, including alignment gaps.

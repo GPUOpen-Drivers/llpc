@@ -158,6 +158,7 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, overrideShaderThreadGroupSizeX, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, overrideShaderThreadGroupSizeY, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, overrideShaderThreadGroupSizeZ, MemberTypeInt, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, nsaThreshold, MemberTypeInt, false);
 
     VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
@@ -166,7 +167,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 33;
+  static const unsigned MemberCount = 34;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
