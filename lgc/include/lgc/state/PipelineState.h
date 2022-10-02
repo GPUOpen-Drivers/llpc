@@ -122,7 +122,7 @@ struct NggControl {
 // The middle-end implementation of PipelineState, a subclass of Pipeline.
 class PipelineState final : public Pipeline {
 public:
-  PipelineState(LgcContext *builderContext, bool emitLgc = false) : Pipeline(builderContext), m_emitLgc(emitLgc) {}
+  PipelineState(LgcContext *builderContext, bool emitLgc = false);
 
   ~PipelineState() override final;
 
@@ -307,6 +307,9 @@ public:
 
   // Checks if SW-emulated mesh pipeline statistics is needed
   bool needSwMeshPipelineStats() const;
+
+  // Checks if row export for mesh shader is enabled or not
+  bool enableMeshRowExport() const;
 
   // Gets resource usage of the specified shader stage
   ResourceUsage *getShaderResourceUsage(ShaderStage shaderStage);
@@ -499,6 +502,7 @@ private:
   llvm::SmallVector<std::unique_ptr<uint32_t[]>, 4> m_immutableValueAllocs;
 
   bool m_gsOnChip = false;                                                     // Whether to use GS on-chip mode
+  bool m_meshRowExport = false;                                                // Enable mesh shader row export or not
   NggControl m_nggControl = {};                                                // NGG control settings
   ShaderModes m_shaderModes;                                                   // Shader modes for this pipeline
   unsigned m_deviceIndex = 0;                                                  // Device index
