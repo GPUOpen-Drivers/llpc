@@ -50,6 +50,10 @@ using namespace llvm;
 static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable tessellation off-chip mode"),
                                        cl::init(false));
 
+// -enable-row-export: enable row export for mesh shader
+static cl::opt<bool> EnableRowExport("enable-row-export", cl::desc("Enable row export for mesh shader"),
+                                     cl::init(false));
+
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";
 static const char PreRasterHasGsMetadataName[] = "lgc.prerast.has.gs";
@@ -213,6 +217,15 @@ namespace lgc {
 // Create BuilderReplayer pass
 ModulePass *createLegacyBuilderReplayer(Pipeline *pipeline);
 } // namespace lgc
+
+// =====================================================================================================================
+// Constructor
+//
+// @param builderContext : LGC builder context
+// @param emitLgc : Whether the option -emit-lgc is on
+PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
+    : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
+}
 
 // =====================================================================================================================
 // Destructor
@@ -1295,6 +1308,15 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
 // Checks if SW-emulated mesh pipeline statistics is needed
 bool PipelineState::needSwMeshPipelineStats() const {
   return getTargetInfo().getGfxIpVersion().major < 11;
+}
+
+// =====================================================================================================================
+// Checks if row export for mesh shader is enabled or not
+bool PipelineState::enableMeshRowExport() const {
+  if (getTargetInfo().getGfxIpVersion().major < 11)
+    return false; // Row export is not supported by HW
+
+  return m_meshRowExport;
 }
 
 // =====================================================================================================================
