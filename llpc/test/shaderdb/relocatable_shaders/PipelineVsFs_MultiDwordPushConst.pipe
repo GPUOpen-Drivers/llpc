@@ -16,8 +16,7 @@
 ; Check that those parameters are passed in as s2 and s3.
 ; SHADERTEST-LABEL: _amdgpu_ps_main:
 ; SHADERTEST-NEXT: BB0_0
-; SHADERTEST-NEXT: s_mov_b32 s0, 0
-; SHADERTEST-NEXT: v_mov_b32_e32 v0, 0
+; SHADERTEST: v_mov_b32_e32 v0, 0
 ; SHADERTEST-NEXT: v_mov_b32_e32 v5, s2
 ; SHADERTEST-NEXT: v_mov_b32_e32 v6, s3
 ; SHADERTEST: image_gather4_lz v[0:4], v[5:6]
