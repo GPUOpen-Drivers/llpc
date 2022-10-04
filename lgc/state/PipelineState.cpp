@@ -1250,6 +1250,8 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
       //  1) A stage-specific default is preferred.
       //  2) If specified by tuning option, use the specified wave size.
       //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size when required.
+      //  4) If gl_SubgroupSize is not used in the (mesh/task/compute) shader, and the workgroup size is
+      //     not larger than 32, use wave size 32.
 
       if (checkingStage == ShaderStageFragment) {
         // Per programming guide, it's recommended to use wave64 for fragment shader.
@@ -1268,8 +1270,9 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
       if (waveSizeOption != 0)
         waveSize = waveSizeOption;
 
+      // Note: the conditions below override the tuning option.
       // If subgroup size is used in any shader in the pipeline, use the specified subgroup size as wave size.
-      if (getShaderModes()->getAnyUseSubgroupSize()) {
+      if (m_shaderModes.getAnyUseSubgroupSize()) {
         // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
         subgroupSize = getShaderOptions(checkingStage).subgroupSize;
         subgroupSize = (subgroupSize == 0) ? waveSize : subgroupSize;
@@ -1278,6 +1281,21 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
 
         if ((subgroupSize < waveSize) || getOptions().fullSubgroups)
           waveSize = subgroupSize;
+      } else if (checkingStage == ShaderStageMesh || checkingStage == ShaderStageTask ||
+                 checkingStage == ShaderStageCompute) {
+        // If workgroup size is not larger than 32, use wave size 32.
+        unsigned workGroupSize;
+        if (checkingStage == ShaderStageMesh) {
+          auto &mode = m_shaderModes.getMeshShaderMode();
+          workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
+        } else {
+          assert(checkingStage == ShaderStageTask || checkingStage == ShaderStageCompute);
+          auto &mode = m_shaderModes.getComputeShaderMode();
+          workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
+        }
+
+        if (workGroupSize <= 32)
+          waveSize = 32;
       }
 
       assert(waveSize == 32 || waveSize == 64);

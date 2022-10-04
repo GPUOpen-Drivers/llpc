@@ -1,0 +1,17 @@
+#version 450
+
+// Test that wavefront size is 32.
+
+layout(local_size_x = 3, local_size_y = 3, local_size_y = 3) in;
+void main()
+{
+}
+
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
+; SHADERTEST: .wavefront_size: 0x0000000000000020
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST
