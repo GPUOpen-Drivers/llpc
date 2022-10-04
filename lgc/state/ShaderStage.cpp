@@ -55,8 +55,12 @@ void lgc::setShaderStage(Module *module, ShaderStage stage) {
   auto stageMetaNode = MDNode::get(
       module->getContext(), {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(module->getContext()), stage))});
   for (Function &func : *module) {
-    if (!func.isDeclaration())
-      func.setMetadata(mdKindId, stageMetaNode);
+    if (!func.isDeclaration()) {
+      if (stage != ShaderStageInvalid)
+        func.setMetadata(mdKindId, stageMetaNode);
+      else
+        func.eraseMetadata(mdKindId);
+    }
   }
 }
 
@@ -64,12 +68,15 @@ void lgc::setShaderStage(Module *module, ShaderStage stage) {
 // Set shader stage metadata on a function
 //
 // @param [in/out] func : Function to set shader stage on
-// @param stage : Shader stage to set
+// @param stage : Shader stage to set or ShaderStageInvalid
 void lgc::setShaderStage(Function *func, ShaderStage stage) {
   unsigned mdKindId = func->getContext().getMDKindID(ShaderStageMetadata);
-  auto stageMetaNode = MDNode::get(
-      func->getContext(), {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(func->getContext()), stage))});
-  func->setMetadata(mdKindId, stageMetaNode);
+  if (stage != ShaderStageInvalid) {
+    auto stageMetaNode = MDNode::get(
+        func->getContext(), {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(func->getContext()), stage))});
+    func->setMetadata(mdKindId, stageMetaNode);
+  } else
+    func->eraseMetadata(mdKindId);
 }
 
 // =====================================================================================================================
