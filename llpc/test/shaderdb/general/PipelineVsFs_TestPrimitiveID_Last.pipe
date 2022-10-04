@@ -1,7 +1,7 @@
 ; Test primitiveID when provoking vertex mode is LAST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -v --gfxip=10.1.0 %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v --gfxip=10.1.0 %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: @[[LDS:[^ ]*]] = external addrspace(3) global [{{[0-9]*}} x i32], align 4
 ; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main({{.*}}, i32 %esGsOffsets01, i32 %esGsOffsets23, i32 %gsPrimitiveId,
@@ -9,9 +9,8 @@
 ; calculate the address at which to store the provoking vertex.
 ; SHADERTEST: [[offset1:%[0-9]*]] = lshr i32 %esGsOffsets01, 18
 ; SHADERTEST: [[offset2:%[0-9]*]] = and i32 [[offset1]], 2044
-; SHADERTEST: [[Addr1:%[0-9]*]] = getelementptr i8, i8 addrspace(3)* bitcast ([{{[0-9]*}} x i32] addrspace(3)* @[[LDS]] to i8 addrspace(3)*), i32 [[offset2]]
-; SHADERTEST: [[Addr2:%[0-9]*]] = bitcast i8 addrspace(3)* [[Addr1]] to i32 addrspace(3)*
-; SHADERTEST: store i32 %gsPrimitiveId, i32 addrspace(3)* [[Addr2]], align 4
+; SHADERTEST: [[Addr1:%[0-9]*]] = getelementptr i8, ptr addrspace(3) @[[LDS]], i32 [[offset2]]
+; SHADERTEST: store i32 %gsPrimitiveId, ptr addrspace(3) [[Addr1]], align 4
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

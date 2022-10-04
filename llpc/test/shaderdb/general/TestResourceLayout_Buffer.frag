@@ -1,10 +1,11 @@
 // Check the resource layout option '--resource-layout-scheme'
 
 // BEGIN_SHADERTEST
-// RUN: amdllpc -v %gfxip --resource-layout-scheme=indirect %s | FileCheck -check-prefix=SHADERTEST %s
+// RUN: amdllpc -enable-opaque-pointers=false -v %gfxip --resource-layout-scheme=indirect %s | FileCheck -check-prefix=SHADERTEST %s
+// RUN: amdllpc -enable-opaque-pointers=true -v %gfxip --resource-layout-scheme=indirect %s | FileCheck -check-prefix=SHADERTEST %s
 
 // SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-// SHADERTEST: call i8 addrspace(4)* @lgc.descriptor.table.addr(i32 6, i32 6, i32 1, i32 1, i32 -1)
+// SHADERTEST: call {{i8 addrspace\(4\)\*|ptr addrspace\(4\)}} @lgc.descriptor.table.addr(i32 6, i32 6, i32 1, i32 1, i32 -1)
 
 // SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 // %descTable2 is for uniform buf, it should be %descTable1 in compact mode.

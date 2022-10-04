@@ -23,20 +23,20 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 1, i32 608, {{.*}}, <2 x i32> zeroinitializer)
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 1)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 1)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.with.fmask.v4f32(i32 6, i32 608, {{.*}}, {{.*}}, <2 x i32> zeroinitializer, i32 7)
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 2)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 2)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4i32(i32 1, i32 612, {{.*}}, <2 x i32> zeroinitializer)
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 3)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 3)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.with.fmask.v4i32(i32 6, i32 612, {{.*}}, {{.*}}, <2 x i32> zeroinitializer, i32 7)
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 4)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 4)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4i32(i32 1, i32 608, {{.*}}, <2 x i32> zeroinitializer)
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 5)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 5)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.with.fmask.v4i32(i32 6, i32 608, {{.*}}, {{.*}}, <2 x i32> zeroinitializer, i32 7)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

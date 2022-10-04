@@ -23,29 +23,29 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: getelementptr <3 x double>, <3 x double> addrspace({{.*}})* %{{.*}}, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr <3 x float>, <3 x float> addrspace({{.*}})* %{{.*}}, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr <3 x float>, <3 x float> addrspace({{.*}})* %{{.*}}, i32 0, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr <3 x double>, ptr addrspace({{.*}}) %{{.*}}, i32 0, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr <3 x float>, ptr addrspace({{.*}}) %{{.*}}, i32 0, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr <3 x float>, ptr addrspace({{.*}}) %{{.*}}, i32 0, i32 %{{[0-9]*}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: cmp eq i32 %{{[0-9]*}}, 1
-; SHADERTEST: select i1 %{{[0-9]*}}, double addrspace({{.*}})* %{{.*}}, double addrspace({{.*}})* %{{.*}}
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 2
-; SHADERTEST: select i1 %{{[0-9]*}}, double addrspace({{.*}})* %{{.*}}, double addrspace({{.*}})* %{{[0-9]*}}
+; SHADERTEST: %[[cmp1:.*]] = icmp eq i32 %{{[0-9]*}}, 1
+; SHADERTEST: select i1 %[[cmp1]], i32 {{.*}}, i32 {{.*}}
+; SHADERTEST: %[[cmp2:.*]] = icmp eq i32 %{{[0-9]*}}, 2
+; SHADERTEST: select i1 %[[cmp2]], i32 {{.*}}, i32 {{.*}}
 
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 1
-; SHADERTEST: select i1 %{{[0-9]*}}, float addrspace({{.*}})* %{{.*}}, float addrspace({{.*}})* %{{.*}}
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 2
-; SHADERTEST: select i1 %{{[0-9]*}}, float addrspace({{.*}})* %{{.*}}, float addrspace({{.*}})* %{{[0-9]*}}
+; SHADERTEST: %[[cmp11:.*]] = icmp eq i32 %{{[0-9]*}}, 1
+; SHADERTEST: select i1 %[[cmp11]], i32 {{.*}}, i32 {{.*}}
+; SHADERTEST: %[[cmp21:.*]] = icmp eq i32 %{{[0-9]*}}, 2
+; SHADERTEST: select i1 %[[cmp21]], i32 {{.*}}, i32 {{.*}}
 
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 1
-; SHADERTEST: select i1 %{{[0-9]*}}, float %{{.*}}, float %{{.*}}
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 2
-; SHADERTEST: select i1 %{{[0-9]*}}, float %{{.*}}, float %{{[0-9]*}}
+; SHADERTEST: %[[cmp12:.*]] = icmp eq i32 %{{[0-9]*}}, 1
+; SHADERTEST: select i1 %[[cmp12]], float %{{.*}}, float %{{.*}}
+; SHADERTEST: %[[cmp22:.*]] = icmp eq i32 %{{[0-9]*}}, 2
+; SHADERTEST: select i1 %[[cmp22]], float %{{.*}}, float %{{[0-9]*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

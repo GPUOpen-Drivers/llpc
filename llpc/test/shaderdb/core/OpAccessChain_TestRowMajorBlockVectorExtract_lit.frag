@@ -40,16 +40,16 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: insertelement <4 x [4 x %{{[a-z0-9.]*}}] addrspace(7)*> undef, [4 x %{{[a-z0-9.]*}}] addrspace(7)* %{{[0-9]*}}, i{{32|64}} 0
-; SHADERTEST: insertelement <4 x [4 x %{{[a-z0-9.]*}}] addrspace(7)*> %{{[0-9]*}}, [4 x %{{[a-z0-9.]*}}] addrspace(7)* %{{[0-9]*}}, i{{32|64}} 1
-; SHADERTEST: insertelement <4 x [4 x %{{[a-z0-9.]*}}] addrspace(7)*> %{{[0-9]*}}, [4 x %{{[a-z0-9.]*}}] addrspace(7)* %{{[0-9]*}}, i{{32|64}} 2
-; SHADERTEST: insertelement <4 x [4 x %{{[a-z0-9.]*}}] addrspace(7)*> %{{[0-9]*}}, [4 x %{{[a-z0-9.]*}}] addrspace(7)* %{{[0-9]*}}, i{{32|64}} 3
-; SHADERTEST: insertelement <3 x [3 x %{{[a-z.]*}}] addrspace(7)*> undef, [3 x %{{[a-z.]*}}] addrspace(7)* %{{[0-9]*}}, i{{32|64}} 0
-; SHADERTEST: insertelement <3 x [3 x %{{[a-z.]*}}] addrspace(7)*> %{{[0-9]*}}, [3 x %{{[a-z.]*}}] addrspace(7)* %{{[0-9]*}}, i{{32|64}} 1
-; SHADERTEST: insertelement <3 x [3 x %{{[a-z.]*}}] addrspace(7)*> %{{[0-9]*}}, [3 x %{{[a-z.]*}}] addrspace(7)* %{{[0-9]*}}, i{{32|64}} 2
+; SHADERTEST: insertelement <4 x ptr addrspace(7)> undef, ptr addrspace(7) %{{[0-9]*}}, i{{32|64}} 0
+; SHADERTEST: insertelement <4 x ptr addrspace(7)> %{{[0-9]*}}, ptr addrspace(7) %{{[0-9]*}}, i{{32|64}} 1
+; SHADERTEST: insertelement <4 x ptr addrspace(7)> %{{[0-9]*}}, ptr addrspace(7) %{{[0-9]*}}, i{{32|64}} 2
+; SHADERTEST: insertelement <4 x ptr addrspace(7)> %{{[0-9]*}}, ptr addrspace(7) %{{[0-9]*}}, i{{32|64}} 3
+; SHADERTEST: insertelement <3 x ptr addrspace(7)> undef, ptr addrspace(7) %{{[0-9]*}}, i{{32|64}} 0
+; SHADERTEST: insertelement <3 x ptr addrspace(7)> %{{[0-9]*}}, ptr addrspace(7) %{{[0-9]*}}, i{{32|64}} 1
+; SHADERTEST: insertelement <3 x ptr addrspace(7)> %{{[0-9]*}}, ptr addrspace(7) %{{[0-9]*}}, i{{32|64}} 2
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

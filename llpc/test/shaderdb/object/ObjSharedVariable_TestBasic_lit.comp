@@ -19,12 +19,13 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[LDS:[^ ]*]] = addrspace(3) global <4 x float> undef
-; SHADERTEST: store <4 x float> %{{[0-9]*}}, <4 x float> addrspace(3)* @[[LDS]]
-; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(3)* @[[LDS]]
+; SHADERTEST: store <4 x float> %{{[0-9]*}}, {{<4 x float> addrspace\(3\)\*|ptr addrspace\(3\)}} @[[LDS]]
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, {{<4 x float> addrspace\(3\)\*|ptr addrspace\(3\)}} @[[LDS]]
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -1,20 +1,20 @@
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
+; RUN: amdllpc -enable-opaque-pointers=true -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
 ; SHADERTEST_PP0-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST_PP0: %{{[0-9]*}} = call i64 (...) @lgc.create.read.generic.input.i64(i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
 ; SHADERTEST_PP0: call void (...) @lgc.create.write.generic.output(i64 %{{[0-9]*}}, i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
 ; SHADERTEST_PP0: %{{[0-9]*}} = call i64 (...) @lgc.create.read.generic.input.i64(i32 1, i32 0, i32 0, i32 0, i32 17, i32 undef)
-; SHADERTEST_PP0: inttoptr i64 %{{[0-9]*}} to <{ [4294967295 x [4 x float]] }> addrspace(1)*
+; SHADERTEST_PP0: inttoptr i64 %{{[0-9]*}} to ptr addrspace(1)
 ; SHADERTEST_PP0: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP1 %s
+; RUN: amdllpc -enable-opaque-pointers=true -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP1 %s
 ; Fragment shader part-pipeline:
 ; SHADERTEST_PP1-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST_PP1: %{{[0-9]*}} = call i64 (...) @lgc.create.read.generic.input.i64(i32 1, i32 0, i32 0, i32 0, i32 17, i32 undef)
-; SHADERTEST_PP1: inttoptr i64 %{{[0-9]*}} to <{ [4294967295 x [4 x float]] }> addrspace(1)*
+; SHADERTEST_PP1: inttoptr i64 %{{[0-9]*}} to ptr addrspace(1)
 ; Pre-rasterization part-pipeline:
 ; SHADERTEST_PP1-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST_PP1: %{{[0-9]*}} = call i64 (...) @lgc.create.read.generic.input.i64(i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)

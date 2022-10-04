@@ -18,13 +18,13 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %[[SQRT:[^ ,]*]] = call reassoc nnan nsz arcp contract double (...) @lgc.create.inverse.sqrt.f64(double
 ; SHADERTEST: %[[SQRT3:[^ ,]*]] = call reassoc nnan nsz arcp contract <3 x double> (...) @lgc.create.inverse.sqrt.v3f64(<3 x double>
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: %[[X:[^ ,]*]] = load double, double addrspace(7)*
+; SHADERTEST: %[[X:[^ ,]*]] = load double, ptr addrspace(7)
 ; SHADERTEST: %[[SCALING:[^ ,]*]] = fcmp reassoc nnan nsz arcp contract olt double %[[X]], 0x1000000000000000
 ; SHADERTEST: %[[SCALE_UP:[^ ,]*]] = select i1 %[[SCALING]], i32 256, i32 0
 ; SHADERTEST: %[[SCALE_DOWN:[^ ,]*]] = select i1 %[[SCALING]], i32 128, i32 0

@@ -4,24 +4,24 @@
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s -enable-scratch-bounds-checks | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s -enable-scratch-bounds-checks | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: .[[entry:[a-z0-9]+]]:
 ; SHADERTEST: %[[arr:[a-z0-9]+]] = alloca [5 x i32], align 4, addrspace(5)
-; SHADERTEST: %[[idx1:[0-9]+]] = load i32, i32 addrspace(7)* getelementptr inbounds (<{ i32 }>, <{ i32 }> addrspace(7)* @c, i32 0, i32 0), align 4
-; SHADERTEST: %[[gep1:[0-9]+]] = getelementptr [5 x i32], [5 x i32] addrspace(5)* %[[arr]], i32 0, i32 %[[idx1]]
+; SHADERTEST: %[[idx1:[0-9]+]] = load i32, ptr addrspace(7) @c, align 4
+; SHADERTEST: %[[gep1:[0-9]+]] = getelementptr [5 x i32], ptr addrspace(5) %[[arr]], i32 0, i32 %[[idx1]]
 ; SHADERTEST: %[[cmp1:[0-9]+]] = icmp ult i32 %[[idx1]], 5
 ; SHADERTEST: br i1 %[[cmp1]], label %{{.*}}, label %{{.*}}
 ; SHADERTEST: [[load1:[a-z0-9]+]]:
-; SHADERTEST: %[[loadResult1:[0-9]+]] = load i32, i32 addrspace(5)* %[[gep1]], align 4
+; SHADERTEST: %[[loadResult1:[0-9]+]] = load i32, ptr addrspace(5) %[[gep1]], align 4
 ; SHADERTEST: [[final1:[a-z0-9]+]]:
 ; SHADERTEST: %{{.*}} = phi i32 [ 0, %.[[entry]] ], [ %[[loadResult1]], %[[load1]] ]
-; SHADERTEST: %[[idx2:[0-9]+]] = load i32, i32 addrspace(5)* %{{.*}}, align 4
-; SHADERTEST: %[[gep2:[0-9]+]] = getelementptr [5 x i32], [5 x i32] addrspace(5)* %[[arr]], i32 0, i32 %[[idx2]]
+; SHADERTEST: %[[idx2:[0-9]+]] = load i32, ptr addrspace(5) %{{.*}}, align 4
+; SHADERTEST: %[[gep2:[0-9]+]] = getelementptr [5 x i32], ptr addrspace(5) %[[arr]], i32 0, i32 %[[idx2]]
 ; SHADERTEST: %[[cmp2:[0-9]+]] = icmp ult i32 %[[idx2]], 5
 ; SHADERTEST: br i1 %[[cmp2]], label %{{.*}}, label %{{.*}}
 ; SHADERTEST: [[load2:[a-z0-9]+]]:
-; SHADERTEST: %[[loadResult2:[0-9]+]] = load i32, i32 addrspace(5)* %[[gep2]], align 4
+; SHADERTEST: %[[loadResult2:[0-9]+]] = load i32, ptr addrspace(5) %[[gep2]], align 4
 ; SHADERTEST: [[final2:[a-z0-9]+]]:
 ; SHADERTEST: %{{.*}} = phi i32 [ 0, %[[final1]] ], [ %[[loadResult2]], %[[load2]] ]
 

@@ -34,33 +34,34 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.{{p4v8i32|p4}}(i32 1, i32 1, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 384, {{.*}}, {{.*}}, i32 153, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, <2 x float> <float 1.000000e+00, float 1.000000e+00>, <2 x float> <float 0x3FF19999A0000000, float 0x3FF19999A0000000>, {{.*}})
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 1, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.{{p4v8i32|p4}}(i32 1, i32 1, i32 1, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 2, i32 512, {{.*}}, {{.*}}, i32 153, <3 x float> <float 0x3FC99999A0000000, float 0x3FC99999A0000000, float 0x3FC99999A0000000>, <3 x float> <float 0x3FF3333340000000, float 0x3FF3333340000000, float 0x3FF3333340000000>, <3 x float> <float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000>, {{.*}})
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.{{p4v8i32|p4}}(i32 1, i32 1, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 384, {{.*}}, {{.*}}, i32 409, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, <2 x float> <float 1.000000e+00, float 1.000000e+00>, <2 x float> <float 0x3FF19999A0000000, float 0x3FF19999A0000000>, {{.*}}, <2 x i32> <i32 2, i32 2>)
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 1, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.{{p4v8i32|p4}}(i32 1, i32 1, i32 1, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 2, i32 512, {{.*}}, {{.*}}, i32 409, <3 x float> <float 0x3FC99999A0000000, float 0x3FC99999A0000000, float 0x3FC99999A0000000>, <3 x float> <float 0x3FF3333340000000, float 0x3FF3333340000000, float 0x3FF3333340000000>, <3 x float> <float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000>, {{.*}}, <3 x i32> <i32 3, i32 3, i32 3>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.{{p4v8i32|p4}}(i32 1, i32 1, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 384, {{.*}}, {{.*}}, i32 153, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, <2 x float> <float 1.000000e+00, float 1.000000e+00>, <2 x float> <float 0x3FF19999A0000000, float 0x3FF19999A0000000>, {{.*}})
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 1, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.{{p4v8i32|p4}}(i32 1, i32 1, i32 1, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 2, i32 512, {{.*}}, {{.*}}, i32 153, <3 x float> <float 0x3FC99999A0000000, float 0x3FC99999A0000000, float 0x3FC99999A0000000>, <3 x float> <float 0x3FF3333340000000, float 0x3FF3333340000000, float 0x3FF3333340000000>, <3 x float> <float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000>, {{.*}})
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 384, {{.*}}, {{.*}}, i32 409, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, <2 x float> <float 1.000000e+00, float 1.000000e+00>, <2 x float> <float 0x3FF19999A0000000, float 0x3FF19999A0000000>, {{.*}}, <2 x i32> <i32 2, i32 2>)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 2, i32 512, {{.*}}, {{.*}}, i32 409, <3 x float> <float 0x3FC99999A0000000, float 0x3FC99999A0000000, float 0x3FC99999A0000000>, <3 x float> <float 0x3FF3333340000000, float 0x3FF3333340000000, float 0x3FF3333340000000>, <3 x float> <float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000>, {{.*}}, <3 x i32> <i32 3, i32 3, i32 3>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.readfirstlane
-; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
+; SHADERTEST: load <4 x i32>, {{<4 x i32> addrspace\(4\)\*|ptr addrspace\(4\)}} %{{[0-9]*}}
+; SHADERTEST: load <8 x i32>, {{<8 x i32> addrspace\(4\)\*|ptr addrspace\(4\)}} %{{[0-9]*}}
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.d.cl.2d.v4f32.f32.f32({{.*}}, float 1.000000e+00, float 1.000000e+00, float 0x3FF19999A0000000, float 0x3FF19999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000, {{.*}})
-; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
+; SHADERTEST: load <4 x i32>, {{<4 x i32> addrspace\(4\)\*|ptr addrspace\(4\)}} %{{[0-9]*}}
+; SHADERTEST: load <8 x i32>, {{<8 x i32> addrspace\(4\)\*|ptr addrspace\(4\)}} %{{[0-9]*}}
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.d.cl.3d.v4f32.f32.f32({{.*}}, float 0x3FF3333340000000, float 0x3FF3333340000000, float 0x3FF3333340000000, float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000, float 0x3FC99999A0000000, float 0x3FC99999A0000000, float 0x3FC99999A0000000, {{.*}})
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.d.cl.o.2d.v4f32.f32.f32({{.*}}, i32 514, float 1.000000e+00, float 1.000000e+00, float 0x3FF19999A0000000, float 0x3FF19999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000, {{.*}})
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.d.cl.o.3d.v4f32.f32.f32({{.*}}, i32 197379, float 0x3FF3333340000000, float 0x3FF3333340000000, float 0x3FF3333340000000, float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000, float 0x3FF4CCCCC0000000, float 0x3FC99999A0000000, float 0x3FC99999A0000000, float 0x3FC99999A0000000, {{.*}})
