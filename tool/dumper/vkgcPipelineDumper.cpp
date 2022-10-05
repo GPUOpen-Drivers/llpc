@@ -610,6 +610,8 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.overrideShaderThreadGroupSizeY = " << shaderInfo->options.overrideShaderThreadGroupSizeY << "\n";
   dumpFile << "options.overrideShaderThreadGroupSizeZ = " << shaderInfo->options.overrideShaderThreadGroupSizeZ << "\n";
   dumpFile << "options.nsaThreshold = " << shaderInfo->options.nsaThreshold << "\n";
+  dumpFile << "options.aggressiveInvariantLoads = " << shaderInfo->options.aggressiveInvariantLoads << "\n";
+  dumpFile << "options.disableInvariantLoads = " << shaderInfo->options.disableInvariantLoads << "\n";
   dumpFile << "\n";
 }
 
@@ -1582,6 +1584,8 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.overrideShaderThreadGroupSizeY);
       hasher->Update(options.overrideShaderThreadGroupSizeZ);
       hasher->Update(options.nsaThreshold);
+      hasher->Update(options.aggressiveInvariantLoads);
+      hasher->Update(options.disableInvariantLoads);
     }
   }
 }

@@ -24,31 +24,45 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  PassRegistry.inc
- * @brief LLPC header file: used as the registry of LLPC patching passes
+ * @file  PatchInvariantLoads.h
+ * @brief LLPC header file: contains declaration of class lgc::PatchInvariantLoads.
  ***********************************************************************************************************************
  */
+#pragma once
 
-LLPC_PASS("lgc-builder-replayer", BuilderReplayer)
+#include "lgc/state/PipelineState.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 
-LLPC_PASS("lgc-patch-resource-collect", PatchResourceCollect)
-LLPC_PASS("lgc-patch-initialize-workgroup-memory", PatchInitializeWorkgroupMemory)
-LLPC_PASS("lgc-patch-image-derivatives", PatchImageDerivatives)
-LLPC_PASS("lgc-patch-in-out-import-export", PatchInOutImportExport)
-LLPC_PASS("lgc-patch-invariant-loads", PatchInvariantLoads)
-LLPC_PASS("lgc-patch-setup-target-features", PatchSetupTargetFeatures)
-LLPC_PASS("lgc-patch-copy-shader", PatchCopyShader)
-LLPC_PASS("lgc-patch-prepare-pipeline-abi", PatchPreparePipelineAbi)
-LLPC_PASS("lgc-patch-read-first-lane", PatchReadFirstLane)
-LLPC_PASS("lgc-patch-llvm-ir-inclusion", PatchLlvmIrInclusion)
-LLPC_PASS("lgc-patch-wave-size-adjust", PatchWaveSizeAdjust)
-LLPC_PASS("lgc-patch-peephole-opt", PatchPeepholeOpt)
-LLPC_PASS("lgc-patch-entry-point-mutate", PatchEntryPointMutate)
-LLPC_PASS("lgc-patch-check-shader-cache", PatchCheckShaderCache)
-LLPC_PASS("lgc-patch-loop-metadata", PatchLoopMetadata)
-LLPC_PASS("lgc-patch-buffer-op", PatchBufferOp)
-LLPC_PASS("lgc-patch-workarounds", PatchWorkarounds)
-LLPC_PASS("lgc-patch-load-scalarizer", PatchLoadScalarizer)
-LLPC_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
+namespace lgc {
 
-#undef LLPC_PASS
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations for image operations
+class PatchInvariantLoads : public llvm::PassInfoMixin<PatchInvariantLoads> {
+public:
+  llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
+
+  bool runImpl(llvm::Function &function, PipelineState *pipelineState);
+
+  static llvm::StringRef name() { return "Patch metadata for invariant loads"; }
+};
+
+// =====================================================================================================================
+// Represents the pass of LLVM patching operations for image operations
+class LegacyPatchInvariantLoads : public llvm::FunctionPass {
+public:
+  LegacyPatchInvariantLoads();
+
+  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
+  bool runOnFunction(llvm::Function &function) override;
+
+  static char ID; // ID of this pass
+
+private:
+  LegacyPatchInvariantLoads(const LegacyPatchInvariantLoads &) = delete;
+  LegacyPatchInvariantLoads &operator=(const LegacyPatchInvariantLoads &) = delete;
+
+  PatchInvariantLoads m_impl;
+};
+
+} // namespace lgc
