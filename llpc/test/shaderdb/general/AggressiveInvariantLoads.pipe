@@ -1,0 +1,68 @@
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %4, align 16, !invariant.load
+; SHADERTEST: load <4 x float>, <4 x float> addrspace(4)* %4, align 16, !invariant.load
+; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
+
+[VsGlsl]
+#version 450
+
+layout( location = 0 ) in vec4 app_position;
+
+void main() {
+  gl_Position = app_position;
+}
+
+[VsInfo]
+entryPoint = main
+options.aggressiveInvariantLoads = 1
+
+[FsGlsl]
+#version 450
+
+layout( location = 0 ) out vec4 frag_color;
+
+layout( push_constant ) uniform ColorBlock {
+  vec4 Color;
+} PushConstant;
+
+void main() {
+   frag_color = PushConstant.Color;
+}
+
+[FsInfo]
+entryPoint = main
+options.aggressiveInvariantLoads = 1
+
+[ResourceMapping]
+userDataNode[0].visibility = 2
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 4
+userDataNode[1].visibility = 66
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].next[0].type = PushConst
+userDataNode[1].next[0].offsetInDwords = 0
+userDataNode[1].next[0].sizeInDwords = 4
+userDataNode[1].next[0].set = 0xFFFFFFFF
+userDataNode[1].next[0].binding = 0
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+options.resourceLayoutScheme = Indirect
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 12
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32_SFLOAT
+attribute[0].offset = 0

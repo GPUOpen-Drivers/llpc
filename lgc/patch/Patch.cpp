@@ -42,6 +42,7 @@
 #include "lgc/patch/PatchImageOpCollect.h"
 #include "lgc/patch/PatchInOutImportExport.h"
 #include "lgc/patch/PatchInitializeWorkgroupMemory.h"
+#include "lgc/patch/PatchInvariantLoads.h"
 #include "lgc/patch/PatchLlvmIrInclusion.h"
 #include "lgc/patch/PatchLoadScalarizer.h"
 #include "lgc/patch/PatchLoopMetadata.h"
@@ -148,6 +149,8 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, b
   passMgr.addPass(AlwaysInlinerPass());
   passMgr.addPass(GlobalDCEPass());
 
+  // Patch invariant load and loop metadata.
+  passMgr.addPass(createModuleToFunctionPassAdaptor(PatchInvariantLoads()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
 
   if (patchTimer) {
@@ -294,6 +297,9 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   // Prior to general optimization, do function inlining and dead function removal
   passMgr.add(createAlwaysInlinerLegacyPass());
   passMgr.add(createGlobalDCEPass());
+
+  // Patch invariant load metadata before optimizations.
+  passMgr.add(createLegacyPatchInvariantLoads());
 
   // Patch loop metadata
   passMgr.add(createLegacyPatchLoopMetadata());

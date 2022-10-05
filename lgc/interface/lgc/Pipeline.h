@@ -248,6 +248,12 @@ struct ShaderOptions {
   /// Minimum number of addresses to use NSA encoding on GFX10+ (0 = backend decides).
   unsigned nsaThreshold;
 
+  /// Aggressively mark shader loads as invariant (where it is safe to do so).
+  bool aggressiveInvariantLoads;
+
+  /// Strip invariant load metadata.
+  bool disableInvariantLoads;
+
   ShaderOptions() {
     // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from
     // being written, we force everything to 0, including alignment gaps.

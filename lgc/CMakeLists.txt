@@ -151,6 +151,7 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchEntryPointMutate.cpp
     patch/PatchImageDerivatives.cpp
     patch/PatchInOutImportExport.cpp
+    patch/PatchInvariantLoads.cpp
     patch/PatchLlvmIrInclusion.cpp
     patch/PatchLoadScalarizer.cpp
     patch/PatchLoopMetadata.cpp

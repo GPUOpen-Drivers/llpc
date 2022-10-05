@@ -528,6 +528,9 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
 
     shaderOptions.nsaThreshold = shaderInfo->options.nsaThreshold;
 
+    shaderOptions.aggressiveInvariantLoads = shaderInfo->options.aggressiveInvariantLoads;
+    shaderOptions.disableInvariantLoads = shaderInfo->options.disableInvariantLoads;
+
     pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
   }
 }

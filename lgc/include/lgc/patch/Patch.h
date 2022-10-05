@@ -64,6 +64,7 @@ void initializeLegacyPatchReadFirstLanePass(PassRegistry &);
 void initializeLegacyPatchWaveSizeAdjustPass(PassRegistry &);
 void initializeLegacyPatchImageDerivativesPass(PassRegistry &);
 void initializeLegacyPatchInitializeWorkgroupMemoryPass(PassRegistry &);
+void initializeLegacyPatchInvariantLoadsPass(PassRegistry &);
 } // namespace llvm
 
 namespace lgc {
@@ -94,6 +95,7 @@ inline void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializeLegacyPatchWaveSizeAdjustPass(passRegistry);
   initializeLegacyPatchImageDerivativesPass(passRegistry);
   initializeLegacyPatchInitializeWorkgroupMemoryPass(passRegistry);
+  initializeLegacyPatchInvariantLoadsPass(passRegistry);
 }
 
 llvm::ModulePass *createLegacyLowerFragColorExport();
@@ -116,6 +118,7 @@ llvm::FunctionPass *createLegacyPatchReadFirstLane();
 llvm::ModulePass *createLegacyPatchWaveSizeAdjust();
 llvm::ModulePass *createLegacyPatchImageDerivatives();
 llvm::ModulePass *createLegacyPatchInitializeWorkgroupMemory();
+llvm::FunctionPass *createLegacyPatchInvariantLoads();
 class PipelineState;
 class PassManager;
 
