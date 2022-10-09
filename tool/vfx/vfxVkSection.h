@@ -614,11 +614,7 @@ public:
   SubState &getSubStateRef() { return m_state; }
 
 private:
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
-  static const unsigned MemberCount = 28;
-#else
-  static const unsigned MemberCount = 27;
-#endif
+  static const unsigned MemberCount = 30;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
