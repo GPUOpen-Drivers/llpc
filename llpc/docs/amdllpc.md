@@ -21,18 +21,15 @@ cmake --build xgl/builds/Release64 --target check-amber
 ```
 
 The `amdllpc` build needs SPVGEN.
-If the SPVGEN build fails with an error like this:
+If the amdllpc build fails with an error like this:
 ```
-drivers/spvgen/source/spvgen.cpp:51:10: fatal error: doc.h: No such file or directory
-```
-or
-```
-drivers/spvgen/source/spvgen.cpp:73:10: fatal error: SPIRV/GlslangToSpv.h: No such file or directory
+drivers/llpc/llpc/tool/llpcCompilationUtils.cpp:69:10: fatal error: spvgen.h: No such file or directory
 ```
 
-then you need to fetch the external sources (glslang and SPIRV-Tools) used by SPVGEN:
+then you need to fetch spvgen and external sources (glslang and SPIRV-Tools):
 ```
-(cd ../spvgen/external && python fetch_external_sources.py)
+repo init -m build_with_tools.xml
+repo sync
 ```
 and then retry the ninja command.
 
