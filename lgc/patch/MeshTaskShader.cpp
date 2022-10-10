@@ -1584,6 +1584,13 @@ void MeshTaskShader::setMeshOutputs(Value *vertexCount, Value *primitiveCount) {
     vertexCount = m_builder->CreateSelect(hasZeroCount, m_builder->getInt32(0), vertexCount);
     primitiveCount = m_builder->CreateSelect(hasZeroCount, m_builder->getInt32(0), primitiveCount);
 
+    // NOTE: Here, we promote vertex/primitive count to SGPRs once again because M0 implicitly used in s_sendmsg is
+    // SGPR. LLVM backend has issues of handling this because it doesn't use s_cselect to translate LLVM IR select
+    // instruction (which keeps the destination operand still in SGPR) and it doesn't use readfirstlane to promote
+    // VGPR to SGPR for M0.
+    vertexCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
+    primitiveCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
+
     // M0[10:0] = vertexCount, M0[22:12] = primitiveCount
     Value *m0 = m_builder->CreateShl(primitiveCount, 12);
     m0 = m_builder->CreateOr(m0, vertexCount);
