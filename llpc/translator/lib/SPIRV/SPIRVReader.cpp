@@ -1590,7 +1590,7 @@ std::pair<Type *, Value *> SPIRVToLLVM::createLaunderRowMajorMatrix(Type *const 
   FunctionType *const rowMajorFuncType =
       FunctionType::get(newMatrixPointerType, {matrixPointerType, matrixType}, false);
   string mangledName(SpirvLaunderRowMajor);
-  appendTypeMangling(nullptr, args, mangledName);
+  appendTypeMangling(newMatrixPointerType, args, mangledName);
   Function *rowMajorFunc = m_m->getFunction(mangledName);
   if (!rowMajorFunc) {
     rowMajorFunc = Function::Create(rowMajorFuncType, GlobalValue::ExternalLinkage, SpirvLaunderRowMajor, m_m);
@@ -5688,6 +5688,8 @@ static void printTypeName(Type *ty, raw_ostream &nameStream) {
   for (;;) {
     if (auto pointerTy = dyn_cast<PointerType>(ty)) {
       nameStream << "p" << pointerTy->getAddressSpace();
+      if (pointerTy->isOpaque())
+        return;
       ty = pointerTy->getPointerElementType();
       continue;
     }
@@ -5790,7 +5792,7 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
 #endif
 
   std::string mangledName(funcName);
-  appendTypeMangling(nullptr, args, mangledName);
+  appendTypeMangling(retTy, args, mangledName);
   Function *func = m_m->getFunction(mangledName);
   FunctionType *ft = FunctionType::get(retTy, argTys, false);
   // ToDo: Some intermediate functions have duplicate names with
@@ -7560,7 +7562,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       // so we choose to add a dummy instruction and remove them when it isn't
       // needed.
       std::string mangledFuncName(gSPIRVMD::NonUniform);
-      appendTypeMangling(nullptr, args, mangledFuncName);
+      appendTypeMangling(voidTy, args, mangledFuncName);
       auto f = getOrCreateFunction(m_m, voidTy, types, mangledFuncName);
       if (bb->getTerminator()) {
         // NOTE: For OpCopyObject, we use the operand value directly, which may be in another block that already has a
@@ -8743,8 +8745,9 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *bc, BasicBlock *bb
 
   string mangledName(unmangledName);
   std::vector<Value *> args = transValue(bc->getArgumentValues(), bb->getParent(), bb);
-  appendTypeMangling(nullptr, args, mangledName);
-  FunctionType *funcTy = FunctionType::get(transType(bc->getType()), argTys, false);
+  Type *retType = transType(bc->getType());
+  appendTypeMangling(retType, args, mangledName);
+  FunctionType *funcTy = FunctionType::get(retType, argTys, false);
   Function *func = m_m->getFunction(mangledName);
   if (!func) {
     func = Function::Create(funcTy, GlobalValue::ExternalLinkage, mangledName, m_m);
