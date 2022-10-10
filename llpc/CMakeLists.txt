@@ -65,7 +65,6 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_TOOLS ON CACHE BOOL Force)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
-    set(LLVM_ENABLE_ZLIB OFF CACHE BOOL Force)
     if (NOT WIN32)
         # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
         #
