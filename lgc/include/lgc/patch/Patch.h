@@ -126,9 +126,9 @@ public:
   Patch() : m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStageInvalid), m_entryPoint(nullptr) {}
   virtual ~Patch() {}
 
-  static void addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, bool addReplayerPass,
-                        llvm::Timer *patchTimer, llvm::Timer *optTimer,
-                        Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, llvm::CodeGenOpt::Level optLevel);
+  static void addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, llvm::Timer *patchTimer,
+                        llvm::Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc,
+                        llvm::CodeGenOpt::Level optLevel);
 
   // Register all the patching passes into the given pass manager
   static void registerPasses(lgc::PassManager &passMgr);

@@ -255,10 +255,6 @@ public:
   // Find the single root resource node of the given type
   const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType) const;
 
-  // Set "no replayer" flag, saying that this pipeline is being compiled with a BuilderImpl so does not
-  // need a BuilderReplayer pass.
-  void setNoReplayer() { m_noReplayer = true; }
-
   // Accessors for vertex input descriptions.
   llvm::ArrayRef<VertexInputDescription> getVertexInputDescriptions() const { return m_vertexInputDescriptions; }
   const VertexInputDescription *findVertexInputDescription(unsigned location) const;
@@ -484,7 +480,6 @@ private:
   void readGraphicsState(llvm::Module *module);
 
   std::string m_lastError;   // Error to be reported by getLastError()
-  bool m_noReplayer = false; // True if no BuilderReplayer needed
   bool m_emitLgc = false;    // Whether -emit-lgc is on
   // Whether generating pipeline or unlinked part-pipeline
   PipelineLink m_pipelineLink = PipelineLink::WholePipeline;

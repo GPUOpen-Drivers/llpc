@@ -45,7 +45,6 @@ BuilderImpl::BuilderImpl(LgcContext *builderContext, Pipeline *pipeline)
       ImageBuilder(builderContext), InOutBuilder(builderContext), MatrixBuilder(builderContext),
       MiscBuilder(builderContext), SubgroupBuilder(builderContext) {
   m_pipelineState = reinterpret_cast<PipelineState *>(pipeline);
-  m_pipelineState->setNoReplayer();
 }
 
 // =====================================================================================================================

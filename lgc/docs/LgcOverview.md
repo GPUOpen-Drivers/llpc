@@ -47,16 +47,10 @@ size, etc. These are set via Builder rather than Pipeline because they need to b
 in the case of compiling a single shader; in that case the modes are saved in its IR for future
 linking and generating.
 
-The front-end decides which one of two modes Builder works in, although which mode is selected
-does not otherwise affect the front-end:
-
-* BuilderRecorder, where methods to generate IR for graphics-pipeline-specific constructs are
-  "recorded" in the IR by a call to `@lgc.call.*` for each one, and then replayed at the start
-  of the middle-end;
-
-* BuilderImpl, where those same methods generate IR more directly.
-
-If doing a single shader compile, BuilderRecorder is always used.
+Builder now only supports "BuilderRecorder" mode,
+where methods to generate IR for graphics-pipeline-specific constructs are
+"recorded" in the IR by a call to `@lgc.call.*` for each one, and then replayed at the start
+of the middle-end using the same methods in BuilderImpl.
 
 ### Typical front-end flow
 
@@ -98,9 +92,7 @@ The front-end flow is:
   - `SetGraphicsState` (to set input assembly, viewport and rasterizer state)
 
 * Use `BuilderContext::CreateBuilder` to create a Builder object, passing the Pipeline (or nullptr
-  if this is a shader compile). For a pipeline compile, the front-end can choose here whether to use
-  BuilderRecorder (record Builder calls into IR for later replay) or the direct Builder implementation.
-  For a shader compile, BuilderRecorder is always used.
+  if this is a shader compile).
 
 * For each shader stage (when not doing a pipeline compile where the shaders are the result of earlier
   shader compiles):
@@ -119,7 +111,7 @@ The front-end flow is:
 
 * Call `Pipeline::Link` to link the shader IR modules into a pipeline IR module. (This needs to be
   done even if the pipeline only has a single shader, such as a compute pipeline.)
-  If using BuilderRecorder, this also records the pipeline state into IR metadata.
+  This also records the pipeline state into IR metadata.
 
 * Call `Pipeline::Generate` to run middle-end and back-end passes and generate the ELF.
   (Global options such as `-filetype` and `-emit-llvm` can cause the output to be something other than ELF.)
@@ -235,8 +227,7 @@ it via PipelineState.
 
 ### BuilderRecorder
 
-If the front-end selects BuilderRecorder mode for Builder (or it is a shader compile), then
-the Builder created by `BuilderContext::CreateBuilder` is a BuilderRecorder. For each Create
+The Builder created by `BuilderContext::CreateBuilder` is now always a BuilderRecorder. For each Create
 method, such as `CreateImageSample`, BuilderRecorder records the call in the IR at the insertion
 point as a call to an `lgc.call.*` method, in this example `lgc.call.image.sample`. Such a
 call is a varargs call, so BuilderRecorder only needs to overload the declarations by return
@@ -248,7 +239,7 @@ IR as would have been generated if the front-end had chosen to use BuilderImpl d
 
 ### BuilderImpl
 
-If the front-end selects BuilderImpl mode for Builder, or when running the BuilderReplayer
+When running the BuilderReplayer
 pass, the Builder is an instance of BuilderImpl. That generates IR more directly for
 Builder methods such as `CreateImageSample`. BuilderImpl multiple-inherits from a bunch of classes
 that implement the different categories of Builder calls (arithmetic, descriptors, image,
@@ -270,7 +261,7 @@ pass manager to never be invalidated.
 PipelineState stores two kinds of outside-IR state:
 
 * The state set by the front-end calling methods in Pipeline, such as the vertex input descriptions.
-  For a pipeline compile using BuilderRecorder, this state gets written into the IR as metadata
+  This state gets written into the IR as metadata
   in `PipelineState::Link`, and read out the first time PipelineState is used in the middle-end.
   Thus this kind of state can be considered a cache of information that is in IR metadata, and
   in theory could be re-read if necessary at any point in the pass flow, although that does not
