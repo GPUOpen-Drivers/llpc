@@ -17,7 +17,8 @@
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
+; RUN: amdllpc -enable-relocatable-shader-elf -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
+; RUN: amdllpc -enable-relocatable-shader-elf -enable-opaque-pointers=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
 ; SHADERTEST1-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST1-LABEL: _amdgpu_vs_main_fetchless
 ; SHADERTEST1: %[[SPILLCONST:.+]] = call i32 @llvm.amdgcn.reloc.constant(metadata ![[SPILLNODE:[0-9]+]])
@@ -27,7 +28,7 @@
 ; SHADERTEST1: %[[OFFCONSTEXT:.+]] = zext i32 %[[OFFCONST]] to i64
 ; SHADERTEST1: %[[BUFFFERDESCADDR:.+]] = add i64 %{{.+}}, %[[OFFCONSTEXT]]
 ; SHADERTEST1: %[[BUFFERDESCPTR:.+]] = inttoptr i64 %[[BUFFFERDESCADDR]] {{.*}}
-; SHADERTEST1: %{{.+}} = load <4 x i32>, <4 x i32> addrspace(4)* %[[BUFFERDESCPTR]], align 1
+; SHADERTEST1: %{{.+}} = load <4 x i32>, {{<4 x i32> addrspace\(4\)\*|ptr addrspace\(4\)}} %[[BUFFERDESCPTR]], align 1
 ; SHADERTEST1: ![[SPILLNODE]] = !{!"dusespill_0_0"}
 ; SHADERTEST1: ![[OFFNODE]] = !{!"doff_0_0_b"}
 ; SHADERTEST1-LABEL: {{^// LLPC}} final pipeline module info

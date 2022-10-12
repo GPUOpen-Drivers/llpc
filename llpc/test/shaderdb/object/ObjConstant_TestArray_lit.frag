@@ -18,12 +18,13 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: @{{.*}} = {{.*}} addrspace(4) constant [4 x float] [float 1.000000e+00, float 2.000000e+00, float 3.000000e+00, float 4.000000e+00]
 ; SHADERTEST: @{{.*}} = {{.*}} addrspace(4) constant [4 x float] [float 7.000000e+00, float 8.000000e+00, float 9.000000e+00, float 0.000000e+00]
-; SHADERTEST: getelementptr [4 x float], [4 x float] addrspace(4)* @{{.*}}, i64 0, i64 %{{[0-9]*}}
+; SHADERTEST: getelementptr [4 x float], {{\[4 x float\] addrspace\(4\)\*|ptr addrspace\(4\)}} @{{.*}}, i64 0, i64 %{{[0-9]*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

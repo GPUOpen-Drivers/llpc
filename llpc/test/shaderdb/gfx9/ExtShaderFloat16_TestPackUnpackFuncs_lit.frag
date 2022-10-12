@@ -16,12 +16,13 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = load <2 x half>, <2 x half> addrspace(7)* %{{[0-9]*}}, align 4
-; SHADERTEST: store <2 x half> %{{[0-9]*}}, <2 x half> addrspace(7)* %{{[0-9]*}}, align 4
+; SHADERTEST: %{{[0-9]*}} = load <2 x half>, {{<2 x half> addrspace\(7\)\*|ptr addrspace\(7\)}} %{{[0-9]*}}, align 4
+; SHADERTEST: store <2 x half> %{{[0-9]*}}, {{<2 x half> addrspace\(7\)\*|ptr addrspace\(7\)}} %{{[0-9]*}}, align 4
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */

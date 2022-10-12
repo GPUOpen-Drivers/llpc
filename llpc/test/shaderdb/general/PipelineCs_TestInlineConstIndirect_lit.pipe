@@ -1,9 +1,9 @@
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{.*}} = getelementptr <{ [256 x [4 x i32]], i32 }>, <{ [256 x [4 x i32]], i32 }> {{.*}} {{.*}}, i32 0, i32 0, i32 %{{.*}}
-; SHADERTEST: %{{.*}} = load <4 x i32>, <4 x i32> addrspace(7)* %{{.*}}
+; SHADERTEST: %{{.*}} = getelementptr <{ [256 x [4 x i32]], i32 }>, ptr {{.*}} {{.*}}, i32 0, i32 0, i32 %{{.*}}
+; SHADERTEST: %{{.*}} = load <4 x i32>, ptr addrspace(7) %{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

@@ -7,14 +7,15 @@
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
+; RUN: amdllpc -enable-opaque-pointers=false -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
+; RUN: amdllpc -enable-opaque-pointers=true -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
 ; SHADERTEST1-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST1-DAG: ![[METADATANODE:[0-9]+]] = !{!"doff_0_0_b"}
 ; SHADERTEST1-DAG: %[[RELOCONST:[0-9]+]] = call i32 @llvm.amdgcn.reloc.constant(metadata ![[METADATANODE]])
 ; SHADERTEST1: %[[RELOCONSTEXT:[0-9]+]] = zext i32 %[[RELOCONST]] to i64
 ; SHADERTEST1: %[[BUFFFERDESCADDR:[0-9]+]] = add i64 %{{[0-9]+}}, %[[RELOCONSTEXT]]
 ; SHADERTEST1: %[[BUFFERDESCPTR:[0-9]+]] = inttoptr i64 %[[BUFFFERDESCADDR]] {{.*}}
-; SHADERTEST1: %{{[0-9]+}} = load <4 x i32>, <4 x i32> addrspace(4)* %[[BUFFERDESCPTR]], align 16
+; SHADERTEST1: %{{[0-9]+}} = load <4 x i32>, {{<4 x i32> addrspace\(4\)\*|ptr addrspace\(4\)}} %[[BUFFERDESCPTR]], align 16
 ; SHADERTEST1: COMPUTE_USER_DATA_{{.}} 0x0000000000000006
 ; SHADERTEST1: COMPUTE_USER_DATA_{{.}} 0x0000000000000007
 ; SHADERTEST1: AMDLLPC SUCCESS

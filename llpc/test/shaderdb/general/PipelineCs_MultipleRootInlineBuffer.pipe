@@ -1,21 +1,21 @@
 ; Test that LLPC can handle multiple inline buffer in the root table.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -o %t.elf %gfxip %s -enable-opaque-pointers=true -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^//}} LLPC SPIR-V lowering result
 ; SHADERTEST: define dllexport spir_func void @main()
-; SHADERTEST-DAG: call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 0)
-; SHADERTEST-DAG: call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 1, i32 0, i32 0)
+; SHADERTEST-DAG: call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 0, i32 0, i32 0)
+; SHADERTEST-DAG: call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 1, i32 0, i32 0)
 ; SHADERTEST: ret void
 ; SHADERTEST-LABEL: {{^//}} LLPC pipeline before-patching results
 ; SHADERTEST: define dllexport spir_func void @lgc.shader.CS.main()
 
 ; Get a pointer to the spill table
-; SHADERTEST: [[spill_table1:%[0-9]*]] = call i8 addrspace(4)* @lgc.spill.table() #2
+; SHADERTEST: [[spill_table1:%[0-9]*]] = call ptr addrspace(4) @lgc.spill.table() #2
 
 ; Get a pointer to the second inline buffer in the spill table.  Offset 40 comes from the user data nodes.
-; SHADERTEST: [[buf_addr1:%[0-9]*]] = getelementptr i8, i8 addrspace(4)* [[spill_table1]], i32 40
-; SHADERTEST: [[buf1:%[0-9]*]] = ptrtoint i8 addrspace(4)* [[buf_addr1]] to i64
+; SHADERTEST: [[buf_addr1:%[0-9]*]] = getelementptr i8, ptr addrspace(4) [[spill_table1]], i32 40
+; SHADERTEST: [[buf1:%[0-9]*]] = ptrtoint ptr addrspace(4) [[buf_addr1]] to i64
 
 ; Build the descriptor.  The first two elements comes from the address of the buffer.
 ; SHADERTEST: [[buf1_vec:%[0-9]*]] = bitcast i64 [[buf1]] to <2 x i32>
@@ -30,10 +30,10 @@
 ; SHADERTEST: [[desc1_3:%[0-9]*]] = insertelement <4 x i32> [[desc1_2]], i32 151468, i64 3
 
 ; Get the "fat pointer" for the buffer
-; SHADERTEST: call i8 addrspace(7)* @lgc.late.launder.fat.pointer(<4 x i32> [[desc1_3]]) #2
+; SHADERTEST: call ptr addrspace(7) @lgc.late.launder.fat.pointer(<4 x i32> [[desc1_3]]) #2
 
 ; Get a pointer to the spill table
-; SHADERTEST: [[spill_table0:%[0-9]*]] = call i8 addrspace(4)* @lgc.spill.table() #2
+; SHADERTEST: [[spill_table0:%[0-9]*]] = call ptr addrspace(4) @lgc.spill.table() #2
 
 ; SHADERTEST: ret void
 ; SHADERTEST-LABEL: {{^//}} LLPC pipeline patching results
@@ -42,7 +42,7 @@
 ; Test the use of InlineBuffer with relocatable shaders.  This is currently not supported, and we
 ; should fall back to full pipeline compilation.
 ; BEGIN_RELOCTEST
-; RUN: amdllpc --enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=RELOCTEST %s
+; RUN: amdllpc --enable-relocatable-shader-elf -o %t.elf %gfxip %s -enable-opaque-pointers=true -v | FileCheck -check-prefix=RELOCTEST %s
 ; RELOCTEST-LABEL: {{^// LLPC}} calculated hash results (compute pipeline)
 ; RELOCTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible
 ; RELOCTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results

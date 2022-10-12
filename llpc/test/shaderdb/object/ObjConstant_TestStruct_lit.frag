@@ -27,12 +27,12 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: alloca <4 x float>,{{.*}} addrspace(5)
 ; SHADERTEST: alloca { [3 x <3 x float>], [3 x <3 x float>], i32, <2 x i32> },{{.*}} addrspace(5)
-; SHADERTEST: store { [3 x <3 x float>], [3 x <3 x float>], i32, <2 x i32> } { [3 x <3 x float>] [<3 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000>, <3 x float> <float 5.000000e-01, float 5.000000e-01, float 5.000000e-01>, <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>], [3 x <3 x float>] [<3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, <3 x float> <float 0.000000e+00, float 1.000000e+00, float 0.000000e+00>, <3 x float> <float 0.000000e+00, float 0.000000e+00, float 1.000000e+00>], i32 1, <2 x i32> <i32 5, i32 5> }, { [3 x <3 x float>], [3 x <3 x float>], i32, <2 x i32> } addrspace(5)* %{{[0-9]*}}
-; SHADERTEST: load i32, i32 addrspace(5)* %{{[0-9]*}}
+; SHADERTEST: store { [3 x <3 x float>], [3 x <3 x float>], i32, <2 x i32> } { [3 x <3 x float>] [<3 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000>, <3 x float> <float 5.000000e-01, float 5.000000e-01, float 5.000000e-01>, <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>], [3 x <3 x float>] [<3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, <3 x float> <float 0.000000e+00, float 1.000000e+00, float 0.000000e+00>, <3 x float> <float 0.000000e+00, float 0.000000e+00, float 1.000000e+00>], i32 1, <2 x i32> <i32 5, i32 5> }, ptr addrspace(5) %{{[0-9]*}}
+; SHADERTEST: load i32, ptr addrspace(5) %{{[0-9]*}}
 ; SHADERTEST: trunc i32 %{{[0-9]*}} to i1
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}v4f32

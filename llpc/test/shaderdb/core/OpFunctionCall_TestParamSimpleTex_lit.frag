@@ -17,10 +17,11 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-COUNT-2: call {{.*}} <4 x float> @{{.*}}
-; SHADERTEST: define internal {{.*}}<4 x float> @{{.*}}({ { <8 x i32> addrspace(4)*, i32 }, { <4 x i32> addrspace(4)*, i32, i32 } } %{{[a-zA-Z0-9]+}}, <2 x float> addrspace(5)* %{{[a-z0-9]+}})
+; SHADERTEST: define internal {{.*}}<4 x float> @{{.*}}({ { {{<8 x i32> addrspace\(4\)\*|ptr addrspace\(4\)}}, i32 }, { {{<4 x i32> addrspace\(4\)\*|ptr addrspace\(4\)}}, i32, i32 } } %{{[a-zA-Z0-9]+}}, {{<2 x float> addrspace\(5\)\*|ptr addrspace\(5\)}} %{{[a-z0-9]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

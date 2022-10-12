@@ -1,11 +1,11 @@
 // gl_BaryCoordNoPerspEXT requires different interpolant mode. This tests interpolateAtCentroid(gl_BaryCoordNoPerspEXT)
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[BaryCoord:[^ ]*]] = external addrspace(64) global <3 x float>
-; SHADERTEST: call spir_func <3 x float> @interpolateAtCentroid.v3f32.p64v3f32(<3 x float> addrspace(64)* @[[BaryCoord]])
+; SHADERTEST: call spir_func <3 x float> @interpolateAtCentroid.v3f32.p64(ptr addrspace(64) @[[BaryCoord]])
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; The second argument (i32 32) respects that interpLoc is InterpLocCentroid.

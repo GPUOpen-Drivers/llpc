@@ -27,21 +27,21 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 
 ; SHADERTEST: [[bc:%[0-9]*]] = bitcast <2 x i32> {{%[0-9]*}} to i64
-; SHADERTEST: [[itop:%[0-9]*]] = inttoptr i64 [[bc]] to %0 addrspace(1)*
+; SHADERTEST: [[itop:%[0-9]*]] = inttoptr i64 [[bc]] to ptr addrspace(1)
 
-; SHADERTEST: [[ld1:%[0-9]*]] = load i64, i64 addrspace(5)*
-; SHADERTEST: [[itop:%[0-9]*]] = inttoptr i64 [[ld1]] to %0 addrspace(1)*
+; SHADERTEST: [[ld1:%[0-9]*]] = load i64, ptr addrspace(5)
+; SHADERTEST: [[itop:%[0-9]*]] = inttoptr i64 [[ld1]] to ptr addrspace(1)
 
-; SHADERTEST: [[int:%[0-9]*]] = ptrtoint %0 addrspace(1)* {{%[0-9]*}} to i64
+; SHADERTEST: [[int:%[0-9]*]] = ptrtoint ptr addrspace(1) {{%[0-9]*}} to i64
 ; SHADERTEST: [[bc2:%[0-9]*]] = bitcast i64 [[int]] to <2 x i32>
 
-; SHADERTEST: [[ld2:%[0-9]*]] = load %0 addrspace(1)*, %0 addrspace(1)* addrspace(5)*
-; SHADERTEST: [[ptoi:%[0-9]*]] = ptrtoint %0 addrspace(1)* [[ld2]] to i64
+; SHADERTEST: [[ld2:%[0-9]*]] = load ptr addrspace(1), ptr addrspace(5)
+; SHADERTEST: [[ptoi:%[0-9]*]] = ptrtoint ptr addrspace(1) [[ld2]] to i64
 
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
