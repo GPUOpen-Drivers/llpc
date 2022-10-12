@@ -197,11 +197,6 @@ extern opt<std::string> LogFileOuts;
 
 } // namespace llvm
 
-// -use-builder-recorder
-static cl::opt<bool> UseBuilderRecorder("use-builder-recorder",
-                                        cl::desc("Do lowering via recording and replaying LLPC builder"),
-                                        cl::init(true));
-
 namespace Llpc {
 
 sys::Mutex Compiler::m_contextPoolMutex;
@@ -1071,7 +1066,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr,
                                                   pipelineLink == PipelineLink::Unlinked);
-  context->setBuilder(builderContext->createBuilder(&*pipeline, UseBuilderRecorder));
+  context->setBuilder(builderContext->createBuilder(&*pipeline));
 
   std::unique_ptr<Module> pipelineModule;
 
@@ -2300,7 +2295,7 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   helperThreadPayload->rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, false);
-  context->setBuilder(builderContext->createBuilder(&*pipeline, UseBuilderRecorder));
+  context->setBuilder(builderContext->createBuilder(&*pipeline));
 
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
 
@@ -2392,7 +2387,7 @@ Result Compiler::buildRayTracingPipelineInternal(Context *context, ArrayRef<cons
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, unlinked);
-  context->setBuilder(builderContext->createBuilder(&*pipeline, UseBuilderRecorder));
+  context->setBuilder(builderContext->createBuilder(&*pipeline));
 
   // Create empty modules and set target machine in each.
   std::vector<Module *> modules(shaderInfo.size());

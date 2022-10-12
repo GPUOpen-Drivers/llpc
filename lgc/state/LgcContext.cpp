@@ -288,15 +288,11 @@ Pipeline *LgcContext::createPipeline() {
 }
 
 // =====================================================================================================================
-// Create a Builder object. For a shader compile (pPipeline is nullptr), useBuilderRecorder is ignored
-// because it always uses BuilderRecorder.
+// Create a Builder object.
 //
 // @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
-// @param useBuilderRecorder : True to use BuilderRecorder, false to use BuilderImpl
-Builder *LgcContext::createBuilder(Pipeline *pipeline, bool useBuilderRecorder) {
-  if (!pipeline || useBuilderRecorder || EmitLgc)
-    return Builder::createBuilderRecorder(this, pipeline, EmitLgc);
-  return Builder::createBuilderImpl(this, pipeline);
+Builder *LgcContext::createBuilder(Pipeline *pipeline) {
+  return Builder::createBuilderRecorder(this, pipeline, EmitLgc);
 }
 
 // =====================================================================================================================

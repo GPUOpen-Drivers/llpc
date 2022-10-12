@@ -126,9 +126,8 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
   assert(shaderStageMask == getShaderStageMask());
 #endif
 
-  // If the front-end was using a BuilderRecorder, record pipeline state into IR metadata.
-  if (!m_noReplayer)
-    record(modules[0]);
+  // The front-end was using a BuilderRecorder; record pipeline state into IR metadata.
+  record(modules[0]);
 
   // If there is only one shader, just change the name on its module and return it.
   Module *pipelineModule = nullptr;
@@ -213,12 +212,10 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
   getLgcContext()->preparePassManager(*passMgr);
 
   // Manually add a PipelineStateWrapper pass.
-  // If we were not using BuilderRecorder, give our PipelineState to it. (In the BuilderRecorder case,
-  // the first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
+  // We were using BuilderRecorder, so we do not give our PipelineState to it.
+  // (The first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
   // it by reading IR metadata.)
   passMgr->registerModuleAnalysis([&] {
-    if (m_noReplayer)
-      return PipelineStateWrapper(this);
     return PipelineStateWrapper(getLgcContext());
   });
 
@@ -229,7 +226,7 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
     passMgr->run(*pipelineModule);
   } else {
     // Patching.
-    Patch::addPasses(this, *passMgr, !m_noReplayer, patchTimer, optTimer, std::move(checkShaderCacheFunc),
+    Patch::addPasses(this, *passMgr, patchTimer, optTimer, std::move(checkShaderCacheFunc),
                      getLgcContext()->getOptimizationLevel());
 
     // Add pass to clear pipeline state from IR
@@ -265,13 +262,11 @@ void PipelineState::generateWithLegacyPassManager(std::unique_ptr<Module> pipeli
   getLgcContext()->preparePassManager(&*passMgr);
 
   // Manually add a PipelineStateWrapper pass.
-  // If we were not using BuilderRecorder, give our PipelineState to it. (In the BuilderRecorder case,
-  // the first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
+  // We were not using BuilderRecorder, so we do not give our PipelineState to it.
+  // (The first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
   // it by reading IR metadata.)
   LegacyPipelineStateWrapper *pipelineStateWrapper = new LegacyPipelineStateWrapper(getLgcContext());
   passMgr->add(pipelineStateWrapper);
-  if (m_noReplayer)
-    pipelineStateWrapper->setPipelineState(this);
 
   if (m_emitLgc) {
     // -emit-lgc: Just write the module.
@@ -279,10 +274,8 @@ void PipelineState::generateWithLegacyPassManager(std::unique_ptr<Module> pipeli
     passMgr->stop();
   }
 
-  // Get a BuilderReplayer pass if needed.
-  ModulePass *replayerPass = nullptr;
-  if (!m_noReplayer)
-    replayerPass = createLegacyBuilderReplayer(this);
+  // Get a BuilderReplayer pass.
+  ModulePass *replayerPass = createLegacyBuilderReplayer(this);
 
   // Patching.
   LegacyPatch::addPasses(this, *passMgr, replayerPass, patchTimer, optTimer, std::move(checkShaderCacheFunc),

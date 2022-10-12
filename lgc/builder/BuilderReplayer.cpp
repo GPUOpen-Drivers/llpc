@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/builder/BuilderReplayer.h"
+#include "BuilderImpl.h"
 #include "lgc/LgcContext.h"
 #include "lgc/builder/BuilderRecorder.h"
 #include "lgc/state/PipelineState.h"
@@ -126,7 +127,7 @@ bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
 
   // Create the BuilderImpl to replay into, passing it the PipelineState
   LgcContext *builderContext = pipelineState->getLgcContext();
-  m_builder.reset(builderContext->createBuilder(pipelineState, /*useBuilderRecorder=*/false));
+  m_builder.reset(new BuilderImpl(builderContext, pipelineState));
 
   SmallVector<Function *, 8> funcsToRemove;
 

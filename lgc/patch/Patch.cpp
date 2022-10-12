@@ -109,16 +109,14 @@ namespace lgc {
 // @param checkShaderCacheFunc : Callback function to check shader cache
 // @param optLevel : The optimization level uses to adjust the aggressiveness of
 //                   passes and which passes to add.
-void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, bool addReplayerPass, Timer *patchTimer,
-                      Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc,
-                      CodeGenOpt::Level optLevel) {
+void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, Timer *patchTimer, Timer *optTimer,
+                      Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, CodeGenOpt::Level optLevel) {
   // Start timer for patching passes.
   if (patchTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
 
-  // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
-  if (addReplayerPass)
-    passMgr.addPass(BuilderReplayer(pipelineState));
+  // We're using BuilderRecorder; replay the Builder calls now
+  passMgr.addPass(BuilderReplayer(pipelineState));
 
   if (raw_ostream *outs = getLgcOuts()) {
     passMgr.addPass(PrintModulePass(*outs,

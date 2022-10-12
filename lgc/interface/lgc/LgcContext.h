@@ -111,12 +111,10 @@ public:
   // Create a Pipeline object for a pipeline compile
   Pipeline *createPipeline();
 
-  // Create a Builder object. For a shader compile (pPipelineState is nullptr), useBuilderRecorder is ignored
-  // because it always uses BuilderRecorder.
+  // Create a Builder object
   //
   // @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
-  // @param useBuilderRecorder : True to use BuilderRecorder, false to use BuilderImpl
-  Builder *createBuilder(Pipeline *pipeline, bool useBuilderRecorder);
+  Builder *createBuilder(Pipeline *pipeline);
 
   // Prepare a legacy pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
   // think that we have library functions.
