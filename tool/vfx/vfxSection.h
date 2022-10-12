@@ -882,7 +882,7 @@ class SectionSpecInfo : public Section {
 public:
   typedef VkSpecializationInfo SubState;
 
-  SectionSpecInfo() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "specConst") {
+  SectionSpecInfo() : Section(getAddrTable(), SectionTypeUnset, "specConst") {
     m_intData = &m_bufMem;
     m_uintData = &m_bufMem;
     m_int64Data = &m_bufMem;
@@ -890,19 +890,6 @@ public:
     m_floatData = &m_bufMem;
     m_doubleData = &m_bufMem;
     m_float16Data = &m_bufMem;
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionSpecInfo, m_mapEntry, MemberTypeSpecEntryItem, true);
-    INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_intData, MemberTypeIArray, false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uintData, MemberTypeUArray, false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_int64Data, MemberTypeI64Array, false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uint64Data, MemberTypeU64Array, false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_floatData, MemberTypeFArray, false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_doubleData, MemberTypeDArray, false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_float16Data, MemberTypeF16Array, false);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   void getSubState(SubState &state) {
@@ -919,8 +906,21 @@ public:
   }
 
 private:
-  static const unsigned MemberCount = 8;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionSpecInfo, m_mapEntry, MemberTypeSpecEntryItem, true);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_intData, MemberTypeIArray, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uintData, MemberTypeUArray, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_int64Data, MemberTypeI64Array, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uint64Data, MemberTypeU64Array, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_floatData, MemberTypeFArray, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_doubleData, MemberTypeDArray, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_float16Data, MemberTypeF16Array, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
 
   std::vector<SectionSpecEntryItem> m_mapEntry;
   std::vector<uint8_t> *m_intData;     // Contains int data of this buffer
