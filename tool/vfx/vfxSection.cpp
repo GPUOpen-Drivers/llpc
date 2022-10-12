@@ -44,8 +44,6 @@ namespace Vfx {
 // Static variables in class Section and derived class
 std::map<std::string, SectionInfo> Section::m_sectionInfo;
 
-StrToMemberAddr SectionSpecInfo::m_addrTable[SectionSpecInfo::MemberCount];
-
 #ifndef VFX_DISABLE_SPVGEN
 // =====================================================================================================================
 // A helper method to convert ShaderStage enumerant to corresponding SpvGenStage enumerant.
@@ -94,7 +92,6 @@ public:
     initEnumMap();
 
     Section::initSectionInfo();
-    SectionSpecInfo::initialAddrTable();
   };
 };
 
