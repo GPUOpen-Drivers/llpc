@@ -432,43 +432,8 @@ private:
 class SectionIndirectCalleeSavedRegs : public Section {
 public:
   typedef Vkgc::RayTracingShaderExportConfig SubState;
-  SectionIndirectCalleeSavedRegs() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "exportConfig") {
+  SectionIndirectCalleeSavedRegs() : Section(getAddrTable(), SectionTypeUnset, "exportConfig") {
     memset(&m_state, 0, sizeof(m_state));
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, raygen, raygen,
-                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
-                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.raygen)>,
-                                           MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, miss, miss,
-                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
-                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.miss)>,
-                                           MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, closestHit, closestHit,
-                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
-                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.closestHit)>,
-                                           MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, anyHit, anyHit,
-                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
-                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.anyHit)>,
-                                           MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
-        SectionIndirectCalleeSavedRegs, intersection, intersection,
-        SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
-                                                                       indirectCalleeSavedRegs.intersection)>,
-        MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, callable, callable,
-                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
-                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.callable)>,
-                                           MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, traceRays, traceRays,
-                                           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
-                                               Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.traceRays)>,
-                                           MemberTypeInt, false);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   void getSubState(SubState &state) { state.indirectCalleeSavedRegs = m_state.indirectCalleeSavedRegs; }
@@ -476,13 +441,52 @@ public:
   SubState &getSubStateRef() { return m_state; }
 
 private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+          SectionIndirectCalleeSavedRegs, raygen, raygen,
+          SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
+                                                                         indirectCalleeSavedRegs.raygen)>,
+          MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, miss, miss,
+                                                 SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                                     Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.miss)>,
+                                                 MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+          SectionIndirectCalleeSavedRegs, closestHit, closestHit,
+          SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
+                                                                         indirectCalleeSavedRegs.closestHit)>,
+          MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+          SectionIndirectCalleeSavedRegs, anyHit, anyHit,
+          SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
+                                                                         indirectCalleeSavedRegs.anyHit)>,
+          MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+          SectionIndirectCalleeSavedRegs, intersection, intersection,
+          SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
+                                                                         indirectCalleeSavedRegs.intersection)>,
+          MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+          SectionIndirectCalleeSavedRegs, callable, callable,
+          SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
+                                                                         indirectCalleeSavedRegs.callable)>,
+          MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+          SectionIndirectCalleeSavedRegs, traceRays, traceRays,
+          SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
+                                                                         indirectCalleeSavedRegs.traceRays)>,
+          MemberTypeInt, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
   template <size_t Offset> static void *GetExportConfigMember(void *pObj) {
     constexpr size_t ExportConfigOffset = offsetof(SectionIndirectCalleeSavedRegs, m_state);
     return reinterpret_cast<uint8_t *>(pObj) + ExportConfigOffset + Offset;
   }
-
-  static const unsigned MemberCount = 7;
-  static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
 };
