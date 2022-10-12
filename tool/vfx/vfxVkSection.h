@@ -263,16 +263,8 @@ class SectionResourceMapping : public Section {
 public:
   typedef Vkgc::ResourceMappingData SubState;
 
-  SectionResourceMapping() : Section({m_addrTable, MemberCount}, SectionTypeResourceMapping, "ResourceMapping") {
+  SectionResourceMapping() : Section(getAddrTable(), SectionTypeResourceMapping, "ResourceMapping") {
     memset(&m_state, 0, sizeof(m_state));
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_descriptorRangeValue, MemberTypeDescriptorRangeValue,
-                                      true);
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_userDataNode, MemberTypeResourceMappingNode, true);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   void getSubState(SubState &state) {
@@ -297,8 +289,18 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 2;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_descriptorRangeValue,
+                                            MemberTypeDescriptorRangeValue, true);
+      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_userDataNode, MemberTypeResourceMappingNode,
+                                            true);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
   SubState m_state;
   std::vector<SectionDescriptorRangeValueItem> m_descriptorRangeValue; // Contains descriptor range value
   std::vector<SectionResourceMappingNode> m_userDataNode;              // Contains user data node
