@@ -10,7 +10,6 @@ namespace Vfx {
 
 #if VKI_RAY_TRACING
 StrToMemberAddr SectionShaderGroup::m_addrTable[SectionShaderGroup::MemberCount];
-StrToMemberAddr SectionRtState::m_addrTable[SectionRtState::MemberCount];
 #endif
 
 // =====================================================================================================================
@@ -46,7 +45,6 @@ public:
 
 #if VKI_RAY_TRACING
     SectionShaderGroup::initialAddrTable();
-    SectionRtState::initialAddrTable();
 #endif
   };
 
