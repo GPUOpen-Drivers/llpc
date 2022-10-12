@@ -8,10 +8,6 @@ using namespace Vkgc;
 
 namespace Vfx {
 
-#if VKI_RAY_TRACING
-StrToMemberAddr SectionShaderGroup::m_addrTable[SectionShaderGroup::MemberCount];
-#endif
-
 // =====================================================================================================================
 // Dummy class used to initialize all VK special sections
 class VkSectionParserInit {
@@ -42,10 +38,6 @@ public:
     INIT_SECTION_INFO("callInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingCallable)
 #endif
     INIT_SECTION_INFO("ResourceMapping", SectionTypeResourceMapping, 0)
-
-#if VKI_RAY_TRACING
-    SectionShaderGroup::initialAddrTable();
-#endif
   };
 
   void initEnumMap() {
