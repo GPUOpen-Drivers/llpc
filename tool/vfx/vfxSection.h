@@ -588,15 +588,8 @@ class SectionShader : public Section {
 public:
   typedef ShaderSource SubState;
   SectionShader(const SectionInfo &info)
-      : Section({m_addrTable, MemberCount}, info.type, nullptr), m_shaderType(static_cast<ShaderType>(info.propertyLo)),
+      : Section(getAddrTable(), info.type, nullptr), m_shaderType(static_cast<ShaderType>(info.propertyLo)),
         m_shaderStage(static_cast<ShaderStage>(info.propertyHi)) {}
-
-  // Setup member name to member address mapping.
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_NAME_TO_ADDR(SectionShader, m_fileName, MemberTypeString, false);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
-  }
 
   virtual bool isShaderSourceSection();
 
@@ -609,11 +602,17 @@ public:
   ShaderStage getShaderStage() { return m_shaderStage; }
 
 private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionShader, m_fileName, MemberTypeString, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
   bool compileGlsl(const char *entryPoint, std::string *errorMsg);
   bool assembleSpirv(std::string *errorMsg);
-
-  static const unsigned MemberCount = 1;
-  static StrToMemberAddr m_addrTable[MemberCount];
 
   std::string m_fileName;        // External shader source file name
   std::string m_shaderSource;    // Shader source code
