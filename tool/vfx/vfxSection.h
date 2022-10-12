@@ -198,6 +198,81 @@ inline SectionInfo initSectionItemInfo(SectionType type, uint16_t propertyLo, ui
 
 // =====================================================================================================================
 // Initiates a member to address table
+#define VEC_INIT_MEMBER_NAME_TO_ADDR(T, name, type, _isObject)                                                         \
+  do {                                                                                                                 \
+    addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
+    StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
+    tableItem.memberName = STRING(name);                                                                               \
+    if (!strncmp(tableItem.memberName, "m_", 2))                                                                       \
+      tableItem.memberName += 2;                                                                                       \
+    tableItem.getMember = GetMemberHelper<decltype(&T::name), &T::name>::getMemberPtr;                                 \
+    tableItem.memberType = type;                                                                                       \
+    tableItem.arrayMaxSize = 1;                                                                                        \
+    tableItem.isSection = _isObject;                                                                                   \
+  } while (false)
+
+// =====================================================================================================================
+// Initiates a state's member to address table
+#define VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(T, name, type, _isObject)                                                   \
+  do {                                                                                                                 \
+    addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
+    StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
+    tableItem.memberName = STRING(name);                                                                               \
+    if (!strncmp(tableItem.memberName, "m_", 2))                                                                       \
+      tableItem.memberName += 2;                                                                                       \
+    tableItem.getMember = GetSubStateMemberHelper<T, decltype(&SubState::name), &SubState::name>::getMemberPtr;        \
+    tableItem.memberType = type;                                                                                       \
+    tableItem.arrayMaxSize = 1;                                                                                        \
+    tableItem.isSection = _isObject;                                                                                   \
+  } while (false)
+
+// =====================================================================================================================
+// Initiates a state's member to address table with explicit name
+#define VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(T, name, member, getter, type, _isObject)                           \
+  do {                                                                                                                 \
+    addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
+    StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
+    tableItem.memberName = STRING(name);                                                                               \
+    if (!strncmp(tableItem.memberName, "m_", 2))                                                                       \
+      tableItem.memberName += 2;                                                                                       \
+    tableItem.getMember = getter;                                                                                      \
+    tableItem.memberType = type;                                                                                       \
+    tableItem.arrayMaxSize = 1;                                                                                        \
+    tableItem.isSection = _isObject;                                                                                   \
+  } while (false)
+
+// =====================================================================================================================
+// Initiates a array member to address table
+#define VEC_INIT_MEMBER_ARRAY_NAME_TO_ADDR(T, name, type, maxSize, _isObject)                                          \
+  do {                                                                                                                 \
+    addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
+    StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
+    tableItem.memberName = STRING(name);                                                                               \
+    if (!strncmp(tableItem.memberName, "m_", 2))                                                                       \
+      tableItem.memberName += 2;                                                                                       \
+    tableItem.getMember = GetMemberHelper<decltype(&T::name), &T::name>::getMemberPtr;                                 \
+    tableItem.memberType = type;                                                                                       \
+    tableItem.arrayMaxSize = maxSize;                                                                                  \
+    tableItem.isSection = _isObject;                                                                                   \
+  } while (false)
+
+// =====================================================================================================================
+// Initiates a dynamic array member to address table
+#define VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(T, name, type, _isObject)                                                \
+  do {                                                                                                                 \
+    addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
+    StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
+    tableItem.memberName = STRING(name);                                                                               \
+    if (!strncmp(tableItem.memberName, "m_", 2))                                                                       \
+      tableItem.memberName += 2;                                                                                       \
+    tableItem.getMember = GetMemberHelper<decltype(&T::name), &T::name>::getMemberPtr;                                 \
+    tableItem.memberType = type;                                                                                       \
+    tableItem.arrayMaxSize = VfxDynamicArrayId;                                                                        \
+    tableItem.isSection = _isObject;                                                                                   \
+  } while (false)
+
+// =====================================================================================================================
+// Initiates a member to address table
 #define INIT_MEMBER_NAME_TO_ADDR(T, name, type, _isObject)                                                             \
   tableItem->memberName = STRING(name);                                                                                \
   if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
