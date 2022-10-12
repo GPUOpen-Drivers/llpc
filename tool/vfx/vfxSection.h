@@ -648,19 +648,9 @@ class SectionColorBuffer : public Section {
 public:
   typedef ColorBuffer SubState;
 
-  SectionColorBuffer() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "colorBuffer") {
+  SectionColorBuffer() : Section(getAddrTable(), SectionTypeUnset, "colorBuffer") {
     memset(&m_state, 0, sizeof(m_state));
     m_state.channelWriteMask = 0xF;
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, format, MemberTypeEnum, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendEnable, MemberTypeInt, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendSrcAlphaToColor, MemberTypeInt, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, channelWriteMask, MemberTypeInt, false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionColorBuffer, m_palFormat, MemberTypeString, false);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   void getSubState(SubState &state) {
@@ -670,8 +660,18 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 5;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, format, MemberTypeEnum, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendEnable, MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendSrcAlphaToColor, MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, channelWriteMask, MemberTypeInt, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionColorBuffer, m_palFormat, MemberTypeString, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
 
   SubState m_state;
   std::string m_palFormat;
