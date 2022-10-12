@@ -45,7 +45,6 @@ namespace Vfx {
 std::map<std::string, SectionInfo> Section::m_sectionInfo;
 
 StrToMemberAddr SectionColorBuffer::m_addrTable[SectionColorBuffer::MemberCount];
-StrToMemberAddr SectionCompileLog::m_addrTable[SectionCompileLog::MemberCount];
 StrToMemberAddr SectionVertexInputBinding::m_addrTable[SectionVertexInputBinding::MemberCount];
 StrToMemberAddr SectionVertexInputAttribute::m_addrTable[SectionVertexInputAttribute::MemberCount];
 StrToMemberAddr SectionVertexInputDivisor::m_addrTable[SectionVertexInputDivisor::MemberCount];
@@ -101,7 +100,6 @@ public:
     initEnumMap();
 
     Section::initSectionInfo();
-    SectionCompileLog::initialAddrTable();
     SectionColorBuffer::initialAddrTable();
     SectionVertexInputBinding::initialAddrTable();
     SectionVertexInputAttribute::initialAddrTable();
