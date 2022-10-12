@@ -684,26 +684,24 @@ class SectionShaderGroup : public Section {
 public:
   typedef VkRayTracingShaderGroupCreateInfoKHR SubState;
 
-  SectionShaderGroup() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "groups") {
-    memset(&m_state, 0, sizeof(m_state));
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, type, MemberTypeEnum, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, generalShader, MemberTypeInt, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, closestHitShader, MemberTypeInt, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, anyHitShader, MemberTypeInt, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, intersectionShader, MemberTypeInt, false);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
-  }
+  SectionShaderGroup() : Section(getAddrTable(), SectionTypeUnset, "groups") { memset(&m_state, 0, sizeof(m_state)); }
 
   void getSubState(SubState &state) { state = m_state; };
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 5;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, type, MemberTypeEnum, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, generalShader, MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, closestHitShader, MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, anyHitShader, MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, intersectionShader, MemberTypeInt, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
 
   SubState m_state;
 };
