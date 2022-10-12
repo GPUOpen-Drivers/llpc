@@ -540,14 +540,8 @@ private:
 class SectionGpurtFuncTable : public Section {
 public:
   typedef Vkgc::GpurtFuncTable SubState;
-  SectionGpurtFuncTable() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "gpurtFuncTable") {
+  SectionGpurtFuncTable() : Section(getAddrTable(), SectionTypeUnset, "gpurtFuncTable") {
     memset(&m_state, 0, sizeof(m_state));
-  }
-
-  static void initAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGpurtFuncTable, m_pFunc, MemberTypeString, Vkgc::RT_ENTRY_FUNC_COUNT, false);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   void getSubState(SubState &state) {
@@ -558,8 +552,15 @@ public:
   SubState &getSubStateRef() { return m_state; }
 
 private:
-  static const unsigned MemberCount = 1;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGpurtFuncTable, m_pFunc, MemberTypeString, Vkgc::RT_ENTRY_FUNC_COUNT,
+                                         false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
 
   SubState m_state;
   std::string m_pFunc[Vkgc::RT_ENTRY_FUNC_COUNT];
