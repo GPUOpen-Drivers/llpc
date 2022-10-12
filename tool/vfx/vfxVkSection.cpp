@@ -10,7 +10,6 @@ namespace Vfx {
 
 StrToMemberAddr SectionGraphicsState::m_addrTable[SectionGraphicsState::MemberCount];
 StrToMemberAddr SectionComputeState::m_addrTable[SectionComputeState::MemberCount];
-StrToMemberAddr SectionNggState::m_addrTable[SectionNggState::MemberCount];
 #if VKI_RAY_TRACING
 StrToMemberAddr SectionRayTracingState::m_addrTable[SectionRayTracingState::MemberCount];
 StrToMemberAddr SectionShaderGroup::m_addrTable[SectionShaderGroup::MemberCount];
@@ -55,7 +54,6 @@ public:
 
     SectionGraphicsState::initialAddrTable();
     SectionComputeState::initialAddrTable();
-    SectionNggState::initialAddrTable();
 #if VKI_RAY_TRACING
     SectionRayTracingState::initialAddrTable();
     SectionShaderGroup::initialAddrTable();
