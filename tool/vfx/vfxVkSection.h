@@ -496,24 +496,30 @@ private:
 class SectionRayTracingShaderExportConfig : public Section {
 public:
   typedef Vkgc::RayTracingShaderExportConfig SubState;
-  SectionRayTracingShaderExportConfig() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "exportConfig") {
+  SectionRayTracingShaderExportConfig() : Section(getAddrTable(), SectionTypeUnset, "exportConfig") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, indirectCallingConvention, MemberTypeInt,
-                                   false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableUniformNoReturn, MemberTypeBool, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableTraceRayArgsInLds, MemberTypeBool, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, readsDispatchRaysIndex, MemberTypeBool, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableDynamicLaunch, MemberTypeBool, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, emitRaytracingShaderDataToken, MemberTypeBool,
-                                   false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, m_indirectCalleeSavedRegs,
-                             MemberTypeIndirectCalleeSavedRegs, true);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, indirectCallingConvention, MemberTypeInt,
+                                         false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableUniformNoReturn, MemberTypeBool,
+                                         false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableTraceRayArgsInLds, MemberTypeBool,
+                                         false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, readsDispatchRaysIndex, MemberTypeBool,
+                                         false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableDynamicLaunch, MemberTypeBool,
+                                         false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, emitRaytracingShaderDataToken,
+                                         MemberTypeBool, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, m_indirectCalleeSavedRegs,
+                                   MemberTypeIndirectCalleeSavedRegs, true);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
   }
 
   void getSubState(SubState &state) {
@@ -524,9 +530,6 @@ public:
   SubState &getSubStateRef() { return m_state; }
 
 private:
-  static const unsigned MemberCount = 7;
-  static StrToMemberAddr m_addrTable[MemberCount];
-
   SubState m_state;
   SectionIndirectCalleeSavedRegs m_indirectCalleeSavedRegs;
 };
