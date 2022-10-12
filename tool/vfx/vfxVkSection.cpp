@@ -13,7 +13,6 @@ StrToMemberAddr SectionResourceMapping::m_addrTable[SectionResourceMapping::Memb
 StrToMemberAddr SectionGraphicsState::m_addrTable[SectionGraphicsState::MemberCount];
 StrToMemberAddr SectionComputeState::m_addrTable[SectionComputeState::MemberCount];
 StrToMemberAddr SectionPipelineOption::m_addrTable[SectionPipelineOption::MemberCount];
-StrToMemberAddr SectionShaderOption::m_addrTable[SectionShaderOption::MemberCount];
 StrToMemberAddr SectionNggState::m_addrTable[SectionNggState::MemberCount];
 #if VKI_RAY_TRACING
 StrToMemberAddr SectionRayTracingState::m_addrTable[SectionRayTracingState::MemberCount];
@@ -63,7 +62,6 @@ public:
     SectionShaderInfo::initialAddrTable();
     SectionResourceMapping::initialAddrTable();
     SectionPipelineOption::initialAddrTable();
-    SectionShaderOption::initialAddrTable();
     SectionNggState::initialAddrTable();
 #if VKI_RAY_TRACING
     SectionRayTracingState::initialAddrTable();
