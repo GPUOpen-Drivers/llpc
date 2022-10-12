@@ -129,11 +129,11 @@ static ParserInit Init;
 // @param tableSize : Size of above table
 // @param sectionType : Section type
 // @param sectionName : Name of this section.
-Section::Section(StrToMemberAddr *addrTable, unsigned tableSize, SectionType sectionType, const char *sectionName)
-    : m_sectionType(sectionType), m_sectionName(sectionName), m_lineNum(0), m_memberTable(addrTable),
-      m_tableSize(tableSize), m_isActive(false){
+Section::Section(StrToMemberAddrArrayRef addrTable, SectionType sectionType, const char *sectionName)
+    : m_sectionType(sectionType), m_sectionName(sectionName), m_lineNum(0), m_memberTable(addrTable.data),
+      m_tableSize(addrTable.size), m_isActive(false){
 
-                              };
+                                   };
 
 // =====================================================================================================================
 // Initializes static variable m_sectionInfo

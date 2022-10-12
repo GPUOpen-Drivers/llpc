@@ -282,10 +282,17 @@ struct StrToMemberAddr {
 };
 
 // =====================================================================================================================
+// Represents a reference to a non-owned array of StrToMemberAddr, similar to llvm::ArrayRef.
+struct StrToMemberAddrArrayRef {
+  StrToMemberAddr *data;
+  uint64_t size;
+};
+
+// =====================================================================================================================
 // Represents an object whose member can be set through it's string form name.
 class Section {
 public:
-  Section(StrToMemberAddr *addrTable, unsigned tableSize, SectionType type, const char *sectionName);
+  Section(StrToMemberAddrArrayRef addrTable, SectionType type, const char *sectionName);
   virtual ~Section() {}
 
   static SectionType getSectionType(const char *sectionName);
@@ -427,7 +434,7 @@ bool Section::set(unsigned lineNum, const char *memberName, unsigned arrayIndex,
 // Represents the document version.
 class SectionVersion : public Section {
 public:
-  SectionVersion() : Section(m_addrTable, MemberCount, SectionTypeVersion, nullptr) { m_version = 0; };
+  SectionVersion() : Section({m_addrTable, MemberCount}, SectionTypeVersion, nullptr) { m_version = 0; };
 
   // Setup member name to member mapping.
   static void initialAddrTable() {
@@ -451,7 +458,7 @@ class SectionSpecConstItem : public Section {
 public:
   typedef SpecConstItem SubState;
 
-  SectionSpecConstItem() : Section(m_addrTable, MemberCount, SectionTypeUnset, "specConst"){};
+  SectionSpecConstItem() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "specConst"){};
 
   // Setup member name to member address mapping.
   static void initialAddrTable() {
@@ -478,7 +485,7 @@ class SectionSpecConst : public Section {
 public:
   typedef SpecConst SubState;
 
-  SectionSpecConst(const char *name = nullptr) : Section(m_addrTable, MemberCount, SectionTypeUnset, name){};
+  SectionSpecConst(const char *name = nullptr) : Section({m_addrTable, MemberCount}, SectionTypeUnset, name){};
 
   // Setup member name to member address mapping.
   static void initialAddrTable() {
@@ -508,7 +515,7 @@ class SectionShader : public Section {
 public:
   typedef ShaderSource SubState;
   SectionShader(const SectionInfo &info)
-      : Section(m_addrTable, MemberCount, info.type, nullptr), m_shaderType(static_cast<ShaderType>(info.propertyLo)),
+      : Section({m_addrTable, MemberCount}, info.type, nullptr), m_shaderType(static_cast<ShaderType>(info.propertyLo)),
         m_shaderStage(static_cast<ShaderStage>(info.propertyHi)) {}
 
   // Setup member name to member address mapping.
@@ -546,7 +553,7 @@ private:
 // Represents the class that includes all kinds of compile log, This section is ignored in Document::GetDocument
 class SectionCompileLog : public Section {
 public:
-  SectionCompileLog() : Section(m_addrTable, MemberCount, SectionTypeCompileLog, nullptr) {}
+  SectionCompileLog() : Section({m_addrTable, MemberCount}, SectionTypeCompileLog, nullptr) {}
 
   // Setup member name to member address mapping.
   static void initialAddrTable() {}
@@ -565,7 +572,7 @@ class SectionColorBuffer : public Section {
 public:
   typedef ColorBuffer SubState;
 
-  SectionColorBuffer() : Section(m_addrTable, MemberCount, SectionTypeUnset, "colorBuffer") {
+  SectionColorBuffer() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "colorBuffer") {
     memset(&m_state, 0, sizeof(m_state));
     m_state.channelWriteMask = 0xF;
   }
@@ -601,7 +608,7 @@ class SectionShaderGroup : public Section {
 public:
   typedef VkRayTracingShaderGroupCreateInfoKHR SubState;
 
-  SectionShaderGroup() : Section(m_addrTable, MemberCount, SectionTypeUnset, "groups") {
+  SectionShaderGroup() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "groups") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -632,7 +639,7 @@ class SectionVertexInputBinding : public Section {
 public:
   typedef VkVertexInputBindingDescription SubState;
 
-  SectionVertexInputBinding() : Section(m_addrTable, MemberCount, SectionTypeUnset, "binding") {
+  SectionVertexInputBinding() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "binding") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -660,7 +667,7 @@ class SectionVertexInputAttribute : public Section {
 public:
   typedef VkVertexInputAttributeDescription SubState;
 
-  SectionVertexInputAttribute() : Section(m_addrTable, MemberCount, SectionTypeUnset, "binding") {
+  SectionVertexInputAttribute() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "binding") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -689,7 +696,7 @@ class SectionVertexInputDivisor : public Section {
 public:
   typedef VkVertexInputBindingDivisorDescriptionEXT SubState;
 
-  SectionVertexInputDivisor() : Section(m_addrTable, MemberCount, SectionTypeUnset, "divisor") {
+  SectionVertexInputDivisor() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "divisor") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -716,7 +723,7 @@ class SectionVertexInput : public Section {
 public:
   typedef VkPipelineVertexInputStateCreateInfo SubState;
 
-  SectionVertexInput() : Section(m_addrTable, MemberCount, SectionTypeVertexInputState, nullptr) {
+  SectionVertexInput() : Section({m_addrTable, MemberCount}, SectionTypeVertexInputState, nullptr) {
     memset(&m_vkDivisorState, 0, sizeof(m_vkDivisorState));
     m_vkDivisorState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT;
   }
@@ -773,7 +780,7 @@ class SectionSpecEntryItem : public Section {
 public:
   typedef VkSpecializationMapEntry SubState;
 
-  SectionSpecEntryItem() : Section(m_addrTable, MemberCount, SectionTypeUnset, "mapEntry") {
+  SectionSpecEntryItem() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "mapEntry") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -801,7 +808,7 @@ class SectionSpecInfo : public Section {
 public:
   typedef VkSpecializationInfo SubState;
 
-  SectionSpecInfo() : Section(m_addrTable, MemberCount, SectionTypeUnset, "specConst") {
+  SectionSpecInfo() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "specConst") {
     m_intData = &m_bufMem;
     m_uintData = &m_bufMem;
     m_int64Data = &m_bufMem;
