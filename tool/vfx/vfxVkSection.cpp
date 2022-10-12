@@ -8,7 +8,6 @@ using namespace Vkgc;
 
 namespace Vfx {
 
-StrToMemberAddr SectionComputeState::m_addrTable[SectionComputeState::MemberCount];
 #if VKI_RAY_TRACING
 StrToMemberAddr SectionRayTracingState::m_addrTable[SectionRayTracingState::MemberCount];
 StrToMemberAddr SectionShaderGroup::m_addrTable[SectionShaderGroup::MemberCount];
@@ -46,7 +45,6 @@ public:
 #endif
     INIT_SECTION_INFO("ResourceMapping", SectionTypeResourceMapping, 0)
 
-    SectionComputeState::initialAddrTable();
 #if VKI_RAY_TRACING
     SectionRayTracingState::initialAddrTable();
     SectionShaderGroup::initialAddrTable();
