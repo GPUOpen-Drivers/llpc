@@ -48,26 +48,9 @@ class SectionResourceMappingNode : public Section {
 public:
   typedef Vkgc::ResourceMappingNode SubState;
 
-  SectionResourceMappingNode() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "userDataNode") {
+  SectionResourceMappingNode() : Section(getAddrTable(), SectionTypeUnset, "userDataNode") {
     memset(&m_state, 0, sizeof(m_state));
     m_visibility = 0;
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, m_visibility, MemberTypeInt, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, type, MemberTypeEnum, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, sizeInDwords, MemberTypeInt, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, offsetInDwords, MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, set, srdRange.set,
-                                           SectionResourceMappingNode::getResourceMapNodeSet, MemberTypeInt, false);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, binding, srdRange.binding,
-                                           SectionResourceMappingNode::getResourceMapNodeBinding, MemberTypeInt, false);
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMappingNode, m_next, MemberTypeResourceMappingNode, true);
-    INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, indirectUserDataCount, userDataPtr.sizeInDwords,
-                                           SectionResourceMappingNode::getResourceMapNodeUserDataCount, MemberTypeInt,
-                                           false);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   SubState &getSubStateRef() { return m_state; };
@@ -89,6 +72,28 @@ public:
   }
 
 private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, m_visibility, MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, type, MemberTypeEnum, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, sizeInDwords, MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, offsetInDwords, MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, set, srdRange.set,
+                                                 SectionResourceMappingNode::getResourceMapNodeSet, MemberTypeInt,
+                                                 false);
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, binding, srdRange.binding,
+                                                 SectionResourceMappingNode::getResourceMapNodeBinding, MemberTypeInt,
+                                                 false);
+      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMappingNode, m_next, MemberTypeResourceMappingNode, true);
+      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+          SectionResourceMappingNode, indirectUserDataCount, userDataPtr.sizeInDwords,
+          SectionResourceMappingNode::getResourceMapNodeUserDataCount, MemberTypeInt, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
   static void *getResourceMapNodeSet(void *obj) {
     SectionResourceMappingNode *castedObj = static_cast<SectionResourceMappingNode *>(obj);
     return static_cast<void *>(&castedObj->m_state.srdRange.set);
@@ -103,9 +108,6 @@ private:
     SectionResourceMappingNode *castedObj = static_cast<SectionResourceMappingNode *>(obj);
     return static_cast<void *>(&castedObj->m_state.userDataPtr.sizeInDwords);
   }
-
-  static const unsigned MemberCount = 11;
-  static StrToMemberAddr m_addrTable[MemberCount];
 
   std::vector<SectionResourceMappingNode> m_next; // Next resource mapping node
   uint32_t m_visibility;

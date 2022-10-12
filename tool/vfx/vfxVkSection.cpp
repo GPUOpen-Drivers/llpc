@@ -8,7 +8,6 @@ using namespace Vkgc;
 
 namespace Vfx {
 
-StrToMemberAddr SectionResourceMappingNode::m_addrTable[SectionResourceMappingNode::MemberCount];
 StrToMemberAddr SectionShaderInfo::m_addrTable[SectionShaderInfo::MemberCount];
 StrToMemberAddr SectionResourceMapping::m_addrTable[SectionResourceMapping::MemberCount];
 StrToMemberAddr SectionGraphicsState::m_addrTable[SectionGraphicsState::MemberCount];
@@ -61,7 +60,6 @@ public:
 
     SectionGraphicsState::initialAddrTable();
     SectionComputeState::initialAddrTable();
-    SectionResourceMappingNode::initialAddrTable();
     SectionShaderInfo::initialAddrTable();
     SectionResourceMapping::initialAddrTable();
     SectionPipelineOption::initialAddrTable();
