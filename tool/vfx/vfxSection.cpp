@@ -44,7 +44,6 @@ namespace Vfx {
 // Static variables in class Section and derived class
 std::map<std::string, SectionInfo> Section::m_sectionInfo;
 
-StrToMemberAddr SectionVertexInput::m_addrTable[SectionVertexInput::MemberCount];
 StrToMemberAddr SectionSpecEntryItem::m_addrTable[SectionSpecEntryItem::MemberCount];
 StrToMemberAddr SectionSpecInfo::m_addrTable[SectionSpecInfo::MemberCount];
 
@@ -96,7 +95,6 @@ public:
     initEnumMap();
 
     Section::initSectionInfo();
-    SectionVertexInput::initialAddrTable();
     SectionSpecEntryItem::initialAddrTable();
     SectionSpecInfo::initialAddrTable();
   };

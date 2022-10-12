@@ -797,17 +797,9 @@ class SectionVertexInput : public Section {
 public:
   typedef VkPipelineVertexInputStateCreateInfo SubState;
 
-  SectionVertexInput() : Section({m_addrTable, MemberCount}, SectionTypeVertexInputState, nullptr) {
+  SectionVertexInput() : Section(getAddrTable(), SectionTypeVertexInputState, nullptr) {
     memset(&m_vkDivisorState, 0, sizeof(m_vkDivisorState));
     m_vkDivisorState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT;
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_attribute, MemberTypeVertexInputAttributeItem, true);
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_binding, MemberTypeVertexInputBindingItem, true);
-    INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_divisor, MemberTypeVertexInputDivisorItem, true);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   void getSubState(SubState &state) {
@@ -836,8 +828,16 @@ public:
   };
 
 private:
-  static const unsigned MemberCount = 3;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_attribute, MemberTypeVertexInputAttributeItem, true);
+      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_binding, MemberTypeVertexInputBindingItem, true);
+      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_divisor, MemberTypeVertexInputDivisorItem, true);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
 
   std::vector<SectionVertexInputAttribute> m_attribute;                // Vertex input attribute
   std::vector<SectionVertexInputBinding> m_binding;                    // Vertex input binding
