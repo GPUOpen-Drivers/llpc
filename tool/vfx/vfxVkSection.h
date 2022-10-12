@@ -8,7 +8,7 @@ class SectionDescriptorRangeValueItem : public Section {
 public:
   typedef Vkgc::StaticDescriptorValue SubState;
 
-  SectionDescriptorRangeValueItem() : Section(m_addrTable, MemberCount, SectionTypeUnset, "descriptorRangeValue") {
+  SectionDescriptorRangeValueItem() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "descriptorRangeValue") {
     m_intData = &m_bufMem;
     m_uintData = &m_bufMem;
     memset(&m_state, 0, sizeof(m_state));
@@ -47,7 +47,7 @@ class SectionResourceMappingNode : public Section {
 public:
   typedef Vkgc::ResourceMappingNode SubState;
 
-  SectionResourceMappingNode() : Section(m_addrTable, MemberCount, SectionTypeUnset, "userDataNode") {
+  SectionResourceMappingNode() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "userDataNode") {
     memset(&m_state, 0, sizeof(m_state));
     m_visibility = 0;
   }
@@ -118,7 +118,7 @@ class SectionShaderOption : public Section {
 public:
   typedef Vkgc::PipelineShaderOptions SubState;
 
-  SectionShaderOption() : Section(m_addrTable, MemberCount, SectionTypeUnset, "options") {
+  SectionShaderOption() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "options") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -181,7 +181,8 @@ class SectionShaderInfo : public Section {
 public:
   typedef Vkgc::PipelineShaderInfo SubState;
   SectionShaderInfo(const SectionInfo &info)
-      : Section(m_addrTable, MemberCount, info.type, nullptr), m_shaderStage(static_cast<ShaderStage>(info.property)) {
+      : Section({m_addrTable, MemberCount}, info.type, nullptr),
+        m_shaderStage(static_cast<ShaderStage>(info.property)) {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -262,7 +263,7 @@ class SectionResourceMapping : public Section {
 public:
   typedef Vkgc::ResourceMappingData SubState;
 
-  SectionResourceMapping() : Section(m_addrTable, MemberCount, SectionTypeResourceMapping, "ResourceMapping") {
+  SectionResourceMapping() : Section({m_addrTable, MemberCount}, SectionTypeResourceMapping, "ResourceMapping") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -312,7 +313,7 @@ class SectionExtendedRobustness : public Section {
 public:
   typedef Vkgc::ExtendedRobustness SubState;
 
-  SectionExtendedRobustness() : Section(m_addrTable, MemberCount, SectionTypeUnset, "extendedRobustness") {
+  SectionExtendedRobustness() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "extendedRobustness") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -341,7 +342,7 @@ class SectionPipelineOption : public Section {
 public:
   typedef Vkgc::PipelineOptions SubState;
 
-  SectionPipelineOption() : Section(m_addrTable, MemberCount, SectionTypeUnset, "options") {
+  SectionPipelineOption() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "options") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -392,7 +393,7 @@ class SectionNggState : public Section {
 public:
   typedef Vkgc::NggState SubState;
 
-  SectionNggState() : Section(m_addrTable, MemberCount, SectionTypeUnset, "nggState") {
+  SectionNggState() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "nggState") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -433,7 +434,7 @@ private:
 class SectionIndirectCalleeSavedRegs : public Section {
 public:
   typedef Vkgc::RayTracingShaderExportConfig SubState;
-  SectionIndirectCalleeSavedRegs() : Section(m_addrTable, MemberCount, SectionTypeUnset, "exportConfig") {
+  SectionIndirectCalleeSavedRegs() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "exportConfig") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -493,7 +494,7 @@ private:
 class SectionRayTracingShaderExportConfig : public Section {
 public:
   typedef Vkgc::RayTracingShaderExportConfig SubState;
-  SectionRayTracingShaderExportConfig() : Section(m_addrTable, MemberCount, SectionTypeUnset, "exportConfig") {
+  SectionRayTracingShaderExportConfig() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "exportConfig") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -534,7 +535,7 @@ private:
 class SectionGpurtFuncTable : public Section {
 public:
   typedef Vkgc::GpurtFuncTable SubState;
-  SectionGpurtFuncTable() : Section(m_addrTable, MemberCount, SectionTypeUnset, "gpurtFuncTable") {
+  SectionGpurtFuncTable() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "gpurtFuncTable") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -565,7 +566,7 @@ private:
 class SectionRtState : public Section {
 public:
   typedef Vkgc::RtState SubState;
-  SectionRtState() : Section(m_addrTable, MemberCount, SectionTypeUnset, "rtState") {
+  SectionRtState() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "rtState") {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -635,7 +636,7 @@ class SectionGraphicsState : public Section {
 public:
   typedef GraphicsPipelineState SubState;
 
-  SectionGraphicsState() : Section(m_addrTable, MemberCount, SectionTypeGraphicsState, nullptr) {
+  SectionGraphicsState() : Section({m_addrTable, MemberCount}, SectionTypeGraphicsState, nullptr) {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -713,7 +714,7 @@ class SectionComputeState : public Section {
 public:
   typedef ComputePipelineState SubState;
 
-  SectionComputeState() : Section(m_addrTable, MemberCount, SectionTypeComputeState, nullptr) {
+  SectionComputeState() : Section({m_addrTable, MemberCount}, SectionTypeComputeState, nullptr) {
     memset(&m_state, 0, sizeof(m_state));
   }
 
@@ -765,7 +766,7 @@ class SectionRayTracingState : public Section {
 public:
   typedef RayTracingPipelineState SubState;
 
-  SectionRayTracingState() : Section(m_addrTable, MemberCount, SectionTypeComputeState, nullptr) {
+  SectionRayTracingState() : Section({m_addrTable, MemberCount}, SectionTypeComputeState, nullptr) {
     memset(&m_state, 0, sizeof(m_state));
   }
 
