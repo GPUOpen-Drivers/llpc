@@ -38,10 +38,6 @@
 #include "vfxVkSection.h"
 #endif
 
-#if VFX_SUPPORT_RENDER_DOCOUMENT
-#include "vfxRenderDoc.h"
-#endif
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -152,10 +148,6 @@ Document::~Document() {
 //
 // @param type : Document type
 Document *Document::createDocument(VfxDocType type) {
-#if VFX_SUPPORT_RENDER_DOCOUMENT
-  if (type == VfxDocTypeRender)
-    return new RenderDocument;
-#endif
 #if VFX_SUPPORT_VK_PIPELINE
   if (type == VfxDocTypePipeline)
     return new PipelineDocument;

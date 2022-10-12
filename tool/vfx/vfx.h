@@ -41,7 +41,7 @@
 #define VFX_REVISION 1
 
 // Enable VFX_SUPPORT_VK_PIPELINE in default
-#if !defined(VFX_SUPPORT_VK_PIPELINE) && !defined(VFX_SUPPORT_RENDER_DOCOUMENT)
+#if !defined(VFX_SUPPORT_VK_PIPELINE)
 #define VFX_SUPPORT_VK_PIPELINE 1
 #endif
 
@@ -562,27 +562,6 @@ struct RayTracingPipelineState {
 
 }; // namespace Vfx
 
-#if VFX_SUPPORT_RENDER_DOCOUMENT
-// =====================================================================================================================
-// Represents the content of RenderDocument.
-struct VfxRenderState {
-  unsigned version;                                             // Render state version
-  Vfx::TestResult result;                                       // Section "Result"
-  unsigned numBufferView;                                       // Number of section "BufferView"
-  Vfx::BufferView bufferView[Vfx::MaxRenderSectionCount];       // Section "BufferView"
-  Vfx::VertexState vertexState;                                 // Section "VertexState"
-  Vfx::DrawState drawState;                                     // Section "DrawState"
-  unsigned numImageView;                                        // Number of section "ImageView"
-  Vfx::ImageView imageView[Vfx::MaxRenderSectionCount];         // Section "ImageView"
-  unsigned numSampler;                                          // Number of section "Sampler"
-  Vfx::Sampler sampler[Vfx::MaxRenderSectionCount];             // Section "Sampler"
-  Vfx::ShaderSource stages[Vfx::ShaderStage::ShaderStageCount]; // Shader source sections
-};
-typedef struct VfxRenderState *VfxRenderStatePtr;
-#else
-typedef void *VfxRenderStatePtr;
-#endif
-
 #if VFX_SUPPORT_VK_PIPELINE
 // =====================================================================================================================
 // Represents the kind of vkgc pipeline
@@ -625,10 +604,6 @@ bool VFXAPI vfxParseFile(const char *pFilename, unsigned int numMacro, const cha
                          void **ppDoc, const char **ppErrorMsg);
 
 void VFXAPI vfxCloseDoc(void *pDoc);
-
-#if VFX_SUPPORT_RENDER_DOCOUMENT
-void VFXAPI vfxGetRenderDoc(void *pDoc, VfxRenderStatePtr *pRenderState);
-#endif
 
 #if VFX_SUPPORT_VK_PIPELINE
 void VFXAPI vfxGetPipelineDoc(void *pDoc, VfxPipelineStatePtr *pPipelineState);

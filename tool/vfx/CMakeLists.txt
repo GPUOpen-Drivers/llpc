@@ -36,7 +36,6 @@ target_compile_definitions(vfx PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CP
 target_sources(vfx PRIVATE
     vfxParser.cpp
     vfxPipelineDoc.cpp
-    vfxRenderDoc.cpp
     vfxSection.cpp
     vfxEnumsConverter.cpp
     vfxVkSection.cpp
