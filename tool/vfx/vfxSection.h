@@ -558,14 +558,7 @@ class SectionSpecConst : public Section {
 public:
   typedef SpecConst SubState;
 
-  SectionSpecConst(const char *name = nullptr) : Section({m_addrTable, MemberCount}, SectionTypeUnset, name){};
-
-  // Setup member name to member address mapping.
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionSpecConst, m_specConst, MemberTypeSpecConstItem, MaxSpecConstantCount, true);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
-  }
+  SectionSpecConst(const char *name = nullptr) : Section(getAddrTable(), SectionTypeUnset, name){};
 
   void getSubState(SubState &state) {
     state.numSpecConst = 0;
@@ -576,8 +569,15 @@ public:
   }
 
 private:
-  static const unsigned MemberCount = 3;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionSpecConst, m_specConst, MemberTypeSpecConstItem, MaxSpecConstantCount,
+                                         true);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
 
   SectionSpecConstItem m_specConst[MaxSpecConstantCount]; // Spec constant for one shader stage
 };
