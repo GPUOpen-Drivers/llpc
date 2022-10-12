@@ -315,25 +315,24 @@ class SectionExtendedRobustness : public Section {
 public:
   typedef Vkgc::ExtendedRobustness SubState;
 
-  SectionExtendedRobustness() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "extendedRobustness") {
+  SectionExtendedRobustness() : Section(getAddrTable(), SectionTypeUnset, "extendedRobustness") {
     memset(&m_state, 0, sizeof(m_state));
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustBufferAccess, MemberTypeBool, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustImageAccess, MemberTypeBool, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, nullDescriptor, MemberTypeBool, false);
-
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   void getSubState(SubState &state) { state = m_state; };
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 3;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustBufferAccess, MemberTypeBool, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustImageAccess, MemberTypeBool, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, nullDescriptor, MemberTypeBool, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
 
   SubState m_state;
 };
