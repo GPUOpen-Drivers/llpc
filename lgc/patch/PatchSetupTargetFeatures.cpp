@@ -171,6 +171,16 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       builder.addAttribute("amdgpu-flat-work-group-size",
                            (Twine(flatWorkGroupSize) + "," + Twine(flatWorkGroupSize)).toStringRef(attributeBuf));
     }
+    if (func->getCallingConv() == CallingConv::AMDGPU_CS) {
+      // Tag the position of MultiDispatchInfo argument, so the backend knows which
+      // sgpr needs to be preloaded for COMPUTE_PGM_RSRC2.tg_size_en (Work-Group Info).
+      // This is needed for LDS spilling.
+      for (unsigned i = 0, e = func->arg_size(); i != e; ++i) {
+        if (func->getArg(i)->getName().equals("MultiDispatchInfo")) {
+          builder.addAttribute("amdgpu-work-group-info-arg-no", std::to_string(i));
+        }
+      }
+    }
 
     auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
