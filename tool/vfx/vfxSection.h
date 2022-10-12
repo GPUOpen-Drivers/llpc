@@ -625,16 +625,20 @@ private:
 // Represents the class that includes all kinds of compile log, This section is ignored in Document::GetDocument
 class SectionCompileLog : public Section {
 public:
-  SectionCompileLog() : Section({m_addrTable, MemberCount}, SectionTypeCompileLog, nullptr) {}
-
-  // Setup member name to member address mapping.
-  static void initialAddrTable() {}
+  SectionCompileLog() : Section(getAddrTable(), SectionTypeCompileLog, nullptr) {}
 
   virtual void addLine(const char *line) { m_compileLog += line; };
 
 private:
-  static const unsigned MemberCount = 1;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  // Returns an empty table currently
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
   std::string m_compileLog; // Compile Log
 };
 
