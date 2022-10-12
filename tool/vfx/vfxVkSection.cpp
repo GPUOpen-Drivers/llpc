@@ -15,7 +15,6 @@ StrToMemberAddr SectionRayTracingState::m_addrTable[SectionRayTracingState::Memb
 StrToMemberAddr SectionShaderGroup::m_addrTable[SectionShaderGroup::MemberCount];
 StrToMemberAddr SectionRtState::m_addrTable[SectionRtState::MemberCount];
 StrToMemberAddr SectionRayTracingShaderExportConfig::m_addrTable[SectionRayTracingShaderExportConfig::MemberCount];
-StrToMemberAddr SectionIndirectCalleeSavedRegs::m_addrTable[SectionIndirectCalleeSavedRegs::MemberCount];
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
 StrToMemberAddr SectionGpurtFuncTable::m_addrTable[SectionGpurtFuncTable::MemberCount];
 #endif
@@ -59,7 +58,6 @@ public:
     SectionShaderGroup::initialAddrTable();
     SectionRtState::initialAddrTable();
     SectionRayTracingShaderExportConfig::initialAddrTable();
-    SectionIndirectCalleeSavedRegs::initialAddrTable();
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
     SectionGpurtFuncTable::initAddrTable();
 #endif
