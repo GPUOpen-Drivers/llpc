@@ -509,20 +509,19 @@ bool Section::set(unsigned lineNum, const char *memberName, unsigned arrayIndex,
 // Represents the document version.
 class SectionVersion : public Section {
 public:
-  SectionVersion() : Section({m_addrTable, MemberCount}, SectionTypeVersion, nullptr) { m_version = 0; };
-
-  // Setup member name to member mapping.
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_MEMBER_NAME_TO_ADDR(SectionVersion, m_version, MemberTypeInt, false);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
-  }
+  SectionVersion() : Section(getAddrTable(), SectionTypeVersion, nullptr) { m_version = 0; };
 
   void getSubState(unsigned &state) { state = m_version; };
 
 private:
-  static const unsigned MemberCount = 1;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionVersion, m_version, MemberTypeInt, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
 
   unsigned m_version; // Document version
 };
