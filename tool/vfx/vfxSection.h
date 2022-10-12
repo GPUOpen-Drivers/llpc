@@ -770,23 +770,23 @@ class SectionVertexInputDivisor : public Section {
 public:
   typedef VkVertexInputBindingDivisorDescriptionEXT SubState;
 
-  SectionVertexInputDivisor() : Section({m_addrTable, MemberCount}, SectionTypeUnset, "divisor") {
+  SectionVertexInputDivisor() : Section(getAddrTable(), SectionTypeUnset, "divisor") {
     memset(&m_state, 0, sizeof(m_state));
-  }
-
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, binding, MemberTypeInt, false);
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, divisor, MemberTypeInt, false);
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
   }
 
   void getSubState(SubState &state) { state = m_state; };
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 2;
-  static StrToMemberAddr m_addrTable[MemberCount];
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, binding, MemberTypeInt, false);
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, divisor, MemberTypeInt, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
 
   SubState m_state;
 };
