@@ -44,7 +44,6 @@ namespace Vfx {
 // Static variables in class Section and derived class
 std::map<std::string, SectionInfo> Section::m_sectionInfo;
 
-StrToMemberAddr SectionSpecEntryItem::m_addrTable[SectionSpecEntryItem::MemberCount];
 StrToMemberAddr SectionSpecInfo::m_addrTable[SectionSpecInfo::MemberCount];
 
 #ifndef VFX_DISABLE_SPVGEN
@@ -95,7 +94,6 @@ public:
     initEnumMap();
 
     Section::initSectionInfo();
-    SectionSpecEntryItem::initialAddrTable();
     SectionSpecInfo::initialAddrTable();
   };
 };
