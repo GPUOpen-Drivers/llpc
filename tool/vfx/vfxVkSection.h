@@ -24,13 +24,13 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, visibility, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, type, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, set, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, binding, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, arraySize, MemberTypeInt, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, m_uintData, MemberTypeUArray, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, m_intData, MemberTypeIArray, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, visibility, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, type, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, set, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, binding, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, arraySize, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, m_uintData, MemberTypeUArray, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionDescriptorRangeValueItem, m_intData, MemberTypeIArray, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -75,18 +75,17 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, m_visibility, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, type, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, sizeInDwords, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, offsetInDwords, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, set, srdRange.set,
-                                                 SectionResourceMappingNode::getResourceMapNodeSet, MemberTypeInt,
-                                                 false);
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, binding, srdRange.binding,
-                                                 SectionResourceMappingNode::getResourceMapNodeBinding, MemberTypeInt,
-                                                 false);
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMappingNode, m_next, MemberTypeResourceMappingNode, true);
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+      INIT_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, m_visibility, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, type, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, sizeInDwords, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionResourceMappingNode, offsetInDwords, MemberTypeInt, false);
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, set, srdRange.set,
+                                             SectionResourceMappingNode::getResourceMapNodeSet, MemberTypeInt, false);
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, binding, srdRange.binding,
+                                             SectionResourceMappingNode::getResourceMapNodeBinding, MemberTypeInt,
+                                             false);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMappingNode, m_next, MemberTypeResourceMappingNode, true);
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
           SectionResourceMappingNode, indirectUserDataCount, userDataPtr.sizeInDwords,
           SectionResourceMappingNode::getResourceMapNodeUserDataCount, MemberTypeInt, false);
       return addrTableInitializer;
@@ -130,43 +129,43 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, trapPresent, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, debugMode, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enablePerformanceData, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowReZ, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLateZ, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, vgprLimit, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, sgprLimit, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveSize, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, subgroupSize, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, wgpMode, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveBreakSize, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, trapPresent, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, debugMode, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enablePerformanceData, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowReZ, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLateZ, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, vgprLimit, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, sgprLimit, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveSize, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, subgroupSize, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, wgpMode, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveBreakSize, MemberTypeEnum, false);
 
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, updateDescInElf, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowVaryWaveSize, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicm, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, unrollThreshold, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, scalarThreshold, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, fp32DenormalMode, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLoopUnroll, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, adjustDepthImportVrs, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicmThreshold, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, unrollHintThreshold, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, dontUnrollHintThreshold, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, fastMathFlags, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableFastMathFlags, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, ldsSpillLimitDwords, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, scalarizeWaterfallLoads, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, overrideShaderThreadGroupSizeX, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, overrideShaderThreadGroupSizeY, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, overrideShaderThreadGroupSizeZ, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, nsaThreshold, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, aggressiveInvariantLoads, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableInvariantLoads, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, updateDescInElf, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowVaryWaveSize, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicm, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, unrollThreshold, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, scalarThreshold, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, fp32DenormalMode, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLoopUnroll, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, adjustDepthImportVrs, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicmThreshold, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, unrollHintThreshold, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, dontUnrollHintThreshold, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, fastMathFlags, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableFastMathFlags, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, ldsSpillLimitDwords, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, scalarizeWaterfallLoads, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, overrideShaderThreadGroupSizeX, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, overrideShaderThreadGroupSizeY, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, overrideShaderThreadGroupSizeZ, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, nsaThreshold, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, aggressiveInvariantLoads, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableInvariantLoads, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -231,12 +230,12 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, m_entryPoint, MemberTypeString, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, m_specConst, MemberTypeSpecInfo, true);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, m_options, MemberTypeShaderOption, true);
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, m_descriptorRangeValue, MemberTypeDescriptorRangeValue,
-                                            true);
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, m_userDataNode, MemberTypeResourceMappingNode, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, m_entryPoint, MemberTypeString, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, m_specConst, MemberTypeSpecInfo, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, m_options, MemberTypeShaderOption, true);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, m_descriptorRangeValue, MemberTypeDescriptorRangeValue,
+                                        true);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, m_userDataNode, MemberTypeResourceMappingNode, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -292,10 +291,9 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_descriptorRangeValue,
-                                            MemberTypeDescriptorRangeValue, true);
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_userDataNode, MemberTypeResourceMappingNode,
-                                            true);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_descriptorRangeValue, MemberTypeDescriptorRangeValue,
+                                        true);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMapping, m_userDataNode, MemberTypeResourceMappingNode, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -326,9 +324,9 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustBufferAccess, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustImageAccess, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, nullDescriptor, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustBufferAccess, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, robustImageAccess, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionExtendedRobustness, nullDescriptor, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -357,27 +355,27 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeDisassembly, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, scalarBlockLayout, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIr, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, robustBufferAccess, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reconfigWorkgroupLayout, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, forceCsThreadIdSwizzling, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, overrideThreadGroupSizeX, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, overrideThreadGroupSizeY, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, overrideThreadGroupSizeZ, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTableUsage, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTablePtrHigh, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, resourceLayoutScheme, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeDisassembly, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, scalarBlockLayout, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIr, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, robustBufferAccess, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reconfigWorkgroupLayout, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, forceCsThreadIdSwizzling, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, overrideThreadGroupSizeX, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, overrideThreadGroupSizeY, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, overrideThreadGroupSizeZ, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTableUsage, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, shadowDescriptorTablePtrHigh, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, resourceLayoutScheme, MemberTypeEnum, false);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizationLevel, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizationLevel, MemberTypeInt, false);
 #endif
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, threadGroupSwizzleMode, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reverseThreadGroup, MemberTypeBool, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_extendedRobustness, MemberTypeExtendedRobustness, true);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, threadGroupSwizzleMode, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reverseThreadGroup, MemberTypeBool, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_extendedRobustness, MemberTypeExtendedRobustness, true);
       // One internal member
 #if VKI_RAY_TRACING
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, internalRtShaders, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, internalRtShaders, MemberTypeBool, false);
 #endif
       return addrTableInitializer;
     }();
@@ -403,21 +401,21 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableNgg, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableGsUse, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, forceCullingMode, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, compactMode, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableVertexReuse, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableBackfaceCulling, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableFrustumCulling, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableBoxFilterCulling, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableSphereCulling, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableSmallPrimFilter, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableCullDistanceCulling, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, backfaceExponent, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, subgroupSizing, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, primsPerSubgroup, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, vertsPerSubgroup, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableNgg, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableGsUse, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, forceCullingMode, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, compactMode, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableVertexReuse, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableBackfaceCulling, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableFrustumCulling, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableBoxFilterCulling, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableSphereCulling, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableSmallPrimFilter, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableCullDistanceCulling, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, backfaceExponent, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, subgroupSizing, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, primsPerSubgroup, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, vertsPerSubgroup, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -444,36 +442,33 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
-          SectionIndirectCalleeSavedRegs, raygen, raygen,
-          SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
-                                                                         indirectCalleeSavedRegs.raygen)>,
-          MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, miss, miss,
-                                                 SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
-                                                     Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.miss)>,
-                                                 MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, raygen, raygen,
+                                             SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                                 Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.raygen)>,
+                                             MemberTypeInt, false);
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, miss, miss,
+                                             SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                                 Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.miss)>,
+                                             MemberTypeInt, false);
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
           SectionIndirectCalleeSavedRegs, closestHit, closestHit,
           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
                                                                          indirectCalleeSavedRegs.closestHit)>,
           MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
-          SectionIndirectCalleeSavedRegs, anyHit, anyHit,
-          SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
-                                                                         indirectCalleeSavedRegs.anyHit)>,
-          MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, anyHit, anyHit,
+                                             SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                                 Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.anyHit)>,
+                                             MemberTypeInt, false);
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
           SectionIndirectCalleeSavedRegs, intersection, intersection,
           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
                                                                          indirectCalleeSavedRegs.intersection)>,
           MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
-          SectionIndirectCalleeSavedRegs, callable, callable,
-          SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
-                                                                         indirectCalleeSavedRegs.callable)>,
-          MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionIndirectCalleeSavedRegs, callable, callable,
+                                             SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(
+                                                 Vkgc::RayTracingShaderExportConfig, indirectCalleeSavedRegs.callable)>,
+                                             MemberTypeInt, false);
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
           SectionIndirectCalleeSavedRegs, traceRays, traceRays,
           SectionIndirectCalleeSavedRegs::GetExportConfigMember<offsetof(Vkgc::RayTracingShaderExportConfig,
                                                                          indirectCalleeSavedRegs.traceRays)>,
@@ -503,20 +498,18 @@ public:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, indirectCallingConvention, MemberTypeInt,
-                                         false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableUniformNoReturn, MemberTypeBool,
-                                         false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableTraceRayArgsInLds, MemberTypeBool,
-                                         false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, readsDispatchRaysIndex, MemberTypeBool,
-                                         false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableDynamicLaunch, MemberTypeBool,
-                                         false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, emitRaytracingShaderDataToken,
-                                         MemberTypeBool, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, m_indirectCalleeSavedRegs,
-                                   MemberTypeIndirectCalleeSavedRegs, true);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, indirectCallingConvention, MemberTypeInt,
+                                     false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableUniformNoReturn, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableTraceRayArgsInLds, MemberTypeBool,
+                                     false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, readsDispatchRaysIndex, MemberTypeBool,
+                                     false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableDynamicLaunch, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, emitRaytracingShaderDataToken, MemberTypeBool,
+                                     false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, m_indirectCalleeSavedRegs,
+                               MemberTypeIndirectCalleeSavedRegs, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -555,8 +548,8 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGpurtFuncTable, m_pFunc, MemberTypeString, Vkgc::RT_ENTRY_FUNC_COUNT,
-                                         false);
+      INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGpurtFuncTable, m_pFunc, MemberTypeString, Vkgc::RT_ENTRY_FUNC_COUNT,
+                                     false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -591,34 +584,34 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_bvhResDescSize, MemberTypeInt, false);
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRtState, m_bvhResDesc, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, nodeStrideShift, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, staticPipelineFlags, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, triCompressMode, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, pipelineFlags, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, threadGroupSizeX, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, threadGroupSizeY, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, threadGroupSizeZ, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, boxSortHeuristicMode, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, counterMode, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, counterMask, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, rayQueryCsSwizzle, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, ldsStackSize, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, dispatchRaysThreadGroupSize, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, ldsSizePerThreadGroup, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, outerTileSize, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, dispatchDimSwizzleMode, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayQueryCsSwizzle, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableDispatchRaysInnerSwizzle, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableDispatchRaysOuterSwizzle, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, forceInvalidAccelStruct, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayTracingCounters, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForIndirect, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForUnified, MemberTypeInt, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_exportConfig, MemberTypeRayTracingShaderExportConfig, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_bvhResDescSize, MemberTypeInt, false);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRtState, m_bvhResDesc, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, nodeStrideShift, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, staticPipelineFlags, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, triCompressMode, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, pipelineFlags, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, threadGroupSizeX, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, threadGroupSizeY, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, threadGroupSizeZ, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, boxSortHeuristicMode, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, counterMode, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, counterMask, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, rayQueryCsSwizzle, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, ldsStackSize, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, dispatchRaysThreadGroupSize, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, ldsSizePerThreadGroup, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, outerTileSize, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, dispatchDimSwizzleMode, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayQueryCsSwizzle, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableDispatchRaysInnerSwizzle, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableDispatchRaysOuterSwizzle, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, forceInvalidAccelStruct, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayTracingCounters, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForIndirect, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForUnified, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_exportConfig, MemberTypeRayTracingShaderExportConfig, true);
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_gpurtFuncTable, MemberTypeGpurtFuncTable, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_gpurtFuncTable, MemberTypeGpurtFuncTable, true);
 #endif
       return addrTableInitializer;
     }();
@@ -648,34 +641,34 @@ public:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, topology, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, provokingVertexMode, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, patchControlPoints, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, deviceIndex, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, disableVertexReuse, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, depthClipEnable, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, rasterizerDiscardEnable, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, perSampleShading, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, numSamples, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, pixelShaderSamples, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, samplePatternIdx, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, usrClipPlaneMask, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, alphaToCoverageEnable, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dualSourceBlendEnable, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, switchWinding, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableMultiView, MemberTypeInt, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_options, MemberTypePipelineOption, true);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_nggState, MemberTypeNggState, true);
-      VEC_INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_colorBuffer, MemberTypeColorBufferItem,
-                                         Vkgc::MaxColorTargets, true);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, topology, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, provokingVertexMode, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, patchControlPoints, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, deviceIndex, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, disableVertexReuse, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, depthClipEnable, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, rasterizerDiscardEnable, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, perSampleShading, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, numSamples, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, pixelShaderSamples, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, samplePatternIdx, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, usrClipPlaneMask, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, alphaToCoverageEnable, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dualSourceBlendEnable, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, switchWinding, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableMultiView, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_options, MemberTypePipelineOption, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_nggState, MemberTypeNggState, true);
+      INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_colorBuffer, MemberTypeColorBufferItem,
+                                     Vkgc::MaxColorTargets, true);
 
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dynamicVertexStride, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableUberFetchShader, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableEarlyCompile, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dynamicVertexStride, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableUberFetchShader, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableEarlyCompile, MemberTypeBool, false);
 
 #if VKI_RAY_TRACING
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
 #endif
       return addrTableInitializer;
     }();
@@ -727,11 +720,11 @@ public:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_options, MemberTypePipelineOption, true);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_options, MemberTypePipelineOption, true);
 #if VKI_RAY_TRACING
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_shaderLibrary, MemberTypeString, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_rtState, MemberTypeRtState, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_shaderLibrary, MemberTypeString, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_rtState, MemberTypeRtState, true);
 #endif
       return addrTableInitializer;
     }();
@@ -779,17 +772,17 @@ public:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, deviceIndex, MemberTypeInt, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_options, MemberTypePipelineOption, true);
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRayTracingState, m_groups, MemberTypeShaderGroup, true);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_shaderTraceRay, MemberTypeString, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, maxRecursionDepth, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, indirectStageMask, MemberTypeInt, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_rtState, MemberTypeRtState, true);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, payloadSizeMaxInLib, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, attributeSizeMaxInLib, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, hasPipelineLibrary, MemberTypeBool, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, pipelineLibStageMask, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, deviceIndex, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_options, MemberTypePipelineOption, true);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRayTracingState, m_groups, MemberTypeShaderGroup, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_shaderTraceRay, MemberTypeString, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, maxRecursionDepth, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, indirectStageMask, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_rtState, MemberTypeRtState, true);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, payloadSizeMaxInLib, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, attributeSizeMaxInLib, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, hasPipelineLibrary, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, pipelineLibStageMask, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
