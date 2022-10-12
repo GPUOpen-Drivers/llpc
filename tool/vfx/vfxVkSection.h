@@ -721,19 +721,22 @@ class SectionComputeState : public Section {
 public:
   typedef ComputePipelineState SubState;
 
-  SectionComputeState() : Section({m_addrTable, MemberCount}, SectionTypeComputeState, nullptr) {
+  SectionComputeState() : Section(getAddrTable(), SectionTypeComputeState, nullptr) {
     memset(&m_state, 0, sizeof(m_state));
   }
 
-  static void initialAddrTable() {
-    StrToMemberAddr *tableItem = m_addrTable;
-    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_options, MemberTypePipelineOption, true);
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_options, MemberTypePipelineOption, true);
 #if VKI_RAY_TRACING
-    INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_shaderLibrary, MemberTypeString, false);
-    INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_rtState, MemberTypeRtState, true);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_shaderLibrary, MemberTypeString, false);
+      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_rtState, MemberTypeRtState, true);
 #endif
-    VFX_ASSERT(tableItem - &m_addrTable[0] <= MemberCount);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
   }
 
   void getSubState(const std::string &docFilename, SubState &state, std::string *errorMsg) {
@@ -754,9 +757,6 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 5;
-  static StrToMemberAddr m_addrTable[MemberCount];
-
   SubState m_state;
   SectionPipelineOption m_options;
 #if VKI_RAY_TRACING
