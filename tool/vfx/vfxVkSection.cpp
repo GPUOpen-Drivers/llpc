@@ -22,7 +22,6 @@ StrToMemberAddr SectionIndirectCalleeSavedRegs::m_addrTable[SectionIndirectCalle
 StrToMemberAddr SectionGpurtFuncTable::m_addrTable[SectionGpurtFuncTable::MemberCount];
 #endif
 #endif
-StrToMemberAddr SectionExtendedRobustness::m_addrTable[SectionExtendedRobustness::MemberCount];
 
 // =====================================================================================================================
 // Dummy class used to initialize all VK special sections
@@ -69,7 +68,6 @@ public:
     SectionGpurtFuncTable::initAddrTable();
 #endif
 #endif
-    SectionExtendedRobustness::initialAddrTable();
   };
 
   void initEnumMap() {
