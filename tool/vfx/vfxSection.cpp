@@ -47,7 +47,6 @@ std::map<std::string, SectionInfo> Section::m_sectionInfo;
 StrToMemberAddr SectionSpecConstItem::m_addrTable[SectionSpecConstItem::MemberCount];
 StrToMemberAddr SectionSpecConst::m_addrTable[SectionSpecConst::MemberCount];
 StrToMemberAddr SectionColorBuffer::m_addrTable[SectionColorBuffer::MemberCount];
-StrToMemberAddr SectionVersion::m_addrTable[SectionVersion::MemberCount];
 StrToMemberAddr SectionCompileLog::m_addrTable[SectionCompileLog::MemberCount];
 StrToMemberAddr SectionShader::m_addrTable[SectionShader::MemberCount];
 StrToMemberAddr SectionVertexInputBinding::m_addrTable[SectionVertexInputBinding::MemberCount];
@@ -107,7 +106,6 @@ public:
     Section::initSectionInfo();
     SectionSpecConstItem::initialAddrTable();
     SectionSpecConst::initialAddrTable();
-    SectionVersion::initialAddrTable();
     SectionCompileLog::initialAddrTable();
     SectionShader::initialAddrTable();
     SectionColorBuffer::initialAddrTable();
