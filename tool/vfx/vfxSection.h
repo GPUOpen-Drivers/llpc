@@ -198,7 +198,7 @@ inline SectionInfo initSectionItemInfo(SectionType type, uint16_t propertyLo, ui
 
 // =====================================================================================================================
 // Initiates a member to address table
-#define VEC_INIT_MEMBER_NAME_TO_ADDR(T, name, type, _isObject)                                                         \
+#define INIT_MEMBER_NAME_TO_ADDR(T, name, type, _isObject)                                                             \
   do {                                                                                                                 \
     addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
     StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
@@ -213,7 +213,7 @@ inline SectionInfo initSectionItemInfo(SectionType type, uint16_t propertyLo, ui
 
 // =====================================================================================================================
 // Initiates a state's member to address table
-#define VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(T, name, type, _isObject)                                                   \
+#define INIT_STATE_MEMBER_NAME_TO_ADDR(T, name, type, _isObject)                                                       \
   do {                                                                                                                 \
     addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
     StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
@@ -228,7 +228,7 @@ inline SectionInfo initSectionItemInfo(SectionType type, uint16_t propertyLo, ui
 
 // =====================================================================================================================
 // Initiates a state's member to address table with explicit name
-#define VEC_INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(T, name, member, getter, type, _isObject)                           \
+#define INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(T, name, member, getter, type, _isObject)                               \
   do {                                                                                                                 \
     addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
     StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
@@ -243,7 +243,7 @@ inline SectionInfo initSectionItemInfo(SectionType type, uint16_t propertyLo, ui
 
 // =====================================================================================================================
 // Initiates a array member to address table
-#define VEC_INIT_MEMBER_ARRAY_NAME_TO_ADDR(T, name, type, maxSize, _isObject)                                          \
+#define INIT_MEMBER_ARRAY_NAME_TO_ADDR(T, name, type, maxSize, _isObject)                                              \
   do {                                                                                                                 \
     addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
     StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
@@ -258,7 +258,7 @@ inline SectionInfo initSectionItemInfo(SectionType type, uint16_t propertyLo, ui
 
 // =====================================================================================================================
 // Initiates a dynamic array member to address table
-#define VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(T, name, type, _isObject)                                                \
+#define INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(T, name, type, _isObject)                                                    \
   do {                                                                                                                 \
     addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
     StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
@@ -270,66 +270,6 @@ inline SectionInfo initSectionItemInfo(SectionType type, uint16_t propertyLo, ui
     tableItem.arrayMaxSize = VfxDynamicArrayId;                                                                        \
     tableItem.isSection = _isObject;                                                                                   \
   } while (false)
-
-// =====================================================================================================================
-// Initiates a member to address table
-#define INIT_MEMBER_NAME_TO_ADDR(T, name, type, _isObject)                                                             \
-  tableItem->memberName = STRING(name);                                                                                \
-  if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
-    tableItem->memberName += 2;                                                                                        \
-  tableItem->getMember = GetMemberHelper<decltype(&T::name), &T::name>::getMemberPtr;                                  \
-  tableItem->memberType = type;                                                                                        \
-  tableItem->arrayMaxSize = 1;                                                                                         \
-  tableItem->isSection = _isObject;                                                                                    \
-  ++tableItem;
-
-// =====================================================================================================================
-// Initiates a state's member to address table
-#define INIT_STATE_MEMBER_NAME_TO_ADDR(T, name, type, _isObject)                                                       \
-  tableItem->memberName = STRING(name);                                                                                \
-  if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
-    tableItem->memberName += 2;                                                                                        \
-  tableItem->getMember = GetSubStateMemberHelper<T, decltype(&SubState::name), &SubState::name>::getMemberPtr;         \
-  tableItem->memberType = type;                                                                                        \
-  tableItem->arrayMaxSize = 1;                                                                                         \
-  tableItem->isSection = _isObject;                                                                                    \
-  ++tableItem;
-
-// =====================================================================================================================
-// Initiates a state's member to address table with explicit name
-#define INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(T, name, member, getter, type, _isObject)                               \
-  tableItem->memberName = STRING(name);                                                                                \
-  if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
-    tableItem->memberName += 2;                                                                                        \
-  tableItem->getMember = getter;                                                                                       \
-  tableItem->memberType = type;                                                                                        \
-  tableItem->arrayMaxSize = 1;                                                                                         \
-  tableItem->isSection = _isObject;                                                                                    \
-  ++tableItem;
-
-// =====================================================================================================================
-// Initiates a array member to address table
-#define INIT_MEMBER_ARRAY_NAME_TO_ADDR(T, name, type, maxSize, _isObject)                                              \
-  tableItem->memberName = STRING(name);                                                                                \
-  if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
-    tableItem->memberName += 2;                                                                                        \
-  tableItem->getMember = GetMemberHelper<decltype(&T::name), &T::name>::getMemberPtr;                                  \
-  tableItem->memberType = type;                                                                                        \
-  tableItem->arrayMaxSize = maxSize;                                                                                   \
-  tableItem->isSection = _isObject;                                                                                    \
-  ++tableItem;
-
-// =====================================================================================================================
-// Initiates a dynamic array member to address table
-#define INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(T, name, type, _isObject)                                                    \
-  tableItem->memberName = STRING(name);                                                                                \
-  if (!strncmp(tableItem->memberName, "m_", 2))                                                                        \
-    tableItem->memberName += 2;                                                                                        \
-  tableItem->getMember = GetMemberHelper<decltype(&T::name), &T::name>::getMemberPtr;                                  \
-  tableItem->memberType = type;                                                                                        \
-  tableItem->arrayMaxSize = VfxDynamicArrayId;                                                                         \
-  tableItem->isSection = _isObject;                                                                                    \
-  ++tableItem;
 
 // =====================================================================================================================
 // Cases a section to sub section
@@ -517,7 +457,7 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionVersion, m_version, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionVersion, m_version, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -541,9 +481,9 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, i, MemberTypeIVec4, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, f, MemberTypeFVec4, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, d, MemberTypeDVec2, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, i, MemberTypeIVec4, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, f, MemberTypeFVec4, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecConstItem, d, MemberTypeDVec2, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -572,8 +512,8 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionSpecConst, m_specConst, MemberTypeSpecConstItem, MaxSpecConstantCount,
-                                         true);
+      INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionSpecConst, m_specConst, MemberTypeSpecConstItem, MaxSpecConstantCount,
+                                     true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -605,7 +545,7 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionShader, m_fileName, MemberTypeString, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionShader, m_fileName, MemberTypeString, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -663,11 +603,11 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, format, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendEnable, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendSrcAlphaToColor, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, channelWriteMask, MemberTypeInt, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionColorBuffer, m_palFormat, MemberTypeString, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, format, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendEnable, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, blendSrcAlphaToColor, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionColorBuffer, channelWriteMask, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionColorBuffer, m_palFormat, MemberTypeString, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -693,11 +633,11 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, type, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, generalShader, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, closestHitShader, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, anyHitShader, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, intersectionShader, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, type, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, generalShader, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, closestHitShader, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, anyHitShader, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, intersectionShader, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -724,9 +664,9 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, binding, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, stride, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, inputRate, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, binding, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, stride, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputBinding, inputRate, MemberTypeEnum, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -752,10 +692,10 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, location, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, binding, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, format, MemberTypeEnum, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, offset, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, location, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, binding, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, format, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, offset, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -781,8 +721,8 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, binding, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, divisor, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, binding, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputDivisor, divisor, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -831,9 +771,9 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_attribute, MemberTypeVertexInputAttributeItem, true);
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_binding, MemberTypeVertexInputBindingItem, true);
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_divisor, MemberTypeVertexInputDivisorItem, true);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_attribute, MemberTypeVertexInputAttributeItem, true);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_binding, MemberTypeVertexInputBindingItem, true);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionVertexInput, m_divisor, MemberTypeVertexInputDivisorItem, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -865,9 +805,9 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, constantID, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, offset, MemberTypeInt, false);
-      VEC_INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, size, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, constantID, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, offset, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionSpecEntryItem, size, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -909,14 +849,14 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
-      VEC_INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionSpecInfo, m_mapEntry, MemberTypeSpecEntryItem, true);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_intData, MemberTypeIArray, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uintData, MemberTypeUArray, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_int64Data, MemberTypeI64Array, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uint64Data, MemberTypeU64Array, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_floatData, MemberTypeFArray, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_doubleData, MemberTypeDArray, false);
-      VEC_INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_float16Data, MemberTypeF16Array, false);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionSpecInfo, m_mapEntry, MemberTypeSpecEntryItem, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_intData, MemberTypeIArray, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uintData, MemberTypeUArray, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_int64Data, MemberTypeI64Array, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_uint64Data, MemberTypeU64Array, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_floatData, MemberTypeFArray, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_doubleData, MemberTypeDArray, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionSpecInfo, m_float16Data, MemberTypeF16Array, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
