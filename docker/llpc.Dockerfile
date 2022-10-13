@@ -16,6 +16,7 @@
 # - LLPC_REPO_SHA: SHA of the commit to checkout
 # - FEATURES: A '+'-separated set of features to enable such as code coverage ('+coverage')
 #
+FROM "$AMDVLK_IMAGE"
 
 ARG LLPC_REPO_NAME
 ARG LLPC_REPO_REF
