@@ -15,6 +15,7 @@
 # - LLPC_REPO_SHA: SHA of the commit to checkout
 # - LLPC_BASE_REF: ref name for the base of the tested change
 #
+FROM "$AMDVLK_IMAGE"
 
 ARG LLPC_REPO_NAME
 ARG LLPC_REPO_REF
