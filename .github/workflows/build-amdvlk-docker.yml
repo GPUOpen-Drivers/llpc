@@ -45,9 +45,6 @@ jobs:
                          --build-arg FEATURES="${{ matrix.feature-set }}" \
                          --build-arg GENERATOR="${{ matrix.generator }}" \
                          --tag "$IMAGE_TAG"
-      - name: Push the new image
-        run: |
-          docker push "$IMAGE_TAG"
       - name: Garbage collect old docker images
         if: matrix.feature-set == '+clang'
         run: |
