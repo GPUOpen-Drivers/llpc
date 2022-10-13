@@ -3,7 +3,6 @@
 # Sample invocation:
 #    docker build .                                                                                       \
 #      --file docker/llpc.Dockerfile                                                                      \
-#      --build-arg AMDVLK_IMAGE=us-docker.pkg.dev/stadia-open-source/amdvlk-public-ci/gcc_release:nightly \
 #      --build-arg LLPC_REPO_NAME=GPUOpen-Drivers/llpc                                                    \
 #      --build-arg LLPC_REPO_REF=<GIT_REF>                                                                \
 #      --build-arg LLPC_REPO_SHA=<GIT_SHA>                                                                \
@@ -17,10 +16,6 @@
 # - LLPC_REPO_SHA: SHA of the commit to checkout
 # - FEATURES: A '+'-separated set of features to enable such as code coverage ('+coverage')
 #
-
-# Resume build from the specified image.
-ARG AMDVLK_IMAGE
-FROM "$AMDVLK_IMAGE"
 
 ARG LLPC_REPO_NAME
 ARG LLPC_REPO_REF
