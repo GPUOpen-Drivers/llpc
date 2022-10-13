@@ -42,7 +42,6 @@ jobs:
           echo "CONFIG_TAG=$CONFIG_TAG" | tee -a $GITHUB_ENV
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc.Dockerfile
-                             --build-arg AMDVLK_IMAGE="$IMAGE_TAG"
                              --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
                              --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                              --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
