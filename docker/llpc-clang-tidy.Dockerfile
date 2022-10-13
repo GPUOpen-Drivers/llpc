@@ -17,10 +17,6 @@
 # - LLPC_BASE_REF: ref name for the base of the tested change
 #
 
-# Resume build from the specified image.
-ARG AMDVLK_IMAGE
-FROM "$AMDVLK_IMAGE"
-
 ARG LLPC_REPO_NAME
 ARG LLPC_REPO_REF
 ARG LLPC_REPO_SHA
