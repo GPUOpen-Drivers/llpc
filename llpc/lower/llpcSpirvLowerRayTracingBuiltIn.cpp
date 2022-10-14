@@ -165,7 +165,7 @@ bool SpirvLowerRayTracingBuiltIn::runImpl(Module &module) {
         Type *instTy = inst->getType();
         if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Input) {
           assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
-          Type *newInstTy = PointerType::get(instTy->getContainedType(0), SPIRAS_Private);
+          Type *newInstTy = PointerType::getWithSamePointeeType(cast<PointerType>(instTy), SPIRAS_Private);
           inst->mutateType(newInstTy);
         }
       }
