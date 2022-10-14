@@ -15,9 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         host-os:             ["ubuntu-20.04"]
-        image-template:      ["us-docker.pkg.dev/stadia-open-source/amdvlk-public-ci/amdvlk_%s%s:nightly"]
         config:              [Release]
-        feature-set:         ["+gcc", "+gcc+assertions"]
+        feature-set:         ["+gcc"]
     steps:
       - name: Free up disk space
         if: contains(matrix.feature-set, '+ubsan') || contains(matrix.feature-set, '+asan') || contains(matrix.feature-set, '+tsan') || contains(matrix.feature-set, '+coverage')
@@ -32,21 +31,12 @@ jobs:
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
           git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
           git checkout ${GITHUB_SHA}
-      - name: Generate Docker base image tag string
-        run: |
-          CONFIG_LOWER=$(echo "${{ matrix.config }}" | tr "[:upper:]" "[:lower:]")
-          FEATURES_LOWER=$(echo "${{ matrix.feature-set }}" | tr "+" "_")
-          TAG=$(printf "${{ matrix.image-template }}" "$CONFIG_LOWER" "$FEATURES_LOWER")
-          echo "IMAGE_TAG=$TAG" | tee -a $GITHUB_ENV
-          CONFIG_TAG=$(printf "%s%s" "$CONFIG_LOWER" "$FEATURES_LOWER")
-          echo "CONFIG_TAG=$CONFIG_TAG" | tee -a $GITHUB_ENV
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc.Dockerfile
                              --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
                              --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                              --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
                              --build-arg FEATURES="${{ matrix.feature-set }}"
-                             --tag llpc/ci-shaderdb
       - name: Copy code coverage report to host and save PR number
         if: contains(matrix.feature-set, '+coverage') && github.event.pull_request.number
         run: |
