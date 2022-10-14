@@ -53,14 +53,31 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
 WORKDIR /vulkandriver/drivers/llpc
 RUN git clone https://github.com/${LLPC_REPO_NAME}.git . \
     && git fetch origin +${LLPC_REPO_SHA}:${LLPC_REPO_REF} --update-head-ok \
-    && git checkout ${LLPC_REPO_SHA}
+    && git checkout ${LLPC_REPO_SHA} \
+    && touch /vulkandriver/env.sh
+
+# Checkout others
+WORKDIR /vulkandriver/drivers/
+RUN git clone -b amd-master --depth=1 https://github.com/GPUOpen-Drivers/MetroHash.git ./third_party/metrohash \
+    && git clone -b amd-master --depth=1 https://github.com/GPUOpen-Drivers/CWPack ./third_party/cwpack \
+    && git clone -b amd-gfx-gpuopen-dev --depth=1 https://github.com/GPUOpen-Drivers/llvm-project
 
 # Copy helper scripts into container.
 COPY docker/*.sh /vulkandriver/
 
+# Build LLPC.
+WORKDIR /vulkandriver/builds/ci-build
+RUN echo "Extra env vars (/vulkandriver/env.sh): " \
+    && cat /vulkandriver/env.sh \
+    && source /vulkandriver/env.sh \
+    && cmake "/vulkandriver/drivers/llpc" \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release
+
 # Run CMake.
 WORKDIR /vulkandriver/builds/ci-build
-RUN cmake .
+RUN source /vulkandriver/env.sh \
+    && cmake .
 
 # Run clang-tidy. Detect failures by searching for a colon. An empty line or "No relevant changes found." signals success.
 WORKDIR /vulkandriver/drivers/llpc
