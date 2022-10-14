@@ -76,6 +76,152 @@ Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vect
 
 // =====================================================================================================================
 // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
+// where available. The factor inputs are always <N x iM> of the same type, N can be arbitrary and M must be 4, 8, 16,
+// 32, or 64 Use a value of 0 for no accumulation and the value type is consistent with the result type. The result is
+// saturated if there is an accumulator. Only the final addition to the accumulator needs to be saturated.
+// Intermediate overflows of the dot product can lead to an undefined result.
+//
+// @param vector1 : The integer Vector 1
+// @param vector2 : The integer Vector 2
+// @param accumulator : The accumulator to the scalar of dot product
+// @param flags : The first bit marks whether Vector 1 is signed and the second bit marks whether Vector 2 is signed
+// @param instName : Name to give instruction(s)
+Value *BuilderImplBase::CreateIntegerDotProductNew(Value *vector1, Value *vector2, Value *accumulator, unsigned flags,
+                                                   const Twine &instName) {
+  if (flags == SecondVectorSigned) {
+    std::swap(vector1, vector2);
+    flags = FirstVectorSigned;
+  }
+  const bool isBothSigned = (flags == (FirstVectorSigned | SecondVectorSigned));
+  const bool isMixedSigned = (flags == FirstVectorSigned);
+  const bool isSigned = isBothSigned || isMixedSigned;
+
+  // The factor inputs are always <N x iM> of the same type
+  Type *inputTy = vector1->getType();
+  assert(inputTy->isVectorTy() && inputTy->getScalarType()->isIntegerTy() && inputTy == vector2->getType());
+  const unsigned compCount = cast<FixedVectorType>(inputTy)->getNumElements();
+
+  // The supported size of M
+  const unsigned compBitWidth = inputTy->getScalarSizeInBits();
+  assert(compBitWidth == 4 || compBitWidth == 8 || compBitWidth == 16 || compBitWidth == 32 || compBitWidth == 64);
+
+  // The result type is given by accumulator, which must be greater than or equal to that of the components of Vector 1
+  Type *expectedTy = accumulator->getType();
+  const bool hasAccumulator = !(isa<ConstantInt>(accumulator) && cast<ConstantInt>(accumulator)->isNullValue());
+  const unsigned expectedWidth = expectedTy->getScalarSizeInBits();
+  assert(expectedWidth == 4 || expectedWidth == 8 || expectedWidth == 16 || expectedWidth == 32 || expectedWidth == 64);
+
+  // Check if there is a native intrinsic that can do the entire operation (dot product and saturating accumulate) in a
+  // single instruction. They must meet the two conditions:
+  // 1. The required native intrinsic is supported by the specified hardware
+  // 2. The factor inputs must be <2 x i16> or <N x i8> (N <= 4) or <N x i4> (N <= 8)
+  const auto &supportIntegerDotFlag = getPipelineState()->getTargetInfo().getGpuProperty().supportIntegerDotFlag;
+  const bool isSupportCompBitwidth = (supportIntegerDotFlag.compBitwidth16 && compBitWidth == 16) ||
+                                     (supportIntegerDotFlag.compBitwidth8 && compBitWidth == 8) ||
+                                     (supportIntegerDotFlag.compBitwidth4 && compBitWidth == 4);
+  const bool isSupportSignedness =
+      isMixedSigned ? supportIntegerDotFlag.diffSignedness : supportIntegerDotFlag.sameSignedness;
+  const bool isDot2 = (compCount == 2 && compBitWidth == 16);
+  const bool isDot4 = (compCount <= 4 && compBitWidth == 8);
+  const bool isDot8 = (compCount <= 8 && compBitWidth == 4);
+  const bool hasNativeIntrinsic =
+      isSupportCompBitwidth && isSupportSignedness && (isDot2 || isDot4 || isDot8) && (expectedWidth <= 32);
+
+  auto input1 = vector1;
+  auto input2 = vector2;
+  Value *computedResult = nullptr;
+  if (hasNativeIntrinsic) {
+    int supportedN = InvalidValue;
+    int intrinsic = InvalidValue;
+    if (isDot2) {
+      intrinsic = isBothSigned ? Intrinsic::amdgcn_sdot2 : Intrinsic::amdgcn_udot2;
+      supportedN = 2;
+    } else if (isDot4) {
+      intrinsic = isBothSigned ? Intrinsic::amdgcn_sdot4 : Intrinsic::amdgcn_udot4;
+      supportedN = 4;
+    } else {
+      assert(isDot8);
+      intrinsic = isBothSigned ? Intrinsic::amdgcn_sdot8 : Intrinsic::amdgcn_udot8;
+      supportedN = 8;
+    }
+    assert(intrinsic != InvalidValue);
+    // Do null-extension
+    SmallVector<int, 8> shuffleMask;
+    for (int i = 0; i < supportedN; ++i)
+      shuffleMask.push_back(std::min(i, static_cast<int>(compCount)));
+    input1 = CreateShuffleVector(input1, Constant::getNullValue(inputTy), shuffleMask);
+    input2 = CreateShuffleVector(input2, Constant::getNullValue(inputTy), shuffleMask);
+
+    // Cast to i32 for dot4 and dot8
+    if (compBitWidth == 4 || compBitWidth == 8) {
+      input1 = CreateBitCast(input1, getInt32Ty());
+      input2 = CreateBitCast(input2, getInt32Ty());
+    }
+
+    Value *clamp = hasAccumulator ? getTrue() : getFalse();
+    accumulator = isSigned ? CreateSExt(accumulator, getInt32Ty()) : CreateZExt(accumulator, getInt32Ty());
+    computedResult = CreateIntrinsic(intrinsic, {}, {input1, input2, accumulator, clamp}, nullptr, instName);
+  } else {
+    Value *sum = nullptr;
+    const bool canUseDot2 = isSupportCompBitwidth && isSupportSignedness && !isDot4 && !isDot8;
+    if (canUseDot2) {
+      sum = getInt32(0);
+      // Iterator over two components at a time and perform shuffle vectors and then use the intrinsic
+      unsigned intrinsic = isBothSigned ? Intrinsic::amdgcn_sdot2 : Intrinsic::amdgcn_udot2;
+      for (int compIdx = 0; compIdx < compCount; compIdx += 2) {
+        input1 = CreateShuffleVector(vector1, Constant::getNullValue(inputTy), ArrayRef<int>{compIdx, compIdx + 1});
+        input2 = CreateShuffleVector(vector2, Constant::getNullValue(inputTy), ArrayRef<int>{compIdx, compIdx + 1});
+        sum = CreateIntrinsic(intrinsic, {}, {input1, input2, sum, getFalse()}, nullptr, instName);
+      }
+    } else {
+      sum = getIntN(expectedWidth, 0);
+      for (unsigned compIdx = 0; compIdx < compCount; ++compIdx) {
+        Value *elem1 = CreateExtractElement(vector1, compIdx);
+        elem1 = isSigned ? CreateSExt(elem1, expectedTy) : CreateZExt(elem1, expectedTy);
+        Value *elem2 = CreateExtractElement(vector2, compIdx);
+        elem2 = isBothSigned ? CreateSExt(elem2, expectedTy) : CreateZExt(elem2, expectedTy);
+        sum = CreateAdd(sum, CreateMul(elem1, elem2));
+      }
+    }
+    if (hasAccumulator) {
+      if (sum->getType()->getScalarSizeInBits() > expectedWidth)
+        sum = CreateTrunc(sum, expectedTy);
+      else if (sum->getType()->getScalarSizeInBits() < expectedWidth)
+        sum = isSigned ? CreateSExt(sum, expectedTy) : CreateZExt(sum, expectedTy);
+
+      Intrinsic::ID addIntrinsic = isSigned ? Intrinsic::sadd_sat : Intrinsic::uadd_sat;
+      sum = CreateBinaryIntrinsic(addIntrinsic, sum, accumulator, nullptr, instName);
+    }
+    computedResult = sum;
+  }
+
+  // Do clampping or truncation
+  Type *computedTy = computedResult->getType();
+  const unsigned computedWidth = computedTy->getScalarSizeInBits();
+  if (expectedWidth < computedWidth) {
+    if (hasAccumulator) {
+      // Compute the clamp range based on the
+      unsigned long long unsignedMax = (2ULL << (expectedWidth - 1)) - 1;
+      long long signedMax = unsignedMax >> 1;
+      long long signedMin = -1LL - signedMax;
+
+      Value *minimum = isSigned ? ConstantInt::getSigned(computedTy, signedMin) : getIntN(computedWidth, 0);
+      Value *maximum = isSigned ? ConstantInt::getSigned(computedTy, signedMax) : getIntN(computedWidth, unsignedMax);
+      Intrinsic::ID minIntrinsic = isSigned ? Intrinsic::smin : Intrinsic::umin;
+      Intrinsic::ID maxIntrinsic = isSigned ? Intrinsic::smax : Intrinsic::umax;
+
+      computedResult = CreateBinaryIntrinsic(maxIntrinsic, computedResult, minimum, nullptr, instName);
+      computedResult = CreateBinaryIntrinsic(minIntrinsic, computedResult, maximum, nullptr, instName);
+    }
+    computedResult = CreateTrunc(computedResult, expectedTy);
+  }
+
+  computedResult->setName(instName);
+  return computedResult;
+}
+
+// =====================================================================================================================
+// Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
 // where available.
 // Use a value of 0 for no accumulation and the value type is consistent with the result type. The result is saturated
 // if there is an accumulator. The component type of input vectors can have 8-bit/16-bit/32-bit and i32/i16/i8 result.
