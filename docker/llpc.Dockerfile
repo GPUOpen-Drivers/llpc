@@ -119,7 +119,7 @@ RUN EXTRA_COMPILER_FLAGS=() \
     && echo "Extra env vars (/vulkandriver/env.sh): " \
     && cat /vulkandriver/env.sh \
     && source /vulkandriver/env.sh \
-    && cmake "/vulkandriver/llpc" \
+    && cmake "/vulkandriver/drivers/llpc" \
           -G Ninja \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
           "${EXTRA_FLAGS[@]}" \
