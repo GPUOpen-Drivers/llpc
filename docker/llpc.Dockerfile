@@ -53,8 +53,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
 
 # Checkout llpc
 WORKDIR /vulkandriver
-RUN git clone https://github.com/${LLPC_REPO_NAME}.git .
-    && git fetch origin +${LLPC_REPO_SHA}:${LLPC_REPO_REF} --update-head-ok
+RUN git clone https://github.com/${LLPC_REPO_NAME}.git . \
+    && git fetch origin +${LLPC_REPO_SHA}:${LLPC_REPO_REF} --update-head-ok \
     && git checkout ${LLPC_REPO_SHA}
 
 # Copy helper scripts into container.
