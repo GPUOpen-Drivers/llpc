@@ -13,14 +13,9 @@ jobs:
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
           git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
           git checkout ${GITHUB_SHA}
-      - name: Generate Docker base image tag string
-        run: |
-          echo "IMAGE_TAG=us-docker.pkg.dev/stadia-open-source/amdvlk-public-ci/amdvlk_release_clang:nightly" \
-            | tee -a $GITHUB_ENV
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc-clang-tidy.Dockerfile
                             --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
                             --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                             --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
                             --build-arg LLPC_BASE_REF="${{ github.base_ref }}"
-                            --tag llpc/ci-shaderdb
