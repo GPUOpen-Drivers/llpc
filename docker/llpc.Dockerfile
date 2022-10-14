@@ -121,7 +121,7 @@ RUN EXTRA_COMPILER_FLAGS=() \
     && source /vulkandriver/env.sh \
     && cmake "/vulkandriver/drivers/llpc" \
           -G Ninja \
-          -DCMAKE_BUILD_TYPE="$CONFIG" \
+          -DCMAKE_BUILD_TYPE=Release \
           "${EXTRA_FLAGS[@]}" \
     && cmake --build . --target check-amdllpc check-amdllpc-units -- -v \
     && cmake --build . --target check-lgc check-lgc-units -- -v
