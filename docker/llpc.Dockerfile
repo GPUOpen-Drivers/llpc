@@ -116,7 +116,7 @@ RUN EXTRA_COMPILER_FLAGS=() \
     && cmake "/vulkandriver/llpc" \
           -G Ninja \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
-          "${EXTRA_FLAGS[@]}"
+          "${EXTRA_FLAGS[@]}" \
     && cmake --build . --target check-amdllpc check-amdllpc-units -- -v \
     && cmake --build . --target check-lgc check-lgc-units -- -v
 
