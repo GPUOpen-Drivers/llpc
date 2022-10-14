@@ -51,6 +51,13 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-12 10 \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
 
+# Update the VulkanSDK 1.3.216 or higher, install the shader compiler tools for gpurt.
+RUN wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | apt-key add - \
+    && wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.216-focal.list https://packages.lunarg.com/vulkan/1.3.216/lunarg-vulkan-1.3.216-focal.list \
+    && apt-get update \
+    && apt-get install -yqq --no-install-recommends vulkan-sdk \
+    && rm -rf /var/lib/apt/lists/*
+
 # Checkout llpc
 WORKDIR /vulkandriver/drivers/llpc
 RUN git clone https://github.com/${LLPC_REPO_NAME}.git . \
