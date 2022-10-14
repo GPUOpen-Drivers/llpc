@@ -55,7 +55,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
 WORKDIR /vulkandriver
 RUN git clone https://github.com/${LLPC_REPO_NAME}.git . \
     && git fetch origin +${LLPC_REPO_SHA}:${LLPC_REPO_REF} --update-head-ok \
-    && git checkout ${LLPC_REPO_SHA}
+    && git checkout ${LLPC_REPO_SHA} \
+    && touch ./env.sh
 
 # Copy helper scripts into container.
 COPY docker/*.sh /vulkandriver/
@@ -112,7 +113,6 @@ RUN EXTRA_COMPILER_FLAGS=() \
     && echo "Extra env vars (/vulkandriver/env.sh): " \
     && cat /vulkandriver/env.sh \
     && source /vulkandriver/env.sh \
-
     && cmake "/vulkandriver/llpc" \
           -G Ninja \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
