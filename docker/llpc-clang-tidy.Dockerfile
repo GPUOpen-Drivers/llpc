@@ -5,7 +5,6 @@
 #      --file docker/llpc-clang-tidy.Dockerfile                                                             \
 #      --build-arg LLPC_REPO_NAME=GPUOpen-Drivers/llpc                                                      \
 #      --build-arg LLPC_REPO_REF=<GIT_REF>                                                                  \
-#      --build-arg LLPC_REPO_SHA=<GIT_SHA>                                                                  \
 #      --tag llpc-ci/llpc
 #
 # Required arguments:
@@ -15,7 +14,8 @@
 # - LLPC_REPO_SHA: SHA of the commit to checkout
 # - LLPC_BASE_REF: ref name for the base of the tested change
 #
-FROM "$AMDVLK_IMAGE"
+
+FROM ubuntu:20.04
 
 ARG LLPC_REPO_NAME
 ARG LLPC_REPO_REF
@@ -25,15 +25,42 @@ ARG LLPC_BASE_REF
 # Use bash instead of sh in this docker file.
 SHELL ["/bin/bash", "-c"]
 
-COPY docker/update-llpc.sh /vulkandriver/
+# Install required packages.
+# Use pip to install an up-to-date version of CMake. The apt package is
+# too old for LLVM.
+RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
+    && apt-get update \
+    && apt-get install -yqq --no-install-recommends \
+       build-essential pkg-config ninja-build \
+       gcc g++ binutils-gold \
+       llvm-11 clang-11 clang-tidy-12 libclang-common-11-dev lld-11 \
+       python python3 python3-distutils python3-pip \
+       libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
+       libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
+       libwayland-dev \
+       git curl wget openssh-client \
+       gpg gpg-agent \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --no-cache-dir --upgrade pip \
+    && python3 -m pip install --no-cache-dir --upgrade cmake \
+    && for tool in clang clang++ llvm-cov llvm-profdata llvm-symbolizer lld ld.lld ; do \
+         update-alternatives --install /usr/bin/"$tool" "$tool" /usr/bin/"$tool"-11 10 ; \
+        done \
+    && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-12 10 \
+    && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
 
-RUN /vulkandriver/update-llpc.sh
-RUN git -C /vulkandriver/drivers/llpc fetch origin "$LLPC_BASE_REF" --update-head-ok
+# Checkout llpc
+WORKDIR /vulkandriver/drivers/llpc
+RUN git clone https://github.com/${LLPC_REPO_NAME}.git . \
+    && git fetch origin +${LLPC_REPO_SHA}:${LLPC_REPO_REF} --update-head-ok \
+    && git checkout ${LLPC_REPO_SHA}
+
+# Copy helper scripts into container.
+COPY docker/*.sh /vulkandriver/
 
 # Run CMake.
 WORKDIR /vulkandriver/builds/ci-build
-RUN source /vulkandriver/env.sh \
-    && cmake .
+RUN cmake .
 
 # Run clang-tidy. Detect failures by searching for a colon. An empty line or "No relevant changes found." signals success.
 WORKDIR /vulkandriver/drivers/llpc
