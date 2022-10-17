@@ -3,7 +3,7 @@
 # Sample invocation:
 #    docker build .                                                                                       \
 #      --file docker/llpc.Dockerfile                                                                      \
-#      --build-arg AMDVLK_IMAGE=us-docker.pkg.dev/stadia-open-source/amdvlk-public-ci/gcc_release:nightly \
+#      --build-arg AMDVLK_IMAGE=***/amdvlk_%s%s:nightly                                                   \
 #      --build-arg LLPC_REPO_NAME=GPUOpen-Drivers/llpc                                                    \
 #      --build-arg LLPC_REPO_REF=<GIT_REF>                                                                \
 #      --build-arg LLPC_REPO_SHA=<GIT_SHA>                                                                \
