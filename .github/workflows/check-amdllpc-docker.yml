@@ -26,6 +26,11 @@ jobs:
                       /usr/lib/jvm /opt/hostedtoolcache/go /opt/hostedtoolcache/CodeQL /opt/az \
                       /usr/share/swift /usr/local/.ghcup /usr/local/graalvm /usr/local/lib/node_modules
           echo 'After:' && df -h
+      - name: Checkout LLPC
+        run: |
+          git clone https://github.com/${GITHUB_REPOSITORY}.git .
+          git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
+          git checkout ${GITHUB_SHA}
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc.Dockerfile
                              --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
