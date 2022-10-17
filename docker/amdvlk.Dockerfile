@@ -130,4 +130,17 @@ RUN EXTRA_COMPILER_FLAGS=() \
           -DXGL_BUILD_TOOLS=ON \
           -DICD_ANALYSIS_WARNINGS_AS_ERRORS=OFF \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-          "${EXTRA_FLAGS[@]}"
+          "${EXTRA_FLAGS[@]}" \
+    && cmake --build . \
+    && cmake --build . --target lgc spvgen count FileCheck llvm-objdump not
+
+# Run the lit test suite.
+RUN source /vulkandriver/env.sh \
+    && cmake --build . --target check-amdllpc check-amdllpc-units -- -v \
+    && cmake --build . --target check-lgc check-lgc-units -- -v
+
+# Save build info to /vulkandriver/build_info.txt.
+RUN cd /vulkandriver \
+    && (printf "Base image built on $(date)\n\n" | tee build_info.txt) \
+    && (repo forall -p -c "git log -1 --pretty=format:'%H %s by %an <%ae>'" | tee -a build_info.txt) \
+    && (echo | tee -a build_info.txt)
