@@ -17,8 +17,10 @@ jobs:
         image-template: ["amdvlk_%s%s:nightly"]
         branch:         [dev]
         config:         [Release]
-        feature-set:    ["+gcc+assertions",
-                        "+clang+shadercache+coverage+assertions"]
+        feature-set:    ["+gcc", "+gcc+assertions",
+                         "+clang", "+clang+coverage",
+                         "+clang+shadercache+coverage+assertions",
+                         "+clang+shadercache+tsan"]
         generator:      [Ninja]
     steps:
       - name: Free up disk space
