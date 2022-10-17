@@ -1614,8 +1614,10 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
         coherent.bits.dlc = isDlc;
       }
       if (isInvariant && accessSize >= 4) {
-        part = m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,
-                                          {bufferDesc, offsetVal, m_builder->getInt32(coherent.u32All)});
+        CallInst *call = m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,
+                                                    {bufferDesc, offsetVal, m_builder->getInt32(coherent.u32All)});
+        call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, None));
+        part = call;
       } else {
         unsigned intrinsicID = Intrinsic::amdgcn_raw_buffer_load;
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
