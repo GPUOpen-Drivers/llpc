@@ -109,6 +109,9 @@ private:
   void appendVertexFetchTypes(std::vector<llvm::Type *> &argTys) const;
   void appendArguments(llvm::SmallVectorImpl<llvm::Value *> &args, llvm::Argument *begin, llvm::Argument *end) const;
 
+  void gatherTuningAttributes(llvm::AttrBuilder &tuningAttrs, const llvm::Function *srcEntryPoint) const;
+  void applyTuningAttributes(llvm::Function *dstEntryPoint, const llvm::AttrBuilder &tuningAttrs) const;
+
 #if VKI_RAY_TRACING
   void processRayQueryLdsStack(llvm::Function *entryPoint1, llvm::Function *entryPoint2) const;
 #endif

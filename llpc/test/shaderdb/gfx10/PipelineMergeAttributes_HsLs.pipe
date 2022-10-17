@@ -1,0 +1,183 @@
+; RUN: amdllpc -v --gfxip=10.3.0 %s | FileCheck -check-prefix=SHADERTEST %s
+
+; Check the merged HS has acquired HS amdgpu-nsa-threshold, LS amdgpu-num-vgpr.
+; SHADERTEST-LABEL: {{^//}} LLPC pipeline patching results
+; SHADERTEST: amdgpu_hs void @_amdgpu_hs_main{{.*}} #0
+; SHADERTEST: attributes #0 = {{.*}} "amdgpu-nsa-threshold"="16"{{.*}} "amdgpu-num-vgpr"="42"
+; SHADERTEST: {{^//}} LLPC final pipeline module info
+
+[Version]
+version = 40
+
+[VsGlsl]
+#version 450 core
+
+layout(location = 0) in vec4 inV0;
+layout(location = 1) in vec2 inV1;
+layout(location = 2) in vec2 inV2;
+layout(location = 3) in vec3 inV3;
+
+layout(location = 0) out vec2 out1;
+layout(location = 1) out vec2 out2;
+layout(location = 2) out vec3 out3;
+layout(location = 3) out float out4[3];
+layout(location = 6) out int index;
+layout(location = 7) out dvec3 out5[2];
+
+
+void main(void)
+{
+    gl_Position = inV0;
+    out1 = inV1;
+    out2 = inV2;
+    out3 = inV3;
+    out4[0] = out4[1] = out4[2] = inV0.x;
+    index = 1;
+    out5[0] = dvec3(1.0, 1.0, 1.0);
+    out5[1] = dvec3(2.0, 2.0, 2.0);
+}
+
+[VsInfo]
+entryPoint = main
+options.vgprLimit = 42
+
+
+[TcsGlsl]
+#version 450 core
+layout(vertices=3) out;
+layout(location = 0) in vec2 inArray1[];
+layout(location = 1) in vec2 inArray2[];
+layout(location = 2) in vec3 inArray3[];
+layout(location = 3) in float inArray4[][3];
+layout(location = 6) in int indexArr[];
+layout(location = 7) in dvec3 inArray5[][2];
+
+layout(location = 0) out vec4 outArray[];
+
+void main(void)
+{
+    gl_TessLevelOuter[0] = 2.0;
+    gl_TessLevelOuter[1] = 2.0;
+    gl_TessLevelOuter[2] = 2.0;
+    gl_TessLevelInner[0] = 4.0;
+
+    gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+    int index = indexArr[gl_InvocationID];
+    float z = inArray3[gl_InvocationID].z + inArray4[gl_InvocationID][index];
+    float w = inArray3[0][gl_InvocationID] + inArray3[1][gl_InvocationID] + inArray3[2][gl_InvocationID];
+    dvec3 dv = inArray5[0][index];
+    w += float(dv.x + dv.y + dv.z);
+    outArray[gl_InvocationID] = vec4(inArray2[gl_InvocationID].xy + inArray1[gl_InvocationID].xy, z, w);
+}
+[TcsInfo]
+entryPoint = main
+options.nsaThreshold = 16
+
+[TesGlsl]
+#version 450 core
+
+layout(triangles,fractional_even_spacing,ccw) in;
+
+layout(location = 0) in vec4 inArray[];
+
+layout(location = 0) out vec2 oVf2;
+layout(location = 1) out vec3 oVf3;
+layout(location = 2) out float of;
+void main(void)
+{
+    float u = gl_TessCoord[0];
+    float v = gl_TessCoord[1];
+    float w = gl_TessCoord[2];
+
+    gl_Position = inArray[0] * u + inArray[1] * v + inArray[2] * w;
+    oVf2 = inArray[0].xy;
+    oVf3 = inArray[1].xyz;
+    of = inArray[2].w;
+}
+
+[TesInfo]
+entryPoint = main
+
+
+[FsGlsl]
+#version 450 core
+
+layout(location = 0) in vec2 inVf2;
+layout(location = 1) in vec3 inVf3;
+layout(location = 2) in float inf;
+
+layout(location = 0) out vec4 fragColor;
+
+void main(void)
+{
+    fragColor =  vec4(inVf2.xy + inVf3.xy, inVf3.z, inf);
+}
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+patchControlPoints = 3
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 1
+rasterizerDiscardEnable = 0
+perSampleShading = 0
+numSamples = 1
+samplePatternIdx = 0
+usrClipPlaneMask = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 1
+nggState.enableNgg = 0
+nggState.enableGsUse = 0
+nggState.compactMode = NggCompactDisable
+nggState.enableVertexReuse = 0
+nggState.enableBackfaceCulling = 0
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 0
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 0
+nggState.vertsPerSubgroup = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 1
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+options.shadowDescriptorTableUsage = Enable
+options.shadowDescriptorTablePtrHigh = 2
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 0
+options.extendedRobustness.nullDescriptor = 0
+
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 64
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+attribute[1].location = 1
+attribute[1].binding = 0
+attribute[1].format = VK_FORMAT_R32G32_SFLOAT
+attribute[1].offset = 16
+attribute[2].location = 2
+attribute[2].binding = 0
+attribute[2].format = VK_FORMAT_R32G32_SFLOAT
+attribute[2].offset = 24
+attribute[3].location = 3
+attribute[3].binding = 0
+attribute[3].format = VK_FORMAT_R32G32B32_SFLOAT
+attribute[3].offset = 32
