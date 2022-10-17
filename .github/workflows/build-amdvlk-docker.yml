@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         host-os:        ["ubuntu-20.04"]
-        image-template: ["amdvlk_%s%s"]
+        image-template: ["amdvlk_%s%s:nightly"]
         branch:         [dev]
         config:         [Release]
         feature-set:    ["+gcc+assertions",
@@ -45,10 +45,10 @@ jobs:
                          --build-arg CONFIG="${{ matrix.config }}" \
                          --build-arg FEATURES="${{ matrix.feature-set }}" \
                          --build-arg GENERATOR="${{ matrix.generator }}" \
-                         --tag "$IMAGE_TAG"
+                         --tag "${{secrets.DOCKER_USR}}/$IMAGE_TAG"
       - name: Login Docker
         run: |
           echo "${{ secrets.DOCKER_PWD }}" | docker login -u ${{ secrets.DOCKER_USR }} --password-stdin
       - name: Push the new image
         run: |
-          docker push "$IMAGE_TAG"
+          docker push "${{secrets.DOCKER_USR}}/$IMAGE_TAG"
