@@ -16,7 +16,8 @@ jobs:
         host-os:        ["ubuntu-20.04"]
         branch:         [dev]
         config:         [Release]
-        feature-set:    ["+gcc"]
+        feature-set:    ["+gcc+assertions",
+                        "+clang+shadercache+coverage+assertions"]
         generator:      [Ninja]
     steps:
       - name: Free up disk space
