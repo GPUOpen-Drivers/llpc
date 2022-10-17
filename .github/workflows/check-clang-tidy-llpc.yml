@@ -21,7 +21,7 @@ jobs:
         run: docker pull "${{secrets.DOCKER_USR}}/$IMAGE_TAG"
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc-clang-tidy.Dockerfile
-                            --build-arg AMDVLK_IMAGE="$IMAGE_TAG"
+                            --build-arg AMDVLK_IMAGE="${{secrets.DOCKER_USR}}/$IMAGE_TAG"
                             --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
                             --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                             --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
