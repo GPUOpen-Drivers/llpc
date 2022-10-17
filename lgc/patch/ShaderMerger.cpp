@@ -132,6 +132,51 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, EsGs::Specia
 }
 
 // =====================================================================================================================
+// Gather tuning attributes from an new entry-point function.
+//
+// @param tuningAttrs : Attribute builder holding gathered tuning options
+// @param srcEntryPoint : Entry-point providing tuning options (can be null)
+void ShaderMerger::gatherTuningAttributes(AttrBuilder &tuningAttrs, const Function *srcEntryPoint) const {
+  if (!srcEntryPoint)
+    return;
+
+  const AttributeSet &fnAttrs = srcEntryPoint->getAttributes().getFnAttrs();
+  for (const Attribute &srcAttr : fnAttrs) {
+    if (!srcAttr.isStringAttribute())
+      continue;
+
+    auto attrKind = srcAttr.getKindAsString();
+    if (!(attrKind.startswith("amdgpu") || attrKind.startswith("disable")))
+      continue;
+
+    // Note: this doesn't mean attribute values match
+    if (!tuningAttrs.contains(attrKind)) {
+      tuningAttrs.addAttribute(srcAttr);
+    } else if (tuningAttrs.getAttribute(attrKind) != srcAttr) {
+      LLVM_DEBUG(dbgs() << "[gatherTuningAttributes] Incompatible values for " << attrKind << "\n");
+    }
+  }
+}
+
+// =====================================================================================================================
+// Apply tuning attributes to new entry-point function.
+//
+// @param dstEntryPoint : Entry-point receiving tuning options
+// @param tuningAttrs : Attribute builder holding gathered tuning options
+void ShaderMerger::applyTuningAttributes(Function *dstEntryPoint, const AttrBuilder &tuningAttrs) const {
+  AttrBuilder attrs(*m_context);
+  attrs.merge(tuningAttrs);
+
+  // Remove any attributes already defined in the destination
+  const AttributeSet &existingAttrs = dstEntryPoint->getAttributes().getFnAttrs();
+  for (const Attribute &dstAttr : existingAttrs)
+    attrs.removeAttribute(dstAttr);
+
+  // Apply attributes
+  dstEntryPoint->addFnAttrs(attrs);
+}
+
+// =====================================================================================================================
 // Builds LLVM function for hardware primitive shader (NGG).
 //
 // @param esEntryPoint : Entry-point of hardware export shader (ES) (could be null)
@@ -143,8 +188,15 @@ Function *ShaderMerger::buildPrimShader(Function *esEntryPoint, Function *gsEntr
   processRayQueryLdsStack(esEntryPoint, gsEntryPoint);
 #endif
 
+  AttrBuilder tuningAttrs(*m_context);
+  gatherTuningAttributes(tuningAttrs, esEntryPoint);
+  gatherTuningAttributes(tuningAttrs, gsEntryPoint);
+  gatherTuningAttributes(tuningAttrs, copyShaderEntryPoint);
+
   NggPrimShader primShader(m_pipelineState);
-  return primShader.generate(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
+  auto primShaderEntryPoint = primShader.generate(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
+  applyTuningAttributes(primShaderEntryPoint, tuningAttrs);
+  return primShaderEntryPoint;
 }
 
 // =====================================================================================================================
@@ -231,8 +283,13 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto module = hsEntryPoint->getParent();
   module->getFunctionList().push_front(entryPoint);
 
+  AttrBuilder tuningAttrs(*m_context);
+  gatherTuningAttributes(tuningAttrs, lsEntryPoint);
+  gatherTuningAttributes(tuningAttrs, hsEntryPoint);
+
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
+  applyTuningAttributes(entryPoint, tuningAttrs);
 
   for (auto &arg : entryPoint->args()) {
     auto argIdx = arg.getArgNo();
@@ -535,8 +592,13 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   module->getFunctionList().push_front(entryPoint);
 
+  AttrBuilder tuningAttrs(*m_context);
+  gatherTuningAttributes(tuningAttrs, esEntryPoint);
+  gatherTuningAttributes(tuningAttrs, gsEntryPoint);
+
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
+  applyTuningAttributes(entryPoint, tuningAttrs);
 
   for (auto &arg : entryPoint->args()) {
     auto argIdx = arg.getArgNo();
