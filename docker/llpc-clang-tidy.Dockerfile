@@ -19,7 +19,7 @@
 
 # Resume build from the specified image.
 ARG AMDVLK_IMAGE
-FROM "${{secrets.DOCKER_USR}}/$AMDVLK_IMAGE"
+FROM "$AMDVLK_IMAGE"
 
 ARG LLPC_REPO_NAME
 ARG LLPC_REPO_REF
