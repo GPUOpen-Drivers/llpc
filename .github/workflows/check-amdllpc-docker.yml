@@ -15,11 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         host-os:             ["ubuntu-20.04"]
-        image-template:      ["us-docker.pkg.dev/stadia-open-source/amdvlk-public-ci/amdvlk_%s%s:nightly"]
+        image-template:      ["amdvlk_%s%s:nightly"]
         config:              [Release]
         feature-set:         ["+gcc", "+gcc+assertions",
                               "+clang", "+clang+coverage",
-                              "+clang+shadercache+coverage+assertions",
                               "+clang+shadercache+tsan"]
     steps:
       - name: Free up disk space
@@ -44,10 +43,10 @@ jobs:
           CONFIG_TAG=$(printf "%s%s" "$CONFIG_LOWER" "$FEATURES_LOWER")
           echo "CONFIG_TAG=$CONFIG_TAG" | tee -a $GITHUB_ENV
       - name: Fetch the latest prebuilt AMDVLK
-        run: docker pull "$IMAGE_TAG"
+        run: docker pull "${{secrets.DOCKER_USR}}/$IMAGE_TAG"
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc.Dockerfile
-                             --build-arg AMDVLK_IMAGE="$IMAGE_TAG"
+                             --build-arg AMDVLK_IMAGE="${{secrets.DOCKER_USR}}/$IMAGE_TAG"
                              --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
                              --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                              --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
