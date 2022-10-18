@@ -26,43 +26,54 @@
 project(DUMPER C CXX)
 
 ### Create DUMPER Library ################################################################################################
-add_library(dumper STATIC "")
+add_library(dumper_base OBJECT "")
 
 ### Cached Project Options #############################################################################################
 option(DUMPER_ENABLE_WERROR "Build ${PROJECT_NAME} with more errors" OFF)
 
 ### Compiler Options ###################################################################################################
 include(../../cmake/CompilerFlags.cmake)
-set_compiler_options(dumper ${DUMPER_ENABLE_WERROR})
+set_compiler_options(dumper_base ${DUMPER_ENABLE_WERROR})
 
-### Defines/Includes/Sources ###########################################################################################
-target_compile_definitions(dumper PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
-target_compile_definitions(dumper PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
-if(ICD_BUILD_LLPC)
-    target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
+# We get link errors on Linux
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-fPIC)
 endif()
 
-target_link_libraries(dumper PUBLIC metrohash)
-target_link_libraries(dumper PRIVATE cwpack)
-target_link_libraries(dumper PRIVATE vkgc_headers)
-target_link_libraries(dumper PRIVATE
+### Defines/Includes/Sources ###########################################################################################
+target_compile_definitions(dumper_base PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
+target_compile_definitions(dumper_base PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
+
+target_link_libraries(dumper_base PUBLIC metrohash)
+target_link_libraries(dumper_base PUBLIC cwpack)
+target_link_libraries(dumper_base PUBLIC vkgc_headers)
+target_link_libraries(dumper_base PUBLIC
     khronos_vulkan_interface
     khronos_spirv_interface
 )
 
-target_include_directories(dumper
+target_include_directories(dumper_base
     PUBLIC
         .
-    PRIVATE
+    PUBLIC
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
         ${XGL_VKGC_PATH}/util
 )
 
-target_sources(dumper PRIVATE
+target_sources(dumper_base PRIVATE
     ../../util/vkgcUtil.cpp
-    ../../util/vkgcElfReader.cpp
-    vkgcPipelineDumper.cpp
     vkgcPipelineDumperRegs.cpp
 )
+
+add_library(dumper STATIC
+    ../../util/vkgcElfReader.cpp
+    vkgcPipelineDumper.cpp
+)
+if(ICD_BUILD_LLPC)
+    target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
+endif()
+
+target_link_libraries(dumper PUBLIC dumper_base)
+

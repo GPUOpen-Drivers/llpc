@@ -80,6 +80,7 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
   }
 
   m_resourceMapping = pipelineInfo->resourceMapping;
+  m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;
 }
 
 // =====================================================================================================================

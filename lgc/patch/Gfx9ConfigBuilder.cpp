@@ -1619,9 +1619,9 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     appendConfig(mmSPI_PS_INPUT_CNTL_0 + i, spiPsInputCntl.u32All);
   }
 
-  const unsigned numInterp = resUsage->inOutUsage.fs.interpInfo.size() - numPrimInterp;
+  unsigned numInterp = resUsage->inOutUsage.fs.interpInfo.size() - numPrimInterp;
   SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, numInterp);
-  if (gfxIp >= GfxIpVersion{10, 3})
+  if (gfxIp == GfxIpVersion{10, 3})
     SET_REG_GFX10_3_PLUS_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_PRIM_INTERP, numPrimInterp);
 
   if (pointCoordLoc != InvalidValue) {
@@ -1666,7 +1666,6 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
 
   const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
-  (void(gfxIp));                          // Unused
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
   const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);
@@ -1687,7 +1686,11 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
 
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
-  SET_REG_GFX09_1X_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_FAST_LAUNCH, true);
+  {
+    (void(gfxIp)); // Unused
+    static constexpr unsigned LEGACY_FAST_LAUNCH = 0x1;
+    SET_REG_GFX09_1X_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_FAST_LAUNCH, LEGACY_FAST_LAUNCH);
+  }
 
   //
   // Build ES-GS specific configuration

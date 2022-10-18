@@ -928,8 +928,15 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
       builder.addAttribute("amdgpu-lds-spill-limit-dwords", std::to_string(shaderOptions->ldsSpillLimitDwords));
   }
 
+  if (shaderOptions->disableCodeSinking)
+    builder.addAttribute("disable-code-sinking");
+
   if (shaderOptions->nsaThreshold != 0)
     builder.addAttribute("amdgpu-nsa-threshold", std::to_string(shaderOptions->nsaThreshold));
+
+  // Disable backend heuristics which would allow shaders to have lower occupancy.
+  builder.addAttribute("amdgpu-memory-bound", "false");
+  builder.addAttribute("amdgpu-wave-limiter", "false");
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396807
   // Old version of the code

@@ -384,6 +384,7 @@ private:
                                              const std::function<Value *(Value *)> &createImageOp);
 
   Function *createLibraryEntryFunc();
+
   // ========================================================================================================================
   // Wrapper method for easier access to pipeline options.
   // @returns : Pointer to the pipeline options of the current LLPC context.
