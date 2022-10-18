@@ -66,6 +66,7 @@ static const unsigned GetRealTime = 0x83; // [7] = 1, [6:0] = 3
 
 // Enumerates address spaces valid for AMD GPU (similar to LLVM header AMDGPU.h)
 enum AddrSpace {
+  ADDR_SPACE_FLAT = 0,               // Flat memory
   ADDR_SPACE_GLOBAL = 1,             // Global memory
   ADDR_SPACE_REGION = 2,             // GDS memory
   ADDR_SPACE_LOCAL = 3,              // Local memory
@@ -73,6 +74,7 @@ enum AddrSpace {
   ADDR_SPACE_PRIVATE = 5,            // Private memory
   ADDR_SPACE_CONST_32BIT = 6,        // Constant 32-bit memory
   ADDR_SPACE_BUFFER_FAT_POINTER = 7, // Buffer fat-pointer memory
+  ADDR_SPACE_MAX = ADDR_SPACE_BUFFER_FAT_POINTER
 };
 
 // Enumerates the target for "export" instruction.
