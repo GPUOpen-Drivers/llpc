@@ -15,13 +15,13 @@ jobs:
           git checkout ${GITHUB_SHA}
       - name: Generate Docker base image tag string
         run: |
-          echo "IMAGE_TAG=us-docker.pkg.dev/stadia-open-source/amdvlk-public-ci/amdvlk_release_clang:nightly" \
+          echo "IMAGE_TAG=amdvlk_release_clang:nightly" \
             | tee -a $GITHUB_ENV
       - name: Fetch the latest prebuilt AMDVLK
-        run: docker pull "$IMAGE_TAG"
+        run: docker pull "${{secrets.DOCKER_USR}}/$IMAGE_TAG"
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc-clang-tidy.Dockerfile
-                            --build-arg AMDVLK_IMAGE="$IMAGE_TAG"
+                            --build-arg AMDVLK_IMAGE="${{secrets.DOCKER_USR}}/$IMAGE_TAG"
                             --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
                             --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                             --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"

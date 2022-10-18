@@ -14,14 +14,12 @@ jobs:
       fail-fast: false
       matrix:
         host-os:        ["ubuntu-20.04"]
-        image-template: ["us-docker.pkg.dev/stadia-open-source/amdvlk-public-ci/amdvlk_%s%s:nightly"]
+        image-template: ["amdvlk_%s%s:nightly"]
         branch:         [dev]
         config:         [Release]
         feature-set:    ["+gcc", "+gcc+assertions",
                          "+clang", "+clang+coverage",
                          "+clang+shadercache+coverage+assertions",
-                         "+clang+shadercache+ubsan+asan",
-                         "+clang+shadercache+ubsan+asan+assertions",
                          "+clang+shadercache+tsan"]
         generator:      [Ninja]
     steps:
@@ -36,16 +34,6 @@ jobs:
         run: |
           git clone https://github.com/${GITHUB_REPOSITORY}.git .
           git checkout ${GITHUB_SHA}
-      - name: Authenticate with Google Cloud
-        id: 'auth'
-        uses: 'google-github-actions/auth@v0'
-        with:
-          credentials_json: '${{ secrets.GCR_KEY }}'
-      - name: Setup Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
-      - name: Setup Docker to use the Google Cloud Artifact Registry
-        run: |
-          gcloud auth configure-docker us-docker.pkg.dev --quiet
       - name: Generate Docker image tag string
         run: |
           CONFIG_LOWER=$(echo "${{ matrix.config }}" | tr "[:upper:]" "[:lower:]")
@@ -59,11 +47,10 @@ jobs:
                          --build-arg CONFIG="${{ matrix.config }}" \
                          --build-arg FEATURES="${{ matrix.feature-set }}" \
                          --build-arg GENERATOR="${{ matrix.generator }}" \
-                         --tag "$IMAGE_TAG"
+                         --tag "${{secrets.DOCKER_USR}}/$IMAGE_TAG"
+      - name: Login Docker
+        run: |
+          echo "${{ secrets.DOCKER_PWD }}" | docker login -u ${{ secrets.DOCKER_USR }} --password-stdin
       - name: Push the new image
         run: |
-          docker push "$IMAGE_TAG"
-      - name: Garbage collect old docker images
-        if: matrix.feature-set == '+clang'
-        run: |
-          python3 script/gc-amdvlk-docker-images.py
+          docker push "${{secrets.DOCKER_USR}}/$IMAGE_TAG"
