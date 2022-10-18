@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 55
+#define LLPC_INTERFACE_MAJOR_VERSION 56
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,9 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     56.1 | Add struct UberFetchShaderAttribInfo                                                                  |
+//  |     56.0 | Move maxRayLength to RtState, add traceWaveDensityThreshold to RtState                                |
+//  |     55.2 | Add pipeline layout API hash to all PipelineBuildInfos                                                |
 //  |     55.0 | Remove isInternalRtShader from module options                                                         |
 //  |     54.9 | Add internalRtShaders to PipelineOptions to allow for dumping this data                               |
 //  |     54.6 | Add reverseThreadGroup to PipelineOptions                                                             |
@@ -317,7 +320,7 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
   InlineBuffer,                 ///< Push constant with binding
-  Count, ///< Count of resource mapping node types.
+  Count,                        ///< Count of resource mapping node types.
 };
 
 /// Enumerates part-pipeline stages of compilation.
@@ -470,8 +473,10 @@ struct PipelineOptions {
   ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the
                                                          ///  features of VK_EXT_robustness2.
 #if VKI_RAY_TRACING
-  bool enableRayQuery;  ///< If set, ray query is enabled
+  bool enableRayQuery; ///< If set, ray query is enabled
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 56
   float rtMaxRayLength; ///< Overrides the rayTMax value
+#endif
 #endif
   bool reserved1f;            /// Reserved for future functionality
   bool enableInterpModePatch; ///< If set, per-sample interpolation for nonperspective and smooth input is enabled
@@ -696,6 +701,9 @@ struct PipelineShaderOptions {
   /// Use the LLVM backend's SI scheduler instead of the default scheduler.
   bool useSiScheduler;
 
+  /// Disable various LLVM IR code sinking passes.
+  bool disableCodeSinking;
+
   // Whether update descriptor root offset in ELF
   bool updateDescInElf;
 
@@ -842,6 +850,36 @@ struct SamplerYCbCrConversionMetaData {
   } word5;
 };
 
+/// Represents assistant info for each vertex attribute in uber fetch shader
+struct UberFetchShaderAttribInfo {
+  uint32_t binding : 8;       ///< Attribute binding in vertex buffer table
+  uint32_t perInstance : 1;   ///< Whether vertex input rate is per-instance
+  uint32_t isCurrent : 1;     ///< Whether it is a current attribute
+  uint32_t isPacked : 1;      ///< Whether it is a packed format
+  uint32_t isFixed : 1;       ///< Whether it is a fixed format
+  uint32_t componentSize : 4; ///< Byte size per component
+  uint32_t componentMask : 4; ///< Component mask of this attribute.
+  uint32_t isBgra : 1;        ///< Whether is BGRA format
+  uint32_t reserved : 11;     ///< reserved bits in DWORD 0
+  uint32_t offset;            ///< Attribute offset
+  uint32_t instanceDivisor;   ///< Reciprocal of instance divisor
+  uint32_t bufferFormat;      ///< Buffer format info. it is a copy of buffer SRD DWORD3.
+};
+
+/// Represents the bit field info of struct BilUberFetchShaderAttribInfo
+constexpr uint32_t UberFetchShaderAttribMaskBinding = 0x00000FFu;
+constexpr uint32_t UberFetchShaderAttribMaskPerInstance = 0x0000100u;
+constexpr uint32_t UberFetchShaderAttribMaskIsCurrent = 0x0000200u;
+constexpr uint32_t UberFetchShaderAttribMaskIsPacked = 0x0000400u;
+constexpr uint32_t UberFetchShaderAttribMaskIsFixed = 0x0000800u;
+constexpr uint32_t UberFetchShaderAttribMaskComponentSize = 0x000F000u;
+constexpr uint32_t UberFetchShaderAttribShiftComponentSize = 12u;
+constexpr uint32_t UberFetchShaderAttribMaskComponent0 = 0x0010000u;
+constexpr uint32_t UberFetchShaderAttribMaskComponent1 = 0x0020000u;
+constexpr uint32_t UberFetchShaderAttribMaskComponent2 = 0x0040000u;
+constexpr uint32_t UberFetchShaderAttribMaskComponent3 = 0x0080000u;
+constexpr uint32_t UberFetchShaderAttribMaskIsBgra = 0x0100000u;
+
 /// Represents info of a shader attached to a to-be-built pipeline.
 struct PipelineShaderInfo {
   const void *pModuleData;                         ///< Shader module data used for pipeline building (opaque)
@@ -942,7 +980,9 @@ union RayTracingSystemValueUsage {
 
 /// Represents ray-tracing shader export configuration
 struct RayTracingShaderExportConfig {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 56
   float maxRayLength; // Raytracing rayDesc.tMax override
+#endif
 
   unsigned indirectCallingConvention; ///< Indirect calling convention
   struct {
@@ -1007,6 +1047,10 @@ struct RtState {
   bool enableRayTracingCounters;                 ///< Enable using ray tracing counters
   bool enableOptimalLdsStackSizeForIndirect;     ///< Enable optimal LDS stack size for indirect shaders
   bool enableOptimalLdsStackSizeForUnified;      ///< Enable optimal LDS stack size for unified shaders
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 56
+  float maxRayLength; ///< Raytracing rayDesc.tMax override
+#endif
+  float traceRayWaveDensityThreshold; ///< Controls the threshold of trace ray wave density for TraceLongRayAMD
 
   GpurtFuncTable gpurtFuncTable; ///< GPURT function table
 };
@@ -1028,6 +1072,7 @@ struct GraphicsPipelineBuildInfo {
   PipelineShaderInfo fs;  ///< Fragment shader
 
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
+  uint64_t pipelineLayoutApiHash;      ///< Pipeline Layout Api Hash
 
   /// Create info of vertex input state
   const VkPipelineVertexInputStateCreateInfo *pVertexInput;
@@ -1098,6 +1143,7 @@ struct ComputePipelineBuildInfo {
   unsigned deviceIndex;                ///< Device index for device group
   PipelineShaderInfo cs;               ///< Compute shader
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
+  uint64_t pipelineLayoutApiHash;      ///< Pipeline Layout Api Hash
   PipelineOptions options;             ///< Per pipeline tuning options
   bool unlinked;                       ///< True to build an "unlinked" half-pipeline ELF
 #if VKI_RAY_TRACING
@@ -1118,6 +1164,7 @@ struct RayTracingPipelineBuildInfo {
   unsigned shaderCount;                                      ///< Count of shader info
   PipelineShaderInfo *pShaders;                              ///< An array of shader info
   ResourceMappingData resourceMapping;                       ///< Resource mapping graph and static descriptor values
+  uint64_t pipelineLayoutApiHash;                            ///< Pipeline Layout Api Hash
   unsigned shaderGroupCount;                                 ///< Count of shader group
   const VkRayTracingShaderGroupCreateInfoKHR *pShaderGroups; ///< An array of shader group
   BinaryData shaderTraceRay;                                 ///< Trace-ray SPIR-V binary data

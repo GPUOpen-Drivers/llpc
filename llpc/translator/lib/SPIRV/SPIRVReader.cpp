@@ -2626,7 +2626,6 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   // generating the code to get the descriptor pointer(s).
   SPIRVWord binding = 0;
   unsigned descriptorSet = 0;
-
   spvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
   spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
 
@@ -7451,7 +7450,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       SPIRVWord binding = SPIRVID_INVALID;
       unsigned descSet = SPIRVID_INVALID;
       bool hasBinding = bv->hasDecorate(DecorationBinding, 0, &binding);
-      bool hasDescSet = bv->hasDecorate(DecorationDescriptorSet, 0, &descSet);
+      bool hasDescSet = false;
+      hasDescSet = bv->hasDecorate(DecorationDescriptorSet, 0, &descSet);
 
       // TODO: Currently, set default binding and descriptor to 0. Will be
       // changed later.

@@ -95,6 +95,8 @@ public:
 
   const ResourceMappingData *getResourceMapping() const { return m_pipelineContext->getResourceMapping(); }
 
+  const uint64_t getPipelineLayoutApiHash() const { return m_pipelineContext->getPipelineLayoutApiHash(); }
+
   const void *getPipelineBuildInfo() const { return m_pipelineContext->getPipelineBuildInfo(); }
 
   unsigned getShaderStageMask() const { return m_pipelineContext->getShaderStageMask(); }

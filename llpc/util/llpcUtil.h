@@ -35,6 +35,7 @@
 #include "vkgcDefs.h"
 #include "vkgcMetroHash.h"
 #include "vkgcUtil.h"
+#include "lgc/CommonDefs.h"
 #include "lgc/EnumIterator.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"

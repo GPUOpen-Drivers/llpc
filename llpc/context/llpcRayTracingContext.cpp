@@ -51,6 +51,7 @@ RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelin
       m_entryName(""), m_payloadMaxSize(pipelineInfo->payloadSizeMaxInLib), m_callableDataMaxSize(0),
       m_attributeDataMaxSize(pipelineInfo->attributeSizeMaxInLib) {
   m_resourceMapping = pipelineInfo->resourceMapping;
+  m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;
 }
 
 // =====================================================================================================================

@@ -2998,7 +2998,8 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher, false);
     hasher.Update(pipelineInfo->iaState.deviceIndex);
 
-    PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), &hasher, stage);
+    PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), context->getPipelineLayoutApiHash(),
+                                                     &hasher, stage);
 
     // Update input/output usage (provided by middle-end caller of this callback).
     hasher.Update(stageHashes[getLgcShaderStage(stage)].data(), stageHashes[getLgcShaderStage(stage)].size());
