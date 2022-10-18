@@ -43,10 +43,10 @@ jobs:
           CONFIG_TAG=$(printf "%s%s" "$CONFIG_LOWER" "$FEATURES_LOWER")
           echo "CONFIG_TAG=$CONFIG_TAG" | tee -a $GITHUB_ENV
       - name: Fetch the latest prebuilt AMDVLK
-        run: docker pull "${{secrets.DOCKER_USR}}/$IMAGE_TAG"
+        run: docker pull "qiaojbao/$IMAGE_TAG"
       - name: Build and Test with Docker
         run: docker build . --file docker/llpc.Dockerfile
-                             --build-arg AMDVLK_IMAGE="${{secrets.DOCKER_USR}}/$IMAGE_TAG"
+                             --build-arg AMDVLK_IMAGE="qiaojbao/$IMAGE_TAG"
                              --build-arg LLPC_REPO_NAME="${GITHUB_REPOSITORY}"
                              --build-arg LLPC_REPO_REF="${GITHUB_REF}"
                              --build-arg LLPC_REPO_SHA="${GITHUB_SHA}"
