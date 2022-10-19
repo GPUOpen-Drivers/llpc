@@ -5,7 +5,7 @@ IncludeBlocks: Merge
 IncludeCategories:
   - Regex:           '^"lgc/'
     Priority:        2
-  - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
+  - Regex:           '^"(llvm|llvm-c|llvm-dialects|clang|clang-c)/'
     Priority:        3
   - Regex:           '^(<|"(gtest|gmock|isl|json)/)'
     Priority:        4

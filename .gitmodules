@@ -1,0 +1,3 @@
+[submodule "imported/llvm-dialects"]
+	path = imported/llvm-dialects
+	url = ../llvm-dialects
