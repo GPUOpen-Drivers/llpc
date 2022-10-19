@@ -73,7 +73,7 @@ void Pipeline::markShaderEntryPoint(Function *func, ShaderStage stage) {
 }
 
 // =====================================================================================================================
-// Get a function's shader stage, as marked by markShaderEntryPoint.
+// Get a function's shader stage.
 //
 // @param func : Function to check
 // @returns stage : Shader stage, or ShaderStageInvalid if none
