@@ -115,9 +115,6 @@ static bool isIsaText(StringRef data) {
 int main(int argc, char **argv) {
   const char *progName = sys::path::filename(argv[0]).data();
   LLVMContext context;
-  // Temporarily disable opaque pointers (llvm is making opaque the default).
-  // TODO: Remove this once work complete on transition to opaque pointers.
-  context.setOpaquePointers(OpaquePointers);
   LgcContext::initialize();
 
   // Set our category on options that we want to show in -help, and hide other options.
@@ -146,6 +143,10 @@ int main(int argc, char **argv) {
                                    "files are the same as in a link operation, but lgc instead compiles the glue\n"
                                    "shader of the given one-based index that would be used in the link.\n";
   cl::ParseCommandLineOptions(argc, argv, commandDesc);
+
+  // Temporarily disable opaque pointers (llvm is making opaque the default).
+  // TODO: Remove this once work complete on transition to opaque pointers.
+  context.setOpaquePointers(OpaquePointers);
 
   // Find the -mcpu option and get its value.
   auto mcpu = opts.find("mcpu");
