@@ -47,6 +47,7 @@ target_compile_definitions(lgc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CP
 target_include_directories(lgc
 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../interface
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
 
 set_compiler_options(lgc ${LLPC_ENABLE_WERROR})

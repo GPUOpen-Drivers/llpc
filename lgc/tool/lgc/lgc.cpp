@@ -31,10 +31,19 @@
 
 #include "lgc/ElfLinker.h"
 #include "lgc/LgcContext.h"
+#include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
+#include "lgc/patch/Patch.h"
+#include "lgc/state/PipelineShaders.h"
+#include "lgc/state/PipelineState.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/BinaryFormat/ELF.h"
+#include "llvm/Bitcode/BitcodeWriterPass.h"
+#include "llvm/CodeGen/CommandFlags.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
@@ -63,6 +72,11 @@ cl::opt<unsigned> Glue("glue", cl::desc("Compile a single glue shader instead of
 cl::opt<bool> Link("l", cl::cat(LgcCategory),
                    cl::desc("Link shader/part-pipeline ELFs. First input filename is "
                             "IR providing pipeline state; subsequent ones are ELF files."));
+
+// -passes: pass pipeline
+cl::opt<std::string> Passes("passes", cl::cat(LgcCategory), cl::value_desc("passes"),
+                            cl::desc("Run the given pass pipeline, described using the same syntax as for LLVM's opt"
+                                     "tool"));
 
 // -o: output filename
 cl::opt<std::string> OutFileName("o", cl::cat(LgcCategory), cl::desc("Output filename ('-' for stdout)"),
@@ -107,6 +121,53 @@ static bool isIsaText(StringRef data) {
   // with a tab character.
   return data.startswith("\t");
 }
+
+// =====================================================================================================================
+// Run the pass pipeline given by the -passes command-line option and output the final IR to outStream.
+//
+// @param pipeline : The LGC pipeline for the module
+// @param module : The module
+// @param outStream : The output stream for the final IR
+static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_stream &outStream) {
+  // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
+  LgcContext *lgcContext = pipeline.getLgcContext();
+  std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(lgcContext->getTargetMachine()));
+  passMgr->registerFunctionAnalysis([&] { return lgcContext->getTargetMachine()->getTargetIRAnalysis(); });
+  passMgr->registerModuleAnalysis([&] { return PipelineShaders(); });
+  passMgr->registerModuleAnalysis([&] { return PipelineStateWrapper(static_cast<PipelineState *>(&pipeline)); });
+  Patch::registerPasses(*passMgr);
+
+  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
+  lgcContext->preparePassManager(*passMgr);
+
+  PassBuilder passBuilder(lgcContext->getTargetMachine(), PipelineTuningOptions(), None,
+                          &passMgr->getInstrumentationCallbacks());
+  Patch::registerPasses(passBuilder);
+
+  if (auto err = passBuilder.parsePassPipeline(*passMgr, Passes)) {
+    errs() << "Failed to parse -passes: " << toString(std::move(err)) << '\n';
+    return false;
+  }
+
+  // This mode of the tool is only ever used for development and testing, so unconditionally run the verifier on the
+  // final output.
+  passMgr->addPass(VerifierPass());
+
+  switch (codegen::getFileType()) {
+  case CGFT_AssemblyFile:
+    passMgr->addPass(PrintModulePass(outStream));
+    break;
+  case CGFT_ObjectFile:
+    passMgr->addPass(BitcodeWriterPass(outStream));
+    break;
+  case CGFT_Null:
+    break;
+  }
+
+  passMgr->run(module);
+  return true;
+}
+
 // =====================================================================================================================
 // Main code of LGC standalone tool
 //
@@ -141,7 +202,12 @@ int main(int argc, char **argv) {
                                    "\n"
                                    "If the -glue option is given in addition to the -l (link) option, then input\n"
                                    "files are the same as in a link operation, but lgc instead compiles the glue\n"
-                                   "shader of the given one-based index that would be used in the link.\n";
+                                   "shader of the given one-based index that would be used in the link.\n"
+                                   "\n"
+                                   "If the -passes option is given, modules are instead run through a pass pipeline\n"
+                                   "as defined by the -passes argument, which uses the same syntax as LLVM's opt\n"
+                                   "tool, and the resulting IR is output as assembly or bitcode. Passes from both\n"
+                                   " LLVM and LGC can be used.\n";
   cl::ParseCommandLineOptions(argc, argv, commandDesc);
 
   // Temporarily disable opaque pointers (llvm is making opaque the default).
@@ -329,6 +395,12 @@ int main(int argc, char **argv) {
           if (!elfLinker->link(outStream))
             err = pipeline->getLastError();
         }
+      } else if (Passes.getNumOccurrences() > 0) {
+        // Run a pass pipeline.
+        pipeline->setStateFromModule(&*module);
+
+        if (!runPassPipeline(*pipeline, *module, outStream))
+          return 1;
       } else {
         // Run the middle-end compiler.
         if (!pipeline->generate(std::move(module), outStream, nullptr, {}, true))

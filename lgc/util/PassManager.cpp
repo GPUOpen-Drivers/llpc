@@ -101,6 +101,7 @@ public:
   void registerPass(StringRef passName, StringRef className) override;
   void run(Module &module) override;
   void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
+  PassInstrumentationCallbacks &getInstrumentationCallbacks() override { return m_instrumentationCallbacks; }
 
 private:
   void registerCallbacks();
