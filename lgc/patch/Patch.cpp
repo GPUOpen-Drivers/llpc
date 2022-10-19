@@ -60,6 +60,7 @@
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
@@ -227,6 +228,73 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 void Patch::registerPasses(lgc::PassManager &passMgr) {
 #define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, CLASS::name());
 #include "PassRegistry.inc"
+}
+
+// =====================================================================================================================
+// Register all the patching passes into the given pass manager
+//
+// @param [in/out] passMgr : Pass manager
+void Patch::registerPasses(PassBuilder &passBuilder) {
+#define HANDLE_PASS(NAME, CLASS)                                                                                       \
+  if (innerPipeline.empty() && name == NAME) {                                                                         \
+    passMgr.addPass(CLASS());                                                                                          \
+    return true;                                                                                                       \
+  }
+
+  auto checkNameWithParams = [](StringRef name, StringRef passName, StringRef &params) -> bool {
+    params = name;
+    if (!params.consume_front(passName))
+      return false;
+    if (params.empty())
+      return true;
+    if (!params.consume_front("<"))
+      return false;
+    if (!params.consume_back(">"))
+      return false;
+    return true;
+  };
+
+#define HANDLE_PASS_WITH_PARSER(NAME, CLASS)                                                                           \
+  if (innerPipeline.empty() && checkNameWithParams(name, NAME, params))                                                \
+    return CLASS::parsePass(params, passMgr);
+
+  passBuilder.registerPipelineParsingCallback(
+      [=](StringRef name, ModulePassManager &passMgr, ArrayRef<PassBuilder::PipelineElement> innerPipeline) {
+        StringRef params;
+#define LLPC_PASS(NAME, CLASS) /* */
+#define LLPC_MODULE_PASS HANDLE_PASS
+#define LLPC_MODULE_PASS_WITH_PARSER HANDLE_PASS_WITH_PARSER
+#include "PassRegistry.inc"
+
+        return false;
+      });
+
+  passBuilder.registerPipelineParsingCallback(
+      [=](StringRef name, FunctionPassManager &passMgr, ArrayRef<PassBuilder::PipelineElement> innerPipeline) {
+        StringRef params;
+        (void)params;
+#define LLPC_PASS(NAME, CLASS) /* */
+#define LLPC_FUNCTION_PASS HANDLE_PASS
+#define LLPC_FUNCTION_PASS_WITH_PARSER HANDLE_PASS_WITH_PARSER
+#include "PassRegistry.inc"
+
+        return false;
+      });
+
+  passBuilder.registerPipelineParsingCallback(
+      [=](StringRef name, LoopPassManager &passMgr, ArrayRef<PassBuilder::PipelineElement> innerPipeline) {
+        StringRef params;
+        (void)params;
+#define LLPC_PASS(NAME, CLASS) /* */
+#define LLPC_LOOP_PASS HANDLE_PASS
+#define LLPC_LOOP_PASS_WITH_PARSER HANDLE_PASS_WITH_PARSER
+#include "PassRegistry.inc"
+
+        return false;
+      });
+
+#undef HANDLE_PASS
+#undef HANDLE_PASS_WITH_PARSER
 }
 
 // =====================================================================================================================

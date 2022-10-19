@@ -86,6 +86,19 @@ BuilderReplayer::BuilderReplayer(Pipeline *pipeline)
 }
 
 // =====================================================================================================================
+// Parser callback for adding this pass from a textually described pass pipeline.
+//
+// @param params : Parameters to the pass (in angle brackets)
+// @param passMgr : The pass manager to which the pass should be added
+bool BuilderReplayer::parsePass(llvm::StringRef params, llvm::ModulePassManager &passMgr) {
+  if (!params.empty())
+    return false;
+
+  passMgr.addPass(BuilderReplayer(nullptr));
+  return true;
+}
+
+// =====================================================================================================================
 // Constructor
 //
 // @param pipeline : Pipeline object

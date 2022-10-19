@@ -36,6 +36,7 @@
 
 namespace llvm {
 
+class PassBuilder;
 class PassRegistry;
 
 namespace legacy {
@@ -135,6 +136,9 @@ public:
 
   // Register all the patching passes into the given pass manager
   static void registerPasses(lgc::PassManager &passMgr);
+
+  // Register all the patching passes into the given pass builder
+  static void registerPasses(llvm::PassBuilder &passBuilder);
 
   static llvm::GlobalVariable *getLdsVariable(PipelineState *pipelineState, llvm::Module *module);
 

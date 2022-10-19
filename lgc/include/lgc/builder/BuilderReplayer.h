@@ -48,6 +48,8 @@ public:
 
   static llvm::StringRef name() { return "Replay LLPC builder calls"; }
 
+  static bool parsePass(llvm::StringRef params, llvm::ModulePassManager &passMgr);
+
 private:
   void replayCall(unsigned opcode, llvm::CallInst *call);
 

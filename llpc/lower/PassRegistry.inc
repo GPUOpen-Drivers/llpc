@@ -29,21 +29,26 @@
  ***********************************************************************************************************************
  */
 
-LLPC_PASS("llpc-spirv-lower-access-chain", SpirvLowerAccessChain)
-LLPC_PASS("llpc-spirv-lower-const-immediate-store", SpirvLowerConstImmediateStore)
-LLPC_PASS("llpc-spirv-lower-inst-meta-remove", SpirvLowerInstMetaRemove)
-LLPC_PASS("llpc-spirv-lower-terminator", SpirvLowerTerminator)
-LLPC_PASS("llpc-spirv-lower-translator", SpirvLowerTranslator)
-LLPC_PASS("llpc-spirv-lower-global", SpirvLowerGlobal)
-LLPC_PASS("llpc-spirv-lower-math-const-folding", SpirvLowerMathConstFolding)
-LLPC_PASS("llpc-spirv-lower-math-float-op", SpirvLowerMathFloatOp)
-LLPC_PASS("llpc-spirv-lower-memory-op", SpirvLowerMemoryOp)
+#ifndef LLPC_MODULE_PASS
+#define LLPC_MODULE_PASS LLPC_PASS
+#endif
+
+LLPC_MODULE_PASS("llpc-spirv-lower-access-chain", SpirvLowerAccessChain)
+LLPC_MODULE_PASS("llpc-spirv-lower-const-immediate-store", SpirvLowerConstImmediateStore)
+LLPC_MODULE_PASS("llpc-spirv-lower-inst-meta-remove", SpirvLowerInstMetaRemove)
+LLPC_MODULE_PASS("llpc-spirv-lower-terminator", SpirvLowerTerminator)
+LLPC_MODULE_PASS("llpc-spirv-lower-translator", SpirvLowerTranslator)
+LLPC_MODULE_PASS("llpc-spirv-lower-global", SpirvLowerGlobal)
+LLPC_MODULE_PASS("llpc-spirv-lower-math-const-folding", SpirvLowerMathConstFolding)
+LLPC_MODULE_PASS("llpc-spirv-lower-math-float-op", SpirvLowerMathFloatOp)
+LLPC_MODULE_PASS("llpc-spirv-lower-memory-op", SpirvLowerMemoryOp)
 #if VKI_RAY_TRACING
-LLPC_PASS("llpc-spirv-lower-ray-tracing-intrinsics", SpirvLowerRayTracingIntrinsics)
-LLPC_PASS("llpc-spirv-lower-ray-query", SpirvLowerRayQuery)
-LLPC_PASS("llpc-spirv-lower-ray-tracing", SpirvLowerRayTracing)
-LLPC_PASS("llpc-spirv-lower-ray-query-post-inline", SpirvLowerRayQueryPostInline)
-LLPC_PASS("llpc-spirv-lower-ray-tracing-builtin", SpirvLowerRayTracingBuiltIn)
+LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing-intrinsics", SpirvLowerRayTracingIntrinsics)
+LLPC_MODULE_PASS("llpc-spirv-lower-ray-query", SpirvLowerRayQuery)
+LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing", SpirvLowerRayTracing)
+LLPC_MODULE_PASS("llpc-spirv-lower-ray-query-post-inline", SpirvLowerRayQueryPostInline)
+LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing-builtin", SpirvLowerRayTracingBuiltIn)
 #endif
 
 #undef LLPC_PASS
+#undef LLPC_MODULE_PASS

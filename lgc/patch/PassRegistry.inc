@@ -29,26 +29,43 @@
  ***********************************************************************************************************************
  */
 
-LLPC_PASS("lgc-builder-replayer", BuilderReplayer)
+#ifndef LLPC_LOOP_PASS
+#define LLPC_LOOP_PASS LLPC_PASS
+#endif
+#ifndef LLPC_FUNCTION_PASS
+#define LLPC_FUNCTION_PASS LLPC_PASS
+#endif
+#ifndef LLPC_MODULE_PASS
+#define LLPC_MODULE_PASS LLPC_PASS
+#endif
+#ifndef LLPC_MODULE_PASS_WITH_PARSER
+#define LLPC_MODULE_PASS_WITH_PARSER LLPC_MODULE_PASS
+#endif
 
-LLPC_PASS("lgc-patch-resource-collect", PatchResourceCollect)
-LLPC_PASS("lgc-patch-initialize-workgroup-memory", PatchInitializeWorkgroupMemory)
-LLPC_PASS("lgc-patch-image-derivatives", PatchImageDerivatives)
-LLPC_PASS("lgc-patch-in-out-import-export", PatchInOutImportExport)
-LLPC_PASS("lgc-patch-invariant-loads", PatchInvariantLoads)
-LLPC_PASS("lgc-patch-setup-target-features", PatchSetupTargetFeatures)
-LLPC_PASS("lgc-patch-copy-shader", PatchCopyShader)
-LLPC_PASS("lgc-patch-prepare-pipeline-abi", PatchPreparePipelineAbi)
-LLPC_PASS("lgc-patch-read-first-lane", PatchReadFirstLane)
-LLPC_PASS("lgc-patch-llvm-ir-inclusion", PatchLlvmIrInclusion)
-LLPC_PASS("lgc-patch-wave-size-adjust", PatchWaveSizeAdjust)
-LLPC_PASS("lgc-patch-peephole-opt", PatchPeepholeOpt)
-LLPC_PASS("lgc-patch-entry-point-mutate", PatchEntryPointMutate)
-LLPC_PASS("lgc-patch-check-shader-cache", PatchCheckShaderCache)
-LLPC_PASS("lgc-patch-loop-metadata", PatchLoopMetadata)
-LLPC_PASS("lgc-patch-buffer-op", PatchBufferOp)
-LLPC_PASS("lgc-patch-workarounds", PatchWorkarounds)
-LLPC_PASS("lgc-patch-load-scalarizer", PatchLoadScalarizer)
-LLPC_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
+LLPC_MODULE_PASS_WITH_PARSER("lgc-builder-replayer", BuilderReplayer)
+
+LLPC_MODULE_PASS("lgc-patch-resource-collect", PatchResourceCollect)
+LLPC_MODULE_PASS("lgc-patch-initialize-workgroup-memory", PatchInitializeWorkgroupMemory)
+LLPC_MODULE_PASS("lgc-patch-image-derivatives", PatchImageDerivatives)
+LLPC_MODULE_PASS("lgc-patch-in-out-import-export", PatchInOutImportExport)
+LLPC_FUNCTION_PASS("lgc-patch-invariant-loads", PatchInvariantLoads)
+LLPC_MODULE_PASS("lgc-patch-setup-target-features", PatchSetupTargetFeatures)
+LLPC_MODULE_PASS("lgc-patch-copy-shader", PatchCopyShader)
+LLPC_MODULE_PASS("lgc-patch-prepare-pipeline-abi", PatchPreparePipelineAbi)
+LLPC_FUNCTION_PASS("lgc-patch-read-first-lane", PatchReadFirstLane)
+LLPC_MODULE_PASS("lgc-patch-llvm-ir-inclusion", PatchLlvmIrInclusion)
+LLPC_MODULE_PASS("lgc-patch-wave-size-adjust", PatchWaveSizeAdjust)
+LLPC_FUNCTION_PASS("lgc-patch-peephole-opt", PatchPeepholeOpt)
+LLPC_MODULE_PASS("lgc-patch-entry-point-mutate", PatchEntryPointMutate)
+LLPC_MODULE_PASS("lgc-patch-check-shader-cache", PatchCheckShaderCache)
+LLPC_LOOP_PASS("lgc-patch-loop-metadata", PatchLoopMetadata)
+LLPC_FUNCTION_PASS("lgc-patch-buffer-op", PatchBufferOp)
+LLPC_MODULE_PASS("lgc-patch-workarounds", PatchWorkarounds)
+LLPC_FUNCTION_PASS("lgc-patch-load-scalarizer", PatchLoadScalarizer)
+LLPC_MODULE_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
 
 #undef LLPC_PASS
+#undef LLPC_LOOP_PASS
+#undef LLPC_FUNCTION_PASS
+#undef LLPC_MODULE_PASS
+#undef LLPC_MODULE_PASS_WITH_PARSER

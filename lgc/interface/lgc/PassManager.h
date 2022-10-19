@@ -63,6 +63,8 @@ public:
   virtual void run(llvm::Module &module) = 0;
   virtual void setPassIndex(unsigned *passIndex) = 0;
 
+  virtual llvm::PassInstrumentationCallbacks &getInstrumentationCallbacks() = 0;
+
 protected:
   llvm::FunctionAnalysisManager m_functionAnalysisManager;
   llvm::ModuleAnalysisManager m_moduleAnalysisManager;
