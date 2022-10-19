@@ -46,7 +46,7 @@ add_lit_testsuite(check-lgc "Running the LGC regression tests"
 )
 set_target_properties(check-lgc PROPERTIES FOLDER "Tests")
 
-add_lit_testsuites(LLVM ${CMAKE_CURRENT_SOURCE_DIR}
+add_lit_testsuites(LGC ${CMAKE_CURRENT_SOURCE_DIR}
   ${exclude_from_check_all}
-  DEPENDS ${LLVM_TEST_DEPENDS} llvm-mc
+  DEPENDS ${LGC_TEST_DEPENDS}
 )
