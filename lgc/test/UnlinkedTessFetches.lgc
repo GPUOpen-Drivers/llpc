@@ -6,7 +6,7 @@
 ; CHECK: IR Dump After Patch LLVM for preparing pipeline ABI
 ; CHECK: define dllexport amdgpu_hs void @_amdgpu_hs_main_fetchless({{.*}}, <4 x float> [[vertInput:%[0-9]*]])
 ; CHECK: call amdgpu_ls void @_amdgpu_ls_main_fetchless({{.*}}, <4 x float> [[vertInput]])
-; CHECK: define internal dllexport amdgpu_ls void @_amdgpu_ls_main_fetchless({{.*}}, <4 x float> %vertex{{[0-9]*.[0-9]*}})
+; CHECK: define internal{{.*}} amdgpu_ls void @_amdgpu_ls_main_fetchless({{.*}}, <4 x float> %vertex{{[0-9]*.[0-9]*}})
 
 ; ModuleID = 'lgcPipeline'
 source_filename = "lgcPipeline"

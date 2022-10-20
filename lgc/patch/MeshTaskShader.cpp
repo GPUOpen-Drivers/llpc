@@ -303,6 +303,7 @@ GlobalVariable *MeshTaskShader::getOrCreateMeshLds(Module *module, unsigned mesh
 // @param pipelineState : Pipeline state
 // @returns : The flag indicating whether flat workgroup ID is used.
 unsigned MeshTaskShader::useFlatWorkgroupId(PipelineState *pipelineState) {
+
   const auto &builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageMesh)->builtInUsage.mesh;
   return builtInUsage.workgroupId || builtInUsage.globalInvocationId;
 }
@@ -430,7 +431,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   //
   //   if (threadIdInSubgroup == 0) {
   //     Write invalid vertex count (~0) to LDS
-  //     Write flat workgroup ID to LDS
+  //     Write flat workgroup ID to LDS (only for GFX10.3)
   //   }
   //
   //   Barrier
@@ -1669,22 +1670,23 @@ void MeshTaskShader::exportPrimitive() {
   auto primitiveIndices = readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
 
   // The second dword is primitive payload, which has the following bit layout specified by HW:
-  //   [31:30] = VRS rate Y
-  //   [29:28] = VRS rate X
-  //   [27:24] = Unused
-  //   [23:20] = Viewport index
-  //   [19:17] = Render target slice index
-  //   [16:0]  = Pipeline primitive ID
+  //
+  //   +------------+------------+---------+----------------+----------------+------------------+
+  //   | VRS Rate Y | VRS Rate X | Unused  | Viewport Index | RT Slice Index | Pipeline Prim ID |
+  //   | [31:30]    | [29:28]    | [27:24] | [23:20]        | [19:17]        | [16:0]           |
+  //   +------------+------------+---------+----------------+----------------+------------------+
   Value *primitivePayload = nullptr;
   Value *primitiveId = nullptr;
   if (builtInUsage.primitiveId) {
-    // [16:0] = Pipeline primitive ID
-    primitiveId = readMeshBuiltInFromLds(BuiltInPrimitiveId);
-    auto primitiveIdMaskAndShift = m_builder->CreateAnd(primitiveId, 0x1FFFF);
-    if (primitivePayload)
-      primitivePayload = m_builder->CreateOr(primitivePayload, primitiveIdMaskAndShift);
-    else
-      primitivePayload = primitiveIdMaskAndShift;
+    if (m_gfxIp.major < 11) {
+      // [16:0] = Pipeline primitive ID
+      primitiveId = readMeshBuiltInFromLds(BuiltInPrimitiveId);
+      auto primitiveIdMaskAndShift = m_builder->CreateAnd(primitiveId, 0x1FFFF);
+      if (primitivePayload)
+        primitivePayload = m_builder->CreateOr(primitivePayload, primitiveIdMaskAndShift);
+      else
+        primitivePayload = primitiveIdMaskAndShift;
+    }
   }
 
   Value *layer = nullptr;
@@ -1700,10 +1702,13 @@ void MeshTaskShader::exportPrimitive() {
   }
 
   if (enableMultiView || builtInUsage.layer) {
-    // [19:17] = Render target slice index
+    // [19:17] = RT slice index
     // When multi-view is enabled, the input view index is treated as the output layer.
-    auto layerMaskAndShift = m_builder->CreateAnd(enableMultiView ? viewIndex : layer, 0x7);
-    layerMaskAndShift = m_builder->CreateShl(layerMaskAndShift, 17);
+    Value *layerMaskAndShift = nullptr;
+    if (m_gfxIp.major < 11) {
+      layerMaskAndShift = m_builder->CreateAnd(enableMultiView ? viewIndex : layer, 0x7);
+      layerMaskAndShift = m_builder->CreateShl(layerMaskAndShift, 17);
+    }
     if (primitivePayload)
       primitivePayload = m_builder->CreateOr(primitivePayload, layerMaskAndShift);
     else
@@ -2098,17 +2103,19 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
     if ((kind == ExportKind::Pos || kind == ExportKind::Prim) && i == exports.size() - 1)
       exportDone = true; // Last export
 
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, valueTy,
-                               {
-                                   m_builder->getInt32(target + exports[i].index), // tgt
-                                   m_builder->getInt32(validMask),                 // en
-                                   values[0],                                      // src0
-                                   values[1] ? values[1] : undef,                  // src1
-                                   values[2] ? values[2] : undef,                  // src2
-                                   values[3] ? values[3] : undef,                  // src3
-                                   m_builder->getInt1(exportDone),                 // done
-                                   m_builder->getFalse(),                          // vm
-                               });
+    {
+      m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, valueTy,
+                                 {
+                                     m_builder->getInt32(target + exports[i].index), // tgt
+                                     m_builder->getInt32(validMask),                 // en
+                                     values[0],                                      // src0
+                                     values[1] ? values[1] : undef,                  // src1
+                                     values[2] ? values[2] : undef,                  // src2
+                                     values[3] ? values[3] : undef,                  // src3
+                                     m_builder->getInt1(exportDone),                 // done
+                                     m_builder->getFalse(),                          // vm
+                                 });
+    }
   }
 }
 
@@ -2153,40 +2160,42 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
   assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
 
   if (!m_meshWorkgroupId) {
-    // flatWorkgroupId = workgroupId.z * dispatchDims.x * dispatchDims.y +
-    //                   workgroupId.y * dispatchDims.x + workgroupId.x
-    //
-    // workgroupId.z = flatWorkgroupId / dispatchDims.x * dispatchDims.y
-    // workgroupId.y = (flatWorkgroupId - dispatchDims.x * dispatchDims.y * workgroupId.z) / dispatchDims.x
-    // workgroupId.x = (flatWorkgroupId - dispatchDims.x * dispatchDims.y * workgroupId.z) -
-    //                 dispatchDims.x * workgroupId.y
-    auto flatWorkgroupId = getMeshFlatWorkgroupId();
+    {
+      // flatWorkgroupId = workgroupId.z * dispatchDims.x * dispatchDims.y +
+      //                   workgroupId.y * dispatchDims.x + workgroupId.x
+      //
+      // workgroupId.z = flatWorkgroupId / dispatchDims.x * dispatchDims.y
+      // workgroupId.y = (flatWorkgroupId - dispatchDims.x * dispatchDims.y * workgroupId.z) / dispatchDims.x
+      // workgroupId.x = (flatWorkgroupId - dispatchDims.x * dispatchDims.y * workgroupId.z) -
+      //                 dispatchDims.x * workgroupId.y
+      auto flatWorkgroupId = getMeshFlatWorkgroupId();
 
-    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
 
-    auto dispatchDims = getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
-    auto dispatchDimX = m_builder->CreateExtractElement(dispatchDims, static_cast<uint64_t>(0));
-    auto dispatchDimY = m_builder->CreateExtractElement(dispatchDims, 1);
-    auto dispatchDimXMulY = m_builder->CreateMul(dispatchDimX, dispatchDimY);
+      auto dispatchDims = getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
+      auto dispatchDimX = m_builder->CreateExtractElement(dispatchDims, static_cast<uint64_t>(0));
+      auto dispatchDimY = m_builder->CreateExtractElement(dispatchDims, 1);
+      auto dispatchDimXMulY = m_builder->CreateMul(dispatchDimX, dispatchDimY);
 
-    auto workgroupIdZ = m_builder->CreateUDiv(flatWorkgroupId, dispatchDimXMulY);
-    workgroupIdZ = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdZ); // Promoted to SGPR
+      auto workgroupIdZ = m_builder->CreateUDiv(flatWorkgroupId, dispatchDimXMulY);
+      workgroupIdZ = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdZ); // Promoted to SGPR
 
-    auto diff = m_builder->CreateMul(dispatchDimXMulY, workgroupIdZ);
-    diff = m_builder->CreateSub(flatWorkgroupId, diff);
-    auto workgroupIdY = m_builder->CreateUDiv(diff, dispatchDimX);
-    workgroupIdY = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdY); // Promoted to SGPR
+      auto diff = m_builder->CreateMul(dispatchDimXMulY, workgroupIdZ);
+      diff = m_builder->CreateSub(flatWorkgroupId, diff);
+      auto workgroupIdY = m_builder->CreateUDiv(diff, dispatchDimX);
+      workgroupIdY = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdY); // Promoted to SGPR
 
-    auto workgroupIdX = m_builder->CreateMul(dispatchDimX, workgroupIdY);
-    workgroupIdX = m_builder->CreateSub(diff, workgroupIdX);
-    workgroupIdX = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdX); // Promoted to SGPR
+      auto workgroupIdX = m_builder->CreateMul(dispatchDimX, workgroupIdY);
+      workgroupIdX = m_builder->CreateSub(diff, workgroupIdX);
+      workgroupIdX = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdX); // Promoted to SGPR
 
-    Value *workgroupId = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
-    workgroupId = m_builder->CreateInsertElement(workgroupId, workgroupIdX, static_cast<uint64_t>(0));
-    workgroupId = m_builder->CreateInsertElement(workgroupId, workgroupIdY, 1);
-    workgroupId = m_builder->CreateInsertElement(workgroupId, workgroupIdZ, 2);
+      Value *workgroupId = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
+      workgroupId = m_builder->CreateInsertElement(workgroupId, workgroupIdX, static_cast<uint64_t>(0));
+      workgroupId = m_builder->CreateInsertElement(workgroupId, workgroupIdY, 1);
+      workgroupId = m_builder->CreateInsertElement(workgroupId, workgroupIdZ, 2);
 
-    m_meshWorkgroupId = workgroupId;
+      m_meshWorkgroupId = workgroupId;
+    }
     m_meshWorkgroupId->setName("workgroupId");
   }
 
@@ -2381,6 +2390,7 @@ Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
 // @param primitiveShadingRate : Primitive shading rate from API
 // @returns : HW-specific shading rate
 Value *MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
+
   assert(m_gfxIp == GfxIpVersion({10, 3})); // Must be GFX10.3
 
   // NOTE: The shading rates have different meanings in HW and LGC interface. GFX10.3 HW supports 2-pixel mode
@@ -2396,7 +2406,7 @@ Value *MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
   xRate2Pixels = m_builder->CreateICmpNE(xRate2Pixels, m_builder->getInt32(0));
   Value *hwXRate = m_builder->CreateSelect(xRate2Pixels, m_builder->getInt32(1), m_builder->getInt32(0));
 
-  // yRate = (primitiveShadingRate & (Vertical2Pixels | Vertical4Pixels)) ? 0x1 : 0x0
+  // hwYRate = (primitiveShadingRate & (Vertical2Pixels | Vertical4Pixels)) ? 0x1 : 0x0
   Value *yRate2Pixels = m_builder->CreateAnd(
       primitiveShadingRate, m_builder->getInt32(ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
   yRate2Pixels = m_builder->CreateICmpNE(yRate2Pixels, m_builder->getInt32(0));

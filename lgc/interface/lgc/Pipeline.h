@@ -194,6 +194,12 @@ struct ShaderOptions {
   // Use the LLVM backend's SI scheduler instead of the default scheduler.
   bool useSiScheduler;
 
+  // Disable various LLVM IR code sinking passes.
+  bool disableCodeSinking;
+
+  // Schedule for latency even if it reduces occupancy.
+  bool favorLatencyHiding;
+
   // Whether update descriptor root offset in ELF
   bool updateDescInElf;
 

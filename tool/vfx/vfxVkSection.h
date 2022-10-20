@@ -139,6 +139,8 @@ public:
 
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableCodeSinking, MemberTypeBool, false);
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, favorLatencyHiding, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, updateDescInElf, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowVaryWaveSize, MemberTypeBool, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);
@@ -166,7 +168,7 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  static const unsigned MemberCount = 33;
+  static const unsigned MemberCount = 34;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;
@@ -593,6 +595,9 @@ public:
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayTracingCounters, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForIndirect, MemberTypeInt, false);
     INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForUnified, MemberTypeInt, false);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 56
+    INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, maxRayLength, MemberTypeFloat, false);
+#endif
     INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_exportConfig, MemberTypeRayTracingShaderExportConfig, true);
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
     INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_gpurtFuncTable, MemberTypeGpurtFuncTable, true);
@@ -613,11 +618,14 @@ public:
   SubState &getSubStateRef() { return m_state; }
 
 private:
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
-  static const unsigned MemberCount = 28;
-#else
-  static const unsigned MemberCount = 27;
+  static const unsigned MemberCount = 27
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 56
+                                      + 1
 #endif
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
+                                      + 1
+#endif
+                                      + 0;
   static StrToMemberAddr m_addrTable[MemberCount];
 
   SubState m_state;

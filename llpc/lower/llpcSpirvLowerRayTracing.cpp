@@ -1668,7 +1668,11 @@ void SpirvLowerRayTracing::createTraceRay() {
   m_builder->CreateStore(elem2, traceRaysArgs[TraceRayLibFuncParam::DirZ]);
 
   // 14, TMax
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 56
+  const float rayTMax = m_context->getPipelineContext()->getRayTracingState()->maxRayLength;
+#else
   const float rayTMax = m_context->getPipelineContext()->getPipelineOptions()->rtMaxRayLength;
+#endif
   if (rayTMax > 0.0) {
     arg = ConstantFP::get(m_builder->getFloatTy(), rayTMax);
   } else {
