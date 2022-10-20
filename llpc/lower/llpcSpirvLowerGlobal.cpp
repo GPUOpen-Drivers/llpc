@@ -1863,7 +1863,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 assert(resMetaNode);
                 descSets[1] = mdconst::dyn_extract<ConstantInt>(resMetaNode1->getOperand(0))->getZExtValue();
                 bindings[1] = mdconst::dyn_extract<ConstantInt>(resMetaNode1->getOperand(1))->getZExtValue();
-
                 if (!nextGlobalIdx) {
                   std::swap(descSets[0], descSets[1]);
                   std::swap(bindings[0], bindings[1]);

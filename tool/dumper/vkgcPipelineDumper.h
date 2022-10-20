@@ -32,6 +32,7 @@
 
 #include "vkgcDefs.h"
 #include "vkgcMetroHash.h"
+#include "vkgcRegisterDefs.h"
 #include <fstream>
 
 namespace Vkgc {
@@ -84,7 +85,8 @@ public:
   static void updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo, bool isCacheHash,
                                               MetroHash64 *hasher, bool isRelocatableShader);
 
-  static void updateHashForResourceMappingInfo(const ResourceMappingData *resourceMapping, MetroHash64 *hasher,
+  static void updateHashForResourceMappingInfo(const ResourceMappingData *resourceMapping,
+                                               const uint64_t pipelineLayoutApiHash, MetroHash64 *hasher,
                                                ShaderStage stage = ShaderStageInvalid);
 
   static void updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,

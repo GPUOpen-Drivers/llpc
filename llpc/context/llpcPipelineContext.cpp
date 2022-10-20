@@ -485,6 +485,8 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
     }
 
     shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo->options.useSiScheduler;
+    shaderOptions.disableCodeSinking = shaderInfo->options.disableCodeSinking;
+    shaderOptions.favorLatencyHiding = shaderInfo->options.favorLatencyHiding;
     shaderOptions.updateDescInElf = shaderInfo->options.updateDescInElf;
     shaderOptions.unrollThreshold = shaderInfo->options.unrollThreshold;
     // A non-zero command line -force-loop-unroll-count value overrides the shaderInfo option value.
@@ -545,6 +547,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
 // @param stageMask : Bitmap of shader stages
 void PipelineContext::setUserDataInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const {
   auto resourceMapping = getResourceMapping();
+  auto pipelineLayoutApiHash = getPipelineLayoutApiHash();
 
   if (hasher) {
     // If there is only a single shader in stageMask (the common cases of just FS and just VS), then specify that
@@ -553,7 +556,7 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline, Util::MetroHash6
     // TODO: Improve the API here to let us pass the mask.
     const auto shaderStages = maskToShaderStages(stageMask);
     ShaderStage userDataStage = shaderStages.size() == 1 ? shaderStages[0] : ShaderStageInvalid;
-    PipelineDumper::updateHashForResourceMappingInfo(resourceMapping, hasher, userDataStage);
+    PipelineDumper::updateHashForResourceMappingInfo(resourceMapping, pipelineLayoutApiHash, hasher, userDataStage);
   }
   if (!pipeline)
     return; // Only hashing
