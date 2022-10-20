@@ -58,15 +58,27 @@ ElfLinker *createElfLinkerImpl(PipelineState *pipelineState, llvm::ArrayRef<llvm
 // in the front-end before a shader is associated with a pipeline.
 //
 // @param func : Shader entry-point function
-// @param stage : Shader stage
+// @param stage : Shader stage or ShaderStageInvalid
 void Pipeline::markShaderEntryPoint(Function *func, ShaderStage stage) {
   // We mark the shader entry-point function by
   // 1. marking it external linkage and DLLExportStorageClass; and
   // 2. adding the shader stage metadata.
   // The shader stage metadata for any other non-inlined functions in the module is added in irLink().
-  func->setLinkage(GlobalValue::ExternalLinkage);
-  func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  if (stage != ShaderStageInvalid) {
+    func->setLinkage(GlobalValue::ExternalLinkage);
+    func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  } else
+    func->setDLLStorageClass(GlobalValue::DefaultStorageClass);
   setShaderStage(func, stage);
+}
+
+// =====================================================================================================================
+// Get a function's shader stage.
+//
+// @param func : Function to check
+// @returns stage : Shader stage, or ShaderStageInvalid if none
+ShaderStage Pipeline::getShaderStage(llvm::Function *func) {
+  return lgc::getShaderStage(func);
 }
 
 // =====================================================================================================================

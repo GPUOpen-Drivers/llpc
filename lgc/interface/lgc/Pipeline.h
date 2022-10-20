@@ -704,9 +704,15 @@ public:
   // with irLink(). This is a static method in Pipeline, as it does not need a Pipeline object, and can be used
   // in the front-end before a shader is associated with a pipeline.
   //
-  // @param func : Shader entry-point function
-  // @param stage : Shader stage
+  // @param func : Function to mark
+  // @param stage : Shader stage, or ShaderStageInvalid if none
   static void markShaderEntryPoint(llvm::Function *func, ShaderStage stage);
+
+  // Get a function's shader stage.
+  //
+  // @param func : Function to check
+  // @returns stage : Shader stage, or ShaderStageInvalid if none
+  static ShaderStage getShaderStage(llvm::Function *func);
 
   // Link the individual shader modules into a single pipeline module. The front-end must have
   // finished calling Builder::Create* methods and finished building the IR. In the case that
