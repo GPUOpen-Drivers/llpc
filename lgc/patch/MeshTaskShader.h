@@ -30,11 +30,14 @@
  */
 #pragma once
 
+#include "lgc/patch/PatchPreparePipelineAbi.h"
 #include "lgc/patch/SystemValues.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 
 namespace lgc {
+
+struct FunctionAnalysisHandlers;
 
 // Represents the entry layout of mesh pipeline statistics buffer for a workgroup
 struct MeshPipeStatsEntry {
@@ -45,12 +48,13 @@ struct MeshPipeStatsEntry {
 
 // Enumerates the LDS regions used by mesh shader
 enum class MeshLdsRegion : unsigned {
-  VertexCount = 0,  // Vertex count set by SetMeshOutputs
-  PrimitiveCount,   // Primitive count set by SetMeshOutputs
-  FlatWorkgroupId,  // Flat workgroup ID
-  PrimitiveIndices, // Primitive indices set by SetPrimitiveIndices
-  VertexOutput,     // Per-vertex outputs
-  PrimitiveOutput,  // Per-primitive outputsr
+  VertexCount = 0,   // Vertex count set by SetMeshOutputs
+  PrimitiveCount,    // Primitive count set by SetMeshOutputs
+  BarrierCompletion, // Barrier completion flag
+  FlatWorkgroupId,   // Flat workgroup ID
+  PrimitiveIndices,  // Primitive indices set by SetPrimitiveIndices
+  VertexOutput,      // Per-vertex outputs
+  PrimitiveOutput,   // Per-primitive outputsr
 };
 
 // Map: LDS Region -> <Region Offset, Region Size>
@@ -60,7 +64,7 @@ typedef std::unordered_map<MeshLdsRegion, std::pair<unsigned, unsigned>> MeshLds
 // Represents the handler of mesh/task shader.
 class MeshTaskShader {
 public:
-  MeshTaskShader(PipelineState *pipelineState);
+  MeshTaskShader(PipelineState *pipelineState, PatchPreparePipelineAbi::FunctionAnalysisHandlers *analysisHandlers);
   ~MeshTaskShader();
 
   static unsigned layoutMeshShaderLds(PipelineState *pipelineState, llvm::Function *entryPoint,
@@ -93,7 +97,7 @@ private:
   llvm::Value *convertToDivergent(llvm::Value *value);
 
   llvm::Function *mutateMeshShaderEntryPoint(llvm::Function *entryPoint);
-  void lowerMeshShaderBody(llvm::BasicBlock *beginMeshShaderBlock);
+  void lowerMeshShaderBody(llvm::BasicBlock *apiMeshEntryBlock, llvm::BasicBlock *apiMeshExitBlock);
   void setMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount);
   void setPrimitiveIndices(llvm::Value *primitiveIndex, llvm::Value *primitiveIndices);
   void setPrimitiveCulled(llvm::Value *primitiveIndex, llvm::Value *isCulled);
@@ -130,6 +134,8 @@ private:
   llvm::Value *readMeshBuiltInFromLds(BuiltInKind builtIn);
   llvm::Value *convertToHwShadingRate(llvm::Value *primitiveShadingRate);
 
+  bool checkNeedBarrierFlag(llvm::Function *entryPoint);
+
   unsigned getMeshShaderLdsRegionStart(MeshLdsRegion region) {
     assert(m_ldsLayout.count(region) > 0);
     return m_ldsLayout[region].first;
@@ -144,6 +150,9 @@ private:
   static constexpr unsigned AttribGranularity = 32 * SizeOfVec4; // 32 * 16 bytes
 
   PipelineState *m_pipelineState = nullptr; // Pipeline state
+
+  PatchPreparePipelineAbi::FunctionAnalysisHandlers
+      *m_analysisHandlers; // A collection of handler functions to get the analysis info of the given function
 
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
@@ -166,6 +175,10 @@ private:
   llvm::Value *m_meshLocalInvocationId = nullptr;     // Built-in LocalInvocationId of mesh shader
   llvm::Value *m_meshGlobalInvocationId = nullptr;    // Built-in GlobalInvocationId of mesh shader
   llvm::Value *m_meshGlobalInvocationIndex = nullptr; // Global invocation index of mesh shader
+
+  llvm::Value *m_barrierToggle = nullptr;            // Toggle used by calculation of barrier completion flag
+  bool m_needBarrierFlag = false;                    // Whether barrier completion flag is needed
+  llvm::SmallVector<llvm::CallInst *, 8> m_barriers; // Barriers collected from API mesh shader
 
   llvm::GlobalValue *m_lds = nullptr; // Global variable to model mesh shader LDS
 
