@@ -57,7 +57,7 @@ namespace {
 cl::OptionCategory LgcCategory("lgc");
 
 // Input sources
-cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueRequired, cl::cat(LgcCategory),
+cl::list<std::string> InFiles(cl::Positional, cl::ZeroOrMore, cl::cat(LgcCategory),
                               cl::desc("Input file(s) (\"-\" for stdin)"));
 
 // -extract: extract a single module from a multi-module input file
@@ -222,8 +222,15 @@ int main(int argc, char **argv) {
   if (gpuName == "")
     gpuName = "gfx802";
 
+  // Default to reading from stdin and writing to stdout
+  if (InFiles.empty())
+    InFiles.push_back("-");
+
+  if (OutFileName.empty() && InFiles[0] == "-")
+    OutFileName = "-";
+
   // If we will be outputting to stdout, default to -filetype=asm
-  if ((!InFiles.empty() && InFiles[0] == "-" && OutFileName.empty()) || OutFileName == "-") {
+  if (OutFileName == "-") {
     auto optIterator = cl::getRegisteredOptions().find("filetype");
     assert(optIterator != cl::getRegisteredOptions().end());
     cl::Option *opt = optIterator->second;
