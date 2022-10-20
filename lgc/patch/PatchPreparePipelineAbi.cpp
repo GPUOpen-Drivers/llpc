@@ -68,7 +68,19 @@ LegacyPatchPreparePipelineAbi::LegacyPatchPreparePipelineAbi() : ModulePass(ID) 
 bool LegacyPatchPreparePipelineAbi::runOnModule(Module &module) {
   PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
   PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
-  return m_impl.runImpl(module, pipelineShaders, pipelineState);
+
+  auto getPostDomTree = [&](Function &func) -> PostDominatorTree & {
+    return getAnalysis<PostDominatorTreeWrapperPass>(func).getPostDomTree();
+  };
+  auto getCycleInfo = [&](Function &func) -> CycleInfo & {
+    return getAnalysis<CycleInfoWrapperPass>(func).getCycleInfo();
+  };
+
+  PatchPreparePipelineAbi::FunctionAnalysisHandlers analysisHandlers = {};
+  analysisHandlers.getPostDomTree = getPostDomTree;
+  analysisHandlers.getCycleInfo = getCycleInfo;
+
+  return m_impl.runImpl(module, pipelineShaders, pipelineState, analysisHandlers);
 }
 
 // =====================================================================================================================
@@ -80,7 +92,21 @@ bool LegacyPatchPreparePipelineAbi::runOnModule(Module &module) {
 PreservedAnalyses PatchPreparePipelineAbi::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
-  runImpl(module, pipelineShaders, pipelineState);
+
+  auto getPostDomTree = [&](Function &func) -> PostDominatorTree & {
+    auto &funcAnalysisManager = analysisManager.getResult<FunctionAnalysisManagerModuleProxy>(module).getManager();
+    return funcAnalysisManager.getResult<PostDominatorTreeAnalysis>(func);
+  };
+  auto getCycleInfo = [&](Function &func) -> CycleInfo & {
+    auto &funcAnalysisManager = analysisManager.getResult<FunctionAnalysisManagerModuleProxy>(module).getManager();
+    return funcAnalysisManager.getResult<CycleAnalysis>(func);
+  };
+
+  FunctionAnalysisHandlers analysisHandlers = {};
+  analysisHandlers.getPostDomTree = getPostDomTree;
+  analysisHandlers.getCycleInfo = getCycleInfo;
+
+  runImpl(module, pipelineShaders, pipelineState, analysisHandlers);
   return PreservedAnalyses::none();
 }
 
@@ -90,15 +116,17 @@ PreservedAnalyses PatchPreparePipelineAbi::run(Module &module, ModuleAnalysisMan
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] pipelineShaders : Pipeline shaders result object to use for this pass
 // @param [in/out] pipelineState : Pipeline state object to use for this pass
+// @param analysisHandlers : A collection of handler functions to get the analysis info of the given function
 // @returns : True if the module was modified by the transformation and false otherwise
 bool PatchPreparePipelineAbi::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
-                                      PipelineState *pipelineState) {
+                                      PipelineState *pipelineState, FunctionAnalysisHandlers &analysisHandlers) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Pipeline-Abi\n");
 
   Patch::init(&module);
 
   m_pipelineState = pipelineState;
   m_pipelineShaders = &pipelineShaders;
+  m_analysisHandlers = &analysisHandlers;
 
   m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
   m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
@@ -134,7 +162,7 @@ void PatchPreparePipelineAbi::mergeShader(Module &module) {
     if (m_hasTask || m_hasMesh) {
       auto taskEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTask);
       auto meshEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageMesh);
-      MeshTaskShader meshTaskShader(m_pipelineState);
+      MeshTaskShader meshTaskShader(m_pipelineState, m_analysisHandlers);
       meshTaskShader.process(taskEntryPoint, meshEntryPoint);
       return;
     }

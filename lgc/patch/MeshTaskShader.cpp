@@ -48,8 +48,11 @@ namespace lgc {
 // Constructor
 //
 // @param pipelineState : Pipeline state
-MeshTaskShader::MeshTaskShader(PipelineState *pipelineState)
-    : m_pipelineState(pipelineState), m_builder(std::make_unique<IRBuilder<>>(pipelineState->getContext())),
+// @param getPostDomTree : Function to get the post dominator tree of the given function
+MeshTaskShader::MeshTaskShader(PipelineState *pipelineState,
+                               PatchPreparePipelineAbi::FunctionAnalysisHandlers *analysisHandlers)
+    : m_pipelineState(pipelineState), m_analysisHandlers(analysisHandlers),
+      m_builder(std::make_unique<IRBuilder<>>(pipelineState->getContext())),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()) {
   assert(pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
   m_pipelineSysValues.initialize(m_pipelineState);
@@ -83,9 +86,12 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
   //
   // 1. Internal mesh LDS:
   //
-  // +--------------+-----------------+-------------------+-------------------+----------------+-------------------+
-  // | Vertex Count | Primitive Count | Flat Workgroup ID | Primitive Indices | Vertex Outputs | Primitive Outputs |
-  // +--------------+-----------------+-------------------+-------------------+----------------+-------------------+
+  // +--------------+-----------------+--------------------+-------------------+-------------------+
+  // | Vertex Count | Primitive Count | Barrier Completion | Flat Workgroup ID | Primitive Indices | >>>
+  // +--------------+-----------------+--------------------+-------------------+-------------------+
+  //       +----------------+-------------------+
+  //   >>> | Vertex Outputs | Primitive Outputs |
+  //       +----------------+-------------------+
   //
   // 2. Shared variable LDS:
   //
@@ -134,11 +140,20 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
   }
   meshLdsSizeInDwords += ldsRegionSize;
 
+  // Barrier completion
+  ldsRegionSize = 1; // A dword corresponds to barrier completion flag (i32)
+  if (ldsLayout) {
+    printLdsRegionInfo("Barrier Completion", ldsOffsetInDwords, ldsRegionSize);
+    (*ldsLayout)[MeshLdsRegion::BarrierCompletion] = std::make_pair(ldsOffsetInDwords, ldsRegionSize);
+    ldsOffsetInDwords += ldsRegionSize;
+  }
+  meshLdsSizeInDwords += ldsRegionSize;
+
   // Flat workgroup ID
   if (useFlatWorkgroupId(pipelineState)) {
     ldsRegionSize = 1; // A dword corresponds to flat workgroup ID (i32)
     if (ldsLayout) {
-      printLdsRegionInfo("Flat workgroup ID", ldsOffsetInDwords, ldsRegionSize);
+      printLdsRegionInfo("Flat Workgroup ID", ldsOffsetInDwords, ldsRegionSize);
       (*ldsLayout)[MeshLdsRegion::FlatWorkgroupId] = std::make_pair(ldsOffsetInDwords, ldsRegionSize);
       ldsOffsetInDwords += ldsRegionSize;
     }
@@ -431,19 +446,38 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   //
   //   if (threadIdInSubgroup == 0) {
   //     Write invalid vertex count (~0) to LDS
+  //     Write barrier completion flag to LDS (if needBarrierFlag)
   //     Write flat workgroup ID to LDS (only for GFX10.3)
   //   }
   //
   //   Barrier
-  //   if (threadIdInSubgroup < numMeshThreads) {
-  //     Mesh shader main body (from API shader, lower mesh shader specific calls)
-  //       - SetMeshOutputs -> Write vertex/primitive count to LDS and send message GS_ALLOC_REQ
-  //         (threadIdInSubgroup == 0)
-  //       - SetPrimitiveIndices -> Write primitive connectivity data to LDS
-  //       - SetPrimitiveCulled -> Write null primitive flag to LDS
-  //       - GetMeshInput -> Lower mesh built-in input
-  //       - ReadTaskPayload -> Read task payload from payload ring
-  //       - Write primitive/vertex output -> Write output data to LDS
+  //   if (waveId < numMeshWaves) {
+  //     if (threadIdInSubgroup < numMeshThreads) {
+  //       Mesh shader main body (from API shader)
+  //         1. Handle API barriers (if needBarrierFlag):
+  //           - Flip barrier toggle (barrierToggle = !barrierToggle) when encountering each API barrier
+  //           - Write barrier completion flag to LDS (barrierFlag = barrierToggle ? 0b11 : 0b10)
+  //         2. Lower mesh shader specific calls:
+  //           - SetMeshOutputs -> Write vertex/primitive count to LDS and send message GS_ALLOC_REQ
+  //             (threadIdInSubgroup == 0)
+  //           - SetPrimitiveIndices -> Write primitive connectivity data to LDS
+  //           - SetPrimitiveCulled -> Write null primitive flag to LDS
+  //           - GetMeshInput -> Lower mesh built-in input
+  //           - ReadTaskPayload -> Read task payload from payload ring
+  //           - Write primitive/vertex output -> Write output data to LDS
+  //     }
+  //
+  //     Barrier (if needBarrierFlag)
+  //   } else {
+  //     Extra waves to add additional barriers (if needBarrierFlag):
+  //     do {
+  //       barrierToggle = !barrierToggle
+  //       Barrier
+  //
+  //       Read barrierFlag from LDS:
+  //         barriersCompleted = barrierFlag != 0
+  //         barriersToggle = barrierFlag & 0x1
+  //     } while (!barriersCompleted || barriersToggle == barrierToggle)
   //   }
   //
   //   Barrier
@@ -483,6 +517,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   m_shaderRingEntryIndex = nullptr;
   m_payloadRingEntryOffset = nullptr;
 
+  // Determine if barrier completion flag is needed
+  m_needBarrierFlag = checkNeedBarrierFlag(entryPoint);
+
   auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageMesh);
 
@@ -504,35 +541,42 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
                         std::to_string(primAmpFactor) + std::string(",") + std::to_string(flatWorkgroupSize));
 
   const unsigned numWaves = alignTo(flatWorkgroupSize, waveSize) / waveSize;
+  const unsigned numMeshWaves = alignTo(numMeshThreads, waveSize) / waveSize;
 
   // API mesh shader entry block
-  BasicBlock *beginMeshShaderBlock = &entryPoint->getEntryBlock();
-  beginMeshShaderBlock->setName(".beginMeshShader");
+  BasicBlock *apiMeshEntryBlock = &entryPoint->getEntryBlock();
+  apiMeshEntryBlock->setName(".apiMeshEntry");
 
   // API mesh shader exit block
-  BasicBlock *retBlock = nullptr;
+  BasicBlock *apiMeshExitBlock = nullptr;
   for (auto &block : *entryPoint) {
     auto retInst = dyn_cast<ReturnInst>(block.getTerminator());
     if (retInst) {
-      retBlock = &block;
+      apiMeshExitBlock = &block;
       break;
     }
   }
-  assert(retBlock);
-  auto endMeshShaderBlock = retBlock->splitBasicBlock(retBlock->getTerminator(), ".endMeshShader");
+  assert(apiMeshExitBlock);
+  apiMeshExitBlock->setName(".apiMeshExit");
+  auto endMeshWaveBlock = apiMeshExitBlock->splitBasicBlock(apiMeshExitBlock->getTerminator(), ".endApiMeshWave");
 
   // Helper to create basic block
   auto createBlock = [&](const char *blockName, BasicBlock *insertBefore = nullptr) {
     return BasicBlock::Create(entryPoint->getParent()->getContext(), blockName, entryPoint, insertBefore);
   };
 
-  auto entryBlock = createBlock(".entry", beginMeshShaderBlock);
-  auto initPrimitiveIndicesHeaderBlock = createBlock(".initPrimitiveIndicesHeader", beginMeshShaderBlock);
-  auto initPrimitiveIndicesBodyBlock = createBlock(".initPrimitiveIndicesBody", beginMeshShaderBlock);
-  auto endInitPrimitiveIndicesBlock = createBlock(".endInitPrimitiveIndices", beginMeshShaderBlock);
+  auto entryBlock = createBlock(".entry", apiMeshEntryBlock);
+  auto initPrimitiveIndicesHeaderBlock = createBlock(".initPrimitiveIndicesHeader", apiMeshEntryBlock);
+  auto initPrimitiveIndicesBodyBlock = createBlock(".initPrimitiveIndicesBody", apiMeshEntryBlock);
+  auto endInitPrimitiveIndicesBlock = createBlock(".endInitPrimitiveIndices", apiMeshEntryBlock);
 
-  auto writeSpecialValueBlock = createBlock(".writeSpecialValue", beginMeshShaderBlock);
-  auto endWriteSpecialValueBlock = createBlock(".endWriteSpecialValue", beginMeshShaderBlock);
+  auto writeSpecialValueBlock = createBlock(".writeSpecialValue", apiMeshEntryBlock);
+  auto endWriteSpecialValueBlock = createBlock(".endWriteSpecialValue", apiMeshEntryBlock);
+
+  auto beginMeshWaveBlock = createBlock(".beginMeshWave", apiMeshEntryBlock);
+
+  auto beginExtraWaveBlock = createBlock(".beginExtraWave");
+  auto checkMeshOutputCountBlock = createBlock(".checkMeshOutputCount");
 
   auto checkDummyAllocReqBlock = createBlock(".checkDummyAllocReq");
   auto dummyAllocReqBlock = createBlock(".dummyAllocReq");
@@ -555,6 +599,11 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
     m_builder->SetInsertPoint(entryBlock);
 
     initWaveThreadInfo(entryPoint);
+
+    if (m_needBarrierFlag) {
+      m_barrierToggle = m_builder->CreateAlloca(m_builder->getInt1Ty(), nullptr, "barrierToggle");
+      m_builder->CreateStore(m_builder->getFalse(), m_barrierToggle);
+    }
 
     m_builder->CreateBr(initPrimitiveIndicesHeaderBlock);
   }
@@ -628,6 +677,12 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
     auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
     writeValueToLds(m_builder->getInt32(InvalidValue), ldsOffset);
 
+    // Write barrier completion flag to LDS if it is required. Otherwise, skip it.
+    if (m_needBarrierFlag) {
+      auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
+      writeValueToLds(m_builder->getInt32(0), ldsOffset);
+    }
+
     // Write flat workgroup ID to LDS if it is required. Otherwise, skip it.
     if (useFlatWorkgroupId(m_pipelineState)) {
       auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::FlatWorkgroupId));
@@ -648,22 +703,91 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
     m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
     m_builder->CreateFence(AtomicOrdering::Acquire, syncScope);
 
-    auto validMesh = m_builder->CreateICmpULT(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(numMeshThreads));
-    m_builder->CreateCondBr(validMesh, beginMeshShaderBlock, endMeshShaderBlock);
+    auto validMeshWave = m_builder->CreateICmpULT(m_waveThreadInfo.waveIdInSubgroup, m_builder->getInt32(numMeshWaves));
+    // There could be no extra waves
+    validMeshWave = m_builder->CreateOr(validMeshWave, m_builder->getInt1(numMeshWaves == numWaves));
+    m_builder->CreateCondBr(validMeshWave, beginMeshWaveBlock, beginExtraWaveBlock);
+  }
+
+  // Construct ".beginMeshWave" block
+  {
+    m_builder->SetInsertPoint(beginMeshWaveBlock);
+
+    auto validMeshThread =
+        m_builder->CreateICmpULT(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(numMeshThreads));
+    m_builder->CreateCondBr(validMeshThread, apiMeshEntryBlock, endMeshWaveBlock);
   }
 
   // Lower mesh shader main body
-  lowerMeshShaderBody(beginMeshShaderBlock);
+  lowerMeshShaderBody(apiMeshEntryBlock, apiMeshExitBlock);
 
-  // Construct ".endMeshShader" block
-  Value *vertexCount = nullptr;
-  Value *primitiveCount = nullptr;
+  // Construct ".endMeshWave" block
   {
-    m_builder->SetInsertPoint(endMeshShaderBlock);
+    m_builder->SetInsertPoint(endMeshWaveBlock);
 
     // NOTE: Here, we remove original return instruction from API mesh shader and continue to construct this block
     // with other instructions.
-    endMeshShaderBlock->getTerminator()->eraseFromParent();
+    endMeshWaveBlock->getTerminator()->eraseFromParent();
+
+    if (m_needBarrierFlag) {
+      SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
+      m_builder->CreateFence(AtomicOrdering::Release, syncScope);
+      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      m_builder->CreateFence(AtomicOrdering::Acquire, syncScope);
+    }
+
+    m_builder->CreateBr(checkMeshOutputCountBlock);
+  }
+
+  // Construct ".beginExtraWave" block
+  {
+    m_builder->SetInsertPoint(beginExtraWaveBlock);
+
+    if (m_needBarrierFlag) {
+      //
+      // do {
+      //   barrierToggle != barrierToggle
+      //   Barrier
+      // } while (!barriersCompleted || barriersToggle == barrierToggle)
+      //
+
+      // barrierToggle = !barrierToggle
+      Value *barrierToggle = m_builder->CreateLoad(m_builder->getInt1Ty(), m_barrierToggle);
+      barrierToggle = m_builder->CreateNot(barrierToggle);
+      m_builder->CreateStore(barrierToggle, m_barrierToggle);
+
+      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+      auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
+      auto barrierFlag = readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
+
+      // barriersNotCompleted = barrierFlag == 0
+      auto barriersNotCompleted = m_builder->CreateICmpEQ(barrierFlag, m_builder->getInt32(0));
+      // barriersToggle = barrierFlag & 0x1
+      auto barriersToggle = m_builder->CreateAnd(barrierFlag, 0x1);
+      barriersToggle = m_builder->CreateTrunc(barriersToggle, m_builder->getInt1Ty());
+
+      // toggleEqual = barriersToggle == barrierToggle
+      auto toggleEqual = m_builder->CreateICmpEQ(barriersToggle, barrierToggle);
+
+      auto continueToAddBarriers = m_builder->CreateOr(barriersNotCompleted, toggleEqual);
+      m_builder->CreateCondBr(continueToAddBarriers, beginExtraWaveBlock, checkMeshOutputCountBlock);
+    } else {
+      const unsigned numBarriers = m_barriers.size();
+      // NOTEL: Here, we don't need barrier completion flag, but we still find API barriers. To match number of API
+      // barriers, we add additional barriers in extra waves. The number is known.
+      for (unsigned i = 0; i < numBarriers; ++i) {
+        m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      }
+      m_builder->CreateBr(checkMeshOutputCountBlock);
+    }
+  }
+
+  // Construct ".checkMeshOutputCount" block
+  Value *vertexCount = nullptr;
+  Value *primitiveCount = nullptr;
+  {
+    m_builder->SetInsertPoint(checkMeshOutputCountBlock);
 
     SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
     m_builder->CreateFence(AtomicOrdering::Release, syncScope);
@@ -1455,12 +1579,34 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
 // =====================================================================================================================
 // Lower mesh shader main body by lowering mesh shader specific calls.
 //
-// @param beginMeshShaderBlock : API mesh shader entry block (before any mutation)
-void MeshTaskShader::lowerMeshShaderBody(BasicBlock *beginMeshShaderBlock) {
-  auto entryPoint = beginMeshShaderBlock->getParent();
+// @param apiMeshEntryBlock : API mesh shader entry block (before any mutation)
+// @param apiMeshExitBlock : API mesh shader exit block (before any mutation)`
+void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlock *apiMeshExitBlock) {
+  auto entryPoint = apiMeshEntryBlock->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageMesh);
 
   SmallVector<CallInst *, 8> removedCalls;
+
+  // Handle API mesh shader barrier
+  if (m_needBarrierFlag) {
+    // Flip barrier toggle when we encounter a API barrier
+    for (auto barrier : m_barriers) {
+      m_builder->SetInsertPoint(barrier);
+      // barrierToggle = !barrierToggle
+      Value *barrierToggle = m_builder->CreateLoad(m_builder->getInt1Ty(), m_barrierToggle);
+      barrierToggle = m_builder->CreateNot(barrierToggle);
+      m_builder->CreateStore(barrierToggle, m_barrierToggle);
+    }
+
+    // Store barrier completion flag according to barrier toggle
+    m_builder->SetInsertPoint(apiMeshExitBlock->getTerminator());
+    // barrierFlag = barrierToggle ? 0b11 : 0b10
+    Value *barrierToggle = m_builder->CreateLoad(m_builder->getInt1Ty(), m_barrierToggle);
+    Value *barrierFlag = m_builder->CreateSelect(barrierToggle, m_builder->getInt32(3), m_builder->getInt32(2));
+
+    auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
+    writeValueToLds(barrierFlag, ldsOffset);
+  }
 
   // Lower mesh shader calls
   auto module = entryPoint->getParent();
@@ -1504,7 +1650,7 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *beginMeshShaderBlock) {
           unsigned builtIn = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
 
           // NOTE: Mesh shader input lowering is supposed to happen at the beginning of API mesh shader.
-          m_builder->SetInsertPoint(&*beginMeshShaderBlock->getFirstInsertionPt());
+          m_builder->SetInsertPoint(&*apiMeshEntryBlock->getFirstInsertionPt());
 
           auto meshInput = getMeshInput(static_cast<BuiltInKind>(builtIn));
           assert(meshInput->getType() == call->getType());
@@ -2547,6 +2693,115 @@ Value *MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
   hwShadingRate = m_builder->CreateOr(hwShadingRate, hwXRate);
 
   return hwShadingRate;
+}
+
+// =====================================================================================================================
+// Check if barrier completion flag is needed. Barrier completion flag is to address this case:
+//
+//   ...
+//   if (threadId < numMeshThreads) {
+//     Run API mesh shader (contains API barriers)
+//     ...
+//     Barrier
+//     Or
+//     if (Uniform condition)
+//       Barrier
+//   }
+//
+//   Barrier (Post-API)
+//   ...
+//
+// There are extra waves that will not run API mesh shader (just to export vertices and primitives as post-API
+// mesh shader processing) and the API mesh shader contains API barriers by calling barrier(). As a result, the
+// extra waves will be out of sync because when API mesh shader waves hit the API barriers, the extra waves
+// will hit the post-API barrier. The extra waves are then out of sync after that. The solution idea is to add
+// additional barriers for extra waves according to the hit number of API barriers, making them matching to
+// avoid out-of-sync problems. There are two cases:
+//
+//   1. Barriers are all placed in the entry-point
+//   For such cases, we just collected all used API barriers. In extra wave, we add equal number of barriers statically
+//   and the number is known from previous collecting.
+//
+//   2. Some of barriers are placed in uniform control flow
+//   For such cases, the blocks where API barriers are placed don't post-dominate the entry block or the block is
+//   contained by a cycle (loop). We have to add dynamical barrier handling. The processing is something like this:
+//
+//   barrierToggle = false
+//   Write 0 to barrier completion flag in LDS
+//   ...
+//   if (API mesh waves) {
+//     if (API mesh threads) {
+//       ...
+//       barrierToggle = !barrierToggle (Flip the toggle)
+//       API barrier
+//       ...
+//       barrierFlag = barrierToggle ? 3 : 2 (Before API mesh shader completion)
+//       Write barrierFlag to LDS
+//     }
+//     Barrier (Sync the completion of API mesh waves)
+//   } else {
+//     do {
+//       barrierToggle = !barrierToggle (Flip the toggle)
+//       Barrier
+//
+//       Read barrierFlag from LDS
+//       barrierCompleted = barrierFlag != 0
+//       barriersToggle = barrierFlag & 0x1
+//     } while (!barrierCompleted || barriersToggle == barrierToggle)
+//   }
+//   ...
+//
+//   The barrier completion flag has 2 bits: bits[1] indicates if all API barriers are completed, bits[0] indicates the
+//   toggle flipping in API mesh waves. The toggle in extra waves should not be equal to the toggle in API mesh waves
+//   because we have an extra barrier in API mesh waves to sync their completion.
+//
+// @param entryPoint : Entry-point of mesh shader
+// @returns : Value indicating whether barrier completion flag is needed
+bool MeshTaskShader::checkNeedBarrierFlag(Function *entryPoint) {
+  if (m_pipelineState->enableMeshRowExport())
+    return false; // Not needed if row export is enable
+
+  const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+  const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
+  const unsigned numThreads =
+      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.primAmpFactor;
+  assert(numThreads >= numMeshThreads);
+
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageMesh);
+  const unsigned numMeshWaves = alignTo(numMeshThreads, waveSize) / waveSize;
+  const unsigned numWaves = alignTo(numThreads, waveSize) / waveSize;
+  if (numWaves == numMeshWaves)
+    return false; // Wave number to run API mesh shader is equal to actual wave number to run HW mesh shader (HW GS)
+
+  assert(getShaderStage(entryPoint) == ShaderStageMesh);
+  auto module = entryPoint->getParent();
+  for (auto &func : module->functions()) {
+    if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_s_barrier) {
+      for (auto user : func.users()) {
+        CallInst *const call = cast<CallInst>(user);
+        if (call->getParent()->getParent() == entryPoint)
+          m_barriers.push_back(call);
+      }
+    }
+  }
+
+  // API mesh shader contains no barriers
+  if (m_barriers.empty())
+    return false;
+
+  auto &postDomTree = m_analysisHandlers->getPostDomTree(*entryPoint);
+  auto &cycleInfo = m_analysisHandlers->getCycleInfo(*entryPoint);
+  auto &entryBlock = entryPoint->getEntryBlock();
+  for (auto barrier : m_barriers) {
+    auto barrierBlock = barrier->getParent();
+    if (!postDomTree.dominates(barrierBlock, &entryBlock) || cycleInfo.getCycleDepth(barrierBlock) > 0) {
+      // NOTE: If the block where the API barrier is placed doesn't post-dominates the entry block or the block is
+      // contained within a cycle, we have to switch to dynamical barrier handling.
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // =====================================================================================================================
