@@ -324,7 +324,7 @@ target_link_libraries(llpc PRIVATE Threads::Threads)
 
 if(LLPC_BUILD_TOOLS)
 ### VFX library for Standalone Compiler ###################################################################################
-if(ICD_BUILD_LLPC)
+if(NOT TARGET vfx)
     set(VFX_ENABLE_WERROR ${LLPC_ENABLE_WERROR} CACHE BOOL "${PROJECT_NAME} override." FORCE)
     add_subdirectory(${PROJECT_SOURCE_DIR}/../tool/vfx ${PROJECT_BINARY_DIR}/../vfx)
 endif()

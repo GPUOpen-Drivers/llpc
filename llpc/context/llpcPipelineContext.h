@@ -216,6 +216,9 @@ public:
   // Gets pipeline resource mapping data
   const ResourceMappingData *getResourceMapping() const { return &m_resourceMapping; }
 
+  // Gets pipeline layout api hash
+  const uint64_t getPipelineLayoutApiHash() const { return m_pipelineLayoutApiHash; }
+
 protected:
   // Gets dummy vertex input create info
   virtual VkPipelineVertexInputStateCreateInfo *getDummyVertexInputInfo() { return nullptr; }
@@ -230,7 +233,7 @@ protected:
   MetroHash::Hash m_pipelineHash;        // Pipeline hash code
   MetroHash::Hash m_cacheHash;           // Cache hash code
   ResourceMappingData m_resourceMapping; // Contains resource mapping nodes and static descriptor values
-
+  uint64_t m_pipelineLayoutApiHash;      // Pipeline Layout Api Hash
 #if VKI_RAY_TRACING
   const Vkgc::RtState *m_rtState; // Ray tracing state
 #endif
