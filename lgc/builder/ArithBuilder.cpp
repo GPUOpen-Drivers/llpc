@@ -1242,10 +1242,9 @@ Value *ArithBuilder::CreateInsertBitField(Value *base, Value *insert, Value *off
   offset = CreateZExtOrTrunc(offset, base->getType());
   count = CreateZExtOrTrunc(count, base->getType());
 
-  Value *baseXorInsert = CreateXor(CreateShl(insert, offset), base);
   Constant *one = ConstantInt::get(count->getType(), 1);
   Value *mask = CreateShl(CreateSub(CreateShl(one, count), one), offset);
-  Value *result = CreateXor(CreateAnd(baseXorInsert, mask), base);
+  Value *result = CreateOr(CreateAnd(CreateShl(insert, offset), mask), CreateAnd(base, CreateNot(mask)));
   Value *isWholeField = CreateICmpEQ(
       count, ConstantInt::get(count->getType(), count->getType()->getScalarType()->getPrimitiveSizeInBits()));
   return CreateSelect(isWholeField, insert, result, instName);
