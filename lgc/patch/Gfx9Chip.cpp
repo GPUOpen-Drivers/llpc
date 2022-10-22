@@ -349,8 +349,6 @@ PipelineMeshFsRegConfig::PipelineMeshFsRegConfig(GfxIpVersion gfxIp) : meshRegs(
 // @param gfxIp : Graphics IP version info
 PipelineTaskMeshFsRegConfig::PipelineTaskMeshFsRegConfig(GfxIpVersion gfxIp)
     : taskRegs(gfxIp), meshRegs(gfxIp), psRegs(gfxIp) {
-  INIT_REG(VGT_SHADER_STAGES_EN);
-  INIT_REG_GFX10(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
 }
 
 } // namespace Gfx9

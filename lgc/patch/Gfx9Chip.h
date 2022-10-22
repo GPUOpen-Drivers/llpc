@@ -568,9 +568,6 @@ struct PipelineTaskMeshFsRegConfig {
   MeshRegConfig meshRegs; // Mesh -> hardware primitive shader (NGG, ES-GS)
   PsRegConfig psRegs;     // FS   -> hardware PS
 
-  DEF_REG(VGT_SHADER_STAGES_EN);
-  DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
-
   PipelineTaskMeshFsRegConfig(GfxIpVersion gfxIp);
 };
 
