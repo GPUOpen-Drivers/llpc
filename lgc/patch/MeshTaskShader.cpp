@@ -28,6 +28,7 @@
  * @brief LLPC source file: contains implementation of class lgc::MeshTaskShader.
  ***********************************************************************************************************************
  */
+ 
 #include "MeshTaskShader.h"
 #include "Gfx9Chip.h"
 #include "ShaderMerger.h"
