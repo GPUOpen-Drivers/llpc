@@ -3092,7 +3092,9 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
   case BuiltInClipDistance:
   case BuiltInCullDistance: {
     if ((builtInId == BuiltInPosition && !builtInUsage.position) ||
-        (builtInId == BuiltInPointSize && !builtInUsage.pointSize))
+        (builtInId == BuiltInPointSize && !builtInUsage.pointSize) ||
+        (builtInId == BuiltInClipDistance && builtInUsage.clipDistance == 0) ||
+        (builtInId == BuiltInCullDistance && builtInUsage.cullDistance == 0))
       return;
 
     if (isa<UndefValue>(output)) {
