@@ -1037,11 +1037,11 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
       // NOTE: The fetch values are represented by <n x i32>, so we will bitcast the float16 values to
       // int32 eventually.
       Type *bitCastTy = Type::getInt16Ty(*m_context);
-      bitCastTy = numChannels == 1 ? bitCastTy : FixedVectorType::get(bitCastTy, numChannels);
+      bitCastTy = numChannels == 1 ? bitCastTy : FixedVectorType::get(bitCastTy, numChannels >= 3 ? 4 : numChannels);
       fetch = new BitCastInst(fetch, bitCastTy, "", insertPos);
 
       Type *zExtTy = Type::getInt32Ty(*m_context);
-      zExtTy = numChannels == 1 ? zExtTy : FixedVectorType::get(zExtTy, numChannels);
+      zExtTy = numChannels == 1 ? zExtTy : FixedVectorType::get(zExtTy, numChannels >= 3 ? 4 : numChannels);
       fetch = new ZExtInst(fetch, zExtTy, "", insertPos);
     }
 
