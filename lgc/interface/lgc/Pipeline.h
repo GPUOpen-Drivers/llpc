@@ -154,6 +154,9 @@ struct Options {
 #endif
 };
 
+/// Represent a pipeline option which can be automatic as well as explicitly set.
+enum InvariantLoadsOption : unsigned { Auto = 0, EnableOptimization = 1, DisableOptimization = 2, ClearInvariants = 3 };
+
 // Middle-end per-shader options to pass to SetShaderOptions.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 struct ShaderOptions {
@@ -255,10 +258,7 @@ struct ShaderOptions {
   unsigned nsaThreshold;
 
   /// Aggressively mark shader loads as invariant (where it is safe to do so).
-  bool aggressiveInvariantLoads;
-
-  /// Strip invariant load metadata.
-  bool disableInvariantLoads;
+  InvariantLoadsOption aggressiveInvariantLoads;
 
   ShaderOptions() {
     // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from

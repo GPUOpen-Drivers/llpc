@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 56
+#define LLPC_INTERFACE_MAJOR_VERSION 57
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 2
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     57.0 | Merge aggressiveInvariantLoads and disableInvariantLoads to an enumerated option                      |
 //  |     56.2 | Add aggressiveInvariantLoads and disableInvariantLoads to PipelineShaderOptions                       |
 //  |     56.1 | Add struct UberFetchShaderAttribInfo                                                                  |
 //  |     56.0 | Move maxRayLength to RtState                                                                          |
@@ -655,6 +656,9 @@ inline unsigned compact32(ShaderHash hash) {
           static_cast<unsigned>(hash.upper) ^ static_cast<unsigned>(hash.upper >> 32));
 }
 
+/// Represent a pipeline option which can be automatic as well as explicitly set.
+enum InvariantLoads : unsigned { Auto = 0, EnableOptimization = 1, DisableOptimization = 2, ClearInvariants = 3 };
+
 /// Represents per shader stage options.
 struct PipelineShaderOptions {
   ShaderHash clientHash;      ///< Client-supplied unique shader hash. A value of zero indicates that LLPC should
@@ -779,10 +783,7 @@ struct PipelineShaderOptions {
   unsigned nsaThreshold;
 
   /// Aggressively mark shader loads as invariant (where it is safe to do so).
-  bool aggressiveInvariantLoads;
-
-  /// Strip invariant load metadata.
-  bool disableInvariantLoads;
+  InvariantLoads aggressiveInvariantLoads;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor

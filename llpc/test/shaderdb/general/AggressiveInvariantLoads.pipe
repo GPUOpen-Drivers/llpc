@@ -16,7 +16,7 @@ void main() {
 
 [VsInfo]
 entryPoint = main
-options.aggressiveInvariantLoads = 1
+options.aggressiveInvariantLoads = EnableOptimization
 
 [FsGlsl]
 #version 450
@@ -33,7 +33,7 @@ void main() {
 
 [FsInfo]
 entryPoint = main
-options.aggressiveInvariantLoads = 1
+options.aggressiveInvariantLoads = EnableOptimization
 
 [ResourceMapping]
 userDataNode[0].visibility = 2

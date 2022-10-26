@@ -530,8 +530,18 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
 
     shaderOptions.nsaThreshold = shaderInfo->options.nsaThreshold;
 
-    shaderOptions.aggressiveInvariantLoads = shaderInfo->options.aggressiveInvariantLoads;
-    shaderOptions.disableInvariantLoads = shaderInfo->options.disableInvariantLoads;
+    static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::Auto) == InvariantLoadsOption::Auto, "Mismatch");
+    static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::EnableOptimization) ==
+                      InvariantLoadsOption::EnableOptimization,
+                  "Mismatch");
+    static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::DisableOptimization) ==
+                      InvariantLoadsOption::DisableOptimization,
+                  "Mismatch");
+    static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::ClearInvariants) ==
+                      InvariantLoadsOption::ClearInvariants,
+                  "Mismatch");
+    shaderOptions.aggressiveInvariantLoads =
+        static_cast<InvariantLoadsOption>(shaderInfo->options.aggressiveInvariantLoads);
 
     pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
   }
