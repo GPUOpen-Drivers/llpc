@@ -88,6 +88,11 @@ public:
     ADD_CLASS_ENUM_MAP(ThreadGroupSwizzleMode, _4x4)
     ADD_CLASS_ENUM_MAP(ThreadGroupSwizzleMode, _8x8)
     ADD_CLASS_ENUM_MAP(ThreadGroupSwizzleMode, _16x16)
+
+    ADD_CLASS_ENUM_MAP(InvariantLoads, Auto)
+    ADD_CLASS_ENUM_MAP(InvariantLoads, EnableOptimization)
+    ADD_CLASS_ENUM_MAP(InvariantLoads, DisableOptimization)
+    ADD_CLASS_ENUM_MAP(InvariantLoads, ClearInvariants)
   }
 };
 

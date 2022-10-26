@@ -1174,7 +1174,7 @@ bool parseEnumName(char *enumName, unsigned lineNum, IUFValue *output, std::stri
   result = getEnumValue(enumName, value);
 
   if (!result) {
-    PARSE_ERROR(*errorMsg, lineNum, "unknow enum");
+    PARSE_ERROR(*errorMsg, lineNum, "unknown enum");
   } else
     output->iVec4[0] = value;
 

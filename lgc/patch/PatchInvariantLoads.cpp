@@ -31,6 +31,7 @@
 #include "lgc/patch/PatchInvariantLoads.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/InitializePasses.h"
@@ -137,8 +138,22 @@ bool PatchInvariantLoads::runImpl(Function &function, PipelineState *pipelineSta
     return false;
 
   auto &options = pipelineState->getShaderOptions(shaderStage);
-  bool clearInvariants = options.disableInvariantLoads;
-  bool aggressiveInvariants = options.aggressiveInvariantLoads && !clearInvariants;
+  bool clearInvariants = options.aggressiveInvariantLoads == ClearInvariants;
+  bool aggressiveInvariants = options.aggressiveInvariantLoads == EnableOptimization;
+
+  if (options.aggressiveInvariantLoads == Auto && pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
+    switch (function.getCallingConv()) {
+    case CallingConv::AMDGPU_HS:
+    case CallingConv::AMDGPU_LS:
+    case CallingConv::AMDGPU_GS:
+    case CallingConv::AMDGPU_VS:
+      LLVM_DEBUG(dbgs() << "Heuristically enable aggressive invariant load optimization\n");
+      aggressiveInvariants = true;
+      break;
+    default:
+      break;
+    }
+  }
 
   if (!(clearInvariants || aggressiveInvariants))
     return false;

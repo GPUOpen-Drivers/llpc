@@ -69,6 +69,7 @@ std::ostream &operator<<(std::ostream &out, ShadowDescriptorTableUsage shadowDes
 std::ostream &operator<<(std::ostream &out, VkProvokingVertexModeEXT provokingVertexMode);
 std::ostream &operator<<(std::ostream &out, ResourceLayoutScheme layout);
 std::ostream &operator<<(std::ostream &out, ThreadGroupSwizzleMode threadGroupSwizzleMode);
+std::ostream &operator<<(std::ostream &out, InvariantLoads invariants);
 
 template std::ostream &operator<<(std::ostream &out, ElfReader<Elf64> &reader);
 template raw_ostream &operator<<(raw_ostream &out, ElfReader<Elf64> &reader);
@@ -614,7 +615,6 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.overrideShaderThreadGroupSizeZ = " << shaderInfo->options.overrideShaderThreadGroupSizeZ << "\n";
   dumpFile << "options.nsaThreshold = " << shaderInfo->options.nsaThreshold << "\n";
   dumpFile << "options.aggressiveInvariantLoads = " << shaderInfo->options.aggressiveInvariantLoads << "\n";
-  dumpFile << "options.disableInvariantLoads = " << shaderInfo->options.disableInvariantLoads << "\n";
   dumpFile << "\n";
 }
 
@@ -1596,7 +1596,6 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.overrideShaderThreadGroupSizeZ);
       hasher->Update(options.nsaThreshold);
       hasher->Update(options.aggressiveInvariantLoads);
-      hasher->Update(options.disableInvariantLoads);
     }
   }
 }
@@ -2507,6 +2506,25 @@ std::ostream &operator<<(std::ostream &out, ThreadGroupSwizzleMode threadGroupSw
     llvm_unreachable("Should never be called!");
     break;
   }
+  return out << string;
+}
+
+// =====================================================================================================================
+// Translates enum "InvariantLoads" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param option : Value to convert
+std::ostream &operator<<(std::ostream &out, InvariantLoads option) {
+  const char *string = nullptr;
+  switch (option) {
+    CASE_CLASSENUM_TO_STRING(InvariantLoads, Auto)
+    CASE_CLASSENUM_TO_STRING(InvariantLoads, EnableOptimization)
+    CASE_CLASSENUM_TO_STRING(InvariantLoads, DisableOptimization)
+    CASE_CLASSENUM_TO_STRING(InvariantLoads, ClearInvariants)
+  default:
+    llvm_unreachable("Should never be called!");
+  }
+
   return out << string;
 }
 

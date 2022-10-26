@@ -14,7 +14,7 @@ void main() {
 
 [VsInfo]
 entryPoint = main
-options.disableInvariantLoads = 1
+options.aggressiveInvariantLoads = ClearInvariants
 
 [FsGlsl]
 #version 450
@@ -31,7 +31,7 @@ void main() {
 
 [FsInfo]
 entryPoint = main
-options.disableInvariantLoads = 1
+options.aggressiveInvariantLoads = ClearInvariants
 
 [ResourceMapping]
 userDataNode[0].visibility = 2
