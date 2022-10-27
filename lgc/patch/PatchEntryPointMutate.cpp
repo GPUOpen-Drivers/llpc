@@ -1522,9 +1522,9 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
                                 &userDataUsage->spillTable.entryArgIdx);
 
   // Figure out how many sgprs we have available for userDataArgs.
-  // We have s0-s31 (s0-s15 for <=GFX8, or for a compute shader on any chip) for everything, so take off the number
+  // We have s0-s31 (s0-s15 for <=GFX8, or for a compute/task shader on any chip) for everything, so take off the number
   // of registers used by specialUserDataArgs.
-  unsigned userDataEnd = m_shaderStage == ShaderStageCompute
+  unsigned userDataEnd = (m_shaderStage == ShaderStageCompute || m_shaderStage == ShaderStageTask)
                              ? InterfaceData::MaxCsUserDataCount
                              : m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
 
