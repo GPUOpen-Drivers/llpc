@@ -380,10 +380,12 @@ void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, un
   unsigned userDataReg = getUserDataReg0(stage);
 
   // Assert that the supplied user data index is not too big.
-  assert(userDataIndex + dwordCount <= 32 &&
-         (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 || stage != ShaderStageCompute ||
-          userDataIndex + dwordCount <= 16) &&
-         "Out of range user data index");
+  bool inRange = userDataIndex + dwordCount <= 16;
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 && stage != ShaderStageCompute &&
+      stage != ShaderStageTask)
+    inRange = userDataIndex + dwordCount <= 32;
+  assert(inRange && "Out of range user data index");
+  (void(inRange)); // Unused
 
   // Update userDataLimit if userData is a 0-based integer for root user data dword offset.
   if (userDataValue < InterfaceData::MaxSpillTableSize && userDataValue + dwordCount > m_userDataLimit->getUInt())
