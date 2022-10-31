@@ -392,6 +392,24 @@ Value *BuilderRecorder::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
 }
 
 // =====================================================================================================================
+// Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
+// where available. The factor inputs are always <N x iM> of the same type, N can be arbitrary and M must be 4, 8, 16,
+// 32, or 64 Use a value of 0 for no accumulation and the value type is consistent with the result type. The result is
+// saturated if there is an accumulator. Only the final addition to the accumulator needs to be saturated.
+// Intermediate overflows of the dot product can lead to an undefined result.
+//
+// @param vector1 : The integer Vector 1
+// @param vector2 : The integer Vector 2
+// @param accumulator : The accumulator to the scalar of dot product
+// @param flags : The first bit marks whether Vector 1 is signed and the second bit marks whether Vector 2 is signed
+// @param instName : Name to give instruction(s)
+Value *BuilderRecorder::CreateIntegerDotProductNew(Value *vector1, Value *vector2, Value *accumulator, unsigned flags,
+                                                   const Twine &instName) {
+  return record(Opcode::IntegerDotProduct, accumulator->getType(), {vector1, vector2, accumulator, getInt32(flags)},
+                instName);
+}
+
+// =====================================================================================================================
 // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
 // the current output primitive in the specified output-primitive stream number.
 //

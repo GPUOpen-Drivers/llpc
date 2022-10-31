@@ -6875,8 +6875,18 @@ Value *SPIRVToLLVM::transSPIRVIntegerDotProductFromInst(SPIRVInstruction *bi, Ba
                                : getBuilder()->getIntN(returnTy->getScalarSizeInBits(), 0);
 
   if (vector1->getType()->isIntegerTy(32)) {
-    // Cast i32 to <4xi8>
-    auto vecTy = FixedVectorType::get(getBuilder()->getInt8Ty(), 4);
+    const unsigned operandId = hasAccumulator ? 3 : 2;
+    SPIRVConstant *constOp = static_cast<SPIRVConstant *>(bc->getOperand(operandId));
+    spv::PackedVectorFormat packedVecFormat = static_cast<spv::PackedVectorFormat>(constOp->getZExtIntValue());
+    Type *vecTy = nullptr;
+    switch (packedVecFormat) {
+    case spv::PackedVectorFormatPackedVectorFormat4x8Bit:
+      vecTy = FixedVectorType::get(getBuilder()->getInt8Ty(), 4);
+      break;
+    default:
+      llvm_unreachable("invalid packed vector format");
+      break;
+    }
     vector1 = getBuilder()->CreateBitCast(vector1, vecTy);
     vector2 = getBuilder()->CreateBitCast(vector2, vecTy);
   }
