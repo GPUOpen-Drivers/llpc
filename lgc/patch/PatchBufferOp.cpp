@@ -1425,6 +1425,36 @@ bool PatchBufferOp::removeUsersForInvariantStarts(Value *const value) {
 }
 
 // =====================================================================================================================
+// Get integer access type for load/store.
+//
+// @param context : LLVM context.
+// @param alignment : Access alignment.
+// @param isInvariant : Whether the load is invariant.
+// @param bytes : Size of access in bytes.
+static Type *getIntAccessType(llvm::LLVMContext *context, Align alignment, bool isInvariant, unsigned bytes) {
+  Type *intAccessType = nullptr;
+
+  // Handle the greatest possible size
+  if (alignment >= 4 && bytes >= 4) {
+    if (bytes >= 16) {
+      intAccessType = FixedVectorType::get(Type::getInt32Ty(*context), 4);
+    } else if (bytes >= 12 && !isInvariant) {
+      intAccessType = FixedVectorType::get(Type::getInt32Ty(*context), 3);
+    } else if (bytes >= 8) {
+      intAccessType = FixedVectorType::get(Type::getInt32Ty(*context), 2);
+    } else {
+      // bytes >= 4
+      intAccessType = Type::getInt32Ty(*context);
+    }
+  } else if (alignment >= 2 && bytes >= 2) {
+    intAccessType = Type::getInt16Ty(*context);
+  } else {
+    intAccessType = Type::getInt8Ty(*context);
+  }
+  return intAccessType;
+}
+
+// =====================================================================================================================
 // Replace a fat pointer load or store with the required intrinsics.
 //
 // @param inst : The instruction to replace.
@@ -1574,34 +1604,9 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
     const unsigned offset = bytesToHandle - remainingBytes;
     Value *offsetVal = offset == 0 ? baseIndex : m_builder->CreateAdd(baseIndex, m_builder->getInt32(offset));
 
-    Type *intAccessType = nullptr;
-    unsigned accessSize = 0;
-
-    // Handle the greatest possible size
-    if (alignment >= 4 && remainingBytes >= 4) {
-      if (remainingBytes >= 16) {
-        intAccessType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
-        accessSize = 16;
-      } else if (remainingBytes >= 12 && !isInvariant) {
-        intAccessType = FixedVectorType::get(Type::getInt32Ty(*m_context), 3);
-        accessSize = 12;
-      } else if (remainingBytes >= 8) {
-        intAccessType = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
-        accessSize = 8;
-      } else {
-        // remainingBytes >= 4
-        intAccessType = Type::getInt32Ty(*m_context);
-        accessSize = 4;
-      }
-    } else if (alignment >= 2 && remainingBytes >= 2) {
-      intAccessType = Type::getInt16Ty(*m_context);
-      accessSize = 2;
-    } else {
-      intAccessType = Type::getInt8Ty(*m_context);
-      accessSize = 1;
-    }
-    assert(intAccessType);
-    assert(accessSize != 0);
+    Type *intAccessType = getIntAccessType(m_context, alignment, isInvariant, remainingBytes);
+    const DataLayout &dataLayout = m_builder->GetInsertBlock()->getModule()->getDataLayout();
+    unsigned accessSize = dataLayout.getTypeSizeInBits(intAccessType) / 8;
 
     Value *part = nullptr;
 
