@@ -1455,6 +1455,31 @@ static Type *getIntAccessType(llvm::LLVMContext *context, Align alignment, bool 
 }
 
 // =====================================================================================================================
+// Get intrinsic ID for load/store.
+//
+// @param isLoad : Whether the instruction is a load.
+// @param isInvariant : Whether the instruction is invariant.
+// @param accessSize : Access size of load/store in bytes.
+// @param ordering : Atomic ordering.
+static unsigned getLoadStoreIntrinsicId(bool isLoad, bool isInvariant, unsigned accessSize, AtomicOrdering ordering) {
+  if (isLoad) {
+    if (isInvariant && accessSize >= 4)
+      return Intrinsic::amdgcn_s_buffer_load;
+    unsigned intrinsicId = Intrinsic::amdgcn_raw_buffer_load;
+#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
+#warning[!amd-gfx] Atomic load loses memory semantics
+#else
+    if (ordering != AtomicOrdering::NotAtomic)
+      intrinsicId = Intrinsic::amdgcn_raw_atomic_buffer_load;
+#endif
+    return intrinsicId;
+  }
+
+  assert(!isLoad);
+  return Intrinsic::amdgcn_raw_buffer_store;
+}
+
+// =====================================================================================================================
 // Replace a fat pointer load or store with the required intrinsics.
 //
 // @param inst : The instruction to replace.
@@ -1610,6 +1635,8 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
 
     Value *part = nullptr;
 
+    unsigned intrinsicId = getLoadStoreIntrinsicId(isLoad, isInvariant, accessSize, ordering);
+
     CoherentFlag coherent = {};
     coherent.bits.glc = isGlc;
     if (!isInvariant)
@@ -1620,21 +1647,15 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
         // TODO For stores?
         coherent.bits.dlc = isDlc;
       }
-      if (isInvariant && accessSize >= 4) {
-        CallInst *call = m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,
+
+      if (intrinsicId == Intrinsic::amdgcn_s_buffer_load) {
+        CallInst *call = m_builder->CreateIntrinsic(intrinsicId, intAccessType,
                                                     {bufferDesc, offsetVal, m_builder->getInt32(coherent.u32All)});
         call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, None));
         part = call;
       } else {
-        unsigned intrinsicID = Intrinsic::amdgcn_raw_buffer_load;
-#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
-#warning[!amd-gfx] Atomic load loses memory semantics
-#else
-        if (ordering != AtomicOrdering::NotAtomic)
-          intrinsicID = Intrinsic::amdgcn_raw_atomic_buffer_load;
-#endif
         part = m_builder->CreateIntrinsic(
-            intrinsicID, intAccessType,
+            intrinsicId, intAccessType,
             {bufferDesc, offsetVal, m_builder->getInt32(0), m_builder->getInt32(coherent.u32All)});
       }
     } else {
@@ -1649,7 +1670,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
       part = m_builder->CreateBitCast(part, intAccessType);
       copyMetadata(part, &inst);
       part = m_builder->CreateIntrinsic(
-          Intrinsic::amdgcn_raw_buffer_store, intAccessType,
+          intrinsicId, intAccessType,
           {part, bufferDesc, offsetVal, m_builder->getInt32(0), m_builder->getInt32(coherent.u32All)});
     }
 
