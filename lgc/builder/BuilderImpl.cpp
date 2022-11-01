@@ -688,7 +688,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
   }
 
   // Save Builder's insert point
-  auto savedInsertPoint = saveIP();
+  IRBuilder<>::InsertPointGuard guard(*this);
 
   Value *waterfallBegin;
   if (scalarizeDescriptorLoads && firstIndexInst && identicalIndexes) {
@@ -778,8 +778,6 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
     *useOfNonUniformInst = nonUniformInst;
   }
 
-  // Restore Builder's insert point.
-  restoreIP(savedInsertPoint);
   return resultValue;
 #endif
 }

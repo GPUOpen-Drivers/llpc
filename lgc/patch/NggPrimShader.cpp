@@ -2975,7 +2975,7 @@ void NggPrimShader::splitEs(Module *module) {
   }
   assert(retBlock);
 
-  auto savedInsertPos = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
   m_builder->SetInsertPoint(retBlock);
 
   SmallVector<CallInst *, 8> removeCalls;
@@ -3078,8 +3078,6 @@ void NggPrimShader::splitEs(Module *module) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
-
-  m_builder->restoreIP(savedInsertPos);
 }
 
 // =====================================================================================================================
@@ -3184,7 +3182,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
   auto gsEntryPoint = module->getFunction(lgcName::NggGsEntryPoint);
   assert(gsEntryPoint);
 
-  auto savedInsertPos = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   std::vector<Instruction *> removeCalls;
 
@@ -3283,8 +3281,6 @@ Function *NggPrimShader::mutateGs(Module *module) {
     call->eraseFromParent();
   }
 
-  m_builder->restoreIP(savedInsertPos);
-
   return gsEntryPoint;
 }
 
@@ -3358,7 +3354,7 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
   auto copyShaderEntryPoint = module->getFunction(lgcName::NggCopyShaderEntryPoint);
   assert(copyShaderEntryPoint);
 
-  auto savedInsertPos = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   // Vertex ID is always the last argument
   auto vertexId = getFunctionArgument(copyShaderEntryPoint, copyShaderEntryPoint->arg_size() - 1);
@@ -3400,8 +3396,6 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
-
-  m_builder->restoreIP(savedInsertPos);
 
   return copyShaderEntryPoint;
 }
@@ -3652,7 +3646,7 @@ Function *NggPrimShader::createGsEmitHandler(Module *module) {
   auto emitPrimBlock = createBlock(func, ".emitPrim");
   auto endEmitPrimBlock = createBlock(func, ".endEmitPrim");
 
-  auto savedInsertPoint = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
   const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
@@ -3714,8 +3708,6 @@ Function *NggPrimShader::createGsEmitHandler(Module *module) {
     m_builder->CreateRetVoid();
   }
 
-  m_builder->restoreIP(savedInsertPoint);
-
   return func;
 }
 
@@ -3746,7 +3738,7 @@ Function *NggPrimShader::createGsCutHandler(Module *module) {
 
   auto entryBlock = createBlock(func, ".entry");
 
-  auto savedInsertPoint = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   // Construct ".entry" block
   {
@@ -3754,8 +3746,6 @@ Function *NggPrimShader::createGsCutHandler(Module *module) {
     m_builder->CreateStore(m_builder->getInt32(0), outVertsPtr); // Reset outVerts
     m_builder->CreateRetVoid();
   }
-
-  m_builder->restoreIP(savedInsertPoint);
 
   return func;
 }
@@ -4098,7 +4088,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
   auto backfaceExponentBlock = createBlock(func, ".backfaceExponent");
   auto backfaceExitBlock = createBlock(func, ".backfaceExit");
 
-  auto savedInsertPoint = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   // Construct ".backfaceEntry" block
   {
@@ -4270,8 +4260,6 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     m_builder->CreateRet(cullFlag);
   }
 
-  m_builder->restoreIP(savedInsertPoint);
-
   return func;
 }
 
@@ -4323,7 +4311,7 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
   auto frustumCullBlock = createBlock(func, ".frustumCull");
   auto frustumExitBlock = createBlock(func, ".frustumExit");
 
-  auto savedInsertPoint = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   // Construct ".frustumEntry" block
   {
@@ -4527,8 +4515,6 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
     m_builder->CreateRet(cullFlagPhi);
   }
 
-  m_builder->restoreIP(savedInsertPoint);
-
   return func;
 }
 
@@ -4584,7 +4570,7 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
   auto boxFilterCullBlock = createBlock(func, ".boxfilterCull");
   auto boxFilterExitBlock = createBlock(func, ".boxfilterExit");
 
-  auto savedInsertPoint = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   // Construct ".boxfilterEntry" block
   {
@@ -4752,8 +4738,6 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
     m_builder->CreateRet(cullFlagPhi);
   }
 
-  m_builder->restoreIP(savedInsertPoint);
-
   return func;
 }
 
@@ -4809,7 +4793,7 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
   auto sphereCullBlock = createBlock(func, ".sphereCull");
   auto sphereExitBlock = createBlock(func, ".sphereExit");
 
-  auto savedInsertPoint = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   // Construct ".sphereEntry" block
   {
@@ -5117,8 +5101,6 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
     m_builder->CreateRet(cullFlagPhi);
   }
 
-  m_builder->restoreIP(savedInsertPoint);
-
   return func;
 }
 
@@ -5182,7 +5164,7 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
   auto smallPrimFilterCullBlock = createBlock(func, ".smallprimfilterCull");
   auto smallPrimFilterExitBlock = createBlock(func, ".smallprimfilterExit");
 
-  auto savedInsertPoint = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   // Construct ".smallprimfilterEntry" block
   {
@@ -5401,8 +5383,6 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     m_builder->CreateRet(cullFlagPhi);
   }
 
-  m_builder->restoreIP(savedInsertPoint);
-
   return func;
 }
 
@@ -5442,7 +5422,7 @@ Function *NggPrimShader::createCullDistanceCuller(Module *module) {
   auto cullDistanceCullBlock = createBlock(func, ".culldistanceCull");
   auto cullDistanceExitBlock = createBlock(func, ".culldistanceExit");
 
-  auto savedInsertPoint = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   // Construct ".culldistanceEntry" block
   {
@@ -5482,8 +5462,6 @@ Function *NggPrimShader::createCullDistanceCuller(Module *module) {
     m_builder->CreateRet(cullFlagPhi);
   }
 
-  m_builder->restoreIP(savedInsertPoint);
-
   return func;
 }
 
@@ -5517,7 +5495,7 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
 
   BasicBlock *entryBlock = createBlock(func); // Create entry block
 
-  auto savedInsertPoint = m_builder->saveIP();
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
 
   // Construct entry block
   {
@@ -5546,8 +5524,6 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
 
     m_builder->CreateRet(regValue);
   }
-
-  m_builder->restoreIP(savedInsertPoint);
 
   return func;
 }

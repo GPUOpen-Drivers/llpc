@@ -545,10 +545,9 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   if (description->inputRate == VertexInputRateVertex) {
     // Use vertex index
     if (!m_vertexIndex) {
-      auto savedInsertPoint = builder.saveIP();
+      IRBuilder<>::InsertPointGuard guard(builder);
       builder.SetInsertPointPastAllocas(insertPos->getFunction());
       m_vertexIndex = ShaderInputs::getVertexIndex(builder, *m_lgcContext);
-      builder.restoreIP(savedInsertPoint);
     }
     vbIndex = m_vertexIndex;
   } else {
@@ -557,10 +556,9 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     } else if (description->inputRate == VertexInputRateInstance) {
       // Use instance index
       if (!m_instanceIndex) {
-        auto savedInsertPoint = builder.saveIP();
+        IRBuilder<>::InsertPointGuard guard(builder);
         builder.SetInsertPointPastAllocas(insertPos->getFunction());
         m_instanceIndex = ShaderInputs::getInstanceIndex(builder, *m_lgcContext);
-        builder.restoreIP(savedInsertPoint);
       }
       vbIndex = m_instanceIndex;
     } else {
@@ -921,11 +919,10 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderBase
   // Get the vertex buffer table pointer as pointer to v4i32 descriptor.
   Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   if (!m_vertexBufTablePtr) {
-    auto savedInsertPoint = builder.saveIP();
+    IRBuilder<>::InsertPointGuard guard(builder);
     builder.SetInsertPointPastAllocas(builder.GetInsertPoint()->getFunction());
     m_vertexBufTablePtr =
         ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping::VertexBufferTable, vbDescTy, builder);
-    builder.restoreIP(savedInsertPoint);
   }
 
   Value *vbDescPtr = builder.CreateGEP(vbDescTy, m_vertexBufTablePtr, builder.getInt64(binding));
