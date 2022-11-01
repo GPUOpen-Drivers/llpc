@@ -297,6 +297,7 @@ struct ResourceNode {
                                       // If pipeline option "useResourceBindingRange" is set, then this is the
                                       //  start of a range of bindings whose size is sizeInDwords/stride.
       unsigned stride;                // Size of each descriptor in the indexable range in dwords.
+      unsigned srdStride;             // Size of each SRD in one descriptor set node
       unsigned immutableSize;         // Size (in units of DescriptorSizeSampler bytes) of immutableValue array
       const uint32_t *immutableValue; // Array of dwords for immutable sampler.
     };

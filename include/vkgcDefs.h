@@ -347,6 +347,7 @@ struct ResourceMappingNode {
     struct {
       unsigned set;     ///< Descriptor set
       unsigned binding; ///< Descriptor binding
+      unsigned stride;  ///< Descriptor stride
       unsigned reserv0;
       unsigned reserv1;
       unsigned reserv2;
