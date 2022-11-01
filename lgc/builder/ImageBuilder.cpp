@@ -2031,7 +2031,7 @@ Value *ImageBuilder::fixImageDescForRead(Value *imageDesc) {
 // @param imageInst : the image instruction
 // @param descIdx : the index of the descriptor to put readfirstlane on
 void ImageBuilder::enforceReadFirstLane(Instruction *imageInst, unsigned descIdx) {
-  InsertPoint savedInsertPoint = saveIP();
+  IRBuilder<>::InsertPointGuard guard(*this);
   SetInsertPoint(imageInst);
   Value *origDesc = imageInst->getOperand(descIdx);
   const unsigned elemCount = cast<FixedVectorType>(origDesc->getType())->getNumElements();
@@ -2042,5 +2042,4 @@ void ImageBuilder::enforceReadFirstLane(Instruction *imageInst, unsigned descIdx
     newDesc = CreateInsertElement(newDesc, elem, elemIdx);
   }
   imageInst->setOperand(descIdx, newDesc);
-  restoreIP(savedInsertPoint);
 }
