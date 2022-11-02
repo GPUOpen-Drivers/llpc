@@ -595,6 +595,54 @@ Value *SpirvLowerRayQuery::getDispatchId() {
 }
 
 // =====================================================================================================================
+// Create instructions to get BVH SRD given the expansion and box sort mode at the current insert point
+//
+// @param expansion : Box expansion
+// @param boxSortMode : Box sort mode
+Value *SpirvLowerRayQuery::createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode) {
+  const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
+  assert(rtState->bvhResDesc.dataSizeInDwords == 4);
+
+  // Construct image descriptor from rtstate.
+  Value *bvhSrd = PoisonValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 4));
+  bvhSrd =
+      m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(rtState->bvhResDesc.descriptorData[0]), uint64_t(0));
+  bvhSrd = m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(rtState->bvhResDesc.descriptorData[2]), 2u);
+  bvhSrd = m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(rtState->bvhResDesc.descriptorData[3]), 3u);
+
+  Value *bvhSrdDw1 = m_builder->getInt32(rtState->bvhResDesc.descriptorData[1]);
+
+  if (expansion) {
+    const unsigned BvhSrdBoxExpansionShift = 23;
+    const unsigned BvhSrdBoxExpansionBitCount = 8;
+    // Update the box expansion ULPs field.
+    bvhSrdDw1 = m_builder->CreateInsertBitField(bvhSrdDw1, expansion, m_builder->getInt32(BvhSrdBoxExpansionShift),
+                                                m_builder->getInt32(BvhSrdBoxExpansionBitCount));
+  }
+
+  if (boxSortMode) {
+    const unsigned BvhSrdBoxSortDisableValue = 3;
+    const unsigned BvhSrdBoxSortModeShift = 21;
+    const unsigned BvhSrdBoxSortModeBitCount = 2;
+    const unsigned BvhSrdBoxSortEnabledFlag = 1u << 31u;
+    // Update the box sort mode field.
+    Value *newBvhSrdDw1 =
+        m_builder->CreateInsertBitField(bvhSrdDw1, boxSortMode, m_builder->getInt32(BvhSrdBoxSortModeShift),
+                                        m_builder->getInt32(BvhSrdBoxSortModeBitCount));
+    // Box sort enabled, need to OR in the box sort flag at bit 31 in DWORD 1.
+    newBvhSrdDw1 = m_builder->CreateOr(newBvhSrdDw1, m_builder->getInt32(BvhSrdBoxSortEnabledFlag));
+
+    Value *boxSortEnabled = m_builder->CreateICmpNE(boxSortMode, m_builder->getInt32(BvhSrdBoxSortDisableValue));
+    bvhSrdDw1 = m_builder->CreateSelect(boxSortEnabled, newBvhSrdDw1, bvhSrdDw1);
+  }
+
+  // Fill in modified DW1 to the BVH SRD.
+  bvhSrd = m_builder->CreateInsertElement(bvhSrd, bvhSrdDw1, 1u);
+
+  return bvhSrd;
+}
+
+// =====================================================================================================================
 // Process RayQuery OpRayQueryProceedKHR
 //
 // @param func : The function to create
@@ -1531,35 +1579,8 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), m_builder->getInt32Ty()));
   Value *expansion = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
-  const unsigned boxExpansionShift = 23;
-  expansion = m_builder->CreateShl(expansion, boxExpansionShift);
 
-  // Construct image descriptor from rtstate
-  Value *imageDesc = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 4));
-  imageDesc = m_builder->CreateInsertElement(imageDesc, m_builder->getInt32(rtState->bvhResDesc.descriptorData[0]),
-                                             uint64_t(0));
-  imageDesc = m_builder->CreateInsertElement(imageDesc, m_builder->getInt32(rtState->bvhResDesc.descriptorData[1]), 1u);
-  imageDesc = m_builder->CreateInsertElement(imageDesc, m_builder->getInt32(rtState->bvhResDesc.descriptorData[2]), 2u);
-  imageDesc = m_builder->CreateInsertElement(imageDesc, m_builder->getInt32(rtState->bvhResDesc.descriptorData[3]), 3u);
-
-  // Process box sort heuristic
-
-  auto disableBoxSortFlag = m_builder->getInt32(3);
-  auto enableBoxSort = m_builder->CreateICmpNE(flags, disableBoxSortFlag);
-
-  // flag_in_dw1 = (value << 21)
-  const unsigned BoxSortHeuristicShift = 21;
-  const unsigned boxSortEnabledValue = 1u << 31u;
-  auto boxSortFlag = m_builder->CreateShl(flags, BoxSortHeuristicShift);
-  boxSortFlag = m_builder->CreateOr(boxSortFlag, m_builder->getInt32(boxSortEnabledValue));
-  boxSortFlag = m_builder->CreateOr(boxSortFlag, expansion);
-
-  // Initially set DW upon ULP bit, and default box_sort_en bit as 0
-  // box_sort logic could be overwritten if sort is enabled.
-  auto imageDescDW1 = m_builder->CreateSelect(enableBoxSort, boxSortFlag, expansion);
-
-  // update / overwrite DW1 bit 31 (box sorting enable), 21 (box sorting heuristic)
-  imageDesc = m_builder->CreateInsertElement(imageDesc, imageDescDW1, 1u);
+  Value *imageDesc = createGetBvhSrd(expansion, flags);
 
   m_builder->CreateRet(m_builder->CreateImageBvhIntersectRay(address, extent, origin, dir, invDir, imageDesc));
 }
