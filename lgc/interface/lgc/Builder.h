@@ -219,19 +219,6 @@ public:
   };
 
   // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
-  // where available.
-  // Use a value of 0 for no accumulation and the value type is consistent with the result type. The result is saturated
-  // if there is an accumulator. The component type of input vectors can have 8-bit/16-bit/32-bit and i32/i16/i8 result.
-  //
-  // @param vector1 : The integer vector 1
-  // @param vector2 : The integer vector 2
-  // @param accumulator : The accumulator to the scalar of dot product
-  // @param flags : Bit 0 is "first vector is signed" and bit 1 is "second vector is signed"
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
-                                               unsigned flags, const llvm::Twine &instName = "") = 0;
-
-  // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
   // where available. The factor inputs are always <N x iM> of the same type, N can be arbitrary and M must be 4, 8, 16,
   // 32, or 64 Use a value of 0 for no accumulation and the value type is consistent with the result type. The result is
   // saturated if there is an accumulator. Only the final addition to the accumulator needs to be saturated.
@@ -242,8 +229,8 @@ public:
   // @param accumulator : The accumulator to the scalar of dot product
   // @param flags : The first bit marks whether Vector 1 is signed and the second bit marks whether Vector 2 is signed
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateIntegerDotProductNew(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
-                                                  unsigned flags, const llvm::Twine &instName = "") = 0;
+  virtual llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
+                                               unsigned flags, const llvm::Twine &instName = "") = 0;
 
   // Create a call to the specified intrinsic with one operand, mangled on its type.
   // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math

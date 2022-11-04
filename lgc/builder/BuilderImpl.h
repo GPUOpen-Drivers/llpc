@@ -48,10 +48,6 @@ public:
 
   // Create scalar from integer dot product of vector
   llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
-                                       unsigned flags, const llvm::Twine &instName = "") override final;
-
-  // Create scalar from integer dot product of vector
-  llvm::Value *CreateIntegerDotProductNew(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
                                           unsigned flags, const llvm::Twine &instName = "") override final;
 
 protected:
