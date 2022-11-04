@@ -398,15 +398,31 @@ struct ResourceMappingData {
 /// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
 /// details.
 struct GfxIpVersion {
-  unsigned major;    ///< Major version
-  unsigned minor;    ///< Minor version
-  unsigned stepping; ///< Stepping info
+  static const unsigned Unspecified = ~0U;
 
-  // GFX IP checkers
+  unsigned major = 0;              ///< Major version
+  unsigned minor = Unspecified;    ///< Minor version
+  unsigned stepping = Unspecified; ///< Stepping info
+
+  /// GFX IP checkers
   bool operator==(const GfxIpVersion &rhs) const {
+    if (rhs.minor == Unspecified && rhs.stepping == Unspecified)
+      return major == rhs.major;
+
+    if (rhs.stepping == Unspecified)
+      return std::tie(major, minor) == std::tie(rhs.major, rhs.minor);
+
+    assert(rhs.minor != Unspecified && rhs.stepping != Unspecified);
     return std::tie(major, minor, stepping) == std::tie(rhs.major, rhs.minor, rhs.stepping);
   }
   bool operator>=(const GfxIpVersion &rhs) const {
+    if (rhs.minor == Unspecified && rhs.stepping == Unspecified)
+      return major >= rhs.major;
+
+    if (rhs.stepping == Unspecified)
+      return std::tie(major, minor) >= std::tie(rhs.major, rhs.minor);
+
+    assert(rhs.minor != Unspecified && rhs.stepping != Unspecified);
     return std::tie(major, minor, stepping) >= std::tie(rhs.major, rhs.minor, rhs.stepping);
   }
 };
