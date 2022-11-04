@@ -151,6 +151,7 @@ private:
   uint32_t getWorkgroupSize() const;
   llvm::Value *createGetInstanceNodeAddr(llvm::Value *instNodePtr, llvm::Value *rayQuery);
   llvm::Value *getDispatchId();
+  llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
   bool stageNotSupportLds(ShaderStage stage);
   llvm::GlobalVariable *m_ldsStack;        // LDS to hold stack value
   llvm::GlobalVariable *m_ldsUsage;        // LDS usage
