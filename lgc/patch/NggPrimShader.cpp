@@ -1007,7 +1007,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       primitiveIdPhi->addIncoming(m_builder->getInt32(0), endWritePrimIdBlock);
 
       // Record primitive ID
-      m_nggFactor.primitiveId = primitiveId;
+      m_nggFactor.primitiveId = primitiveIdPhi;
 
       SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
       m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
