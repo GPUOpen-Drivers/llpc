@@ -1,6 +1,6 @@
 ; Change inttoptr ( add x, const ) -> gep ( inttoptr x, const )
 
-; RUN: lgc -mcpu=gfx900 -print-after=lgc-patch-peephole-opt -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
+; RUN: lgc -enable-opaque-pointers=true -mcpu=gfx900 -print-after=lgc-patch-peephole-opt -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
 
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
 target triple = "amdgcn--amdpal"
@@ -8,26 +8,26 @@ target triple = "amdgcn--amdpal"
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.VS.main(i64 %0, <4 x i32> addrspace(1)* %1) local_unnamed_addr #0 !lgc.shaderstage !10 {
 ; CHECK: IR Dump After Patch LLVM for peephole optimizations
-; CHECK: [[INTTOPTR:%[0-9]+]] = inttoptr i64 %[[#]] to i32 addrspace(1)*
-; CHECK: [[LOAD:%[0-9]+]] = load i32, i32 addrspace(1)* [[INTTOPTR]], align 4
+; CHECK: [[INTTOPTR:%[0-9]+]] = inttoptr i64 %[[#]] to ptr addrspace(1)
+; CHECK: [[LOAD:%[0-9]+]] = load i32, ptr addrspace(1) [[INTTOPTR]], align 4
 ; CHECK: [[INSERTELEMENT:%[0-9]+]] = insertelement <4 x i32> undef, i32 [[LOAD]], i{{32|64}} 0
 
-; CHECK: [[INTTOPTR1:%[0-9]+]] = inttoptr i64 %[[#]] to i32 addrspace(1)*
-; CHECK: [[GEP1:%[0-9]+]] = getelementptr i32, i32 addrspace(1)* [[INTTOPTR1]], i64 1
-; CHECK: [[LOAD1:%[0-9]+]] = load i32, i32 addrspace(1)* [[GEP1]], align 4
+; CHECK: [[INTTOPTR1:%[0-9]+]] = inttoptr i64 %[[#]] to ptr addrspace(1)
+; CHECK: [[GEP1:%[0-9]+]] = getelementptr i32, ptr addrspace(1) [[INTTOPTR1]], i64 1
+; CHECK: [[LOAD1:%[0-9]+]] = load i32, ptr addrspace(1) [[GEP1]], align 4
 ; CHECK: [[INSERTELEMENT1:%[0-9]+]] = insertelement <4 x i32> [[INSERTELEMENT]], i32 [[LOAD1]], i{{32|64}} 1
 
-; CHECK: [[INTTOPTR2:%[0-9]+]] = inttoptr i64 %[[#]] to i32 addrspace(1)*
-; CHECK: [[GEP2:%[0-9]+]] = getelementptr i32, i32 addrspace(1)* [[INTTOPTR2]], i64 2
-; CHECK: [[LOAD2:%[0-9]+]] = load i32, i32 addrspace(1)* [[GEP2]], align 4
+; CHECK: [[INTTOPTR2:%[0-9]+]] = inttoptr i64 %[[#]] to ptr addrspace(1)
+; CHECK: [[GEP2:%[0-9]+]] = getelementptr i32, ptr addrspace(1) [[INTTOPTR2]], i64 2
+; CHECK: [[LOAD2:%[0-9]+]] = load i32, ptr addrspace(1) [[GEP2]], align 4
 ; CHECK: [[INSERTELEMENT2:%[0-9]+]] = insertelement <4 x i32> [[INSERTELEMENT1]], i32 [[LOAD2]], i{{32|64}} 2
 
-; CHECK: [[INTTOPTR3:%[0-9]+]] = inttoptr i64 %[[#]] to i32 addrspace(1)*
-; CHECK: [[GEP3:%[0-9]+]] = getelementptr i32, i32 addrspace(1)* [[INTTOPTR3]], i64 3
-; CHECK: [[LOAD3:%[0-9]+]] = load i32, i32 addrspace(1)* [[GEP3]], align 4
+; CHECK: [[INTTOPTR3:%[0-9]+]] = inttoptr i64 %[[#]] to ptr addrspace(1)
+; CHECK: [[GEP3:%[0-9]+]] = getelementptr i32, ptr addrspace(1) [[INTTOPTR3]], i64 3
+; CHECK: [[LOAD3:%[0-9]+]] = load i32, ptr addrspace(1) [[GEP3]], align 4
 ; CHECK: [[INSERTELEMENT3:%[0-9]+]] = insertelement <4 x i32> [[INSERTELEMENT2]], i32 [[LOAD3]], i{{32|64}} 3
 
-; CHECK: store <4 x i32> [[INSERTELEMENT3]], <4 x i32> addrspace(1)* %[[#]], align 16
+; CHECK: store <4 x i32> [[INSERTELEMENT3]], ptr addrspace(1) %[[#]], align 16
 .entry:
   %2 = inttoptr i64 %0 to i32 addrspace(1)*
   %3 = load i32, i32 addrspace(1)* %2, align 4

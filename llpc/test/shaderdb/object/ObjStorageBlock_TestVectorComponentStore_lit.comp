@@ -12,13 +12,13 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call i8 addrspace(7)* {{.*}} @lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 0, i32 0,
-; SHADERTEST: %{{[0-9]*}} = load float, float addrspace(7)* %{{[0-9]*}}, align 4
-; SHADERTEST: %{{[0-9]*}} = getelementptr inbounds i8, i8 addrspace(7)* %{{[0-9]*}}, i64 4
-; SHADERTEST: store float %{{[0-9]*}}, float addrspace(7)* %{{[0-9]*}}, align 4
+; SHADERTEST: %{{[0-9]*}} = call ptr addrspace(7) {{.*}} @lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 0, i32 0,
+; SHADERTEST: %{{[0-9]*}} = load float, ptr addrspace(7) %{{[0-9]*}}, align 4
+; SHADERTEST: %{{[0-9]*}} = getelementptr inbounds <{ [4 x float] }>, ptr addrspace(7) %{{[0-9]*}}, i64 0, i32 0, i64 1
+; SHADERTEST: store float %{{[0-9]*}}, ptr addrspace(7) %{{[0-9]*}}, align 4
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

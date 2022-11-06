@@ -1,5 +1,5 @@
-; RUN: lgc -mcpu=gfx900 -print-after=lgc-patch-read-first-lane %s -o /dev/null 2>&1 | FileCheck  %s
-; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-read-first-lane %s -o /dev/null 2>&1 | FileCheck %s
+; RUN: lgc -mcpu=gfx900 -print-after=lgc-patch-read-first-lane -enable-opaque-pointers=true %s -o /dev/null 2>&1 | FileCheck  %s
+; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-read-first-lane -enable-opaque-pointers=true %s -o /dev/null 2>&1 | FileCheck %s
 
 ; ModuleID = 'lgcPipeline'
 source_filename = "llpccompute6"
@@ -12,7 +12,7 @@ target triple = "amdgcn--amdpal"
 ; Test that %LocalInvocationId.i0 gets replaced with %scalar in BB1.
 ; CHECK: @icmp_eq_true
 ; CHECK: %use = add i32 %scalar, 1
-; CHECK: store i32 %use, i32 addrspace(3)* @lds, align 16
+; CHECK: store i32 %use, ptr addrspace(3) @lds, align 16
 
 ; Function Attrs: nounwind
 define dllexport amdgpu_cs void @icmp_eq_true(i32 inreg %0, i32 inreg %1, <3 x i32> inreg %2, i32 inreg %3, <3 x i32> %LocalInvocationId) local_unnamed_addr #0 !lgc.shaderstage !4 {
@@ -37,7 +37,7 @@ define dllexport amdgpu_cs void @icmp_eq_true(i32 inreg %0, i32 inreg %1, <3 x i
 ; Test that %LocalInvocationId.i0 gets replaced with %scalar in BB1.
 ; CHECK: @icmp_ne_false
 ; CHECK: %use = add i32 %scalar, 1
-; CHECK: store i32 %use, i32 addrspace(3)* @lds, align 16
+; CHECK: store i32 %use, ptr addrspace(3) @lds, align 16
 
 ; Function Attrs: nounwind
 define dllexport amdgpu_cs void @icmp_ne_false(i32 inreg %0, i32 inreg %1, <3 x i32> inreg %2, i32 inreg %3, <3 x i32> %LocalInvocationId) local_unnamed_addr #0 !lgc.shaderstage !4 {
@@ -62,7 +62,7 @@ define dllexport amdgpu_cs void @icmp_ne_false(i32 inreg %0, i32 inreg %1, <3 x 
 ; Test that %LocalInvocationId.i0 does not get replaced with %scalar in BB1.
 ; CHECK: @icmp_eq_false
 ; CHECK: %use = add i32 %LocalInvocationId1.i0, 1
-; CHECK: store i32 %use, i32 addrspace(3)* @lds, align 16
+; CHECK: store i32 %use, ptr addrspace(3) @lds, align 16
 
 ; Function Attrs: nounwind
 define dllexport amdgpu_cs void @icmp_eq_false(i32 inreg %0, i32 inreg %1, <3 x i32> inreg %2, i32 inreg %3, <3 x i32> %LocalInvocationId) local_unnamed_addr #0 !lgc.shaderstage !4 {
@@ -87,7 +87,7 @@ define dllexport amdgpu_cs void @icmp_eq_false(i32 inreg %0, i32 inreg %1, <3 x 
 ; Test that %LocalInvocationId.i0 does not get replaced with %scalar in BB1.
 ; CHECK: @icmp_ne_true
 ; CHECK: %use = add i32 %LocalInvocationId1.i0, 1
-; CHECK: store i32 %use, i32 addrspace(3)* @lds, align 16
+; CHECK: store i32 %use, ptr addrspace(3) @lds, align 16
 
 ; Function Attrs: nounwind
 define dllexport amdgpu_cs void @icmp_ne_true(i32 inreg %0, i32 inreg %1, <3 x i32> inreg %2, i32 inreg %3, <3 x i32> %LocalInvocationId) local_unnamed_addr #0 !lgc.shaderstage !4 {
