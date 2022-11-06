@@ -4771,8 +4771,9 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   case OpSwitch: {
     auto bs = static_cast<SPIRVSwitch *>(bv);
     auto select = transValue(bs->getSelect(), f, bb);
-    auto ls =
-        SwitchInst::Create(select, dyn_cast<BasicBlock>(transValue(bs->getDefault(), f, bb)), bs->getNumPairs(), bb);
+    auto defaultSuccessor = dyn_cast<BasicBlock>(transValue(bs->getDefault(), f, bb));
+    recordBlockPredecessor(defaultSuccessor, bb);
+    auto ls = SwitchInst::Create(select, defaultSuccessor, bs->getNumPairs(), bb);
     bs->foreachPair([&](SPIRVSwitch::LiteralTy literals, SPIRVBasicBlock *label) {
       assert(!literals.empty() && "Literals should not be empty");
       assert(literals.size() <= 2 && "Number of literals should not be more then two");
