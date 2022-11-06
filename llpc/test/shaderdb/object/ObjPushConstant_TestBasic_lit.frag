@@ -32,15 +32,13 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
 ; SHADERTEST:  [[V0:%.*]] = call {{.*}} @lgc.create.load.push.constants.ptr
-; SHADERTEST:  [[V1:%.*]] = getelementptr {{.*}} addrspace(4)* [[V0]], i64 0, i64 64
-; SHADERTEST:  [[V2:%.*]] = bitcast {{.*}} [[V1]]
-; SHADERTEST:  load <4 x float>, <4 x float> addrspace(4)* [[V2]], align 16
-; SHADERTEST:  [[V11:%.*]] = getelementptr {{.*}} addrspace(4)* [[V0]], i64 0, i64 144
-; SHADERTEST:  [[V12:%.*]] = bitcast {{.*}} [[V11]]
-; SHADERTEST:  load <4 x float>, <4 x float> addrspace(4)* [[V12]], align 16
+; SHADERTEST:  [[V1:%.*]] = getelementptr {{.*}} addrspace(4) [[V0]], i64 0, i32 4
+; SHADERTEST:  load <4 x float>, ptr addrspace(4) [[V1]], align 16
+; SHADERTEST:  [[V11:%.*]] = getelementptr {{.*}} addrspace(4) [[V0]], i64 0, i32 4
+; SHADERTEST:  load <4 x float>, ptr addrspace(4) [[V11]], align 16
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

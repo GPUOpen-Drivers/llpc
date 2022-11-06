@@ -51,10 +51,10 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{.*}} i1 @{{.*}}
-; SHADERTEST: define internal {{.*}} i1 @{{.*}}(i32{{.*}}, <2 x i32>{{.*}}, <3 x i32>{{.*}}, <4 x i32>{{.*}}, float{{.*}}, <2 x float>{{.*}}, <3 x float>{{.*}}, <4 x float>{{.*}}, i32{{.*}}, <2 x i32>{{.*}}, <3 x i32>{{.*}}, <4 x i32>{{.*}})
+; SHADERTEST: define internal {{.*}} i1 @{{.*}}(ptr{{.*}}, ptr{{.*}}, ptr{{.*}}, ptr{{.*}}, ptr{{.*}}, ptr{{.*}}, ptr{{.*}}, ptr{{.*}}, ptr{{.*}}, ptr{{.*}}, ptr{{.*}}, ptr{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

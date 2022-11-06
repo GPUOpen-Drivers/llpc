@@ -16,14 +16,13 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: [[GEPVAR:%[^ ]+]] = getelementptr <{ [4 x double], i32 }>, <{ [4 x double], i32 }> addrspace(7)* {{%[^,]+}}, i64 0, i32 0, i64 %
-; SHADERTEST: load double, double addrspace(7)* [[GEPVAR]], align 8
-; SHADERTEST: [[GEP16:%[^ ]+]] = getelementptr inbounds i8, i8 addrspace(7)* {{%[^,]+}}, i64 16
-; SHADERTEST: [[BC:%[^ ]+]] = bitcast i8 addrspace(7)* [[GEP16]] to double addrspace(7)*
-; SHADERTEST: load double, double addrspace(7)* [[BC]], align 8
+; SHADERTEST: [[GEPVAR:%[^ ]+]] = getelementptr <{ [4 x double], i32 }>, ptr addrspace(7) {{%[^,]+}}, i64 0, i32 0, i64 %
+; SHADERTEST: load double, ptr addrspace(7) [[GEPVAR]], align 8
+; SHADERTEST: [[GEP16:%[^ ]+]] = getelementptr inbounds <{ [4 x double], i32 }>, ptr addrspace(7) {{%[^,]+}}, i64 0, i32 0, i64 2
+; SHADERTEST: load double, ptr addrspace(7) [[GEP16]], align 8
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

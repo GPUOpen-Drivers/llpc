@@ -1,6 +1,6 @@
 ; Test that the operations of task shader are handled as expected.
 
-; RUN: lgc -mcpu=gfx1030 --emit-llvm -v -o=- - <%s | FileCheck --check-prefixes=CHECK %s
+; RUN: lgc -mcpu=gfx1030 --emit-llvm -v -enable-opaque-pointers=true -o=- - <%s | FileCheck --check-prefixes=CHECK %s
 
 ; In this test case, we check if the operations of a task shader is correctly handled. Three operations
 ; are ReadTaskPayload, WriteTaskPayload, EmitMeshTasks.
@@ -22,15 +22,13 @@
 ; CHECK-NEXT: [[groupIdX:%[0-9]*]] = extractelement <3 x i32> %WorkgroupId, i64 0
 ; CHECK-NEXT: [[flattenId:%[0-9]*]] = add i32 [[tempResult2]], [[groupIdX]]
 ; CHECK-NEXT: [[entryIndex:%[0-9]*]] = add i32 [[flattenId]], %meshTaskRingIndex
-; CHECK: [[payloadRingDescPtr:%[0-9]*]] = getelementptr i8, i8 addrspace(4)* %{{[0-9]*}}, i64 208
-; CHECK-NEXT: [[payloadRingDescPtr_cast:%[0-9]*]] = bitcast i8 addrspace(4)* [[payloadRingDescPtr]] to <4 x i32> addrspace(4)*
-; CHECK-NEXT: [[payloadRingDesc:%[0-9]*]] = load <4 x i32>, <4 x i32> addrspace(4)* [[payloadRingDescPtr_cast]], align 16
-; CHECK: [[drawDataRingDescPtr:%[0-9]*]] = getelementptr i8, i8 addrspace(4)* %{{[0-9]*}}, i64 224
-; CHECK-NEXT: [[drawDataRingDescPtr_cast:%[0-9]*]] = bitcast i8 addrspace(4)* [[drawDataRingDescPtr]] to <4 x i32> addrspace(4)*
-; CHECK-NEXT: [[drawDataRingDesc:%[0-9]*]] = load <4 x i32>, <4 x i32> addrspace(4)* [[drawDataRingDescPtr_cast]], align 16
+; CHECK: [[payloadRingDescPtr:%[0-9]*]] = getelementptr <4 x i32>, ptr addrspace(4) %{{[0-9]*}}, i64 13
+; CHECK-NEXT: [[payloadRingDesc:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[payloadRingDescPtr]], align 16
+; CHECK: [[drawDataRingDescPtr:%[0-9]*]] = getelementptr <4 x i32>, ptr addrspace(4) %{{[0-9]*}}, i64 14
+; CHECK-NEXT: [[drawDataRingDesc:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[drawDataRingDescPtr]], align 16
 ; CHECK: [[meshPipeStatsBufAddr2x32:%[0-9]*]] = insertelement <2 x i32> %{{[0-9]*}}, i32 %meshPipeStatsBuf, i64 0
 ; CHECK-NEXT: [[meshPipeStatsBufAddr64:%[0-9]*]] = bitcast <2 x i32> [[meshPipeStatsBufAddr2x32]] to i64
-; CHECK-NEXT: [[meshPipeStatsBufAddr:%[0-9]*]] = inttoptr i64 [[meshPipeStatsBufAddr64]] to i8 addrspace(1)*
+; CHECK-NEXT: [[meshPipeStatsBufAddr:%[0-9]*]] = inttoptr i64 [[meshPipeStatsBufAddr64]] to ptr addrspace(1)
 ; CHECK: [[ringSize:%[0-9]*]] = extractelement <4 x i32> [[payloadRingDesc]], i64 2
 ; CHECK-NEXT: [[numEntries:%[0-9]*]] = lshr i32 [[ringSize]], 14
 ; CHECK-NEXT: [[wrapMask:%[0-9]*]] = add nuw nsw i32 [[numEntries]], 262143
@@ -41,9 +39,8 @@
 ; CHECK: br i1 %{{[0-9]*}}, label %.emitMeshs, label %.endEmitMeshs
 ;
 ; CHECK: .emitMeshs:
-; CHECK: [[numTaskThreadsPtr8:%[0-9]*]] = getelementptr i8, i8 addrspace(1)* [[meshPipeStatsBufAddr]], i64 16
-; CHECK-NEXT: [[numTaskThreadsPtr:%[0-9]*]] = bitcast i8 addrspace(1)* [[numTaskThreadsPtr8]] to i64 addrspace(1)*
-; CHECK: %{{[0-9]*}} = atomicrmw add i64 addrspace(1)* [[numTaskThreadsPtr]], i64 %{{[0-9]*}} monotonic, align 8
+; CHECK: [[numTaskThreadsPtr8:%[0-9]*]] = getelementptr i8, ptr addrspace(1) [[meshPipeStatsBufAddr]], i64 16
+; CHECK: %{{[0-9]*}} = atomicrmw add ptr addrspace(1) [[numTaskThreadsPtr8]], i64 %{{[0-9]*}} monotonic, align 8
 ; CHECK: [[ringSize:%[0-9]*]] = extractelement <4 x i32> [[drawDataRingDesc]], i64 2
 ; CHECK-NEXT: [[numEntries:%[0-9]*]] = lshr i32 [[ringSize]], 4
 ; CHECK-NEXT: [[wrapMask:%[0-9]*]] = add nuw nsw i32 [[numEntries]], 268435455

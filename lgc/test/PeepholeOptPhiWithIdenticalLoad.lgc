@@ -1,8 +1,8 @@
 ; Test that PHI with incoming value that may read from memory should not be optimized.
 
-; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-peephole-opt -o - - <%s 2>&1 | FileCheck --check-prefixes=CHECK %s
+; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-peephole-opt -enable-opaque-pointers=true -o - - <%s 2>&1 | FileCheck --check-prefixes=CHECK %s
 
-; CHECK: [[LOAD:%[0-9a-z]*]] = load i32, i32 addrspace(3)* @lds, align 16
+; CHECK: [[LOAD:%[0-9a-z]*]] = load i32, ptr addrspace(3) @lds, align 16
 ; CHECK: [[PHI:%[0-9a-z]*]] = phi i32 [ [[LOAD]], %.entry ], [ [[INC:%[0-9a-z]*]], %.block2 ]
 ; CHECK: .block2:
 ; CHECK-NEXT: [[INC]] = add i32 [[PHI]], 1

@@ -43,25 +43,25 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: atomicrmw add i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw min i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw max i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw and i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw or i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw xor i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw xchg i32 {{.*}} monotonic
-; SHADERTEST: cmpxchg i32 {{.*}} monotonic monotonic
-; SHADERTEST: atomicrmw add i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw umin i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw umax i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw and i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw or i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw xor i32 {{.*}} monotonic
-; SHADERTEST: atomicrmw xchg i32 {{.*}} monotonic
-; SHADERTEST: cmpxchg i32 {{.*}} monotonic monotonic
+; SHADERTEST: atomicrmw add ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw min ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw max ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw and ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw or ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw xor ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw xchg ptr {{.*}} monotonic
+; SHADERTEST: cmpxchg ptr {{.*}} monotonic monotonic
+; SHADERTEST: atomicrmw add ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw umin ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw umax ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw and ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw or ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw xor ptr {{.*}} monotonic
+; SHADERTEST: atomicrmw xchg ptr {{.*}} monotonic
+; SHADERTEST: cmpxchg ptr {{.*}} monotonic monotonic
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.add.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)

@@ -1,9 +1,9 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST; store i32
-; SHADERTEST: atomicrmw add i32
+; SHADERTEST: atomicrmw add ptr
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.add.i32(i32 1, <4 x i32> %{{[0-9]*}}, i32 24, i32 0, i32 0)

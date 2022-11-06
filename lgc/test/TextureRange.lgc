@@ -1,17 +1,17 @@
 
-; RUN: lgc %s -print-after=lgc-builder-replayer -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
+; RUN: lgc %s -print-after=lgc-builder-replayer -enable-opaque-pointers=true -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
 
-; CHECK: [[desc0:%[0-9]+]] = call i8 addrspace(4)* @lgc.descriptor.table.addr(i32 6
-; CHECK-NEXT: %{{.*}} = getelementptr i8, i8 addrspace(4)* [[desc0]], i32 16
+; CHECK: [[desc0:%[0-9]+]] = call ptr addrspace(4) @lgc.descriptor.table.addr(i32 6
+; CHECK-NEXT: %{{.*}} = getelementptr i8, ptr addrspace(4) [[desc0]], i32 16
 ; CHECK: call <2 x i32> @lgc.root.descriptor.v2i32(i32 6)
-; CHECK: call i8 addrspace(7)* @lgc.late.launder.fat.pointer(<4 x i32>
-; CHECK: [[varindex0:%[0-9]+]] = call i8 addrspace(7)* @lgc.late.launder.fat.pointer(<4 x i32>
-; CHECK: [[varindex1:%[0-9]+]] = bitcast i8 addrspace(7)* [[varindex0]] to i32 addrspace(7)*
-; CHECK-NEXT: [[varindex2:%[0-9]+]] = load i32, i32 addrspace(7)* [[varindex1]], align 4
+; CHECK: call ptr addrspace(7) @lgc.late.launder.fat.pointer(<4 x i32>
+; CHECK: [[varindex0:%[0-9]+]] = call ptr addrspace(7) @lgc.late.launder.fat.pointer(<4 x i32>
+; CHECK: [[varindex1:%[0-9]+]] = bitcast ptr addrspace(7) [[varindex0]] to ptr addrspace(7)
+; CHECK-NEXT: [[varindex2:%[0-9]+]] = load i32, ptr addrspace(7) [[varindex1]], align 4
 ; CHECK-NEXT: [[varindex3:%[0-9]+]] = sext i32 [[varindex2]] to i64
-; CHECK-NEXT: getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* %{{.*}}, i64 0, i32 0, i64 [[varindex3]]
-; CHECK: [[desc1:%[0-9]+]] = call i8 addrspace(4)* @lgc.descriptor.table.addr(i32 1
-; CHECK-NEXT: %{{.*}} = getelementptr i8, i8 addrspace(4)* [[desc1]], i32 32
+; CHECK-NEXT: getelementptr <{ [4294967295 x float] }>, ptr addrspace(7) %{{.*}}, i64 0, i32 0, i64 [[varindex3]]
+; CHECK: [[desc1:%[0-9]+]] = call ptr addrspace(4) @lgc.descriptor.table.addr(i32 1
+; CHECK-NEXT: %{{.*}} = getelementptr i8, ptr addrspace(4) [[desc1]], i32 32
 
 ; RUN: lgc -mcpu=gfx1030 -o - - <%s | FileCheck --check-prefixes=SHADER_TEST %s
 ; SHADER_TEST: s_and_b32 s5, s5, 0xffff

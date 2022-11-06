@@ -15,9 +15,9 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: getelementptr inbounds ([4 x <{ [4 x float], [10 x [4 x float]] }>], [4 x <{ [4 x float], [10 x [4 x float]] }>] addrspace({{.*}})* @{{.*}}, i32 0, i32 3, i32 1, i32 5
+; SHADERTEST: getelementptr inbounds ([4 x <{ [4 x float], [10 x [4 x float]] }>], ptr addrspace({{.*}}) @{{.*}}, i32 0, i32 3, i32 1, i32 5
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call {{.*}} {{.*}}@lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i32 1, i32 0, i32 0
