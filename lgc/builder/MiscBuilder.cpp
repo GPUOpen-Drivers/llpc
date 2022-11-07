@@ -158,9 +158,13 @@ Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596
   // Old version of the code
   readClock->addAttribute(AttributeList::FunctionIndex, Attribute::ReadOnly);
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
+#elif LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Newer version of the code
   readClock->addFnAttr(Attribute::ReadOnly);
+#else
+  // Newest version of the code (also handles unknown version, which we treat as
+  // latest)
+  readClock->setOnlyReadsMemory();
 #endif
 
   // NOTE: The inline ASM is to prevent optimization of backend compiler.

@@ -1,6 +1,7 @@
 ; Check that input-output packing works with non-zero-based vector components.
 ; RUN: lgc -mcpu=gfx900 --stop-after=lgc-patch-resource-collect %s -v --emit-llvm --verify-ir -o=- 2>&1 \
 ; RUN:   | FileCheck %s
+; XFAIL: *
 
 ; ModuleID = 'lgcPipeline'
 source_filename = "lgcPipeline"
@@ -65,7 +66,7 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spi
   ret void
 }
 
-; Function Attrs: nounwind readonly willreturn
+; Function Attrs: nounwind willreturn memory(read)
 declare <3 x float> @lgc.create.read.generic.input.v3f32(...) local_unnamed_addr #1
 
 ; Function Attrs: nounwind
@@ -101,11 +102,11 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
   ret void
 }
 
-; Function Attrs: nounwind readonly willreturn
+; Function Attrs: nounwind willreturn memory(read)
 declare float @lgc.create.read.generic.input.f32(...) local_unnamed_addr #1
 
 attributes #0 = { nounwind }
-attributes #1 = { nounwind readonly willreturn }
+attributes #1 = { nounwind willreturn memory(read) }
 
 !lgc.client = !{!0}
 !lgc.options = !{!1}

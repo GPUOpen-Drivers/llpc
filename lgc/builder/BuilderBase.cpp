@@ -61,8 +61,30 @@ CallInst *BuilderCommon::CreateNamedCall(StringRef funcName, Type *retTy, ArrayR
     func->setCallingConv(CallingConv::C);
     func->addFnAttr(Attribute::NoUnwind);
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+    // Old version of the code
     for (auto attrib : attribs)
       func->addFnAttr(attrib);
+#else
+    // New version of the code (also handles unknown version, which we treat as
+    // latest)
+    for (auto attrib : attribs) {
+      switch (attrib) {
+      default:
+        func->addFnAttr(attrib);
+        break;
+      case Attribute::ReadNone:
+        func->setDoesNotAccessMemory();
+        break;
+      case Attribute::ReadOnly:
+        func->setOnlyReadsMemory();
+        break;
+      case Attribute::WriteOnly:
+        func->setOnlyWritesMemory();
+        break;
+      }
+    }
+#endif
   }
 
   auto call = CreateCall(func, args, instName);

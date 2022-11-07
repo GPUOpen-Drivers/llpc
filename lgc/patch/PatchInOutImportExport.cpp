@@ -5470,7 +5470,14 @@ void PatchInOutImportExport::createSwizzleThreadGroupFunction() {
   func->setCallingConv(CallingConv::C);
   func->addFnAttr(Attribute::NoUnwind);
   func->addFnAttr(Attribute::AlwaysInline);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Old version of the code
   func->addFnAttr(Attribute::ReadNone);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  func->setDoesNotAccessMemory();
+#endif
   func->setLinkage(GlobalValue::InternalLinkage);
 
   auto argIt = func->arg_begin();

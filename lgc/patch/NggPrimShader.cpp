@@ -4055,7 +4055,14 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingBackface, module);
 
   func->setCallingConv(CallingConv::C);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Old version of the code
   func->addFnAttr(Attribute::ReadNone);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  func->setDoesNotAccessMemory();
+#endif
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
@@ -4282,7 +4289,14 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingFrustum, module);
 
   func->setCallingConv(CallingConv::C);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Old version of the code
   func->addFnAttr(Attribute::ReadNone);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  func->setDoesNotAccessMemory();
+#endif
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
@@ -4538,7 +4552,14 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingBoxFilter, module);
 
   func->setCallingConv(CallingConv::C);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Old version of the code
   func->addFnAttr(Attribute::ReadNone);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  func->setDoesNotAccessMemory();
+#endif
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
@@ -4761,7 +4782,14 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingSphere, module);
 
   func->setCallingConv(CallingConv::C);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Old version of the code
   func->addFnAttr(Attribute::ReadNone);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  func->setDoesNotAccessMemory();
+#endif
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
@@ -5126,7 +5154,14 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingSmallPrimFilter, module);
 
   func->setCallingConv(CallingConv::C);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Old version of the code
   func->addFnAttr(Attribute::ReadNone);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  func->setDoesNotAccessMemory();
+#endif
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
@@ -5402,7 +5437,14 @@ Function *NggPrimShader::createCullDistanceCuller(Module *module) {
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingCullDistance, module);
 
   func->setCallingConv(CallingConv::C);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Old version of the code
   func->addFnAttr(Attribute::ReadNone);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  func->setDoesNotAccessMemory();
+#endif
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
@@ -5480,7 +5522,14 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingFetchReg, module);
 
   func->setCallingConv(CallingConv::C);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Old version of the code
   func->addFnAttr(Attribute::ReadOnly);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  func->setOnlyReadsMemory();
+#endif
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();

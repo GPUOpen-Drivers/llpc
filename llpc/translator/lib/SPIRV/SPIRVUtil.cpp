@@ -47,9 +47,26 @@ void addFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr) {
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596
   // Old version of the code
   Call->addAttribute(AttributeList::FunctionIndex, Attr);
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
+#elif LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+  // Newer version of the code
   Call->addFnAttr(Attr);
+#else
+  // Newest version of the code (also handles unknown version, which we treat as
+  // latest)
+  switch (Attr) {
+  default:
+    Call->addFnAttr(Attr);
+    break;
+  case Attribute::ReadNone:
+    Call->setDoesNotAccessMemory();
+    break;
+  case Attribute::ReadOnly:
+    Call->setOnlyReadsMemory();
+    break;
+  case Attribute::WriteOnly:
+    Call->setOnlyWritesMemory();
+    break;
+  }
 #endif
 }
 

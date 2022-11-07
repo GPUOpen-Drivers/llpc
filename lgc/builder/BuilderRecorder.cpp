@@ -2151,7 +2151,14 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::SubgroupBallotFindMsb:
     case Opcode::SubgroupBallotInclusiveBitCount:
       // Functions that don't access memory.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+      // Old version of the code
       func->addFnAttr(Attribute::ReadNone);
+#else
+      // New version of the code (also handles unknown version, which we treat as
+      // latest)
+      func->setDoesNotAccessMemory();
+#endif
       break;
     case Opcode::ImageGather:
     case Opcode::ImageLoad:
@@ -2168,13 +2175,27 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ReadPerVertexInput:
     case Opcode::ReadTaskPayload:
       // Functions that only read memory.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+      // Old version of the code
       func->addFnAttr(Attribute::ReadOnly);
+#else
+      // New version of the code (also handles unknown version, which we treat as
+      // latest)
+      func->setOnlyReadsMemory();
+#endif
       // Must be marked as returning for DCE.
       func->addFnAttr(Attribute::WillReturn);
       break;
     case Opcode::ImageStore:
       // Functions that only write memory.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440909
+      // Old version of the code
       func->addFnAttr(Attribute::WriteOnly);
+#else
+      // New version of the code (also handles unknown version, which we treat as
+      // latest)
+      func->setOnlyWritesMemory();
+#endif
       break;
     case Opcode::ImageAtomic:
     case Opcode::ImageAtomicCompareSwap:
