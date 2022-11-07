@@ -61,8 +61,22 @@ CallInst *BuilderCommon::CreateNamedCall(StringRef funcName, Type *retTy, ArrayR
     func->setCallingConv(CallingConv::C);
     func->addFnAttr(Attribute::NoUnwind);
 
-    for (auto attrib : attribs)
-      func->addFnAttr(attrib);
+    for (auto attrib : attribs) {
+      switch (attrib) {
+      default:
+        func->addFnAttr(attrib);
+        break;
+      case Attribute::ReadNone:
+        func->setDoesNotAccessMemory();
+        break;
+      case Attribute::ReadOnly:
+        func->setOnlyReadsMemory();
+        break;
+      case Attribute::WriteOnly:
+        func->setOnlyWritesMemory();
+        break;
+      }
+    }
   }
 
   auto call = CreateCall(func, args, instName);

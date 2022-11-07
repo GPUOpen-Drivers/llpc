@@ -2151,7 +2151,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::SubgroupBallotFindMsb:
     case Opcode::SubgroupBallotInclusiveBitCount:
       // Functions that don't access memory.
-      func->addFnAttr(Attribute::ReadNone);
+      func->setDoesNotAccessMemory();
       break;
     case Opcode::ImageGather:
     case Opcode::ImageLoad:
@@ -2168,13 +2168,13 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::ReadPerVertexInput:
     case Opcode::ReadTaskPayload:
       // Functions that only read memory.
-      func->addFnAttr(Attribute::ReadOnly);
+      func->setOnlyReadsMemory();
       // Must be marked as returning for DCE.
       func->addFnAttr(Attribute::WillReturn);
       break;
     case Opcode::ImageStore:
       // Functions that only write memory.
-      func->addFnAttr(Attribute::WriteOnly);
+      func->setOnlyWritesMemory();
       break;
     case Opcode::ImageAtomic:
     case Opcode::ImageAtomicCompareSwap:
