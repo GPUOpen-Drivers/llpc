@@ -743,51 +743,48 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
   resUsage->inOutUsage.enableXfb = true;
   resUsage->inOutUsage.streamXfbBuffers[streamId] |= 1 << xfbBuffer;
 
-  if (m_shaderStage == ShaderStageGeometry) {
+  // Collect the XFB output.
+  XfbOutInfo xfbOutInfo = {};
+  xfbOutInfo.streamId = streamId;
+  xfbOutInfo.xfbBuffer = xfbBuffer;
+  xfbOutInfo.xfbOffset = cast<ConstantInt>(xfbOffset)->getZExtValue();
+  xfbOutInfo.is16bit = valueToWrite->getType()->getScalarSizeInBits() == 16;
 
-    // Mark the XFB output for copy shader generation.
-    XfbOutInfo xfbOutInfo = {};
-    xfbOutInfo.streamId = streamId;
-    xfbOutInfo.xfbBuffer = xfbBuffer;
-    xfbOutInfo.xfbOffset = cast<ConstantInt>(xfbOffset)->getZExtValue();
-    xfbOutInfo.is16bit = valueToWrite->getType()->getScalarSizeInBits() == 16;
-
-    // For packed generic GS output, the XFB output should be scalarized to align with the scalarized GS output
-    if (getPipelineState()->canPackOutput(m_shaderStage) && !isBuiltIn) {
-      Type *elementTy = valueToWrite->getType();
-      unsigned scalarizeBy = 1;
-      if (auto vectorTy = dyn_cast<FixedVectorType>(elementTy)) {
-        scalarizeBy = vectorTy->getNumElements();
-        elementTy = vectorTy->getElementType();
-      }
-      if (elementTy->getPrimitiveSizeInBits() == 64)
-        scalarizeBy *= 2;
-      unsigned xfbOffset = xfbOutInfo.xfbOffset;
-      for (unsigned i = 0; i < scalarizeBy; ++i) {
-        InOutLocationInfo outLocInfo;
-        outLocInfo.setLocation(location);
-        outLocInfo.setStreamId(streamId);
-        outLocInfo.setComponent(i);
-        outLocInfo.setBuiltIn(isBuiltIn);
-        if (i >= 4) {
-          outLocInfo.setLocation(location + 1);
-          outLocInfo.setComponent(i - 4);
-          xfbOutInfo.xfbOffset = xfbOffset + 16;
-        }
-        resUsage->inOutUsage.gs.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
-      }
-    } else {
+  // For packed generic GS output, the XFB output should be scalarized to align with the scalarized GS output
+  if (getPipelineState()->canPackOutput(m_shaderStage) && !isBuiltIn) {
+    Type *elementTy = valueToWrite->getType();
+    unsigned scalarizeBy = 1;
+    if (auto vectorTy = dyn_cast<FixedVectorType>(elementTy)) {
+      scalarizeBy = vectorTy->getNumElements();
+      elementTy = vectorTy->getElementType();
+    }
+    if (elementTy->getPrimitiveSizeInBits() == 64)
+      scalarizeBy *= 2;
+    unsigned xfbOffset = xfbOutInfo.xfbOffset;
+    for (unsigned i = 0; i < scalarizeBy; ++i) {
       InOutLocationInfo outLocInfo;
       outLocInfo.setLocation(location);
-      outLocInfo.setBuiltIn(isBuiltIn);
       outLocInfo.setStreamId(streamId);
-      resUsage->inOutUsage.gs.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
-
-      if (valueToWrite->getType()->getPrimitiveSizeInBits() > 128) {
+      outLocInfo.setComponent(i);
+      outLocInfo.setBuiltIn(isBuiltIn);
+      if (i >= 4) {
         outLocInfo.setLocation(location + 1);
-        xfbOutInfo.xfbOffset += 32;
-        resUsage->inOutUsage.gs.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
+        outLocInfo.setComponent(i - 4);
+        xfbOutInfo.xfbOffset = xfbOffset + 16;
       }
+      resUsage->inOutUsage.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
+    }
+  } else {
+    InOutLocationInfo outLocInfo;
+    outLocInfo.setLocation(location);
+    outLocInfo.setBuiltIn(isBuiltIn);
+    outLocInfo.setStreamId(streamId);
+    resUsage->inOutUsage.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
+
+    if (valueToWrite->getType()->getPrimitiveSizeInBits() > 128) {
+      outLocInfo.setLocation(location + 1);
+      xfbOutInfo.xfbOffset += 32;
+      resUsage->inOutUsage.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
     }
   }
 

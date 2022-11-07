@@ -1355,7 +1355,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
           outLocInfoMap.erase(outLocInfo);
         // For GS, we remove transform feedback location info as well if it exists
         if (m_shaderStage == ShaderStageGeometry) {
-          auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.gs.locInfoXfbOutInfoMap;
+          auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.locInfoXfbOutInfoMap;
           if (locInfoXfbOutInfoMap.count(outLocInfo) > 0)
             locInfoXfbOutInfoMap.erase(outLocInfo);
         }
@@ -1655,11 +1655,12 @@ void PatchResourceCollect::matchGenericInOut() {
   if (m_shaderStage == ShaderStageVertex && m_tcsInputHasDynamicIndexing)
     packOutput = false;
   if (packOutput) {
+    // OutputLocInfoMap is used for computing the shader hash and looking remapped location
+    updateOutputLocInfoMapWithPack();
     // Re-create output export calls to pack exp instruction for the last vertex processing stage
     if (m_shaderStage == m_pipelineState->getLastVertexProcessingStage() && m_shaderStage != ShaderStageGeometry)
       reassembleOutputExportCalls();
-    // OutputLocInfoMap is used for computing the shader hash and looking remapped location
-    updateOutputLocInfoMapWithPack();
+    m_outputCalls.clear();
   } else {
     updateOutputLocInfoMapWithUnpack();
   }
@@ -2846,7 +2847,7 @@ void PatchResourceCollect::clearUnusedOutput() {
         // Collect locations of those outputs that are not used
         bool isOutputXfb = false;
         if (m_shaderStage == ShaderStageGeometry)
-          isOutputXfb = inOutUsage.gs.locInfoXfbOutInfoMap.count(locInfoPair.first) > 0;
+          isOutputXfb = inOutUsage.locInfoXfbOutInfoMap.count(locInfoPair.first) > 0;
 
         if (!isOutputXfb && nextInLocInfoMap.find(locInfoPair.first) == nextInLocInfoMap.end()) {
           bool isActiveLoc = false;
@@ -3023,22 +3024,19 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   // FS: @lgc.input.import.generic.%Type%(i32 location, i32 elemIdx, i1 perPrimitive, i32 interpMode, i32 interpLoc)
   //     @lgc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
   //                                          i32 interpMode, <2 x float> | i32 auxInterpValue)
-
-  // The locations of TCS with dynamic indexing (locOffset/elemIdx) cannot be unpacked
-  // NOTE: Dynamic indexing in FS is processed to be constant in the lower pass.
-  std::vector<CallInst *> packableCalls;
-  packableCalls = std::move(m_inputCalls);
+  // NOTE: Dynamic indexing in FS is processed to be constant in the lower pass and TCS has dynamic indexing will go
+  // through unpacked path
 
   // LDS load/store copes with dword. For 8-bit/16-bit data type, we will extend them to 32-bit
   bool partPipelineHasGs = m_pipelineState->isPartPipeline() && m_pipelineState->getPreRasterHasGs();
   bool isFsAndHasGs = (isFs && (m_pipelineState->hasShaderStage(ShaderStageGeometry) || partPipelineHasGs));
   bool requireDword = isTcs || isGs || isFsAndHasGs;
-  // Create locationMap according to the packable calls
-  m_locationInfoMapManager->createMap(packableCalls, m_shaderStage, requireDword);
+  // Create locationMap
+  m_locationInfoMapManager->createMap(m_inputCalls, m_shaderStage, requireDword);
 
   // Fill inputLocInfoMap of {TCS, GS, FS} for the packable calls
   unsigned newLocIdx = 0;
-  for (auto call : packableCalls) {
+  for (auto call : m_inputCalls) {
     const bool isInterpolant = call->getCalledFunction()->getName().startswith(lgcName::InputImportInterpolant);
     unsigned locOffset = 0;
     unsigned compIdxArgIdx = 1;
@@ -3053,21 +3051,18 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
     InOutLocationInfo origLocInfo;
     origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue() + locOffset);
     origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue());
+    if (isFs && isInterpolant) {
+      const unsigned interpMode = cast<ConstantInt>(call->getOperand(3))->getZExtValue();
+      origLocInfo.setFlat(interpMode == InOutInfo::InterpModeFlat);
+      origLocInfo.setCustom(interpMode == InOutInfo::InterpModeCustom);
+    }
     InOutLocationInfoMap::const_iterator mapIter;
     assert(m_locationInfoMapManager->findMap(origLocInfo, mapIter));
     m_locationInfoMapManager->findMap(origLocInfo, mapIter);
     inputLocInfoMap[origLocInfo] = mapIter->second;
     newLocIdx = std::max(newLocIdx, mapIter->second.getLocation() + 1);
   }
-  if (isTcs) {
-    // Fill inputLocInfoMap for the unpackable calls of TCS
-    for (auto &locInfo : inputLocInfoMap) {
-      if (locInfo.second.isInvalid()) {
-        locInfo.second.setData(0);
-        locInfo.second.setLocation(newLocIdx++);
-      }
-    }
-  }
+  m_inputCalls.clear();
 }
 
 // =====================================================================================================================
@@ -3080,64 +3075,102 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
   if (m_outputCalls.empty())
     return;
 
-  if (m_shaderStage != ShaderStageGeometry) {
-    assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval);
-    auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-    assert(nextStage != ShaderStageInvalid);
-    // In reassembleOutputExportCalls, the unused calls in next stage have been added into dead call set.
-    bool isMarkedDeadCall = (m_shaderStage == m_pipelineState->getLastVertexProcessingStage());
-    auto &nextStageInputLocInfoMap = m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.inputLocInfoMap;
+  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
+         m_shaderStage == ShaderStageGeometry);
+  auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+  assert(nextStage != ShaderStageInvalid);
+  auto &nextStageInputLocInfoMap = m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.inputLocInfoMap;
+
+  // Remove unused outputs and update the output map
+  if (m_shaderStage != m_pipelineState->getLastVertexProcessingStage()) {
+    // For VS-{TCS, GS}, the dead output has no matching input of the next stage
     for (auto call : m_outputCalls) {
       InOutLocationInfo origLocInfo;
       origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
       origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
-
-      auto locInfoMapIt = nextStageInputLocInfoMap.find(origLocInfo);
-      if (locInfoMapIt != nextStageInputLocInfoMap.end())
-        outputLocInfoMap[origLocInfo] = locInfoMapIt->second;
-      else if (!isMarkedDeadCall)
-        m_deadCalls.push_back(call); // unused call in next stage
+      if (nextStageInputLocInfoMap.find(origLocInfo) == nextStageInputLocInfoMap.end())
+        m_deadCalls.push_back(call);
     }
-    m_outputCalls.clear();
-    return;
-  }
+    // The output map should be equal to the input map of the next stage
+    outputLocInfoMap = nextStageInputLocInfoMap;
+  } else {
+    // For {VS, TES, GS}-FS, the dead output is neither a XFB output or a corresponding FS' input.
+    // Collect XFB locations
+    auto &xfbOutLocInfoMap = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.locInfoXfbOutInfoMap;
+    std::set<unsigned> xfbOutputLocs[MaxGsStreams];
+    for (const auto &locInfoPair : xfbOutLocInfoMap) {
+      const auto &locInfo = locInfoPair.first;
+      xfbOutputLocs[locInfo.getStreamId()].insert(locInfo.getLocation());
+    }
 
-  // For GS, the outputLocInfoMap is created according to the output calls in each stream
-  // LDS load/store copes with dword
-  m_locationInfoMapManager->createMap(m_outputCalls, m_shaderStage, true);
-  m_outputCalls.clear();
+    // Collect flat-shading locations and custom interpolation locations
+    std::set<unsigned> flatInputLocs;
+    std::set<unsigned> customInputLocs;
+    for (const auto &locInfoPair : nextStageInputLocInfoMap) {
+      const auto &locInfo = locInfoPair.first;
+      if (locInfo.isFlat())
+        flatInputLocs.insert(locInfo.getLocation());
+      else if (locInfo.isCustom())
+        customInputLocs.insert(locInfo.getLocation());
+    }
 
-  auto &fsInOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->inOutUsage;
-  auto &fsInputLocInfoMap = fsInOutUsage.inputLocInfoMap;
-  auto &locationInfoMap = m_locationInfoMapManager->getMap();
+    // Add dead calls
+    for (auto call : m_outputCalls) {
+      InOutLocationInfo origLocInfo;
+      origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
+      origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
+      unsigned streamId = 0;
+      if (m_shaderStage == ShaderStageGeometry) {
+        streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
+        origLocInfo.setStreamId(streamId);
+      }
+      const unsigned origLocation = origLocInfo.getLocation();
+      bool isUsed = xfbOutputLocs[streamId].count(origLocation) > 0 || flatInputLocs.count(origLocation) > 0 ||
+                    customInputLocs.count(origLocation) > 0 || nextStageInputLocInfoMap.count(origLocInfo) > 0;
+      if (!isUsed)
+        m_deadCalls.push_back(call);
+    }
 
-  const bool hasNullFs = fsInOutUsage.fs.isNullFs || fsInputLocInfoMap.empty();
-  if (!hasNullFs) {
-    // Update mapped location infos (excluding XFB output) in raster stream according to inputLocInfoMap fo FS
-    for (auto locInfoMapIt = locationInfoMap.begin(); locInfoMapIt != locationInfoMap.end();) {
-      const auto &origLocInfo = locInfoMapIt->first;
-      const bool isOutputXfb = inOutUsage.gs.locInfoXfbOutInfoMap.count(locInfoMapIt->first) > 0;
-      if (origLocInfo.getStreamId() == inOutUsage.gs.rasterStream && !isOutputXfb) {
-        if (fsInputLocInfoMap.count(origLocInfo) > 0) {
-          // Get remmapped InOutLocationInfo from the inputLocMap of FS
-          locInfoMapIt->second = fsInputLocInfoMap[origLocInfo];
-          ++locInfoMapIt;
-        } else {
-          // Erase the output that is not used by FS
-          locInfoMapIt = locationInfoMap.erase(locInfoMapIt);
-        }
-      } else {
-        ++locInfoMapIt;
+    auto *locInfoMap = &nextStageInputLocInfoMap;
+
+    // If the outputs are allowed to have no matching inputs, such as XFB output and non-raster streams outputs, we
+    // should build the output map based on output info, otherwise, update the output map via the input map of the next
+    // stage.
+    if (xfbOutLocInfoMap.size() > 0 || xfbOutputLocs[1].size() > 0 || xfbOutputLocs[2].size() > 0 ||
+        xfbOutputLocs[3].size() > 0) {
+      std::vector<InOutLocationInfo> outLocInfos;
+      for (auto call : m_outputCalls) {
+        InOutLocationInfo origLocInfo;
+        origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
+        origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
+        if (m_shaderStage == ShaderStageGeometry)
+          origLocInfo.setStreamId(cast<ConstantInt>(call->getOperand(2))->getZExtValue());
+        if (flatInputLocs.count(origLocInfo.getLocation()))
+          origLocInfo.setFlat(true);
+        else if (customInputLocs.count(origLocInfo.getLocation()))
+          origLocInfo.setCustom(true);
+        outLocInfos.push_back(origLocInfo);
+      }
+      m_locationInfoMapManager->createMap(outLocInfos, m_shaderStage);
+      locInfoMap = &m_locationInfoMapManager->getMap();
+    }
+
+    // Update the output map
+    for (auto &locInfoPair : *locInfoMap) {
+      InOutLocationInfo origLocInfo;
+      origLocInfo.setStreamId(locInfoPair.first.getStreamId());
+      origLocInfo.setLocation(locInfoPair.first.getLocation());
+      origLocInfo.setComponent(locInfoPair.first.getComponent());
+      outputLocInfoMap.insert({origLocInfo, locInfoPair.second});
+    }
+
+    // update output count per stream for GS
+    if (m_shaderStage == ShaderStageGeometry) {
+      for (auto &locInfoPair : outputLocInfoMap) {
+        auto &outLocCount = inOutUsage.gs.outLocCount[locInfoPair.first.getStreamId()];
+        outLocCount = std::max(outLocCount, locInfoPair.second.getLocation() + 1);
       }
     }
-  }
-
-  outputLocInfoMap = std::move(locationInfoMap);
-  // Update inOutUsage.gs.outLocCount
-  for (auto &locInfoPair : outputLocInfoMap) {
-    const auto &newLocInfo = locInfoPair.second;
-    auto &outLocCount = inOutUsage.gs.outLocCount[newLocInfo.getStreamId()];
-    outLocCount = std::max(outLocCount, newLocInfo.getLocation() + 1);
   }
 }
 
@@ -3171,18 +3204,20 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   };
 
   // Collect ElementsInfo in each packed location
-  const unsigned locCount = m_locationInfoMapManager->getMap().size();
-  std::vector<ElementsInfo> elementsInfoArray(locCount);
+  auto &outputLocInfoMap = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.outputLocInfoMap;
+  std::vector<ElementsInfo> elementsInfoArray(outputLocInfoMap.size());
 
   for (auto call : m_outputCalls) {
     InOutLocationInfo origLocInfo;
     origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
     origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
 
-    m_deadCalls.push_back(call);
-    InOutLocationInfoMap::const_iterator mapIter;
-    if (!m_locationInfoMapManager->findMap(origLocInfo, mapIter))
+    auto mapIter = outputLocInfoMap.find(origLocInfo);
+    // Unused scalarized calls have been added into dead call set
+    if (mapIter == outputLocInfoMap.end())
       continue;
+    // Add used scalarized calls to dead call set
+    m_deadCalls.push_back(call);
 
     const unsigned newLoc = mapIter->second.getLocation();
     auto &elementsInfo = elementsInfoArray[newLoc];
@@ -3525,6 +3560,20 @@ void InOutLocationInfoMapManager::createMap(const std::vector<CallInst *> &calls
 }
 
 // =====================================================================================================================
+// Create a locationInfo map for the given shader stage
+//
+// @param locInfos : location infos to process
+// @param shaderStage : Shader stage
+void InOutLocationInfoMapManager::createMap(const std::vector<InOutLocationInfo> &locInfos, ShaderStage shaderStage) {
+  for (const auto &locInfo : locInfos) {
+    LocationSpan span{};
+    span.firstLocationInfo = locInfo;
+    m_locationSpans.insert(span);
+  }
+  buildMap(shaderStage);
+}
+
+// =====================================================================================================================
 // Create a locationInfo map by deserializing the serialized map. Used when compiling the vertex-processing
 // part-pipeline given the packed input map from the separate FS compilation.
 void InOutLocationInfoMapManager::deserializeMap(ArrayRef<std::pair<unsigned, unsigned>> serializedMap) {
@@ -3539,7 +3588,6 @@ void InOutLocationInfoMapManager::deserializeMap(ArrayRef<std::pair<unsigned, un
 // @param call : Call to process
 // @param shaderStage : Shader stage
 // @param requireDword : Whether need extend to dword
-// @param resUsage : The resource usage reference
 void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStage, bool requireDword) {
   const bool isFs = shaderStage == ShaderStageFragment;
   const bool isInterpolant = call->getCalledFunction()->getName().startswith(lgcName::InputImportInterpolant);
@@ -3572,14 +3620,10 @@ void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStag
 
   if (isFs && isInterpolant) {
     const unsigned interpMode = cast<ConstantInt>(call->getOperand(3))->getZExtValue();
-    span.compatibilityInfo.isFlat = interpMode == InOutInfo::InterpModeFlat;
-    span.compatibilityInfo.isCustom = interpMode == InOutInfo::InterpModeCustom;
-
-    assert(isInterpolant || (!isInterpolant && !is_contained(m_locationSpans, span)));
+    span.firstLocationInfo.setFlat(interpMode == InOutInfo::InterpModeFlat);
+    span.firstLocationInfo.setCustom(interpMode == InOutInfo::InterpModeCustom);
   }
-  if (!is_contained(m_locationSpans, span)) {
-    m_locationSpans.push_back(span);
-  }
+  m_locationSpans.insert(span);
 }
 
 // =====================================================================================================================
@@ -3587,21 +3631,16 @@ void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStag
 //
 // @param shaderStage : The shader stage to determine whether to check compatibility
 void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
+  m_locationInfoMap.clear();
   if (m_locationSpans.empty())
     return;
-  // Sort m_locationSpans based on LocationSpan::GetCompatibilityKey() and InOutLocationInfo::AsIndex()
-  std::sort(m_locationSpans.begin(), m_locationSpans.end());
-
-  m_locationInfoMap.clear();
 
   // Map original InOutLocationInfo to new InOutLocationInfo
   unsigned consecutiveLocation = 0;
   unsigned compIdx = 0;
   bool isHighHalf = false;
   const bool isGs = shaderStage == ShaderStageGeometry;
-  // For GS, the locationSpans in the same stream is compatible.
-  // No need to check compatibility means all locationSpans are compatible.
-  const bool checkCompatibility = shaderStage == ShaderStageFragment || isGs;
+
   for (auto spanIt = m_locationSpans.begin(); spanIt != m_locationSpans.end(); ++spanIt) {
     if (spanIt != m_locationSpans.begin()) {
       // Check the current span with previous span to determine whether it is put in the same location or the next
@@ -3609,9 +3648,7 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
       const auto &prevSpan = *(--spanIt);
       ++spanIt;
 
-      bool compatible = true;
-      if (checkCompatibility)
-        compatible = isCompatible(prevSpan, *spanIt, isGs);
+      bool compatible = isCompatible(prevSpan, *spanIt, shaderStage);
 
       // If the current locationSpan is compatible with previous one, increase component index with location unchanged
       // until the component index is up to 4 and increase location index and reset component index to 0. Otherwise,
@@ -3625,8 +3662,10 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
           isHighHalf = spanIt->compatibilityInfo.is16Bit ? !isHighHalf : false;
         }
       } else {
+        ++consecutiveLocation;
         // NOTE: For GS, the indexing of remapped location is zero-based in each stream
-        consecutiveLocation = isGs ? 0 : consecutiveLocation + 1;
+        if (isGs && spanIt->firstLocationInfo.getStreamId() != prevSpan.firstLocationInfo.getStreamId())
+          consecutiveLocation = 0;
         compIdx = 0;
         isHighHalf = false;
       }
@@ -3641,7 +3680,7 @@ void InOutLocationInfoMapManager::buildMap(ShaderStage shaderStage) {
     m_locationInfoMap.insert({spanIt->firstLocationInfo, newLocInfo});
 
     // Update component index
-    if ((spanIt->compatibilityInfo.is16Bit && isHighHalf) || !spanIt->compatibilityInfo.is16Bit)
+    if (isHighHalf || !spanIt->compatibilityInfo.is16Bit)
       ++compIdx;
     assert(compIdx <= 4);
   }

@@ -146,8 +146,6 @@ union InOutCompatibilityInfo {
     uint16_t halfComponentCount : 9; // The number of components measured in times of 16-bits.
                                      // A single 32-bit component will be halfComponentCount=2
     uint16_t is16Bit : 1;            // 16-bit (i8/i16/f16, i8 is treated as 16-bit) or not
-    uint16_t isFlat : 1;             // Flat shading or not
-    uint16_t isCustom : 1;           // Custom interpolation mode or not
   };
   uint16_t u16All;
 };
@@ -159,6 +157,7 @@ public:
   InOutLocationInfoMapManager() {}
 
   void createMap(const std::vector<llvm::CallInst *> &calls, ShaderStage shaderStage, bool requireDword);
+  void createMap(const std::vector<InOutLocationInfo> &locInfos, ShaderStage shaderStage);
   void deserializeMap(llvm::ArrayRef<std::pair<unsigned, unsigned>> serializedMap);
   bool findMap(const InOutLocationInfo &origLocInfo, InOutLocationInfoMap::const_iterator &mapIt);
   InOutLocationInfoMap &getMap() { return m_locationInfoMap; }
@@ -183,14 +182,23 @@ private:
   void addSpan(llvm::CallInst *call, ShaderStage shaderStage, bool requireDword);
   void buildMap(ShaderStage shaderStage);
 
-  bool isCompatible(const LocationSpan &rSpan, const LocationSpan &lSpan, const bool isGs) const {
+  bool isCompatible(const LocationSpan &rSpan, const LocationSpan &lSpan, ShaderStage shaderStage) const {
     bool isCompatible = rSpan.getCompatibilityKey() == lSpan.getCompatibilityKey();
-    if (isGs)
-      isCompatible &= rSpan.firstLocationInfo.getStreamId() == lSpan.firstLocationInfo.getStreamId();
+    if (isCompatible) {
+      if (shaderStage == ShaderStageGeometry) {
+        // Outputs with the same stream id are packed together
+        isCompatible &= rSpan.firstLocationInfo.getStreamId() == lSpan.firstLocationInfo.getStreamId();
+      } else if (shaderStage == ShaderStageFragment) {
+        // Inputs with the same interpolation mode are packed together
+        const unsigned rInterpMode = rSpan.firstLocationInfo.isCustom() | rSpan.firstLocationInfo.isFlat() << 1;
+        const unsigned lInterpMode = lSpan.firstLocationInfo.isCustom() | lSpan.firstLocationInfo.isFlat() << 1;
+        isCompatible &= rInterpMode == lInterpMode;
+      }
+    }
     return isCompatible;
   }
 
-  std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space
+  std::set<LocationSpan> m_locationSpans;    // Tracks spans of contiguous components in the generic input space
   InOutLocationInfoMap m_locationInfoMap;    // The map between original location and new location
 };
 
