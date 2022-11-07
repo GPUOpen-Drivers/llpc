@@ -1084,7 +1084,7 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     if (stride == 16) {
       memoryType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
     } else {
-      assert(stride < 8);
+      assert(stride <= 8);
       memoryType = m_builder->getIntNTy(stride * 8);
     }
 
