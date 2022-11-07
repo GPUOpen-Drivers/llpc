@@ -1480,6 +1480,75 @@ static unsigned getLoadStoreIntrinsicId(bool isLoad, bool isInvariant, unsigned 
 }
 
 // =====================================================================================================================
+// Recalculate offset by moving the constant part of the offset from "Value" component to "unsigned" component.
+//
+// Analyze the gep contributing to "Value" component, and move the constant part to the "unsigned" component.
+//
+// @param initialOffset : The initial offset, consisting of (Value, unsigned) components.
+// @returns : The updated offset, where some of "Value" component has been moved to "unsigned" component.
+std::pair<Value *, unsigned> PatchBufferOp::recalculateOffset(std::pair<Value *, unsigned> initialOffset) {
+  auto ptrToInt = dyn_cast<PtrToIntInst>(initialOffset.first);
+  if (!ptrToInt)
+    return initialOffset;
+
+  auto bitcast = dyn_cast<BitCastInst>(ptrToInt->getPointerOperand());
+  Value *gepCand = bitcast ? bitcast->getOperand(0) : ptrToInt->getPointerOperand();
+
+  auto gep = dyn_cast<GetElementPtrInst>(gepCand);
+  if (!gep)
+    return initialOffset;
+
+  // Find the splitting point in gep: first const index in the series of all const indices.
+  auto idxBegin = gep->idx_begin();
+  auto idxEnd = gep->idx_end();
+  auto idxFirstConstInSequence = idxEnd;
+  for (; idxFirstConstInSequence != idxBegin; --idxFirstConstInSequence) {
+    if (!isa<ConstantInt>(*(idxFirstConstInSequence - 1))) {
+      break;
+    }
+  }
+
+  // No constant indices at the end, exit early.
+  if (idxFirstConstInSequence == idxEnd)
+    return initialOffset;
+
+  // All indices are constant. No need to recalculate anything, as the "Value" component will be later
+  // constant folded to immediate anyway.
+  if (idxFirstConstInSequence == idxBegin)
+    return initialOffset;
+
+  // Prepare a list of gep indices containing the const indices to query the total offset accumulated.
+  SmallVector<Value *, 8> frontIndices(idxBegin, idxFirstConstInSequence);
+  auto constSequenceGepType = GetElementPtrInst::getIndexedType(gep->getSourceElementType(), frontIndices);
+
+  SmallVector<Value *, 8> constSequenceIndices;
+  constSequenceIndices.push_back(m_builder->getInt32(0));
+  constSequenceIndices.insert(constSequenceIndices.end(), idxFirstConstInSequence, idxEnd);
+
+  const DataLayout &dataLayout = m_builder->GetInsertBlock()->getModule()->getDataLayout();
+  APInt Offset(dataLayout.getIndexSizeInBits(gep->getPointerAddressSpace()), 0);
+  if (!GEPOperator::accumulateConstantOffset(constSequenceGepType, constSequenceIndices, dataLayout, Offset))
+    return initialOffset;
+
+  int64_t newOffsetImm = initialOffset.second + Offset.getSExtValue();
+  if (newOffsetImm < 0 || newOffsetImm > UINT_MAX)
+    return initialOffset;
+
+  // Create a new gep, without the sequence of constants at the end. The accumulated constant part of the gep
+  // will be moved to the the "unsigned" component.
+  m_builder->SetInsertPoint(gep);
+
+  Value *const pointer = getPointerOperandAsInst(gep->getPointerOperand());
+  auto getElemPtrEltTy = gep->getSourceElementType();
+  Value *newGetElemPtr = gep->isInBounds() ? m_builder->CreateInBoundsGEP(getElemPtrEltTy, pointer, frontIndices)
+                                           : m_builder->CreateGEP(getElemPtrEltTy, pointer, frontIndices);
+  copyMetadata(newGetElemPtr, pointer);
+  Value *const newOffsetVal = m_builder->CreatePtrToInt(newGetElemPtr, m_builder->getInt32Ty());
+
+  return std::make_pair(newOffsetVal, newOffsetImm);
+}
+
+// =====================================================================================================================
 // Replace a fat pointer load or store with the required intrinsics.
 //
 // @param inst : The instruction to replace.
@@ -1621,21 +1690,39 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
     }
   }
 
+  bool canUseSBufferLoadImm = m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9;
+
   // The index in storeValue which we use next
   unsigned storeIndex = 0;
 
   unsigned remainingBytes = bytesToHandle;
   while (remainingBytes > 0) {
-    const unsigned offset = bytesToHandle - remainingBytes;
-    Value *offsetVal = offset == 0 ? baseIndex : m_builder->CreateAdd(baseIndex, m_builder->getInt32(offset));
 
     Type *intAccessType = getIntAccessType(m_context, alignment, isInvariant, remainingBytes);
-    const DataLayout &dataLayout = m_builder->GetInsertBlock()->getModule()->getDataLayout();
     unsigned accessSize = dataLayout.getTypeSizeInBits(intAccessType) / 8;
+    unsigned intrinsicId = getLoadStoreIntrinsicId(isLoad, isInvariant, accessSize, ordering);
+
+    auto offsetPair = std::make_pair(baseIndex, bytesToHandle - remainingBytes);
+
+    // FIXME: in addition to SMEM loads, we could utilize immediate offset field in VMEM loads.
+
+    // Try using amdgcn_s_buffer_load_imm instead of amdgcn_s_buffer_load if target supports it and
+    // the immediate part of the offset is non-zero.
+    // It is expected that amdgcn_s_buffer_load_imm will not be needed when we switch to GlobalISel,
+    // so we should try to remove it when it happens.
+    if (canUseSBufferLoadImm && intrinsicId == Intrinsic::amdgcn_s_buffer_load) {
+      offsetPair = recalculateOffset(offsetPair);
+      if (offsetPair.second != 0)
+        intrinsicId = Intrinsic::amdgcn_s_buffer_load_imm;
+    }
+
+    m_builder->SetInsertPoint(&inst);
+    if (intrinsicId != Intrinsic::amdgcn_s_buffer_load_imm && offsetPair.second != 0) {
+      offsetPair.first = m_builder->CreateAdd(offsetPair.first, m_builder->getInt32(offsetPair.second));
+      offsetPair.second = 0;
+    }
 
     Value *part = nullptr;
-
-    unsigned intrinsicId = getLoadStoreIntrinsicId(isLoad, isInvariant, accessSize, ordering);
 
     CoherentFlag coherent = {};
     coherent.bits.glc = isGlc;
@@ -1648,16 +1735,21 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
         coherent.bits.dlc = isDlc;
       }
 
+      CallInst *call = nullptr;
       if (intrinsicId == Intrinsic::amdgcn_s_buffer_load) {
-        CallInst *call = m_builder->CreateIntrinsic(intrinsicId, intAccessType,
-                                                    {bufferDesc, offsetVal, m_builder->getInt32(coherent.u32All)});
-        call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, None));
-        part = call;
+        call = m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,
+                                          {bufferDesc, offsetPair.first, m_builder->getInt32(coherent.u32All)});
+        assert(offsetPair.second == 0);
       } else {
-        part = m_builder->CreateIntrinsic(
-            intrinsicId, intAccessType,
-            {bufferDesc, offsetVal, m_builder->getInt32(0), m_builder->getInt32(coherent.u32All)});
+        call = m_builder->CreateIntrinsic(intrinsicId, intAccessType,
+                                          {bufferDesc, offsetPair.first, m_builder->getInt32(offsetPair.second),
+                                           m_builder->getInt32(coherent.u32All)});
       }
+
+      if (intrinsicId == Intrinsic::amdgcn_s_buffer_load || intrinsicId == Intrinsic::amdgcn_s_buffer_load_imm)
+        call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, None));
+      part = call;
+
     } else {
       // Store
       unsigned compCount = accessSize / smallestByteSize;
@@ -1669,9 +1761,9 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
       }
       part = m_builder->CreateBitCast(part, intAccessType);
       copyMetadata(part, &inst);
-      part = m_builder->CreateIntrinsic(
-          intrinsicId, intAccessType,
-          {part, bufferDesc, offsetVal, m_builder->getInt32(0), m_builder->getInt32(coherent.u32All)});
+      part = m_builder->CreateIntrinsic(intrinsicId, intAccessType,
+                                        {part, bufferDesc, offsetPair.first, m_builder->getInt32(offsetPair.second),
+                                         m_builder->getInt32(coherent.u32All)});
     }
 
     copyMetadata(part, &inst);

@@ -84,6 +84,7 @@ private:
   void postVisitMemCpyInst(llvm::MemCpyInst &memCpyInst);
   void postVisitMemSetInst(llvm::MemSetInst &memSetInst);
   void fixIncompletePhis();
+  std::pair<llvm::Value *, unsigned> recalculateOffset(std::pair<llvm::Value *, unsigned> initialOffset);
 
   using Replacement = std::pair<llvm::Value *, llvm::Value *>;
   using PhiIncoming = std::pair<llvm::PHINode *, llvm::BasicBlock *>;
