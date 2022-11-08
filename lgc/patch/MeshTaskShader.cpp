@@ -2667,7 +2667,7 @@ Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
 // @returns : HW-specific shading rate
 Value *MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
 
-  assert(m_gfxIp == GfxIpVersion({10, 3})); // Must be GFX10.3
+  assert(m_gfxIp.isGfx(10, 3)); // Must be GFX10.3
 
   // NOTE: The shading rates have different meanings in HW and LGC interface. GFX10.3 HW supports 2-pixel mode
   // and 4-pixel mode is not supported. But the spec requires us to accept unsupported rates and clamp them to
