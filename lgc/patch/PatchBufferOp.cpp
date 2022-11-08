@@ -1215,7 +1215,7 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
     if (stride == 16)
       castDestType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
     else {
-      assert(stride < 8);
+      assert(stride <= 8);
       castDestType = m_builder->getIntNTy(stride * 8);
     }
 
