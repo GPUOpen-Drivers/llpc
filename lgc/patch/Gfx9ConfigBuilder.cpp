@@ -1621,7 +1621,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
 
   unsigned numInterp = resUsage->inOutUsage.fs.interpInfo.size() - numPrimInterp;
   SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, numInterp);
-  if (gfxIp == GfxIpVersion{10, 3})
+  if (gfxIp.isGfx(10, 3))
     SET_REG_GFX10_3_PLUS_EXCLUSIVE_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_PRIM_INTERP, numPrimInterp);
 
   if (pointCoordLoc != InvalidValue) {

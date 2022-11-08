@@ -694,7 +694,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         gsPrimsPerSubgroup = nggControl->primsPerSubgroup;
         break;
       case NggSubgroupSizing::Auto:
-        if (m_pipelineState->getTargetInfo().getGfxIpVersion() == GfxIpVersion{10, 1}) {
+        if (m_pipelineState->getTargetInfo().getGfxIpVersion().isGfx(10, 1)) {
           esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2 - 2;
           gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
         } else {
@@ -741,9 +741,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           esVertsPerSubgroup = std::min(esVertsPerSubgroup, OptimalVerticesPerPrimitiveForTess * gsPrimsPerSubgroup);
 
         // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
-        if (gfxIp == GfxIpVersion{10, 3})
+        if (gfxIp.isGfx(10, 3))
           esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
-        else if (gfxIp == GfxIpVersion{10, 1})
+        else if (gfxIp.isGfx(10, 1))
           esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
       } else {
         // If GS is not present, instance count must be 1
@@ -822,9 +822,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
                                               Gfx9::NggMaxThreadsPerSubgroup));
 
         // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
-        if (gfxIp == GfxIpVersion{10, 3})
+        if (gfxIp.isGfx(10, 3))
           esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
-        else if (gfxIp == GfxIpVersion{10, 1})
+        else if (gfxIp.isGfx(10, 1))
           esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
 
 #if VKI_RAY_TRACING
