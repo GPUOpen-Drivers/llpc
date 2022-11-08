@@ -82,6 +82,8 @@ inline bool isValid(spv::ExecutionModel V) {
   case ExecutionModelMissKHR:
   case ExecutionModelCallableKHR:
 #endif
+  case ExecutionModelTaskEXT:
+  case ExecutionModelMeshEXT:
     return true;
   default:
     return false;
@@ -157,6 +159,9 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeRoundingModeRTE:
   case ExecutionModeRoundingModeRTZ:
   case ExecutionModeSubgroupUniformControlFlowKHR:
+  case ExecutionModeOutputLinesEXT:
+  case ExecutionModeOutputTrianglesEXT:
+  case ExecutionModeOutputPrimitivesEXT:
   case ExecutionModeStencilRefReplacingEXT:
   case ExecutionModeEarlyAndLateFragmentTestsAMD:
   case ExecutionModeStencilRefUnchangedFrontAMD:
@@ -200,6 +205,7 @@ inline bool isValid(spv::StorageClass V) {
   case StorageClassIncomingRayPayloadKHR:
   case StorageClassShaderRecordBufferKHR:
 #endif
+  case StorageClassTaskPayloadWorkgroupEXT:
     return true;
   default:
     return false;
@@ -345,6 +351,7 @@ inline bool isValid(spv::Decoration V) {
   case DecorationNoUnsignedWrap:
 #endif
   case DecorationExplicitInterpAMD:
+  case DecorationPerPrimitiveEXT:
   case DecorationPerVertexKHR:
 #if SPV_VERSION >= 0x10500
   case DecorationNonUniform:
@@ -419,6 +426,10 @@ inline bool isValid(spv::BuiltIn V) {
   case BuiltInBaryCoordSmoothCentroidAMD:
   case BuiltInBaryCoordSmoothSampleAMD:
   case BuiltInBaryCoordPullModelAMD:
+  case BuiltInCullPrimitiveEXT:
+  case BuiltInPrimitivePointIndicesEXT:
+  case BuiltInPrimitiveLineIndicesEXT:
+  case BuiltInPrimitiveTriangleIndicesEXT:
   case BuiltInBaryCoordKHR:
   case BuiltInBaryCoordNoPerspKHR:
     return true;
@@ -550,6 +561,7 @@ inline bool isValid(spv::Capability V) {
   case CapabilityVariablePointers:
   case CapabilityFragmentShadingRateKHR:
   case CapabilityInt64ImageEXT:
+  case CapabilityMeshShadingEXT:
 #if SPV_VERSION >= 0x10500
   case CapabilityShaderNonUniform:
   case CapabilityRuntimeDescriptorArray:
@@ -921,6 +933,8 @@ inline bool isValid(spv::Op V) {
   case OpGroupUMaxNonUniformAMD:
   case OpGroupSMaxNonUniformAMD:
   case OpReadClockKHR:
+  case OpEmitMeshTasksEXT:
+  case OpSetMeshOutputsEXT:
 #if VKI_RAY_TRACING
   case OpReportIntersectionKHR:
   case OpIgnoreIntersectionKHR:

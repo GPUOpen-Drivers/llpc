@@ -190,10 +190,12 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
   if (m_pipelineState.pipelineType == VfxPipelineTypeGraphics ||
       m_pipelineState.pipelineType == VfxPipelineTypeCompute) {
     PipelineShaderInfo *shaderInfo[NativeShaderStageCount] = {
+      &m_pipelineState.gfxPipelineInfo.task,
       &m_pipelineState.gfxPipelineInfo.vs,
       &m_pipelineState.gfxPipelineInfo.tcs,
       &m_pipelineState.gfxPipelineInfo.tes,
       &m_pipelineState.gfxPipelineInfo.gs,
+      &m_pipelineState.gfxPipelineInfo.mesh,
       &m_pipelineState.gfxPipelineInfo.fs,
       &m_pipelineState.compPipelineInfo.cs,
     };

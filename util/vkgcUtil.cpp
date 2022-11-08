@@ -64,10 +64,12 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
   else if (shaderStage < ShaderStageCount) {
     if (upper) {
       static const char *ShaderStageAbbrs[] = {
+        "TASK",
         "VS",
         "TCS",
         "TES",
         "GS",
+        "MESH",
         "FS",
         "CS",
 #if VKI_RAY_TRACING
@@ -83,10 +85,12 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
       abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
     } else {
       static const char *ShaderStageAbbrs[] = {
+        "Task",
         "Vs",
         "Tcs",
         "Tes",
         "Gs",
+        "Mesh",
         "Fs",
         "Cs",
 #if VKI_RAY_TRACING

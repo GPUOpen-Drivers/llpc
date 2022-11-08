@@ -1568,7 +1568,7 @@ Value *ImageBuilder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, V
   std::string callName = "llvm.amdgcn.image.bvh.intersect.ray";
   addTypeMangling(nullptr, {nodePtr, direction}, callName);
 
-  return emitCall(callName, FixedVectorType::get(getInt32Ty(), 4), args, {}, &*GetInsertPoint());
+  return CreateNamedCall(callName, FixedVectorType::get(getInt32Ty(), 4), args, {});
 }
 #endif
 

@@ -934,8 +934,9 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
   if (shaderOptions->nsaThreshold != 0)
     builder.addAttribute("amdgpu-nsa-threshold", std::to_string(shaderOptions->nsaThreshold));
 
-  // Disable backend heuristics which would allow shaders to have lower occupancy.
-  builder.addAttribute("amdgpu-memory-bound", "false");
+  // Disable backend heuristics which would allow shaders to have lower occupancy. Heed the favorLatencyHiding tuning
+  // option instead.
+  builder.addAttribute("amdgpu-memory-bound", shaderOptions->favorLatencyHiding ? "true" : "false");
   builder.addAttribute("amdgpu-wave-limiter", "false");
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396807

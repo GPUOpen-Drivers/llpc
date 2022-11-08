@@ -319,6 +319,8 @@ _SPIRV_OP(GroupSMaxNonUniformAMD, 5007)
 _SPIRV_OP(FragmentMaskFetchAMD, 5011)
 _SPIRV_OP(FragmentFetchAMD, 5012)
 _SPIRV_OP(ReadClockKHR, 5056)
+_SPIRV_OP(EmitMeshTasksEXT, 5294)
+_SPIRV_OP(SetMeshOutputsEXT, 5295)
 #if VKI_RAY_TRACING
 _SPIRV_OP(ReportIntersectionKHR, 5334)
 _SPIRV_OP(IgnoreIntersectionKHR, 4448)

@@ -132,6 +132,17 @@ using namespace Pal::Gfx9::Chip;
     }                                                                                                                  \
   }
 
+// HasHwVs only
+#define INIT_REG_HAS_HW_VS(_gfx, _reg)                                                                                 \
+  {                                                                                                                    \
+    if (_gfx == 9 || _gfx == 10) {                                                                                     \
+      _reg##_ID = HasHwVs::mm##_reg;                                                                                   \
+      _reg##_VAL.u32All = 0;                                                                                           \
+    } else {                                                                                                           \
+      INIT_REG_TO_INVALID(_reg);                                                                                       \
+    }                                                                                                                  \
+  }
+
 // Case label for switch, set register value
 #define CASE_SET_REG(_stage, _reg, _val)                                                                               \
   case (mm##_reg * 4): {                                                                                               \
@@ -179,6 +190,8 @@ using namespace Pal::Gfx9::Chip;
 #define SET_REG_GFX10_PLUS_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx10Plus._field = (_val);
 #define SET_REG_GFX10_1_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx101._field = (_val);
 #define SET_REG_GFX10_3_PLUS_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx103Plus._field = (_val);
+#define SET_REG_GFX10_3_PLUS_EXCLUSIVE_FIELD(_stage, _reg, _field, _val)                                               \
+  (_stage)->_reg##_VAL.gfx103PlusExclusive._field = (_val);
 
 // Preferred number of GS primitives per ES thread.
 constexpr unsigned GsPrimsPerEsThread = 256;

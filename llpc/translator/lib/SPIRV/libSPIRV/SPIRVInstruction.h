@@ -2261,6 +2261,8 @@ _SPIRV_OP(SubgroupAnyKHR, true, 4, false)
 _SPIRV_OP(SubgroupAllEqualKHR, true, 4, false)
 _SPIRV_OP(ReadClockKHR, true, 4)
 _SPIRV_OP(IsHelperInvocationEXT, true, 3)
+_SPIRV_OP(EmitMeshTasksEXT, false, 5, false)
+_SPIRV_OP(SetMeshOutputsEXT, false, 3, false)
 #undef _SPIRV_OP
 class SPIRVSubgroupShuffleINTELInstBase : public SPIRVInstTemplateBase {
 protected:

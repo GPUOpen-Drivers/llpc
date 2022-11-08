@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -447,7 +447,7 @@ union CB_CGTT_SCLK_CTRL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union CB_CGTT_SCLK_CTRL1 {
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
@@ -547,7 +547,7 @@ union CB_COLOR0_ATTRIB3 {
         unsigned int RESOURCE_LEVEL                                               :  3;
         unsigned int                                                              :  2;
     } gfx10Core;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
         unsigned int VRS_RATE_HINT_ENABLE                                         :  1;
@@ -684,17 +684,17 @@ union CB_COLOR0_DCC_CONTROL {
     } gfx10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 21;
-        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
-        unsigned int                                                              : 10;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
         unsigned int                                                              : 22;
         unsigned int DCC_COMPRESS_DISABLE                                         :  1;
         unsigned int                                                              :  9;
-    } gfx10Vrs;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
+        unsigned int                                                              : 10;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -750,6 +750,10 @@ union CB_COLOR0_INFO {
         unsigned int                                                              :  6;
     } bits, bitfields;
     struct {
+        unsigned int                                                              : 31;
+        unsigned int ALT_TILE_MODE                                                :  1;
+    } most;
+    struct {
         unsigned int ENDIAN                                                       :  2;
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              :  6;
@@ -762,10 +766,6 @@ union CB_COLOR0_INFO {
         unsigned int CMASK_ADDR_TYPE                                              :  2;
         unsigned int                                                              :  1;
     } gfx09_10;
-    struct {
-        unsigned int                                                              : 31;
-        unsigned int ALT_TILE_MODE                                                :  1;
-    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
@@ -900,7 +900,7 @@ union CB_COLOR1_ATTRIB3 {
         unsigned int RESOURCE_LEVEL                                               :  3;
         unsigned int                                                              :  2;
     } gfx10Core;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
         unsigned int VRS_RATE_HINT_ENABLE                                         :  1;
@@ -1037,17 +1037,17 @@ union CB_COLOR1_DCC_CONTROL {
     } gfx10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 21;
-        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
-        unsigned int                                                              : 10;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
         unsigned int                                                              : 22;
         unsigned int DCC_COMPRESS_DISABLE                                         :  1;
         unsigned int                                                              :  9;
-    } gfx10Vrs;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
+        unsigned int                                                              : 10;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -1103,6 +1103,10 @@ union CB_COLOR1_INFO {
         unsigned int                                                              :  6;
     } bits, bitfields;
     struct {
+        unsigned int                                                              : 31;
+        unsigned int ALT_TILE_MODE                                                :  1;
+    } most;
+    struct {
         unsigned int ENDIAN                                                       :  2;
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              :  6;
@@ -1115,10 +1119,6 @@ union CB_COLOR1_INFO {
         unsigned int CMASK_ADDR_TYPE                                              :  2;
         unsigned int                                                              :  1;
     } gfx09_10;
-    struct {
-        unsigned int                                                              : 31;
-        unsigned int ALT_TILE_MODE                                                :  1;
-    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
@@ -1253,7 +1253,7 @@ union CB_COLOR2_ATTRIB3 {
         unsigned int RESOURCE_LEVEL                                               :  3;
         unsigned int                                                              :  2;
     } gfx10Core;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
         unsigned int VRS_RATE_HINT_ENABLE                                         :  1;
@@ -1390,17 +1390,17 @@ union CB_COLOR2_DCC_CONTROL {
     } gfx10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 21;
-        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
-        unsigned int                                                              : 10;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
         unsigned int                                                              : 22;
         unsigned int DCC_COMPRESS_DISABLE                                         :  1;
         unsigned int                                                              :  9;
-    } gfx10Vrs;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
+        unsigned int                                                              : 10;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -1456,6 +1456,10 @@ union CB_COLOR2_INFO {
         unsigned int                                                              :  6;
     } bits, bitfields;
     struct {
+        unsigned int                                                              : 31;
+        unsigned int ALT_TILE_MODE                                                :  1;
+    } most;
+    struct {
         unsigned int ENDIAN                                                       :  2;
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              :  6;
@@ -1468,10 +1472,6 @@ union CB_COLOR2_INFO {
         unsigned int CMASK_ADDR_TYPE                                              :  2;
         unsigned int                                                              :  1;
     } gfx09_10;
-    struct {
-        unsigned int                                                              : 31;
-        unsigned int ALT_TILE_MODE                                                :  1;
-    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
@@ -1606,7 +1606,7 @@ union CB_COLOR3_ATTRIB3 {
         unsigned int RESOURCE_LEVEL                                               :  3;
         unsigned int                                                              :  2;
     } gfx10Core;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
         unsigned int VRS_RATE_HINT_ENABLE                                         :  1;
@@ -1743,17 +1743,17 @@ union CB_COLOR3_DCC_CONTROL {
     } gfx10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 21;
-        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
-        unsigned int                                                              : 10;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
         unsigned int                                                              : 22;
         unsigned int DCC_COMPRESS_DISABLE                                         :  1;
         unsigned int                                                              :  9;
-    } gfx10Vrs;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
+        unsigned int                                                              : 10;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -1809,6 +1809,10 @@ union CB_COLOR3_INFO {
         unsigned int                                                              :  6;
     } bits, bitfields;
     struct {
+        unsigned int                                                              : 31;
+        unsigned int ALT_TILE_MODE                                                :  1;
+    } most;
+    struct {
         unsigned int ENDIAN                                                       :  2;
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              :  6;
@@ -1821,10 +1825,6 @@ union CB_COLOR3_INFO {
         unsigned int CMASK_ADDR_TYPE                                              :  2;
         unsigned int                                                              :  1;
     } gfx09_10;
-    struct {
-        unsigned int                                                              : 31;
-        unsigned int ALT_TILE_MODE                                                :  1;
-    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
@@ -1959,7 +1959,7 @@ union CB_COLOR4_ATTRIB3 {
         unsigned int RESOURCE_LEVEL                                               :  3;
         unsigned int                                                              :  2;
     } gfx10Core;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
         unsigned int VRS_RATE_HINT_ENABLE                                         :  1;
@@ -2096,17 +2096,17 @@ union CB_COLOR4_DCC_CONTROL {
     } gfx10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 21;
-        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
-        unsigned int                                                              : 10;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
         unsigned int                                                              : 22;
         unsigned int DCC_COMPRESS_DISABLE                                         :  1;
         unsigned int                                                              :  9;
-    } gfx10Vrs;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
+        unsigned int                                                              : 10;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -2162,6 +2162,10 @@ union CB_COLOR4_INFO {
         unsigned int                                                              :  6;
     } bits, bitfields;
     struct {
+        unsigned int                                                              : 31;
+        unsigned int ALT_TILE_MODE                                                :  1;
+    } most;
+    struct {
         unsigned int ENDIAN                                                       :  2;
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              :  6;
@@ -2174,10 +2178,6 @@ union CB_COLOR4_INFO {
         unsigned int CMASK_ADDR_TYPE                                              :  2;
         unsigned int                                                              :  1;
     } gfx09_10;
-    struct {
-        unsigned int                                                              : 31;
-        unsigned int ALT_TILE_MODE                                                :  1;
-    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
@@ -2312,7 +2312,7 @@ union CB_COLOR5_ATTRIB3 {
         unsigned int RESOURCE_LEVEL                                               :  3;
         unsigned int                                                              :  2;
     } gfx10Core;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
         unsigned int VRS_RATE_HINT_ENABLE                                         :  1;
@@ -2449,17 +2449,17 @@ union CB_COLOR5_DCC_CONTROL {
     } gfx10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 21;
-        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
-        unsigned int                                                              : 10;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
         unsigned int                                                              : 22;
         unsigned int DCC_COMPRESS_DISABLE                                         :  1;
         unsigned int                                                              :  9;
-    } gfx10Vrs;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
+        unsigned int                                                              : 10;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -2515,6 +2515,10 @@ union CB_COLOR5_INFO {
         unsigned int                                                              :  6;
     } bits, bitfields;
     struct {
+        unsigned int                                                              : 31;
+        unsigned int ALT_TILE_MODE                                                :  1;
+    } most;
+    struct {
         unsigned int ENDIAN                                                       :  2;
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              :  6;
@@ -2527,10 +2531,6 @@ union CB_COLOR5_INFO {
         unsigned int CMASK_ADDR_TYPE                                              :  2;
         unsigned int                                                              :  1;
     } gfx09_10;
-    struct {
-        unsigned int                                                              : 31;
-        unsigned int ALT_TILE_MODE                                                :  1;
-    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
@@ -2665,7 +2665,7 @@ union CB_COLOR6_ATTRIB3 {
         unsigned int RESOURCE_LEVEL                                               :  3;
         unsigned int                                                              :  2;
     } gfx10Core;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
         unsigned int VRS_RATE_HINT_ENABLE                                         :  1;
@@ -2802,17 +2802,17 @@ union CB_COLOR6_DCC_CONTROL {
     } gfx10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 21;
-        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
-        unsigned int                                                              : 10;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
         unsigned int                                                              : 22;
         unsigned int DCC_COMPRESS_DISABLE                                         :  1;
         unsigned int                                                              :  9;
-    } gfx10Vrs;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
+        unsigned int                                                              : 10;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -2868,6 +2868,10 @@ union CB_COLOR6_INFO {
         unsigned int                                                              :  6;
     } bits, bitfields;
     struct {
+        unsigned int                                                              : 31;
+        unsigned int ALT_TILE_MODE                                                :  1;
+    } most;
+    struct {
         unsigned int ENDIAN                                                       :  2;
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              :  6;
@@ -2880,10 +2884,6 @@ union CB_COLOR6_INFO {
         unsigned int CMASK_ADDR_TYPE                                              :  2;
         unsigned int                                                              :  1;
     } gfx09_10;
-    struct {
-        unsigned int                                                              : 31;
-        unsigned int ALT_TILE_MODE                                                :  1;
-    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
@@ -3018,7 +3018,7 @@ union CB_COLOR7_ATTRIB3 {
         unsigned int RESOURCE_LEVEL                                               :  3;
         unsigned int                                                              :  2;
     } gfx10Core;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
         unsigned int VRS_RATE_HINT_ENABLE                                         :  1;
@@ -3155,17 +3155,17 @@ union CB_COLOR7_DCC_CONTROL {
     } gfx10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 21;
-        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
-        unsigned int                                                              : 10;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
         unsigned int                                                              : 22;
         unsigned int DCC_COMPRESS_DISABLE                                         :  1;
         unsigned int                                                              :  9;
-    } gfx10Vrs;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
+        unsigned int                                                              : 10;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -3221,6 +3221,10 @@ union CB_COLOR7_INFO {
         unsigned int                                                              :  6;
     } bits, bitfields;
     struct {
+        unsigned int                                                              : 31;
+        unsigned int ALT_TILE_MODE                                                :  1;
+    } most;
+    struct {
         unsigned int ENDIAN                                                       :  2;
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              :  6;
@@ -3233,10 +3237,6 @@ union CB_COLOR7_INFO {
         unsigned int CMASK_ADDR_TYPE                                              :  2;
         unsigned int                                                              :  1;
     } gfx09_10;
-    struct {
-        unsigned int                                                              : 31;
-        unsigned int ALT_TILE_MODE                                                :  1;
-    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
@@ -3318,7 +3318,7 @@ union CB_COLOR_CONTROL {
         unsigned int                                                              :  1;
         unsigned int                                                              :  1;
         unsigned int                                                              : 30;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -3343,10 +3343,9 @@ union CB_COVERAGE_OUT_CONTROL {
 
 union CB_DCC_CONFIG {
     struct {
-        unsigned int                                                              :  8;
-        unsigned int FC_RDLAT_KEYID_FIFO_DEPTH                                    :  8;
-        unsigned int                                                              : 16;
-    } bits, bitfields;
+        unsigned int                                                              : 26;
+        unsigned int DCC_CACHE_NUM_TAGS                                           :  6;
+    } most;
     struct {
         unsigned int                                                              : 16;
         unsigned int READ_RETURN_SKID_FIFO_DEPTH                                  :  7;
@@ -3358,22 +3357,20 @@ union CB_DCC_CONFIG {
         unsigned int OVERWRITE_COMBINER_DEPTH                                     :  5;
         unsigned int OVERWRITE_COMBINER_DISABLE                                   :  1;
         unsigned int OVERWRITE_COMBINER_CC_POP_DISABLE                            :  1;
-        unsigned int                                                              : 25;
+        unsigned int                                                              :  1;
+        unsigned int FC_RDLAT_KEYID_FIFO_DEPTH                                    :  8;
+        unsigned int                                                              : 16;
     } gfx09_10;
     struct {
         unsigned int                                                              :  7;
         unsigned int DISABLE_CONSTANT_ENCODE                                      :  1;
         unsigned int                                                              : 24;
     } gfx09_1xPlus;
-    struct {
-        unsigned int                                                              : 26;
-        unsigned int DCC_CACHE_NUM_TAGS                                           :  6;
-    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 25;
         unsigned int DCC_CACHE_NUM_TAGS                                           :  7;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int                                                              : 16;
@@ -3419,16 +3416,14 @@ union CB_HW_CONTROL {
     struct {
         unsigned int                                                              : 19;
         unsigned int FORCE_NEEDS_DST                                              :  1;
-        unsigned int FORCE_ALWAYS_TOGGLE                                          :  1;
-        unsigned int DISABLE_BLEND_OPT_RESULT_EQ_DEST                             :  1;
-        unsigned int DISABLE_FULL_WRITE_MASK                                      :  1;
         unsigned int                                                              :  1;
+        unsigned int DISABLE_BLEND_OPT_RESULT_EQ_DEST                             :  1;
+        unsigned int                                                              :  2;
         unsigned int DISABLE_BLEND_OPT_DONT_RD_DST                                :  1;
         unsigned int DISABLE_BLEND_OPT_BYPASS                                     :  1;
         unsigned int DISABLE_BLEND_OPT_DISCARD_PIXEL                              :  1;
         unsigned int DISABLE_BLEND_OPT_WHEN_DISABLED_SRCALPHA_IS_USED             :  1;
-        unsigned int                                                              :  1;
-        unsigned int PRIORITIZE_FC_EVICT_OVER_FOP_RD_ON_BANK_CONFLICT             :  1;
+        unsigned int                                                              :  2;
         unsigned int DISABLE_CC_IB_SERIALIZER_STATE_OPT                           :  1;
         unsigned int DISABLE_PIXEL_IN_QUAD_FIX_FOR_LINEAR_SURFACE                 :  1;
     } bits, bitfields;
@@ -3447,11 +3442,15 @@ union CB_HW_CONTROL {
         unsigned int                                                              : 15;
     } gfx09;
     struct {
-        unsigned int                                                              : 23;
+        unsigned int                                                              : 20;
+        unsigned int FORCE_ALWAYS_TOGGLE                                          :  1;
+        unsigned int                                                              :  1;
+        unsigned int DISABLE_FULL_WRITE_MASK                                      :  1;
         unsigned int DISABLE_RESOLVE_OPT_FOR_SINGLE_FRAG                          :  1;
         unsigned int                                                              :  4;
         unsigned int PRIORITIZE_FC_WR_OVER_FC_RD_ON_CMASK_CONFLICT                :  1;
-        unsigned int                                                              :  3;
+        unsigned int PRIORITIZE_FC_EVICT_OVER_FOP_RD_ON_BANK_CONFLICT             :  1;
+        unsigned int                                                              :  2;
     } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
@@ -3462,31 +3461,32 @@ union CB_HW_CONTROL {
 #endif
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
+        unsigned int                                                              :  3;
+        unsigned int DISABLE_FILLRATE_OPT_FIX_WITH_CFC                            :  1;
+        unsigned int DISABLE_POST_DCC_WITH_CFC_FIX                                :  1;
+        unsigned int DISABLE_COMPRESS_1FRAG_WHEN_VRS_RATE_HINT_EN                 :  1;
+        unsigned int                                                              :  6;
+        unsigned int CHICKEN_BITS                                                 :  3;
+        unsigned int                                                              :  1;
+        unsigned int DISABLE_CMASK_CACHE_BYTEMASKING                              :  1;
+        unsigned int                                                              : 15;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
         unsigned int                                                              :  1;
         unsigned int DISABLE_VRS_FILLRATE_OPTIMIZATION                            :  1;
         unsigned int                                                              :  4;
         unsigned int RMI_CREDITS                                                  :  6;
-        unsigned int CHICKEN_BITS                                                 :  3;
-        unsigned int                                                              :  2;
+        unsigned int                                                              :  5;
         unsigned int DISABLE_DCC_CACHE_BYTEMASKING                                :  1;
         unsigned int                                                              : 14;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int ALLOW_MRT_WITH_DUAL_SOURCE                                   :  1;
         unsigned int                                                              : 31;
     } gfx10Plus;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
-        unsigned int                                                              :  3;
-        unsigned int DISABLE_FILLRATE_OPT_FIX_WITH_CFC                            :  1;
-        unsigned int DISABLE_POST_DCC_WITH_CFC_FIX                                :  1;
-        unsigned int DISABLE_COMPRESS_1FRAG_WHEN_VRS_RATE_HINT_EN                 :  1;
-        unsigned int                                                              : 10;
-        unsigned int DISABLE_CMASK_CACHE_BYTEMASKING                              :  1;
-        unsigned int                                                              : 15;
-    } gfx10Vrs;
-#endif
 
     unsigned int u32All;
     signed int   i32All;
@@ -3521,7 +3521,7 @@ union CB_HW_CONTROL_1 {
         unsigned int CC_CACHE_NUM_TAGS                                            :  6;
         unsigned int CM_TILE_FIFO_DEPTH                                           :  9;
         unsigned int                                                              :  5;
-    } gfx10Vrs;
+    } gfx103Derivative;
 #endif
 #if CHIP_HDR_NAVI21
     struct {
@@ -3561,7 +3561,7 @@ union CB_HW_CONTROL_2 {
     struct {
         unsigned int CC_EVEN_ODD_FIFO_DEPTH                                       :  8;
         unsigned int                                                              : 24;
-    } core;
+    } most;
     struct {
         unsigned int                                                              : 24;
         unsigned int DRR_ASSUMED_FIFO_DEPTH_DIV8                                  :  4;
@@ -3586,10 +3586,9 @@ union CB_HW_CONTROL_2 {
 
 union CB_HW_CONTROL_3 {
     struct {
-        unsigned int DISABLE_SLOW_MODE_EMPTY_HALF_QUAD_KILL                       :  1;
+        unsigned int                                                              :  1;
         unsigned int RAM_ADDRESS_CONFLICTS_DISALLOWED                             :  1;
-        unsigned int DISABLE_FAST_CLEAR_FETCH_OPT                                 :  1;
-        unsigned int                                                              : 29;
+        unsigned int                                                              : 30;
     } bits, bitfields;
     struct {
         unsigned int                                                              : 26;
@@ -3607,7 +3606,9 @@ union CB_HW_CONTROL_3 {
         unsigned int                                                              :  2;
     } gfx09;
     struct {
-        unsigned int                                                              :  3;
+        unsigned int DISABLE_SLOW_MODE_EMPTY_HALF_QUAD_KILL                       :  1;
+        unsigned int                                                              :  1;
+        unsigned int DISABLE_FAST_CLEAR_FETCH_OPT                                 :  1;
         unsigned int DISABLE_QUAD_MARKER_DROP_STOP                                :  1;
         unsigned int DISABLE_OVERWRITE_COMBINER_CAM_CLR                           :  1;
         unsigned int DISABLE_CC_CACHE_OVWR_STATUS_ACCUM                           :  1;
@@ -3649,7 +3650,7 @@ union CB_HW_CONTROL_3 {
         unsigned int                                                              : 31;
         unsigned int DISABLE_FMASK_NOFETCH_OPT_BC                                 :  1;
     } gfx10Core;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 28;
         unsigned int DISABLE_DCC_VRS_OPT                                          :  1;
@@ -3870,7 +3871,7 @@ union CB_PERFCOUNTER0_SELECT {
         unsigned int                                                              :  1;
         unsigned int PERF_SEL1                                                    :  9;
         unsigned int                                                              : 13;
-    } core;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -3888,7 +3889,7 @@ union CB_PERFCOUNTER0_SELECT1 {
         unsigned int                                                              :  1;
         unsigned int PERF_SEL3                                                    :  9;
         unsigned int                                                              : 13;
-    } core;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -3923,7 +3924,7 @@ union CB_PERFCOUNTER1_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
         unsigned int                                                              : 23;
-    } core;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -3958,7 +3959,7 @@ union CB_PERFCOUNTER2_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
         unsigned int                                                              : 23;
-    } core;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -3993,7 +3994,7 @@ union CB_PERFCOUNTER3_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
         unsigned int                                                              : 23;
-    } core;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -5072,10 +5073,15 @@ union COMPUTE_PREF_PRI_ACCUM_0 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -5088,10 +5094,15 @@ union COMPUTE_PREF_PRI_ACCUM_1 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -5104,10 +5115,15 @@ union COMPUTE_PREF_PRI_ACCUM_2 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -5120,10 +5136,15 @@ union COMPUTE_PREF_PRI_ACCUM_3 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -5349,9 +5370,13 @@ union COMPUTE_THREAD_TRACE_ENABLE {
 union COMPUTE_TMPRING_SIZE {
     struct {
         unsigned int WAVES                                                        : 12;
+        unsigned int                                                              : 20;
+    } bits, bitfields;
+    struct {
+        unsigned int                                                              : 12;
         unsigned int WAVESIZE                                                     : 13;
         unsigned int                                                              :  7;
-    } bits, bitfields;
+    } gfx09_10;
 
     unsigned int u32All;
     signed int   i32All;
@@ -5683,24 +5708,27 @@ union CPC_PERFCOUNTER1_SELECT {
     struct {
         unsigned int                                                              : 20;
         unsigned int SPM_MODE                                                     :  4;
-        unsigned int                                                              :  4;
-        unsigned int CNTR_MODE0                                                   :  4;
+        unsigned int                                                              :  8;
     } bits, bitfields;
     struct {
         unsigned int                                                              : 24;
         unsigned int CNTR_MODE1                                                   :  4;
         unsigned int                                                              :  4;
-    } core;
+    } most;
     struct {
         unsigned int CNTR_SEL0                                                    : 10;
         unsigned int CNTR_SEL1                                                    : 10;
         unsigned int                                                              : 12;
     } gfx09;
     struct {
+        unsigned int                                                              : 28;
+        unsigned int CNTR_MODE0                                                   :  4;
+    } gfx09_10;
+    struct {
         unsigned int                                                              : 10;
         unsigned int PERF_SEL1                                                    : 10;
         unsigned int                                                              : 12;
-    } gfx10CorePlus;
+    } gfx10Core;
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -5800,24 +5828,27 @@ union CPF_PERFCOUNTER1_SELECT {
     struct {
         unsigned int                                                              : 20;
         unsigned int SPM_MODE                                                     :  4;
-        unsigned int                                                              :  4;
-        unsigned int CNTR_MODE0                                                   :  4;
+        unsigned int                                                              :  8;
     } bits, bitfields;
     struct {
         unsigned int                                                              : 24;
         unsigned int CNTR_MODE1                                                   :  4;
         unsigned int                                                              :  4;
-    } core;
+    } most;
     struct {
         unsigned int CNTR_SEL0                                                    : 10;
         unsigned int CNTR_SEL1                                                    : 10;
         unsigned int                                                              : 12;
     } gfx09;
     struct {
+        unsigned int                                                              : 28;
+        unsigned int CNTR_MODE0                                                   :  4;
+    } gfx09_10;
+    struct {
         unsigned int                                                              : 10;
         unsigned int PERF_SEL1                                                    : 10;
         unsigned int                                                              : 12;
-    } gfx10CorePlus;
+    } gfx10Core;
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -5917,24 +5948,27 @@ union CPG_PERFCOUNTER1_SELECT {
     struct {
         unsigned int                                                              : 20;
         unsigned int SPM_MODE                                                     :  4;
-        unsigned int                                                              :  4;
-        unsigned int CNTR_MODE0                                                   :  4;
+        unsigned int                                                              :  8;
     } bits, bitfields;
     struct {
         unsigned int                                                              : 24;
         unsigned int CNTR_MODE1                                                   :  4;
         unsigned int                                                              :  4;
-    } core;
+    } most;
     struct {
         unsigned int CNTR_SEL0                                                    : 10;
         unsigned int CNTR_SEL1                                                    : 10;
         unsigned int                                                              : 12;
     } gfx09;
     struct {
+        unsigned int                                                              : 28;
+        unsigned int CNTR_MODE0                                                   :  4;
+    } gfx09_10;
+    struct {
         unsigned int                                                              : 10;
         unsigned int PERF_SEL1                                                    : 10;
         unsigned int                                                              : 12;
-    } gfx10CorePlus;
+    } gfx10Core;
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -6536,7 +6570,7 @@ union DB_CGTT_CLK_CTRL_0 {
     struct {
         unsigned int ON_DELAY                                                     :  4;
         unsigned int OFF_HYSTERESIS                                               :  8;
-        unsigned int RESERVED                                                     :  4;
+        unsigned int                                                              :  4;
         unsigned int SOFT_STALL_OVERRIDE7                                         :  1;
         unsigned int SOFT_STALL_OVERRIDE6                                         :  1;
         unsigned int SOFT_STALL_OVERRIDE5                                         :  1;
@@ -6553,7 +6587,17 @@ union DB_CGTT_CLK_CTRL_0 {
         unsigned int SOFT_OVERRIDE2                                               :  1;
         unsigned int SOFT_OVERRIDE1                                               :  1;
         unsigned int SOFT_OVERRIDE0                                               :  1;
-    } core;
+    } most;
+    struct {
+        unsigned int                                                              : 12;
+        unsigned int RESERVED                                                     :  4;
+        unsigned int                                                              : 16;
+    } gfx09;
+    struct {
+        unsigned int                                                              : 12;
+        unsigned int RESERVED                                                     :  4;
+        unsigned int                                                              : 16;
+    } gfx10Core;
 
     unsigned int u32All;
     signed int   i32All;
@@ -6562,7 +6606,7 @@ union DB_CGTT_CLK_CTRL_0 {
 
 union DB_COUNT_CONTROL {
     struct {
-        unsigned int ZPASS_INCREMENT_DISABLE                                      :  1;
+        unsigned int                                                              :  1;
         unsigned int PERFECT_ZPASS_COUNTS                                         :  1;
         unsigned int                                                              :  2;
         unsigned int SAMPLE_RATE                                                  :  3;
@@ -6574,6 +6618,10 @@ union DB_COUNT_CONTROL {
         unsigned int SLICE_EVEN_ENABLE                                            :  4;
         unsigned int SLICE_ODD_ENABLE                                             :  4;
     } bits, bitfields;
+    struct {
+        unsigned int ZPASS_INCREMENT_DISABLE                                      :  1;
+        unsigned int                                                              : 31;
+    } gfx09_10;
     struct {
         unsigned int                                                              :  2;
         unsigned int DISABLE_CONSERVATIVE_ZPASS_COUNTS                            :  1;
@@ -6661,7 +6709,7 @@ union DB_DEPTH_SIZE {
         unsigned int                                                              :  2;
         unsigned int Y_MAX                                                        : 14;
         unsigned int                                                              :  2;
-    } bits, bitfields;
+    } gfx09;
 
     unsigned int u32All;
     signed int   i32All;
@@ -6902,7 +6950,10 @@ union DB_EXCEPTION_CONTROL {
     struct {
         unsigned int                                                              :  5;
         unsigned int EXTRA_BITS_GROUP_A                                           :  3;
-        unsigned int                                                              :  4;
+        unsigned int                                                              : 24;
+    } most;
+    struct {
+        unsigned int                                                              : 12;
         unsigned int EXTRA_BITS_GROUP_B                                           : 12;
         unsigned int                                                              :  8;
     } gfx101;
@@ -6911,7 +6962,7 @@ union DB_EXCEPTION_CONTROL {
         unsigned int                                                              : 16;
         unsigned int FORCE_VRS_RATE_FINE                                          :  8;
         unsigned int                                                              :  8;
-    } gfx103Plus;
+    } gfx103Derivative;
 #endif
     struct {
         unsigned int                                                              :  3;
@@ -6932,8 +6983,7 @@ union DB_EXCEPTION_CONTROL {
 union DB_FGCG_INTERFACES_CLK_CTRL {
     struct {
         unsigned int DB_SC_QUAD_OVERRIDE                                          :  1;
-        unsigned int                                                              :  1;
-        unsigned int DB_CB_LQUAD_OVERRIDE                                         :  1;
+        unsigned int                                                              :  2;
         unsigned int DB_RMI_RDREQ_OVERRIDE                                        :  1;
         unsigned int DB_RMI_WRREQ_OVERRIDE                                        :  1;
         unsigned int DB_SC_TILE_OVERRIDE                                          :  1;
@@ -6943,7 +6993,8 @@ union DB_FGCG_INTERFACES_CLK_CTRL {
     struct {
         unsigned int                                                              :  1;
         unsigned int DB_CB_TILE_OVERRIDE                                          :  1;
-        unsigned int                                                              : 30;
+        unsigned int DB_CB_LQUAD_OVERRIDE                                         :  1;
+        unsigned int                                                              : 29;
     } gfx10;
 
     unsigned int u32All;
@@ -6981,7 +7032,7 @@ union DB_FGCG_SRAMS_CLK_CTRL {
         unsigned int OVERRIDE25                                                   :  1;
         unsigned int OVERRIDE26                                                   :  1;
         unsigned int                                                              :  5;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -7102,7 +7153,10 @@ union DB_HTILE_SURFACE {
         unsigned int PRELOAD                                                      :  1;
         unsigned int PREFETCH_WIDTH                                               :  6;
         unsigned int PREFETCH_HEIGHT                                              :  6;
-        unsigned int                                                              :  3;
+        unsigned int                                                              : 16;
+    } most;
+    struct {
+        unsigned int                                                              : 19;
         unsigned int RB_ALIGNED                                                   :  1;
         unsigned int                                                              : 12;
     } gfx09;
@@ -7116,8 +7170,21 @@ union DB_HTILE_SURFACE {
         unsigned int                                                              :  1;
         unsigned int RESERVED_FIELD_6                                             :  1;
         unsigned int                                                              : 14;
-    } gfx10Plus;
+    } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int RESERVED_FIELD_1                                             :  1;
+        unsigned int                                                              :  1;
+        unsigned int RESERVED_FIELD_2                                             :  1;
+        unsigned int RESERVED_FIELD_3                                             :  1;
+        unsigned int RESERVED_FIELD_4                                             :  6;
+        unsigned int RESERVED_FIELD_5                                             :  6;
+        unsigned int                                                              :  1;
+        unsigned int RESERVED_FIELD_6                                             :  1;
+        unsigned int                                                              : 14;
+    } gfx103PlusExclusive;
+#endif
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 19;
         unsigned int VRS_HTILE_ENCODING                                           :  2;
@@ -7154,7 +7221,18 @@ union DB_LAST_OF_BURST_CONFIG {
         unsigned int ENABLE_TIMEOUT_RD_BA_ACCUM                                   :  1;
         unsigned int BYPASS_SORT_RD_BA                                            :  1;
         unsigned int                                                              :  2;
-    } gfx101;
+    } most;
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 16;
+        unsigned int DBCB_LOB_USES_MAXBURST                                       :  1;
+        unsigned int                                                              :  7;
+        unsigned int ENABLE_TIMEOUT_CB_LOB_GEN                                    :  1;
+        unsigned int                                                              :  2;
+        unsigned int ENABLE_TIMEOUT_RD_BA_ACCUM                                   :  1;
+        unsigned int                                                              :  4;
+    } gfx103Derivative;
+#endif
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
@@ -7170,20 +7248,11 @@ union DB_LAST_OF_BURST_CONFIG {
         unsigned int                                                              :  1;
         unsigned int ENABLE_TIMEOUT_FL_BURST                                      :  1;
         unsigned int ENABLE_TIMEOUT_FG_LOB_FWDR                                   :  1;
-        unsigned int ENABLE_TIMEOUT_RD_BA_ACCUM                                   :  1;
+        unsigned int                                                              :  1;
         unsigned int BYPASS_SORT_RD_BA                                            :  1;
         unsigned int DISABLE_256B_COALESCE                                        :  1;
         unsigned int                                                              :  2;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
-        unsigned int                                                              : 16;
-        unsigned int DBCB_LOB_USES_MAXBURST                                       :  1;
-        unsigned int                                                              :  7;
-        unsigned int ENABLE_TIMEOUT_CB_LOB_GEN                                    :  1;
-        unsigned int                                                              :  7;
-    } gfx10Vrs;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -7535,7 +7604,7 @@ union DB_RENDER_OVERRIDE {
         unsigned int FORCE_Z_READ                                                 :  1;
         unsigned int FORCE_STENCIL_READ                                           :  1;
         unsigned int FORCE_FULL_Z_RANGE                                           :  2;
-        unsigned int FORCE_QC_SMASK_CONFLICT                                      :  1;
+        unsigned int                                                              :  1;
         unsigned int DISABLE_VIEWPORT_CLAMP                                       :  1;
         unsigned int IGNORE_SC_ZRANGE                                             :  1;
         unsigned int DISABLE_FULLY_COVERED                                        :  1;
@@ -7548,6 +7617,11 @@ union DB_RENDER_OVERRIDE {
         unsigned int FORCE_STENCIL_VALID                                          :  1;
         unsigned int PRESERVE_COMPRESSION                                         :  1;
     } bits, bitfields;
+    struct {
+        unsigned int                                                              : 15;
+        unsigned int FORCE_QC_SMASK_CONFLICT                                      :  1;
+        unsigned int                                                              : 16;
+    } gfx09_10;
 
     unsigned int u32All;
     signed int   i32All;
@@ -7575,14 +7649,14 @@ union DB_RENDER_OVERRIDE2 {
         unsigned int ALLOW_PARTIAL_RES_HIER_KILL                                  :  1;
         unsigned int                                                              :  6;
     } bits, bitfields;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 27;
         unsigned int CENTROID_COMPUTATION_MODE                                    :  2;
         unsigned int                                                              :  3;
     } gfx103Plus;
 #endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 26;
         unsigned int FORCE_VRS_RATE_FINE                                          :  1;
@@ -7600,7 +7674,7 @@ union DB_RESERVED_REG_1 {
         unsigned int FIELD_1                                                      : 11;
         unsigned int FIELD_2                                                      : 11;
         unsigned int                                                              : 10;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -7618,7 +7692,7 @@ union DB_RESERVED_REG_2 {
         unsigned int FIELD_7                                                      :  2;
         unsigned int                                                              :  7;
         unsigned int FIELD_8                                                      :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -7629,7 +7703,7 @@ union DB_RESERVED_REG_3 {
     struct {
         unsigned int FIELD_1                                                      : 22;
         unsigned int                                                              : 10;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -7762,7 +7836,7 @@ union DB_SHADER_CONTROL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union DB_SPI_VRS_CENTER_LOCATION {
     struct {
         unsigned int CENTER_X_OFFSET_1X1                                          :  4;
@@ -7888,12 +7962,22 @@ union DB_STENCIL_INFO {
         unsigned int                                                              :  1;
     } gfx09;
     struct {
+        unsigned int                                                              : 13;
+        unsigned int RESERVED_FIELD_1                                             :  3;
+        unsigned int                                                              : 16;
+    } gfx101;
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 13;
+        unsigned int RESERVED_FIELD_1                                             :  3;
+        unsigned int                                                              : 16;
+    } gfx103PlusExclusive;
+#endif
+    struct {
         unsigned int                                                              :  9;
         unsigned int FAULT_BEHAVIOR                                               :  2;
         unsigned int ITERATE_FLUSH                                                :  1;
-        unsigned int                                                              :  1;
-        unsigned int RESERVED_FIELD_1                                             :  3;
-        unsigned int                                                              :  4;
+        unsigned int                                                              :  8;
         unsigned int ITERATE_256                                                  :  1;
         unsigned int                                                              : 11;
     } gfx10Plus;
@@ -7976,7 +8060,7 @@ union DB_SUBTILE_CONTROL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union DB_VRS_OVERRIDE_CNTL {
     struct {
         unsigned int VRS_OVERRIDE_RATE_COMBINER_MODE                              :  3;
@@ -8062,12 +8146,22 @@ union DB_Z_INFO {
         unsigned int                                                              :  1;
     } gfx09;
     struct {
+        unsigned int                                                              : 13;
+        unsigned int RESERVED_FIELD_1                                             :  3;
+        unsigned int                                                              : 16;
+    } gfx101;
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 13;
+        unsigned int RESERVED_FIELD_1                                             :  3;
+        unsigned int                                                              : 16;
+    } gfx103PlusExclusive;
+#endif
+    struct {
         unsigned int                                                              :  9;
         unsigned int FAULT_BEHAVIOR                                               :  2;
         unsigned int ITERATE_FLUSH                                                :  1;
-        unsigned int                                                              :  1;
-        unsigned int RESERVED_FIELD_1                                             :  3;
-        unsigned int                                                              :  4;
+        unsigned int                                                              :  8;
         unsigned int ITERATE_256                                                  :  1;
         unsigned int                                                              : 11;
     } gfx10Plus;
@@ -8237,14 +8331,51 @@ union DF_PIE_AON_PerfMonCtlHi7 {
 union DF_PIE_AON_PerfMonCtlLo0 {
     struct {
         unsigned int EventSelect_7_0                                              :  8;
-        unsigned int UnitMask                                                     :  8;
+        unsigned int UnitMaskLo                                                   :  8;
         unsigned int                                                              :  3;
         unsigned int DsmTrig                                                      :  1;
-        unsigned int                                                              :  1;
-        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              :  2;
         unsigned int En                                                           :  1;
         unsigned int                                                              :  9;
     } most;
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } gfx101;
+#if CHIP_HDR_NAVI21
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv21;
+#endif
+#if CHIP_HDR_NAVI22
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv22;
+#endif
+#if CHIP_HDR_NAVI23
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv23;
+#endif
+#if CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv24;
+#endif
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } vg12_Rn;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8254,14 +8385,51 @@ union DF_PIE_AON_PerfMonCtlLo0 {
 union DF_PIE_AON_PerfMonCtlLo1 {
     struct {
         unsigned int EventSelect_7_0                                              :  8;
-        unsigned int UnitMask                                                     :  8;
+        unsigned int UnitMaskLo                                                   :  8;
         unsigned int                                                              :  3;
         unsigned int DsmTrig                                                      :  1;
-        unsigned int                                                              :  1;
-        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              :  2;
         unsigned int En                                                           :  1;
         unsigned int                                                              :  9;
     } most;
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } gfx101;
+#if CHIP_HDR_NAVI21
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv21;
+#endif
+#if CHIP_HDR_NAVI22
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv22;
+#endif
+#if CHIP_HDR_NAVI23
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv23;
+#endif
+#if CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv24;
+#endif
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } vg12_Rn;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8271,14 +8439,51 @@ union DF_PIE_AON_PerfMonCtlLo1 {
 union DF_PIE_AON_PerfMonCtlLo2 {
     struct {
         unsigned int EventSelect_7_0                                              :  8;
-        unsigned int UnitMask                                                     :  8;
+        unsigned int UnitMaskLo                                                   :  8;
         unsigned int                                                              :  3;
         unsigned int DsmTrig                                                      :  1;
-        unsigned int                                                              :  1;
-        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              :  2;
         unsigned int En                                                           :  1;
         unsigned int                                                              :  9;
     } most;
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } gfx101;
+#if CHIP_HDR_NAVI21
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv21;
+#endif
+#if CHIP_HDR_NAVI22
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv22;
+#endif
+#if CHIP_HDR_NAVI23
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv23;
+#endif
+#if CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv24;
+#endif
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } vg12_Rn;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8288,14 +8493,51 @@ union DF_PIE_AON_PerfMonCtlLo2 {
 union DF_PIE_AON_PerfMonCtlLo3 {
     struct {
         unsigned int EventSelect_7_0                                              :  8;
-        unsigned int UnitMask                                                     :  8;
+        unsigned int UnitMaskLo                                                   :  8;
         unsigned int                                                              :  3;
         unsigned int DsmTrig                                                      :  1;
-        unsigned int                                                              :  1;
-        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              :  2;
         unsigned int En                                                           :  1;
         unsigned int                                                              :  9;
     } most;
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } gfx101;
+#if CHIP_HDR_NAVI21
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv21;
+#endif
+#if CHIP_HDR_NAVI22
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv22;
+#endif
+#if CHIP_HDR_NAVI23
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv23;
+#endif
+#if CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv24;
+#endif
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } vg12_Rn;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8305,14 +8547,51 @@ union DF_PIE_AON_PerfMonCtlLo3 {
 union DF_PIE_AON_PerfMonCtlLo4 {
     struct {
         unsigned int EventSelect_7_0                                              :  8;
-        unsigned int UnitMask                                                     :  8;
+        unsigned int UnitMaskLo                                                   :  8;
         unsigned int                                                              :  3;
         unsigned int DsmTrig                                                      :  1;
-        unsigned int                                                              :  1;
-        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              :  2;
         unsigned int En                                                           :  1;
         unsigned int                                                              :  9;
     } most;
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } gfx101;
+#if CHIP_HDR_NAVI21
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv21;
+#endif
+#if CHIP_HDR_NAVI22
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv22;
+#endif
+#if CHIP_HDR_NAVI23
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv23;
+#endif
+#if CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv24;
+#endif
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } vg12_Rn;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8322,14 +8601,51 @@ union DF_PIE_AON_PerfMonCtlLo4 {
 union DF_PIE_AON_PerfMonCtlLo5 {
     struct {
         unsigned int EventSelect_7_0                                              :  8;
-        unsigned int UnitMask                                                     :  8;
+        unsigned int UnitMaskLo                                                   :  8;
         unsigned int                                                              :  3;
         unsigned int DsmTrig                                                      :  1;
-        unsigned int                                                              :  1;
-        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              :  2;
         unsigned int En                                                           :  1;
         unsigned int                                                              :  9;
     } most;
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } gfx101;
+#if CHIP_HDR_NAVI21
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv21;
+#endif
+#if CHIP_HDR_NAVI22
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv22;
+#endif
+#if CHIP_HDR_NAVI23
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv23;
+#endif
+#if CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv24;
+#endif
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } vg12_Rn;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8339,14 +8655,51 @@ union DF_PIE_AON_PerfMonCtlLo5 {
 union DF_PIE_AON_PerfMonCtlLo6 {
     struct {
         unsigned int EventSelect_7_0                                              :  8;
-        unsigned int UnitMask                                                     :  8;
+        unsigned int UnitMaskLo                                                   :  8;
         unsigned int                                                              :  3;
         unsigned int DsmTrig                                                      :  1;
-        unsigned int                                                              :  1;
-        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              :  2;
         unsigned int En                                                           :  1;
         unsigned int                                                              :  9;
     } most;
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } gfx101;
+#if CHIP_HDR_NAVI21
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv21;
+#endif
+#if CHIP_HDR_NAVI22
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv22;
+#endif
+#if CHIP_HDR_NAVI23
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv23;
+#endif
+#if CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv24;
+#endif
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } vg12_Rn;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8356,14 +8709,51 @@ union DF_PIE_AON_PerfMonCtlLo6 {
 union DF_PIE_AON_PerfMonCtlLo7 {
     struct {
         unsigned int EventSelect_7_0                                              :  8;
-        unsigned int UnitMask                                                     :  8;
+        unsigned int UnitMaskLo                                                   :  8;
         unsigned int                                                              :  3;
         unsigned int DsmTrig                                                      :  1;
-        unsigned int                                                              :  1;
-        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              :  2;
         unsigned int En                                                           :  1;
         unsigned int                                                              :  9;
     } most;
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } gfx101;
+#if CHIP_HDR_NAVI21
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv21;
+#endif
+#if CHIP_HDR_NAVI22
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv22;
+#endif
+#if CHIP_HDR_NAVI23
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv23;
+#endif
+#if CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } nv24;
+#endif
+    struct {
+        unsigned int                                                              : 21;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int                                                              : 10;
+    } vg12_Rn;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8569,7 +8959,7 @@ union GB_ADDR_CONFIG {
         unsigned int                                                              :  8;
         unsigned int NUM_PKRS                                                     :  3;
         unsigned int                                                              : 21;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -8608,7 +8998,7 @@ union GB_ADDR_CONFIG_READ {
         unsigned int                                                              :  8;
         unsigned int NUM_PKRS                                                     :  3;
         unsigned int                                                              : 21;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -8940,14 +9330,17 @@ union GCR_PERFCOUNTER0_LO {
 
 union GCR_PERFCOUNTER0_SELECT {
     struct {
-        unsigned int PERF_SEL                                                     :  9;
-        unsigned int                                                              :  1;
-        unsigned int PERF_SEL1                                                    :  9;
-        unsigned int                                                              :  1;
+        unsigned int                                                              : 20;
         unsigned int CNTR_MODE                                                    :  4;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int PERF_MODE                                                    :  4;
     } bits, bitfields;
+    struct {
+        unsigned int PERF_SEL                                                     :  9;
+        unsigned int                                                              :  1;
+        unsigned int PERF_SEL1                                                    :  9;
+        unsigned int                                                              : 13;
+    } gfx10;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8956,13 +9349,16 @@ union GCR_PERFCOUNTER0_SELECT {
 
 union GCR_PERFCOUNTER0_SELECT1 {
     struct {
-        unsigned int PERF_SEL2                                                    :  9;
-        unsigned int                                                              :  1;
-        unsigned int PERF_SEL3                                                    :  9;
-        unsigned int                                                              :  5;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
         unsigned int PERF_MODE2                                                   :  4;
     } bits, bitfields;
+    struct {
+        unsigned int PERF_SEL2                                                    :  9;
+        unsigned int                                                              :  1;
+        unsigned int PERF_SEL3                                                    :  9;
+        unsigned int                                                              : 13;
+    } gfx10;
 
     unsigned int u32All;
     signed int   i32All;
@@ -8995,7 +9391,7 @@ union GCR_PERFCOUNTER1_SELECT {
         unsigned int                                                              : 15;
         unsigned int PERF_MODE                                                    :  4;
         unsigned int CNTL_MODE                                                    :  4;
-    } bits, bitfields;
+    } gfx10;
 
     unsigned int u32All;
     signed int   i32All;
@@ -9206,12 +9602,17 @@ union GC_ATC_L2_PERFCOUNTER2_MODE {
 
 union GC_ATC_L2_PERFCOUNTER2_SELECT {
     struct {
-        unsigned int PERF_SEL                                                     : 10;
+        unsigned int                                                              : 10;
         unsigned int PERF_SEL1                                                    : 10;
         unsigned int CNTR_MODE                                                    :  4;
         unsigned int PERF_MODE1                                                   :  4;
-        unsigned int PERF_MODE                                                    :  4;
+        unsigned int                                                              :  4;
     } most;
+    struct {
+        unsigned int PERF_SEL                                                     : 10;
+        unsigned int                                                              : 18;
+        unsigned int PERF_MODE                                                    :  4;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -9577,7 +9978,7 @@ union GE1_PERFCOUNTER0_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -9650,7 +10051,7 @@ union GE1_PERFCOUNTER1_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -9723,7 +10124,7 @@ union GE1_PERFCOUNTER2_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -9796,7 +10197,7 @@ union GE1_PERFCOUNTER3_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -9839,10 +10240,15 @@ union GE2_DIST_PERFCOUNTER0_SELECT {
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int PERF_SEL0                                                    : 10;
-        unsigned int                                                              : 14;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
+    } gfx103;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL0                                                    : 10;
+        unsigned int                                                              : 22;
     } gfx103CorePlus;
 #endif
 
@@ -9864,7 +10270,7 @@ union GE2_DIST_PERFCOUNTER0_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -9907,10 +10313,15 @@ union GE2_DIST_PERFCOUNTER1_SELECT {
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int PERF_SEL0                                                    : 10;
-        unsigned int                                                              : 14;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
+    } gfx103;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL0                                                    : 10;
+        unsigned int                                                              : 22;
     } gfx103CorePlus;
 #endif
 
@@ -9932,7 +10343,7 @@ union GE2_DIST_PERFCOUNTER1_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -9975,10 +10386,15 @@ union GE2_DIST_PERFCOUNTER2_SELECT {
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int PERF_SEL0                                                    : 10;
-        unsigned int                                                              : 14;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
+    } gfx103;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL0                                                    : 10;
+        unsigned int                                                              : 22;
     } gfx103CorePlus;
 #endif
 
@@ -10000,7 +10416,7 @@ union GE2_DIST_PERFCOUNTER2_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -10043,10 +10459,15 @@ union GE2_DIST_PERFCOUNTER3_SELECT {
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int PERF_SEL0                                                    : 10;
-        unsigned int                                                              : 14;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
+    } gfx103;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL0                                                    : 10;
+        unsigned int                                                              : 22;
     } gfx103CorePlus;
 #endif
 
@@ -10068,7 +10489,7 @@ union GE2_DIST_PERFCOUNTER3_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -10111,10 +10532,15 @@ union GE2_SE_PERFCOUNTER0_SELECT {
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int PERF_SEL0                                                    : 10;
-        unsigned int                                                              : 14;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
+    } gfx103;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL0                                                    : 10;
+        unsigned int                                                              : 22;
     } gfx103CorePlus;
 #endif
 
@@ -10136,7 +10562,7 @@ union GE2_SE_PERFCOUNTER0_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -10179,10 +10605,15 @@ union GE2_SE_PERFCOUNTER1_SELECT {
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int PERF_SEL0                                                    : 10;
-        unsigned int                                                              : 14;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
+    } gfx103;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL0                                                    : 10;
+        unsigned int                                                              : 22;
     } gfx103CorePlus;
 #endif
 
@@ -10204,7 +10635,7 @@ union GE2_SE_PERFCOUNTER1_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -10247,10 +10678,15 @@ union GE2_SE_PERFCOUNTER2_SELECT {
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int PERF_SEL0                                                    : 10;
-        unsigned int                                                              : 14;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
+    } gfx103;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL0                                                    : 10;
+        unsigned int                                                              : 22;
     } gfx103CorePlus;
 #endif
 
@@ -10272,7 +10708,7 @@ union GE2_SE_PERFCOUNTER2_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -10315,10 +10751,15 @@ union GE2_SE_PERFCOUNTER3_SELECT {
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int PERF_SEL0                                                    : 10;
-        unsigned int                                                              : 14;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
+    } gfx103;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL0                                                    : 10;
+        unsigned int                                                              : 22;
     } gfx103CorePlus;
 #endif
 
@@ -10340,7 +10781,7 @@ union GE2_SE_PERFCOUNTER3_SELECT1 {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
 
     unsigned int u32All;
@@ -10379,10 +10820,14 @@ union GE_DMA_FIRST_INDEX {
 
 union GE_FAST_CLKS {
     struct {
-        unsigned int HYSTERESIS                                                   : 30;
+        unsigned int                                                              : 30;
         unsigned int LOCK                                                         :  1;
         unsigned int FORCE_FAST_CLK                                               :  1;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int HYSTERESIS                                                   : 30;
+        unsigned int                                                              :  2;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10473,17 +10918,23 @@ union GE_PC_CNTL {
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 17;
-        unsigned int NO_RESERVATION_EN                                            :  1;
+        unsigned int                                                              : 18;
         unsigned int WAVES_WITH_NO_GRANT                                          :  4;
         unsigned int                                                              : 10;
-    } gfx103Plus;
+    } gfx103Derivative;
 #endif
     struct {
         unsigned int                                                              : 16;
         unsigned int EN_GEN_0_1_LATE_ALLOC                                        :  1;
         unsigned int                                                              : 15;
-    } gfx10CorePlus;
+    } gfx10Core;
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 17;
+        unsigned int NO_RESERVATION_EN                                            :  1;
+        unsigned int                                                              : 14;
+    } gfx10Vrs;
+#endif
 
     unsigned int u32All;
     signed int   i32All;
@@ -10493,7 +10944,7 @@ union GE_PC_CNTL {
 union GE_PERFCOUNTER0_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10503,7 +10954,7 @@ union GE_PERFCOUNTER0_HI {
 union GE_PERFCOUNTER0_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10517,7 +10968,7 @@ union GE_PERFCOUNTER0_SELECT {
         unsigned int CNTR_MODE                                                    :  4;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10531,7 +10982,7 @@ union GE_PERFCOUNTER0_SELECT1 {
         unsigned int                                                              :  4;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10541,7 +10992,7 @@ union GE_PERFCOUNTER0_SELECT1 {
 union GE_PERFCOUNTER1_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10551,7 +11002,7 @@ union GE_PERFCOUNTER1_HI {
 union GE_PERFCOUNTER1_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10565,7 +11016,7 @@ union GE_PERFCOUNTER1_SELECT {
         unsigned int CNTR_MODE                                                    :  4;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10579,7 +11030,7 @@ union GE_PERFCOUNTER1_SELECT1 {
         unsigned int                                                              :  4;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10589,7 +11040,7 @@ union GE_PERFCOUNTER1_SELECT1 {
 union GE_PERFCOUNTER2_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10599,7 +11050,7 @@ union GE_PERFCOUNTER2_HI {
 union GE_PERFCOUNTER2_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10613,7 +11064,7 @@ union GE_PERFCOUNTER2_SELECT {
         unsigned int CNTR_MODE                                                    :  4;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10627,7 +11078,7 @@ union GE_PERFCOUNTER2_SELECT1 {
         unsigned int                                                              :  4;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10637,7 +11088,7 @@ union GE_PERFCOUNTER2_SELECT1 {
 union GE_PERFCOUNTER3_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10647,7 +11098,7 @@ union GE_PERFCOUNTER3_HI {
 union GE_PERFCOUNTER3_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10661,7 +11112,7 @@ union GE_PERFCOUNTER3_SELECT {
         unsigned int CNTR_MODE                                                    :  4;
         unsigned int PERF_MODE0                                                   :  4;
         unsigned int PERF_MODE1                                                   :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10675,7 +11126,7 @@ union GE_PERFCOUNTER3_SELECT1 {
         unsigned int                                                              :  4;
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10685,7 +11136,7 @@ union GE_PERFCOUNTER3_SELECT1 {
 union GE_PERFCOUNTER4_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10695,7 +11146,7 @@ union GE_PERFCOUNTER4_HI {
 union GE_PERFCOUNTER4_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10707,7 +11158,7 @@ union GE_PERFCOUNTER4_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 18;
         unsigned int PERF_MODE                                                    :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10717,7 +11168,7 @@ union GE_PERFCOUNTER4_SELECT {
 union GE_PERFCOUNTER5_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10727,7 +11178,7 @@ union GE_PERFCOUNTER5_HI {
 union GE_PERFCOUNTER5_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10739,7 +11190,7 @@ union GE_PERFCOUNTER5_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 18;
         unsigned int PERF_MODE                                                    :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10749,7 +11200,7 @@ union GE_PERFCOUNTER5_SELECT {
 union GE_PERFCOUNTER6_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10759,7 +11210,7 @@ union GE_PERFCOUNTER6_HI {
 union GE_PERFCOUNTER6_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10771,7 +11222,7 @@ union GE_PERFCOUNTER6_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 18;
         unsigned int PERF_MODE                                                    :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10781,7 +11232,7 @@ union GE_PERFCOUNTER6_SELECT {
 union GE_PERFCOUNTER7_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10791,7 +11242,7 @@ union GE_PERFCOUNTER7_HI {
 union GE_PERFCOUNTER7_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10803,7 +11254,7 @@ union GE_PERFCOUNTER7_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 18;
         unsigned int PERF_MODE                                                    :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10813,7 +11264,7 @@ union GE_PERFCOUNTER7_SELECT {
 union GE_PERFCOUNTER8_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10823,7 +11274,7 @@ union GE_PERFCOUNTER8_HI {
 union GE_PERFCOUNTER8_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10835,7 +11286,7 @@ union GE_PERFCOUNTER8_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 18;
         unsigned int PERF_MODE                                                    :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10845,7 +11296,7 @@ union GE_PERFCOUNTER8_SELECT {
 union GE_PERFCOUNTER9_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10855,7 +11306,7 @@ union GE_PERFCOUNTER9_HI {
 union GE_PERFCOUNTER9_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10867,7 +11318,7 @@ union GE_PERFCOUNTER9_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 18;
         unsigned int PERF_MODE                                                    :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10877,7 +11328,7 @@ union GE_PERFCOUNTER9_SELECT {
 union GE_PERFCOUNTER10_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10887,7 +11338,7 @@ union GE_PERFCOUNTER10_HI {
 union GE_PERFCOUNTER10_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10899,7 +11350,7 @@ union GE_PERFCOUNTER10_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 18;
         unsigned int PERF_MODE                                                    :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10909,7 +11360,7 @@ union GE_PERFCOUNTER10_SELECT {
 union GE_PERFCOUNTER11_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10919,7 +11370,7 @@ union GE_PERFCOUNTER11_HI {
 union GE_PERFCOUNTER11_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10931,7 +11382,7 @@ union GE_PERFCOUNTER11_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 18;
         unsigned int PERF_MODE                                                    :  4;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -10955,7 +11406,7 @@ union GE_PRIV_CONTROL {
         unsigned int FGCG_OVERRIDE                                                :  1;
         unsigned int CLAMP_HS_OFFCHIP_PER_SE_OVERRIDE                             :  1;
         unsigned int                                                              : 15;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -11032,7 +11483,7 @@ union GE_USER_VGPR_EN {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union GE_VRS_RATE {
     struct {
         unsigned int RATE_X                                                       :  2;
@@ -11675,6 +12126,17 @@ union GL2C_PERFCOUNTER3_SELECT {
     float        f32All;
 };
 
+union GRBM_CHIP_REVISION {
+    struct {
+        unsigned int CHIP_REVISION                                                :  8;
+        unsigned int                                                              : 24;
+    } core;
+
+    unsigned int u32All;
+    signed int   i32All;
+    float        f32All;
+};
+
 union GRBM_GFX_INDEX {
     struct {
         unsigned int INSTANCE_INDEX                                               :  8;
@@ -11742,7 +12204,7 @@ union GRBM_GFX_INDEX_SR_SELECT {
     struct {
         unsigned int                                                              : 31;
         unsigned int VF_PF                                                        :  1;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -12061,7 +12523,7 @@ union GRBM_SE1_PERFCOUNTER_SELECT {
 union GRBM_SE2_PERFCOUNTER_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -12071,7 +12533,7 @@ union GRBM_SE2_PERFCOUNTER_HI {
 union GRBM_SE2_PERFCOUNTER_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -12096,7 +12558,7 @@ union GRBM_SE2_PERFCOUNTER_SELECT {
         unsigned int BCI_BUSY_USER_DEFINED_MASK                                   :  1;
         unsigned int RMI_BUSY_USER_DEFINED_MASK                                   :  1;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
     struct {
         unsigned int                                                              : 19;
         unsigned int VGT_BUSY_USER_DEFINED_MASK                                   :  1;
@@ -12108,7 +12570,7 @@ union GRBM_SE2_PERFCOUNTER_SELECT {
         unsigned int TCP_BUSY_USER_DEFINED_MASK                                   :  1;
         unsigned int GL1CC_BUSY_USER_DEFINED_MASK                                 :  1;
         unsigned int                                                              :  6;
-    } gfx10CorePlus;
+    } gfx10Core;
 
     unsigned int u32All;
     signed int   i32All;
@@ -12118,7 +12580,7 @@ union GRBM_SE2_PERFCOUNTER_SELECT {
 union GRBM_SE3_PERFCOUNTER_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -12128,7 +12590,7 @@ union GRBM_SE3_PERFCOUNTER_HI {
 union GRBM_SE3_PERFCOUNTER_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -12153,7 +12615,7 @@ union GRBM_SE3_PERFCOUNTER_SELECT {
         unsigned int BCI_BUSY_USER_DEFINED_MASK                                   :  1;
         unsigned int RMI_BUSY_USER_DEFINED_MASK                                   :  1;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
     struct {
         unsigned int                                                              : 19;
         unsigned int VGT_BUSY_USER_DEFINED_MASK                                   :  1;
@@ -12165,7 +12627,7 @@ union GRBM_SE3_PERFCOUNTER_SELECT {
         unsigned int TCP_BUSY_USER_DEFINED_MASK                                   :  1;
         unsigned int GL1CC_BUSY_USER_DEFINED_MASK                                 :  1;
         unsigned int                                                              :  6;
-    } gfx10CorePlus;
+    } gfx10Core;
 
     unsigned int u32All;
     signed int   i32All;
@@ -12904,7 +13366,7 @@ union PA_CL_ENHANCE {
         unsigned int                                                              : 24;
         unsigned int CLAMP_NEGATIVE_BB_TO_ZERO                                    :  1;
         unsigned int                                                              :  7;
-    } gfx10Vrs;
+    } gfx103Derivative;
 #endif
 
     unsigned int u32All;
@@ -12990,7 +13452,7 @@ union PA_CL_NGG_CNTL {
         unsigned int                                                              :  2;
         unsigned int VERTEX_REUSE_DEPTH                                           :  8;
         unsigned int                                                              : 22;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -14248,7 +14710,7 @@ union PA_CL_VPORT_ZSCALE_15 {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union PA_CL_VRS_CNTL {
     struct {
         unsigned int VERTEX_RATE_COMBINER_MODE                                    :  3;
@@ -14294,9 +14756,13 @@ union PA_CL_VS_OUT_CNTL {
         unsigned int VS_OUT_CCDIST0_VEC_ENA                                       :  1;
         unsigned int VS_OUT_CCDIST1_VEC_ENA                                       :  1;
         unsigned int VS_OUT_MISC_SIDE_BUS_ENA                                     :  1;
-        unsigned int USE_VTX_GS_CUT_FLAG                                          :  1;
-        unsigned int                                                              :  6;
+        unsigned int                                                              :  7;
     } bits, bitfields;
+    struct {
+        unsigned int                                                              : 26;
+        unsigned int                                                              :  1;
+        unsigned int                                                              :  5;
+    } most;
     struct {
         unsigned int                                                              : 26;
         unsigned int USE_VTX_LINE_WIDTH                                           :  1;
@@ -14304,11 +14770,11 @@ union PA_CL_VS_OUT_CNTL {
         unsigned int                                                              :  4;
     } gfx09;
     struct {
-        unsigned int                                                              : 26;
-        unsigned int                                                              :  1;
-        unsigned int                                                              :  5;
-    } gfx101;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+        unsigned int                                                              : 25;
+        unsigned int USE_VTX_GS_CUT_FLAG                                          :  1;
+        unsigned int                                                              :  6;
+    } gfx09_10;
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 28;
         unsigned int USE_VTX_VRS_RATE                                             :  1;
@@ -14369,7 +14835,7 @@ union PA_PH_ENHANCE {
         unsigned int                                                              : 13;
         unsigned int DISABLE_USE_LAST_PH_ARBITER_PERFCOUNTER_SAMPLE_EVENT         :  1;
         unsigned int                                                              : 18;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -14720,7 +15186,7 @@ union PA_SC_AA_CONFIG {
         unsigned int COVERAGE_TO_SHADER_SELECT                                    :  2;
         unsigned int                                                              :  4;
     } bits, bitfields;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 28;
         unsigned int SAMPLE_COVERAGE_ENCODING                                     :  1;
@@ -15219,8 +15685,7 @@ union PA_SC_BINNER_EVENT_CNTL_3 {
         unsigned int CONTEXT_SUSPEND                                              :  2;
         unsigned int OFFCHIP_HS_DEALLOC                                           :  2;
         unsigned int ENABLE_NGG_PIPELINE                                          :  2;
-        unsigned int ENABLE_LEGACY_PIPELINE                                       :  2;
-        unsigned int                                                              :  2;
+        unsigned int                                                              :  4;
     } bits, bitfields;
     struct {
         unsigned int                                                              :  4;
@@ -15230,6 +15695,11 @@ union PA_SC_BINNER_EVENT_CNTL_3 {
         unsigned int                                                              : 16;
         unsigned int RESERVED_63                                                  :  2;
     } gfx09;
+    struct {
+        unsigned int                                                              : 28;
+        unsigned int ENABLE_LEGACY_PIPELINE                                       :  2;
+        unsigned int                                                              :  2;
+    } gfx09_10;
     struct {
         unsigned int                                                              :  4;
         unsigned int RESERVED_50                                                  :  2;
@@ -15642,6 +16112,12 @@ union PA_SC_ENHANCE_2 {
         unsigned int                                                              : 20;
     } most;
     struct {
+        unsigned int                                                              : 24;
+        unsigned int DISABLE_PBB_EOP_INSERTION_FOR_MIXED_BINNING_AND_IMMEDIATE    :  1;
+        unsigned int DISABLE_DFSM_FLUSH                                           :  1;
+        unsigned int                                                              :  6;
+    } gfx10;
+    struct {
         unsigned int ECO_SPARE0                                                   :  1;
         unsigned int ECO_SPARE1                                                   :  1;
         unsigned int ECO_SPARE2                                                   :  1;
@@ -15658,7 +16134,7 @@ union PA_SC_ENHANCE_2 {
         unsigned int                                                              : 26;
         unsigned int DISABLE_MAX_DEALLOC_FORCE_EOV_RESET_N_WAVES_COUNT            :  1;
         unsigned int RSVD                                                         :  1;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int                                                              : 20;
@@ -15686,8 +16162,7 @@ union PA_SC_ENHANCE_2 {
         unsigned int DISABLE_SC_DBR_DATAPATH_FGCG                                 :  1;
         unsigned int                                                              :  1;
         unsigned int PROCESS_RESET_FORCE_STILE_MASK_TO_ZERO                       :  1;
-        unsigned int DISABLE_PBB_EOP_INSERTION_FOR_MIXED_BINNING_AND_IMMEDIATE    :  1;
-        unsigned int DISABLE_DFSM_FLUSH                                           :  1;
+        unsigned int                                                              :  2;
         unsigned int BREAK_WHEN_ONE_NULL_PRIM_BATCH                               :  1;
         unsigned int NULL_PRIM_BREAK_BATCH_LIMIT                                  :  3;
         unsigned int                                                              :  2;
@@ -15715,22 +16190,27 @@ union PA_SC_ENHANCE_2 {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union PA_SC_ENHANCE_3 {
     struct {
         unsigned int FORCE_USE_OF_SC_CENTROID_DATA                                :  1;
-        unsigned int                                                              :  2;
-        unsigned int FORCE_PBB_WORKLOAD_MODE_TO_ZERO                              :  1;
-        unsigned int DISABLE_PKR_BCI_QUAD_NEW_PRIM_DATA_LOAD_OPTIMIZATION         :  1;
-        unsigned int DISABLE_CP_CONTEXT_DONE_PERFCOUNT_SAMPLE_EN                  :  1;
-        unsigned int                                                              : 26;
+        unsigned int                                                              : 31;
     } bits, bitfields;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              :  2;
         unsigned int DISABLE_RB_MASK_COPY_FOR_NONP2_SA_HARVEST                    :  1;
         unsigned int                                                              : 29;
-    } gfx10Vrs;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              :  3;
+        unsigned int FORCE_PBB_WORKLOAD_MODE_TO_ZERO                              :  1;
+        unsigned int DISABLE_PKR_BCI_QUAD_NEW_PRIM_DATA_LOAD_OPTIMIZATION         :  1;
+        unsigned int DISABLE_CP_CONTEXT_DONE_PERFCOUNT_SAMPLE_EN                  :  1;
+        unsigned int                                                              : 26;
+    } gfx103PlusExclusive;
 #endif
 #if CHIP_HDR_NAVI21
     struct {
@@ -17575,7 +18055,7 @@ union PA_SU_PERFCOUNTER0_HI {
         unsigned int PERFCOUNTER_HI                                               : 16;
         unsigned int                                                              : 16;
     } most;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
     } gfx103Plus;
@@ -17636,7 +18116,7 @@ union PA_SU_PERFCOUNTER1_HI {
         unsigned int PERFCOUNTER_HI                                               : 16;
         unsigned int                                                              : 16;
     } most;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
     } gfx103Plus;
@@ -17697,7 +18177,7 @@ union PA_SU_PERFCOUNTER2_HI {
         unsigned int PERFCOUNTER_HI                                               : 16;
         unsigned int                                                              : 16;
     } most;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
     } gfx103Plus;
@@ -17761,7 +18241,7 @@ union PA_SU_PERFCOUNTER3_HI {
         unsigned int PERFCOUNTER_HI                                               : 16;
         unsigned int                                                              : 16;
     } most;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
     } gfx103Plus;
@@ -18329,41 +18809,52 @@ union PerfMonCtl5 {
 
 union PerfMonCtlClk {
     struct {
-        unsigned int GlblResetMsk                                                 :  6;
-        unsigned int                                                              : 18;
+        unsigned int                                                              : 24;
         unsigned int GlblReset                                                    :  1;
         unsigned int GlblMonEn                                                    :  1;
         unsigned int                                                              :  5;
         unsigned int CtrClkEn                                                     :  1;
     } most;
+    struct {
+        unsigned int GlblResetMsk                                                 :  6;
+        unsigned int                                                              : 26;
+    } gfx101;
 #if CHIP_HDR_NAVI21
     struct {
-        unsigned int                                                              : 22;
+        unsigned int GlblResetMsk                                                 :  6;
+        unsigned int                                                              : 16;
         unsigned int ClkGate                                                      :  1;
         unsigned int                                                              :  9;
     } nv21;
 #endif
 #if CHIP_HDR_NAVI22
     struct {
-        unsigned int                                                              : 22;
+        unsigned int GlblResetMsk                                                 :  6;
+        unsigned int                                                              : 16;
         unsigned int ClkGate                                                      :  1;
         unsigned int                                                              :  9;
     } nv22;
 #endif
 #if CHIP_HDR_NAVI23
     struct {
-        unsigned int                                                              : 22;
+        unsigned int GlblResetMsk                                                 :  6;
+        unsigned int                                                              : 16;
         unsigned int ClkGate                                                      :  1;
         unsigned int                                                              :  9;
     } nv23;
 #endif
 #if CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              : 22;
+        unsigned int GlblResetMsk                                                 :  6;
+        unsigned int                                                              : 16;
         unsigned int ClkGate                                                      :  1;
         unsigned int                                                              :  9;
     } nv24;
 #endif
+    struct {
+        unsigned int GlblResetMsk                                                 :  6;
+        unsigned int                                                              : 26;
+    } vg12_Rn;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18642,6 +19133,56 @@ union PerfMonCtrClk_Lo {
     float        f32All;
 };
 
+union RLC_CGTT_MGCG_OVERRIDE {
+    struct {
+        unsigned int                                                              :  1;
+        unsigned int RLC_CGTT_SCLK_OVERRIDE                                       :  1;
+        unsigned int GFXIP_MGCG_OVERRIDE                                          :  1;
+        unsigned int GFXIP_CGCG_OVERRIDE                                          :  1;
+        unsigned int GFXIP_CGLS_OVERRIDE                                          :  1;
+        unsigned int GRBM_CGTT_SCLK_OVERRIDE                                      :  1;
+        unsigned int GFXIP_MGLS_OVERRIDE                                          :  1;
+        unsigned int GFXIP_GFX3D_CG_OVERRIDE                                      :  1;
+        unsigned int                                                              : 24;
+    } bits, bitfields;
+    struct {
+        unsigned int                                                              : 16;
+        unsigned int ENABLE_CGTS_LEGACY                                           :  1;
+        unsigned int                                                              : 15;
+    } most;
+    struct {
+        unsigned int CPF_CGTT_SCLK_OVERRIDE                                       :  1;
+        unsigned int                                                              :  7;
+        unsigned int RESERVED                                                     : 24;
+    } gfx09_0;
+    struct {
+        unsigned int RESERVED_0                                                   :  1;
+        unsigned int                                                              :  8;
+        unsigned int RESERVED_15_9                                                :  7;
+        unsigned int                                                              :  1;
+        unsigned int RESERVED_31_17                                               : 15;
+    } gfx09_1x;
+    struct {
+        unsigned int                                                              :  8;
+        unsigned int GFXIP_FGCG_OVERRIDE                                          :  1;
+        unsigned int                                                              : 23;
+    } gfx09_1xPlus;
+    struct {
+        unsigned int RESERVED_0                                                   :  1;
+        unsigned int                                                              : 16;
+        unsigned int RESERVED_31_17                                               : 15;
+    } gfx10;
+    struct {
+        unsigned int                                                              :  9;
+        unsigned int RESERVED_15_9                                                :  7;
+        unsigned int                                                              : 16;
+    } gfx10Core;
+
+    unsigned int u32All;
+    signed int   i32All;
+    float        f32All;
+};
+
 union RLC_PERFCOUNTER0_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -18747,7 +19288,7 @@ union RLC_SPM_ACCUM_CTRL {
         unsigned int                                                              : 10;
         unsigned int RESERVED                                                     : 22;
     } gfx101;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              :  3;
         unsigned int StrobeResetSpmBlock                                          :  1;
@@ -18781,7 +19322,7 @@ union RLC_SPM_ACCUM_CTRLRAM_ADDR {
     struct {
         unsigned int addr                                                         : 11;
         unsigned int RESERVED                                                     : 21;
-    } gfx103CorePlus;
+    } gfx103;
 #endif
     struct {
         unsigned int addr                                                         :  8;
@@ -18793,7 +19334,7 @@ union RLC_SPM_ACCUM_CTRLRAM_ADDR {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_ACCUM_CTRLRAM_ADDR_OFFSET {
     struct {
         unsigned int global_offset                                                :  8;
@@ -18819,7 +19360,7 @@ union RLC_SPM_ACCUM_CTRLRAM_DATA {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_ACCUM_DATARAM_32BITCNTRS_REGIONS {
     struct {
         unsigned int spp_addr_region                                              :  8;
@@ -18884,7 +19425,7 @@ union RLC_SPM_ACCUM_MODE {
         unsigned int AutoResetPerfmonDisable                                      :  1;
         unsigned int RESERVED                                                     : 25;
     } gfx101;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              :  1;
         unsigned int EnableSpmWithAccumMode                                       :  1;
@@ -18902,7 +19443,7 @@ union RLC_SPM_ACCUM_MODE {
         unsigned int                                                              : 19;
     } gfx103Plus;
 #endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              :  4;
         unsigned int SwaAutoResetPerfmonDisable                                   :  1;
@@ -18993,7 +19534,7 @@ union RLC_SPM_ACCUM_STATUS {
         unsigned int                                                              :  9;
     } gfx103CorePlus;
 #endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 16;
         unsigned int SwaAccumDone                                                 :  1;
@@ -19040,7 +19581,7 @@ union RLC_SPM_ACCUM_STATUS {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_ACCUM_SWA_DATARAM_ADDR {
     struct {
         unsigned int addr                                                         :  7;
@@ -19053,7 +19594,7 @@ union RLC_SPM_ACCUM_SWA_DATARAM_ADDR {
 };
 #endif
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_ACCUM_SWA_DATARAM_DATA {
     struct {
         unsigned int data                                                         : 32;
@@ -19205,7 +19746,7 @@ union RLC_SPM_GDS_PERFMON_SAMPLE_DELAY {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_GFXCLOCK_HIGHCOUNT {
     struct {
         unsigned int GFXCLOCK_HIGHCOUNT                                           : 32;
@@ -19217,7 +19758,7 @@ union RLC_SPM_GFXCLOCK_HIGHCOUNT {
 };
 #endif
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_GFXCLOCK_LOWCOUNT {
     struct {
         unsigned int GFXCLOCK_LOWCOUNT                                            : 32;
@@ -19286,7 +19827,7 @@ union RLC_SPM_GLOBAL_MUXSEL_ADDR {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_GLOBAL_MUXSEL_ADDR_OFFSET {
     struct {
         unsigned int OFFSET                                                       : 16;
@@ -19395,7 +19936,7 @@ union RLC_SPM_MC_CNTL {
     struct {
         unsigned int                                                              : 20;
         unsigned int RESERVED                                                     : 12;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int                                                              : 12;
@@ -19592,7 +20133,7 @@ union RLC_SPM_PERFMON_SEGMENT_SIZE {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_PERFMON_SWA_GLB_SEGMENT_SIZE {
     struct {
         unsigned int PERFMON_SEGMENT_SIZE                                         :  8;
@@ -19606,7 +20147,7 @@ union RLC_SPM_PERFMON_SWA_GLB_SEGMENT_SIZE {
 };
 #endif
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_PERFMON_SWA_SE3TO0_SEGMENT_SIZE {
     struct {
         unsigned int SE0_NUM_LINE                                                 :  8;
@@ -19621,7 +20162,7 @@ union RLC_SPM_PERFMON_SWA_SE3TO0_SEGMENT_SIZE {
 };
 #endif
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_PERFMON_SWA_SEGMENT_SIZE {
     struct {
         unsigned int PERFMON_SEGMENT_SIZE                                         :  8;
@@ -19720,7 +20261,7 @@ union RLC_SPM_SE_MUXSEL_ADDR {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union RLC_SPM_SE_MUXSEL_ADDR_OFFSET {
     struct {
         unsigned int OFFSET                                                       : 16;
@@ -21362,7 +21903,7 @@ union SPI_BARYC_CNTL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union SPI_BARYC_SSAA_CNTL {
     struct {
         unsigned int CENTER_SSAA_MODE                                             :  1;
@@ -21428,7 +21969,7 @@ union SPI_CONFIG_CNTL {
         unsigned int                                                              : 26;
         unsigned int FORCE_HALF_RATE_PC_EXP                                       :  1;
         unsigned int                                                              :  5;
-    } gfx10Vrs;
+    } gfx103Derivative;
 #endif
 
     unsigned int u32All;
@@ -21475,7 +22016,7 @@ union SPI_CONFIG_CNTL_1 {
         unsigned int RESERVED                                                     :  9;
     } gfx103;
 #endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 22;
         unsigned int SA_SCREEN_MAP                                                :  1;
@@ -21616,12 +22157,14 @@ union SPI_CONFIG_PS_CU_EN {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union SPI_CSG_PIPE_CONTROL {
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int HYSTERESIS_CNT                                               : 13;
         unsigned int                                                              : 19;
-    } bits, bitfields;
+    } gfx103CorePlus;
+#endif
 
     unsigned int u32All;
     signed int   i32All;
@@ -21743,7 +22286,7 @@ union SPI_CSQ_WF_ACTIVE_STATUS {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union SPI_CS_CRAWLER_CONFIG {
     struct {
         unsigned int CSG_DEPTH                                                    :  6;
@@ -21902,7 +22445,7 @@ union SPI_GFX_CNTL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union SPI_GFX_CRAWLER_CONFIG {
     struct {
         unsigned int PS_DEPTH                                                     :  5;
@@ -21915,7 +22458,7 @@ union SPI_GFX_CRAWLER_CONFIG {
         unsigned int                                                              : 17;
         unsigned int VS_DEPTH                                                     :  5;
         unsigned int                                                              : 10;
-    } gfx10Vrs;
+    } gfx103Derivative;
 #endif
 
     unsigned int u32All;
@@ -22557,13 +23100,13 @@ union SPI_PS_INPUT_CNTL_0 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22592,13 +23135,13 @@ union SPI_PS_INPUT_CNTL_1 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22627,13 +23170,13 @@ union SPI_PS_INPUT_CNTL_2 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22662,13 +23205,13 @@ union SPI_PS_INPUT_CNTL_3 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22697,13 +23240,13 @@ union SPI_PS_INPUT_CNTL_4 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22732,13 +23275,13 @@ union SPI_PS_INPUT_CNTL_5 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22767,13 +23310,13 @@ union SPI_PS_INPUT_CNTL_6 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22802,13 +23345,13 @@ union SPI_PS_INPUT_CNTL_7 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22837,13 +23380,13 @@ union SPI_PS_INPUT_CNTL_8 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22872,13 +23415,13 @@ union SPI_PS_INPUT_CNTL_9 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22907,13 +23450,13 @@ union SPI_PS_INPUT_CNTL_10 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22942,13 +23485,13 @@ union SPI_PS_INPUT_CNTL_11 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -22977,13 +23520,13 @@ union SPI_PS_INPUT_CNTL_12 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23012,13 +23555,13 @@ union SPI_PS_INPUT_CNTL_13 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23047,13 +23590,13 @@ union SPI_PS_INPUT_CNTL_14 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23082,13 +23625,13 @@ union SPI_PS_INPUT_CNTL_15 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23117,13 +23660,13 @@ union SPI_PS_INPUT_CNTL_16 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23152,13 +23695,13 @@ union SPI_PS_INPUT_CNTL_17 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23187,13 +23730,13 @@ union SPI_PS_INPUT_CNTL_18 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23222,13 +23765,13 @@ union SPI_PS_INPUT_CNTL_19 {
         unsigned int                                                              : 13;
         unsigned int CYL_WRAP                                                     :  4;
         unsigned int                                                              : 15;
-    } most;
+    } gfx09_10;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23257,7 +23800,7 @@ union SPI_PS_INPUT_CNTL_20 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23286,7 +23829,7 @@ union SPI_PS_INPUT_CNTL_21 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23315,7 +23858,7 @@ union SPI_PS_INPUT_CNTL_22 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23344,7 +23887,7 @@ union SPI_PS_INPUT_CNTL_23 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23373,7 +23916,7 @@ union SPI_PS_INPUT_CNTL_24 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23402,7 +23945,7 @@ union SPI_PS_INPUT_CNTL_25 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23431,7 +23974,7 @@ union SPI_PS_INPUT_CNTL_26 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23460,7 +24003,7 @@ union SPI_PS_INPUT_CNTL_27 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23489,7 +24032,7 @@ union SPI_PS_INPUT_CNTL_28 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23518,7 +24061,7 @@ union SPI_PS_INPUT_CNTL_29 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23547,7 +24090,7 @@ union SPI_PS_INPUT_CNTL_30 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23576,7 +24119,7 @@ union SPI_PS_INPUT_CNTL_31 {
         unsigned int                                                              : 11;
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -23625,7 +24168,7 @@ union SPI_PS_IN_CONTROL {
         unsigned int                                                              :  9;
         unsigned int NUM_PRIM_INTERP                                              :  5;
         unsigned int                                                              : 18;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int                                                              : 15;
@@ -23689,7 +24232,7 @@ union SPI_RESOURCE_RESERVE_CU_2 {
         unsigned int WAVES                                                        :  3;
         unsigned int BARRIERS                                                     :  4;
         unsigned int                                                              : 13;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -23704,7 +24247,7 @@ union SPI_RESOURCE_RESERVE_CU_3 {
         unsigned int WAVES                                                        :  3;
         unsigned int BARRIERS                                                     :  4;
         unsigned int                                                              : 13;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -23719,7 +24262,7 @@ union SPI_RESOURCE_RESERVE_CU_4 {
         unsigned int WAVES                                                        :  3;
         unsigned int BARRIERS                                                     :  4;
         unsigned int                                                              : 13;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -23734,7 +24277,7 @@ union SPI_RESOURCE_RESERVE_CU_5 {
         unsigned int WAVES                                                        :  3;
         unsigned int BARRIERS                                                     :  4;
         unsigned int                                                              : 13;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -23933,12 +24476,17 @@ union SPI_RESOURCE_RESERVE_EN_CU_2 {
         unsigned int TYPE_MASK                                                    : 15;
         unsigned int QUEUE_MASK                                                   :  8;
         unsigned int                                                              :  8;
-    } bits, bitfields;
+    } most;
     struct {
         unsigned int                                                              : 24;
         unsigned int RESERVE_SPACE_ONLY                                           :  1;
         unsigned int                                                              :  7;
-    } most;
+    } gfx09;
+    struct {
+        unsigned int                                                              : 24;
+        unsigned int RESERVE_SPACE_ONLY                                           :  1;
+        unsigned int                                                              :  7;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -23951,12 +24499,17 @@ union SPI_RESOURCE_RESERVE_EN_CU_3 {
         unsigned int TYPE_MASK                                                    : 15;
         unsigned int QUEUE_MASK                                                   :  8;
         unsigned int                                                              :  8;
-    } bits, bitfields;
+    } most;
     struct {
         unsigned int                                                              : 24;
         unsigned int RESERVE_SPACE_ONLY                                           :  1;
         unsigned int                                                              :  7;
-    } most;
+    } gfx09;
+    struct {
+        unsigned int                                                              : 24;
+        unsigned int RESERVE_SPACE_ONLY                                           :  1;
+        unsigned int                                                              :  7;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -23969,12 +24522,17 @@ union SPI_RESOURCE_RESERVE_EN_CU_4 {
         unsigned int TYPE_MASK                                                    : 15;
         unsigned int QUEUE_MASK                                                   :  8;
         unsigned int                                                              :  8;
-    } bits, bitfields;
+    } most;
     struct {
         unsigned int                                                              : 24;
         unsigned int RESERVE_SPACE_ONLY                                           :  1;
         unsigned int                                                              :  7;
-    } most;
+    } gfx09;
+    struct {
+        unsigned int                                                              : 24;
+        unsigned int RESERVE_SPACE_ONLY                                           :  1;
+        unsigned int                                                              :  7;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -23987,12 +24545,17 @@ union SPI_RESOURCE_RESERVE_EN_CU_5 {
         unsigned int TYPE_MASK                                                    : 15;
         unsigned int QUEUE_MASK                                                   :  8;
         unsigned int                                                              :  8;
-    } bits, bitfields;
+    } most;
     struct {
         unsigned int                                                              : 24;
         unsigned int RESERVE_SPACE_ONLY                                           :  1;
         unsigned int                                                              :  7;
-    } most;
+    } gfx09;
+    struct {
+        unsigned int                                                              : 24;
+        unsigned int RESERVE_SPACE_ONLY                                           :  1;
+        unsigned int                                                              :  7;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24334,7 +24897,7 @@ union SPI_SHADER_PGM_HI_GS {
     struct {
         unsigned int MEM_BASE                                                     :  8;
         unsigned int                                                              : 24;
-    } most;
+    } gfx09_10;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24345,7 +24908,7 @@ union SPI_SHADER_PGM_HI_HS {
     struct {
         unsigned int MEM_BASE                                                     :  8;
         unsigned int                                                              : 24;
-    } most;
+    } gfx09_10;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24491,7 +25054,7 @@ union SPI_SHADER_PGM_RSRC1_ES {
         unsigned int                                                              :  3;
         unsigned int CDBG_USER                                                    :  1;
         unsigned int FP16_OVFL                                                    :  1;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24571,7 +25134,7 @@ union SPI_SHADER_PGM_RSRC1_LS {
         unsigned int CDBG_USER                                                    :  1;
         unsigned int FP16_OVFL                                                    :  1;
         unsigned int                                                              :  1;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24599,7 +25162,7 @@ union SPI_SHADER_PGM_RSRC1_PS {
         unsigned int                                                              : 27;
         unsigned int LOAD_PROVOKING_VTX                                           :  1;
         unsigned int                                                              :  4;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int                                                              : 25;
@@ -24651,7 +25214,7 @@ union SPI_SHADER_PGM_RSRC2_ES {
         unsigned int                                                              :  3;
         unsigned int LDS_SIZE                                                     :  9;
         unsigned int                                                              :  3;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24668,7 +25231,7 @@ union SPI_SHADER_PGM_RSRC2_ES_GS {
         unsigned int                                                              :  3;
         unsigned int LDS_SIZE                                                     :  9;
         unsigned int                                                              :  3;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24685,7 +25248,7 @@ union SPI_SHADER_PGM_RSRC2_ES_VS {
         unsigned int                                                              :  3;
         unsigned int LDS_SIZE                                                     :  9;
         unsigned int                                                              :  3;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24778,7 +25341,7 @@ union SPI_SHADER_PGM_RSRC2_LS {
         unsigned int LDS_SIZE                                                     :  9;
         unsigned int EXCP_EN                                                      :  9;
         unsigned int                                                              :  7;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24793,7 +25356,7 @@ union SPI_SHADER_PGM_RSRC2_LS_ES {
         unsigned int LDS_SIZE                                                     :  9;
         unsigned int EXCP_EN                                                      :  9;
         unsigned int                                                              :  7;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24808,7 +25371,7 @@ union SPI_SHADER_PGM_RSRC2_LS_HS {
         unsigned int LDS_SIZE                                                     :  9;
         unsigned int EXCP_EN                                                      :  9;
         unsigned int                                                              :  7;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24823,7 +25386,7 @@ union SPI_SHADER_PGM_RSRC2_LS_VS {
         unsigned int LDS_SIZE                                                     :  9;
         unsigned int EXCP_EN                                                      :  9;
         unsigned int                                                              :  7;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24902,7 +25465,7 @@ union SPI_SHADER_PGM_RSRC3_ES {
         unsigned int WAVE_LIMIT                                                   :  6;
         unsigned int LOCK_LOW_THRESHOLD                                           :  4;
         unsigned int GROUP_FIFO_DEPTH                                             :  6;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -24960,7 +25523,7 @@ union SPI_SHADER_PGM_RSRC3_LS {
         unsigned int WAVE_LIMIT                                                   :  6;
         unsigned int LOCK_LOW_THRESHOLD                                           :  4;
         unsigned int GROUP_FIFO_DEPTH                                             :  6;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25009,14 +25572,14 @@ union SPI_SHADER_PGM_RSRC3_VS {
 
 union SPI_SHADER_PGM_RSRC4_GS {
     struct {
-        unsigned int CU_EN                                                        : 16;
-        unsigned int                                                              : 16;
-    } most;
-    struct {
         unsigned int GROUP_FIFO_DEPTH                                             :  7;
         unsigned int SPI_SHADER_LATE_ALLOC_GS                                     :  7;
         unsigned int                                                              : 18;
     } gfx09;
+    struct {
+        unsigned int CU_EN                                                        : 16;
+        unsigned int                                                              : 16;
+    } gfx10;
     struct {
         unsigned int                                                              : 16;
         unsigned int SPI_SHADER_LATE_ALLOC_GS                                     :  7;
@@ -25090,10 +25653,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_ESGS_0 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25106,10 +25674,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_ESGS_1 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25122,10 +25695,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_ESGS_2 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25138,10 +25716,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_ESGS_3 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25154,10 +25737,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_LSHS_0 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25170,10 +25758,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_LSHS_1 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25186,10 +25779,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_LSHS_2 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25202,10 +25800,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_LSHS_3 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25218,10 +25821,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_PS_0 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25234,10 +25842,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_PS_1 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25250,10 +25863,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_PS_2 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25266,10 +25884,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_PS_3 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25282,10 +25905,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_VS_0 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25298,10 +25926,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_VS_1 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25314,10 +25947,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_VS_2 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -25330,10 +25968,15 @@ union SPI_SHADER_PREF_PRI_ACCUM_VS_3 {
         unsigned int COEFFICIENT_HIER_SELECT                                      :  3;
         unsigned int CONTRIBUTION_HIER_SELECT                                     :  3;
         unsigned int GROUP_UPDATE_EN                                              :  1;
-        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int COEFFICIENT                                                  :  8;
         unsigned int                                                              :  9;
-    } bits, bitfields;
+    } most;
+    struct {
+        unsigned int                                                              : 14;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int                                                              : 17;
+    } gfx101;
 
     unsigned int u32All;
     signed int   i32All;
@@ -28007,7 +28650,7 @@ union SPI_SYS_COMPUTE {
     struct {
         unsigned int PIPE                                                         :  8;
         unsigned int                                                              : 24;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -28018,7 +28661,7 @@ union SPI_SYS_WIF_CNTL {
     struct {
         unsigned int THRESHOLD                                                    :  8;
         unsigned int                                                              : 24;
-    } bits, bitfields;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -28028,9 +28671,13 @@ union SPI_SYS_WIF_CNTL {
 union SPI_TMPRING_SIZE {
     struct {
         unsigned int WAVES                                                        : 12;
+        unsigned int                                                              : 20;
+    } bits, bitfields;
+    struct {
+        unsigned int                                                              : 12;
         unsigned int WAVESIZE                                                     : 13;
         unsigned int                                                              :  7;
-    } bits, bitfields;
+    } gfx09_10;
 
     unsigned int u32All;
     signed int   i32All;
@@ -28064,7 +28711,7 @@ union SPI_VS_OUT_CONFIG {
         unsigned int                                                              :  8;
         unsigned int PRIM_EXPORT_COUNT                                            :  5;
         unsigned int                                                              : 19;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int                                                              :  7;
@@ -28632,7 +29279,7 @@ union SPI_WF_LIFETIME_STATUS_20 {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
 union SPI_WF_LIFETIME_STATUS_21 {
     struct {
         unsigned int MAX_CNT                                                      : 31;
@@ -28644,6 +29291,112 @@ union SPI_WF_LIFETIME_STATUS_21 {
     float        f32All;
 };
 #endif
+
+union SQG_CONFIG {
+    struct {
+        unsigned int UTCL0_PREFETCH_PAGE                                          :  4;
+        unsigned int UTCL0_RETRY_TIMER                                            :  7;
+        unsigned int                                                              : 21;
+    } gfx10;
+#if CHIP_HDR_NAVI23
+    struct {
+        unsigned int                                                              : 12;
+        unsigned int SQG_WAVEDONE_FIFO_DEPTH                                      :  1;
+        unsigned int                                                              : 19;
+    } nv23;
+#endif
+#if CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 12;
+        unsigned int SQG_WAVEDONE_FIFO_DEPTH                                      :  1;
+        unsigned int                                                              : 19;
+    } nv24;
+#endif
+
+    unsigned int u32All;
+    signed int   i32All;
+    float        f32All;
+};
+
+union SQG_STATUS {
+    struct {
+        unsigned int REG_BUSY                                                     :  1;
+        unsigned int                                                              : 31;
+    } bits, bitfields;
+
+    unsigned int u32All;
+    signed int   i32All;
+    float        f32All;
+};
+
+union SQG_UTCL0_CNTL1 {
+    struct {
+        unsigned int FORCE_4K_L2_RESP                                             :  1;
+        unsigned int GPUVM_64K_DEF                                                :  1;
+        unsigned int GPUVM_PERM_MODE                                              :  1;
+        unsigned int RESP_MODE                                                    :  2;
+        unsigned int RESP_FAULT_MODE                                              :  2;
+        unsigned int CLIENTID                                                     :  9;
+        unsigned int RESERVED                                                     :  1;
+        unsigned int ENABLE_PUSH_LFIFO                                            :  1;
+        unsigned int ENABLE_LFIFO_PRI_ARB                                         :  1;
+        unsigned int REG_INV_VMID                                                 :  4;
+        unsigned int REG_INV_ALL_VMID                                             :  1;
+        unsigned int REG_INV_TOGGLE                                               :  1;
+        unsigned int CLIENT_INVALIDATE_ALL_VMID                                   :  1;
+        unsigned int FORCE_MISS                                                   :  1;
+        unsigned int FORCE_IN_ORDER                                               :  1;
+        unsigned int REDUCE_FIFO_DEPTH_BY_2                                       :  2;
+        unsigned int REDUCE_CACHE_SIZE_BY_2                                       :  2;
+    } bits, bitfields;
+
+    unsigned int u32All;
+    signed int   i32All;
+    float        f32All;
+};
+
+union SQG_UTCL0_CNTL2 {
+    struct {
+        unsigned int SPARE                                                        :  8;
+        unsigned int LFIFO_SCAN_DISABLE                                           :  1;
+        unsigned int MTYPE_OVRD_DIS                                               :  1;
+        unsigned int LINE_VALID                                                   :  1;
+        unsigned int DIS_EDC                                                      :  1;
+        unsigned int GPUVM_INV_MODE                                               :  1;
+        unsigned int SHOOTDOWN_OPT                                                :  1;
+        unsigned int FORCE_SNOOP                                                  :  1;
+        unsigned int FORCE_GPUVM_INV_ACK                                          :  1;
+        unsigned int ARB_BURST_MODE                                               :  2;
+        unsigned int ENABLE_PERF_EVENT_RD_WR                                      :  1;
+        unsigned int PERF_EVENT_RD_WR                                             :  1;
+        unsigned int ENABLE_PERF_EVENT_VMID                                       :  1;
+        unsigned int PERF_EVENT_VMID                                              :  4;
+        unsigned int DIS_DUAL_L2_REQ                                              :  1;
+        unsigned int FORCE_FRAG_2M_TO_64K                                         :  1;
+        unsigned int PERM_MODE_OVRD                                               :  1;
+        unsigned int LINE_INVALIDATE_OPT                                          :  1;
+        unsigned int GPUVM_16K_DEF                                                :  1;
+        unsigned int RESERVED                                                     :  2;
+    } bits, bitfields;
+
+    unsigned int u32All;
+    signed int   i32All;
+    float        f32All;
+};
+
+union SQG_UTCL0_STATUS {
+    struct {
+        unsigned int FAULT_DETECTED                                               :  1;
+        unsigned int RETRY_DETECTED                                               :  1;
+        unsigned int PRT_DETECTED                                                 :  1;
+        unsigned int RESERVED                                                     :  5;
+        unsigned int UNUSED                                                       : 24;
+    } bits, bitfields;
+
+    unsigned int u32All;
+    signed int   i32All;
+    float        f32All;
+};
 
 union SQ_ALU_CLK_CTRL {
     struct {
@@ -28671,7 +29424,7 @@ union SQ_ARB_CONFIG {
         unsigned int                                                              :  8;
         unsigned int DISABLE_SECOND_TRY                                           :  1;
         unsigned int                                                              : 23;
-    } gfx101;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -28761,7 +29514,7 @@ union SQ_CLK_CTRL {
     struct {
         unsigned int WCLK2DCLK_OVERRIDE                                           :  1;
         unsigned int                                                              : 31;
-    } gfx10Vrs;
+    } gfx103Derivative;
 #endif
 
     unsigned int u32All;
@@ -28860,20 +29613,20 @@ union SQ_CONFIG {
     } gfx101;
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
+        unsigned int UNUSED                                                       :  5;
+        unsigned int CHICKEN_BIT_DEGGIGXX0_8637                                   :  1;
+        unsigned int UNUSED_6                                                     :  1;
+        unsigned int                                                              : 25;
+    } gfx103Derivative;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
         unsigned int                                                              : 10;
         unsigned int DISABLE_SGPR_RD_KILL                                         :  1;
         unsigned int                                                              : 10;
         unsigned int WCLK_HYSTERESIS_CNT                                          :  2;
         unsigned int                                                              :  9;
-    } gfx103Plus;
-#endif
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-    struct {
-        unsigned int UNUSED                                                       :  5;
-        unsigned int CHICKEN_BIT_DEGGIGXX0_8637                                   :  1;
-        unsigned int UNUSED_6                                                     :  1;
-        unsigned int                                                              : 25;
-    } gfx10Vrs;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int UNUSED                                                       :  7;
@@ -30620,7 +31373,7 @@ union SQ_PERFCOUNTER_CTRL {
         unsigned int DISABLE_ME1PIPE2_PERF                                        :  1;
         unsigned int DISABLE_ME1PIPE3_PERF                                        :  1;
         unsigned int                                                              : 12;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -30689,7 +31442,7 @@ union SQ_RANDOM_WAVE_PRI {
         unsigned int RNG                                                          : 13;
         unsigned int                                                              :  9;
     } gfx09;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 31;
         unsigned int FORCE_IB_ARB_PRIO_MSK_VALID                                  :  1;
@@ -31030,15 +31783,21 @@ union SQ_THREAD_TRACE_CTRL {
         unsigned int CAPTURE_ALL                                                  :  1;
         unsigned int                                                              :  1;
     } gfx10;
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              : 28;
+        unsigned int AUTO_FLUSH_PADDING_DIS                                       :  1;
+        unsigned int                                                              :  3;
+    } gfx103Plus;
+#endif
 #if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 20;
         unsigned int LOWATER_OFFSET                                               :  3;
-        unsigned int                                                              :  5;
-        unsigned int AUTO_FLUSH_PADDING_DIS                                       :  1;
+        unsigned int                                                              :  6;
         unsigned int AUTO_FLUSH_MODE                                              :  1;
         unsigned int                                                              :  2;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int MODE                                                         :  2;
@@ -31216,7 +31975,7 @@ union SQ_THREAD_TRACE_STATUS {
     struct {
         unsigned int                                                              : 28;
         unsigned int OWNER_VMID                                                   :  4;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int                                                              : 26;
@@ -31272,7 +32031,7 @@ union SQ_THREAD_TRACE_TOKEN_MASK {
         unsigned int                                                              : 13;
         unsigned int REG_EXCLUDE                                                  :  3;
         unsigned int                                                              :  3;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int                                                              : 16;
@@ -31981,7 +32740,7 @@ union SQ_WATCH0_CNTL {
         unsigned int                                                              : 29;
         unsigned int MODE                                                         :  2;
         unsigned int                                                              :  1;
-    } gfx101;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -32021,7 +32780,7 @@ union SQ_WATCH1_CNTL {
         unsigned int                                                              : 29;
         unsigned int MODE                                                         :  2;
         unsigned int                                                              :  1;
-    } gfx101;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -32061,7 +32820,7 @@ union SQ_WATCH2_CNTL {
         unsigned int                                                              : 29;
         unsigned int MODE                                                         :  2;
         unsigned int                                                              :  1;
-    } gfx101;
+    } most;
 
     unsigned int u32All;
     signed int   i32All;
@@ -32101,1022 +32860,6 @@ union SQ_WATCH3_CNTL {
         unsigned int                                                              : 29;
         unsigned int MODE                                                         :  2;
         unsigned int                                                              :  1;
-    } gfx101;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-union SQ_WAVE_ACTIVE {
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int WAVE_SLOT                                                    : 20;
-        unsigned int                                                              : 12;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int WAVE_SLOT                                                    : 20;
-        unsigned int                                                              : 12;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int WAVE_SLOT                                                    : 20;
-        unsigned int                                                              : 12;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int WAVE_SLOT                                                    : 20;
-        unsigned int                                                              : 12;
-    } nv24;
-#endif
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-#endif
-
-union SQ_WAVE_EXEC_HI {
-    struct {
-        unsigned int EXEC_HI                                                      : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_EXEC_LO {
-    struct {
-        unsigned int EXEC_LO                                                      : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_FLAT_SCRATCH_HI {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_FLAT_SCRATCH_LO {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_FLAT_XNACK_MASK {
-    struct {
-        unsigned int MASK                                                         : 32;
-    } bits, bitfields;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_FLUSH_IB {
-    struct {
-        unsigned int UNUSED                                                       : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_GPR_ALLOC {
-    struct {
-        unsigned int                                                              : 24;
-        unsigned int SGPR_SIZE                                                    :  4;
-        unsigned int                                                              :  4;
-    } most;
-    struct {
-        unsigned int VGPR_BASE                                                    :  8;
-        unsigned int VGPR_SIZE                                                    :  8;
-        unsigned int SGPR_BASE                                                    :  8;
-        unsigned int                                                              :  8;
-    } gfx101;
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int VGPR_BASE                                                    :  8;
-        unsigned int VGPR_SIZE                                                    :  8;
-        unsigned int SGPR_BASE                                                    :  8;
-        unsigned int                                                              :  8;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int VGPR_BASE                                                    :  8;
-        unsigned int VGPR_SIZE                                                    :  8;
-        unsigned int SGPR_BASE                                                    :  8;
-        unsigned int                                                              :  8;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int VGPR_BASE                                                    :  8;
-        unsigned int VGPR_SIZE                                                    :  8;
-        unsigned int SGPR_BASE                                                    :  8;
-        unsigned int                                                              :  8;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int VGPR_BASE                                                    :  8;
-        unsigned int VGPR_SIZE                                                    :  8;
-        unsigned int SGPR_BASE                                                    :  8;
-        unsigned int                                                              :  8;
-    } nv24;
-#endif
-    struct {
-        unsigned int VGPR_BASE                                                    :  6;
-        unsigned int                                                              :  2;
-        unsigned int VGPR_SIZE                                                    :  6;
-        unsigned int                                                              :  2;
-        unsigned int SGPR_BASE                                                    :  6;
-        unsigned int                                                              : 10;
-    } vg10_Vg12_Vg20_Rv1x_Rv2x;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_HW_ID {
-    struct {
-        unsigned int WAVE_ID                                                      :  4;
-        unsigned int SIMD_ID                                                      :  2;
-        unsigned int PIPE_ID                                                      :  2;
-        unsigned int CU_ID                                                        :  4;
-        unsigned int SH_ID                                                        :  1;
-        unsigned int SE_ID                                                        :  2;
-        unsigned int                                                              :  1;
-        unsigned int TG_ID                                                        :  4;
-        unsigned int VM_ID                                                        :  4;
-        unsigned int QUEUE_ID                                                     :  3;
-        unsigned int STATE_ID                                                     :  3;
-        unsigned int ME_ID                                                        :  2;
-    } bits, bitfields;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_HW_ID1 {
-    struct {
-        unsigned int WAVE_ID                                                      :  5;
-        unsigned int                                                              :  3;
-        unsigned int SIMD_ID                                                      :  2;
-        unsigned int WGP_ID                                                       :  4;
-        unsigned int                                                              :  2;
-        unsigned int SA_ID                                                        :  1;
-        unsigned int                                                              : 15;
-    } most;
-    struct {
-        unsigned int                                                              : 18;
-        unsigned int SE_ID                                                        :  2;
-        unsigned int                                                              : 12;
-    } gfx101;
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int                                                              : 18;
-        unsigned int SE_ID                                                        :  2;
-        unsigned int                                                              : 12;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int                                                              : 18;
-        unsigned int SE_ID                                                        :  2;
-        unsigned int                                                              : 12;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int                                                              : 18;
-        unsigned int SE_ID                                                        :  2;
-        unsigned int                                                              : 12;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int                                                              : 18;
-        unsigned int SE_ID                                                        :  2;
-        unsigned int                                                              : 12;
-    } nv24;
-#endif
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_HW_ID2 {
-    struct {
-        unsigned int QUEUE_ID                                                     :  4;
-        unsigned int PIPE_ID                                                      :  2;
-        unsigned int                                                              :  2;
-        unsigned int ME_ID                                                        :  2;
-        unsigned int                                                              :  2;
-        unsigned int STATE_ID                                                     :  3;
-        unsigned int                                                              :  1;
-        unsigned int WG_ID                                                        :  5;
-        unsigned int                                                              :  3;
-        unsigned int VM_ID                                                        :  4;
-        unsigned int                                                              :  4;
-    } most;
-    struct {
-        unsigned int                                                              : 29;
-        unsigned int COMPAT_LEVEL                                                 :  2;
-        unsigned int                                                              :  1;
-    } gfx101;
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int                                                              : 29;
-        unsigned int COMPAT_LEVEL                                                 :  2;
-        unsigned int                                                              :  1;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int                                                              : 29;
-        unsigned int COMPAT_LEVEL                                                 :  2;
-        unsigned int                                                              :  1;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int                                                              : 29;
-        unsigned int COMPAT_LEVEL                                                 :  2;
-        unsigned int                                                              :  1;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int                                                              : 29;
-        unsigned int COMPAT_LEVEL                                                 :  2;
-        unsigned int                                                              :  1;
-    } nv24;
-#endif
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_HW_ID_LEGACY {
-    struct {
-        unsigned int WAVE_ID                                                      :  4;
-        unsigned int SIMD_ID                                                      :  2;
-        unsigned int PIPE_ID                                                      :  2;
-        unsigned int CU_ID                                                        :  4;
-        unsigned int SH_ID                                                        :  1;
-        unsigned int SE_ID                                                        :  2;
-        unsigned int WAVE_ID_MSB                                                  :  1;
-        unsigned int TG_ID                                                        :  4;
-        unsigned int VM_ID                                                        :  4;
-        unsigned int QUEUE_ID                                                     :  3;
-        unsigned int STATE_ID                                                     :  3;
-        unsigned int ME_ID                                                        :  2;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_IB_STS {
-    struct {
-        unsigned int VM_CNT                                                       :  4;
-        unsigned int EXP_CNT                                                      :  3;
-        unsigned int                                                              :  1;
-        unsigned int LGKM_CNT                                                     :  4;
-        unsigned int VALU_CNT                                                     :  3;
-        unsigned int                                                              :  7;
-        unsigned int VM_CNT_HI                                                    :  2;
-        unsigned int                                                              :  8;
-    } most;
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int LGKM_CNT_BIT4                                                :  1;
-        unsigned int                                                              :  7;
-        unsigned int FIRST_REPLAY                                                 :  1;
-        unsigned int RCNT                                                         :  6;
-        unsigned int                                                              :  2;
-        unsigned int LGKM_CNT_BIT5                                                :  1;
-        unsigned int REPLAY_W64H                                                  :  1;
-        unsigned int VS_CNT                                                       :  6;
-    } gfx101;
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int LGKM_CNT_BIT4                                                :  1;
-        unsigned int                                                              : 16;
-        unsigned int LGKM_CNT_BIT5                                                :  1;
-        unsigned int                                                              :  1;
-        unsigned int VS_CNT                                                       :  6;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int LGKM_CNT_BIT4                                                :  1;
-        unsigned int                                                              : 16;
-        unsigned int LGKM_CNT_BIT5                                                :  1;
-        unsigned int                                                              :  1;
-        unsigned int VS_CNT                                                       :  6;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int LGKM_CNT_BIT4                                                :  1;
-        unsigned int                                                              : 16;
-        unsigned int LGKM_CNT_BIT5                                                :  1;
-        unsigned int                                                              :  1;
-        unsigned int VS_CNT                                                       :  6;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int LGKM_CNT_BIT4                                                :  1;
-        unsigned int                                                              : 16;
-        unsigned int LGKM_CNT_BIT5                                                :  1;
-        unsigned int                                                              :  1;
-        unsigned int VS_CNT                                                       :  6;
-    } nv24;
-#endif
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int FIRST_REPLAY                                                 :  1;
-        unsigned int RCNT                                                         :  5;
-        unsigned int                                                              : 11;
-    } vg10_Vg12_Vg20_Rv1x_Rv2x;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_IB_STS2 {
-    struct {
-        unsigned int INST_PREFETCH                                                :  2;
-        unsigned int                                                              :  6;
-        unsigned int MEM_ORDER                                                    :  2;
-        unsigned int FWD_PROGRESS                                                 :  1;
-        unsigned int WAVE64                                                       :  1;
-        unsigned int                                                              : 20;
-    } most;
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int RESOURCE_OVERRIDE                                            :  1;
-        unsigned int                                                              :  4;
-        unsigned int WAVE64HI                                                     :  1;
-        unsigned int SUBV_LOOP                                                    :  1;
-        unsigned int                                                              : 18;
-    } gfx101;
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int RESOURCE_OVERRIDE                                            :  1;
-        unsigned int                                                              : 24;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int RESOURCE_OVERRIDE                                            :  1;
-        unsigned int                                                              : 24;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int RESOURCE_OVERRIDE                                            :  1;
-        unsigned int                                                              : 24;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int                                                              :  7;
-        unsigned int RESOURCE_OVERRIDE                                            :  1;
-        unsigned int                                                              : 24;
-    } nv24;
-#endif
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_INST_DW0 {
-    struct {
-        unsigned int INST_DW0                                                     : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_INST_DW1 {
-    struct {
-        unsigned int INST_DW1                                                     : 32;
-    } bits, bitfields;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_LDS_ALLOC {
-    struct {
-        unsigned int                                                              : 12;
-        unsigned int LDS_SIZE                                                     :  9;
-        unsigned int                                                              : 11;
-    } most;
-    struct {
-        unsigned int LDS_BASE                                                     :  9;
-        unsigned int                                                              : 15;
-        unsigned int VGPR_SHARED_SIZE                                             :  4;
-        unsigned int                                                              :  4;
-    } gfx101;
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int LDS_BASE                                                     :  9;
-        unsigned int                                                              : 15;
-        unsigned int VGPR_SHARED_SIZE                                             :  4;
-        unsigned int                                                              :  4;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int LDS_BASE                                                     :  9;
-        unsigned int                                                              : 15;
-        unsigned int VGPR_SHARED_SIZE                                             :  4;
-        unsigned int                                                              :  4;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int LDS_BASE                                                     :  9;
-        unsigned int                                                              : 15;
-        unsigned int VGPR_SHARED_SIZE                                             :  4;
-        unsigned int                                                              :  4;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int LDS_BASE                                                     :  9;
-        unsigned int                                                              : 15;
-        unsigned int VGPR_SHARED_SIZE                                             :  4;
-        unsigned int                                                              :  4;
-    } nv24;
-#endif
-    struct {
-        unsigned int LDS_BASE                                                     :  8;
-        unsigned int                                                              : 24;
-    } vg10_Vg12_Vg20_Rv1x_Rv2x;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_M0 {
-    struct {
-        unsigned int M0                                                           : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_MODE {
-    struct {
-        unsigned int FP_ROUND                                                     :  4;
-        unsigned int FP_DENORM                                                    :  4;
-        unsigned int DX10_CLAMP                                                   :  1;
-        unsigned int IEEE                                                         :  1;
-        unsigned int LOD_CLAMPED                                                  :  1;
-        unsigned int                                                              :  1;
-        unsigned int EXCP_EN                                                      :  9;
-        unsigned int                                                              :  2;
-        unsigned int FP16_OVFL                                                    :  1;
-        unsigned int                                                              :  8;
-    } most;
-    struct {
-        unsigned int                                                              : 11;
-        unsigned int DEBUG_EN                                                     :  1;
-        unsigned int                                                              : 15;
-        unsigned int DISABLE_PERF                                                 :  1;
-        unsigned int VSKIP                                                        :  1;
-        unsigned int CSP                                                          :  3;
-    } gfx101;
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int                                                              : 11;
-        unsigned int DEBUG_EN                                                     :  1;
-        unsigned int                                                              : 15;
-        unsigned int DISABLE_PERF                                                 :  1;
-        unsigned int                                                              :  4;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int                                                              : 11;
-        unsigned int DEBUG_EN                                                     :  1;
-        unsigned int                                                              : 15;
-        unsigned int DISABLE_PERF                                                 :  1;
-        unsigned int                                                              :  4;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int                                                              : 11;
-        unsigned int DEBUG_EN                                                     :  1;
-        unsigned int                                                              : 15;
-        unsigned int DISABLE_PERF                                                 :  1;
-        unsigned int                                                              :  4;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int                                                              : 11;
-        unsigned int DEBUG_EN                                                     :  1;
-        unsigned int                                                              : 15;
-        unsigned int DISABLE_PERF                                                 :  1;
-        unsigned int                                                              :  4;
-    } nv24;
-#endif
-    struct {
-        unsigned int                                                              : 11;
-        unsigned int DEBUG_EN                                                     :  1;
-        unsigned int                                                              : 12;
-        unsigned int POPS_PACKER0                                                 :  1;
-        unsigned int POPS_PACKER1                                                 :  1;
-        unsigned int DISABLE_PERF                                                 :  1;
-        unsigned int GPR_IDX_EN                                                   :  1;
-        unsigned int VSKIP                                                        :  1;
-        unsigned int CSP                                                          :  3;
-    } vg10_Vg12_Vg20_Rv1x_Rv2x;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_PC_HI {
-    struct {
-        unsigned int PC_HI                                                        : 16;
-        unsigned int                                                              : 16;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_PC_LO {
-    struct {
-        unsigned int PC_LO                                                        : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_POPS_PACKER {
-    struct {
-        unsigned int POPS_EN                                                      :  1;
-        unsigned int POPS_PACKER_ID                                               :  2;
-        unsigned int                                                              : 29;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_SCHED_MODE {
-    struct {
-        unsigned int DEP_MODE                                                     :  2;
-        unsigned int                                                              : 30;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-union SQ_WAVE_SHADER_CYCLES {
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int CYCLES                                                       : 20;
-        unsigned int                                                              : 12;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int CYCLES                                                       : 20;
-        unsigned int                                                              : 12;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int CYCLES                                                       : 20;
-        unsigned int                                                              : 12;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int CYCLES                                                       : 20;
-        unsigned int                                                              : 12;
-    } nv24;
-#endif
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-#endif
-
-union SQ_WAVE_STATUS {
-    struct {
-        unsigned int SCC                                                          :  1;
-        unsigned int SPI_PRIO                                                     :  2;
-        unsigned int USER_PRIO                                                    :  2;
-        unsigned int PRIV                                                         :  1;
-        unsigned int TRAP_EN                                                      :  1;
-        unsigned int TTRACE_EN                                                    :  1;
-        unsigned int EXPORT_RDY                                                   :  1;
-        unsigned int EXECZ                                                        :  1;
-        unsigned int VCCZ                                                         :  1;
-        unsigned int IN_TG                                                        :  1;
-        unsigned int IN_BARRIER                                                   :  1;
-        unsigned int HALT                                                         :  1;
-        unsigned int TRAP                                                         :  1;
-        unsigned int                                                              :  1;
-        unsigned int VALID                                                        :  1;
-        unsigned int ECC_ERR                                                      :  1;
-        unsigned int SKIP_EXPORT                                                  :  1;
-        unsigned int PERF_EN                                                      :  1;
-        unsigned int COND_DBG_USER                                                :  1;
-        unsigned int COND_DBG_SYS                                                 :  1;
-        unsigned int                                                              :  1;
-        unsigned int FATAL_HALT                                                   :  1;
-        unsigned int                                                              :  3;
-        unsigned int MUST_EXPORT                                                  :  1;
-        unsigned int                                                              :  4;
-    } most;
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int TTRACE_SIMD_EN                                               :  1;
-        unsigned int                                                              : 16;
-    } gfx101;
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int TTRACE_SIMD_EN                                               :  1;
-        unsigned int                                                              : 16;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int TTRACE_SIMD_EN                                               :  1;
-        unsigned int                                                              : 16;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int TTRACE_SIMD_EN                                               :  1;
-        unsigned int                                                              : 16;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int TTRACE_SIMD_EN                                               :  1;
-        unsigned int                                                              : 16;
-    } nv24;
-#endif
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int TTRACE_CU_EN                                                 :  1;
-        unsigned int                                                              :  6;
-        unsigned int ALLOW_REPLAY                                                 :  1;
-        unsigned int                                                              :  9;
-    } vg10_Vg12_Vg20_Rv1x_Rv2x;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TRAPSTS {
-    struct {
-        unsigned int EXCP                                                         :  9;
-        unsigned int                                                              :  1;
-        unsigned int SAVECTX                                                      :  1;
-        unsigned int ILLEGAL_INST                                                 :  1;
-        unsigned int EXCP_HI                                                      :  3;
-        unsigned int                                                              : 17;
-    } most;
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int BUFFER_OOB                                                   :  1;
-        unsigned int EXCP_CYCLE                                                   :  4;
-        unsigned int EXCP_GROUP_MASK                                              :  4;
-        unsigned int EXCP_WAVE64HI                                                :  1;
-        unsigned int                                                              :  3;
-        unsigned int XNACK_ERROR                                                  :  1;
-        unsigned int DP_RATE                                                      :  3;
-    } gfx101;
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int BUFFER_OOB                                                   :  1;
-        unsigned int EXCP_CYCLE                                                   :  4;
-        unsigned int EXCP_GROUP_MASK                                              :  4;
-        unsigned int EXCP_WAVE64HI                                                :  1;
-        unsigned int                                                              :  3;
-        unsigned int UTC_ERROR                                                    :  1;
-        unsigned int DP_RATE                                                      :  3;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int BUFFER_OOB                                                   :  1;
-        unsigned int EXCP_CYCLE                                                   :  4;
-        unsigned int EXCP_GROUP_MASK                                              :  4;
-        unsigned int EXCP_WAVE64HI                                                :  1;
-        unsigned int                                                              :  3;
-        unsigned int UTC_ERROR                                                    :  1;
-        unsigned int DP_RATE                                                      :  3;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int BUFFER_OOB                                                   :  1;
-        unsigned int EXCP_CYCLE                                                   :  4;
-        unsigned int EXCP_GROUP_MASK                                              :  4;
-        unsigned int EXCP_WAVE64HI                                                :  1;
-        unsigned int                                                              :  3;
-        unsigned int UTC_ERROR                                                    :  1;
-        unsigned int DP_RATE                                                      :  3;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int                                                              : 15;
-        unsigned int BUFFER_OOB                                                   :  1;
-        unsigned int EXCP_CYCLE                                                   :  4;
-        unsigned int EXCP_GROUP_MASK                                              :  4;
-        unsigned int EXCP_WAVE64HI                                                :  1;
-        unsigned int                                                              :  3;
-        unsigned int UTC_ERROR                                                    :  1;
-        unsigned int DP_RATE                                                      :  3;
-    } nv24;
-#endif
-    struct {
-        unsigned int                                                              : 16;
-        unsigned int EXCP_CYCLE                                                   :  6;
-        unsigned int                                                              :  6;
-        unsigned int XNACK_ERROR                                                  :  1;
-        unsigned int DP_RATE                                                      :  3;
-    } vg10_Vg12_Vg20_Rv1x_Rv2x;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP0 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP1 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP2 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP3 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP4 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP5 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP6 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP7 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP8 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP9 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP10 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP11 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP12 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP13 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP14 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-union SQ_WAVE_TTMP15 {
-    struct {
-        unsigned int DATA                                                         : 32;
-    } most;
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
-union SQ_WAVE_VALID_AND_IDLE {
-#if CHIP_HDR_NAVI21
-    struct {
-        unsigned int WAVE_SLOT                                                    : 20;
-        unsigned int                                                              : 12;
-    } nv21;
-#endif
-#if CHIP_HDR_NAVI22
-    struct {
-        unsigned int WAVE_SLOT                                                    : 20;
-        unsigned int                                                              : 12;
-    } nv22;
-#endif
-#if CHIP_HDR_NAVI23
-    struct {
-        unsigned int WAVE_SLOT                                                    : 20;
-        unsigned int                                                              : 12;
-    } nv23;
-#endif
-#if CHIP_HDR_NAVI24
-    struct {
-        unsigned int WAVE_SLOT                                                    : 20;
-        unsigned int                                                              : 12;
-    } nv24;
-#endif
-
-    unsigned int u32All;
-    signed int   i32All;
-    float        f32All;
-};
-#endif
-
-union SQ_WAVE_VGPR_OFFSET {
-    struct {
-        unsigned int SRC0                                                         :  6;
-        unsigned int SRC1                                                         :  6;
-        unsigned int SRC2                                                         :  6;
-        unsigned int DST                                                          :  6;
-        unsigned int                                                              :  8;
     } most;
 
     unsigned int u32All;
@@ -33400,9 +33143,7 @@ union SX_PERFCOUNTER0_SELECT {
         unsigned int                                                              :  8;
     } bits, bitfields;
     struct {
-        unsigned int PERF_SEL                                                     : 10;
-        unsigned int PERF_SEL1                                                    : 10;
-        unsigned int                                                              :  4;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int PERF_MODE                                                    :  4;
     } most;
@@ -33412,10 +33153,22 @@ union SX_PERFCOUNTER0_SELECT {
         unsigned int                                                              : 12;
     } gfx09_0;
     struct {
+        unsigned int PERF_SEL                                                     : 10;
+        unsigned int PERF_SEL1                                                    : 10;
+        unsigned int                                                              : 12;
+    } gfx09_1x;
+    struct {
         unsigned int PERFCOUNTER_SELECT                                           : 10;
         unsigned int PERFCOUNTER_SELECT1                                          : 10;
         unsigned int                                                              : 12;
     } gfx101;
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL                                                     : 10;
+        unsigned int PERF_SEL1                                                    : 10;
+        unsigned int                                                              : 12;
+    } gfx103PlusExclusive;
+#endif
 
     unsigned int u32All;
     signed int   i32All;
@@ -33424,9 +33177,7 @@ union SX_PERFCOUNTER0_SELECT {
 
 union SX_PERFCOUNTER0_SELECT1 {
     struct {
-        unsigned int PERF_SEL2                                                    : 10;
-        unsigned int PERF_SEL3                                                    : 10;
-        unsigned int                                                              :  4;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
         unsigned int PERF_MODE2                                                   :  4;
     } most;
@@ -33436,10 +33187,22 @@ union SX_PERFCOUNTER0_SELECT1 {
         unsigned int                                                              : 12;
     } gfx09_0;
     struct {
+        unsigned int PERF_SEL2                                                    : 10;
+        unsigned int PERF_SEL3                                                    : 10;
+        unsigned int                                                              : 12;
+    } gfx09_1x;
+    struct {
         unsigned int PERFCOUNTER_SELECT2                                          : 10;
         unsigned int PERFCOUNTER_SELECT3                                          : 10;
         unsigned int                                                              : 12;
     } gfx101;
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL2                                                    : 10;
+        unsigned int PERF_SEL3                                                    : 10;
+        unsigned int                                                              : 12;
+    } gfx103PlusExclusive;
+#endif
 
     unsigned int u32All;
     signed int   i32All;
@@ -33473,9 +33236,7 @@ union SX_PERFCOUNTER1_SELECT {
         unsigned int                                                              :  8;
     } bits, bitfields;
     struct {
-        unsigned int PERF_SEL                                                     : 10;
-        unsigned int PERF_SEL1                                                    : 10;
-        unsigned int                                                              :  4;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int PERF_MODE                                                    :  4;
     } most;
@@ -33485,10 +33246,22 @@ union SX_PERFCOUNTER1_SELECT {
         unsigned int                                                              : 12;
     } gfx09_0;
     struct {
+        unsigned int PERF_SEL                                                     : 10;
+        unsigned int PERF_SEL1                                                    : 10;
+        unsigned int                                                              : 12;
+    } gfx09_1x;
+    struct {
         unsigned int PERFCOUNTER_SELECT                                           : 10;
         unsigned int PERFCOUNTER_SELECT1                                          : 10;
         unsigned int                                                              : 12;
     } gfx101;
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL                                                     : 10;
+        unsigned int PERF_SEL1                                                    : 10;
+        unsigned int                                                              : 12;
+    } gfx103PlusExclusive;
+#endif
 
     unsigned int u32All;
     signed int   i32All;
@@ -33497,9 +33270,7 @@ union SX_PERFCOUNTER1_SELECT {
 
 union SX_PERFCOUNTER1_SELECT1 {
     struct {
-        unsigned int PERF_SEL2                                                    : 10;
-        unsigned int PERF_SEL3                                                    : 10;
-        unsigned int                                                              :  4;
+        unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
         unsigned int PERF_MODE2                                                   :  4;
     } most;
@@ -33509,10 +33280,22 @@ union SX_PERFCOUNTER1_SELECT1 {
         unsigned int                                                              : 12;
     } gfx09_0;
     struct {
+        unsigned int PERF_SEL2                                                    : 10;
+        unsigned int PERF_SEL3                                                    : 10;
+        unsigned int                                                              : 12;
+    } gfx09_1x;
+    struct {
         unsigned int PERFCOUNTER_SELECT2                                          : 10;
         unsigned int PERFCOUNTER_SELECT3                                          : 10;
         unsigned int                                                              : 12;
     } gfx101;
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL2                                                    : 10;
+        unsigned int PERF_SEL3                                                    : 10;
+        unsigned int                                                              : 12;
+    } gfx103PlusExclusive;
+#endif
 
     unsigned int u32All;
     signed int   i32All;
@@ -33546,8 +33329,7 @@ union SX_PERFCOUNTER2_SELECT {
         unsigned int                                                              :  8;
     } bits, bitfields;
     struct {
-        unsigned int PERF_SEL                                                     : 10;
-        unsigned int                                                              : 18;
+        unsigned int                                                              : 28;
         unsigned int PERF_MODE                                                    :  4;
     } most;
     struct {
@@ -33556,10 +33338,20 @@ union SX_PERFCOUNTER2_SELECT {
         unsigned int                                                              : 12;
     } gfx09_0;
     struct {
+        unsigned int PERF_SEL                                                     : 10;
+        unsigned int                                                              : 22;
+    } gfx09_1x;
+    struct {
         unsigned int PERFCOUNTER_SELECT                                           : 10;
         unsigned int PERFCOUNTER_SELECT1                                          : 10;
         unsigned int                                                              : 12;
     } gfx101;
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL                                                     : 10;
+        unsigned int                                                              : 22;
+    } gfx103PlusExclusive;
+#endif
 
     unsigned int u32All;
     signed int   i32All;
@@ -33593,8 +33385,7 @@ union SX_PERFCOUNTER3_SELECT {
         unsigned int                                                              :  8;
     } bits, bitfields;
     struct {
-        unsigned int PERF_SEL                                                     : 10;
-        unsigned int                                                              : 18;
+        unsigned int                                                              : 28;
         unsigned int PERF_MODE                                                    :  4;
     } most;
     struct {
@@ -33603,10 +33394,20 @@ union SX_PERFCOUNTER3_SELECT {
         unsigned int                                                              : 12;
     } gfx09_0;
     struct {
+        unsigned int PERF_SEL                                                     : 10;
+        unsigned int                                                              : 22;
+    } gfx09_1x;
+    struct {
         unsigned int PERFCOUNTER_SELECT                                           : 10;
         unsigned int PERFCOUNTER_SELECT1                                          : 10;
         unsigned int                                                              : 12;
     } gfx101;
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int PERF_SEL                                                     : 10;
+        unsigned int                                                              : 22;
+    } gfx103PlusExclusive;
+#endif
 
     unsigned int u32All;
     signed int   i32All;
@@ -33790,14 +33591,20 @@ union TA_CNTL_AUX {
         unsigned int RESERVED                                                     :  3;
         unsigned int                                                              : 28;
     } gfx101;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
-        unsigned int                                                              :  1;
-        unsigned int DEPTH_AS_PITCH_DIS                                           :  1;
+        unsigned int                                                              :  2;
         unsigned int CORNER_SAMPLES_MIN_DIM                                       :  1;
         unsigned int OVERRIDE_QUAD_MODE_DIS                                       :  1;
         unsigned int                                                              : 28;
     } gfx103Plus;
+#endif
+#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+    struct {
+        unsigned int                                                              :  1;
+        unsigned int DEPTH_AS_PITCH_DIS                                           :  1;
+        unsigned int                                                              : 30;
+    } gfx103PlusExclusive;
 #endif
     struct {
         unsigned int                                                              :  4;
@@ -33927,7 +33734,7 @@ union TA_PERFCOUNTER0_SELECT {
         unsigned int PERF_SEL1                                                    :  8;
         unsigned int                                                              : 14;
     } most;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int PERF_SEL1                                                    : 10;
@@ -33952,7 +33759,7 @@ union TA_PERFCOUNTER0_SELECT1 {
         unsigned int PERF_SEL3                                                    :  8;
         unsigned int                                                              : 14;
     } most;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERF_SEL2                                                    : 10;
         unsigned int PERF_SEL3                                                    : 10;
@@ -34003,7 +33810,7 @@ union TA_PERFCOUNTER1_SELECT {
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx09_0;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -34709,7 +34516,7 @@ union TD_PERFCOUNTER0_SELECT {
         unsigned int PERF_SEL1                                                    :  8;
         unsigned int                                                              : 14;
     } most;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int PERF_SEL1                                                    : 10;
@@ -34734,7 +34541,7 @@ union TD_PERFCOUNTER0_SELECT1 {
         unsigned int PERF_SEL3                                                    :  8;
         unsigned int                                                              : 14;
     } most;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERF_SEL2                                                    : 10;
         unsigned int PERF_SEL3                                                    : 10;
@@ -34785,7 +34592,7 @@ union TD_PERFCOUNTER1_SELECT {
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx09_0;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -42595,7 +42402,7 @@ union VGT_DMA_INDEX_TYPE {
         unsigned int PRIMGEN_EN                                                   :  1;
         unsigned int                                                              : 23;
     } gfx09;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 14;
         unsigned int DISABLE_INSTANCE_PACKING                                     :  1;
@@ -42733,7 +42540,7 @@ union VGT_DRAW_PAYLOAD_CNTL {
         unsigned int                                                              :  1;
         unsigned int                                                              : 29;
     } gfx101;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              :  6;
         unsigned int EN_VRS_RATE                                                  :  1;
@@ -43114,7 +42921,7 @@ union VGT_GS_ONCHIP_CNTL {
         unsigned int ES_VERTS_PER_SUBGRP                                          : 11;
         unsigned int GS_PRIMS_PER_SUBGRP                                          : 11;
         unsigned int GS_INST_PRIMS_IN_SUBGRP                                      : 10;
-    } most;
+    } bits, bitfields;
 
     unsigned int u32All;
     signed int   i32All;
@@ -43271,7 +43078,7 @@ union VGT_HS_OFFCHIP_PARAM {
         unsigned int OFFCHIP_BUFFERING                                            : 10;
         unsigned int OFFCHIP_GRANULARITY                                          :  2;
         unsigned int                                                              : 20;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -43284,7 +43091,7 @@ union VGT_HS_OFFCHIP_PARAM_UMD {
         unsigned int OFFCHIP_BUFFERING                                            :  9;
         unsigned int OFFCHIP_GRANULARITY                                          :  2;
         unsigned int                                                              : 21;
-    } gfx101;
+    } most;
 #if CHIP_HDR_NAVI21
     struct {
         unsigned int OFFCHIP_BUFFERING                                            : 10;
@@ -43339,7 +43146,7 @@ union VGT_INDEX_TYPE {
         unsigned int PRIMGEN_EN                                                   :  1;
         unsigned int                                                              : 23;
     } gfx09;
-#if CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
+#if  CHIP_HDR_NAVI21|| CHIP_HDR_NAVI22|| CHIP_HDR_NAVI23|| CHIP_HDR_NAVI24
     struct {
         unsigned int                                                              : 14;
         unsigned int DISABLE_INSTANCE_PACKING                                     :  1;
@@ -44045,7 +43852,7 @@ union VGT_SYS_CONFIG {
         unsigned int                                                              :  8;
         unsigned int NUM_SUBGROUPS_IN_FLIGHT                                      : 11;
         unsigned int                                                              : 13;
-    } gfx103Plus;
+    } gfx103PlusExclusive;
 #endif
 
     unsigned int u32All;
@@ -44246,7 +44053,7 @@ union WD_BUF_RESOURCE_2 {
 union WD_CNTL_SB_BUF_BASE {
     struct {
         unsigned int BASE                                                         : 32;
-    } most;
+    } bits, bitfields;
 
     unsigned int u32All;
     signed int   i32All;
@@ -44257,7 +44064,7 @@ union WD_CNTL_SB_BUF_BASE_HI {
     struct {
         unsigned int BASE_HI                                                      :  8;
         unsigned int                                                              : 24;
-    } most;
+    } bits, bitfields;
 
     unsigned int u32All;
     signed int   i32All;
@@ -44298,7 +44105,7 @@ union WD_CNTL_STATUS {
         unsigned int TE1_BUSY                                                     :  1;
         unsigned int TE0_BUSY                                                     :  1;
         unsigned int                                                              :  4;
-    } gfx10Vrs;
+    } gfx103Derivative;
 #endif
 #if CHIP_HDR_NAVI21
     struct {
@@ -44379,7 +44186,7 @@ union WD_ENHANCE {
 union WD_INDEX_BUF_BASE {
     struct {
         unsigned int BASE                                                         : 32;
-    } most;
+    } bits, bitfields;
 
     unsigned int u32All;
     signed int   i32All;
@@ -44390,7 +44197,7 @@ union WD_INDEX_BUF_BASE_HI {
     struct {
         unsigned int BASE_HI                                                      :  8;
         unsigned int                                                              : 24;
-    } most;
+    } bits, bitfields;
 
     unsigned int u32All;
     signed int   i32All;
@@ -44528,7 +44335,7 @@ union WD_PERFCOUNTER3_SELECT {
 union WD_POS_BUF_BASE {
     struct {
         unsigned int BASE                                                         : 32;
-    } most;
+    } bits, bitfields;
 
     unsigned int u32All;
     signed int   i32All;
@@ -44539,7 +44346,7 @@ union WD_POS_BUF_BASE_HI {
     struct {
         unsigned int BASE_HI                                                      :  8;
         unsigned int                                                              : 24;
-    } most;
+    } bits, bitfields;
 
     unsigned int u32All;
     signed int   i32All;

@@ -353,6 +353,10 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
       fileNamePrefix = "PipelineGs";
     else if (pipelineInfo.pGraphicsInfo->tes.pModuleData)
       fileNamePrefix = "PipelineTess";
+    else if (pipelineInfo.pGraphicsInfo->task.pModuleData && pipelineInfo.pGraphicsInfo->mesh.pModuleData)
+      fileNamePrefix = "PipelineTaskMesh";
+    else if (pipelineInfo.pGraphicsInfo->mesh.pModuleData)
+      fileNamePrefix = "PipelineMesh";
     else
       fileNamePrefix = "PipelineVsFs";
 
@@ -937,10 +941,12 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
   // Dump pipeline
   // clang-format off
   const PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
+    &pipelineInfo->task,
     &pipelineInfo->vs,
     &pipelineInfo->tcs,
     &pipelineInfo->tes,
     &pipelineInfo->gs,
+    &pipelineInfo->mesh,
     &pipelineInfo->fs,
   };
   // clang-format on
@@ -1191,19 +1197,23 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 
   switch (unlinkedShaderType) {
   case UnlinkedStageVertexProcess:
+    updateHashForPipelineShaderInfo(ShaderStageTask, &pipeline->task, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageMesh, &pipeline->mesh, isCacheHash, &hasher, isRelocatableShader);
     break;
   case UnlinkedStageFragment:
     updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
     break;
   case UnlinkedStageCount:
+    updateHashForPipelineShaderInfo(ShaderStageTask, &pipeline->task, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageMesh, &pipeline->mesh, isCacheHash, &hasher, isRelocatableShader);
     updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
     break;
   default:

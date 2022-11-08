@@ -60,10 +60,12 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
   setUnlinked(pipelineInfo->unlinked);
   // clang-format off
   const PipelineShaderInfo *shaderInfo[ShaderStageGfxCount] = {
+    &pipelineInfo->task,
     &pipelineInfo->vs,
     &pipelineInfo->tcs,
     &pipelineInfo->tes,
     &pipelineInfo->gs,
+    &pipelineInfo->mesh,
     &pipelineInfo->fs,
   };
   // clang-format on
@@ -101,6 +103,9 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
 
   const PipelineShaderInfo *shaderInfo = nullptr;
   switch (shaderStage) {
+  case Llpc::ShaderStageTask:
+    shaderInfo = &m_pipelineInfo->task;
+    break;
   case Llpc::ShaderStageVertex:
     shaderInfo = &m_pipelineInfo->vs;
     break;
@@ -112,6 +117,9 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
     break;
   case Llpc::ShaderStageGeometry:
     shaderInfo = &m_pipelineInfo->gs;
+    break;
+  case Llpc::ShaderStageMesh:
+    shaderInfo = &m_pipelineInfo->mesh;
     break;
   case Llpc::ShaderStageFragment:
     shaderInfo = &m_pipelineInfo->fs;
@@ -131,10 +139,12 @@ const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage sha
 unsigned GraphicsContext::getSubgroupSizeUsage() const {
   // clang-format off
   std::array<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfos = {
+    &m_pipelineInfo->task,
     &m_pipelineInfo->vs,
     &m_pipelineInfo->tcs,
     &m_pipelineInfo->tes,
     &m_pipelineInfo->gs,
+    &m_pipelineInfo->mesh,
     &m_pipelineInfo->fs,
   };
   // clang-format on

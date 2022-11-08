@@ -2044,8 +2044,11 @@ Value *SPIRVToLLVM::transAtomicRMW(SPIRVValue *const spvValue, const AtomicRMWIn
   Value *const atomicValue = transValue(spvAtomicInst->getOpValue(3), getBuilder()->GetInsertBlock()->getParent(),
                                         getBuilder()->GetInsertBlock());
 
-  // This is a workaround, buffer.atomic.swap.f64 is not supported, convert double to int64.
-  if ((binOp == AtomicRMWInst::Xchg) && atomicValue->getType()->isDoubleTy()) {
+  // NOTE: This is a workaround. atomic.swap.f64 is not supported in LLVM backend, so we convert double to int64. But
+  // for task payload, this is deferred because it will facilitate lowering of atomic instructions of task payload and
+  // the work is finally done by LGC in task shader processing.
+  if (dyn_cast<PointerType>(atomicPointer->getType())->getAddressSpace() != SPIRAS_TaskPayload &&
+      binOp == AtomicRMWInst::Xchg && atomicValue->getType()->isDoubleTy()) {
     Value *const int64Value = getBuilder()->CreateBitCast(atomicValue, getBuilder()->getInt64Ty());
 
     Value *const int64AtomicPointer = getBuilder()->CreateBitCast(
@@ -3711,6 +3714,40 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTerminateRayKHR>(SPIRVVal
   return mapValue(spvValue, ret);
 }
 #endif
+
+// =====================================================================================================================
+// Handle OpEmitMeshTasksEXT.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpEmitMeshTasksEXT>(SPIRVValue *const spvValue) {
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+
+  BasicBlock *const block = getBuilder()->GetInsertBlock();
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const groupCountX = transValue(spvOperands[0], func, block);
+  Value *const groupCountY = transValue(spvOperands[1], func, block);
+  Value *const groupCountZ = transValue(spvOperands[2], func, block);
+  getBuilder()->CreateEmitMeshTasks(groupCountX, groupCountY, groupCountZ);
+  // NOTE: According to SPIR-V spec, OpEmitMeshTasksEXT is a terminator. Hence, we have to insert
+  // a return instruction to implement this semantics.
+  return getBuilder()->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Handle OpSetMeshOutputsEXT.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSetMeshOutputsEXT>(SPIRVValue *const spvValue) {
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+
+  BasicBlock *const block = getBuilder()->GetInsertBlock();
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const vertexCount = transValue(spvOperands[0], func, block);
+  Value *const primitiveCount = transValue(spvOperands[1], func, block);
+  return getBuilder()->CreateSetMeshOutputs(vertexCount, primitiveCount);
+}
 
 // =====================================================================================================================
 // Handle a group arithmetic operation.
@@ -5539,6 +5576,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   case OpUDotAccSatKHR:
   case OpSUDotAccSatKHR:
     return mapValue(bv, transSPIRVIntegerDotProductFromInst(static_cast<SPIRVInstruction *>(bv), bb));
+  case OpEmitMeshTasksEXT:
+    return transValueWithOpcode<OpEmitMeshTasksEXT>(bv);
+  case OpSetMeshOutputsEXT:
+    return transValueWithOpcode<OpSetMeshOutputsEXT>(bv);
   default: {
     auto oc = bv->getOpCode();
     if (isSPIRVCmpInstTransToLLVMInst(static_cast<SPIRVInstruction *>(bv)))
@@ -7126,7 +7167,8 @@ bool SPIRVToLLVM::transMetadata() {
       continue;
 
     SPIRVExecutionModelKind execModel = entryPoint->getExecModel();
-    if (execModel >= ExecutionModelVertex && execModel <= ExecutionModelGLCompute) {
+    if ((execModel >= ExecutionModelVertex && execModel <= ExecutionModelGLCompute) ||
+        execModel == ExecutionModelTaskEXT || execModel == ExecutionModelMeshEXT) {
       // Give the shader modes to middle-end
       if (execModel == ExecutionModelVertex) {
         // Currently, nothing to set
@@ -7193,6 +7235,66 @@ bool SPIRVToLLVM::transMetadata() {
 
         getBuilder()->setGeometryShaderMode(geometryMode);
 
+      } else if (execModel == ExecutionModelMeshEXT) {
+        MeshShaderMode meshMode = {};
+        if (bf->getExecutionMode(ExecutionModeOutputPoints))
+          meshMode.outputPrimitive = OutputPrimitives::Points;
+        else if (bf->getExecutionMode(ExecutionModeOutputLinesEXT))
+          meshMode.outputPrimitive = OutputPrimitives::Lines;
+        else if (bf->getExecutionMode(ExecutionModeOutputTrianglesEXT))
+          meshMode.outputPrimitive = OutputPrimitives::Triangles;
+
+        if (auto em = bf->getExecutionMode(ExecutionModeOutputVertices))
+          meshMode.outputVertices = em->getLiterals()[0];
+
+        if (auto em = bf->getExecutionMode(ExecutionModeOutputPrimitivesEXT))
+          meshMode.outputPrimitives = em->getLiterals()[0];
+
+        if (auto em = bf->getExecutionMode(ExecutionModeLocalSize)) {
+          meshMode.workgroupSizeX = em->getLiterals()[0];
+          meshMode.workgroupSizeY = em->getLiterals()[1];
+          meshMode.workgroupSizeZ = em->getLiterals()[2];
+        } else if ((em = bf->getExecutionMode(ExecutionModeLocalSizeId))) {
+          auto workGroupSizeX = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[0]));
+          meshMode.workgroupSizeX = workGroupSizeX->getZExtIntValue();
+
+          auto workGroupSizeY = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[1]));
+          meshMode.workgroupSizeY = workGroupSizeY->getZExtIntValue();
+
+          auto workGroupSizeZ = static_cast<SPIRVConstant *>(m_bm->getValue(em->getLiterals()[2]));
+          meshMode.workgroupSizeZ = workGroupSizeZ->getZExtIntValue();
+        }
+
+        // Traverse the constant list to find gl_WorkGroupSize and use the
+        // values to overwrite local sizes
+        for (unsigned i = 0, e = m_bm->getNumConstants(); i != e; ++i) {
+          auto bv = m_bm->getConstant(i);
+          SPIRVWord builtIn = SPIRVID_INVALID;
+          if ((bv->getOpCode() == OpSpecConstant || bv->getOpCode() == OpSpecConstantComposite) &&
+              bv->hasDecorate(DecorationBuiltIn, 0, &builtIn)) {
+            if (builtIn == spv::BuiltInWorkgroupSize) {
+              // NOTE: Overwrite values of local sizes specified in execution
+              // mode if the constant corresponding to gl_WorkGroupSize
+              // exists. Take its value since gl_WorkGroupSize could be a
+              // specialization constant.
+              auto workGroupSize = static_cast<SPIRVSpecConstantComposite *>(bv);
+
+              // Declared: const uvec3 gl_WorkGroupSize
+              assert(workGroupSize->getElements().size() == 3);
+              auto workGroupSizeX = static_cast<SPIRVConstant *>(workGroupSize->getElements()[0]);
+              auto workGroupSizeY = static_cast<SPIRVConstant *>(workGroupSize->getElements()[1]);
+              auto workGroupSizeZ = static_cast<SPIRVConstant *>(workGroupSize->getElements()[2]);
+
+              meshMode.workgroupSizeX = workGroupSizeX->getZExtIntValue();
+              meshMode.workgroupSizeY = workGroupSizeY->getZExtIntValue();
+              meshMode.workgroupSizeZ = workGroupSizeZ->getZExtIntValue();
+
+              break;
+            }
+          }
+        }
+
+        getBuilder()->setMeshShaderMode(meshMode);
       } else if (execModel == ExecutionModelFragment) {
         FragmentShaderMode fragmentMode = {};
 
@@ -7231,7 +7333,7 @@ bool SPIRVToLLVM::transMetadata() {
 
         getBuilder()->setFragmentShaderMode(fragmentMode);
 
-      } else if (execModel == ExecutionModelGLCompute) {
+      } else if (execModel == ExecutionModelGLCompute || execModel == ExecutionModelTaskEXT) {
         unsigned workgroupSizeX = 0;
         unsigned workgroupSizeY = 0;
         unsigned workgroupSizeZ = 0;
@@ -7350,6 +7452,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       inOutDec.Interp.Mode = InterpModeSmooth;
       inOutDec.Interp.Loc = InterpLocCenter;
       inOutDec.PerPatch = false;
+      inOutDec.PerPrimitive = false;
       inOutDec.StreamId = 0;
       inOutDec.Index = 0;
       inOutDec.IsXfb = false;
@@ -7376,9 +7479,12 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
         Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
         llpcContext->getPipelineContext()->collectBuiltIn(builtIn);
 #endif
-      } else if (bv->getName() == "gl_in" || bv->getName() == "gl_out") {
+      } else if (bv->getName() == "gl_in" || bv->getName() == "gl_out" || bv->getName() == "gl_MeshVerticesEXT") {
         inOutDec.IsBuiltIn = true;
         inOutDec.Value.BuiltIn = BuiltInPerVertex;
+      } else if (bv->getName() == "gl_MeshPrimitivesEXT") {
+        inOutDec.IsBuiltIn = true;
+        inOutDec.Value.BuiltIn = BuiltInPerPrimitive;
       }
 
       SPIRVWord component = SPIRVID_INVALID;
@@ -7411,6 +7517,12 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       if (bv->hasDecorate(DecorationPatch))
         inOutDec.PerPatch = true;
 
+      if (bv->hasDecorate(DecorationPerPrimitiveEXT)) {
+        inOutDec.PerPrimitive = true;
+        // Per-primitive inputs always use flat shading
+        inOutDec.Interp.Mode = InterpModeFlat;
+      }
+
       SPIRVWord streamId = SPIRVID_INVALID;
       if (bv->hasDecorate(DecorationStream, 0, &streamId))
         inOutDec.StreamId = streamId;
@@ -7442,7 +7554,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       auto mdNode = MDNode::get(*m_context, mDs);
       gv->addMetadata(gSPIRVMD::InOut, *mdNode);
 
-    } else if (as == SPIRAS_Uniform) {
+    } else if (as == SPIRAS_Uniform || as == SPIRAS_TaskPayload) {
       // Translate decorations of blocks
       // Remove array dimensions, it is useless for block metadata building
       SPIRVType *blockTy = nullptr;
@@ -7454,7 +7566,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
 #if VKI_RAY_TRACING
       isStructTy = isStructTy || blockTy->isTypeAccelerationStructureKHR();
 #endif
-      assert(isStructTy);
+      assert(isStructTy || as == SPIRAS_TaskPayload); // Task payload is not necessarily a structure
       (void)isStructTy;
 
       // Get values of descriptor binding and set based on corresponding
@@ -7487,7 +7599,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       ShaderBlockDecorate blockDec = {};
       blockDec.NonWritable = isUniformBlock;
       Type *blockMdTy = nullptr;
-      auto blockMd = buildShaderBlockMetadata(blockTy, blockDec, blockMdTy);
+      auto blockMd = buildShaderBlockMetadata(
+          blockTy, blockDec, blockMdTy, bv->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT);
 
       std::vector<Metadata *> blockMDs;
       blockMDs.push_back(ConstantAsMetadata::get(blockMd));
@@ -7691,6 +7804,12 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
   if (bt->hasDecorate(DecorationPatch))
     inOutDec.PerPatch = true;
 
+  if (bt->hasDecorate(DecorationPerPrimitiveEXT)) {
+    inOutDec.PerPrimitive = true;
+    // Per-primitive inputs always use flat shading
+    inOutDec.Interp.Mode = InterpModeFlat;
+  }
+
   SPIRVWord streamId = SPIRVID_INVALID;
   if (bt->hasDecorate(DecorationStream, 0, &streamId))
     inOutDec.StreamId = streamId;
@@ -7727,6 +7846,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     inOutMd.InterpMode = inOutDec.Interp.Mode;
     inOutMd.InterpLoc = inOutDec.Interp.Loc;
     inOutMd.PerPatch = inOutDec.PerPatch;
+    inOutMd.PerPrimitive = inOutDec.PerPrimitive;
     inOutMd.StreamId = inOutDec.StreamId;
     inOutMd.XfbBuffer = inOutDec.XfbBuffer;
     inOutMd.XfbStride = inOutDec.XfbStride;
@@ -7797,6 +7917,9 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     if (elemDec.PerPatch)
       inOutDec.PerPatch = true; // Set "per-patch" flag
 
+    if (elemDec.PerPrimitive)
+      inOutDec.PerPrimitive = true; // Set "per-primitive" flag
+
     inOutDec.IsBlockArray = elemTy->hasDecorate(DecorationBlock) || elemDec.IsBlockArray; // Multi-dimension array
 
     unsigned stride = elemDec.Value.Loc - startLoc;
@@ -7849,6 +7972,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     inOutMd.InterpMode = inOutDec.Interp.Mode;
     inOutMd.InterpLoc = inOutDec.Interp.Loc;
     inOutMd.PerPatch = inOutDec.PerPatch;
+    inOutMd.PerPrimitive = inOutDec.PerPrimitive;
     inOutMd.StreamId = inOutDec.StreamId;
     inOutMd.IsBlockArray = inOutDec.IsBlockArray;
     inOutMd.XfbBuffer = inOutDec.XfbBuffer;
@@ -7940,6 +8064,12 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
       if (bt->hasMemberDecorate(memberIdx, DecorationPatch))
         memberDec.PerPatch = true;
 
+      if (bt->hasMemberDecorate(memberIdx, DecorationPerPrimitiveEXT)) {
+        memberDec.PerPrimitive = true;
+        // Per-primitive inputs always use flat shading
+        memberDec.Interp.Mode = InterpModeFlat;
+      }
+
       auto memberTy = bt->getStructMemberType(memberIdx);
       bool alignTo64Bit = checkContains64BitType(memberTy);
       if (bt->hasMemberDecorate(memberIdx, DecorationOffset, 0, &xfbOffset)) {
@@ -7975,6 +8105,9 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
 
       if (memberDec.PerPatch)
         inOutDec.PerPatch = true; // Set "per-patch" flag
+
+      if (memberDec.PerPrimitive)
+        inOutDec.PerPrimitive = true; // Set "per-primitive" flag
 
       memberMdTys.push_back(memberMdTy);
       memberMdValues.push_back(memberMd);

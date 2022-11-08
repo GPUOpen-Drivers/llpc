@@ -129,6 +129,8 @@ void cleanupCompileInfo(CompileInfo *compileInfo) {
 // @param sourceLang : GLSL source language
 static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
   switch (sourceLang) {
+  case SpvGenStageTask:
+    return ShaderStage::ShaderStageTask;
   case SpvGenStageVertex:
     return ShaderStage::ShaderStageVertex;
   case SpvGenStageTessControl:
@@ -137,6 +139,8 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
     return ShaderStage::ShaderStageTessEval;
   case SpvGenStageGeometry:
     return ShaderStage::ShaderStageGeometry;
+  case SpvGenStageMesh:
+    return ShaderStage::ShaderStageMesh;
   case SpvGenStageFragment:
     return ShaderStage::ShaderStageFragment;
   case SpvGenStageCompute:

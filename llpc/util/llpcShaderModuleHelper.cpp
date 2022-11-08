@@ -441,7 +441,11 @@ BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shader
   bool trimDebugInfo = cl::TrimDebugInfo;
 #if VKI_RAY_TRACING
   trimDebugInfo = trimDebugInfo &&
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 55
                   !(shaderInfo->options.pipelineOptions.internalRtShaders || shaderInfo->options.isInternalRtShader);
+#else
+                  !(shaderInfo->options.pipelineOptions.internalRtShaders);
+#endif
 #endif
   if (trimDebugInfo) {
     code.codeSize = trimSpirvDebugInfo(&shaderBinary, codeBuffer);
@@ -462,7 +466,11 @@ unsigned ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo
   bool trimDebugInfo = cl::TrimDebugInfo;
 #if VKI_RAY_TRACING
   trimDebugInfo = trimDebugInfo &&
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 55
                   !(shaderInfo->options.pipelineOptions.internalRtShaders || shaderInfo->options.isInternalRtShader);
+#else
+                  !(shaderInfo->options.pipelineOptions.internalRtShaders);
+#endif
 #endif
   if (!trimDebugInfo)
     return shaderBinary.codeSize;

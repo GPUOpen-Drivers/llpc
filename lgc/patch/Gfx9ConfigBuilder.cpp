@@ -237,9 +237,9 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
   if (gfxIp.major == 10) {
     SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
 
-    SET_REG_MOST_FIELD(&config, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, EsVertsOffchipGsOrTess);
-    SET_REG_MOST_FIELD(&config, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, GsPrimsOffchipGsOrTess);
-    SET_REG_MOST_FIELD(&config, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, GsPrimsOffchipGsOrTess);
+    SET_REG_FIELD(&config, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, EsVertsOffchipGsOrTess);
+    SET_REG_FIELD(&config, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, GsPrimsOffchipGsOrTess);
+    SET_REG_FIELD(&config, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, GsPrimsOffchipGsOrTess);
   } else {
     SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
   }
@@ -1126,23 +1126,23 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   }
 
   if (geometryMode.outputVertices <= 128) {
-    SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_128);
+    SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_128__HASHWVS);
   } else if (geometryMode.outputVertices <= 256) {
-    SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_256);
+    SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_256__HASHWVS);
   } else if (geometryMode.outputVertices <= 512) {
-    SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_512);
+    SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_512__HASHWVS);
   } else {
-    SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_1024);
+    SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_1024__HASHWVS);
   }
 
-  SET_REG_MOST_FIELD(&config->esGsRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
-  SET_REG_MOST_FIELD(&config->esGsRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
+  SET_REG_FIELD(&config->esGsRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
+  SET_REG_FIELD(&config->esGsRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
 
   // NOTE: The value of field "GS_INST_PRIMS_IN_SUBGRP" should be strictly equal to the product of
   // VGT_GS_ONCHIP_CNTL.GS_PRIMS_PER_SUBGRP * VGT_GS_INSTANCE_CNT.CNT.
   const unsigned gsInstPrimsInSubgrp =
       geometryMode.invocations > 1 ? (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations) : 0;
-  SET_REG_MOST_FIELD(&config->esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
+  SET_REG_FIELD(&config->esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
 
   unsigned gsVertItemSize0 = sizeof(unsigned) * gsInOutUsage.gs.outLocCount[0];
   SET_REG_FIELD(&config->esGsRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize0);
@@ -1327,14 +1327,14 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   SET_REG_FIELD(&config->primShaderRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
   SET_REG_FIELD(&config->primShaderRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, true);
 
-  SET_REG_MOST_FIELD(&config->primShaderRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
-  SET_REG_MOST_FIELD(&config->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
+  SET_REG_FIELD(&config->primShaderRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
+  SET_REG_FIELD(&config->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
   setNggSubgroupSize(std::max(calcFactor.esVertsPerSubgroup, calcFactor.gsPrimsPerSubgroup));
 
   const unsigned gsInstPrimsInSubgrp = geometryMode.invocations > 1
                                            ? (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations)
                                            : calcFactor.gsPrimsPerSubgroup;
-  SET_REG_MOST_FIELD(&config->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
+  SET_REG_FIELD(&config->primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
 
   unsigned gsVertItemSize = 4 * gsInOutUsage.outputMapLocCount;
   SET_REG_FIELD(&config->primShaderRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize);
@@ -1622,7 +1622,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   unsigned numInterp = resUsage->inOutUsage.fs.interpInfo.size() - numPrimInterp;
   SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, numInterp);
   if (gfxIp == GfxIpVersion{10, 3})
-    SET_REG_GFX10_3_PLUS_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_PRIM_INTERP, numPrimInterp);
+    SET_REG_GFX10_3_PLUS_EXCLUSIVE_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_PRIM_INTERP, numPrimInterp);
 
   if (pointCoordLoc != InvalidValue) {
     SET_REG_FIELD(&config->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_ENA, true);
@@ -1740,9 +1740,9 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
   SET_REG_FIELD(&config->meshRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, true);
 
   assert(calcFactor.esVertsPerSubgroup == 1 && calcFactor.gsPrimsPerSubgroup == 1);
-  SET_REG_MOST_FIELD(&config->meshRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, 1);
-  SET_REG_MOST_FIELD(&config->meshRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, 1);
-  SET_REG_MOST_FIELD(&config->meshRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, 1);
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, 1);
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, 1);
+  SET_REG_FIELD(&config->meshRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, 1);
   setNggSubgroupSize(1);
 
   SET_REG_FIELD(&config->meshRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
@@ -2087,7 +2087,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
 
     if (primExpCount > 0) {
       assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
-      SET_REG_GFX10_3_PLUS_FIELD(config, SPI_VS_OUT_CONFIG, PRIM_EXPORT_COUNT, primExpCount);
+      SET_REG_GFX10_3_PLUS_EXCLUSIVE_FIELD(config, SPI_VS_OUT_CONFIG, PRIM_EXPORT_COUNT, primExpCount);
     }
   }
 

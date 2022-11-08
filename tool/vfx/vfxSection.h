@@ -297,7 +297,8 @@ struct StrToMemberAddr {
 };
 
 // =====================================================================================================================
-// Represents a reference to a non-owned array of StrToMemberAddr, similar to llvm::ArrayRef.
+// Represents a reference to a non-owned array of StrToMemberAddr,
+// similar to llvm::ArrayRef.
 struct StrToMemberAddrArrayRef {
   StrToMemberAddr *data;
   uint64_t size;

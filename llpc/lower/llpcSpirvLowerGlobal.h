@@ -60,6 +60,10 @@ public:
   void handleStoreInstGlobal(StoreInst &storeInst);
   void handleStoreInstGEP(GetElementPtrInst *const getElemPtr, StoreInst &storeInst);
 
+  void handleAtomicInst();
+  void handleAtomicInstGlobal(Instruction &atomicInst);
+  void handleAtomicInstGEP(GetElementPtrInst *const getElemPtr, Instruction &atomicInst);
+
   static llvm::StringRef name() { return "Lower SPIR-V globals (global variables, inputs, and outputs)"; }
 
 private:
@@ -99,6 +103,19 @@ private:
                          unsigned maxLocOffset, llvm::Constant *outputMeta, llvm::Value *locOffset,
                          llvm::Value *vertexOrPrimitiveIdx);
 
+  llvm::Value *loadIndexedValueFromTaskPayload(llvm::Type *indexedTy, llvm::ArrayRef<llvm::Value *> indexOperands,
+                                               llvm::Constant *metadata, llvm::Value *extraByteOffset);
+  llvm::Value *loadValueFromTaskPayload(llvm::Type *loadTy, llvm::Constant *metadata, llvm::Value *extraByteOffset);
+  void storeIndexedValueToTaskPayload(llvm::Type *indexedTy, llvm::Value *storeValue,
+                                      llvm::ArrayRef<llvm::Value *> indexOperands, llvm::Constant *metadata,
+                                      llvm::Value *extraByteOffset);
+  void storeValueToTaskPayload(llvm::Value *storeValue, llvm::Constant *metadata, llvm::Value *extraByteOffse);
+  llvm::Value *atomicOpWithIndexedValueInTaskPayload(llvm::Type *indexedTy, llvm::Instruction *atomicInst,
+                                                     llvm::ArrayRef<llvm::Value *> indexOperands,
+                                                     llvm::Constant *metadata, llvm::Value *extraByteOffset);
+  llvm::Value *atomicOpWithValueInTaskPayload(llvm::Instruction *atomicInst, llvm::Constant *metadata,
+                                              llvm::Value *extraByteOffset);
+
   void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst);
 
   std::unordered_map<llvm::Value *, llvm::Value *> m_globalVarProxyMap; // Proxy map for lowering global variables
@@ -113,12 +130,13 @@ private:
   bool m_lowerInputInPlace;  // Whether to lower input inplace
   bool m_lowerOutputInPlace; // Whether to lower output inplace
 
-  std::unordered_set<llvm::ReturnInst *> m_retInsts;  // "Return" instructions to be removed
-  std::unordered_set<llvm::CallInst *> m_emitCalls;   // "Call" instructions to emit vertex (geometry shader)
-  std::unordered_set<llvm::LoadInst *> m_loadInsts;   // "Load" instructions to be removed
-  std::unordered_set<llvm::StoreInst *> m_storeInsts; // "Store" instructions to be removed
-  std::unordered_set<llvm::CallInst *> m_interpCalls; // "Call" instruction to do input interpolation
-                                                      // (fragment shader)
+  std::unordered_set<llvm::ReturnInst *> m_retInsts;     // "Return" instructions to be removed
+  std::unordered_set<llvm::CallInst *> m_emitCalls;      // "Call" instructions to emit vertex (geometry shader)
+  std::unordered_set<llvm::LoadInst *> m_loadInsts;      // "Load" instructions to be removed
+  std::unordered_set<llvm::StoreInst *> m_storeInsts;    // "Store" instructions to be removed
+  std::unordered_set<llvm::Instruction *> m_atomicInsts; // "Atomicrwm" or "cmpxchg" instructions to be removed
+  std::unordered_set<llvm::CallInst *> m_interpCalls;    // "Call" instruction to do input interpolation
+                                                         // (fragment shader)
 };
 
 // =====================================================================================================================

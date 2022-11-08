@@ -68,7 +68,7 @@ typedef Vkgc::ShaderStage ShaderStage;
 // =====================================================================================================================
 // Common definition of VfxParser
 
-static const unsigned NativeShaderStageCount = 6;        // Number of native shader stages in Vulkan
+static const unsigned NativeShaderStageCount = 8;        // Number of native shader stages in Vulkan
 static const unsigned MaxRenderSectionCount = 16;        // Max render document section count
 static const unsigned MaxBindingCount = 16;              // Max binding count
 static const unsigned MaxResultCount = 16;               // Max result count
