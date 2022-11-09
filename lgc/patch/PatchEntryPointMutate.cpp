@@ -65,6 +65,7 @@
 #include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/AliasAnalysis.h" // for MemoryEffects
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -951,8 +952,15 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 
   // NOTE: Remove "readnone" attribute for entry-point. If GS is empty, this attribute will allow
   // LLVM optimization to remove sendmsg(GS_DONE). It is unexpected.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440919
+  // Old version of the code
   if (entryPoint->hasFnAttribute(Attribute::ReadNone))
     entryPoint->removeFnAttr(Attribute::ReadNone);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  entryPoint->setMemoryEffects(MemoryEffects::unknown());
+#endif
 }
 
 // =====================================================================================================================

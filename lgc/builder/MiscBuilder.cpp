@@ -160,7 +160,7 @@ Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) 
   readClock->addAttribute(AttributeList::FunctionIndex, Attribute::ReadOnly);
 #else
   // New version of the code (also handles unknown version, which we treat as latest)
-  readClock->addFnAttr(Attribute::ReadOnly);
+  readClock->setOnlyReadsMemory();
 #endif
 
   // NOTE: The inline ASM is to prevent optimization of backend compiler.
