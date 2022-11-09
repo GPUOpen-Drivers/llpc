@@ -353,9 +353,6 @@ template <typename T> void move(std::vector<T> &V, size_t Begin, size_t End, siz
   V.insert(V.begin() + Target, Segment.begin(), Segment.end());
 }
 
-void removeFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr);
-void addFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr);
-
 Function *getOrCreateFunction(Module *M, Type *RetTy, ArrayRef<Type *> ArgTypes, StringRef Name,
                               AttributeList *Attrs = nullptr, bool TakeName = true);
 

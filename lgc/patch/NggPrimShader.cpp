@@ -4217,13 +4217,8 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
 
     // threshold = (10 ^ (-backfaceExponent)) / |w0 * w1 * w2|
     auto threshold = m_builder->CreateNeg(backfaceExponent);
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 391319
-    threshold = m_builder->CreateIntrinsic(Intrinsic::powi, m_builder->getFloatTy(),
-                                           {ConstantFP::get(m_builder->getFloatTy(), 10.0), threshold});
-#else
     threshold = m_builder->CreateIntrinsic(Intrinsic::powi, {m_builder->getFloatTy(), threshold->getType()},
                                            {ConstantFP::get(m_builder->getFloatTy(), 10.0), threshold});
-#endif
 
     auto rcpAbsW0W1W2 = m_builder->CreateFDiv(ConstantFP::get(m_builder->getFloatTy(), 1.0), absW0W1W2);
     threshold = m_builder->CreateFMul(threshold, rcpAbsW0W1W2);

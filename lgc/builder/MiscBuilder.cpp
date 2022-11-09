@@ -155,13 +155,7 @@ Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) 
     readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
   } else
     readClock = CreateIntrinsic(Intrinsic::readcyclecounter, {}, {}, nullptr, instName);
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596
-  // Old version of the code
-  readClock->addAttribute(AttributeList::FunctionIndex, Attribute::ReadOnly);
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   readClock->setOnlyReadsMemory();
-#endif
 
   // NOTE: The inline ASM is to prevent optimization of backend compiler.
   InlineAsm *asmFunc = InlineAsm::get(FunctionType::get(getInt64Ty(), {getInt64Ty()}, false), "; %1", "=r,0", true);

@@ -844,13 +844,7 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
 // =====================================================================================================================
 // Set Attributes on new function
 void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 409358
-  // Old version of the code
-  AttrBuilder builder;
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   AttrBuilder builder(entryPoint->getContext());
-#endif
   if (m_shaderStage == ShaderStageFragment) {
     auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
     SpiPsInputAddr spiPsInputAddr = {};
@@ -940,15 +934,7 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
   builder.addAttribute("amdgpu-memory-bound", shaderOptions->favorLatencyHiding ? "true" : "false");
   builder.addAttribute("amdgpu-wave-limiter", "false");
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396807
-  // Old version of the code
-  AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
-  entryPoint->addAttributes(attribIdx, builder);
-#else
-  // New version of the code (also handles unknown version, which we treat as
-  // latest)
   entryPoint->addFnAttrs(builder);
-#endif
 
   // NOTE: Remove "readnone" attribute for entry-point. If GS is empty, this attribute will allow
   // LLVM optimization to remove sendmsg(GS_DONE). It is unexpected.
