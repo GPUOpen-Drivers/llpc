@@ -76,6 +76,8 @@ template <> inline void SPIRVMap<ExecutionModel, std::string>::init() {
   add(ExecutionModelMissKHR, "MissKHR");
   add(ExecutionModelCallableKHR, "CallableKHR");
 #endif
+  add(ExecutionModelTaskEXT, "TaskEXT");
+  add(ExecutionModelMeshEXT, "MeshEXT");
 }
 SPIRV_DEF_NAMEMAP(ExecutionModel, SPIRVExecutionModelNameMap)
 
@@ -128,6 +130,9 @@ template <> inline void SPIRVMap<ExecutionMode, std::string>::init() {
   add(ExecutionModeRoundingModeRTE, "RoundingModeRTE");
   add(ExecutionModeRoundingModeRTZ, "RoundingModeRTZ");
   add(ExecutionModeSubgroupUniformControlFlowKHR, "SubgroupUniformControlFlowKHR");
+  add(ExecutionModeOutputLinesEXT, "OutputLinesEXT");
+  add(ExecutionModeOutputTrianglesEXT, "OutputTrianglesEXT");
+  add(ExecutionModeOutputPrimitivesEXT, "OutputPrimitivesEXT");
   add(ExecutionModeEarlyAndLateFragmentTestsAMD, "EarlyAndLateFragmentTestsAMD");
   add(ExecutionModeStencilRefUnchangedFrontAMD, "StencilRefUnchangedFrontAMD");
   add(ExecutionModeStencilRefGreaterFrontAMD, "StencilRefGreaterFrontAMD");
@@ -160,6 +165,7 @@ template <> inline void SPIRVMap<StorageClass, std::string>::init() {
   add(StorageClassIncomingRayPayloadKHR, "IncomingRayPayloadKHR");
   add(StorageClassShaderRecordBufferKHR, "ShaderRecordBufferKHR");
 #endif
+  add(StorageClassTaskPayloadWorkgroupEXT, "TaskPayloadWorkgroupEXT");
 }
 SPIRV_DEF_NAMEMAP(StorageClass, SPIRVStorageClassNameMap)
 
@@ -282,6 +288,7 @@ template <> inline void SPIRVMap<Decoration, std::string>::init() {
   add(DecorationNoUnsignedWrap, "NoUnsignedWrap");
 #endif
   add(DecorationExplicitInterpAMD, "ExplicitInterpAMD");
+  add(DecorationPerPrimitiveEXT, "PerPrimitiveEXT");
   add(DecorationPerVertexKHR, "PerVertexKHR");
   add(DecorationNonUniformEXT, "NonUniformEXT");
 #if SPV_VERSION >= 0x10400
@@ -348,6 +355,10 @@ template <> inline void SPIRVMap<BuiltIn, std::string>::init() {
   add(BuiltInBaryCoordSmoothCentroidAMD, "BuiltInBaryCoordSmoothCentroidAMD");
   add(BuiltInBaryCoordSmoothSampleAMD, "BuiltInBaryCoordSmoothSampleAMD");
   add(BuiltInBaryCoordPullModelAMD, "BuiltInBaryCoordPullModelAMD");
+  add(BuiltInCullPrimitiveEXT, "BuiltInCullPrimitiveEXT");
+  add(BuiltInPrimitivePointIndicesEXT, "BuiltInPrimitivePointIndicesEXT");
+  add(BuiltInPrimitiveLineIndicesEXT, "BuiltInPrimitiveLineIndicesEXT");
+  add(BuiltInPrimitiveTriangleIndicesEXT, "BuiltInPrimitiveTriangleIndicesEXT");
   add(BuiltInBaryCoordKHR, "BuiltInBaryCoordKHR");
   add(BuiltInBaryCoordNoPerspKHR, "BuiltInBaryCoordNoPerspKHR");
 #if VKI_RAY_TRACING
@@ -474,6 +485,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityVariablePointersStorageBuffer, "VariablePointersStorageBuffer");
   add(CapabilityVariablePointers, "VariablePointers");
   add(CapabilityFragmentShadingRateKHR, "FragmentShadingRateKHR");
+  add(CapabilityMeshShadingEXT, "MeshShadingEXT");
   add(CapabilityFragmentBarycentricKHR, "FragmentBarycentricKHR");
 #if VKI_RAY_TRACING
   add(CapabilityRayTracingProvisionalKHR, "RayTracingProvisionalKHR");

@@ -44,7 +44,8 @@ using namespace Util;
 
 namespace Llpc {
 // The names of API shader stages used in PAL metadata, in ShaderStage order.
-static const char *const ApiStageNames[] = {".vertex", ".hull", ".domain", ".geometry", ".pixel", ".compute"};
+static const char *const ApiStageNames[] = {".task",     ".vertex", ".hull",  ".domain",
+                                            ".geometry", "mesh",    ".pixel", ".compute"};
 
 // The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.
 static const char *const HwStageNames[] = {".ls", ".hs", ".es", ".gs", ".vs", ".ps", ".cs"};

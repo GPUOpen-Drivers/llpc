@@ -112,6 +112,8 @@
 //  |     52.2 | Add provokingVertexMode to rsState                                                                    |
 //  |     52.1 | Add pageMigrationEnabled to PipelineOptions                                                           |
 //  |     52.0 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
+//  |     51.2 | Added new pipeline shader info to support mesh shader                                                 |
+//  |     51.0 | Added new shader stage enumerants to support mesh shader                                              |
 //  |     50.2 | Add the member dsState to GraphicsPipelineBuildInfo                                                   |
 //  |     50.1 | Disclose ResourceMappingNodeType::InlineBuffer                                                        |
 //  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
@@ -233,10 +235,12 @@ enum class BasicType : unsigned {
 
 /// Enumerates LLPC shader stages.
 enum ShaderStage : unsigned {
-  ShaderStageVertex = 0,  ///< Vertex shader
+  ShaderStageTask = 0,    ///< Task shader
+  ShaderStageVertex,      ///< Vertex shader
   ShaderStageTessControl, ///< Tessellation control shader
   ShaderStageTessEval,    ///< Tessellation evaluation shader
   ShaderStageGeometry,    ///< Geometry shader
+  ShaderStageMesh,        ///< Mesh shader
   ShaderStageFragment,    ///< Fragment shader
   ShaderStageCompute,     ///< Compute shader
 #if VKI_RAY_TRACING
@@ -258,10 +262,12 @@ enum ShaderStage : unsigned {
 
 /// Enumerating multiple shader stages when used in a mask.
 enum ShaderStageBit : unsigned {
+  ShaderStageTaskBit = (1 << ShaderStageTask),               ///< Task shader bit
   ShaderStageVertexBit = (1 << ShaderStageVertex),           ///< Vertex shader bit
   ShaderStageTessControlBit = (1 << ShaderStageTessControl), ///< Tessellation control shader bit
   ShaderStageTessEvalBit = (1 << ShaderStageTessEval),       ///< Tessellation evaluation shader bit
   ShaderStageGeometryBit = (1 << ShaderStageGeometry),       ///< Geometry shader bit
+  ShaderStageMeshBit = (1 << ShaderStageMesh),               ///< Mesh shader bit
   ShaderStageFragmentBit = (1 << ShaderStageFragment),       ///< Fragment shader bit
   ShaderStageComputeBit = (1 << ShaderStageCompute),         ///< Compute shader bit
 #if VKI_RAY_TRACING
@@ -272,8 +278,10 @@ enum ShaderStageBit : unsigned {
   ShaderStageRayTracingMissBit = (1 << ShaderStageRayTracingMiss),             ///< Miss shader bit
   ShaderStageRayTracingCallableBit = (1 << ShaderStageRayTracingCallable),     ///< Callable shader bit
 #endif
+  ShaderStageAllMeshBit = ShaderStageTaskBit | ShaderStageMeshBit, ///< All mesh bits
   ShaderStageAllGraphicsBit = ShaderStageVertexBit | ShaderStageTessControlBit | ShaderStageTessEvalBit |
-                              ShaderStageGeometryBit | ShaderStageFragmentBit, ///< All graphics bits
+                              ShaderStageGeometryBit | ShaderStageFragmentBit |
+                              ShaderStageAllMeshBit, ///< All graphics bits
 #if VKI_RAY_TRACING
   ShaderStageAllRayTracingBit = ShaderStageRayTracingRayGenBit | ShaderStageRayTracingIntersectBit |
                                 ShaderStageRayTracingAnyHitBit | ShaderStageRayTracingClosestHitBit |
@@ -1079,11 +1087,13 @@ struct GraphicsPipelineBuildInfo {
 #if LLPC_ENABLE_SHADER_CACHE
   IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
 #endif
-  PipelineShaderInfo vs;  ///< Vertex shader
-  PipelineShaderInfo tcs; ///< Tessellation control shader
-  PipelineShaderInfo tes; ///< Tessellation evaluation shader
-  PipelineShaderInfo gs;  ///< Geometry shader
-  PipelineShaderInfo fs;  ///< Fragment shader
+  PipelineShaderInfo task; ///< Task shader
+  PipelineShaderInfo vs;   ///< Vertex shader
+  PipelineShaderInfo tcs;  ///< Tessellation control shader
+  PipelineShaderInfo tes;  ///< Tessellation evaluation shader
+  PipelineShaderInfo gs;   ///< Geometry shader
+  PipelineShaderInfo mesh; ///< Mesh shader
+  PipelineShaderInfo fs;   ///< Fragment shader
 
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
   uint64_t pipelineLayoutApiHash;      ///< Pipeline Layout Api Hash

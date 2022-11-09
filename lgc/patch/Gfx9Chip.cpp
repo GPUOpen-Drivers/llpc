@@ -39,6 +39,10 @@ namespace Gfx9 {
 #include "chip/gfx9/gfx9_plus_merged_enum.h"
 #include "chip/gfx9/gfx9_plus_merged_offset.h"
 
+// NOTE: This register only exist in GFX9 and GFX10, but its values are still useful for programming other registers in
+// PAL, so always leave it in the ELF.
+const unsigned mmVGT_GS_ONCHIP_CNTL = Pal::Gfx9::Gfx09_10::mmVGT_GS_ONCHIP_CNTL;
+
 // =====================================================================================================================
 // Initializer
 //
@@ -55,12 +59,12 @@ VsRegConfig::VsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(VGT_PRIMITIVEID_EN);
   INIT_REG(VGT_REUSE_OFF);
 
-  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_CONFIG);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_BUFFER_CONFIG);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_0);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_1);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_2);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_3);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_STRMOUT_CONFIG);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_STRMOUT_BUFFER_CONFIG);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_0);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_1);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_2);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_STRMOUT_VTX_STRIDE_3);
 
   INIT_REG_GFX10(gfxIp.major, SPI_SHADER_PGM_CHKSUM_VS);
 }
@@ -92,16 +96,17 @@ EsGsRegConfig::EsGsRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(VGT_GS_INSTANCE_CNT);
   INIT_REG(VGT_ESGS_RING_ITEMSIZE);
 
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_PER_VS);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_ITEMSIZE);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_1);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_2);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_3);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_1);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_2);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_3);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_MODE);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_PER_VS);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_ITEMSIZE);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE_1);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE_2);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE_3);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_OFFSET_1);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_OFFSET_2);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_OFFSET_3);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_MODE);
+
   INIT_REG_GFX9_10(gfxIp.major, VGT_GS_ONCHIP_CNTL);
   INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
 
@@ -124,25 +129,25 @@ PrimShaderRegConfig::PrimShaderRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(VGT_GS_MAX_VERT_OUT);
   INIT_REG(VGT_GS_INSTANCE_CNT);
   INIT_REG(VGT_ESGS_RING_ITEMSIZE);
+  INIT_REG(VGT_GS_ONCHIP_CNTL);
 
   // Special registers, having different register IDs
   if (gfxIp.major == 9 || gfxIp.major == 10) {
     INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
-    INIT_REG_GFX9_10(gfxIp.major, VGT_GS_ONCHIP_CNTL);
   } else {
     llvm_unreachable("Not implemented!");
   }
 
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_PER_VS);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_ITEMSIZE);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_1);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_2);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_3);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_1);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_2);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_3);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_MODE);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_PER_VS);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_ITEMSIZE);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE_1);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE_2);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE_3);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_OFFSET_1);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_OFFSET_2);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_OFFSET_3);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_MODE);
 
   INIT_REG_GFX10_PLUS(gfxIp.major, GE_MAX_OUTPUT_PER_SUBGROUP);
   INIT_REG_APU09_1X_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_GS);
@@ -300,25 +305,25 @@ MeshRegConfig::MeshRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(VGT_GS_MAX_VERT_OUT);
   INIT_REG(VGT_GS_INSTANCE_CNT);
   INIT_REG(VGT_ESGS_RING_ITEMSIZE);
+  INIT_REG(VGT_GS_ONCHIP_CNTL);
 
   // Special registers, having different register IDs
   if (gfxIp.major == 10) {
     INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
-    INIT_REG_GFX9_10(gfxIp.major, VGT_GS_ONCHIP_CNTL);
   } else {
     llvm_unreachable("Not implemented!");
   }
 
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_PER_VS);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_ITEMSIZE);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_1);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_2);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_VERT_ITEMSIZE_3);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_1);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_2);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GSVS_RING_OFFSET_3);
-  INIT_REG_GFX9_10(gfxIp.major, VGT_GS_MODE);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_PER_VS);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_ITEMSIZE);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE_1);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE_2);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_VERT_ITEMSIZE_3);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_OFFSET_1);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_OFFSET_2);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GSVS_RING_OFFSET_3);
+  INIT_REG_HAS_HW_VS(gfxIp.major, VGT_GS_MODE);
 
   INIT_REG_GFX10_PLUS(gfxIp.major, GE_MAX_OUTPUT_PER_SUBGROUP);
 

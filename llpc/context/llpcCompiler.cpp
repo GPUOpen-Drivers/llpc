@@ -634,16 +634,20 @@ Result Compiler::buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipel
     nullptr,
     nullptr,
     nullptr,
+    nullptr,
+    nullptr,
     nullptr
   };
   // clang-format on
 
   switch (stage) {
   case UnlinkedStageVertexProcess: {
+    shaderInfo[ShaderStageTask] = &pipelineInfo->task;
     shaderInfo[ShaderStageVertex] = &pipelineInfo->vs;
     shaderInfo[ShaderStageTessControl] = &pipelineInfo->tcs;
     shaderInfo[ShaderStageTessEval] = &pipelineInfo->tes;
     shaderInfo[ShaderStageGeometry] = &pipelineInfo->gs;
+    shaderInfo[ShaderStageMesh] = &pipelineInfo->mesh;
     break;
   }
   case UnlinkedStageFragment: {
@@ -699,10 +703,12 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
 
   // clang-format off
   SmallVector<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfo = {
+    &pipelineInfo->task,
     &pipelineInfo->vs,
     &pipelineInfo->tcs,
     &pipelineInfo->tes,
     &pipelineInfo->gs,
+    &pipelineInfo->mesh,
     &pipelineInfo->fs,
   };
   // clang-format on
@@ -1303,9 +1309,10 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       };
 
   // Only enable per stage cache for full graphics pipeline (traditional pipeline or mesh pipeline)
-  bool checkPerStageCache = cl::EnablePerStageCache && !cl::EnablePartPipeline && context->isGraphics() &&
-                            !buildingRelocatableElf &&
-                            (context->getShaderStageMask() & (ShaderStageVertexBit | ShaderStageFragmentBit));
+  bool checkPerStageCache =
+      cl::EnablePerStageCache && !cl::EnablePartPipeline && context->isGraphics() && !buildingRelocatableElf &&
+      (context->getShaderStageMask() & (ShaderStageVertexBit | ShaderStageMeshBit | ShaderStageFragmentBit));
+
   if (!checkPerStageCache)
     checkShaderCacheFunc = nullptr;
 
@@ -1697,10 +1704,12 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   BinaryData elfBin = {};
   // clang-format off
   SmallVector<const PipelineShaderInfo *, ShaderStageGfxCount> shaderInfo = {
+    &pipelineInfo->task,
     &pipelineInfo->vs,
     &pipelineInfo->tcs,
     &pipelineInfo->tes,
     &pipelineInfo->gs,
+    &pipelineInfo->mesh,
     &pipelineInfo->fs,
   };
   // clang-format on
@@ -1832,10 +1841,12 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
   context->attachPipelineContext(computeContext);
 
   std::vector<const PipelineShaderInfo *> shadersInfo = {
+      nullptr,          ///< Task shader
       nullptr,          ///< Vertex shader
       nullptr,          ///< Tessellation control shader
       nullptr,          ///< Tessellation evaluation shader
       nullptr,          ///< Geometry shader
+      nullptr,          ///< Mesh shader
       nullptr,          ///< Fragment shader
       &pipelineInfo->cs ///< Compute shader
   };
@@ -3075,6 +3086,8 @@ bool Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
 // @param stage : Front-end LLPC shader stage
 lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
   switch (stage) {
+  case ShaderStageTask:
+    return lgc::ShaderStageTask;
   case ShaderStageCompute:
     return lgc::ShaderStageCompute;
   case ShaderStageVertex:
@@ -3085,6 +3098,8 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
     return lgc::ShaderStageTessEval;
   case ShaderStageGeometry:
     return lgc::ShaderStageGeometry;
+  case ShaderStageMesh:
+    return lgc::ShaderStageMesh;
   case ShaderStageFragment:
     return lgc::ShaderStageFragment;
   case ShaderStageCopyShader:

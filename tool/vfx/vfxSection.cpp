@@ -51,6 +51,8 @@ std::map<std::string, SectionInfo> Section::m_sectionInfo;
 // @param shaderStage : Input ShaderStage enumerant
 static SpvGenStage shaderStageToSpvGenStage(ShaderStage shaderStage) {
   switch (shaderStage) {
+  case ShaderStage::ShaderStageTask:
+    return SpvGenStageTask;
   case ShaderStage::ShaderStageVertex:
     return SpvGenStageVertex;
   case ShaderStage::ShaderStageTessControl:
@@ -59,6 +61,8 @@ static SpvGenStage shaderStageToSpvGenStage(ShaderStage shaderStage) {
     return SpvGenStageTessEvaluation;
   case ShaderStage::ShaderStageGeometry:
     return SpvGenStageGeometry;
+  case ShaderStage::ShaderStageMesh:
+    return SpvGenStageMesh;
   case ShaderStage::ShaderStageFragment:
     return SpvGenStageFragment;
   case ShaderStage::ShaderStageCompute:
@@ -114,24 +118,30 @@ Section::Section(StrToMemberAddrArrayRef addrTable, SectionType sectionType, con
 // Initializes static variable m_sectionInfo
 void Section::initSectionInfo() {
   // Shader source sections
+  INIT_SECTION_INFO("TaskShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VertexShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TessControlShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTessControl)
   INIT_SECTION_INFO("TessEvalShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTessEval)
   INIT_SECTION_INFO("GeometryShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("MeshShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FragmentShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("ComputeShaderGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageCompute)
 
+  INIT_SECTION_INFO("TaskShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VertexShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TessControlShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTessControl)
   INIT_SECTION_INFO("TessEvalShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTessEval)
   INIT_SECTION_INFO("GeometryShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("MeshShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FragmentShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("ComputeShaderSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageCompute)
 
+  INIT_SECTION_INFO("TaskGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TcsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTessControl)
   INIT_SECTION_INFO("TesGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageTessEval)
   INIT_SECTION_INFO("GsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("MeshGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageCompute)
 #if VKI_RAY_TRACING
@@ -143,10 +153,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("callGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageRayTracingCallable)
 #endif
 
+  INIT_SECTION_INFO("TaskSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TcsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTessControl)
   INIT_SECTION_INFO("TesSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTessEval)
   INIT_SECTION_INFO("GsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("MeshSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageCompute)
 #if VKI_RAY_TRACING
@@ -159,10 +171,12 @@ void Section::initSectionInfo() {
 #endif
 
   // Shader source file section
+  INIT_SECTION_INFO("TaskGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TcsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageTessControl)
   INIT_SECTION_INFO("TesGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageTessEval)
   INIT_SECTION_INFO("GsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("MeshGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageCompute)
 #if VKI_RAY_TRACING
@@ -174,10 +188,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("callGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageRayTracingCallable)
 #endif
 
+  INIT_SECTION_INFO("TaskSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TcsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageTessControl)
   INIT_SECTION_INFO("TesSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageTessEval)
   INIT_SECTION_INFO("GsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("MeshSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageCompute)
 #if VKI_RAY_TRACING
@@ -189,10 +205,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("callSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageRayTracingCallable)
 #endif
 
+  INIT_SECTION_INFO("TaskSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TcsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageTessControl)
   INIT_SECTION_INFO("TesSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageTessEval)
   INIT_SECTION_INFO("GsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("MeshSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageCompute)
 #if VKI_RAY_TRACING
@@ -204,10 +222,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("callSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageRayTracingCallable)
 #endif
 
+  INIT_SECTION_INFO("TaskHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TcsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageTessControl)
   INIT_SECTION_INFO("TesHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageTessEval)
   INIT_SECTION_INFO("GsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("MeshHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageCompute)
 #if VKI_RAY_TRACING
@@ -219,10 +239,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("callHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageRayTracingCallable)
 #endif
 
+  INIT_SECTION_INFO("TaskHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TcsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageTessControl)
   INIT_SECTION_INFO("TesHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageTessEval)
   INIT_SECTION_INFO("GsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageGeometry)
+  INIT_SECTION_INFO("MeshHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageCompute)
 #if VKI_RAY_TRACING

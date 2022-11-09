@@ -73,7 +73,9 @@ using Vkgc::ShaderStageFragment;
 using Vkgc::ShaderStageGeometry;
 using Vkgc::ShaderStageGfxCount;
 using Vkgc::ShaderStageInvalid;
+using Vkgc::ShaderStageMesh;
 using Vkgc::ShaderStageNativeStageCount;
+using Vkgc::ShaderStageTask;
 #if VKI_RAY_TRACING
 using Vkgc::ShaderStageRayTracingAnyHit;
 using Vkgc::ShaderStageRayTracingCallable;
@@ -86,6 +88,8 @@ using Vkgc::ShaderStageBit;
 using Vkgc::ShaderStageComputeBit;
 using Vkgc::ShaderStageFragmentBit;
 using Vkgc::ShaderStageGeometryBit;
+using Vkgc::ShaderStageTask;
+using Vkgc::ShaderStageTaskBit;
 using Vkgc::ShaderStageTessControl;
 using Vkgc::ShaderStageTessEval;
 using Vkgc::ShaderStageVertex;

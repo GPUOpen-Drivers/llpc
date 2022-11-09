@@ -101,10 +101,12 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
   // Fill pipeline shader info.
   // clang-format off
   PipelineShaderInfo *shaderInfos[ShaderStageGfxCount] = {
+      &pipelineInfo->task,
       &pipelineInfo->vs,
       &pipelineInfo->tcs,
       &pipelineInfo->tes,
       &pipelineInfo->gs,
+      &pipelineInfo->mesh,
       &pipelineInfo->fs,
   };
   // clang-format on

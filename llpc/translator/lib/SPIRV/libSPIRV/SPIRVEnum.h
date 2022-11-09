@@ -205,6 +205,7 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityStorageTexelBufferArrayNonUniformIndexingEXT, {CapabilityImageBuffer});
   ADD_VEC_INIT(CapabilityInt64ImageEXT, {CapabilityShader});
   ADD_VEC_INIT(CapabilityDotProductInput4x8BitKHR, {CapabilityInt16});
+  ADD_VEC_INIT(CapabilityMeshShadingEXT, {CapabilityShader});
   ADD_VEC_INIT(CapabilityFragmentBarycentricKHR, {CapabilityShader});
 }
 
@@ -215,6 +216,8 @@ template <> inline void SPIRVMap<SPIRVExecutionModelKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(ExecutionModelGeometry, {CapabilityGeometry});
   ADD_VEC_INIT(ExecutionModelFragment, {CapabilityShader});
   ADD_VEC_INIT(ExecutionModelGLCompute, {CapabilityShader});
+  ADD_VEC_INIT(ExecutionModelTaskEXT, {CapabilityMeshShadingEXT});
+  ADD_VEC_INIT(ExecutionModelMeshEXT, {CapabilityMeshShadingEXT});
 }
 
 template <> inline void SPIRVMap<SPIRVExecutionModeKind, SPIRVCapVec>::init() {
@@ -251,6 +254,9 @@ template <> inline void SPIRVMap<SPIRVExecutionModeKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(ExecutionModeSignedZeroInfNanPreserve, {CapabilitySignedZeroInfNanPreserve});
   ADD_VEC_INIT(ExecutionModeRoundingModeRTE, {CapabilityRoundingModeRTE});
   ADD_VEC_INIT(ExecutionModeRoundingModeRTZ, {CapabilityRoundingModeRTZ});
+  ADD_VEC_INIT(ExecutionModeOutputLinesEXT, {CapabilityMeshShadingEXT});
+  ADD_VEC_INIT(ExecutionModeOutputTrianglesEXT, {CapabilityMeshShadingEXT});
+  ADD_VEC_INIT(ExecutionModeOutputPrimitivesEXT, {CapabilityMeshShadingEXT});
   ADD_VEC_INIT(ExecutionModeEarlyAndLateFragmentTestsAMD, {CapabilityShader});
   ADD_VEC_INIT(ExecutionModeStencilRefUnchangedFrontAMD, {CapabilityStencilExportEXT});
   ADD_VEC_INIT(ExecutionModeStencilRefGreaterFrontAMD, {CapabilityStencilExportEXT});
@@ -282,6 +288,7 @@ template <> inline void SPIRVMap<SPIRVStorageClassKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(StorageClassIncomingRayPayloadKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassShaderRecordBufferKHR, {CapabilityRayTracingProvisionalKHR});
 #endif
+  ADD_VEC_INIT(StorageClassTaskPayloadWorkgroupEXT, {CapabilityMeshShadingEXT});
 }
 
 template <> inline void SPIRVMap<SPIRVImageDimKind, SPIRVCapVec>::init() {
@@ -375,6 +382,7 @@ template <> inline void SPIRVMap<Decoration, SPIRVCapVec>::init() {
   ADD_VEC_INIT(DecorationNoContraction, {CapabilityShader});
   ADD_VEC_INIT(DecorationInputAttachmentIndex, {CapabilityInputAttachment});
   ADD_VEC_INIT(DecorationNonUniformEXT, {CapabilityShaderNonUniformEXT});
+  ADD_VEC_INIT(DecorationPerPrimitiveEXT, {CapabilityMeshShadingEXT});
   ADD_VEC_INIT(DecorationPerVertexKHR, {CapabilityFragmentBarycentricKHR});
 }
 
@@ -420,6 +428,10 @@ template <> inline void SPIRVMap<BuiltIn, SPIRVCapVec>::init() {
   ADD_VEC_INIT(BuiltInViewIndex, {CapabilityMultiView});
   ADD_VEC_INIT(BuiltInPrimitiveShadingRateKHR, {CapabilityFragmentShadingRateKHR});
   ADD_VEC_INIT(BuiltInShadingRateKHR, {CapabilityFragmentShadingRateKHR});
+  ADD_VEC_INIT(BuiltInCullPrimitiveEXT, {CapabilityMeshShadingEXT});
+  ADD_VEC_INIT(BuiltInPrimitivePointIndicesEXT, {CapabilityMeshShadingEXT});
+  ADD_VEC_INIT(BuiltInPrimitiveLineIndicesEXT, {CapabilityMeshShadingEXT});
+  ADD_VEC_INIT(BuiltInPrimitiveTriangleIndicesEXT, {CapabilityMeshShadingEXT});
   ADD_VEC_INIT(BuiltInBaryCoordKHR, {CapabilityFragmentBarycentricKHR});
   ADD_VEC_INIT(BuiltInBaryCoordNoPerspKHR, {CapabilityFragmentBarycentricKHR});
 }

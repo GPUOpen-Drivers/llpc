@@ -55,10 +55,12 @@ const char *getShaderStageName(ShaderStage shaderStage) {
     name = "copy";
   else if (shaderStage < ShaderStageCount) {
     static const char *ShaderStageNames[] = {
+      "task",
       "vertex",
       "tessellation control",
       "tessellation evaluation",
       "geometry",
+      "mesh",
       "fragment",
       "compute",
 #if VKI_RAY_TRACING
@@ -84,6 +86,8 @@ const char *getShaderStageName(ShaderStage shaderStage) {
 // @param execModel : SPIR-V execution model
 ShaderStage convertToShaderStage(unsigned execModel) {
   switch (execModel) {
+  case spv::ExecutionModelTaskEXT:
+    return ShaderStageTask;
   case spv::ExecutionModelVertex:
     return ShaderStageVertex;
   case spv::ExecutionModelTessellationControl:
@@ -92,6 +96,8 @@ ShaderStage convertToShaderStage(unsigned execModel) {
     return ShaderStageTessEval;
   case spv::ExecutionModelGeometry:
     return ShaderStageGeometry;
+  case spv::ExecutionModelMeshEXT:
+    return ShaderStageMesh;
   case spv::ExecutionModelFragment:
     return ShaderStageFragment;
   case spv::ExecutionModelGLCompute:
@@ -124,6 +130,8 @@ ShaderStage convertToShaderStage(unsigned execModel) {
 // @param shaderStage : Shader stage
 spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
   switch (shaderStage) {
+  case ShaderStageTask:
+    return spv::ExecutionModelTaskEXT;
   case ShaderStageVertex:
     return spv::ExecutionModelVertex;
   case ShaderStageTessControl:
@@ -132,6 +140,8 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
     return spv::ExecutionModelTessellationEvaluation;
   case ShaderStageGeometry:
     return spv::ExecutionModelGeometry;
+  case ShaderStageMesh:
+    return spv::ExecutionModelMeshEXT;
   case ShaderStageFragment:
     return spv::ExecutionModelFragment;
   case ShaderStageCompute:
@@ -184,7 +194,7 @@ bool hasRayTracingShaderStage(unsigned shageMask) {
 bool hasDataForUnlinkedShaderType(Vkgc::UnlinkedShaderStage type, ArrayRef<const PipelineShaderInfo *> shaderInfo) {
   switch (type) {
   case UnlinkedStageVertexProcess:
-    return doesShaderStageExist(shaderInfo, ShaderStageVertex);
+    return doesShaderStageExist(shaderInfo, ShaderStageVertex) || doesShaderStageExist(shaderInfo, ShaderStageMesh);
   case UnlinkedStageFragment:
     return doesShaderStageExist(shaderInfo, ShaderStageFragment);
   case UnlinkedStageCompute:
@@ -201,8 +211,9 @@ bool hasDataForUnlinkedShaderType(Vkgc::UnlinkedShaderStage type, ArrayRef<const
 unsigned getShaderStageMaskForType(Vkgc::UnlinkedShaderStage type) {
   switch (type) {
   case UnlinkedStageVertexProcess:
-    return ShaderStageBit::ShaderStageVertexBit | ShaderStageBit::ShaderStageTessControlBit |
-           ShaderStageBit::ShaderStageTessEvalBit | ShaderStageBit::ShaderStageGeometryBit;
+    return ShaderStageBit::ShaderStageTaskBit | ShaderStageBit::ShaderStageVertexBit |
+           ShaderStageBit::ShaderStageTessControlBit | ShaderStageBit::ShaderStageTessEvalBit |
+           ShaderStageBit::ShaderStageGeometryBit | ShaderStageBit::ShaderStageMeshBit;
   case UnlinkedStageFragment:
     return ShaderStageBit::ShaderStageFragmentBit;
   case UnlinkedStageCompute:

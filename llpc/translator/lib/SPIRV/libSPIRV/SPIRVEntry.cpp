@@ -372,6 +372,7 @@ void SPIRVExecutionMode::decode(std::istream &I) {
     break;
   case ExecutionModeInvocations:
   case ExecutionModeOutputVertices:
+  case ExecutionModeOutputPrimitivesEXT:
     WordLiterals.resize(1);
     break;
   case ExecutionModeDenormPreserve:

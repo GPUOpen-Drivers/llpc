@@ -28,7 +28,7 @@ if(NOT LLPC_IS_STANDALONE)
   find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
     COMPONENTS Interpreter)
 
-  list(APPEND CMAKE_MODULE_PATH "${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm")
+  list(APPEND CMAKE_MODULE_PATH "${XGL_LLVM_BUILD_PATH}/${CMAKE_CFG_INTDIR}/lib/cmake/llvm")
   include(LLVMConfig)
 
   # required by lit.site.cfg.py.in.

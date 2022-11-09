@@ -227,9 +227,7 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
   // We were using BuilderRecorder, so we do not give our PipelineState to it.
   // (The first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
   // it by reading IR metadata.)
-  passMgr->registerModuleAnalysis([&] {
-    return PipelineStateWrapper(getLgcContext());
-  });
+  passMgr->registerModuleAnalysis([&] { return PipelineStateWrapper(getLgcContext()); });
 
   if (m_emitLgc) {
     // -emit-lgc: Just write the module.

@@ -23,10 +23,12 @@ public:
     INIT_SECTION_INFO("RtState", SectionTypeRtState, 0)
 #endif
     INIT_SECTION_INFO("VertexInputState", SectionTypeVertexInputState, 0)
+    INIT_SECTION_INFO("TaskInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageTask)
     INIT_SECTION_INFO("VsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageVertex)
     INIT_SECTION_INFO("TcsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageTessControl)
     INIT_SECTION_INFO("TesInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageTessEval)
     INIT_SECTION_INFO("GsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageGeometry)
+    INIT_SECTION_INFO("MeshInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageMesh)
     INIT_SECTION_INFO("FsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageFragment)
     INIT_SECTION_INFO("CsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageCompute)
 #if VKI_RAY_TRACING

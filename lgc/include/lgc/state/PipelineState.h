@@ -479,8 +479,8 @@ private:
   void recordGraphicsState(llvm::Module *module);
   void readGraphicsState(llvm::Module *module);
 
-  std::string m_lastError;   // Error to be reported by getLastError()
-  bool m_emitLgc = false;    // Whether -emit-lgc is on
+  std::string m_lastError; // Error to be reported by getLastError()
+  bool m_emitLgc = false;  // Whether -emit-lgc is on
   // Whether generating pipeline or unlinked part-pipeline
   PipelineLink m_pipelineLink = PipelineLink::WholePipeline;
   unsigned m_stageMask = 0;                             // Mask of active shader stages
