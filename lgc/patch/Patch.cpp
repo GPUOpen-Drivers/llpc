@@ -227,6 +227,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 // @param [in/out] passMgr : Pass manager
 void Patch::registerPasses(lgc::PassManager &passMgr) {
 #define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, CLASS::name());
+#define LLPC_MODULE_ANALYSIS(NAME, CLASS) passMgr.registerPass(NAME, CLASS::name());
 #include "PassRegistry.inc"
 }
 
@@ -238,6 +239,16 @@ void Patch::registerPasses(PassBuilder &passBuilder) {
 #define HANDLE_PASS(NAME, CLASS)                                                                                       \
   if (innerPipeline.empty() && name == NAME) {                                                                         \
     passMgr.addPass(CLASS());                                                                                          \
+    return true;                                                                                                       \
+  }
+
+#define HANDLE_ANALYSIS(NAME, CLASS, IRUNIT)                                                                           \
+  if (innerPipeline.empty() && name == "require<" NAME ">") {                                                          \
+    passMgr.addPass(RequireAnalysisPass<CLASS, IRUNIT>());                                                             \
+    return true;                                                                                                       \
+  }                                                                                                                    \
+  if (innerPipeline.empty() && name == "invalidate<" NAME ">") {                                                       \
+    passMgr.addPass(InvalidateAnalysisPass<CLASS>());                                                                  \
     return true;                                                                                                       \
   }
 
@@ -264,6 +275,7 @@ void Patch::registerPasses(PassBuilder &passBuilder) {
 #define LLPC_PASS(NAME, CLASS) /* */
 #define LLPC_MODULE_PASS HANDLE_PASS
 #define LLPC_MODULE_PASS_WITH_PARSER HANDLE_PASS_WITH_PARSER
+#define LLPC_MODULE_ANALYSIS(NAME, CLASS) HANDLE_ANALYSIS(NAME, CLASS, Module)
 #include "PassRegistry.inc"
 
         return false;
