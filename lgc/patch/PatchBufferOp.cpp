@@ -120,7 +120,9 @@ bool PatchBufferOp::runImpl(Function &function, PipelineState *pipelineState,
   m_pipelineState = pipelineState;
   m_isDivergent = std::move(isDivergent);
   m_context = &function.getContext();
-  m_builder = std::make_unique<IRBuilder<>>(*m_context);
+
+  IRBuilder<> builder(*m_context);
+  m_builder = &builder;
 
   // Invoke visitation of the target instructions.
 

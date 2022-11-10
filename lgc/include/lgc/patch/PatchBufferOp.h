@@ -92,7 +92,7 @@ private:
   llvm::DenseSet<llvm::Value *> m_invariantSet;                // The invariant set.
   llvm::DenseSet<llvm::Value *> m_divergenceSet;               // The divergence set.
   llvm::SmallVector<llvm::Instruction *, 16> m_postVisitInsts; // The post process instruction set.
-  std::unique_ptr<llvm::IRBuilder<>> m_builder;                // The IRBuilder.
+  llvm::IRBuilder<> *m_builder;                                // The IRBuilder.
   llvm::LLVMContext *m_context;                                // The LLVM context.
   PipelineState *m_pipelineState;                              // The pipeline state
 
