@@ -126,13 +126,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       continue;
 
     std::string targetFeatures(globalFeatures);
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 409358
-    // Old version of the code
-    AttrBuilder builder;
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
     AttrBuilder builder(module->getContext());
-#endif
 
     ShaderStage shaderStage = lgc::getShaderStage(&*func);
 
@@ -195,14 +189,9 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       targetFeatures += ",+cumode";
     }
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 414671
-    // Old version of the code
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
     // Enable flat scratch for gfx10.3+
     if (gfxIp.major == 10 && gfxIp.minor >= 3)
       targetFeatures += ",+enable-flat-scratch";
-#endif
 
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportsXnack) {
       // Enable or disable xnack depending on whether page migration is enabled.
@@ -238,15 +227,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
 
     builder.addAttribute("target-features", targetFeatures);
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396807
-    // Old version of the code
-    AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
-    func->addAttributes(attribIdx, builder);
-#else
-    // New version of the code (also handles unknown version, which we treat as
-    // latest)
     func->addFnAttrs(builder);
-#endif
   }
 }
 

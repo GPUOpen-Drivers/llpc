@@ -43,16 +43,10 @@
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCTargetOptions.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Support/AMDGPUMetadata.h"
 #include "llvm/Support/StringSaver.h"
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 401324
-// Old version
-#include "llvm/Support/TargetRegistry.h"
-#else
-// New version (and unknown version)
-#include "llvm/MC/TargetRegistry.h"
-#endif
 #include "llvm/Support/TargetSelect.h"
 
 using namespace llvm;
@@ -207,17 +201,11 @@ void ObjDisassembler::run() {
   if (!instrInfo)
     report_fatal_error(m_data.getBufferIdentifier() + ": No instruction info for target");
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 389223
-  MCObjectFileInfo objFileInfo;
-  MCContext context(triple, asmInfo.get(), regInfo.get(), &objFileInfo, m_subtargetInfo.get());
-  objFileInfo.initMCObjectFileInfo(context, false);
-#else
   MCContext context(triple, asmInfo.get(), regInfo.get(), m_subtargetInfo.get());
   std::unique_ptr<MCObjectFileInfo> objFileInfo(m_target->createMCObjectFileInfo(context, /*PIC=*/false));
   if (!objFileInfo)
     report_fatal_error("No MC object file info");
   context.setObjectFileInfo(objFileInfo.get());
-#endif
   m_context = &context;
 
   m_instDisassembler.reset(m_target->createMCDisassembler(*m_subtargetInfo, *m_context));
@@ -247,23 +235,11 @@ void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
       sectType == ELF::SHT_REL || sectType == ELF::SHT_RELA)
     return;
 
-    // Switch the streamer to the section.
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 425813
-  // Old version of code
-  m_streamer->AddBlankLine();
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
+  // Switch the streamer to the section.
   m_streamer->addBlankLine();
-#endif
   unsigned sectFlags = sectionRef.getFlags();
   MCSection *sect = m_context->getELFSection(cantFail(sectionRef.getName()), sectType, sectFlags);
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 425813
-  // Old version of code
-  m_streamer->SwitchSection(sect);
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   m_streamer->switchSection(sect);
-#endif
 
   // Create all symbols in this section. Also emit directives for symbol type and size,
   // adding a synthesized label for the end of the symbol.

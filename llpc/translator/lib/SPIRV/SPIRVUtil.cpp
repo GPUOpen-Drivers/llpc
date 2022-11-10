@@ -43,26 +43,6 @@
 
 namespace SPIRV {
 
-void addFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596
-  // Old version of the code
-  Call->addAttribute(AttributeList::FunctionIndex, Attr);
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
-  Call->addFnAttr(Attr);
-#endif
-}
-
-void removeFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 396596
-  // Old version of the code
-  Call->removeAttribute(AttributeList::FunctionIndex, Attr);
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
-  Call->removeFnAttr(Attr);
-#endif
-}
-
 Function *getOrCreateFunction(Module *M, Type *RetTy, ArrayRef<Type *> ArgTypes, StringRef Name, AttributeList *Attrs,
                               bool TakeName) {
   const std::string MangledName(Name);

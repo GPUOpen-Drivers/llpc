@@ -1540,33 +1540,16 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   Value *origin = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
   argIt++;
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
-  // Construct vec3 = {0.0, 1.0, 0.0}
-  auto zero = ConstantFP::get(m_builder->getFloatTy(), 0.0f);
-  auto one = ConstantFP::get(m_builder->getFloatTy(), 1.0f);
-  Value *constVec = ConstantVector::get({zero, one, zero});
-
-  // vec4 origin = vec4(origin.xyz, 1.0);
-  origin = m_builder->CreateShuffleVector(origin, constVec, ArrayRef<int>{0, 1, 2, 4});
-#endif
   // Ray dir vec3 type
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
   Value *dir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
   argIt++;
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
-  // vec4 dir = vec4(dir.xyz, 0.0)
-  dir = m_builder->CreateShuffleVector(dir, constVec, ArrayRef<int>{0, 1, 2, 3});
-#endif
   // Ray inv_dir vec3 type
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), FixedVectorType::get(m_builder->getFloatTy(), 3)));
   Value *invDir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 406441
-  // vec4 inDir = vec4(invDir, 0.0)
-  invDir = m_builder->CreateShuffleVector(invDir, constVec, ArrayRef<int>{0, 1, 2, 3});
-#endif
   argIt++;
 
   // uint flag

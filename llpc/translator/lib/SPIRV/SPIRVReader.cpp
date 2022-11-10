@@ -1946,14 +1946,8 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
                                      constStoreValue->getAggregateElement(i));
 
       if (needsPad) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
-        // Old version of the code
-        constElements[i] = ConstantExpr::getInsertValue(constElements[i], constElement, 0);
-#else
-        // New version of the code (also handles unknown version, which we treat as latest).
         constElements[i] = llvm::ConstantFoldInsertValueInstruction(constElements[i], constElement, 0);
         assert(constElements[i] && "unexpected error creating aggregate initializer, malformed aggregate?");
-#endif
       } else {
         constElements[i] = constElement;
       }
@@ -4194,14 +4188,8 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
 
       Constant *const initializer = transInitializer(spvMembers[i], type->getStructElementType(memberIndex));
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
-      // Old version of the code
-      structInitializer = ConstantExpr::getInsertValue(structInitializer, initializer, memberIndex);
-#else
-      // New version of the code (also handles unknown version, which we treat as latest).
       structInitializer = llvm::ConstantFoldInsertValueInstruction(structInitializer, initializer, memberIndex);
       assert(structInitializer && "unexpected error creating aggregate initializer, malformed aggregate?");
-#endif
     }
 
     return structInitializer;
@@ -4221,25 +4209,13 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
       if (needsPad) {
         Type *const elementType = type->getArrayElementType()->getStructElementType(0);
         Constant *const initializer = transInitializer(spvElements[i], elementType);
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
-        // Old version of the code
-        arrayInitializer = ConstantExpr::getInsertValue(arrayInitializer, initializer, {i, 0});
-#else
-        // New version of the code (also handles unknown version, which we treat as latest).
         arrayInitializer = llvm::ConstantFoldInsertValueInstruction(arrayInitializer, initializer, {i, 0});
         assert(arrayInitializer && "unexpected error creating aggregate initializer, malformed aggregate?");
-#endif
       } else {
         Type *const elementType = type->getArrayElementType();
         Constant *const initializer = transInitializer(spvElements[i], elementType);
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 428736
-        // Old version of the code
-        arrayInitializer = ConstantExpr::getInsertValue(arrayInitializer, initializer, i);
-#else
-        // New version of the code (also handles unknown version, which we treat as latest).
         arrayInitializer = llvm::ConstantFoldInsertValueInstruction(arrayInitializer, initializer, i);
         assert(arrayInitializer && "unexpected error creating aggregate initializer, malformed aggregate?");
-#endif
       }
     }
 
@@ -5671,13 +5647,7 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
 
     SPIRVWord maxOffset = 0;
     if (ba->hasDecorate(DecorationMaxByteOffset, 0, &maxOffset)) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 409358
-      // Old version of the code
-      AttrBuilder builder;
-#else
-      // New version of the code (also handles unknown version, which we treat as latest)
       AttrBuilder builder(*m_context);
-#endif
       builder.addDereferenceableAttr(maxOffset);
       i->addAttrs(builder);
     }
@@ -8901,7 +8871,7 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *bc, BasicBlock *bb
   }
   CallInst *call = CallInst::Create(func, args, bc->getName(), bb);
   setCallingConv(call);
-  addFnAttr(m_context, call, Attribute::NoUnwind);
+  call->addFnAttr(Attribute::NoUnwind);
   return call;
 }
 
