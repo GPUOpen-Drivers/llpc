@@ -29,6 +29,9 @@
  ***********************************************************************************************************************
  */
 
+#ifndef LLPC_PASS
+#define LLPC_PASS(name, class)
+#endif
 #ifndef LLPC_LOOP_PASS
 #define LLPC_LOOP_PASS LLPC_PASS
 #endif
@@ -42,7 +45,13 @@
 #define LLPC_MODULE_PASS_WITH_PARSER LLPC_MODULE_PASS
 #endif
 
+#ifndef LLPC_MODULE_ANALYSIS
+#define LLPC_MODULE_ANALYSIS(name, class)
+#endif
+
 LLPC_MODULE_PASS_WITH_PARSER("lgc-builder-replayer", BuilderReplayer)
+
+LLPC_MODULE_ANALYSIS("lgc-pipeline-state", PipelineStateWrapper)
 
 LLPC_MODULE_PASS("lgc-patch-resource-collect", PatchResourceCollect)
 LLPC_MODULE_PASS("lgc-patch-initialize-workgroup-memory", PatchInitializeWorkgroupMemory)
@@ -69,3 +78,4 @@ LLPC_MODULE_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
 #undef LLPC_FUNCTION_PASS
 #undef LLPC_MODULE_PASS
 #undef LLPC_MODULE_PASS_WITH_PARSER
+#undef LLPC_MODULE_ANALYSIS
