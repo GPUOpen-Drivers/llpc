@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,32 +24,47 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  PassRegistry.inc
- * @brief LLPC header file: used as the registry of LLPC lowering passes
+ * @file  llpcSpirvLowerCfgMerges.h
+ * @brief LLPC header file: contains declaration of Llpc::SpirvLowerCfgMerges
  ***********************************************************************************************************************
  */
+#pragma once
 
-#ifndef LLPC_MODULE_PASS
-#define LLPC_MODULE_PASS LLPC_PASS
-#endif
+#include "llpcSpirvLower.h"
+#include "llvm/IR/PassManager.h"
 
-LLPC_MODULE_PASS("llpc-spirv-lower-access-chain", SpirvLowerAccessChain)
-LLPC_MODULE_PASS("llpc-spirv-lower-cfg-merges", SpirvLowerCfgMerges)
-LLPC_MODULE_PASS("llpc-spirv-lower-const-immediate-store", SpirvLowerConstImmediateStore)
-LLPC_MODULE_PASS("llpc-spirv-lower-inst-meta-remove", SpirvLowerInstMetaRemove)
-LLPC_MODULE_PASS("llpc-spirv-lower-terminator", SpirvLowerTerminator)
-LLPC_MODULE_PASS("llpc-spirv-lower-translator", SpirvLowerTranslator)
-LLPC_MODULE_PASS("llpc-spirv-lower-global", SpirvLowerGlobal)
-LLPC_MODULE_PASS("llpc-spirv-lower-math-const-folding", SpirvLowerMathConstFolding)
-LLPC_MODULE_PASS("llpc-spirv-lower-math-float-op", SpirvLowerMathFloatOp)
-LLPC_MODULE_PASS("llpc-spirv-lower-memory-op", SpirvLowerMemoryOp)
-#if VKI_RAY_TRACING
-LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing-intrinsics", SpirvLowerRayTracingIntrinsics)
-LLPC_MODULE_PASS("llpc-spirv-lower-ray-query", SpirvLowerRayQuery)
-LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing", SpirvLowerRayTracing)
-LLPC_MODULE_PASS("llpc-spirv-lower-ray-query-post-inline", SpirvLowerRayQueryPostInline)
-LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing-builtin", SpirvLowerRayTracingBuiltIn)
-#endif
+namespace Llpc {
 
-#undef LLPC_PASS
-#undef LLPC_MODULE_PASS
+// =====================================================================================================================
+// Represents the pass of SPIR-V lowering CFG merges.
+class SpirvLowerCfgMerges : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerCfgMerges> {
+public:
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  bool runImpl(llvm::Module &module);
+
+  void mapConvergentValues(llvm::Module &module);
+
+  static llvm::StringRef name() { return "Lower SPIR-V CFG merges"; }
+
+private:
+  llvm::DenseSet<llvm::Value *> m_convergentValues;
+};
+
+// =====================================================================================================================
+// Legacy pass manager wrapper class
+class LegacySpirvLowerCfgMerges : public llvm::ModulePass {
+public:
+  LegacySpirvLowerCfgMerges();
+
+  virtual bool runOnModule(llvm::Module &module);
+
+  static char ID; // ID of this pass
+
+private:
+  LegacySpirvLowerCfgMerges(const LegacySpirvLowerCfgMerges &) = delete;
+  LegacySpirvLowerCfgMerges &operator=(const LegacySpirvLowerCfgMerges &) = delete;
+
+  SpirvLowerCfgMerges Impl;
+};
+
+} // namespace Llpc

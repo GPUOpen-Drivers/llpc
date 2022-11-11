@@ -48,6 +48,7 @@ class PassManager;
 
 class PassRegistry;
 void initializeLegacySpirvLowerAccessChainPass(PassRegistry &);
+void initializeLegacySpirvLowerCfgMergesPass(PassRegistry &);
 void initializeLegacySpirvLowerMathConstFoldingPass(PassRegistry &);
 void initializeLegacySpirvLowerMathFloatOpPass(PassRegistry &);
 void initializeLegacySpirvLowerConstImmediateStorePass(PassRegistry &);
@@ -79,6 +80,7 @@ namespace Llpc {
 // @param passRegistry : Pass registry
 inline void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
   initializeLegacySpirvLowerAccessChainPass(passRegistry);
+  initializeLegacySpirvLowerCfgMergesPass(passRegistry);
   initializeLegacySpirvLowerConstImmediateStorePass(passRegistry);
   initializeLegacySpirvLowerMathConstFoldingPass(passRegistry);
   initializeLegacySpirvLowerMathFloatOpPass(passRegistry);
@@ -99,6 +101,7 @@ inline void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
 class Context;
 
 llvm::ModulePass *createLegacySpirvLowerAccessChain();
+llvm::ModulePass *createLegacySpirvLowerCfgMerges();
 llvm::ModulePass *createLegacySpirvLowerConstImmediateStore();
 llvm::ModulePass *createLegacySpirvLowerMathConstFolding();
 llvm::ModulePass *createLegacySpirvLowerMathFloatOp();
