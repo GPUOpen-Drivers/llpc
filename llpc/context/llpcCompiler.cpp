@@ -44,6 +44,7 @@
 #endif
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLower.h"
+#include "llpcSpirvLowerCfgMerges.h"
 #if VKI_RAY_TRACING
 #include "llpcSpirvLowerRayTracing.h"
 #endif
@@ -2459,8 +2460,11 @@ Result Compiler::buildRayTracingPipelineInternal(Context *context, ArrayRef<cons
 
       // OpTerminateRay/OpIgnoreIntersection of anyhit shader and OpReportIntersection of intersection shader could
       // terminate ray during inbetween of shader execution. So functions in these shaders need to be inlined.
-      if (entryStage == ShaderStageRayTracingAnyHit || entryStage == ShaderStageRayTracingIntersect)
+      if (entryStage == ShaderStageRayTracingAnyHit || entryStage == ShaderStageRayTracingIntersect) {
+        // Lower SPIR-V CFG merges before inlining
+        lowerPassMgr->addPass(SpirvLowerCfgMerges());
         lowerPassMgr->addPass(AlwaysInlinerPass());
+      }
       lowerPassMgr->addPass(SpirvLowerRayTracing(false));
 
       // Stop timer for translate.
@@ -2480,8 +2484,11 @@ Result Compiler::buildRayTracingPipelineInternal(Context *context, ArrayRef<cons
 
       // OpTerminateRay/OpIgnoreIntersection of anyhit shader and OpReportIntersection of intersection shader could
       // terminate ray during inbetween of shader execution. So functions in these shaders need to be inlined.
-      if (entryStage == ShaderStageRayTracingAnyHit || entryStage == ShaderStageRayTracingIntersect)
+      if (entryStage == ShaderStageRayTracingAnyHit || entryStage == ShaderStageRayTracingIntersect) {
+        // Lower SPIR-V CFG merges before inlining
+        lowerPassMgr->add(createLegacySpirvLowerCfgMerges());
         lowerPassMgr->add(createAlwaysInlinerLegacyPass());
+      }
       lowerPassMgr->add(createLegacySpirvLowerRayTracing(false));
 
       // Stop timer for translate.

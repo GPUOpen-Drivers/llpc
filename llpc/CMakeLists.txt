@@ -224,6 +224,7 @@ endif()
     target_sources(llpc PRIVATE
         lower/llpcSpirvLower.cpp
         lower/llpcSpirvLowerAccessChain.cpp
+        lower/llpcSpirvLowerCfgMerges.cpp
         lower/llpcSpirvLowerConstImmediateStore.cpp
         lower/llpcSpirvLowerGlobal.cpp
         lower/llpcSpirvLowerInstMetaRemove.cpp

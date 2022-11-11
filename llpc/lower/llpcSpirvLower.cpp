@@ -32,6 +32,7 @@
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerAccessChain.h"
+#include "llpcSpirvLowerCfgMerges.h"
 #include "llpcSpirvLowerConstImmediateStore.h"
 #include "llpcSpirvLowerGlobal.h"
 #include "llpcSpirvLowerInstMetaRemove.h"
@@ -194,6 +195,9 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     passMgr.addPass(SpirvLowerRayTracingIntrinsics());
 #endif
 
+  // Lower SPIR-V CFG merges before inlining
+  passMgr.addPass(SpirvLowerCfgMerges());
+
   // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
   // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
   passMgr.addPass(AlwaysInlinerPass());
@@ -310,6 +314,9 @@ void LegacySpirvLower::addPasses(Context *context, ShaderStage stage, legacy::Pa
   if (isInternalRtShader)
     passMgr.add(createLegacySpirvLowerRayTracingIntrinsics());
 #endif
+
+  // Lower SPIR-V CFG merges before inlining
+  passMgr.add(createLegacySpirvLowerCfgMerges());
 
   // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
   // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.

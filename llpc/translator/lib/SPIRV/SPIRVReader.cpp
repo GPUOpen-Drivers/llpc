@@ -4790,9 +4790,27 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return nullptr;
   case OpLoopMerge: { // Should be translated at OpBranch or OpBranchConditional cases
     SPIRVLoopMerge *lm = static_cast<SPIRVLoopMerge *>(bv);
-    auto label = m_bm->get<SPIRVBasicBlock>(lm->getContinueTarget());
-    label->setLoopMerge(lm);
-    return nullptr;
+    auto continueLabel = m_bm->get<SPIRVBasicBlock>(lm->getContinueTarget());
+    auto mergeLabel = m_bm->get<SPIRVBasicBlock>(lm->getMergeBlock());
+    auto continueBlock = cast<BasicBlock>(transValue(continueLabel, f, bb));
+    auto mergeBlock = cast<BasicBlock>(transValue(mergeLabel, f, bb));
+
+    continueLabel->setLoopMerge(lm);
+
+    // Annotate the loop structure with pseudo intrinsic calls
+    auto builder = getBuilder();
+    IRBuilder<>::InsertPointGuard guard(*builder);
+
+    auto loopMerge = mapValue(lm, builder->CreateNamedCall("spirv.loop.merge", builder->getInt32Ty(), {},
+                                                           {Attribute::ReadNone, Attribute::Convergent}));
+    builder->SetInsertPoint(continueBlock);
+    builder->CreateNamedCall("spirv.loop.continue.block", builder->getVoidTy(), {loopMerge},
+                             {Attribute::ReadNone, Attribute::Convergent});
+    builder->SetInsertPoint(mergeBlock);
+    builder->CreateNamedCall("spirv.loop.merge.block", builder->getVoidTy(), {loopMerge},
+                             {Attribute::ReadNone, Attribute::Convergent});
+
+    return loopMerge;
   }
   case OpSwitch: {
     auto bs = static_cast<SPIRVSwitch *>(bv);
