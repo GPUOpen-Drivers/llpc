@@ -1340,7 +1340,10 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
 
           // Add all the users of this GEP to the worklist for processing.
           for (User *const user : getElemPtr->users())
-            workList.push_back(user);
+            // Add only unique instructions to the list. If comparing the same pointers then
+            // GEP can be used twice by the same CmpInst as operand 0 and operand 1.
+            if (std::find(workList.begin(), workList.end(), user) == workList.end())
+              workList.push_back(user);
         } else if (LoadInst *const load = dyn_cast<LoadInst>(value)) {
           // For loads we have to handle three cases:
           // 1. We are loading a full matrix, so do a load + transpose.
@@ -1528,6 +1531,22 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
         } else if (CallInst *const callInst = dyn_cast<CallInst>(value)) {
           if (callInst->getCalledFunction()->getName().startswith(gSPIRVMD::NonUniform))
             continue;
+        } else if (CmpInst *const cmpInst = dyn_cast<CmpInst>(value)) {
+          if (cmpInst->use_empty())
+            continue;
+
+          Value *lhs = cmpInst->getOperand(0);
+          Value *rhs = cmpInst->getOperand(1);
+          if (Value *mapped = valueMap.lookup(lhs))
+            lhs = mapped;
+          if (Value *mapped = valueMap.lookup(rhs))
+            rhs = mapped;
+
+          Value *newCmpInst = getBuilder()->CreateCmp(cmpInst->getPredicate(), lhs, rhs, cmpInst->getName());
+          cmpInst->replaceAllUsesWith(newCmpInst);
+          // Drop all references to eliminate double add to remove list.
+          // This can happen when we are comparing pointers of two matrices of row major.
+          cmpInst->dropAllReferences();
         } else
           llvm_unreachable("Should never be called!");
       }
