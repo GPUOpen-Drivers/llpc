@@ -1,16 +1,21 @@
 ; Test OpPtrEqual
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; Normal comparison
-; SHADERTEST: [[CMP1:%[0-9]*]] = icmp eq float addrspace(7)* getelementptr inbounds ({{.*}}, i32 0, i32 2), getelementptr inbounds ({{.*}}, i32 0, i32 3)
+; SHADERTEST: [[CMP1:%[0-9]*]] = icmp eq ptr addrspace(7) getelementptr inbounds ({{.*}}, i32 0, i32 3), getelementptr inbounds ({{.*}}, i32 0, i32 4)
 ; SHADERTEST: [[Value1:%[0-9]*]] = select i1 [[CMP1]], i32 0, i32 1
-; SHADERTEST: store i32 [[Value1]], i32 addrspace(7)* {{.*}}, align 4
-; Comparing 4X4 ColMajor and RowMajor matrics, which have the same SPIR-V type "OpTypeMatrix %v4float 4", return false.
-; SHADERTEST: [[CMP2:%[0-9]*]] = icmp eq i32 0, 1
-; SHADERTEST: [[Value2:%[0-9]*]] = select i1 [[CMP2]], i32 0, i32 1
-; SHADERTEST: store i32 [[Value2]], i32 addrspace(7)* {{.*}}, align 4
+; SHADERTEST: store i32 [[Value1]], ptr addrspace(7) {{.*}}, align 4
+; Comparing 4X4 ColMajor and RowMajor matrics.
+; SHADERTEST: [[Value2:%[0-9]*]] = select i1 icmp eq (ptr addrspace(7) getelementptr inbounds ({{.*}}, i32 0, i32 1), ptr addrspace(7) @{{[0-9]+}}), i32 0, i32 1
+; SHADERTEST: store i32 [[Value2]], ptr addrspace(7) {{.*}}, align 4
+; Comparing 4X4 RowMajor and RowMajor matrics.
+; SHADERTEST: [[Value3:%[0-9]*]] = select i1 icmp eq (ptr addrspace(7) getelementptr inbounds ({{.*}}, i32 0, i32 1), ptr addrspace(7) getelementptr inbounds ({{.*}}, i32 0, i32 2)), i32 0, i32 1
+; SHADERTEST: store i32 [[Value3]], ptr addrspace(7) {{.*}}, align 4
+; Comparing the same pointers.
+; SHADERTEST: [[Value4:%[0-9]*]] = select i1 true, i32 0, i32 1
+; SHADERTEST: store i32 [[Value4]], ptr addrspace(7) {{.*}}, align 4
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
@@ -33,8 +38,11 @@
                OpMemberDecorate %_struct_5 1 RowMajor
                OpMemberDecorate %_struct_5 1 Offset 64
                OpMemberDecorate %_struct_5 1 MatrixStride 16
+               OpMemberDecorate %_struct_5 2 RowMajor
                OpMemberDecorate %_struct_5 2 Offset 128
-               OpMemberDecorate %_struct_5 3 Offset 132
+               OpMemberDecorate %_struct_5 2 MatrixStride 16
+               OpMemberDecorate %_struct_5 3 Offset 192
+               OpMemberDecorate %_struct_5 4 Offset 196
                OpMemberDecorate %_struct_6 0 Offset 0
                OpDecorate %2 DescriptorSet 0
                OpDecorate %2 Binding 0
@@ -47,11 +55,12 @@
      %uint_1 = OpConstant %uint 1
      %uint_2 = OpConstant %uint 2
      %uint_3 = OpConstant %uint 3
+     %uint_4 = OpConstant %uint 4
       %float = OpTypeFloat 32
 %_runtimearr_uint = OpTypeRuntimeArray %uint
     %v4float = OpTypeVector %float 4
 %mat4v4float = OpTypeMatrix %v4float 4
-  %_struct_5 = OpTypeStruct %mat4v4float %mat4v4float %float %float
+  %_struct_5 = OpTypeStruct %mat4v4float %mat4v4float %mat4v4float %float %float
   %_struct_6 = OpTypeStruct %_runtimearr_uint
 %_ptr_StorageBuffer__struct_5 = OpTypePointer StorageBuffer %_struct_5
 %_ptr_StorageBuffer__struct_6 = OpTypePointer StorageBuffer %_struct_6
@@ -65,13 +74,12 @@
           %1 = OpFunction %void None %24
          %25 = OpLabel
          %26 = OpCopyObject %uint %uint_0
-         %27 = OpAccessChain %_ptr_StorageBuffer_float %2 %uint_2
-         %28 = OpAccessChain %_ptr_StorageBuffer_float %2 %uint_3
+         %27 = OpAccessChain %_ptr_StorageBuffer_float %2 %uint_3
+         %28 = OpAccessChain %_ptr_StorageBuffer_float %2 %uint_4
          %31 = OpAccessChain %_ptr_StorageBuffer_mat4v4float %2 %uint_0
          %32 = OpAccessChain %_ptr_StorageBuffer_mat4v4float %2 %uint_1
-         %33 = OpAccessChain %_ptr_StorageBuffer_v4float %2 %uint_0 %uint_0
-         %34 = OpAccessChain %_ptr_StorageBuffer_v4float %2 %uint_0 %uint_1
-         %35 = OpAccessChain %_ptr_StorageBuffer_float %2 %uint_0 %uint_0 %uint_0
+         %34 = OpAccessChain %_ptr_StorageBuffer_mat4v4float %2 %uint_1
+         %35 = OpAccessChain %_ptr_StorageBuffer_mat4v4float %2 %uint_2
          %36 = OpPtrEqual %bool %27 %28
          %37 = OpSelect %uint %36 %uint_0 %uint_1
          %38 = OpAccessChain %_ptr_StorageBuffer_uint %4 %uint_0 %26
@@ -82,5 +90,15 @@
          %57 = OpAccessChain %_ptr_StorageBuffer_uint %4 %uint_0 %39
          %58 = OpIAdd %uint %39 %uint_1
                OpStore %57 %56
+         %60 = OpPtrEqual %bool %34 %35
+         %61 = OpSelect %uint %60 %uint_0 %uint_1
+         %62 = OpAccessChain %_ptr_StorageBuffer_uint %4 %uint_0 %58
+         %63 = OpIAdd %uint %58 %uint_1
+               OpStore %62 %61
+         %70 = OpPtrEqual %bool %32 %32
+         %71 = OpSelect %uint %70 %uint_0 %uint_1
+         %72 = OpAccessChain %_ptr_StorageBuffer_uint %4 %uint_0 %63
+         %73 = OpIAdd %uint %63 %uint_1
+               OpStore %72 %71
                OpReturn
                OpFunctionEnd
