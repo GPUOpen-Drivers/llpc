@@ -329,26 +329,29 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   Value *userData = arg++;
 
   // Define basic blocks
+  auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint);
+  auto beginLsBlock = BasicBlock::Create(*m_context, ".beginLs", entryPoint);
+  auto endLsBlock = BasicBlock::Create(*m_context, ".endLs", entryPoint);
+  auto beginHsBlock = BasicBlock::Create(*m_context, ".beginHs", entryPoint);
   auto endHsBlock = BasicBlock::Create(*m_context, ".endHs", entryPoint);
-  auto beginHsBlock = BasicBlock::Create(*m_context, ".beginHs", entryPoint, endHsBlock);
-  auto endLsBlock = BasicBlock::Create(*m_context, ".endLs", entryPoint, beginHsBlock);
-  auto beginLsBlock = BasicBlock::Create(*m_context, ".beginLs", entryPoint, endLsBlock);
-  auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint, beginLsBlock);
 
   // Construct ".entry" block
   BuilderBase builder(entryBlock);
 
   builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, {builder.getInt64(-1)});
 
-  auto threadId = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
+  auto threadIdInWave =
+      builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
   unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
   if (waveSize == 64) {
-    threadId = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadId});
+    threadIdInWave = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWave});
   }
+  threadIdInWave->setName("threadIdInWave");
 
   auto lsVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
                                              {mergeWaveInfo, builder.getInt32(0), builder.getInt32(8)});
+  lsVertCount->setName("lsVertCount");
 
   Value *patchId = arg;
   Value *relPatchId = (arg + 1);
@@ -361,6 +364,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   auto hsVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
                                              {mergeWaveInfo, builder.getInt32(8), builder.getInt32(8)});
+  hsVertCount->setName("hsVertCount");
 
   // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
   // VGPRs rather than expected v2~v4.
@@ -374,8 +378,8 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     instanceId = builder.CreateSelect(nullHs, (arg + 3), (arg + 5));
   }
 
-  auto lsEnable = builder.CreateICmpULT(threadId, lsVertCount);
-  builder.CreateCondBr(lsEnable, beginLsBlock, endLsBlock);
+  auto validLsVert = builder.CreateICmpULT(threadIdInWave, lsVertCount, "validLsVert");
+  builder.CreateCondBr(validLsVert, beginLsBlock, endLsBlock);
 
   // Construct ".beginLs" block
   builder.SetInsertPoint(beginLsBlock);
@@ -423,13 +427,13 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   // Construct ".endLs" block
   builder.SetInsertPoint(endLsBlock);
 
-  SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-  builder.CreateFence(AtomicOrdering::Release, workgroupScope);
+  SyncScope::ID syncScope = m_context->getOrInsertSyncScopeID("workgroup");
+  builder.CreateFence(AtomicOrdering::Release, syncScope);
   builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-  builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
+  builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 
-  auto hsEnable = builder.CreateICmpULT(threadId, hsVertCount);
-  builder.CreateCondBr(hsEnable, beginHsBlock, endHsBlock);
+  auto validHsVert = builder.CreateICmpULT(threadIdInWave, hsVertCount, "validHsVert");
+  builder.CreateCondBr(validHsVert, beginHsBlock, endHsBlock);
 
   // Construct ".beginHs" block
   builder.SetInsertPoint(beginHsBlock);
@@ -640,37 +644,43 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   Value *userData = arg++;
 
   // Define basic blocks
+  auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint);
+  auto beginEsBlock = BasicBlock::Create(*m_context, ".beginEs", entryPoint);
+  auto endEsBlock = BasicBlock::Create(*m_context, ".endEs", entryPoint);
+  auto beginGsBlock = BasicBlock::Create(*m_context, ".beginGs", entryPoint);
   auto endGsBlock = BasicBlock::Create(*m_context, ".endGs", entryPoint);
-  auto beginGsBlock = BasicBlock::Create(*m_context, ".beginGs", entryPoint, endGsBlock);
-  auto endEsBlock = BasicBlock::Create(*m_context, ".endEs", entryPoint, beginGsBlock);
-  auto beginEsBlock = BasicBlock::Create(*m_context, ".beginEs", entryPoint, endEsBlock);
-  auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint, beginEsBlock);
 
   // Construct ".entry" block
   BuilderBase builder(entryBlock);
   builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, {builder.getInt64(-1)});
 
-  auto threadId = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
+  auto threadIdInWave =
+      builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
   unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   if (waveSize == 64) {
-    threadId = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadId});
+    threadIdInWave = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWave});
   }
+  threadIdInWave->setName("threadIdInWave");
 
   auto esVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
                                              {mergedWaveInfo, builder.getInt32(0), builder.getInt32(8)});
+  esVertCount->setName("esVertCount");
   auto gsPrimCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
                                              {mergedWaveInfo, builder.getInt32(8), builder.getInt32(8)});
+  gsPrimCount->setName("gsPrimCount");
   auto gsWaveId = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
                                           {mergedWaveInfo, builder.getInt32(16), builder.getInt32(8)});
+  gsWaveId->setName("gsWaveId");
   auto waveInSubgroup = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
                                                 {mergedWaveInfo, builder.getInt32(24), builder.getInt32(4)});
+  waveInSubgroup->setName("waveInSubgroup");
 
   unsigned esGsBytesPerWave = waveSize * 4 * calcFactor.esGsRingItemSize;
   auto esGsOffset = builder.CreateMul(waveInSubgroup, builder.getInt32(esGsBytesPerWave));
 
-  auto esEnable = builder.CreateICmpULT(threadId, esVertCount);
-  builder.CreateCondBr(esEnable, beginEsBlock, endEsBlock);
+  auto validEsVert = builder.CreateICmpULT(threadIdInWave, esVertCount, "validEsVert");
+  builder.CreateCondBr(validEsVert, beginEsBlock, endEsBlock);
 
   Value *esGsOffsets01 = arg;
 
@@ -779,13 +789,13 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   // Construct ".endEs" block
   builder.SetInsertPoint(endEsBlock);
 
-  SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-  builder.CreateFence(AtomicOrdering::Release, workgroupScope);
+  SyncScope::ID syncScope = m_context->getOrInsertSyncScopeID("workgroup");
+  builder.CreateFence(AtomicOrdering::Release, syncScope);
   builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-  builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
+  builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 
-  auto gsEnable = builder.CreateICmpULT(threadId, gsPrimCount);
-  builder.CreateCondBr(gsEnable, beginGsBlock, endGsBlock);
+  auto validGsPrim = builder.CreateICmpULT(threadIdInWave, gsPrimCount, "validGsPrim");
+  builder.CreateCondBr(validGsPrim, beginGsBlock, endGsBlock);
 
   // Construct ".beginGs" block
   builder.SetInsertPoint(beginGsBlock);
