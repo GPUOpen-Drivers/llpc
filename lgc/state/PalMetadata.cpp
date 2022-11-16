@@ -408,9 +408,47 @@ void PalMetadata::setUserDataSpillUsage(unsigned dwordOffset) {
 }
 
 // =====================================================================================================================
-// Fix up user data registers. Any user data register that has one of the unlinked UserDataMapping values defined
-// in AbiUnlinked.h is fixed up by looking at pipeline state.
+// Fix up registers. Any user data register that has one of the unlinked UserDataMapping values defined in
+// AbiUnlinked.h is fixed up by looking at pipeline state; And some dynamic states also need to be fixed.
 void PalMetadata::fixUpRegisters() {
+  // Fix GS output primitive type (VGT_GS_OUT_PRIM_TYPE). Unlinked compiling VS + NGG, we can't determine
+  // the output primitive type, we must fix up it when linking.
+  // If pipeline includes GS or TS, the type is from shader, we don't need to fix it. We only must fix a case
+  // which includes VS + FS + NGG.
+  if (m_pipelineState->isGraphics()) {
+    const bool hasTs =
+        m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
+    const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+    if (!hasTs && !hasGs) {
+      // Here we use register field to determine if NGG is enabled, because enabling NGG depends on other conditions.
+      // see PatchResourceCollect::canUseNgg.
+      if (m_registers.find(m_document->getNode(mmVGT_GS_OUT_PRIM_TYPE)) != m_registers.end()) {
+        const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
+        unsigned gsOutputPrimitiveType = 0;
+        switch (primType) {
+        case PrimitiveType::Point:
+          gsOutputPrimitiveType = 0; // POINTLIST
+          break;
+        case PrimitiveType::LineList:
+        case PrimitiveType::LineStrip:
+          gsOutputPrimitiveType = 1; // LINESTRIP
+          break;
+        case PrimitiveType::TriangleList:
+        case PrimitiveType::TriangleStrip:
+        case PrimitiveType::TriangleFan:
+        case PrimitiveType::TriangleListAdjacency:
+        case PrimitiveType::TriangleStripAdjacency:
+          gsOutputPrimitiveType = 2; // TRISTRIP
+          break;
+        default:
+          llvm_unreachable("Should never be called!");
+          break;
+        }
+        m_registers[mmVGT_GS_OUT_PRIM_TYPE] = gsOutputPrimitiveType;
+      }
+    }
+  }
+
   static const std::pair<unsigned, unsigned> ComputeRegRanges[] = {{mmCOMPUTE_USER_DATA_0, 16}};
   static const std::pair<unsigned, unsigned> Gfx8RegRanges[] = {
       {mmSPI_SHADER_USER_DATA_PS_0, 16}, {mmSPI_SHADER_USER_DATA_VS_0, 16}, {mmSPI_SHADER_USER_DATA_GS_0, 16},

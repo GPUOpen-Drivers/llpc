@@ -263,6 +263,9 @@ constexpr unsigned mmSPI_PS_IN_CONTROL = 0xA1B6;
 constexpr unsigned mmPA_SC_SHADER_CONTROL = 0xA310;
 constexpr unsigned mmPA_SC_AA_CONFIG = 0xA2F8;
 
+// GS register numbers in PAL metadata
+constexpr unsigned mmVGT_GS_OUT_PRIM_TYPE = 0xA29B;
+
 // Register bitfield layout.
 
 // General RSRC1 register, enough to get the VGPR and SGPR counts.
