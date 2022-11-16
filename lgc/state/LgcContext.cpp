@@ -132,7 +132,6 @@ void LgcContext::initialize() {
   initializeScalarOpts(passRegistry);
   initializeVectorization(passRegistry);
   initializeInstCombine(passRegistry);
-  initializeAggressiveInstCombine(passRegistry);
   initializeIPO(passRegistry);
   initializeCodeGen(passRegistry);
   initializeShadowStackGCLoweringPass(passRegistry);
