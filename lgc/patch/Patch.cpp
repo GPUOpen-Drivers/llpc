@@ -537,7 +537,6 @@ void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr, CodeGenOpt
   passMgr.add(createSpeculativeExecutionIfHasBranchDivergencePass());
   passMgr.add(createCorrelatedValuePropagationPass());
   passMgr.add(createCFGSimplificationPass());
-  passMgr.add(createAggressiveInstCombinerPass());
   passMgr.add(createInstructionCombiningPass(1));
   passMgr.add(createLegacyPatchPeepholeOpt());
   passMgr.add(createCFGSimplificationPass());
