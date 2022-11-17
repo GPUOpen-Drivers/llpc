@@ -205,10 +205,6 @@ private:
   void recordVertexAttribExport(unsigned location, llvm::ArrayRef<llvm::Value *> attribValues);
   void exportVertexAttribs(llvm::Instruction *insertPos);
 
-  void storeTessFactors();
-  void storeTessFactorToBuffer(llvm::ArrayRef<llvm::Value *> outerTessFactors,
-                               llvm::ArrayRef<llvm::Value *> innerTessFactors, llvm::Instruction *insertPos);
-
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
