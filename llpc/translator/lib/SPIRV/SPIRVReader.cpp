@@ -156,7 +156,7 @@ static bool isStorageClassExplicitlyLaidOut(SPIRVModule *m_bm, SPIRVStorageClass
 SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
                          ArrayRef<ConvertingSampler> convertingSamplers, lgc::Builder *builder,
                          const Vkgc::ShaderModuleUsage *moduleUsage, const Vkgc::PipelineShaderOptions *shaderOptions)
-    : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_enableXfb(false), m_entryTarget(nullptr),
+    : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_entryTarget(nullptr),
       m_specConstMap(theSpecConstMap), m_convertingSamplers(convertingSamplers), m_dbgTran(m_bm, m_m, this),
       m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)),
       m_shaderOptions(reinterpret_cast<const Vkgc::PipelineShaderOptions *>(shaderOptions)) {
@@ -7001,6 +7001,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   static_assert(SPIRVTW_32Bit == (32 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_64Bit == (64 >> 3), "Unexpected value!");
 
+  bool enableXfb = false;
   if (m_entryTarget) {
     if (auto em = m_entryTarget->getExecutionMode(ExecutionModeDenormPreserve))
       m_fpControlFlags.DenormPreserve = em->getLiterals()[0] >> 3;
@@ -7016,6 +7017,9 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
 
     if (auto em = m_entryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
       m_fpControlFlags.RoundingModeRTZ = em->getLiterals()[0] >> 3;
+
+    if (m_execModule >= ExecutionModelVertex && m_execModule <= ExecutionModelGeometry)
+      enableXfb = m_entryTarget->getExecutionMode(ExecutionModeXfb) != nullptr;
   } else {
     createLibraryEntryFunc();
   }
@@ -7070,7 +7074,6 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   }
   getBuilder()->setCommonShaderMode(shaderMode);
 
-  m_enableXfb = m_bm->getCapability().find(CapabilityTransformFeedback) != m_bm->getCapability().end();
   m_enableGatherLodNz =
       m_bm->hasCapability(CapabilityImageGatherBiasLodAMD) && entryExecModel == ExecutionModelFragment;
 
@@ -7155,6 +7158,79 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
 
   if (!transMetadata())
     return false;
+
+  // Preserve XFB relevant information in named metadata !lgc.xfb.stage, defined as follows:
+  // lgc.xfb.state metadata = {
+  // i32 buffer0Stream, i32 buffer0Stride, i32 buffer1Stream, i32 buffer1Stride,
+  // i32 buffer2Stream, i32 buffer2Stride, i32 buffer3Stream, i32 buffer3Stride }
+  // ; buffer${i}Stream is the vertex StreamId that writes to buffer i, or -1 if that particular buffer is unused (e.g.
+  // StreamId in EmitVertex)
+  if (enableXfb) {
+    const unsigned bufferCount = 8;
+    std::array<int, 8> xfbState{-1, 0, -1, 0, -1, 0, -1, 0};
+    for (unsigned i = 0, e = m_bm->getNumVariables(); i != e; ++i) {
+      auto bv = m_bm->getVariable(i);
+      if (bv->getStorageClass() == StorageClassOutput) {
+        SPIRVWord xfbBuffer = SPIRVID_INVALID;
+        if (bv->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
+          const unsigned indexOfBuffer = 2 * xfbBuffer;
+          xfbState[indexOfBuffer] = 0;
+          SPIRVWord streamId = SPIRVID_INVALID;
+          if (bv->hasDecorate(DecorationStream, 0, &streamId))
+            xfbState[indexOfBuffer] = streamId;
+
+          SPIRVWord xfbStride = SPIRVID_INVALID;
+          if (bv->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
+            const unsigned indexOfStride = indexOfBuffer + 1;
+            xfbState[indexOfStride] = xfbStride;
+          }
+
+          // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
+          SPIRVType *bt = bv->getType()->getPointerElementType();
+          if (bt->isTypeArray()) {
+            assert(m_valueMap.find(bv) != m_valueMap.end());
+            auto output = cast<GlobalVariable>(m_valueMap[bv]);
+            MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
+            assert(metaNode);
+            auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+            // Find the innermost array-element
+            auto elemTy = bt;
+            uint64_t elemCount = 0;
+            ShaderInOutMetadata outMetadata = {};
+            do {
+              assert(elemMeta->getNumOperands() == 4);
+              outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
+              outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
+              elemCount = elemTy->getArrayLength();
+
+              elemTy = elemTy->getArrayElementType();
+              elemMeta = cast<Constant>(elemMeta->getOperand(1));
+            } while (elemTy->isTypeArray());
+
+            if (outMetadata.IsBlockArray) {
+              // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
+              const unsigned bufferIdx = outMetadata.XfbBuffer;
+              const int streamId = xfbState[2 * bufferIdx];
+              const unsigned stride = xfbState[2 * bufferIdx + 1];
+              for (unsigned idx = 0; idx < elemCount; ++idx) {
+                const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
+                xfbState[indexOfBuffer] = streamId;
+                xfbState[indexOfBuffer + 1] = stride;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    unsigned mdKindId = m_context->getMDKindID(lgc::XfbStateMetadataName);
+    std::array<Metadata *, 8> metadatas{};
+    for (unsigned i = 0; i < bufferCount; ++i)
+      metadatas[i] = ConstantAsMetadata::get(m_builder->getInt32(xfbState[i]));
+    auto entryFunc = m_funcMap[m_entryTarget];
+    assert(entryFunc);
+    entryFunc->setMetadata(mdKindId, MDNode::get(*m_context, metadatas));
+  }
 
   postProcessRowMajorMatrix();
   if (!m_moduleUsage->keepUnusedFunctions)

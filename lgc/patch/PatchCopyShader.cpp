@@ -220,7 +220,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     // If no NGG, the copy shader will become a real HW VS. Set the user data entries in the
     // PAL metadata here.
     m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader, 0, UserDataMapping::GlobalTable);
-    if (resUsage->inOutUsage.enableXfb) {
+    if (m_pipelineState->enableXfb()) {
       m_pipelineState->getPalMetadata()->setUserDataEntry(
           ShaderStageCopyShader, intfData->userDataUsage.gs.copyShaderStreamOutTable, UserDataMapping::StreamOutTable);
     }
@@ -245,7 +245,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     }
   }
 
-  if (outputStreamCount > 1 && resUsage->inOutUsage.enableXfb) {
+  if (outputStreamCount > 1 && m_pipelineState->enableXfb()) {
     if (!m_pipelineState->getNggControl()->enableNgg) {
       // StreamId = streamInfo[25:24]
       auto streamInfo = getFunctionArgument(entryPoint, CopyShaderUserSgprIdxStreamInfo);
@@ -413,7 +413,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
     newLocValueMap[newLoc] = outputValue;
   }
 
-  if (resUsage->inOutUsage.enableXfb) {
+  if (m_pipelineState->enableXfb()) {
     // Export XFB output
     if (m_pipelineState->canPackOutput(ShaderStageGeometry)) {
       // With packing locations, we should collect the XFB output value at an original location
@@ -720,7 +720,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
                                           BuilderBase &builder) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
-  if (resUsage->inOutUsage.enableXfb) {
+  if (m_pipelineState->enableXfb()) {
     InOutLocationInfo outLocInfo;
     outLocInfo.setLocation(builtInId);
     outLocInfo.setBuiltIn(true);

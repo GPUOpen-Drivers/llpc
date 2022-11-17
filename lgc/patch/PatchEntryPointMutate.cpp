@@ -1235,7 +1235,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones
   // above, which go after the user data node args).
   if (userDataUsage->usesStreamOutTable || userDataUsage->isSpecialUserDataUsed(UserDataMapping::StreamOutTable)) {
-    if (enableNgg || !m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage.enableXfb) {
+    if (enableNgg || !m_pipelineState->hasShaderStage(ShaderStageCopyShader) && m_pipelineState->enableXfb()) {
       // If no NGG, stream out table will be set to copy shader's user data entry, we should not set it duplicately.
       switch (m_shaderStage) {
       case ShaderStageVertex:

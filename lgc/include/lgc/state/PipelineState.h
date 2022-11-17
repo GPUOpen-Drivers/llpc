@@ -118,6 +118,13 @@ struct NggControl {
   Util::Abi::PrimShaderCbLayout primShaderTable; // Primitive shader table (only some registers are used)
 };
 
+// Represents transform feedback state metadata
+struct XfbStateMetadata {
+  bool enableXfb;                                               // Whether transform feedback is active
+  std::array<unsigned, MaxTransformFeedbackBuffers> xfbStrides; // The strides of each XFB buffer.
+  std::array<int, MaxGsStreams> streamXfbBuffers;               // The stream-out XFB buffers bit mask per stream.
+};
+
 // =====================================================================================================================
 // The middle-end implementation of PipelineState, a subclass of Pipeline.
 class PipelineState final : public Pipeline {
@@ -355,6 +362,32 @@ public:
   // Get name of built-in
   static llvm::StringRef getBuiltInName(BuiltInKind builtIn);
 
+  // Set transform feedback state metadata
+  void setXfbStateMetadata(llvm::Module *module);
+
+  // Get XFB state metadata
+  const XfbStateMetadata &getXfbStateMetadata() const { return m_xfbStateMetadata; }
+
+  // Get XFB state metadata
+  XfbStateMetadata &getXfbStateMetadata() { return m_xfbStateMetadata; }
+
+  // Check if transform feedback is active
+  bool enableXfb() const { return m_xfbStateMetadata.enableXfb; }
+
+  // Get transform feedback strides
+  const std::array<unsigned, MaxTransformFeedbackBuffers> &getXfbBufferStrides() const {
+    return m_xfbStateMetadata.xfbStrides;
+  }
+
+  // Get transform feedback strides
+  std::array<unsigned, MaxTransformFeedbackBuffers> &getXfbBufferStrides() { return m_xfbStateMetadata.xfbStrides; }
+
+  // Get transform feedback buffers used for each stream
+  const std::array<int, MaxGsStreams> &getStreamXfbBuffers() const { return m_xfbStateMetadata.streamXfbBuffers; }
+
+  // Get transform feedback buffers used for each stream
+  std::array<int, MaxGsStreams> &getStreamXfbBuffers() { return m_xfbStateMetadata.streamXfbBuffers; }
+
   // -----------------------------------------------------------------------------------------------------------------
   // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
 
@@ -514,6 +547,7 @@ private:
   unsigned m_subgroupSize[ShaderStageCountInternal] = {};                      // Per-shader subgroup size
   bool m_inputPackState[ShaderStageGfxCount] = {};  // The input packable state per shader stage
   bool m_outputPackState[ShaderStageGfxCount] = {}; // The output packable state per shader stage
+  XfbStateMetadata m_xfbStateMetadata = {};         // Transform feedback state metadata
 };
 
 // =====================================================================================================================

@@ -358,15 +358,6 @@ struct ResourceUsage {
     // Map from output location info to the transform feedback info
     std::map<InOutLocationInfo, XfbOutInfo> locInfoXfbOutInfoMap;
 
-    // Transform feedback strides
-    unsigned xfbStrides[MaxTransformFeedbackBuffers] = {};
-
-    // Transform feedback enablement
-    bool enableXfb = false;
-
-    // Stream to transform feedback buffers
-    unsigned streamXfbBuffers[MaxGsStreams] = {};
-
     // Count of mapped location for inputs/outputs (including those special locations to which the built-ins
     // are mapped)
     unsigned inputMapLocCount = 0;

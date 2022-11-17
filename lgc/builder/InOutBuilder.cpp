@@ -739,9 +739,6 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
   unsigned streamId = outputInfo.hasStreamId() ? outputInfo.getStreamId() : 0;
   assert(xfbBuffer < MaxTransformFeedbackBuffers);
   assert(streamId < MaxGsStreams);
-  resUsage->inOutUsage.xfbStrides[xfbBuffer] = xfbStride;
-  resUsage->inOutUsage.enableXfb = true;
-  resUsage->inOutUsage.streamXfbBuffers[streamId] |= 1 << xfbBuffer;
 
   // Collect the XFB output.
   XfbOutInfo xfbOutInfo = {};

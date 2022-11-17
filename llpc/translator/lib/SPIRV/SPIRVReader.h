@@ -228,7 +228,6 @@ private:
   LLVMContext *m_context;
   lgc::Builder *m_builder;
   SPIRVModule *m_bm;
-  bool m_enableXfb;
   bool m_enableGatherLodNz;
   ShaderFloatControlFlags m_fpControlFlags;
   SPIRVFunction *m_entryTarget;
