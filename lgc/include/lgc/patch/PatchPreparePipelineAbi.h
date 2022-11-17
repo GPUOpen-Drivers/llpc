@@ -60,12 +60,20 @@ public:
 
   static llvm::StringRef name() { return "Patch LLVM for preparing pipeline ABI"; }
 
+  static std::pair<llvm::Value *, llvm::Value *> readTessFactors(PipelineState *pipelineState, llvm::Value *relPatchId,
+                                                                 llvm::IRBuilder<> &builder);
+  static void writeTessFactors(PipelineState *pipelineState, llvm::Value *tfBufferDesc, llvm::Value *tfBufferBase,
+                               llvm::Value *relPatchId, llvm::Value *outerTf, llvm::Value *innerTf,
+                               llvm::IRBuilder<> &builder);
+
 private:
   void mergeShader(llvm::Module &module);
 
   void setAbiEntryNames(llvm::Module &module);
 
   void addAbiMetadata(llvm::Module &module);
+
+  void storeTessFactors(llvm::Function *entryPoint);
 
   PipelineState *m_pipelineState;           // Pipeline state
   PipelineShadersResult *m_pipelineShaders; // API shaders in the pipeline

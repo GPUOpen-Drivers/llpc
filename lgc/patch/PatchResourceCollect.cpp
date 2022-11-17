@@ -2061,6 +2061,8 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
           builtInUsage.tcs.cullDistance = 0;
       }
 
+      // NOTE: We shouldn't clear the usage of tessellation levels if the next stage doesn't read them back because they
+      // are always required to be written to TF buffer.
       if (nextBuiltInUsage.tessLevelOuter) {
         assert(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelOuter) !=
                nextInOutUsage.perPatchBuiltInInputLocMap.end());
