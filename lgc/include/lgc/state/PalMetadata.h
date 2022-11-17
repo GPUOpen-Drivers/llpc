@@ -130,8 +130,8 @@ public:
   // set to the minimum of any call to this function in any shader.
   void setUserDataSpillUsage(unsigned dwordOffset);
 
-  // Fix up user data registers. Any user data register that has one of the unlinked UserDataMapping values defined
-  // in AbiUnlinked.h is fixed up by looking at pipeline state.
+  // Fix up registers. Any user data register that has one of the unlinked UserDataMapping values defined in
+  // AbiUnlinked.h is fixed up by looking at pipeline state; And some dynamic states also need to be fixed.
   void fixUpRegisters();
 
   // Get a register value in PAL metadata.
