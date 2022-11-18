@@ -179,9 +179,11 @@ bool CacheAccessor::lookUpInShaderCache(const MetroHash::Hash &hash, bool alloca
 void CacheAccessor::setElfInCache(BinaryData elf) {
   if (m_shaderCacheEntryState == ShaderEntryState::Compiling && m_shaderCacheEntry) {
     updateShaderCache(elf);
-    mustSucceed(m_shaderCache->retrieveShader(m_shaderCacheEntry, &m_elf.pCode, &m_elf.codeSize),
-                "Failed to retrieve shader");
-    m_shaderCacheEntryState = ShaderEntryState::Ready;
+    if (m_shaderCache->retrieveShader(m_shaderCacheEntry, &m_elf.pCode, &m_elf.codeSize) == Result::Success) {
+      m_shaderCacheEntryState = ShaderEntryState::Ready;
+    } else {
+      return;
+    }
   }
 
   if (!m_cacheEntry.IsEmpty()) {
