@@ -600,12 +600,18 @@ void ShaderCache::resetShader(CacheEntryHandle hEntry) {
 
 // =====================================================================================================================
 // Retrieves the shader from the cache which is identified by the specified entry handle.
+// If ShaderIndex::state is not ShaderEntryState::Ready it fails and returns ErrorOutOfMemory, in this case
+// the code and codeSize arguments are not modified.
 //
 // @param hEntry : Handle of shader cache entry
 // @param [out] ppBlob : Shader data
 // @param [out] size : Size of shader data in bytes
 Result ShaderCache::retrieveShader(CacheEntryHandle hEntry, const void **ppBlob, size_t *size) {
   const auto *const index = static_cast<ShaderIndex *>(hEntry);
+
+  if (index->state != ShaderEntryState::Ready) {
+    return Result::ErrorOutOfMemory;
+  }
 
   assert(m_disableCache == false);
   assert(index);
