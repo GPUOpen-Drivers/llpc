@@ -5884,17 +5884,18 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
   builder.SetInsertPoint(insertPos);
 
   for (auto &attribExport : m_attribExports) {
-    if (m_gfxIp.major <= 10) {
-      unsigned channelMask = 0;
-      for (unsigned i = 0; i < 4; ++i) {
-        assert(attribExport.second[i]);
-        if (!isa<UndefValue>(attribExport.second[i]))
-          channelMask |= (1u << i); // Update channel mask if the value is valid (not undef)
-      }
+    // NOTE: Here, we force unspecified channel values of vertex attributes to be 0.0. In some cases, not-well-written
+    // shaders don't specify defined values to outputs but will read them back from corresponding inputs.
+    for (unsigned i = 0; i < 4; ++i) {
+      assert(attribExport.second[i]);
+      if (isa<UndefValue>(attribExport.second[i]))
+        attribExport.second[i] = ConstantFP::get(builder.getFloatTy(), 0.0);
+    }
 
+    if (m_gfxIp.major <= 10) {
       builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
                               {builder.getInt32(EXP_TARGET_PARAM_0 + attribExport.first), // tgt
-                               builder.getInt32(channelMask),                             // en
+                               builder.getInt32(0xF),                                     // en
                                attribExport.second[0],                                    // src0
                                attribExport.second[1],                                    // src1
                                attribExport.second[2],                                    // src2
