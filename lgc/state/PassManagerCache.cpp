@@ -31,7 +31,13 @@
 #include "lgc/state/PassManagerCache.h"
 #include "lgc/LgcContext.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
+// Old version of the code
 #include "llvm/IR/IRPrintingPasses.h"
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
+#include "llvm/IRPrinter/IRPrintingPasses.h"
+#endif
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
