@@ -170,7 +170,7 @@ std::pair<Value *, Value *> PatchPreparePipelineAbi::readTessFactors(PipelineSta
 
     Value *readPtr = builder.CreateGEP(lds->getValueType(), lds, {builder.getInt32(0), ldsOffset});
     readPtr = builder.CreateBitCast(readPtr, PointerType::get(readTy, readPtr->getType()->getPointerAddressSpace()));
-    return builder.CreateLoad(readTy, readPtr);
+    return builder.CreateAlignedLoad(readTy, readPtr, Align(4));
   };
 
   unsigned numOuterTfs = 0;
