@@ -1153,11 +1153,9 @@ Value *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb,
   return inst;
 }
 
-Instruction *SPIRVToLLVM::transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f) {
+Value *SPIRVToLLVM::transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f) {
   SPIRVCompare *bc = static_cast<SPIRVCompare *>(bv);
   assert(bb && "Invalid BB");
-  SPIRVType *bt = bc->getOperand(0)->getType();
-  Instruction *inst = nullptr;
   auto op = bc->getOpCode();
   if (op == OpPtrEqual || op == OpPtrNotEqual) {
     // NOTE: The two compared operands have the same SPIR-V type, but the IR types are different.
@@ -1167,20 +1165,16 @@ Instruction *SPIRVToLLVM::transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function 
     //              };
     auto lValue = transValue(bc->getOperand(0), f, bb);
     auto rValue = transValue(bc->getOperand(1), f, bb);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    // For opaque pointers this condition will be always FALSE.
     if (lValue->getType() != rValue->getType())
-      return new ICmpInst(*bb, CmpMap::rmap(op), getBuilder()->getInt32(0), getBuilder()->getInt32(1));
+      return getBuilder()->CreateCmp(CmpMap::rmap(op), getBuilder()->getInt32(0), getBuilder()->getInt32(1));
   }
 
   if (isLogicalOpCode(op))
     op = IntBoolOpMap::rmap(op);
-  if (bt->isTypeVectorOrScalarInt() || bt->isTypeVectorOrScalarBool() || bt->isTypePointer())
-    inst =
-        new ICmpInst(*bb, CmpMap::rmap(op), transValue(bc->getOperand(0), f, bb), transValue(bc->getOperand(1), f, bb));
-  else if (bt->isTypeVectorOrScalarFloat())
-    inst =
-        new FCmpInst(*bb, CmpMap::rmap(op), transValue(bc->getOperand(0), f, bb), transValue(bc->getOperand(1), f, bb));
-  assert(inst && "not implemented");
-  return inst;
+  return getBuilder()->CreateCmp(CmpMap::rmap(op), transValue(bc->getOperand(0), f, bb),
+                                 transValue(bc->getOperand(1), f, bb));
 }
 
 // =====================================================================================================================

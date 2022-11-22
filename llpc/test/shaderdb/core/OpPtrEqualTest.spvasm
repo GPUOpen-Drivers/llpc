@@ -4,8 +4,7 @@
 ; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; Normal comparison
-; SHADERTEST: [[CMP1:%[0-9]*]] = icmp eq ptr addrspace(7) getelementptr inbounds ({{.*}}, i32 0, i32 3), getelementptr inbounds ({{.*}}, i32 0, i32 4)
-; SHADERTEST: [[Value1:%[0-9]*]] = select i1 [[CMP1]], i32 0, i32 1
+; SHADERTEST: [[Value1:%[0-9]*]] = select i1 icmp eq (ptr addrspace(7) getelementptr inbounds ({{.*}}, i32 0, i32 3), ptr addrspace(7) getelementptr inbounds ({{.*}}, i32 0, i32 4)), i32 0, i32 1
 ; SHADERTEST: store i32 [[Value1]], ptr addrspace(7) {{.*}}, align 4
 ; Comparing 4X4 ColMajor and RowMajor matrics.
 ; SHADERTEST: [[Value2:%[0-9]*]] = select i1 icmp eq (ptr addrspace(7) getelementptr inbounds ({{.*}}, i32 0, i32 1), ptr addrspace(7) @{{[0-9]+}}), i32 0, i32 1
