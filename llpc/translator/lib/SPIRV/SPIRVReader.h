@@ -368,7 +368,7 @@ private:
   void setFastMathFlags(SPIRVValue *bv);
   void setFastMathFlags(Value *val);
   llvm::Value *transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
-  Instruction *transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
+  llvm::Value *transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
 
   void setName(llvm::Value *v, SPIRVValue *bv);
   void setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi);
