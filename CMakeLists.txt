@@ -25,7 +25,7 @@
 
 cmake_minimum_required(VERSION 3.13.4)
 
-project(VKGC LANGUAGES C CXX)
+project(VKGC LANGUAGES C CXX){}
 
 ### Standalone LLPC build handling
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
