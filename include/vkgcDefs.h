@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 57
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     57.2 | Move all internal resource binding id to enum InternalBinding.                                        |
 //  |     57.1 | Add forceNonUniformResourceIndexStageMask to PipelineOptions                                          |
 //  |     57.0 | Merge aggressiveInvariantLoads and disableInvariantLoads to an enumerated option                      |
 //  |     56.2 | Add aggressiveInvariantLoads and disableInvariantLoads to PipelineShaderOptions                       |
@@ -180,11 +181,6 @@ static const unsigned Version = LLPC_INTERFACE_MAJOR_VERSION;
 static const unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
 static const unsigned MaxVertexAttribs = 64;
 static const unsigned MaxColorTargets = 8;
-static const unsigned FetchShaderInternalBufferBinding = 5;
-static const unsigned ReverseThreadGroupControlBinding = 7;
-#if VKI_RAY_TRACING
-static const unsigned RtCaptureReplayInternalBufferBinding = 8;
-#endif
 static const unsigned MaxFetchShaderInternalBufferSize = 16 * MaxVertexAttribs;
 
 // Forward declarations
@@ -309,6 +305,24 @@ static_assert((1 << (ShaderStageCount - 1)) == ShaderStageRayTracingCallableBit,
 static_assert((1 << (ShaderStageCount - 1)) == ShaderStageComputeBit,
               "Vkgc::ShaderStage has been updated. Please update Vkgc::ShaderStageBit as well.");
 #endif
+
+/// Enumerates the binding ID of internal resource.
+enum InternalBinding : unsigned {
+  FetchShaderBinding = 0,     ///< Binding ID of vertex buffer table
+  ConstantBuffer0Binding = 1, ///< Binding ID of default uniform block
+  PushConstantBinding = 2,    ///< Binding ID of push constant buffer
+#if VKI_RAY_TRACING
+  ShaderRecordBufferBinding = 3, ///< Binding ID of ray-tracing shader record buffer
+#endif
+  TaskPayloadBinding = 4,               ///< Binding ID of payload buffer in task shader
+  FetchShaderInternalBufferBinding = 5, ///< Binding ID of uber-fetch shader internal buffer
+  ReverseThreadGroupControlBinding = 7, ///< Binding ID of internal buffer for reverseThreadGroup
+#if VKI_RAY_TRACING
+  RtCaptureReplayInternalBufferBinding = 8, ///< Binding ID of ray-tracing capture replay internal buffer
+#endif
+  SpecConstInternalBufferBindingId = 9, ///< Binding ID of internal buffer for specialized constant.
+  SpecConstInternalBufferBindingIdEnd = SpecConstInternalBufferBindingId + ShaderStageCount,
+};
 
 /// Enumerates the function of a particular node in a shader's resource mapping graph.
 enum class ResourceMappingNodeType : unsigned {
