@@ -88,7 +88,7 @@ std::pair<lgc::PassManager &, LegacyPassManager &> PassManagerCache::getPassMana
   // TODO: Creation of a normal compilation pass manager, not just one for a glue shader.
   assert(info.isGlue && "Non-glue shader compilation not implemented yet");
 
-  passManagers.first.reset(PassManager::Create(m_lgcContext->getTargetMachine()));
+  passManagers.first.reset(PassManager::Create(m_lgcContext));
   passManagers.first->registerFunctionAnalysis([&] { return m_lgcContext->getTargetMachine()->getTargetIRAnalysis(); });
 
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
