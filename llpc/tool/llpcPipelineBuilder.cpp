@@ -121,7 +121,7 @@ std::unique_ptr<PipelineBuilder> createPipelineBuilder(ICompiler &compiler, Comp
 void *PipelineBuilder::runPreBuildActions(PipelineBuildInfo buildInfo) {
   void *pipelineDumpHandle = nullptr;
   if (shouldDumpPipelines())
-    pipelineDumpHandle = IPipelineDumper::BeginPipelineDump(m_dumpOptions.getPointer(), buildInfo);
+    pipelineDumpHandle = IPipelineDumper::BeginPipelineDump(&m_dumpOptions.value(), buildInfo);
 
   if (m_printPipelineInfo)
     printPipelineInfo(buildInfo);
