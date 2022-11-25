@@ -36,7 +36,8 @@
 ; SHADERTEST2-DAG: tbuffer_load_format_x v5, v{{[0-9]*}}, s[{{[0-9]+}}:{{[0-9]+}}],  {{dfmt:4, nfmt:7, 0|0 format:\[BUF_DATA_FORMAT_32,BUF_NUM_FORMAT_FLOAT\]}} idxen offset:4
 ; SHADERTEST2-DAG: tbuffer_load_format_x v6, v{{[0-9]*}}, s[{{[0-9]+}}:{{[0-9]+}}],  {{dfmt:4, nfmt:7, 0|0 format:\[BUF_DATA_FORMAT_32,BUF_NUM_FORMAT_FLOAT\]}} idxen offset:8
 ; Identify the start of the vertex shader
-; SHADERTEST2: s_getpc_b64 s[0:1]
+; SHADERTEST2: <_amdgpu_vs_main_fetchless>:
+; SHADERTEST2: s_getpc_b64 s[{{[0-9]+}}:{{[0-9]+}}]
 ; Identify the start of the fragment shader, and check its alignment at the same time.
 ; SHADERTEST2: 00 <_amdgpu_ps_main>
 ; END_SHADERTEST

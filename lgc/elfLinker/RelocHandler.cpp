@@ -190,7 +190,7 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
       if (!node)
         report_fatal_error("No resource node for " + name);
       value = (node->concreteType == ResourceNodeType::DescriptorBufferCompact ||
-               node->concreteType == ResourceNodeType::DescriptorBufferCompact)
+               node->concreteType == ResourceNodeType::DescriptorConstBufferCompact)
                   ? 1
                   : 0;
       return true;

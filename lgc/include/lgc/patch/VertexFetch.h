@@ -49,6 +49,9 @@ public:
   // Generate code to fetch a vertex value
   virtual llvm::Value *fetchVertex(llvm::Type *inputTy, const VertexInputDescription *description, unsigned location,
                                    unsigned compIdx, BuilderBase &builder) = 0;
+
+  // Generate code to fetch a vertex value for uber shader
+  virtual llvm::Value *fetchVertex(llvm::CallInst *vertexFetches, llvm::Value *inputDesc, BuilderBase &builder) = 0;
 };
 
 // =====================================================================================================================
