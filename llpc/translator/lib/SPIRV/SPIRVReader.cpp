@@ -5923,7 +5923,10 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
                              : lgc::Builder::ImageFlagEnforceReadFirstLaneSampler;
   };
 
-  if (bImageInst->hasDecorate(DecorationNonUniformEXT)) {
+  bool forceNonUniform = isShaderStageInMask(convertToShaderStage(m_execModule),
+                                             getPipelineOptions()->forceNonUniformResourceIndexStageMask);
+
+  if (forceNonUniform || bImageInst->hasDecorate(DecorationNonUniformEXT)) {
     info->flags |= lgc::Builder::ImageFlagNonUniformImage;
     if (bImageInst->getType()->getOpCode() == OpTypeSampledImage)
       info->flags |= lgc::Builder::ImageFlagNonUniformSampler;
@@ -5950,7 +5953,7 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
     while (bImagePtr->getOpCode() == OpAccessChain || bImagePtr->getOpCode() == OpInBoundsAccessChain) {
       std::vector<SPIRVValue *> operands = static_cast<SPIRVInstTemplateBase *>(bImagePtr)->getOperands();
       for (SPIRVValue *operand : operands) {
-        if (operand->hasDecorate(DecorationNonUniformEXT))
+        if (forceNonUniform || operand->hasDecorate(DecorationNonUniformEXT))
           info->flags |= lgc::Builder::ImageFlagNonUniformImage;
       }
       imageAccessChain = bImagePtr;
@@ -5993,13 +5996,13 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
   while (scanBackInst->getOpCode() == OpImage || scanBackInst->getOpCode() == OpSampledImage) {
     if (scanBackInst->getOpCode() == OpSampledImage) {
       auto sampler = static_cast<SPIRVInstTemplateBase *>(scanBackInst)->getOpValue(1);
-      if (sampler->hasDecorate(DecorationNonUniformEXT))
+      if (forceNonUniform || sampler->hasDecorate(DecorationNonUniformEXT))
         info->flags |= lgc::Builder::ImageFlagNonUniformSampler;
       if (sampler->getOpCode() == OpLoad)
         samplerLoadSrc = static_cast<SPIRVLoad *>(sampler)->getSrc();
     }
     scanBackInst = static_cast<SPIRVInstTemplateBase *>(scanBackInst)->getOpValue(0);
-    if (scanBackInst->hasDecorate(DecorationNonUniformEXT))
+    if (forceNonUniform || scanBackInst->hasDecorate(DecorationNonUniformEXT))
       info->flags |= lgc::Builder::ImageFlagNonUniformImage;
     if (scanBackInst->getOpCode() == OpLoad)
       imageLoadSrc = static_cast<SPIRVLoad *>(scanBackInst)->getSrc();

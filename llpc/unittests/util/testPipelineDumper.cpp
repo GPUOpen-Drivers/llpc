@@ -372,5 +372,25 @@ TEST(PipelineDumperTest, TestInternalRTShadersCompute) {
 }
 #endif
 
+// =====================================================================================================================
+// Test the forceNonUniformResourceIndexStageMask option.
+
+TEST(PipelineDumperTest, TestForceNonUniformResourceIndexStageMaskGraphics) {
+  ModifyGraphicsBuildInfo modifyBuildInfo = [](GraphicsPipelineBuildInfo *buildInfo) {
+    buildInfo->options.forceNonUniformResourceIndexStageMask = ~0u;
+  };
+
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
+  runGraphicsPipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
+TEST(PipelineDumperTest, TestForceNonUniformResourceIndexStageMaskCompute) {
+  ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
+    buildInfo->options.forceNonUniformResourceIndexStageMask = ~0u;
+  };
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
+  runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
 } // namespace
 } // namespace Llpc
