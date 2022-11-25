@@ -1780,8 +1780,10 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
   SET_REG_FIELD(&config->meshRegs, GE_NGG_SUBGRP_CNTL, THDS_PER_SUBGRP, calcFactor.primAmpFactor);
 
   const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
-  const bool hasPrimitivePayload = builtInUsage.primitiveId || builtInUsage.layer || builtInUsage.viewportIndex ||
-                                   builtInUsage.primitiveShadingRate || enableMultiView;
+  bool hasPrimitivePayload =
+      builtInUsage.layer || builtInUsage.viewportIndex || builtInUsage.primitiveShadingRate || enableMultiView;
+  if (gfxIp.major < 11)
+    hasPrimitivePayload |= builtInUsage.primitiveId;
   SET_REG_FIELD(&config->meshRegs, SPI_SHADER_IDX_FORMAT, IDX0_EXPORT_FORMAT,
                 hasPrimitivePayload ? SPI_SHADER_2COMP : SPI_SHADER_1COMP);
   SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_DRAW_PAYLOAD_CNTL, EN_PRIM_PAYLOAD, hasPrimitivePayload);

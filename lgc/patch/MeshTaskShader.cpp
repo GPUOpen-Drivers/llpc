@@ -1953,9 +1953,9 @@ void MeshTaskShader::exportPrimitive() {
   Value *primitivePayload = nullptr;
   Value *primitiveId = nullptr;
   if (builtInUsage.primitiveId) {
+    primitiveId = readMeshBuiltInFromLds(BuiltInPrimitiveId);
     if (m_gfxIp.major < 11) {
       // [16:0] = Pipeline primitive ID
-      primitiveId = readMeshBuiltInFromLds(BuiltInPrimitiveId);
       auto primitiveIdMaskAndShift = m_builder->CreateAnd(primitiveId, 0x1FFFF);
       if (primitivePayload)
         primitivePayload = m_builder->CreateOr(primitivePayload, primitiveIdMaskAndShift);
