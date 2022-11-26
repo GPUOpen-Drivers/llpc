@@ -1129,7 +1129,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
 
       if (cl::NewPassManager) {
-        std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
+        std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
         lowerPassMgr->setPassIndex(&passIndex);
         SpirvLower::registerPasses(*lowerPassMgr);
 
@@ -1248,7 +1248,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
       bool success;
       if (cl::NewPassManager) {
-        std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
+        std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
         lowerPassMgr->setPassIndex(&passIndex);
         SpirvLower::registerPasses(*lowerPassMgr);
 
@@ -2193,7 +2193,7 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, Module *module, El
   bool success;
   unsigned passIndex = 0;
   if (cl::NewPassManager) {
-    std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
+    std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
     lowerPassMgr->setPassIndex(&passIndex);
     SpirvLower::registerPasses(*lowerPassMgr);
 
@@ -2412,7 +2412,7 @@ Result Compiler::buildRayTracingPipelineInternal(Context *context, ArrayRef<cons
 
     bool success;
     if (cl::NewPassManager) {
-      std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
+      std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
       lowerPassMgr->setPassIndex(&passIndex);
       SpirvLower::registerPasses(*lowerPassMgr);
 
@@ -2448,7 +2448,7 @@ Result Compiler::buildRayTracingPipelineInternal(Context *context, ArrayRef<cons
 
     bool success;
     if (cl::NewPassManager) {
-      std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create());
+      std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
       lowerPassMgr->setPassIndex(&passIndex);
       SpirvLower::registerPasses(*lowerPassMgr);
 

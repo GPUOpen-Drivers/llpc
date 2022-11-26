@@ -137,7 +137,7 @@ static bool isIsaText(StringRef data) {
 static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_stream &outStream) {
   // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
   LgcContext *lgcContext = pipeline.getLgcContext();
-  std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(lgcContext->getTargetMachine()));
+  std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(lgcContext));
   passMgr->registerFunctionAnalysis([&] { return lgcContext->getTargetMachine()->getTargetIRAnalysis(); });
   passMgr->registerModuleAnalysis([&] { return PipelineShaders(); });
   passMgr->registerModuleAnalysis([&] { return PipelineStateWrapper(static_cast<PipelineState *>(&pipeline)); });
