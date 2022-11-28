@@ -1,6 +1,6 @@
 ###############################################################################
 # This file is taken from the LLVM Project's
-# llvm/utils/UpdateTestChecks/common.py.
+# llvm/utils/UpdateTestChecks/common.py and has been modified for use in LLPC.
 #
 # The original file is licensed under the Apache License v2.0 with LLVM
 # Exceptions, see LICENSE.txt in this directory.
@@ -323,6 +323,26 @@ def invoke_tool(exe, cmd_args, ir, preprocess_cmd=None, verbose=False):
   # Fix line endings to unix CR style.
   return stdout.replace('\r\n', '\n')
 
+# Invoke the tool that is being tested, without any preprocessing and without
+# support for pipes.
+def invoke_tool_only(exe, cmd_args, ir, verbose=False):
+  substitutions = getSubstitutions(ir)
+
+  if isinstance(cmd_args, list):
+    args = [applySubstitutions(a, substitutions) for a in cmd_args]
+    stdout = subprocess.check_output([exe] + args)
+  else:
+    stdout = subprocess.check_output(exe + ' ' + applySubstitutions(cmd_args, substitutions),
+                                    shell=True)
+
+  # FYI, if you crashed here with a decode error, your run line probably
+  # results in bitcode or other binary format being written to the pipe.
+  # For an opt test, you probably want to add -S or -disable-output.
+  stdout = stdout.decode()
+
+  # Fix line endings to unix CR style.
+  return stdout.replace('\r\n', '\n')
+
 ##### LLVM IR parser
 RUN_LINE_RE = re.compile(r'^\s*(?://|[;#])\s*RUN:\s*(.*)$')
 CHECK_PREFIX_RE = re.compile(r'--?check-prefix(?:es)?[= ](\S+)')
@@ -607,7 +627,7 @@ class FunctionTestBuilder:
             else:
               # This means a previous RUN line produced a body for this function
               # that is different from the one produced by this current RUN line,
-              # so the body can't be common accross RUN lines. We use None to
+              # so the body can't be common across RUN lines. We use None to
               # indicate that.
               self._func_dict[prefix][func] = None
         else:
