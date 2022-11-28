@@ -4,13 +4,13 @@ on: [pull_request]
 jobs:
   run:
     name: typos
-    runs-on: "ubuntu-20.04"
+    runs-on: "ubuntu-latest"
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v2
 
     - name: Check spelling
-      uses: crate-ci/typos@v1.11.1
+      uses: crate-ci/typos@v1.13.1
 
     - name: Help
       if: always()
