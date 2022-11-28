@@ -93,7 +93,7 @@ RUN EXTRA_COMPILER_FLAGS=() \
     && if echo "$FEATURES" | grep -q "+asan" ; then \
          SANITIZERS+=("Address"); \
          echo "export ASAN_OPTIONS=detect_leaks=0" >> /vulkandriver/env.sh; \
-         echo "export LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan-x86_64.so)" >> /vulkandriver/env.sh; \
+         echo "export LD_LIBRARY_PATH=$(dirname $(clang -print-file-name=libclang_rt.asan-x86_64.so))" >> /vulkandriver/env.sh; \
        fi \
     && if echo "$FEATURES" | grep -q "+ubsan" ; then \
          SANITIZERS+=("Undefined"); \

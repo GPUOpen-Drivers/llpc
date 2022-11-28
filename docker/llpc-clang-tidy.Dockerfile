@@ -3,7 +3,7 @@
 # Sample invocation:
 #    docker build .                                                                                         \
 #      --file docker/llpc-clang-tidy.Dockerfile                                                             \
-#      --build-arg AMDVLK_IMAGE=***/amdvlk_release_clang:nightly                                            \
+#      --build-arg AMDVLK_IMAGE=amdvlkadmin/amdvlk_release_clang:nightly                                    \
 #      --build-arg LLPC_REPO_NAME=GPUOpen-Drivers/llpc                                                      \
 #      --build-arg LLPC_REPO_REF=<GIT_REF>                                                                  \
 #      --build-arg LLPC_REPO_SHA=<GIT_SHA>                                                                  \
