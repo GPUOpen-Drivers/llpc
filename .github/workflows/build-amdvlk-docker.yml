@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host-os:        ["ubuntu-20.04"]
+        host-os:        ["ubuntu-22.04"]
         image-template: ["amdvlkadmin/amdvlk_%s%s:nightly"]
         branch:         [dev]
         config:         [Release]
