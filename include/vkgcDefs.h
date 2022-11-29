@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 57
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     57.1 | Add forceNonUniformResourceIndexStageMask to PipelineOptions                                          |
 //  |     57.0 | Merge aggressiveInvariantLoads and disableInvariantLoads to an enumerated option                      |
 //  |     56.2 | Add aggressiveInvariantLoads and disableInvariantLoads to PipelineShaderOptions                       |
 //  |     56.1 | Add struct UberFetchShaderAttribInfo                                                                  |
@@ -508,6 +509,7 @@ struct PipelineOptions {
 #else
   bool reserved15;
 #endif
+  unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

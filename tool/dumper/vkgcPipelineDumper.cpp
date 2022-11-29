@@ -804,6 +804,9 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
 #if VKI_RAY_TRACING
   dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
 #endif
+
+  dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
+           << "\n";
 }
 
 // =====================================================================================================================
@@ -1525,6 +1528,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 #if VKI_RAY_TRACING
   hasher->Update(options->internalRtShaders);
 #endif
+  hasher->Update(options->forceNonUniformResourceIndexStageMask);
 }
 
 // =====================================================================================================================

@@ -276,6 +276,11 @@ cl::opt<unsigned> OverrideThreadGroupSizeZ("override-threadGroupSizeZ",
 // -reverse-thread-group
 cl::opt<bool> ReverseThreadGroup("reverse-thread-group", cl::desc("Reverse thread group ID\n"), cl::init(false));
 
+// -force-non-uniform-resource-index-stage-mask
+cl::opt<unsigned> ForceNonUniformResourceIndexStageMask("force-non-uniform-resource-index-stage-mask",
+                                                        cl::desc("Stage mask to force non uniform resource index\n"),
+                                                        cl::init(0));
+
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 cl::opt<unsigned> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
                                            cl::desc("Filter which types of pipeline dump are disabled\n"
@@ -489,6 +494,13 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->compPipelineInfo.options.overrideThreadGroupSizeZ = OverrideThreadGroupSizeZ;
   compileInfo->compPipelineInfo.options.threadGroupSwizzleMode = ThreadGroupSwizzleModeSetting;
   compileInfo->compPipelineInfo.options.reverseThreadGroup = ReverseThreadGroup;
+
+  compileInfo->compPipelineInfo.options.forceNonUniformResourceIndexStageMask = ForceNonUniformResourceIndexStageMask;
+  compileInfo->gfxPipelineInfo.options.forceNonUniformResourceIndexStageMask = ForceNonUniformResourceIndexStageMask;
+#if VKI_RAY_TRACING
+  compileInfo->rayTracePipelineInfo.options.forceNonUniformResourceIndexStageMask =
+      ForceNonUniformResourceIndexStageMask;
+#endif
 
   // Set NGG control settings
   if (ParsedGfxIp.major >= 10) {
