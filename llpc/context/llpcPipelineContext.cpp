@@ -420,10 +420,13 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
     shaderOptions.allowReZ = shaderInfo->options.allowReZ;
     shaderOptions.forceLateZ = shaderInfo->options.forceLateZ;
 
-    if (shaderInfo->options.vgprLimit != 0 && shaderInfo->options.vgprLimit != UINT_MAX)
-      shaderOptions.vgprLimit = shaderInfo->options.vgprLimit;
-    else
-      shaderOptions.vgprLimit = VgprLimit;
+    shaderOptions.vgprLimit = shaderInfo->options.vgprLimit;
+
+    if (VgprLimit != 0) {
+      if (VgprLimit < shaderOptions.vgprLimit || shaderOptions.vgprLimit == 0) {
+        shaderOptions.vgprLimit = VgprLimit;
+      }
+    }
 
     if (ScalarizeWaterfallDescriptorLoads.getNumOccurrences() > 0) {
       shaderOptions.scalarizeWaterfallLoads = ScalarizeWaterfallDescriptorLoads;
