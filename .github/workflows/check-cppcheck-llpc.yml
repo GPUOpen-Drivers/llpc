@@ -17,4 +17,4 @@ jobs:
           git fetch origin +${GITHUB_SHA}:${GITHUB_REF} --update-head-ok
           git checkout ${GITHUB_SHA}
       - name: Run cppcheck
-        run: cppcheck -q -j$(( $(nproc) * 4 )) --error-exitcode=1 --std=c++14 --inline-suppr .
+        run: cppcheck -q -j$(( $(nproc) * 4 )) --error-exitcode=1 --std=c++17 --inline-suppr .
