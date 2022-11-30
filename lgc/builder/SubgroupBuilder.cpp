@@ -268,7 +268,8 @@ Value *SubgroupBuilder::CreateSubgroupBallotInclusiveBitCount(Value *const value
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupBallotExclusiveBitCount(Value *const value, const Twine &instName) {
   if (getShaderSubgroupSize() <= 32)
-    return CreateSubgroupMbcnt(CreateExtractElement(value, getInt32(0)), "");
+    // Directly invoke the required mbcnt_lo intrinsic since CreateSubgroupMbcnt expects a 64-bit mask
+    return CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {CreateExtractElement(value, getInt32(0)), getInt32(0)});
   Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
   result = CreateBitCast(result, getInt64Ty());
   return CreateSubgroupMbcnt(result, "");
