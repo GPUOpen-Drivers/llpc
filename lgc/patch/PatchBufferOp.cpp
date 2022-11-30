@@ -181,14 +181,14 @@ void PatchBufferOp::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgInst)
 
   m_builder->SetInsertPoint(&atomicCmpXchgInst);
 
-  Value *const pointer = getPointerOperandAsInst(atomicCmpXchgInst.getPointerOperand());
+  Replacement pointer = getRemappedValue(atomicCmpXchgInst.getPointerOperand());
 
   Type *const storeType = atomicCmpXchgInst.getNewValOperand()->getType();
 
   const bool isSlc = atomicCmpXchgInst.getMetadata(LLVMContext::MD_nontemporal);
 
-  Value *const bufferDesc = m_replacementMap[pointer].first;
-  Value *const baseIndex = m_builder->CreatePtrToInt(m_replacementMap[pointer].second, m_builder->getInt32Ty());
+  Value *const bufferDesc = pointer.first;
+  Value *const baseIndex = m_builder->CreatePtrToInt(pointer.second, m_builder->getInt32Ty());
   copyMetadata(baseIndex, &atomicCmpXchgInst);
 
   // If our buffer descriptor is divergent or is not a 32-bit integer, need to handle it differently.
@@ -283,14 +283,14 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
   if (atomicRmwInst.getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER) {
     m_builder->SetInsertPoint(&atomicRmwInst);
 
-    Value *const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
+    Replacement pointer = getRemappedValue(atomicRmwInst.getPointerOperand());
 
     Type *const storeType = atomicRmwInst.getValOperand()->getType();
 
     const bool isSlc = atomicRmwInst.getMetadata(LLVMContext::MD_nontemporal);
 
-    Value *const bufferDesc = m_replacementMap[pointer].first;
-    Value *const baseIndex = m_builder->CreatePtrToInt(m_replacementMap[pointer].second, m_builder->getInt32Ty());
+    Value *const bufferDesc = pointer.first;
+    Value *const baseIndex = m_builder->CreatePtrToInt(pointer.second, m_builder->getInt32Ty());
     copyMetadata(baseIndex, &atomicRmwInst);
 
     // If our buffer descriptor is divergent, need to handle it differently.
@@ -404,7 +404,7 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
     AtomicRMWInst::BinOp op = atomicRmwInst.getOperation();
     Type *const storeType = atomicRmwInst.getValOperand()->getType();
     if (op == AtomicRMWInst::FMin || op == AtomicRMWInst::FMax || op == AtomicRMWInst::FAdd) {
-      Value *const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
+      Value *const pointer = atomicRmwInst.getPointerOperand();
       m_builder->SetInsertPoint(&atomicRmwInst);
       Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
       switch (atomicRmwInst.getOperation()) {
@@ -433,7 +433,7 @@ void PatchBufferOp::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
     AtomicRMWInst::BinOp op = atomicRmwInst.getOperation();
     Type *const storeType = atomicRmwInst.getValOperand()->getType();
     if (op == AtomicRMWInst::FMin || op == AtomicRMWInst::FMax || op == AtomicRMWInst::FAdd) {
-      Value *const pointer = getPointerOperandAsInst(atomicRmwInst.getPointerOperand());
+      Value *const pointer = atomicRmwInst.getPointerOperand();
       m_builder->SetInsertPoint(&atomicRmwInst);
       Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
       switch (atomicRmwInst.getOperation()) {
@@ -481,14 +481,13 @@ void PatchBufferOp::visitBitCastInst(BitCastInst &bitCastInst) {
 
   m_builder->SetInsertPoint(&bitCastInst);
 
-  Value *const pointer = getPointerOperandAsInst(bitCastInst.getOperand(0));
+  Replacement pointer = getRemappedValue(bitCastInst.getOperand(0));
 
-  Value *const newBitCast =
-      m_builder->CreateBitCast(m_replacementMap[pointer].second, getRemappedType(bitCastInst.getDestTy()));
+  Value *const newBitCast = m_builder->CreateBitCast(pointer.second, getRemappedType(bitCastInst.getDestTy()));
 
-  copyMetadata(newBitCast, pointer);
+  copyMetadata(newBitCast, &bitCastInst);
 
-  m_replacementMap[&bitCastInst] = std::make_pair(m_replacementMap[pointer].first, newBitCast);
+  m_replacementMap[&bitCastInst] = std::make_pair(pointer.first, newBitCast);
 }
 
 // =====================================================================================================================
@@ -522,10 +521,10 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     if (m_isDivergent(*callInst.getArgOperand(0)))
       m_divergenceSet.insert(callInst.getArgOperand(0));
   } else if (callName.startswith(lgcName::LateBufferLength)) {
-    Value *const pointer = getPointerOperandAsInst(callInst.getArgOperand(0));
+    Replacement pointer = getRemappedValue(callInst.getArgOperand(0));
 
     // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
-    Value *const bufferDesc = m_replacementMap[pointer].first;
+    Value *const bufferDesc = pointer.first;
     Value *numRecords = m_builder->CreateExtractElement(bufferDesc, 2);
     Value *offset = callInst.getArgOperand(1);
 
@@ -546,15 +545,15 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
     callInst.replaceAllUsesWith(numRecords);
   } else if (callName.startswith(lgcName::LateBufferPtrDiff)) {
     Type *const ty = callInst.getArgOperand(0)->getType();
-    Value *const lhs = getPointerOperandAsInst(callInst.getArgOperand(1));
-    Value *const rhs = getPointerOperandAsInst(callInst.getArgOperand(2));
+    Value *const lhs = callInst.getArgOperand(1);
+    Value *const rhs = callInst.getArgOperand(2);
 
     assert(lhs->getType()->isPointerTy() && lhs->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
            rhs->getType()->isPointerTy() && rhs->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
            "Argument to BufferPtrDiff is not a buffer fat pointer");
 
-    Value *const lhsPtrToInt = m_builder->CreatePtrToInt(m_replacementMap[lhs].second, m_builder->getInt64Ty());
-    Value *const rhsPtrToInt = m_builder->CreatePtrToInt(m_replacementMap[rhs].second, m_builder->getInt64Ty());
+    Value *const lhsPtrToInt = m_builder->CreatePtrToInt(getRemappedValue(lhs).second, m_builder->getInt64Ty());
+    Value *const rhsPtrToInt = m_builder->CreatePtrToInt(getRemappedValue(rhs).second, m_builder->getInt64Ty());
 
     copyMetadata(lhsPtrToInt, lhs);
     copyMetadata(rhsPtrToInt, rhs);
@@ -588,13 +587,13 @@ void PatchBufferOp::visitExtractElementInst(ExtractElementInst &extractElementIn
 
   m_builder->SetInsertPoint(&extractElementInst);
 
-  Value *const pointer = getPointerOperandAsInst(extractElementInst.getVectorOperand());
+  Replacement pointer = getRemappedValue(extractElementInst.getVectorOperand());
   Value *const index = extractElementInst.getIndexOperand();
 
-  Value *const pointerElem = m_builder->CreateExtractElement(m_replacementMap[pointer].second, index);
-  copyMetadata(pointerElem, pointer);
+  Value *const pointerElem = m_builder->CreateExtractElement(pointer.second, index);
+  copyMetadata(pointerElem, &extractElementInst);
 
-  m_replacementMap[&extractElementInst] = std::make_pair(m_replacementMap[pointer].first, pointerElem);
+  m_replacementMap[&extractElementInst] = std::make_pair(pointer.first, pointerElem);
 }
 
 // =====================================================================================================================
@@ -608,12 +607,12 @@ void PatchBufferOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
 
   m_builder->SetInsertPoint(&getElemPtrInst);
 
-  Value *const pointer = getPointerOperandAsInst(getElemPtrInst.getPointerOperand());
+  Replacement pointer = getRemappedValue(getElemPtrInst.getPointerOperand());
 
   SmallVector<Value *, 8> indices(getElemPtrInst.idx_begin(), getElemPtrInst.idx_end());
 
   Value *newGetElemPtr = nullptr;
-  auto getElemPtrPtr = m_replacementMap[pointer].second;
+  auto getElemPtrPtr = pointer.second;
   auto getElemPtrEltTy = getElemPtrInst.getSourceElementType();
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(getElemPtrPtr->getType()->getScalarType(), getElemPtrEltTy));
 
@@ -622,9 +621,9 @@ void PatchBufferOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
   else
     newGetElemPtr = m_builder->CreateGEP(getElemPtrEltTy, getElemPtrPtr, indices);
 
-  copyMetadata(newGetElemPtr, pointer);
+  copyMetadata(newGetElemPtr, &getElemPtrInst);
 
-  m_replacementMap[&getElemPtrInst] = std::make_pair(m_replacementMap[pointer].first, newGetElemPtr);
+  m_replacementMap[&getElemPtrInst] = std::make_pair(pointer.first, newGetElemPtr);
 }
 
 // =====================================================================================================================
@@ -650,8 +649,8 @@ void PatchBufferOp::visitInsertElementInst(InsertElementInst &insertElementInst)
 
   m_builder->SetInsertPoint(&insertElementInst);
 
-  Value *const pointer = getPointerOperandAsInst(insertElementInst.getOperand(1));
-  Value *const index = m_replacementMap[pointer].second;
+  Replacement pointer = getRemappedValue(insertElementInst.getOperand(1));
+  Value *const index = pointer.second;
 
   Value *indexVector = nullptr;
 
@@ -659,12 +658,12 @@ void PatchBufferOp::visitInsertElementInst(InsertElementInst &insertElementInst)
     indexVector =
         UndefValue::get(FixedVectorType::get(index->getType(), cast<FixedVectorType>(type)->getNumElements()));
   else
-    indexVector = m_replacementMap[getPointerOperandAsInst(insertElementInst.getOperand(0))].second;
+    indexVector = getRemappedValue(insertElementInst.getOperand(0)).second;
 
   indexVector = m_builder->CreateInsertElement(indexVector, index, insertElementInst.getOperand(2));
-  copyMetadata(indexVector, pointer);
+  copyMetadata(indexVector, &insertElementInst);
 
-  m_replacementMap[&insertElementInst] = std::make_pair(m_replacementMap[pointer].first, indexVector);
+  m_replacementMap[&insertElementInst] = std::make_pair(pointer.first, indexVector);
 }
 
 // =====================================================================================================================
@@ -692,7 +691,7 @@ void PatchBufferOp::visitLoadInst(LoadInst &loadInst) {
 
     Type *const castType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(ADDR_SPACE_CONST);
 
-    Value *const pointer = getPointerOperandAsInst(loadInst.getPointerOperand());
+    Value *const pointer = loadInst.getPointerOperand();
 
     Value *const loadPointer = m_builder->CreateBitCast(pointer, castType);
 
@@ -826,19 +825,15 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
   if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     return;
 
-  SmallVector<Value *, 8> incomings;
+  SmallVector<Replacement> incomings;
 
-  for (unsigned i = 0, incomingValueCount = phiNode.getNumIncomingValues(); i < incomingValueCount; i++) {
-    // PHIs require us to insert new incomings in the preceding basic blocks.
-    m_builder->SetInsertPoint(phiNode.getIncomingBlock(i)->getTerminator());
-
-    incomings.push_back(getPointerOperandAsInst(phiNode.getIncomingValue(i)));
-  }
+  for (unsigned i = 0, incomingValueCount = phiNode.getNumIncomingValues(); i < incomingValueCount; i++)
+    incomings.push_back(getRemappedValueOrNull(phiNode.getIncomingValue(i)));
 
   Value *bufferDesc = nullptr;
 
-  for (Value *const incoming : incomings) {
-    Value *const incomingBufferDesc = m_replacementMap[incoming].first;
+  for (const Replacement &incoming : incomings) {
+    Value *const incomingBufferDesc = incoming.first;
 
     if (!bufferDesc)
       bufferDesc = incomingBufferDesc;
@@ -863,13 +858,13 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
       const int blockIndex = phiNode.getBasicBlockIndex(block);
       assert(blockIndex >= 0);
 
-      Value *incomingBufferDesc = m_replacementMap[incomings[blockIndex]].first;
+      Value *incomingBufferDesc = incomings[blockIndex].first;
 
       if (!incomingBufferDesc) {
         // If we cannot get an incoming buffer descriptor from the replacement map, it is unvisited yet. Generate an
         // incomplete phi and fix it later.
         incomingBufferDesc = UndefValue::get(newPhiNode->getType());
-        m_incompletePhis[{newPhiNode, block}] = incomings[blockIndex];
+        m_incompletePhis[{newPhiNode, block}] = phiNode.getIncomingValue(blockIndex);
       }
 
       newPhiNode->addIncoming(incomingBufferDesc, block);
@@ -900,12 +895,12 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
     const int blockIndex = phiNode.getBasicBlockIndex(block);
     assert(blockIndex >= 0);
 
-    Value *incomingIndex = m_replacementMap[incomings[blockIndex]].second;
+    Value *incomingIndex = incomings[blockIndex].second;
 
     if (!incomingIndex) {
       // If we cannot get an incoming index from the replacement map, do the same as buffer descriptor.
       incomingIndex = UndefValue::get(newPhiNode->getType());
-      m_incompletePhis[{newPhiNode, block}] = incomings[blockIndex];
+      m_incompletePhis[{newPhiNode, block}] = phiNode.getIncomingValue(blockIndex);
     }
 
     newPhiNode->addIncoming(incomingIndex, block);
@@ -931,11 +926,11 @@ void PatchBufferOp::visitSelectInst(SelectInst &selectInst) {
 
   m_builder->SetInsertPoint(&selectInst);
 
-  Value *const value1 = getPointerOperandAsInst(selectInst.getTrueValue());
-  Value *const value2 = getPointerOperandAsInst(selectInst.getFalseValue());
+  Replacement value1 = getRemappedValue(selectInst.getTrueValue());
+  Replacement value2 = getRemappedValue(selectInst.getFalseValue());
 
-  Value *const bufferDesc1 = m_replacementMap[value1].first;
-  Value *const bufferDesc2 = m_replacementMap[value2].first;
+  Value *const bufferDesc1 = value1.first;
+  Value *const bufferDesc2 = value2.first;
 
   Value *bufferDesc = nullptr;
 
@@ -955,8 +950,8 @@ void PatchBufferOp::visitSelectInst(SelectInst &selectInst) {
       m_invariantSet.insert(bufferDesc);
   }
 
-  Value *const index1 = m_replacementMap[value1].second;
-  Value *const index2 = m_replacementMap[value2].second;
+  Value *const index1 = value1.second;
+  Value *const index2 = value2.second;
 
   Value *const newSelect = m_builder->CreateSelect(selectInst.getCondition(), index1, index2);
   copyMetadata(newSelect, &selectInst);
@@ -1029,13 +1024,13 @@ void PatchBufferOp::visitPtrToIntInst(PtrToIntInst &ptrToIntInst) {
 
   m_builder->SetInsertPoint(&ptrToIntInst);
 
-  Value *const pointer = getPointerOperandAsInst(ptrToIntInst.getOperand(0));
+  Replacement pointer = getRemappedValue(ptrToIntInst.getOperand(0));
 
-  Value *const newPtrToInt = m_builder->CreatePtrToInt(m_replacementMap[pointer].second, ptrToIntInst.getDestTy());
+  Value *const newPtrToInt = m_builder->CreatePtrToInt(pointer.second, ptrToIntInst.getDestTy());
 
-  copyMetadata(newPtrToInt, pointer);
+  copyMetadata(newPtrToInt, &ptrToIntInst);
 
-  m_replacementMap[&ptrToIntInst] = std::make_pair(m_replacementMap[pointer].first, newPtrToInt);
+  m_replacementMap[&ptrToIntInst] = std::make_pair(pointer.first, newPtrToInt);
 
   ptrToIntInst.replaceAllUsesWith(newPtrToInt);
 }
@@ -1309,32 +1304,31 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
 }
 
 // =====================================================================================================================
-// Get a pointer operand as an instruction.
+// Get the remapped value for a fat-pointer-typed value, or {nullptr, nullptr} if the value is an instruction that has
+// not been visited yet.
 //
-// @param value : The pointer operand value to get as an instruction.
-Value *PatchBufferOp::getPointerOperandAsInst(Value *const value) {
-  // If the value is already an instruction, return it.
-  if (Instruction *const inst = dyn_cast<Instruction>(value))
-    return inst;
-
-  // If the value is a constant (i.e., null pointer), return it.
-  if (isa<Constant>(value)) {
-    Constant *const nullPointer = ConstantPointerNull::get(getRemappedType(value->getType()));
-    m_replacementMap[value] = std::make_pair(nullptr, nullPointer);
-    return value;
+// @param value : The Value to remap
+PatchBufferOp::Replacement PatchBufferOp::getRemappedValueOrNull(Value *value) const {
+  // If the value is already an instruction, look it up in the replacement map.
+  if (Instruction *inst = dyn_cast<Instruction>(value)) {
+    if (auto iter = m_replacementMap.find(inst); iter != m_replacementMap.end())
+      return iter->second;
+    return {nullptr, nullptr};
   }
 
-  ConstantExpr *const constExpr = cast<ConstantExpr>(value);
+  // Otherwise the value is a constant. Assume it is a null pointer and remap its type.
+  Constant *nullPointer = ConstantPointerNull::get(getRemappedType(value->getType()));
+  return std::make_pair(nullptr, nullPointer);
+}
 
-  Instruction *const newInst = m_builder->Insert(constExpr->getAsInstruction());
-
-  // Visit the new instruction we made to ensure we remap the value.
-  visit(newInst);
-
-  // Check that the new instruction was definitely in the replacement map.
-  assert(m_replacementMap.count(newInst) > 0);
-
-  return newInst;
+// =====================================================================================================================
+// Get the remapped value for a fat-pointer-typed value.
+//
+// @param value : The Value to remap
+PatchBufferOp::Replacement PatchBufferOp::getRemappedValue(Value *value) const {
+  Replacement pointer = getRemappedValueOrNull(value);
+  assert(pointer.second != nullptr);
+  return pointer;
 }
 
 // =====================================================================================================================
@@ -1458,7 +1452,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
 
   m_builder->SetInsertPoint(&inst);
 
-  Value *const pointer = getPointerOperandAsInst(pointerOperand);
+  Replacement pointer = getRemappedValue(pointerOperand);
 
   const DataLayout &dataLayout = m_builder->GetInsertBlock()->getModule()->getDataLayout();
 
@@ -1466,16 +1460,15 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
 
   bool isInvariant = false;
   if (isLoad) {
-    isInvariant = m_invariantSet.count(m_replacementMap[pointer].first) > 0 ||
-                  loadInst->getMetadata(LLVMContext::MD_invariant_load);
+    isInvariant = m_invariantSet.count(pointer.first) > 0 || loadInst->getMetadata(LLVMContext::MD_invariant_load);
   }
 
   const bool isSlc = inst.getMetadata(LLVMContext::MD_nontemporal);
   const bool isGlc = ordering != AtomicOrdering::NotAtomic;
   const bool isDlc = isGlc; // For buffer load on GFX10+, we set DLC = GLC
 
-  Value *const bufferDesc = m_replacementMap[pointer].first;
-  Value *const baseIndex = m_builder->CreatePtrToInt(m_replacementMap[pointer].second, m_builder->getInt32Ty());
+  Value *const bufferDesc = pointer.first;
+  Value *const baseIndex = m_builder->CreatePtrToInt(pointer.second, m_builder->getInt32Ty());
 
   // If our buffer descriptor is divergent, need to handle that differently.
   if (m_divergenceSet.count(bufferDesc) > 0) {
@@ -1720,9 +1713,9 @@ Value *PatchBufferOp::replaceICmp(ICmpInst *const iCmpInst) {
   SmallVector<Value *, 2> bufferDescs;
   SmallVector<Value *, 2> indices;
   for (int i = 0; i < 2; ++i) {
-    Value *const operand = getPointerOperandAsInst(iCmpInst->getOperand(i));
-    bufferDescs.push_back(m_replacementMap[operand].first);
-    indices.push_back(m_builder->CreatePtrToInt(m_replacementMap[operand].second, m_builder->getInt32Ty()));
+    Replacement operand = getRemappedValue(iCmpInst->getOperand(i));
+    bufferDescs.push_back(operand.first);
+    indices.push_back(m_builder->CreatePtrToInt(operand.second, m_builder->getInt32Ty()));
   }
 
   Type *const bufferDescTy = bufferDescs[0]->getType();
