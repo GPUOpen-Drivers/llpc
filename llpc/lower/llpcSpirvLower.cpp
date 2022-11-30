@@ -391,6 +391,15 @@ void SpirvLower::init(Module *module) {
   } else {
     m_shaderStage = getShaderStageFromModule(m_module);
     m_entryPoint = getEntryPoint(m_module);
+    if (m_shaderStage == ShaderStageInvalid) {
+#if VKI_RAY_TRACING
+      // There might be cases we fail to get shader stage from a module that is not directly converted from SPIR-V, for
+      // example, unified ray tracing pipeline shader, or entry for indirect ray tracing pipeline. In such case, clamp
+      // the shader stage to compute.
+#endif
+      assert(m_entryPoint);
+      m_shaderStage = ShaderStageCompute;
+    }
   }
   m_builder = m_context->getBuilder();
 }
