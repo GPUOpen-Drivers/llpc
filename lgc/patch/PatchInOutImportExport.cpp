@@ -708,16 +708,18 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
               if (locInfoMapIt == resUsage->inOutUsage.inputLocInfoMap.end()) {
                 // Try the key as the plain location
                 origLocInfo.setComponent(0);
-                locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
                 hasDynIndex = true;
               }
-            } else {
-              locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
             }
           } else {
             origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
-            locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+            if (m_shaderStage == ShaderStageFragment && isInterpolantInputImport) {
+              const unsigned interpMode = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
+              origLocInfo.setFlat(interpMode == InOutInfo::InterpModeFlat);
+              origLocInfo.setCustom(interpMode == InOutInfo::InterpModeCustom);
+            }
           }
+          locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
           assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
 
           loc = locInfoMapIt->second.getLocation();

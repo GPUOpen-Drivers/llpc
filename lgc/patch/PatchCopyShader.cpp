@@ -395,7 +395,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
 void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
   auto &builtInUsage = resUsage->builtInUsage.gs;
-  auto &locInfoXfbOutInfoMap = resUsage->inOutUsage.gs.locInfoXfbOutInfoMap;
+  auto &locInfoXfbOutInfoMap = resUsage->inOutUsage.locInfoXfbOutInfoMap;
   auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
 
   // Build the map between new location and output value
@@ -726,7 +726,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
     outLocInfo.setBuiltIn(true);
     outLocInfo.setStreamId(streamId);
 
-    auto &locInfoXfbOutInfoMap = resUsage->inOutUsage.gs.locInfoXfbOutInfoMap;
+    auto &locInfoXfbOutInfoMap = resUsage->inOutUsage.locInfoXfbOutInfoMap;
     const auto &locInfoXfbOutInfoMapIt = locInfoXfbOutInfoMap.find(outLocInfo);
     if (locInfoXfbOutInfoMapIt != locInfoXfbOutInfoMap.end()) {
 

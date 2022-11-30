@@ -118,18 +118,27 @@ public:
   bool isBuiltIn() const { return m_data.bits.isBuiltIn; }
   void setBuiltIn(bool isBuiltIn) { m_data.bits.isBuiltIn = isBuiltIn; }
 
+  bool isFlat() const { return m_data.bits.isFlat; }
+  void setFlat(bool isFlat) { m_data.bits.isFlat = isFlat; }
+
+  bool isCustom() const { return m_data.bits.isCustom; }
+  void setCustom(bool isCustom) { m_data.bits.isCustom = isCustom; }
+
   unsigned getStreamId() const { return m_data.bits.streamId; }
   void setStreamId(unsigned streamId) { m_data.bits.streamId = static_cast<uint16_t>(streamId); }
 
   bool operator<(const InOutLocationInfo &rhs) const { return this->getData() < rhs.getData(); }
+  bool operator!=(const InOutLocationInfo &rhs) const { return this->getData() != rhs.getData(); }
 
 private:
   union {
     struct {
       uint16_t isHighHalf : 1; // High half in case of 16-bit attributes
       uint16_t component : 2;  // The component index
-      uint16_t location : 10;  // The location
+      uint16_t location : 8;   // The location
       uint16_t isBuiltIn : 1;  // Whether location is actually built-in ID
+      uint16_t isFlat : 1;     // Whether is flat shading
+      uint16_t isCustom : 1;   // Whether is custom interpolation
       uint16_t streamId : 2;   // Output vertex stream ID
     } bits;
     uint16_t u16All;
@@ -346,6 +355,9 @@ struct ResourceUsage {
     std::map<unsigned, unsigned> perPrimitiveBuiltInInputLocMap;
     std::map<unsigned, unsigned> perPrimitiveBuiltInOutputLocMap;
 
+    // Map from output location info to the transform feedback info
+    std::map<InOutLocationInfo, XfbOutInfo> locInfoXfbOutInfoMap;
+
     // Transform feedback strides
     unsigned xfbStrides[MaxTransformFeedbackBuffers] = {};
 
@@ -418,9 +430,6 @@ struct ResourceUsage {
       // export generic outputs to fragment shader, always from vertex stream 0):
       //   <location, <component, byteSize>>
       std::unordered_map<unsigned, std::vector<unsigned>> genericOutByteSizes[MaxGsStreams];
-
-      // Map from output location info to the transform feedback info
-      std::map<InOutLocationInfo, XfbOutInfo> locInfoXfbOutInfoMap;
 
       // ID of the vertex stream sent to rasterizer
       unsigned rasterStream = 0;
