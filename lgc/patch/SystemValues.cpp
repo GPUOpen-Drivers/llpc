@@ -436,18 +436,22 @@ Value *ShaderSystemValues::getStreamOutBufOffset(unsigned xfbBuffer) {
     m_streamOutBufOffsets.resize(xfbBuffer + 1);
 
   if (!m_streamOutBufOffsets[xfbBuffer]) {
-    auto streamOutControlBufPtr = getStreamOutControlBufPtr();
+    auto streamOutControlBufPair = getStreamOutControlBufPtr();
+    auto streamOutControlBufPtr = streamOutControlBufPair.second;
     auto insertPos = streamOutControlBufPtr->getNextNode();
 
     Value *idxs[] = {ConstantInt::get(Type::getInt64Ty(*m_context), 0),
                      ConstantInt::get(Type::getInt64Ty(*m_context), 0), // 0: OFFSET[X], 1: FILLED_SIZE[X]
                      ConstantInt::get(Type::getInt64Ty(*m_context), xfbBuffer)};
 
-    auto streamOutControlBufType = streamOutControlBufPtr->getType()->getPointerElementType();
-    auto streamOutBufOffsetPtr =
-        GetElementPtrInst::Create(streamOutControlBufType, streamOutControlBufPtr, idxs, "", insertPos);
+    auto streamOutControlBufType = streamOutControlBufPair.first;
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(streamOutControlBufPtr->getType(), streamOutControlBufType));
+    auto streamOutBufOffsetPtr = GetElementPtrInst::Create(streamOutControlBufType, streamOutControlBufPtr, idxs, "", insertPos);
     streamOutBufOffsetPtr->setMetadata(MetaNameUniform, MDNode::get(streamOutBufOffsetPtr->getContext(), {}));
-    auto streamOutBufOffsetTy = streamOutBufOffsetPtr->getType()->getPointerElementType();
+    auto streamOutBufOffsetTy = GetElementPtrInst::getIndexedType(streamOutControlBufType, idxs);
+    // TODO: Remove this when LLPC will switch fully to opaque pointers.
+    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(streamOutBufOffsetPtr->getType(), streamOutBufOffsetTy));
 
     auto streamOutBufOffset = new LoadInst(streamOutBufOffsetTy, streamOutBufOffsetPtr, "", false, Align(4), insertPos);
     // NOTE: PAL decided not to invalidate the SQC and L1 for every stream-out update, mainly because that will hurt
@@ -500,10 +504,13 @@ std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
 
 // =====================================================================================================================
 // Get stream-out control buffer pointer
-Instruction *ShaderSystemValues::getStreamOutControlBufPtr() {
+std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutControlBufPtr() {
   assert(m_pipelineState->enableSwXfb());
   assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
          m_shaderStage == ShaderStageCopyShader);
+
+  Type *streamOutControlBufTy =
+      ArrayType::get(FixedVectorType::get(Type::getInt32Ty(*m_context), MaxTransformFeedbackBuffers), 2);
 
   if (!m_streamOutControlBufPtr) {
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
@@ -531,12 +538,10 @@ Instruction *ShaderSystemValues::getStreamOutControlBufPtr() {
     // NOTE: The stream-out control buffer has the following memory layout:
     //   OFFSET[X]: OFFSET0, OFFSET1, ..., OFFSETN
     //   FILLED_SIZE[X]: FILLED_SIZE0, FILLED_SIZE1, ..., FILLED_SIZEN
-    auto streamOutControlBufPtrTy = PointerType::get(
-        ArrayType::get(FixedVectorType::get(Type::getInt32Ty(*m_context), MaxTransformFeedbackBuffers), 2),
-        ADDR_SPACE_CONST);
+    auto streamOutControlBufPtrTy = PointerType::get(streamOutControlBufTy, ADDR_SPACE_CONST);
     m_streamOutControlBufPtr = makePointer(streamOutControlBufPtrLow, streamOutControlBufPtrTy, InvalidValue);
   }
-  return m_streamOutControlBufPtr;
+  return std::make_pair(streamOutControlBufTy, m_streamOutControlBufPtr);
 }
 
 // =====================================================================================================================
