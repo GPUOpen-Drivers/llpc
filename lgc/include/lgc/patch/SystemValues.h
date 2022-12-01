@@ -118,7 +118,7 @@ private:
   std::pair<llvm::Type *, llvm::Instruction *> getStreamOutTablePtr();
 
   // Get stream-out control buffer pointer
-  llvm::Instruction *getStreamOutControlBufPtr();
+  std::pair<llvm::Type *, llvm::Instruction *> getStreamOutControlBufPtr();
 
   // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
   llvm::Instruction *makePointer(llvm::Value *lowValue, llvm::Type *ptrTy, unsigned highValue);
