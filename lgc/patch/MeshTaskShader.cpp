@@ -2080,15 +2080,6 @@ void MeshTaskShader::exportPrimitive() {
     }
   }
 
-  if (enableMultiView) {
-    if (inOutUsage.mesh.perPrimitiveBuiltInExportLocs.count(BuiltInViewIndex) > 0) {
-      assert(viewIndex);
-      const unsigned exportLoc = inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInViewIndex];
-      primAttrExports.push_back({startLoc + exportLoc, viewIndex});
-      ++inOutUsage.primExpCount;
-    }
-  }
-
   bool exportViewportIndex = false;
   if (builtInUsage.viewportIndex) {
     exportViewportIndex = true;

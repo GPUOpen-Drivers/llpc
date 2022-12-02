@@ -624,15 +624,9 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
     for (unsigned idx = 0; idx != userDataUsage->specialUserData.size(); ++idx) {
       auto &specialUserData = userDataUsage->specialUserData[idx];
       if (!specialUserData.users.empty()) {
-        Value *arg = nullptr;
-        if (specialUserData.entryArgIdx == 0) {
-          // This is the case that no arg was created for this value. That can happen, for example when
-          // ViewIndex is used but is not enabled in pipeline state. So we need to handle it. We just replace
-          // it with UndefValue.
-          arg = UndefValue::get(specialUserData.users[0]->getType());
-        } else {
-          arg = getFunctionArgument(&func, specialUserData.entryArgIdx);
-        }
+        assert(specialUserData.entryArgIdx != 0);
+        Value *arg = getFunctionArgument(&func, specialUserData.entryArgIdx);
+
         for (Instruction *&inst : specialUserData.users) {
           if (inst && inst->getFunction() == &func) {
             Value *replacementVal = arg;
@@ -1227,6 +1221,14 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "meshPipeStatsBuf",
                                                 UserDataMapping::MeshPipeStatsBuf,
                                                 &intfData->entryArgIdxs.mesh.pipeStatsBuf));
+    }
+  } else if (m_shaderStage == ShaderStageFragment) {
+    if (m_pipelineState->getInputAssemblyState().enableMultiView &&
+        m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.viewIndex) {
+      // NOTE: Only add special user data of view index when multi-view is enabled and gl_ViewIndex is used in fragment
+      // shader.
+      specialUserDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.fs.viewIndex));
     }
   }
 

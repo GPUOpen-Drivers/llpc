@@ -1237,9 +1237,6 @@ void PatchResourceCollect::processMissingFs() {
     case BuiltInLayer:
       m_resUsage->builtInUsage.fs.layer = true;
       break;
-    case BuiltInViewIndex:
-      m_resUsage->builtInUsage.fs.viewIndex = true;
-      break;
     case BuiltInViewportIndex:
       m_resUsage->builtInUsage.fs.viewportIndex = true;
       break;
@@ -1856,12 +1853,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
       }
 
-      if (nextBuiltInUsage.viewIndex) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
-        inOutUsage.builtInOutputLocMap[BuiltInViewIndex] = mapLoc;
-      }
-
       if (nextBuiltInUsage.viewportIndex) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
@@ -1971,9 +1962,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 
       if (builtInUsage.vs.layer)
         inOutUsage.builtInOutputLocMap[BuiltInLayer] = availOutMapLoc++;
-
-      if (builtInUsage.vs.viewIndex)
-        inOutUsage.builtInOutputLocMap[BuiltInViewIndex] = availOutMapLoc++;
     }
 
     inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, availOutMapLoc);
@@ -2002,9 +1990,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (builtInUsage.tcs.cullDistanceIn > 4)
         ++availInMapLoc;
     }
-
-    if (builtInUsage.tcs.viewIndex)
-      inOutUsage.builtInInputLocMap[BuiltInViewIndex] = availInMapLoc++;
 
     // Map built-in outputs to generic ones
     if (nextStage == ShaderStageTessEval) {
@@ -2209,18 +2194,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
         inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
       }
-
-      if (nextBuiltInUsage.viewIndex) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
-        inOutUsage.builtInOutputLocMap[BuiltInViewIndex] = mapLoc;
-      }
-
-      if (nextBuiltInUsage.viewportIndex) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
-        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
-      }
     } else if (nextStage == ShaderStageGeometry) {
       // TES  ==>  GS
       const auto &nextBuiltInUsage = nextResUsage->builtInUsage.gs;
@@ -2284,9 +2257,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 
       if (builtInUsage.tes.layer)
         inOutUsage.builtInOutputLocMap[BuiltInLayer] = availOutMapLoc++;
-
-      if (builtInUsage.tes.viewIndex)
-        inOutUsage.builtInOutputLocMap[BuiltInViewIndex] = availOutMapLoc++;
     }
 
     inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, availInMapLoc);
@@ -2335,11 +2305,11 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     if (builtInUsage.gs.layer)
       mapGsBuiltInOutput(BuiltInLayer, 1);
 
-    if (builtInUsage.gs.viewIndex)
-      mapGsBuiltInOutput(BuiltInViewIndex, 1);
-
     if (builtInUsage.gs.viewportIndex)
       mapGsBuiltInOutput(BuiltInViewportIndex, 1);
+
+    if (m_pipelineState->getInputAssemblyState().enableMultiView)
+      mapGsBuiltInOutput(BuiltInViewIndex, 1);
 
     if (builtInUsage.gs.primitiveShadingRate)
       mapGsBuiltInOutput(BuiltInPrimitiveShadingRate, 1);
@@ -2376,12 +2346,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         builtInOutLocs[BuiltInLayer] = mapLoc;
       }
 
-      if (nextBuiltInUsage.viewIndex) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
-        builtInOutLocs[BuiltInViewIndex] = mapLoc;
-      }
-
       if (nextBuiltInUsage.viewportIndex) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
@@ -2416,15 +2380,11 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 
       if (builtInUsage.gs.layer)
         builtInOutLocs[BuiltInLayer] = availOutMapLoc++;
-
-      if (builtInUsage.gs.viewIndex)
-        builtInOutLocs[BuiltInViewIndex] = availOutMapLoc++;
     }
 
     inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, availInMapLoc);
   } else if (m_shaderStage == ShaderStageMesh) {
     // Mesh shader -> XXX
-    const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
     unsigned availOutMapLoc = inOutUsage.outputMapLocCount;
     unsigned availPerPrimitiveOutMapLoc = inOutUsage.perPrimitiveOutputMapLocCount;
 
@@ -2525,13 +2485,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInViewportIndex];
         inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInViewportIndex] = mapLoc;
       }
-
-      if (enableMultiView && nextBuiltInUsage.viewIndex) {
-        assert(nextInOutUsage.perPrimitiveBuiltInInputLocMap.find(BuiltInViewIndex) !=
-               nextInOutUsage.perPrimitiveBuiltInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInViewIndex];
-        inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInViewIndex] = mapLoc;
-      }
     } else if (nextStage == ShaderStageInvalid) {
       // Mesh shader only
       unsigned availPerPrimitiveExportLoc = inOutUsage.perPrimitiveOutputMapLocCount;
@@ -2580,13 +2533,6 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         inOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInViewportIndex] = availPerPrimitiveInMapLoc++;
       else
         inOutUsage.builtInInputLocMap[BuiltInViewportIndex] = availInMapLoc++;
-    }
-
-    if (builtInUsage.fs.viewIndex) {
-      if (prevStage == ShaderStageMesh)
-        inOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInViewIndex] = availPerPrimitiveInMapLoc++;
-      else
-        inOutUsage.builtInInputLocMap[BuiltInViewIndex] = availInMapLoc++;
     }
 
     if (builtInUsage.fs.clipDistance > 0 || builtInUsage.fs.cullDistance > 0) {

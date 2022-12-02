@@ -1980,11 +1980,17 @@ Value *ImageBuilder::handleFragCoordViewIndex(Value *coord, unsigned flags, unsi
     case ShaderStageVertex:
       builtInUsage.vs.viewIndex = true;
       break;
+    case ShaderStageTessControl:
+      builtInUsage.tcs.viewIndex = true;
+      break;
     case ShaderStageTessEval:
       builtInUsage.tes.viewIndex = true;
       break;
     case ShaderStageGeometry:
       builtInUsage.gs.viewIndex = true;
+      break;
+    case ShaderStageMesh:
+      builtInUsage.mesh.viewIndex = true;
       break;
     case ShaderStageFragment:
       builtInUsage.fs.viewIndex = true;

@@ -505,14 +505,14 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
   if (builtInUsage.primitiveId)
     builtInPairs.push_back(std::make_pair(BuiltInPrimitiveId, builder.getInt32Ty()));
 
-  const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
-  if (builtInUsage.layer || enableMultiView) {
-    // NOTE: If multi-view is enabled, always export gl_ViewIndex rather than gl_Layer.
-    builtInPairs.push_back(std::make_pair(enableMultiView ? BuiltInViewIndex : BuiltInLayer, builder.getInt32Ty()));
-  }
+  if (builtInUsage.layer)
+    builtInPairs.push_back(std::make_pair(BuiltInLayer, builder.getInt32Ty()));
 
   if (builtInUsage.viewportIndex)
     builtInPairs.push_back(std::make_pair(BuiltInViewportIndex, builder.getInt32Ty()));
+
+  if (m_pipelineState->getInputAssemblyState().enableMultiView)
+    builtInPairs.push_back(std::make_pair(BuiltInViewIndex, builder.getInt32Ty()));
 
   if (builtInUsage.primitiveShadingRate)
     builtInPairs.push_back(std::make_pair(BuiltInPrimitiveShadingRate, builder.getInt32Ty()));
