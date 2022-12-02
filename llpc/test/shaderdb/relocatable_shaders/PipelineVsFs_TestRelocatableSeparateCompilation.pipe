@@ -6,11 +6,11 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-EMPTY:
 ; SHADERTEST-NEXT: ; ModuleID = 'lgcPipeline'
-; SHADERTEST-NEXT: source_filename = "llpcvertex
+; SHADERTEST-NEXT: source_filename = "llpc_vertex
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-EMPTY:
 ; SHADERTEST-NEXT: ; ModuleID = 'lgcPipeline'
-; SHADERTEST-NEXT: source_filename = "llpcfragment
+; SHADERTEST-NEXT: source_filename = "llpc_fragment
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
