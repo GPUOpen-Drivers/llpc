@@ -1460,6 +1460,9 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
   // Topology is required when BaryCoord is used
   hasher->Update(pipeline->iaState.topology);
 
+  // View index in fragment shader depends on the enablement of multi-view
+  hasher->Update(pipeline->iaState.enableMultiView);
+
   if (!isRelocatableShader) {
     hasher->Update(rsState->innerCoverage);
     hasher->Update(rsState->numSamples);

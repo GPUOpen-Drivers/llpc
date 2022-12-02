@@ -1307,6 +1307,10 @@ Value *InOutBuilder::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     return ShaderInputs::getVertexIndex(builder, *getLgcContext());
   case BuiltInInstanceIndex:
     return ShaderInputs::getInstanceIndex(builder, *getLgcContext());
+  case BuiltInViewIndex:
+    if (m_pipelineState->getInputAssemblyState().enableMultiView)
+      return ShaderInputs::getSpecialUserData(UserDataMapping::ViewId, builder);
+    return builder.getInt32(0);
   default:
     // Not handled; caller will handle with lgc.input.import.builtin, which is then lowered in PatchInOutImportExport.
     return nullptr;

@@ -102,7 +102,6 @@ private:
                                     llvm::Value *compIdx, llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
                                     BuilderBase &builder);
 
-  llvm::Value *patchVsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, BuilderBase &builder);
   llvm::Value *patchTcsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
                                           llvm::Value *vertexIdx, BuilderBase &builder);
   llvm::Value *patchTesBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
@@ -220,6 +219,7 @@ private:
   // and gl_Layer is 16-bit low part). Thus, the export is delayed with them merged together.
   llvm::Value *m_viewportIndex; // Correspond to "out int gl_ViewportIndex"
   llvm::Value *m_layer;         // Correspond to "out int gl_Layer"
+  llvm::Value *m_viewIndex;     // Correspond to "in int gl_Layer"
 
   bool m_hasTs; // Whether the pipeline has tessellation shaders
 
