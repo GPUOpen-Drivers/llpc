@@ -1097,7 +1097,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (moduleDataEx->binType == BinaryType::MultiLlvmBc) {
         result = Result::ErrorInvalidShader;
       } else {
-        module = new Module((Twine("llpc") + getShaderStageName(shaderInfoEntry->entryStage)).str() +
+        module = new Module((Twine("llpc") + "_" + getShaderStageName(shaderInfoEntry->entryStage)).str() + "_" +
                                 std::to_string(getModuleIdByIndex(shaderIndex)),
                             *context);
       }
