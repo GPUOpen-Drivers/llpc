@@ -472,8 +472,9 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
           // Image descriptor.
           imagePtrTy = getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorResource);
         }
-        // Pointer to image is represented as a struct containing pointer and stride.
-        imagePtrTy = StructType::get(*m_context, {imagePtrTy, getBuilder()->getInt32Ty()});
+        // Pointer to image is represented as a struct containing {pointer, stride, planeStride, isResource}.
+        imagePtrTy = StructType::get(*m_context, {imagePtrTy, getBuilder()->getInt32Ty(), getBuilder()->getInt32Ty(),
+                                                  getBuilder()->getInt32Ty()});
 
         if (spvImageTy->getDescriptor().MS) {
           // Pointer to multisampled image is represented as two image pointers, the second one for the fmask.
@@ -2609,9 +2610,16 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
     elementTy = arrayTy->getElementType();
     Value *oneVal = getBuilder()->CreateLoad(elementTy, ptr);
     Value *result = getBuilder()->CreateInsertValue(UndefValue::get(arrayTy), oneVal, 0);
-    if (!m_convertingSamplers.empty()) {
+    // Pointer to image is represented as a struct containing {pointer, stride, planeStride, isResource}.
+    if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() >= 4) {
+      Value *planeStride = getBuilder()->CreateExtractValue(base, 2);
+      Type *ptrTy = ptr->getType();
+
       for (unsigned planeIdx = 1; planeIdx != arrayTy->getNumElements(); ++planeIdx) {
-        ptr = getBuilder()->CreateGEP(elementTy, ptr, getBuilder()->getInt32(1));
+        ptr = getBuilder()->CreateBitCast(
+            ptr, getBuilder()->getInt8Ty()->getPointerTo(ptr->getType()->getPointerAddressSpace()));
+        ptr = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), ptr, planeStride);
+        ptr = getBuilder()->CreateBitCast(ptr, ptrTy);
         oneVal = getBuilder()->CreateLoad(elementTy, ptr);
         result = getBuilder()->CreateInsertValue(result, oneVal, planeIdx);
       }
@@ -2703,12 +2711,39 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
 Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned descriptorSet, unsigned binding,
                                             ResourceNodeType searchType) {
   if (resType != ResourceNodeType::DescriptorSampler) {
-    // Image/f-mask/texel buffer, where a pointer is represented by a struct {pointer,stride}.
+    // f-mask/texel buffer, where a pointer is represented by a struct {pointer,stride}.
     Value *descPtr = getBuilder()->CreateGetDescPtr(resType, searchType, descriptorSet, binding);
     Value *descStride = getBuilder()->CreateGetDescStride(resType, searchType, descriptorSet, binding);
     descPtr = getBuilder()->CreateInsertValue(
-        UndefValue::get(StructType::get(*m_context, {descPtr->getType(), descStride->getType()})), descPtr, 0);
+        PoisonValue::get(StructType::get(*m_context, {descPtr->getType(), descStride->getType(), descStride->getType(),
+                                                      getBuilder()->getInt32Ty()})),
+        descPtr, 0);
     descPtr = getBuilder()->CreateInsertValue(descPtr, descStride, 1);
+
+    if (resType == ResourceNodeType::DescriptorResource) {
+      // Image, where a pointer is represented by a struct {pointer, stride, planeStride, isResource}
+      unsigned convertingSamplerIdx = 0;
+      unsigned nextIdx = 1;
+      for (const ConvertingSampler &convertingSampler : m_convertingSamplers) {
+        if (convertingSampler.set == descriptorSet && convertingSampler.binding == binding) {
+          convertingSamplerIdx = nextIdx;
+          break;
+        }
+        nextIdx += convertingSampler.values.size() / ConvertingSamplerDwordCount;
+      }
+      if (convertingSamplerIdx == 0) {
+        descPtr = getBuilder()->CreateInsertValue(descPtr, getBuilder()->getInt32(DescriptorSizeResource), 2);
+      } else {
+        // Sampler Descriptor includes {sampler, YCbCrMetaDta}
+        auto samplerMetadata =
+            m_convertingSamplers[convertingSamplerIdx - 1].values.data() + DescriptorSizeSamplerInDwords;
+        Value *planes = getBuilder()->getInt32(
+            reinterpret_cast<const Vkgc::SamplerYCbCrConversionMetaData *>(samplerMetadata)->word1.planes);
+        Value *planeStride = getBuilder()->CreateUDiv(descStride, planes);
+        descPtr = getBuilder()->CreateInsertValue(descPtr, planeStride, 2);
+      }
+      descPtr = getBuilder()->CreateInsertValue(descPtr, getBuilder()->getInt32(1), 3);
+    }
     return descPtr;
   }
 
@@ -3154,7 +3189,7 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
   // A sampler pointer is represented by a {pointer,stride,convertingSamplerIdx} struct. If the converting sampler
   // index is non-zero (i.e. it is actually a converting sampler), we also want to modify that index. That can only
   // happen if there are any converting samplers at all.
-  if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() >= 3) {
+  if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() == 3) {
     Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(base, 2);
     Value *modifiedIdx = getBuilder()->CreateAdd(convertingSamplerIdx, index);
     Value *isConvertingSampler = getBuilder()->CreateICmpNE(convertingSamplerIdx, getBuilder()->getInt32(0));
