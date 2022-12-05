@@ -19,6 +19,8 @@ jobs:
         config:              [Release]
         feature-set:         ["+gcc", "+gcc+assertions",
                               "+clang",
+                              "+clang+shadercache+ubsan+asan",
+                              "+clang+shadercache+ubsan+asan+assertions",
                               "+clang+shadercache+tsan"]
     steps:
       - name: Free up disk space
