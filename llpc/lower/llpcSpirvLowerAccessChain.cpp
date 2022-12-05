@@ -31,6 +31,7 @@
 #include "llpcSpirvLowerAccessChain.h"
 #include "SPIRVInternal.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <stack>
@@ -121,34 +122,65 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(GetElementPtrInst &getElemPtr
 GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *getElemPtr, unsigned addrSpace) {
   GetElementPtrInst *coalescedGetElemPtr = getElemPtr;
 
-  std::stack<User *> chainedInsts;              // Order: from top to bottom
+  std::stack<GEPOperator *> chainedInsts;       // Order: from top to bottom
   std::stack<GetElementPtrInst *> removedInsts; // Order: from bottom to top
 
   // Collect chained "getelementptr" instructions and constants from bottom to top.
-  auto ptrVal = cast<User>(getElemPtr);
+  auto ptrVal = cast<GEPOperator>(getElemPtr);
   for (;;) {
     chainedInsts.push(ptrVal);
-    auto next = ptrVal->getOperand(0);
-    if (isa<GetElementPtrInst>(next)) {
-      ptrVal = cast<User>(next);
-      continue;
-    }
-    auto constant = dyn_cast<ConstantExpr>(next);
-    if (!constant || constant->getOpcode() != Instruction::GetElementPtr)
+    ptrVal = dyn_cast<GEPOperator>(ptrVal->getOperand(0));
+    if (!ptrVal)
       break;
-    ptrVal = cast<User>(next);
   }
 
   // If there are more than one "getelementptr" instructions/constants, do coalescing
   if (chainedInsts.size() > 1) {
-    std::vector<Value *> idxs;
+    SmallVector<Value *, 8> idxs;
     unsigned startOperand = 1;
-    Value *blockPtr = nullptr;
+    Value *basePtr = nullptr;
     Type *coalescedType = nullptr;
 
     do {
       ptrVal = chainedInsts.top();
       chainedInsts.pop();
+
+      if (coalescedType) {
+        Type *currentLevelGEPSourceType = ptrVal->getSourceElementType();
+        Type *oneLevelAboveGEPRetType = GetElementPtrInst::getIndexedType(coalescedType, idxs);
+        if (currentLevelGEPSourceType != oneLevelAboveGEPRetType) {
+          // For Opaque Pointers some of GEPs (all zero-index) will be removed and since Source Type of the coalesced
+          // GEP is equal to the top of chained GEPs, this will lead to accessing wrong place in memory.
+          //
+          // Example:
+          // %1 = getelementptr { i64, [3 x [4 x { <3 x i32>, <3 x i32> }]], [3 x [4 x i32]] }, ptr
+          // addrspace(5) %381, i32 0, i32 1
+          //
+          // %2 = getelementptr [3 x [4 x { <3 x i32>, <3 x i32> }]], ptr addrspace(5) %1, i32 0, i32 0
+          // ^^^ all zero-index GEP, lack of this instruction for opaque pointers
+          //
+          // %3 = getelementptr [4 x { <3 x i32>, <3 x i32> }], ptraddrspace(5) %2, i32 0, i32 0
+          // ^^^ all zero-index GEP, lack of this instruction for opaque pointers
+          //
+          // %4 = getelementptr { <3 x i32>, <3 x i32> }, ptr addrspace(5) %3, i32 0, i32 1
+          //
+          //
+          // Result after Lower Access Chain:
+          //
+          // In case of non opaque pointers
+          // %5 = getelementptr { i64, [3 x [4 x { <3 x i32>, <3 x i32> }]], [3 x [4 x i32]] }, ptr
+          // addrspace(5) %381, i32 0, i32 1, i32 0, i32 0, i32 1
+          //
+          // For opaque pointers
+          // %5 = getelementptr { i64, [3 x [4 x { <3 x i32>, <3 x i32> }]], [3 x [4 x i32]] }, ptr
+          // addrspace(5) %381, i32 0, i32 1, i32 1
+          //
+          // We need to compare two chained GEP instructions and see if return Type of one is the same as Source
+          // Type of the other. If Types are not the same than we need to add
+          // missing zero-index elements to the "idxs" which are used to create new (coalesced) GEP instruction.
+          appendZeroIndexToMatchTypes(idxs, currentLevelGEPSourceType, oneLevelAboveGEPRetType);
+        }
+      }
 
       for (unsigned i = startOperand; i != ptrVal->getNumOperands(); ++i)
         idxs.push_back(ptrVal->getOperand(i));
@@ -157,22 +189,20 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
       // 0 to dereference the pointer value.
       startOperand = 2;
 
-      auto inst = dyn_cast<GetElementPtrInst>(ptrVal);
-
-      if (!blockPtr && inst) {
-        blockPtr = ptrVal->getOperand(0);
-        coalescedType = inst->getSourceElementType();
+      if (!basePtr) {
+        basePtr = ptrVal->getOperand(0);
+        coalescedType = ptrVal->getSourceElementType();
       }
 
-      if (inst)
+      if (auto inst = dyn_cast<GetElementPtrInst>(ptrVal))
         removedInsts.push(inst);
     } while (!chainedInsts.empty());
 
     // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(cast<PointerType>(blockPtr->getType())->isOpaqueOrPointeeTypeMatches(coalescedType));
+    assert(cast<PointerType>(basePtr->getType())->isOpaqueOrPointeeTypeMatches(coalescedType));
 
     // Create the coalesced "getelementptr" instruction (do combining)
-    coalescedGetElemPtr = GetElementPtrInst::Create(coalescedType, blockPtr, idxs, "", getElemPtr);
+    coalescedGetElemPtr = GetElementPtrInst::Create(coalescedType, basePtr, idxs, "", getElemPtr);
     getElemPtr->replaceAllUsesWith(coalescedGetElemPtr);
 
     // Remove dead "getelementptr" instructions where possible.
@@ -192,6 +222,33 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
   }
 
   return coalescedGetElemPtr;
+}
+
+// =====================================================================================================================
+// Append zero-index elements to "indexOperands" vector while unpacking "baseType" to match "typeToMatch"
+//
+// This function is used to workaround the elimination of zero-index GEP instructions which is taking place
+// when opaque pointers are enabled.
+//
+// @param indexOperands : vector to which zero-index elements will be added
+// @param typeToMatch : type used as destination of unpacking "baseType"
+// @param baseType : packed type which will be unpacked.
+void SpirvLowerAccessChain::appendZeroIndexToMatchTypes(SmallVectorImpl<Value *> &indexOperands, Type *typeToMatch,
+                                                        Type *baseType) {
+  Type *unpackType = baseType;
+  Value *zero = ConstantInt::get(Type::getInt32Ty(m_module->getContext()), 0);
+  while (unpackType != typeToMatch) {
+    // append zero-index
+    indexOperands.push_back(zero);
+    if (unpackType->isStructTy())
+      unpackType = unpackType->getStructElementType(0);
+    else if (unpackType->isArrayTy())
+      unpackType = unpackType->getArrayElementType();
+    else if (unpackType->isVectorTy())
+      unpackType = cast<VectorType>(unpackType)->getElementType();
+    else
+      llvm_unreachable("Should never be called!");
+  }
 }
 
 } // namespace Llpc

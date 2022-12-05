@@ -51,6 +51,8 @@ public:
 
 private:
   llvm::GetElementPtrInst *tryToCoalesceChain(llvm::GetElementPtrInst *getElemPtr, unsigned addrSpace);
+  void appendZeroIndexToMatchTypes(llvm::SmallVectorImpl<llvm::Value *> &indexOperands, llvm::Type *typeToMatch,
+                                   llvm::Type *baseType);
 };
 
 // =====================================================================================================================
