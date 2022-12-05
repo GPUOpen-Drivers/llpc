@@ -4,21 +4,22 @@
 ; Get the descriptor of Uber Fetch Shader buffer
 ; CHECK: [[Desc:%[0-9]*]] = call <2 x i32> @lgc.root.descriptor.v2i32(i32 1)
 
+; CHECK: [[INT64DESC:%[0-9]*]] = bitcast <2 x i32> [[Desc]] to i64
+; CHECK: [[DESCPTR:%[0-9]*]] = inttoptr i64 [[INT64DESC]] to ptr addrspace(4)
+; CHECK: [[UBERINFOPTR:%[0-9]*]] = getelementptr <4 x i32>, ptr addrspace(4) [[DESCPTR]], i32 0
+; CHECK: [[UBERINFO:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[UBERINFOPTR]], align 16
+
 ; Read the first dword: vertex attribute
-; CHECK: [[ADDR0:%[0-9]*]] = getelementptr i8, ptr addrspace(7) {{%[0-9]*}}, i32 0
-; CHECK: [[attr:%[0-9]*]] = load i32, ptr addrspace(7) [[ADDR0]], align 4
+; CHECK: [[attr:%[0-9]*]] = extractelement <4 x i32> [[UBERINFO]], i64 0
 
 ; Read the second dword: Attribute offset
-; CHECK: [[ADDR1:%[0-9]*]] = getelementptr i32, ptr addrspace(7) [[ADDR0]], i32 1
-; CHECK: [[offset:%[0-9]*]] = load i32, ptr addrspace(7) [[ADDR1]], align 4
+; CHECK: [[offset:%[0-9]*]] = extractelement <4 x i32> [[UBERINFO]], i64 1
 
 ; Read the third dword: Reciprocal of instance divisor
-; CHECK: [[ADDR2:%[0-9]*]] = getelementptr i32, ptr addrspace(7) [[ADDR1]], i32 1
-; CHECK: [[divisor:%[0-9]*]] = load i32, ptr addrspace(7) [[ADDR2]], align 4
+; CHECK: [[divisor:%[0-9]*]] = extractelement <4 x i32> [[UBERINFO]], i64 2
 
 ; Read the fourth dword: Buffer format
-; CHECK:[[ADDR3:%[0-9]*]] = getelementptr i32, ptr addrspace(7) [[ADDR2]], i32 1
-; CHECK:[[format:%[0-9]*]] = load i32, ptr addrspace(7) [[ADDR3]], align 4
+; CHECK:[[format:%[0-9]*]] = extractelement <4 x i32> [[UBERINFO]], i64 3
 
 ; parse vertex attribute
 ; Attribute binding in vertex buffer table (attr & 0xFF)
@@ -43,7 +44,7 @@
 ; fetch vertex function
 ; CHECK-LABEL: define internal <4 x i32> @FetchVertex32
 ; Load the whole vertex
-; CHECK: call <4 x i32> @llvm.amdgcn.struct.buffer.load.format.v4i32(<4 x i32> %0, i32 %1, i32 %2, i32 0, i32 0)
+; CHECK: call <4 x i32> @llvm.amdgcn.struct.buffer.load.format.v4i32(<4 x i32>
 ; Load per channel, 4 channels
 ; CHECK: call i32 @llvm.amdgcn.struct.buffer.load.format.i32(<4 x i32>
 ; CHECK: call i32 @llvm.amdgcn.struct.buffer.load.format.i32(<4 x i32>
@@ -53,10 +54,6 @@
 define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !10 !lgc.shaderstage !11 {
 .entry:
   %0 = call <4 x float> @lgc.input.import.vertex.v4f32.i32.i32(i32 0, i32 0) #1
-  call void @lgc.output.export.builtin.Position.i32.v4f32(i32 0, <4 x float> %0) #0
-  call void @lgc.output.export.builtin.PointSize.i32.f32(i32 1, float undef) #0
-  call void @lgc.output.export.builtin.ClipDistance.i32.a1f32(i32 3, [1 x float] undef) #0
-  call void @lgc.output.export.builtin.CullDistance.i32.a1f32(i32 4, [1 x float] undef) #0
   ret void
 }
 

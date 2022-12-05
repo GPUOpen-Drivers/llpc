@@ -45,6 +45,9 @@ using namespace llvm;
 // =====================================================================================================================
 // Create a load of a buffer descriptor.
 //
+// If descSet = -1, this is an internal user data, which is a plain 64-bit pointer, flags must be 'BufferFlagAddress'
+// i64 address is returned.
+//
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param descIndex : Descriptor index
@@ -54,6 +57,7 @@ using namespace llvm;
 Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
                                          Type *const pointeeTy, const Twine &instName) {
   Value *desc = nullptr;
+  bool return64Address = false;
   descIndex = scalarizeIfUniform(descIndex, flags & BufferFlagNonUniform);
 
   // Mark the shader as reading and writing (if applicable) a resource.
@@ -61,6 +65,8 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   resUsage->resourceRead = true;
   if (flags & BufferFlagWritten)
     resUsage->resourceWrite = true;
+  else if (flags & BufferFlagAddress)
+    return64Address = true;
 
   // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
   // look. Later code will use relocs.
@@ -77,6 +83,8 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       abstractType = ResourceNodeType::DescriptorResource;
     else if (flags & BufferFlagSampler)
       abstractType = ResourceNodeType::DescriptorSampler;
+    else if (flags & BufferFlagAddress)
+      abstractType = ResourceNodeType::DescriptorBufferCompact;
 
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     assert(node && "missing resource node");
@@ -100,6 +108,10 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
         dwordOffset += node->offsetInDwords;
         dwordOffset += (binding - node->binding) * node->stride;
         desc = CreateNamedCall(callName, descTy, getInt32(dwordOffset), Attribute::ReadNone);
+      }
+      if (return64Address) {
+        assert(node->concreteType == ResourceNodeType::DescriptorBufferCompact);
+        return CreateBitCast(desc, getInt64Ty());
       }
     } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
       // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
@@ -147,7 +159,8 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       // If descriptor set is -1, this is a internal resource node, it is a root node
       // and its type is ResourceNodeType::DescriptorBufferCompact.
       if (descSet == -1) {
-        desc = compactBufferDesc;
+        assert(return64Address);
+        return CreateBitCast(descLo, getInt64Ty());
       } else {
         // Add offset
         Value *descPtrHi = CreateAddByteOffset(descPtr, getInt32(8));

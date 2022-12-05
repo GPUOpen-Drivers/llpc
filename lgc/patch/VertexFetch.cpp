@@ -92,7 +92,7 @@ public:
                      BuilderBase &builder) override;
 
   // Generate code to fetch a vertex value for uber shader
-  Value *fetchVertex(llvm::CallInst *callInst, Value *inputDesc, BuilderBase &builder);
+  Value *fetchVertex(llvm::CallInst *callInst, Value *descPtr, BuilderBase &builder);
 
 private:
   void initialize(PipelineState *pipelineState);
@@ -586,13 +586,17 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     std::unique_ptr<lgc::Builder> desBuilder(Builder::createBuilderImpl(pipelineState->getLgcContext(), pipelineState));
     desBuilder->setShaderStage(ShaderStageVertex);
     desBuilder->SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
-    auto desc = desBuilder->CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
-                                                 desBuilder->getInt32(0), 0, desBuilder->getInt8Ty());
-    desBuilder->CreateInvariantStart(desc);
+    auto desc =
+        desBuilder->CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
+                                         desBuilder->getInt32(0), Builder::BufferFlagAddress, desBuilder->getInt8Ty());
+
+    // The size of each input descriptor is sizeof(UberFetchShaderAttribInfo). vector4
+    auto uberFetchAttrType = FixedVectorType::get(builder.getInt32Ty(), 4);
+    auto descPtr = desBuilder->CreateIntToPtr(desc, PointerType::get(uberFetchAttrType, ADDR_SPACE_CONST));
 
     for (CallInst *call : vertexFetches) {
       builder.SetInsertPoint(call);
-      Value *vertex = vertexFetch->fetchVertex(call, desc, builder);
+      Value *vertex = vertexFetch->fetchVertex(call, descPtr, builder);
       // Replace and erase this call.
       call->replaceAllUsesWith(vertex);
       call->eraseFromParent();
@@ -723,6 +727,33 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
     func->setCallingConv(CallingConv::C);
     func->addFnAttr(Attribute::AlwaysInline);
 
+    // Name args
+    auto argIt = func->arg_begin();
+    Value *vbDesc = argIt++;
+    vbDesc->setName("vbDesc");
+
+    Value *vbIndex = argIt++;
+    vbIndex->setName("vbIndex");
+
+    Value *vertexOffset = argIt++;
+    vertexOffset->setName("vertexOffset");
+
+    Value *compByteSize = argIt++;
+    compByteSize->setName("compByteSize");
+
+    Value *isPacked = argIt++;
+    isPacked->setName("isPacked");
+
+    Value *isBgr = argIt++;
+    isBgr->setName("isBgr");
+
+    Value *yMask = argIt++;
+    yMask->setName("yMask");
+    Value *zMask = argIt++;
+    zMask->setName("zMask");
+    Value *wMask = argIt++;
+    wMask->setName("wMask");
+
     auto entry = createBlock(".entry", func);
     auto wholeVertex = createBlock(".wholeVertex", func);
     auto comp0Block = createBlock(".comp0Block", func);
@@ -732,9 +763,9 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
     auto endfun = createBlock(".endfun", func);
 
     Value *args[] = {
-        func->getArg(0),     // rsrc
-        func->getArg(1),     // vindex
-        func->getArg(2),     // offset
+        vbDesc,              // rsrc
+        vbIndex,             // vindex
+        vertexOffset,        // offset
         builder.getInt32(0), // soffset
         builder.getInt32(0)  // glc, slc
     };
@@ -743,7 +774,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
     {
       builder.SetInsertPoint(entry);
       // If ispacked is false, we require per-component fetch
-      builder.CreateCondBr(func->getArg(4), wholeVertex, comp0Block);
+      builder.CreateCondBr(isPacked, wholeVertex, comp0Block);
     }
 
     // .wholeVertex
@@ -770,7 +801,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
     Value *comp3 = nullptr;
     // Per-component fetch
     // reset
-    args[2] = func->getArg(2);
+    args[2] = vertexOffset;
 
     // X channel
     // .comp0Block
@@ -789,7 +820,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
         comp0 = lastVert;
       }
       // If Y channel is 0, we will fetch the second component.
-      builder.CreateCondBr(func->getArg(6), comp1Block, endfun);
+      builder.CreateCondBr(yMask, comp1Block, endfun);
     }
 
     // Y channel
@@ -797,7 +828,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
     {
       builder.SetInsertPoint(comp1Block);
       // Add offset. offset = offset + componentSize
-      args[2] = builder.CreateAdd(args[2], func->getArg(3));
+      args[2] = builder.CreateAdd(args[2], compByteSize);
       if (is64bitFetch) {
         Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
         Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
@@ -811,14 +842,14 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
         lastVert = builder.CreateInsertElement(lastVert, comp1, 1);
         comp1 = lastVert;
       }
-      builder.CreateCondBr(func->getArg(7), comp2Block, endfun);
+      builder.CreateCondBr(zMask, comp2Block, endfun);
     }
 
     // Z channel
     // .comp2Block
     {
       builder.SetInsertPoint(comp2Block);
-      args[2] = builder.CreateAdd(args[2], func->getArg(3));
+      args[2] = builder.CreateAdd(args[2], compByteSize);
       if (is64bitFetch) {
         Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
         Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
@@ -832,14 +863,14 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
         lastVert = builder.CreateInsertElement(lastVert, comp2, 2);
         comp2 = lastVert;
       }
-      builder.CreateCondBr(func->getArg(8), comp3Block, endfun);
+      builder.CreateCondBr(wMask, comp3Block, endfun);
     }
 
     // W channel
     // .comp3Block
     {
       builder.SetInsertPoint(comp3Block);
-      args[2] = builder.CreateAdd(args[2], func->getArg(3));
+      args[2] = builder.CreateAdd(args[2], compByteSize);
       if (is64bitFetch) {
         Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
         Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
@@ -873,7 +904,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
         shuffleMask.push_back(builder.getInt32(0));
         shuffleMask.push_back(builder.getInt32(3));
         auto fixedVertex = builder.CreateShuffleVector(vertex, vertex, ConstantVector::get(shuffleMask));
-        vertex = builder.CreateSelect(func->getArg(5), fixedVertex, vertex);
+        vertex = builder.CreateSelect(isBgr, fixedVertex, vertex);
       }
       builder.CreateRet(vertex);
     }
@@ -892,13 +923,14 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
 }
 
 // =====================================================================================================================
+// This is an lgc.input.import.vertex operation.
 // Executes vertex fetch operations based on the uber shader buffer
 //
 // @param callInst : call instruction
-// @param inputDesc : buffer descriptor
+// @param descPtr : 64bit address of buffer
 // @param builder : Builder to use to insert vertex fetch instructions
 // @returns : vertex
-Value *VertexFetchImpl::fetchVertex(CallInst *callInst, llvm::Value *inputDesc, BuilderBase &builder) {
+Value *VertexFetchImpl::fetchVertex(CallInst *callInst, llvm::Value *descPtr, BuilderBase &builder) {
   unsigned location = cast<ConstantInt>(callInst->getArgOperand(0))->getZExtValue();
   unsigned compIdx = cast<ConstantInt>(callInst->getArgOperand(1))->getZExtValue();
   auto zero = builder.getInt32(0);
@@ -927,25 +959,22 @@ Value *VertexFetchImpl::fetchVertex(CallInst *callInst, llvm::Value *inputDesc, 
     builder.restoreIP(savedInsertPoint);
   }
 
-  // The size of each input descriptor is sizeof(UberFetchShaderAttribInfo).
-  unsigned offset = location * sizeof(UberFetchShaderAttribInfo);
-  auto currentLoc = builder.CreateGEP(builder.getInt8Ty(), inputDesc, {builder.getInt32(offset)});
+  // The size of each input descriptor is sizeof(UberFetchShaderAttribInfo). vector4
+  auto uberFetchAttrType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
+  descPtr = builder.CreateGEP(uberFetchAttrType, descPtr, {builder.getInt32(location)});
+  auto uberFetchAttr = builder.CreateLoad(vbDescTy, descPtr);
 
   // The first DWord
-  currentLoc = builder.CreateBitCast(currentLoc, PointerType::get(builder.getInt32Ty(), ADDR_SPACE_BUFFER_FAT_POINTER));
-  auto attr = builder.CreateLoad(builder.getInt32Ty(), currentLoc);
+  auto attr = builder.CreateExtractElement(uberFetchAttr, uint64_t(0));
 
   // The second DWord
-  currentLoc = builder.CreateGEP(builder.getInt32Ty(), currentLoc, {builder.getInt32(1)});
-  auto byteOffset = builder.CreateLoad(builder.getInt32Ty(), currentLoc);
+  auto byteOffset = builder.CreateExtractElement(uberFetchAttr, 1);
 
   // The third DWord
-  currentLoc = builder.CreateGEP(builder.getInt32Ty(), currentLoc, {builder.getInt32(1)});
-  auto instanceDivisor = builder.CreateLoad(builder.getInt32Ty(), currentLoc);
+  auto instanceDivisor = builder.CreateExtractElement(uberFetchAttr, 2);
 
   // The fourth DWord
-  currentLoc = builder.CreateGEP(builder.getInt32Ty(), currentLoc, {builder.getInt32(1)});
-  auto bufferFormat = builder.CreateLoad(builder.getInt32Ty(), currentLoc);
+  auto bufferFormat = builder.CreateExtractElement(uberFetchAttr, 3);
 
   // attr[0~7]
   auto descBinding = builder.CreateAnd(attr, builder.getInt32(0xFF));

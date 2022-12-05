@@ -4,14 +4,13 @@
 ; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; Load input descriptor
-; SHADERTEST: [[attr:%[0-9]*]] = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 0, i32 0)
-; SHADERTEST: [[byteOffset:%[0-9]*]] = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 4, i32 0)
-; SHADERTEST: [[instanceDivisor:%[0-9]*]] = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 8, i32 0)
-; SHADERTEST: [[bufferFormat:%[0-9]*]] = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 12, i32 0)
-; Replace buffer format
-; SHADERTEST: [[vbDesc:%[0-9]*]] = insertelement <4 x i32> %{{[0-9]*}}, i32 [[bufferFormat]], i64 3
+
+; SHADERTEST: [[DESCPTR:%[0-9]*]] = bitcast <2 x i32> %rootDesc2 to i64
+; SHADERTEST: [[INTDESCPTR:%[0-9]*]] = inttoptr i64 [[DESCPTR]] to ptr addrspace(4)
+; SHADERTEST: [[UBERINFO:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[INTDESCPTR]], align 16
+
 ; Load vertex
-; SHADERTEST: call i32 @llvm.amdgcn.struct.buffer.load.format.i32(<4 x i32> [[vbDesc]], i32 %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 0, i32 0)
+; SHADERTEST-COUNT-5: call i32 @llvm.amdgcn.struct.buffer.load.format
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
