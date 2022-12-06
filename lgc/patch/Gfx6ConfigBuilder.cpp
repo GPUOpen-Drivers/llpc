@@ -54,11 +54,8 @@ void ConfigBuilder::buildPalMetadata() {
   else {
     const bool hasTs = (m_hasTcs || m_hasTes);
 
-    if (!m_pipelineState->isWholePipeline() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
-      // FS-only shader compilation (part-pipeline compilation)
-      buildPipelineVsFsRegConfig();
-    } else if (!hasTs && !m_hasGs) {
-      // VS-FS pipeline
+    if (!hasTs && !m_hasGs) {
+      // VS-FS pipeline or FS-only shader compilation (part-pipeline compilation)
       buildPipelineVsFsRegConfig();
     } else if (hasTs && !m_hasGs) {
       // VS-TS-FS pipeline
