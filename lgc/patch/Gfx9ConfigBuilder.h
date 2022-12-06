@@ -75,8 +75,6 @@ private:
 
   void setupVgtTfParam(LsHsRegConfig *config);
   template <typename T> void setupPaSpecificRegisters(T *config);
-
-  bool getShaderWgpMode(ShaderStage shaderStage) const;
 };
 
 } // namespace Gfx9

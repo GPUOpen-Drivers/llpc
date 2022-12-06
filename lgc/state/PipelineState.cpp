@@ -1324,6 +1324,22 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
 }
 
 // =====================================================================================================================
+// Whether WGP mode is enabled for the given shader stage
+//
+// @param stage : Shader stage
+bool PipelineState::getShaderWgpMode(ShaderStage stage) const {
+  if (stage == ShaderStageCopyShader) {
+    // Treat copy shader as part of geometry shader
+    stage = ShaderStageGeometry;
+  }
+
+  assert(stage <= ShaderStageCompute);
+  assert(stage < m_shaderOptions.size());
+
+  return m_shaderOptions[stage].wgpMode;
+}
+
+// =====================================================================================================================
 // Checks if SW-emulated mesh pipeline statistics is needed
 bool PipelineState::needSwMeshPipelineStats() const {
   return getTargetInfo().getGfxIpVersion().major < 11;

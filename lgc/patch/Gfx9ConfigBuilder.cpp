@@ -946,7 +946,8 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   const bool userSgprMsb = (userDataCount > 31);
   if (gfxIp.major >= 10) {
-    bool wgpMode = (getShaderWgpMode(ShaderStageVertex) || getShaderWgpMode(ShaderStageTessControl));
+    bool wgpMode = (m_pipelineState->getShaderWgpMode(ShaderStageVertex) ||
+                    m_pipelineState->getShaderWgpMode(ShaderStageTessControl));
 
     SET_REG_GFX10_PLUS_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, MEM_ORDERED, true);
     SET_REG_GFX10_PLUS_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, WGP_MODE, wgpMode);
@@ -1055,8 +1056,8 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   const bool userSgprMsb = (userDataCount > 31);
   if (gfxIp.major == 10) {
-    bool wgpMode =
-        (getShaderWgpMode(hasTs ? ShaderStageTessEval : ShaderStageVertex) || getShaderWgpMode(ShaderStageGeometry));
+    bool wgpMode = m_pipelineState->getShaderWgpMode(hasTs ? ShaderStageTessEval : ShaderStageVertex) ||
+                   m_pipelineState->getShaderWgpMode(ShaderStageGeometry);
 
     SET_REG_GFX10_PLUS_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC1_GS, MEM_ORDERED, true);
     SET_REG_GFX10_PLUS_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC1_GS, WGP_MODE, wgpMode);
@@ -1266,9 +1267,9 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
       std::max((hasTs ? tesIntfData->userDataCount : vsIntfData->userDataCount), gsIntfData->userDataCount);
 
   const auto &gsShaderOptions = m_pipelineState->getShaderOptions(ShaderStageGeometry);
-  bool wgpMode = getShaderWgpMode(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+  bool wgpMode = m_pipelineState->getShaderWgpMode(hasTs ? ShaderStageTessEval : ShaderStageVertex);
   if (hasGs)
-    wgpMode = (wgpMode || getShaderWgpMode(ShaderStageGeometry));
+    wgpMode = (wgpMode || m_pipelineState->getShaderWgpMode(ShaderStageGeometry));
 
   SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, gsShaderOptions.debugMode);
   SET_REG_GFX10_PLUS_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, MEM_ORDERED, true);
@@ -1700,7 +1701,7 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
   unsigned userDataCount = intfData->userDataCount;
 
   const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
-  bool wgpMode = getShaderWgpMode(shaderStage);
+  bool wgpMode = m_pipelineState->getShaderWgpMode(shaderStage);
 
   SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, shaderOptions.debugMode);
   SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, MEM_ORDERED, true);
@@ -1848,7 +1849,7 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   if (gfxIp.major >= 10) {
-    bool wgpMode = getShaderWgpMode(shaderStage);
+    bool wgpMode = m_pipelineState->getShaderWgpMode(shaderStage);
 
     SET_REG_GFX10_PLUS_FIELD(config, COMPUTE_PGM_RSRC1, MEM_ORDERED, true);
     SET_REG_GFX10_PLUS_FIELD(config, COMPUTE_PGM_RSRC1, WGP_MODE, wgpMode);
@@ -2178,21 +2179,6 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
   if (posCount > 3) {
     SET_REG_FIELD(config, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, SPI_SHADER_4COMP);
   }
-}
-
-// =====================================================================================================================
-// Gets WGP mode enablement for the specified shader stage
-//
-// @param shaderStage : Shader stage
-bool ConfigBuilder::getShaderWgpMode(ShaderStage shaderStage) const {
-  if (shaderStage == ShaderStageCopyShader) {
-    // Treat copy shader as part of geometry shader
-    shaderStage = ShaderStageGeometry;
-  }
-
-  assert(shaderStage <= ShaderStageCompute);
-
-  return m_pipelineState->getShaderOptions(shaderStage).wgpMode;
 }
 
 } // namespace Gfx9

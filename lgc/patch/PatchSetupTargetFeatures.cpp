@@ -184,9 +184,10 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
 
       targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
 
-      // Allow driver setting for WGP by forcing backend to set 0
-      // which is then OR'ed with the driver set value
-      targetFeatures += ",+cumode";
+      if (m_pipelineState->getShaderWgpMode(shaderStage))
+        targetFeatures += ",-cumode";
+      else
+        targetFeatures += ",+cumode";
     }
 
     // Enable flat scratch for gfx10.3+
