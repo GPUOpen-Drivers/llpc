@@ -252,8 +252,7 @@ LgcContext *LgcContext::create(LLVMContext &context, StringRef gpuName, unsigned
 
   LLPC_OUTS("TargetMachine optimization level = " << optLevel << "\n");
 
-  builderContext->m_targetMachine =
-      target->createTargetMachine(triple, gpuName, "", targetOpts, Optional<Reloc::Model>(), None, optLevel);
+  builderContext->m_targetMachine = target->createTargetMachine(triple, gpuName, "", targetOpts, {}, None, optLevel);
   assert(builderContext->m_targetMachine);
   return builderContext;
 }
