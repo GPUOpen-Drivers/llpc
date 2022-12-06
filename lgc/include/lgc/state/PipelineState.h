@@ -298,6 +298,9 @@ public:
     m_waveSize[stage] = waveSize;
   }
 
+  // Whether WGP mode is enabled for the given shader stage
+  bool getShaderWgpMode(ShaderStage stage) const;
+
   // Get NGG control settings
   NggControl *getNggControl() { return &m_nggControl; }
 
