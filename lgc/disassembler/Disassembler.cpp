@@ -61,8 +61,8 @@ namespace {
 
 // Represents an operand of a disassembler instruction.
 struct InstOp {
-  Optional<int64_t> imm;
-  Optional<unsigned> sReg;
+  std::optional<int64_t> imm;
+  std::optional<unsigned> sReg;
 };
 
 // Represents a disassembled instruction or directive.
@@ -180,7 +180,12 @@ void ObjDisassembler::run() {
     report_fatal_error(m_objFile->getFileName() + ": '" + m_tripleName + "': " + error);
 
   // Get the CPU name.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444152
   Optional<StringRef> mcpu = m_objFile->tryGetCPUName();
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  std::optional<StringRef> mcpu = m_objFile->tryGetCPUName();
+#endif
   if (!mcpu)
     report_fatal_error(m_objFile->getFileName() + ": Cannot get CPU name");
 
