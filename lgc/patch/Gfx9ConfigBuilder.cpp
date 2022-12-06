@@ -55,17 +55,14 @@ void ConfigBuilder::buildPalMetadata() {
     const bool hasTs = (m_hasTcs || m_hasTes);
     const bool enableNgg = m_pipelineState->getNggControl()->enableNgg;
 
-    if (!m_pipelineState->isWholePipeline() && m_pipelineState->hasShaderStage(ShaderStageFragment)) {
-      // FS-only shader (part-pipeline compilation)
-      buildPipelineVsFsRegConfig();
-    } else if (m_hasTask) {
+    if (m_hasTask) {
       // Task-Mesh-FS pipeline
       buildPipelineTaskMeshFsConfig();
     } else if (m_hasMesh) {
       // Mesh-FS pipeline
       buildPipelineMeshFsConfig();
     } else if (!hasTs && !m_hasGs) {
-      // VS-FS pipeline
+      // VS-FS pipeline or FS-only shader (part-pipeline compilation)
       if (m_gfxIp.major >= 10 && enableNgg)
         buildPipelineNggVsFsRegConfig();
       else
@@ -95,12 +92,10 @@ void ConfigBuilder::buildPalMetadata() {
 }
 
 // =====================================================================================================================
-// Builds register configuration for graphics pipeline (VS-FS), or FS-only shader compilation
+// Builds register configuration for graphics pipeline (VS-FS) or FS-only shader compilation
 void ConfigBuilder::buildPipelineVsFsRegConfig() {
   GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  const bool partPipeline = !m_pipelineState->isWholePipeline() && m_pipelineState->hasShaderStage(ShaderStageFragment);
-  assert(gfxIp.major <= 10 || partPipeline); // Must be GFX10 or below, or part-pipeline compilation
-  (void(partPipeline));                      // Unused
+  assert(gfxIp.major <= 10); // Must be GFX10 or below
 
   PipelineVsFsRegConfig config(gfxIp);
 
@@ -435,7 +430,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 }
 
 // =====================================================================================================================
-// Builds register configuration for graphics pipeline (NGG, VS-FS).
+// Builds register configuration for graphics pipeline (NGG, VS-FS) or FS-only shader compilation
 void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
   GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   assert(gfxIp.major >= 10);
