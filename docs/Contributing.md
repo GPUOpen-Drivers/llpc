@@ -151,6 +151,19 @@ We do not want to rely on the Vulkan CTS. Running the Vulkan CTS takes a long
 time, putting a *time-to-test* burden on all developers. The Vulkan CTS tests
 are also harder to debug because more components are involved and require a GPU.
 
+LIT tests (tests that are run using the `llvm-lit` tool) should provide good
+and reliable coverage, e.g. using `CHECK-NEXT` lines, while still being easy
+to maintain. Where reasonably possible, try to:
+
+* For passes in LGC, write an `.lgc` test that invokes `lgc` with the `-passes`
+  option to run a single pass. Use LLVM's `update_test_checks.py` with the
+  `--tool` option to automatically generate the check lines.
+* For frontend code, write a GLSL or `.spvasm` test (either standalone file or
+  inlined in a `.pipe` file) that invokes `amdllpc` with the `-emit-lgc` option.
+  Use our [update_llpc_test_checks.py](../tool/update_llpc_test_checks.py) tool
+  to automatically generate the check lines. Where necessary, use options like
+  `--check-globals` to auto-generate additional checks.
+
 To help developers know if their tests are covering their code change, a code
 coverage analysis will be run on all PR before they are submitted. The PR
 should only be merged if the new code is covered. Exceptions can be made if
