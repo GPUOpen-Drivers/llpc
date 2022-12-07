@@ -48,6 +48,7 @@
 #include "llvm/Support/AMDGPUMetadata.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/TargetSelect.h"
+#include <optional>
 
 using namespace llvm;
 using namespace object;
