@@ -328,9 +328,7 @@ bool PatchResourceCollect::canUseNgg(Module *module) {
     return false;
 
   // TODO: If transform feedback is enabled, currently disable NGG.
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(
-      hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex));
-  if (resUsage->inOutUsage.enableXfb)
+  if (m_pipelineState->enableXfb())
     return false;
 
   if (hasTs && hasGs) {
@@ -1104,10 +1102,11 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       unsigned streamItemSize = gsResUsage->inOutUsage.gs.outLocCount[i] * geometryMode.outputVertices * 4;
       LLPC_OUTS("    stream " << i << " = " << streamItemSize);
 
-      if (gsResUsage->inOutUsage.enableXfb) {
+      if (m_pipelineState->enableXfb()) {
         LLPC_OUTS(", XFB buffer = ");
+        const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
         for (unsigned j = 0; j < MaxTransformFeedbackBuffers; ++j) {
-          if ((gsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0) {
+          if ((streamXfbBuffers[i] & (1 << j)) != 0) {
             LLPC_OUTS(j);
             if (j != MaxTransformFeedbackBuffers - 1)
               LLPC_OUTS(", ");

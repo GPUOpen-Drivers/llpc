@@ -523,10 +523,9 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
 
   uint64_t inRegMask = 0;
   auto intfData = pipelineState->getShaderInterfaceData(shaderStage);
-  auto resUsage = pipelineState->getShaderResourceUsage(shaderStage);
-  const auto &xfbStrides = resUsage->inOutUsage.xfbStrides;
+  const auto &xfbStrides = pipelineState->getXfbBufferStrides();
   const unsigned gfxIp = pipelineState->getTargetInfo().getGfxIpVersion().major;
-  const bool enableHwXfb = resUsage->inOutUsage.enableXfb && gfxIp <= 10;
+  const bool enableHwXfb = pipelineState->enableXfb() && gfxIp <= 10;
 
   // Enable optional shader inputs as required.
   switch (shaderStage) {

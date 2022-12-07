@@ -3446,7 +3446,7 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: Only export those outputs that belong to the rasterization stream.
-    assert(resUsage->inOutUsage.enableXfb == false); // Transform feedback must be disabled
+    assert(m_pipelineState->enableXfb() == false); // Transform feedback must be disabled
     return;
   }
 
@@ -3512,7 +3512,7 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: Only import those outputs that belong to the rasterization stream.
-    assert(resUsage->inOutUsage.enableXfb == false); // Transform feedback must be disabled
+    assert(m_pipelineState->enableXfb() == false); // Transform feedback must be disabled
     return UndefValue::get(outputTy);
   }
 
@@ -3564,7 +3564,7 @@ void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *thre
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // Only handle GS_EMIT message that belongs to the rasterization stream.
-    assert(resUsage->inOutUsage.enableXfb == false);
+    assert(m_pipelineState->enableXfb() == false);
     return;
   }
 
@@ -3585,7 +3585,7 @@ void NggPrimShader::processGsCut(Module *module, unsigned streamId, Value *outVe
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // Only handle GS_CUT message that belongs to the rasterization stream.
-    assert(resUsage->inOutUsage.enableXfb == false);
+    assert(m_pipelineState->enableXfb() == false);
     return;
   }
 

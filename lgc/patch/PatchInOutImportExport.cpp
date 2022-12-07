@@ -305,7 +305,7 @@ void PatchInOutImportExport::processShader() {
   bool useThreadId = (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9));
 
   // Thread ID will also be used for stream-out buffer export
-  const bool enableXfb = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
+  const bool enableXfb = m_pipelineState->enableXfb();
   useThreadId = useThreadId || enableXfb;
 
   if (useThreadId) {
@@ -1157,7 +1157,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
   Instruction *insertPos = &retInst;
 
-  const bool enableXfb = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
+  const bool enableXfb = m_pipelineState->enableXfb();
   if (m_shaderStage == ShaderStageCopyShader && enableXfb) {
     if (!m_pipelineState->getNggControl()->enableNgg) {
       // NOTE: For copy shader, if transform feedback is enabled for multiple streams, the following processing doesn't
@@ -3472,7 +3472,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
 
   Value *streamOutBufDesc = m_pipelineSysValues.get(m_entryPoint)->getStreamOutBufDesc(xfbBuffer);
 
-  const auto &xfbStrides = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.xfbStrides;
+  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
   unsigned xfbStride = xfbStrides[xfbBuffer];
 
   auto outputTy = output->getType();
@@ -3861,11 +3861,11 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
     writeIndex = CopyShaderUserSgprIdxWriteIndex;
     streamInfo = CopyShaderUserSgprIdxStreamInfo;
 
-    const auto &inoutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+    const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
     unsigned streamOffset = CopyShaderUserSgprIdxStreamOffset;
 
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-      if (inoutUsage.xfbStrides[i] > 0)
+      if (xfbStrides[i] > 0)
         streamOffsets[i] = streamOffset++;
     }
   }

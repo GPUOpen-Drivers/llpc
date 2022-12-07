@@ -344,6 +344,7 @@ void PipelineState::readState(Module *module) {
   readGraphicsState(module);
   if (!m_palMetadata)
     m_palMetadata = new PalMetadata(this, module);
+  setXfbStateMetadata(module);
 }
 
 // =====================================================================================================================
@@ -1679,6 +1680,34 @@ PrimitiveType PipelineState::getPrimitiveType() {
   }
   llvm_unreachable("Unable to get primitive type!");
   return PrimitiveType::TriangleStrip;
+}
+
+// =====================================================================================================================
+// Set transform feedback state metadata
+//
+// @param xfbStateMetadata : XFB state metadata
+void PipelineState::setXfbStateMetadata(Module *module) {
+  // Read XFB state metadata
+  for (auto &func : *module) {
+    if (isShaderEntryPoint(&func)) {
+      MDNode *xfbStateMetaNode = func.getMetadata(XfbStateMetadataName);
+      if (xfbStateMetaNode) {
+        m_xfbStateMetadata.enableXfb = true;
+        auto &streamXfbBuffers = m_xfbStateMetadata.streamXfbBuffers;
+        auto &xfbStrides = m_xfbStateMetadata.xfbStrides;
+        for (unsigned bufferIdx = 0; bufferIdx < MaxTransformFeedbackBuffers; ++bufferIdx) {
+          // Get the vertex streamId from metadata
+          auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * bufferIdx));
+          int streamId = cast<ConstantInt>(metaOp->getValue())->getSExtValue();
+          if (streamId != -1)
+            streamXfbBuffers[streamId] |= 1 << bufferIdx; // Bit mask of used xfb buffers in a stream
+          // Get the stride from metadata
+          metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * bufferIdx + 1));
+          xfbStrides[bufferIdx] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
+        }
+      }
+    }
+  }
 }
 
 // =====================================================================================================================
