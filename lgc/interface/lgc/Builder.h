@@ -1108,6 +1108,7 @@ public:
   virtual llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
                                                   llvm::Value *direction, llvm::Value *invDirection,
                                                   llvm::Value *imageDesc, const llvm::Twine &instName = "");
+
 #endif
 
   // -----------------------------------------------------------------------------------------------------------------

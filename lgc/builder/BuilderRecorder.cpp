@@ -247,9 +247,13 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
   case Opcode::ImageGetLod:
     return "image.get.lod";
 #if VKI_RAY_TRACING
-  case Opcode::ImageBvhIntersectRayAMD:
+  case Opcode::ImageBvhIntersectRay:
     return "image.bvh.intersect.ray";
+  case Opcode::Reserved2:
+    return "reserved2";
 #else
+  case Opcode::Reserved2:
+    return "reserved2";
   case Opcode::Reserved1:
     return "reserved1";
 #endif
@@ -1657,7 +1661,7 @@ Instruction *BuilderRecorder::CreateWriteBuiltInOutput(Value *valueToWrite, Buil
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value *origin, Value *direction,
                                                    Value *invDirection, Value *imageDesc, const Twine &instName) {
-  return record(Opcode::ImageBvhIntersectRayAMD, FixedVectorType::get(getInt32Ty(), 4),
+  return record(Opcode::ImageBvhIntersectRay, FixedVectorType::get(getInt32Ty(), 4),
                 {nodePtr, extent, origin, direction, invDirection, imageDesc}, instName);
 }
 
@@ -2228,7 +2232,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::WriteBuiltInOutput:
     case Opcode::WriteGenericOutput:
 #if VKI_RAY_TRACING
-    case Opcode::ImageBvhIntersectRayAMD:
+    case Opcode::ImageBvhIntersectRay:
 #endif
       // TODO: These functions have not been classified yet.
       break;

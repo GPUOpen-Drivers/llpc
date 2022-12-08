@@ -717,7 +717,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
 
 #if VKI_RAY_TRACING
-  case BuilderRecorder::Opcode::ImageBvhIntersectRayAMD: {
+  case BuilderRecorder::Opcode::ImageBvhIntersectRay: {
     Value *bvhNodePtr = args[0];
     Value *extent = args[1];
     Value *origin = args[2];

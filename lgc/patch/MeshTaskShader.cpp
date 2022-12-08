@@ -2178,7 +2178,10 @@ void MeshTaskShader::exportVertex() {
     }
   }
 
-  doExport(ExportKind::Pos, posExports);
+  bool waAtmPrecedesPos = false;
+
+  if (!waAtmPrecedesPos)
+    doExport(ExportKind::Pos, posExports);
 
   SmallVector<ExportInfo, 32> vertAttrExports;
 
@@ -2262,6 +2265,13 @@ void MeshTaskShader::exportVertex() {
   }
 
   doExport(ExportKind::VertAttr, vertAttrExports);
+  if (waAtmPrecedesPos) {
+    // Before the first export call of vertex position data, add s_wait_vscnt 0 to make sure the completion of all
+    // attributes being written to the attribute ring buffer
+    m_builder->CreateFence(AtomicOrdering::Release, SyncScope::System);
+
+    doExport(ExportKind::Pos, posExports);
+  }
 }
 
 // =====================================================================================================================

@@ -31,11 +31,14 @@
 #include "ShaderMerger.h"
 #include "NggPrimShader.h"
 #include "lgc/patch/Patch.h"
+#include "lgc/patch/PatchPreparePipelineAbi.h"
+#include "lgc/patch/SystemValues.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/BuilderBase.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -479,6 +482,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   // Construct ".endHs" block
   builder.SetInsertPoint(endHsBlock);
+
   builder.CreateRetVoid();
 
   return entryPoint;

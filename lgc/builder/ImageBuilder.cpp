@@ -1570,6 +1570,7 @@ Value *ImageBuilder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, V
 
   return CreateNamedCall(callName, FixedVectorType::get(getInt32Ty(), 4), args, {});
 }
+
 #endif
 
 // =====================================================================================================================

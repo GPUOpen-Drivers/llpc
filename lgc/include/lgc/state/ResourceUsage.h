@@ -400,9 +400,8 @@ struct ResourceUsage {
         unsigned outPatchSize; // Size of an output patch output (in dword, correspond to
                                // "patchOutputSize")
 
-        unsigned patchConstSize;   // Size of an output patch constants (in dword)
-        unsigned tessFactorStride; // Size of tess factor stride (in dword)
-
+        unsigned patchConstSize;    // Size of an output patch constants (in dword)
+        unsigned tessFactorStride;  // Size of tess factor stride (in dword)
         unsigned tessOnChipLdsSize; // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
 #if VKI_RAY_TRACING
         unsigned rayQueryLdsStackSize; // Ray query LDS stack size

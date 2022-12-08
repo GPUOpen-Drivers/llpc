@@ -456,4 +456,5 @@ Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value 
   return static_cast<BuilderImplBase *>(this)->CreateImageBvhIntersectRay(nodePtr, extent, origin, direction,
                                                                           invDirection, imageDesc, instName);
 }
+
 #endif
