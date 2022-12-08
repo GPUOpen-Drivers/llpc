@@ -1519,7 +1519,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
                                           << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
       }
 
-      if (builtInId == BuiltInCullPrimitiveEXT && outputTy->isIntegerTy(32)) {
+      if (builtInId == lgc::BuiltInCullPrimitive && outputTy->isIntegerTy(32)) {
         // NOTE: In SPIR-V translation, the boolean type (i1) in output block is converted to i32. Here, we convert it
         // back to i1 for further processing in LGC.
         outputValue = m_builder->CreateTrunc(outputValue, m_builder->getInt1Ty());

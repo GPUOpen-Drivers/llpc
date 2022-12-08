@@ -1,4 +1,4 @@
-/*
+﻿/*
  ***********************************************************************************************************************
  *
  *  Copyright (c) 2017-2022 Advanced Micro Devices, Inc. All Rights Reserved.
@@ -406,7 +406,6 @@ void PatchInOutImportExport::processShader() {
       }
 
       calcFactor.tessFactorStride = tessFactorStride;
-
       calcFactor.tessOnChipLdsSize = calcFactor.onChip.tessFactorStart + tessFactorTotalSize;
 
 #if VKI_RAY_TRACING

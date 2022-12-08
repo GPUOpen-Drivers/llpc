@@ -48,7 +48,7 @@ public:
 
   // Create scalar from integer dot product of vector
   llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
-                                          unsigned flags, const llvm::Twine &instName = "") override final;
+                                       unsigned flags, const llvm::Twine &instName = "") override final;
 
 protected:
   // Get the ShaderModes object.
@@ -410,6 +410,7 @@ public:
   llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
                                           llvm::Value *direction, llvm::Value *invDirection, llvm::Value *imageDesc,
                                           const llvm::Twine &instName = "") override final;
+
 #endif
 
 private:

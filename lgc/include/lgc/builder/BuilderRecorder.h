@@ -153,8 +153,10 @@ public:
     ImageQuerySize,
     ImageGetLod,
 #if VKI_RAY_TRACING
-    ImageBvhIntersectRayAMD,
+    ImageBvhIntersectRay,
+    Reserved2,
 #else
+    Reserved2,
     Reserved1,
 #endif
 
@@ -255,7 +257,7 @@ public:
                                 const llvm::Twine &instName = "") override final;
 
   llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
-                                          unsigned flags, const llvm::Twine &instName = "") override final;
+                                       unsigned flags, const llvm::Twine &instName = "") override final;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Arithmetic operations
@@ -446,6 +448,7 @@ public:
   llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
                                           llvm::Value *direction, llvm::Value *invDirection, llvm::Value *imageDesc,
                                           const llvm::Twine &instName = "") override final;
+
 #endif
 
   // -----------------------------------------------------------------------------------------------------------------

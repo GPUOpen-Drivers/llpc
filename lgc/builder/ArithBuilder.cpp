@@ -1358,12 +1358,10 @@ Value *ArithBuilder::createFMix(Value *x, Value *y, Value *a, const Twine &instN
 Value *ArithBuilder::canonicalize(Value *value) {
   const auto &shaderMode = getShaderModes()->getCommonShaderMode(m_shaderStage);
   auto destTy = value->getType();
-  FpDenormMode denormMode =
-      destTy->getScalarType()->isHalfTy()
-          ? shaderMode.fp16DenormMode
-          : destTy->getScalarType()->isFloatTy()
-                ? shaderMode.fp32DenormMode
-                : destTy->getScalarType()->isDoubleTy() ? shaderMode.fp64DenormMode : FpDenormMode::DontCare;
+  FpDenormMode denormMode = destTy->getScalarType()->isHalfTy()     ? shaderMode.fp16DenormMode
+                            : destTy->getScalarType()->isFloatTy()  ? shaderMode.fp32DenormMode
+                            : destTy->getScalarType()->isDoubleTy() ? shaderMode.fp64DenormMode
+                                                                    : FpDenormMode::DontCare;
   if (denormMode == FpDenormMode::FlushOut || denormMode == FpDenormMode::FlushInOut) {
     // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
     value = CreateUnaryIntrinsic(Intrinsic::canonicalize, value);

@@ -141,6 +141,7 @@ protected:
   unsigned m_spirvOpMetaKindId; // Metadata kind ID for "spirv.op"
 private:
   template <spv::Op> void createRayQueryFunc(llvm::Function *func);
+  void createRayQueryProceedFunc(llvm::Function *func);
   llvm::Value *createIntersectSystemValue(llvm::Function *func, unsigned raySystem);
   void createWriteLdsStack(llvm::Function *func);
   void createReadLdsStack(llvm::Function *func);

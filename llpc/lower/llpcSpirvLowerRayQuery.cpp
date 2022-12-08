@@ -642,35 +642,11 @@ Value *SpirvLowerRayQuery::createGetBvhSrd(llvm::Value *expansion, llvm::Value *
   return bvhSrd;
 }
 
-// =====================================================================================================================
-// Process RayQuery OpRayQueryProceedKHR
-//
-// @param func : The function to create
-template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryProceedKHR>(Function *func) {
+void SpirvLowerRayQuery::createRayQueryProceedFunc(Function *func) {
   func->addFnAttr(Attribute::AlwaysInline);
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
 
-  // bool RayQueryProceedAmdInternal(
-  //     inout RayQueryInternal rayQuery,
-  //     in    uint             constRayFlags,
-  //     in    uint3            dispatchThreadId)
-
-  // bool rayQueryProceedEXT(rayQueryEXT q -> rayQuery)
-  // {
-  //     if (stageNotSupportLds(stage))
-  //         ldsUsage = 0;
-  //     else
-  //         ldsUsage = 1;
-  //     if (rayQuery != prevRayQueryObj)
-  //         rayQuery.stackNumEntries = 0
-  //     prevRayQueryObj = rayQuery
-  //     constRayFlags = 0
-  //     rayId = 0
-  //     bool proceed = call RayQueryProceedAmdInternal
-  //     ldsUsage = 1;
-  //     return proceed;
-  // }
   auto int32x3Ty = FixedVectorType::get(m_builder->getInt32Ty(), 3);
   Value *constRayFlags = m_builder->CreateAlloca(m_builder->getInt32Ty(), SPIRAS_Private);
   Value *threadId = m_builder->CreateAlloca(int32x3Ty, SPIRAS_Private);
@@ -707,11 +683,45 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryProceedKHR>(Fu
 
   m_builder->CreateStore(getDispatchId(), threadId);
 
-  Value *result = m_builder->CreateNamedCall(
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED),
-      func->getReturnType(), {rayQuery, constRayFlags, threadId}, {Attribute::NoUnwind, Attribute::AlwaysInline});
+  Value *result;
+  {
+    result = m_builder->CreateNamedCall(
+        m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED),
+        func->getReturnType(), {rayQuery, constRayFlags, threadId}, {Attribute::NoUnwind, Attribute::AlwaysInline});
+  }
+
   m_builder->CreateStore(m_builder->getInt32(1), m_ldsUsage);
   m_builder->CreateRet(result);
+}
+
+// =====================================================================================================================
+// Process RayQuery OpRayQueryProceedKHR
+//
+// @param func : The function to create
+template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryProceedKHR>(Function *func) {
+
+  // bool RayQueryProceedAmdInternal(
+  //     inout RayQueryInternal rayQuery,
+  //     in    uint             constRayFlags,
+  //     in    uint3            dispatchThreadId)
+
+  // bool rayQueryProceedEXT(rayQueryEXT q -> rayQuery)
+  // {
+  //     if (stageNotSupportLds(stage))
+  //         ldsUsage = 0;
+  //     else
+  //         ldsUsage = 1;
+  //     if (rayQuery != prevRayQueryObj)
+  //         rayQuery.stackNumEntries = 0
+  //     prevRayQueryObj = rayQuery
+  //     constRayFlags = 0
+  //     rayId = 0
+  //     bool proceed = call RayQueryProceedAmdInternal
+  //     ldsUsage = 1;
+  //     return proceed;
+  // }
+
+  createRayQueryProceedFunc(func);
 }
 
 // =====================================================================================================================
