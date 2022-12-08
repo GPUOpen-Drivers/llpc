@@ -49,7 +49,6 @@ if(ICD_BUILD_LLPC)
     set(LLVM_EXTERNAL_LGC_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../lgc)
 
     # Set other LLVM settings.
-    set(LLVM_ENABLE_ASSERTIONS ${CMAKE_BUILD_TYPE_DEBUG} CACHE BOOL Force)
     set(LLVM_TARGETS_TO_BUILD AMDGPU CACHE STRING Force)
     set(LLVM_BUILD_TESTS OFF CACHE BOOL Force)
     set(LLVM_BUILD_TOOLS ${LLPC_BUILD_LLVM_TOOLS} CACHE BOOL Force)
@@ -383,10 +382,8 @@ target_link_libraries(llpc_standalone_compiler PUBLIC
     spvgen_static
     vfx
     vkgc_headers
+    ${CMAKE_DL_LIBS}
 )
-if(UNIX)
-    target_link_libraries(llpc_standalone_compiler PUBLIC dl)
-endif()
 
 if (NOT LLVM_LINK_LLVM_DYLIB)
     llvm_map_components_to_libnames(llvm_libs

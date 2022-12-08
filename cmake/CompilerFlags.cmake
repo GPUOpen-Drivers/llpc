@@ -1,4 +1,8 @@
 function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
+    target_compile_features("${PROJECT_NAME}" PUBLIC cxx_std_17)
+    set_target_properties("${PROJECT_NAME}" PROPERTIES CXX_EXTENSIONS OFF)
+    set_target_properties("${PROJECT_NAME}" PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(ENABLE_WERROR)
             target_compile_options("${PROJECT_NAME}" PRIVATE
@@ -32,8 +36,6 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
 
         target_compile_options("${PROJECT_NAME}" PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -fno-rtti
-            -fPIC
-            -std=c++17
             # Some of the games using old versions of the tcmalloc lib are
             # crashing when allocating aligned memory. C++17 enables aligned new
             # by default, so we need to disable it to prevent those crashes.
@@ -97,9 +99,6 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
                 /wd4800 # forcing value to bool 'true' or 'false' (performance warning)
                 /wd6246 # Local declaration of 'S' hides declaration of the same name in outer scope
                 /wd6323 # Use of arithmetic operator on Boolean type(s)
-        )
-        target_compile_options("${PROJECT_NAME}" PRIVATE
-          /std:c++17
         )
 
         target_compile_definitions("${PROJECT_NAME}" PRIVATE _SCL_SECURE_NO_WARNINGS)
