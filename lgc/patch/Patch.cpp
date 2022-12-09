@@ -476,7 +476,13 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   FunctionPassManager fpm;
   fpm.addPass(InstCombinePass(1));
   fpm.addPass(SimplifyCFGPass());
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444780
+  // Old version of the code
   fpm.addPass(SROAPass());
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
+#endif
   fpm.addPass(EarlyCSEPass(true));
   fpm.addPass(SpeculativeExecutionPass(/* OnlyIfDivergentTarget = */ true));
   fpm.addPass(CorrelatedValuePropagationPass());
@@ -538,7 +544,13 @@ void LegacyPatch::addOptimizationPasses(legacy::PassManager &passMgr, CodeGenOpt
   passMgr.add(createForceFunctionAttrsLegacyPass());
   passMgr.add(createInstructionCombiningPass(1));
   passMgr.add(createCFGSimplificationPass());
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444780
+  // Old version of the code
   passMgr.add(createSROAPass());
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  passMgr.add(createSROAPass(false));
+#endif
   passMgr.add(createEarlyCSEPass(true));
   passMgr.add(createSpeculativeExecutionIfHasBranchDivergencePass());
   passMgr.add(createCorrelatedValuePropagationPass());
