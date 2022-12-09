@@ -230,7 +230,13 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 
   // Remove redundant load/store operations and do minimal optimization
   // It is required by SpirvLowerImageOp.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444780
+  // Old version of the code
   passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass()));
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass(SROAOptions::ModifyCFG)));
+#endif
   passMgr.addPass(GlobalOptPass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(ADCEPass()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(2)));
@@ -350,7 +356,13 @@ void LegacySpirvLower::addPasses(Context *context, ShaderStage stage, legacy::Pa
 
   // Remove redundant load/store operations and do minimal optimization
   // It is required by SpirvLowerImageOp.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444780
+  // Old version of the code
   passMgr.add(createSROAPass());
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  passMgr.add(createSROAPass(false));
+#endif
   passMgr.add(createGlobalOptimizerPass());
   passMgr.add(createAggressiveDCEPass());
   passMgr.add(createInstructionCombiningPass(2));
