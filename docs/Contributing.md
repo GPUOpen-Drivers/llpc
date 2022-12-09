@@ -159,7 +159,8 @@ to maintain. Where reasonably possible, try to:
   option to run a single pass. Use LLVM's `update_test_checks.py` with the
   `--tool` option to automatically generate the check lines.
 * For frontend code, write a GLSL or `.spvasm` test (either standalone file or
-  inlined in a `.pipe` file) that invokes `amdllpc` with the `-emit-lgc` option.
+  inlined in a `.pipe` file) that invokes `amdllpc` with the `-emit-lgc` option
+  or with `-o - -filetype=asm`.
   Use our [update_llpc_test_checks.py](../tool/update_llpc_test_checks.py) tool
   to automatically generate the check lines. Where necessary, use options like
   `--check-globals` to auto-generate additional checks.
