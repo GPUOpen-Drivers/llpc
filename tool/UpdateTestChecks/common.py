@@ -222,7 +222,9 @@ class TestInfo(object):
       ))
     return ret
 
-def itertests(test_patterns, parser, script_name, comment_prefix=None, argparse_callback=None):
+def itertests(test_patterns, parser, script_name, comment_prefix=None,
+              comment_prefix_callback=None, argparse_callback=None):
+  assert comment_prefix is None or comment_prefix_callback is None
   for pattern in test_patterns:
     # On Windows we must expand the patterns ourselves.
     tests_list = glob.glob(pattern)
@@ -251,6 +253,8 @@ def itertests(test_patterns, parser, script_name, comment_prefix=None, argparse_
         if UNUSED_NOTE in l:
           break
         final_input_lines.append(l)
+      if comment_prefix_callback is not None:
+        comment_prefix = comment_prefix_callback(test, final_input_lines)
       yield TestInfo(test, parser, script_name, final_input_lines, args, argv,
                      comment_prefix, argparse_callback)
 
