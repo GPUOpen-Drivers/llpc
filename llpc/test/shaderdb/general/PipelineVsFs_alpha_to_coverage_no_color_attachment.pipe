@@ -1,0 +1,67 @@
+; Check the alpha to coverage and no color attachment
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: .registers
+; SHADERTEST: CB_SHADER_MASK 0x0000000000000008
+; SHADERTEST: SPI_SHADER_COL_FORMAT 0x0000000000000003
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 57
+
+[VsGlsl]
+#version 310 es
+layout(location = 0) in vec4 position;
+layout(location = 1) in vec4 color;
+layout(location = 0) out highp vec4 vtxColor;
+void main (void)
+{
+    gl_Position = position;
+    vtxColor = color;
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 310 es
+layout(location = 0) in highp vec4 vtxColor;
+layout(location = 0) out highp vec4 fragColor;
+void main (void)
+{
+   fragColor = vtxColor;
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 4
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 2
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 4
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+numSamples = 2
+alphaToCoverageEnable = 1
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 32
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+attribute[1].location = 1
+attribute[1].binding = 0
+attribute[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[1].offset = 16

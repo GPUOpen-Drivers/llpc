@@ -482,7 +482,7 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
         static_cast<ExportFormat>(m_pipelineState->computeExportFormat(exp.ty, exp.location));
   }
   bool dummyExport =
-      (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_resUsage->builtInUsage.fs.discard);
+      (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 11 || m_resUsage->builtInUsage.fs.discard);
   fragColorExport.generateExportInstructions(m_info, m_exportValues, exportFormat, dummyExport, builder);
 
   const auto &builtInUsage = m_resUsage->builtInUsage.fs;
@@ -850,6 +850,9 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
 
   if (!lastExport && dummyExport) {
     lastExport = FragColorExport::addDummyExport(builder);
+    // Set CB shader mask, if alphaToCoverage is enabled, we need to enable the output mask for the alpha channel
+    auto resUage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
+    resUage->inOutUsage.fs.cbShaderMask |= m_pipelineState->getColorExportState().alphaToCoverageEnable ? 0x8 : 0x0;
   }
 
   if (lastExport)

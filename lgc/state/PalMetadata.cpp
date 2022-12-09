@@ -933,12 +933,15 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool 
   }
 
   if (spiShaderColFormat == 0 && hasDepthExpFmtZero) {
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || killEnabled) {
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 11 || killEnabled) {
       // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
       // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
       // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
       // off by CB_SHADER_MASK.
-      spiShaderColFormat = SPI_SHADER_32_R;
+      //
+      // Need to expose a format with alpha channel for Alpha-to-Coverage case
+      spiShaderColFormat =
+          m_pipelineState->getColorExportState().alphaToCoverageEnable ? SPI_SHADER_32_AR : SPI_SHADER_32_R;
     }
   }
   setRegister(mmSPI_SHADER_COL_FORMAT, spiShaderColFormat);
