@@ -2921,210 +2921,134 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
   }
 
   // Non-image-related handling.
-  Value *const base = transValue(spvAccessChain->getBase(), getBuilder()->GetInsertBlock()->getParent(),
-                                 getBuilder()->GetInsertBlock());
-  auto indices = transValue(spvAccessChain->getIndices(), getBuilder()->GetInsertBlock()->getParent(),
-                            getBuilder()->GetInsertBlock());
+  Value *base = transValue(spvAccessChain->getBase(), getBuilder()->GetInsertBlock()->getParent(),
+                           getBuilder()->GetInsertBlock());
+  auto srcIndices = transValue(spvAccessChain->getIndices(), getBuilder()->GetInsertBlock()->getParent(),
+                               getBuilder()->GetInsertBlock());
 
-  truncConstantIndex(indices, getBuilder()->GetInsertBlock());
+  truncConstantIndex(srcIndices, getBuilder()->GetInsertBlock());
 
   if (!spvAccessChain->hasPtrIndex())
-    indices.insert(indices.begin(), getBuilder()->getInt32(0));
+    srcIndices.insert(srcIndices.begin(), getBuilder()->getInt32(0));
 
-  SPIRVType *const spvBaseType = spvAccessChain->getBase()->getType();
+  SPIRVType *spvAccessType = spvAccessChain->getBase()->getType();
+  const SPIRVStorageClassKind storageClass = spvAccessType->getPointerStorageClass();
+  const bool isBufferBlockPointer = isStorageClassExplicitlyLaidOut(m_bm, storageClass);
 
   Type *basePointeeType = getPointeeType(spvAccessChain->getBase());
   // TODO: Remove this when LLPC will switch fully to opaque pointers.
   assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(base->getType(), basePointeeType));
 
-  SPIRVType *spvAccessType = spvBaseType;
+  SmallVector<Value *, 8> gepIndices;
 
-  // Records where (if at all) we have to split our indices - only required when going through a row_major matrix or
-  // if we indexing into a struct that has partially overlapping offsets (normally occurs with HLSL cbuffer packing).
-  SmallVector<std::pair<unsigned, Type *>, 4> splits;
+  if (spvAccessType->isTypeForwardPointer())
+    spvAccessType = static_cast<SPIRVTypeForwardPointer *>(spvAccessType)->getPointer();
+  assert(spvAccessType->isTypePointer());
+  gepIndices.push_back(srcIndices[0]);
+  spvAccessType = spvAccessType->getPointerElementType();
 
-  const SPIRVStorageClassKind storageClass = spvBaseType->getPointerStorageClass();
+  auto flushGep = [&]() {
+    if (gepIndices.size() == 1) {
+      if (auto *constant = dyn_cast<ConstantInt>(gepIndices[0])) {
+        if (constant->getZExtValue() == 0)
+          return; // no-op
+      }
+    }
 
-  const bool isBufferBlockPointer = isStorageClassExplicitlyLaidOut(m_bm, storageClass);
+    base = getBuilder()->CreateGEP(basePointeeType, base, gepIndices, "", spvAccessChain->isInBounds());
 
-  // Run over the indices of the loop and investigate whether we need to add any additional indices so that we load
-  // the correct data. We explicitly lay out our data in memory, which means because Vulkan has more powerful layout
-  // options to producers than LLVM can model, we have had to insert manual padding into LLVM types to model this.
-  // This loop will ensure that all padding is skipped in indexing.
-  for (unsigned i = 0; i < indices.size(); i++) {
-    bool isDone = false;
+    gepIndices.clear();
+    gepIndices.push_back(getBuilder()->getInt32(0));
+  };
 
-    if (spvAccessType->isTypeForwardPointer())
-      spvAccessType = static_cast<SPIRVTypeForwardPointer *>(spvAccessType)->getPointer();
-
+  // Run over the indices and map the SPIR-V level indices to LLVM indices, which may be different because the LLVM
+  // types may contain manual padding fields to model the power of Vulkan's layout options.
+  // Additionally, break up the GEP sequence to handle some special cases like row major matrices.
+  for (Value *index : makeArrayRef(srcIndices).drop_front()) {
     switch (spvAccessType->getOpCode()) {
     case OpTypeStruct: {
-      assert(isa<ConstantInt>(indices[i]));
-
-      ConstantInt *const constIndex = cast<ConstantInt>(indices[i]);
-
-      const uint64_t memberIndex = constIndex->getZExtValue();
+      ConstantInt *constIndex = cast<ConstantInt>(index);
+      const uint64_t origMemberIndex = constIndex->getZExtValue();
+      Type *castType = nullptr;
 
       if (isBufferBlockPointer) {
         if (isRemappedTypeElements(spvAccessType)) {
-          const uint64_t remappedMemberIndex = lookupRemappedTypeElements(spvAccessType, memberIndex);
-
-          // Replace the original index with the new remapped one.
-          indices[i] = getBuilder()->getInt32(remappedMemberIndex);
+          const uint64_t remappedMemberIndex = lookupRemappedTypeElements(spvAccessType, origMemberIndex);
+          constIndex = getBuilder()->getInt32(remappedMemberIndex);
         }
 
         // If the struct member was actually overlapping another struct member, we need a split here.
-        const auto pair = std::make_pair(spvAccessType, memberIndex);
+        const auto structIndexPair = std::make_pair(spvAccessType, origMemberIndex);
 
-        if (m_overlappingStructTypeWorkaroundMap.count(pair) > 0)
-          splits.push_back(std::make_pair(i + 1, m_overlappingStructTypeWorkaroundMap[pair]));
+        if (m_overlappingStructTypeWorkaroundMap.count(structIndexPair) > 0)
+          castType = m_overlappingStructTypeWorkaroundMap[structIndexPair];
       }
 
-      // Move the type we are looking at down into the member.
-      spvAccessType = spvAccessType->getStructMemberType(memberIndex);
+      gepIndices.push_back(constIndex);
+
+      if (castType) {
+        flushGep();
+        basePointeeType = castType;
+        base =
+            getBuilder()->CreateBitCast(base, basePointeeType->getPointerTo(base->getType()->getPointerAddressSpace()));
+      }
+
+      spvAccessType = spvAccessType->getStructMemberType(origMemberIndex);
       break;
     }
     case OpTypeArray:
     case OpTypeRuntimeArray: {
+      gepIndices.push_back(index);
+
       if (isBufferBlockPointer && isRemappedTypeElements(spvAccessType)) {
         // If we have padding in an array, we inserted a struct to add that
         // padding, and so we need an extra constant 0 index.
-        indices.insert(indices.begin() + i + 1, getBuilder()->getInt32(0));
-
-        // Skip past the new idx we just added.
-        i++;
+        gepIndices.push_back(getBuilder()->getInt32(0));
       }
 
-      // Move the type we are looking at down into the element.
       spvAccessType = spvAccessType->getArrayElementType();
       break;
     }
     case OpTypeMatrix: {
-      ArrayRef<Value *> sliceIndices(indices);
-      sliceIndices = sliceIndices.take_front(i);
-
-      Type *const indexedType = GetElementPtrInst::getIndexedType(basePointeeType, sliceIndices);
-
       // Matrices are represented as an array of columns.
-      assert(indexedType && indexedType->isArrayTy());
+      Type *const matrixType = GetElementPtrInst::getIndexedType(basePointeeType, gepIndices);
+      assert(matrixType && matrixType->isArrayTy());
 
-      // If we have a row major matrix, we need to split the access chain here to handle it.
-      if (isBufferBlockPointer && isTypeWithPadRowMajorMatrix(indexedType))
-        splits.push_back(std::make_pair(i, nullptr));
-      else if (indexedType->getArrayElementType()->isStructTy()) {
-        // If the type of the element is a struct we had to add padding to align, so need a further index.
-        indices.insert(indices.begin() + i + 1, getBuilder()->getInt32(0));
+      if (isBufferBlockPointer && isTypeWithPadRowMajorMatrix(matrixType)) {
+        // We have a row major matrix, we need to split the access chain here to handle it.
+        flushGep();
 
-        // Skip past the new idx we just added.
-        i++;
+        auto pair = createLaunderRowMajorMatrix(matrixType, base);
+        basePointeeType = pair.first;
+        base = pair.second;
+
+        gepIndices.push_back(index);
+      } else {
+        gepIndices.push_back(index);
+        if (matrixType->getArrayElementType()->isStructTy()) {
+          // If the type of the column is a struct we had to add padding to align, so need a further index.
+          gepIndices.push_back(getBuilder()->getInt32(0));
+        }
       }
 
       spvAccessType = spvAccessType->getMatrixColumnType();
       break;
     }
-    case OpTypePointer: {
-      spvAccessType = spvAccessType->getPointerElementType();
+    case OpTypeVector: {
+      gepIndices.push_back(index);
+      spvAccessType = spvAccessType->getVectorComponentType();
       break;
     }
     default:
-      // We are either at the end of the index list, or we've hit a type that we definitely did not have to pad.
-      {
-        isDone = true;
-        break;
-      }
+      llvm_unreachable("unhandled type in access chain");
     }
-
-    if (isDone)
-      break;
   }
 
-  if (isBufferBlockPointer) {
-    Type *const indexedType = GetElementPtrInst::getIndexedType(basePointeeType, indices);
+  Type *finalPointeeType = GetElementPtrInst::getIndexedType(basePointeeType, gepIndices);
+  flushGep();
 
-    // If we have a row major matrix, we need to split the access chain here to handle it.
-    if (isTypeWithPadRowMajorMatrix(indexedType))
-      splits.push_back(std::make_pair(indices.size(), nullptr));
-  }
-
-  Value *resultValue = nullptr;
-  Type *baseEltType = nullptr;
-  if (splits.size() > 0) {
-    Value *newBase = base;
-    Type *newBaseType = basePointeeType;
-
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(newBase->getType()->getScalarType(), newBaseType));
-
-    for (auto split : splits) {
-      const ArrayRef<Value *> indexArray(indices);
-      const ArrayRef<Value *> frontIndices(indexArray.take_front(split.first));
-
-      // Get the pointer to our row major matrix first.
-      Type *const newBaseEltType = newBaseType;
-      // TODO: Remove this when LLPC will switch fully to opaque pointers.
-      assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(newBase->getType()->getScalarType(), newBaseEltType));
-      if (spvAccessChain->isInBounds())
-        newBase = getBuilder()->CreateInBoundsGEP(newBaseEltType, newBase, frontIndices);
-      else
-        newBase = getBuilder()->CreateGEP(newBaseEltType, newBase, frontIndices);
-      newBaseType = GetElementPtrInst::getIndexedType(newBaseEltType, frontIndices);
-      // TODO: Remove this when LLPC will switch fully to opaque pointers.
-      assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(newBase->getType(), newBaseType));
-
-      // Matrix splits are identified by having a nullptr as the .second of the pair.
-      if (!split.second) {
-        auto newPair = createLaunderRowMajorMatrix(newBaseType, newBase);
-        newBase = newPair.second;
-        newBaseType = newPair.first;
-      } else {
-        Type *const bitCastType = split.second->getPointerTo(newBase->getType()->getPointerAddressSpace());
-        newBase = getBuilder()->CreateBitCast(newBase, bitCastType);
-        newBaseType = split.second;
-        // TODO: Remove this when LLPC will switch fully to opaque pointers.
-        assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(newBase->getType(), newBaseType));
-      }
-
-      // Lastly we remove the indices that we have already processed from the list of indices.
-      unsigned index = 0;
-
-      // Always need at least a single index in back.
-      indices[index++] = getBuilder()->getInt32(0);
-
-      for (Value *const indexVal : indexArray.slice(split.first))
-        indices[index++] = indexVal;
-
-      indices.resize(index);
-    }
-
-    // Do the final index if we have one.
-    baseEltType = newBaseType;
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(newBase->getType()->getScalarType(), baseEltType));
-    if (spvAccessChain->isInBounds()) {
-      resultValue = getBuilder()->CreateInBoundsGEP(baseEltType, newBase, indices);
-    } else {
-      resultValue = getBuilder()->CreateGEP(baseEltType, newBase, indices);
-    }
-
-  } else {
-    baseEltType = basePointeeType;
-
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(base->getType()->getScalarType(), baseEltType));
-
-    if (spvAccessChain->isInBounds())
-      resultValue = getBuilder()->CreateInBoundsGEP(baseEltType, base, indices);
-    else
-      resultValue = getBuilder()->CreateGEP(baseEltType, base, indices);
-  }
-
-  // At this point we have to store correlation between SPIR-V AccessChain (SPIRVValue) and its dereferenced return type
-  // (llvm type). It is not possible to get this information later using transType(spvAccessChain->getType()) because if
-  // access chain is pointing to the structure of vectors/matrix then return type may contain some additional padding
-  // which will not be reflected when doing transType.
-  tryAddAccessChainRetType(spvAccessChain, GetElementPtrInst::getIndexedType(baseEltType, indices));
-
-  return resultValue;
+  tryAddAccessChainRetType(spvAccessChain, finalPointeeType);
+  return base;
 }
 
 // =====================================================================================================================
