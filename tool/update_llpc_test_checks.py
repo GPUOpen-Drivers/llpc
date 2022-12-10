@@ -137,10 +137,16 @@ def add_ir_checks(output_lines, comment_marker, prefix_list, func_dict,
                               func_dict, func_name, False, args.function_signature,
                               global_vars_seen_dict, is_filtered)
 
+COMMENT_PREFIXES_BY_FILE_SUFFIX = {
+  '.pipe': ';',
+  '.spvasm': ';',
+  '.ll': ';',
+  # Everything else defaults to '//'
+}
+
 def get_comment_prefix(test_name: str, input_lines):
-  if test_name.endswith('.pipe'):
-    return ';'
-  return '//'
+  ext = os.path.splitext(test_name)[1]
+  return COMMENT_PREFIXES_BY_FILE_SUFFIX.get(ext, '//')
 
 def main():
   from argparse import RawTextHelpFormatter
