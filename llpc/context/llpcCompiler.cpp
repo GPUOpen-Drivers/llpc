@@ -593,7 +593,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 // @returns : Formatted bytes, e.g., `ab c4 ef 00`.
 template <typename T> static FormattedBytes formatBytesLittleEndian(ArrayRef<T> data) {
   ArrayRef<uint8_t> bytes(reinterpret_cast<const uint8_t *>(data.data()), data.size() * sizeof(T));
-  return format_bytes(bytes, /* FirstByteOffset = */ None, /* NumPerLine = */ 16, /* ByteGroupSize = */ 1);
+  return format_bytes(bytes, /* FirstByteOffset = */ {}, /* NumPerLine = */ 16, /* ByteGroupSize = */ 1);
 }
 
 // =====================================================================================================================

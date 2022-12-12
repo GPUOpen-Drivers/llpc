@@ -902,7 +902,7 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
   if (!lm)
     return;
   llvm::MDString *name = nullptr;
-  auto temp = MDNode::getTemporary(*m_context, None);
+  auto temp = MDNode::getTemporary(*m_context, {});
   auto self = MDNode::get(*m_context, temp.get());
   self->replaceOperandWith(0, self);
   std::vector<llvm::Metadata *> mDs;

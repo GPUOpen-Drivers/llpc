@@ -1491,7 +1491,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
       copyMetadata(newLoad, loadInst);
 
       if (isInvariant)
-        newLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, None));
+        newLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
 
       return newLoad;
     }
@@ -1611,7 +1611,7 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
       if (isInvariant && accessSize >= 4) {
         CallInst *call = m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,
                                                     {bufferDesc, offsetVal, m_builder->getInt32(coherent.u32All)});
-        call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, None));
+        call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
         part = call;
       } else {
         unsigned intrinsicID = Intrinsic::amdgcn_raw_buffer_load;

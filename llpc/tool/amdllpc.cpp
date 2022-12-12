@@ -577,7 +577,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   //
   // Build pipeline
   //
-  Optional<PipelineDumpOptions> dumpOptions = None;
+  Optional<PipelineDumpOptions> dumpOptions;
   if (cl::EnablePipelineDump) {
     dumpOptions.emplace();
     dumpOptions->pDumpDir = cl::PipelineDumpDir.c_str();

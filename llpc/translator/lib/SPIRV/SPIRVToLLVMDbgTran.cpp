@@ -953,7 +953,7 @@ DebugLoc SPIRVToLLVMDbgTran::transDebugScope(const SPIRVInstruction *SpirvInst, 
     if (llvm::Function::isInternalLinkage(F->getLinkage())) {
       SPFlags |= DISubprogram::SPFlagLocalToUnit;
     }
-    auto *Ty = Builder.createSubroutineType(Builder.getOrCreateTypeArray(None));
+    auto *Ty = Builder.createSubroutineType(Builder.getOrCreateTypeArray({}));
     Sub = Builder.createFunction(DF, FN, FN, DF, LN, Ty, LN, DINode::FlagZero, SPFlags);
     FuncMap[SF->getId()] = Sub;
     assert(F->getSubprogram() == Sub || F->getSubprogram() == nullptr);

@@ -82,7 +82,7 @@ namespace StandaloneCompiler {
 //
 // @param compiler : LLPC compiler object.
 // @param [in/out] compileInfo : Compilation info of LLPC standalone tool.
-// @param dumpOptions : Pipeline dump options. Pipeline dumps are disabled when `llvm::None` is passed.
+// @param dumpOptions : Pipeline dump options. Pipeline dumps are disabled when `std::nullopt` is passed.
 // @param printPipelineInfo : Whether to print pipeline info (hash, filenames) before compilation.
 // @returns : Concrete `PipelineBuilder` object for this pipeline type.
 std::unique_ptr<PipelineBuilder> createPipelineBuilder(ICompiler &compiler, CompileInfo &compileInfo,
