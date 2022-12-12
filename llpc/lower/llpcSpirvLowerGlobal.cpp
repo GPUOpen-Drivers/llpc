@@ -1818,9 +1818,6 @@ Value *SpirvLowerGlobal::loadIndexedValueFromTaskPayload(Type *indexedTy, Type *
     // Array type
     assert(metadata->getNumOperands() == 3);
 
-    ShaderBlockMetadata arrayMeta = {};
-    arrayMeta.U64All = cast<ConstantInt>(metadata->getOperand(1))->getZExtValue();
-
     auto elemMeta = cast<Constant>(metadata->getOperand(2));
     auto elemTy = indexedTy->getArrayElementType();
 
@@ -1900,9 +1897,6 @@ Value *SpirvLowerGlobal::loadValueFromTaskPayload(Type *loadTy, Constant *metada
   if (loadTy->isArrayTy()) {
     // Array type
     assert(metadata->getNumOperands() == 3);
-
-    ShaderBlockMetadata arrayMeta = {};
-    arrayMeta.U64All = cast<ConstantInt>(metadata->getOperand(1))->getZExtValue();
 
     unsigned stride = cast<ConstantInt>(metadata->getOperand(0))->getZExtValue();
     auto elemMeta = cast<Constant>(metadata->getOperand(2));
@@ -1987,9 +1981,6 @@ void SpirvLowerGlobal::storeIndexedValueToTaskPayload(Type *indexedTy, Type *sto
     // Array type
     assert(metadata->getNumOperands() == 3);
 
-    ShaderBlockMetadata arrayMeta = {};
-    arrayMeta.U64All = cast<ConstantInt>(metadata->getOperand(1))->getZExtValue();
-
     auto elemMeta = cast<Constant>(metadata->getOperand(2));
     auto elemTy = indexedTy->getArrayElementType();
 
@@ -2069,9 +2060,6 @@ void SpirvLowerGlobal::storeValueToTaskPayload(Value *storeValue, Constant *meta
     // Array type
     assert(metadata->getNumOperands() == 3);
 
-    ShaderBlockMetadata arrayMeta = {};
-    arrayMeta.U64All = cast<ConstantInt>(metadata->getOperand(1))->getZExtValue();
-
     unsigned stride = cast<ConstantInt>(metadata->getOperand(0))->getZExtValue();
     auto elemMeta = cast<Constant>(metadata->getOperand(2));
 
@@ -2144,9 +2132,6 @@ Value *SpirvLowerGlobal::atomicOpWithIndexedValueInTaskPayload(Type *indexedTy, 
   if (indexedTy->isArrayTy()) {
     // Array type
     assert(metadata->getNumOperands() == 3);
-
-    ShaderBlockMetadata arrayMeta = {};
-    arrayMeta.U64All = cast<ConstantInt>(metadata->getOperand(1))->getZExtValue();
 
     auto elemMeta = cast<Constant>(metadata->getOperand(2));
     auto elemTy = indexedTy->getArrayElementType();
