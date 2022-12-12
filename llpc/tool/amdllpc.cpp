@@ -647,14 +647,14 @@ int main(int argc, char *argv[]) {
 #endif
 #endif
 
+  ICompiler *compiler = nullptr;
+  Result result = init(argc, argv, compiler);
+
 #ifdef WIN_OS
   if (AssertToMsgBox) {
     _set_error_mode(_OUT_TO_MSGBOX);
   }
 #endif
-
-  ICompiler *compiler = nullptr;
-  Result result = init(argc, argv, compiler);
 
   // Cleanup code that gets run automatically before returning.
   auto onExit = make_scope_exit([compiler, &result] {
