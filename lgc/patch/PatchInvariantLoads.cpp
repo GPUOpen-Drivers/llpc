@@ -253,7 +253,7 @@ bool PatchInvariantLoads::runImpl(Function &function, PipelineState *pipelineSta
       continue;
 
     LLVM_DEBUG(dbgs() << "Marking load invariant: " << *inst << "\n");
-    inst->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(context, None));
+    inst->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(context, {}));
     changed = true;
   }
 

@@ -63,7 +63,7 @@ MDNode *PatchLoopMetadata::updateMetadata(MDNode *loopId, ArrayRef<StringRef> pr
   bool found = false;
   SmallVector<Metadata *, 4> mds;
   // Reserve first location for self reference to the loopId metadata node.
-  TempMDTuple tempNode = MDNode::getTemporary(*m_context, None);
+  TempMDTuple tempNode = MDNode::getTemporary(*m_context, {});
   mds.push_back(tempNode.get());
   for (unsigned i = 1, operandCount = loopId->getNumOperands(); i < operandCount; ++i) {
     Metadata *op = loopId->getOperand(i);

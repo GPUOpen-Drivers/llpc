@@ -56,7 +56,7 @@ public:
   //
   // @param compiler : LLPC compiler object.
   // @param [in/out] compileInfo : Compilation info of LLPC standalone tool. This will be modified by `build()`.
-  // @param dumpOptions : Pipeline dump options. Pipeline dumps are disabled when `llvm::None` is passed.
+  // @param dumpOptions : Pipeline dump options. Pipeline dumps are disabled when `std::nullopt` is passed.
   // @param printPipelineInfo : Whether to print pipeline info (hash, filenames) before compilation.
   PipelineBuilder(ICompiler &compiler, CompileInfo &compileInfo, llvm::Optional<Vkgc::PipelineDumpOptions> dumpOptions,
                   bool printPipelineInfo)
@@ -95,7 +95,7 @@ public:
 
   // Returns the pipeline dump options.
   //
-  // @returns : `PipelineDumpOptions` or `llpc::None` if pipeline dumps were not requested.
+  // @returns : `PipelineDumpOptions` or `std::nullopt` if pipeline dumps were not requested.
   llvm::Optional<Vkgc::PipelineDumpOptions> &getDumpOptions() { return m_dumpOptions; }
 
   // Returns true iff pipeline dumps are requested.
@@ -120,7 +120,7 @@ public:
 private:
   ICompiler &m_compiler;
   CompileInfo &m_compileInfo;
-  llvm::Optional<Vkgc::PipelineDumpOptions> m_dumpOptions = llvm::None;
+  llvm::Optional<Vkgc::PipelineDumpOptions> m_dumpOptions = {};
   bool m_printPipelineInfo = false;
 };
 

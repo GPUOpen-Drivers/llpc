@@ -213,7 +213,7 @@ void PassManagerImpl::run(Module &module) {
   // We register LLVM's default analysis sets late to be sure our custom
   // analyses are added beforehand.
   if (!initialized) {
-    PassBuilder passBuilder(m_targetMachine, PipelineTuningOptions(), None, &m_instrumentationCallbacks);
+    PassBuilder passBuilder(m_targetMachine, PipelineTuningOptions(), {}, &m_instrumentationCallbacks);
     passBuilder.registerModuleAnalyses(m_moduleAnalysisManager);
     passBuilder.registerCGSCCAnalyses(m_cgsccAnalysisManager);
     passBuilder.registerFunctionAnalyses(m_functionAnalysisManager);

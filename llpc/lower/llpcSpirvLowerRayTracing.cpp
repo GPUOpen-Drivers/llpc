@@ -1458,7 +1458,7 @@ void SpirvLowerRayTracing::createDbgInfo(Module &module, Function *func) {
   DIFile *file = builder.createFile(func->getName(), ".");
 
   // Create the DISubprogram for the module entry function
-  auto *funcTy = builder.createSubroutineType(builder.getOrCreateTypeArray(llvm::None));
+  auto *funcTy = builder.createSubroutineType(builder.getOrCreateTypeArray({}));
   auto spFlags = DISubprogram::SPFlagDefinition;
   auto subProgram =
       builder.createFunction(file, func->getName(), module.getName(), file, 0, funcTy, 0, DINode::FlagZero, spFlags);
