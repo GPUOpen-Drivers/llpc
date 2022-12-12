@@ -7166,20 +7166,23 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   // ; buffer${i}Stream is the vertex StreamId that writes to buffer i, or -1 if that particular buffer is unused (e.g.
   // StreamId in EmitVertex)
   if (enableXfb) {
-    const unsigned bufferCount = 8;
-    std::array<int, 8> xfbState{-1, 0, -1, 0, -1, 0, -1, 0};
+    static const unsigned MaxXfbBuffers = 4;
+    std::array<unsigned, 2 * MaxXfbBuffers> xfbState{InvalidValue, 0,  // xfbBuffer[0] -> <streamId, xfbStride>
+                                                     InvalidValue, 0,  // xfbBuffer[1] -> <streamId, xfbStride>
+                                                     InvalidValue, 0,  // xfbBuffer[2] -> <streamId, xfbStride>
+                                                     InvalidValue, 0}; // xfbBuffer[3] -> <streamId, xfbStride>
     for (unsigned i = 0, e = m_bm->getNumVariables(); i != e; ++i) {
       auto bv = m_bm->getVariable(i);
       if (bv->getStorageClass() == StorageClassOutput) {
-        SPIRVWord xfbBuffer = SPIRVID_INVALID;
+        SPIRVWord xfbBuffer = InvalidValue;
         if (bv->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
           const unsigned indexOfBuffer = 2 * xfbBuffer;
           xfbState[indexOfBuffer] = 0;
-          SPIRVWord streamId = SPIRVID_INVALID;
+          SPIRVWord streamId = InvalidValue;
           if (bv->hasDecorate(DecorationStream, 0, &streamId))
             xfbState[indexOfBuffer] = streamId;
 
-          SPIRVWord xfbStride = SPIRVID_INVALID;
+          SPIRVWord xfbStride = InvalidValue;
           if (bv->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
             const unsigned indexOfStride = indexOfBuffer + 1;
             xfbState[indexOfStride] = xfbStride;
@@ -7224,8 +7227,8 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
     }
 
     unsigned mdKindId = m_context->getMDKindID(lgc::XfbStateMetadataName);
-    std::array<Metadata *, 8> metadatas{};
-    for (unsigned i = 0; i < bufferCount; ++i)
+    std::array<Metadata *, 2 * MaxXfbBuffers> metadatas{};
+    for (unsigned i = 0; i < 2 * MaxXfbBuffers; ++i)
       metadatas[i] = ConstantAsMetadata::get(m_builder->getInt32(xfbState[i]));
     auto entryFunc = m_funcMap[m_entryTarget];
     assert(entryFunc);

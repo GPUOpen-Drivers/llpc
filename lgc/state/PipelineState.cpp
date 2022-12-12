@@ -1711,15 +1711,15 @@ void PipelineState::setXfbStateMetadata(Module *module) {
         m_xfbStateMetadata.enableXfb = true;
         auto &streamXfbBuffers = m_xfbStateMetadata.streamXfbBuffers;
         auto &xfbStrides = m_xfbStateMetadata.xfbStrides;
-        for (unsigned bufferIdx = 0; bufferIdx < MaxTransformFeedbackBuffers; ++bufferIdx) {
+        for (unsigned xfbBuffer = 0; xfbBuffer < MaxTransformFeedbackBuffers; ++xfbBuffer) {
           // Get the vertex streamId from metadata
-          auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * bufferIdx));
+          auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer));
           int streamId = cast<ConstantInt>(metaOp->getValue())->getSExtValue();
-          if (streamId != -1)
-            streamXfbBuffers[streamId] |= 1 << bufferIdx; // Bit mask of used xfb buffers in a stream
+          if (streamId != InvalidValue)
+            streamXfbBuffers[streamId] |= 1 << xfbBuffer; // Bit mask of used xfbBuffers in a stream
           // Get the stride from metadata
-          metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * bufferIdx + 1));
-          xfbStrides[bufferIdx] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
+          metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer + 1));
+          xfbStrides[xfbBuffer] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
         }
       }
     }
