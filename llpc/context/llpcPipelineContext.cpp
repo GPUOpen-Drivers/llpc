@@ -422,6 +422,9 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
 
     shaderOptions.vgprLimit = shaderInfo->options.vgprLimit;
 
+    if (shaderOptions.vgprLimit == UINT_MAX)
+      shaderOptions.vgprLimit = 0;
+
     if (VgprLimit != 0) {
       if (VgprLimit < shaderOptions.vgprLimit || shaderOptions.vgprLimit == 0) {
         shaderOptions.vgprLimit = VgprLimit;
