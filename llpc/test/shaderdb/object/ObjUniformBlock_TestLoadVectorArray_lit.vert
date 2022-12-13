@@ -4,6 +4,7 @@ layout(std140, binding = 0) uniform Block
 {
     int  i;
     vec4 f4[4];
+    int  j;
 } block;
 
 void main()
@@ -11,7 +12,7 @@ void main()
     int i = block.i;
     vec4 f4[4] = block.f4;
     f4[i] = vec4(2.0);
-    gl_Position = f4[i];
+    gl_Position = f4[block.j];
 }
 // BEGIN_SHADERTEST
 /*
@@ -23,7 +24,6 @@ void main()
 ; SHADERTEST: call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> %{{[0-9]*}}, i32 32, i32 0)
 ; SHADERTEST: call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> %{{[0-9]*}}, i32 48, i32 0)
 ; SHADERTEST: call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> %{{[0-9]*}}, i32 64, i32 0)
-; SHADERTEST: store <4 x float> <float 2.000000e+00, float 2.000000e+00, float 2.000000e+00, float 2.000000e+00>, {{<4 x float> addrspace\(.*\)*|ptr addrspace\(.*\)}} %{{[0-9]*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

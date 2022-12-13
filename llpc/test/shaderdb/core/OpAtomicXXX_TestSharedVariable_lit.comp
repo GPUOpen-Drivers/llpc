@@ -13,7 +13,7 @@ layout(binding = 0) uniform Uniforms
     int index;
 };
 
-uvec4 u4;
+shared uvec4 u4;
 
 void main()
 {
