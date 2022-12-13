@@ -447,10 +447,16 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
         shaderOptions.scalarizeWaterfallLoads = true;
     }
 
-    if (shaderInfo->options.sgprLimit != 0 && shaderInfo->options.sgprLimit != UINT_MAX)
-      shaderOptions.sgprLimit = shaderInfo->options.sgprLimit;
-    else
-      shaderOptions.sgprLimit = SgprLimit;
+    shaderOptions.sgprLimit = shaderInfo->options.sgprLimit;
+
+    if (shaderOptions.sgprLimit == UINT_MAX)
+      shaderOptions.sgprLimit = 0;
+
+    if (SgprLimit != 0) {
+      if (SgprLimit < shaderOptions.sgprLimit || shaderOptions.sgprLimit == 0) {
+        shaderOptions.sgprLimit = SgprLimit;
+      }
+    }
 
     if (shaderInfo->options.maxThreadGroupsPerComputeUnit != 0)
       shaderOptions.maxThreadGroupsPerComputeUnit = shaderInfo->options.maxThreadGroupsPerComputeUnit;
