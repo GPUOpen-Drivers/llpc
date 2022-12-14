@@ -583,6 +583,9 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     return false;
 
   if (pipelineState->getOptions().enableUberFetchShader) {
+    // Some formats are not supported before gfx9.
+    assert(pipelineState->getLgcContext()->getTargetInfo().getGfxIpVersion().major > 9);
+
     std::unique_ptr<lgc::Builder> desBuilder(Builder::createBuilderImpl(pipelineState->getLgcContext(), pipelineState));
     desBuilder->setShaderStage(ShaderStageVertex);
     desBuilder->SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
@@ -971,7 +974,7 @@ Value *VertexFetchImpl::fetchVertex(CallInst *callInst, llvm::Value *descPtr, Bu
   auto byteOffset = builder.CreateExtractElement(uberFetchAttr, 1);
 
   // The third DWord
-  auto instanceDivisor = builder.CreateExtractElement(uberFetchAttr, 2);
+  auto inputRate = builder.CreateExtractElement(uberFetchAttr, 2);
 
   // The fourth DWord
   auto bufferFormat = builder.CreateExtractElement(uberFetchAttr, 3);
@@ -1016,10 +1019,7 @@ Value *VertexFetchImpl::fetchVertex(CallInst *callInst, llvm::Value *descPtr, Bu
 
   // PerInstance
   auto vbIndexInstance = ShaderInputs::getInput(ShaderInput::InstanceId, builder, *m_lgcContext);
-  auto fInstanceDivisor = builder.CreateBitCast(instanceDivisor, builder.getFloatTy());
-  auto fInstance = builder.CreateSIToFP(vbIndexInstance, builder.getFloatTy());
-  fInstance = builder.CreateFMul(fInstance, fInstanceDivisor);
-  vbIndexInstance = builder.CreateFPToSI(fInstance, builder.getInt32Ty());
+  vbIndexInstance = builder.CreateUDiv(vbIndexInstance, inputRate);
   vbIndexInstance =
       builder.CreateAdd(vbIndexInstance, ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder));
 

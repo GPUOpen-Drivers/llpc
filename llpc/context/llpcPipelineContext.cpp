@@ -351,6 +351,7 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
 #else
       if (!nggState.enableNgg)
 #endif
+        options.nggFlags |= NggFlagDisable;
       else {
         options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
                            (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
