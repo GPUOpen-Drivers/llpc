@@ -373,8 +373,15 @@ void SpirvLowerMemoryOp::expandStoreInst(StoreInst *storeInst, ArrayRef<GetEleme
     auto storeBlock = checkStoreBlock->splitBasicBlock(storeInst);
     auto endStoreBlock = storeBlock->splitBasicBlock(storeInst);
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445640
+    // Old version of the code
     Instruction *checkStoreInsertPos = &checkStoreBlock->getInstList().back();
     Instruction *storeInsertPos = &storeBlock->getInstList().front();
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    Instruction *checkStoreInsertPos = &checkStoreBlock->back();
+    Instruction *storeInsertPos = &storeBlock->front();
+#endif
 
     auto getElemPtrCountVal = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), getElemPtrCount)
                                        : ConstantInt::get(Type::getInt32Ty(*m_context), getElemPtrCount);
