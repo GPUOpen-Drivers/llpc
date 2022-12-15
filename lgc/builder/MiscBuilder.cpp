@@ -152,7 +152,12 @@ Instruction *MiscBuilder::CreateSetMeshOutputs(Value *vertexCount, Value *primit
 Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) {
   CallInst *readClock = nullptr;
   if (realtime) {
-    readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
+#if LLPC_BUILD_GFX11
+    if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11)
+      readClock = CreateNamedCall("llvm.amdgcn.s.sendmsg.rtn", getInt64Ty(), getInt32(GetRealTime), {}, instName);
+    else
+#endif
+      readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
   } else
     readClock = CreateIntrinsic(Intrinsic::readcyclecounter, {}, {}, nullptr, instName);
   readClock->setOnlyReadsMemory();

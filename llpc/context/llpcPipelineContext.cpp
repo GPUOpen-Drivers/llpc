@@ -343,7 +343,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
     // Only set NGG options for a GFX10+ graphics pipeline.
     auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
     const auto &nggState = pipelineInfo->nggState;
+#if VKI_BUILD_GFX11
+    if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG
+#else
     if (!nggState.enableNgg)
+#endif
       options.nggFlags |= NggFlagDisable;
     else {
       options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
@@ -383,6 +387,9 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
 
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
+#if VKI_BUILD_GFX11
+  options.optimizeTessFactor = getPipelineOptions()->optimizeTessFactor;
+#endif
   options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
   options.pageMigrationEnabled = getPipelineOptions()->pageMigrationEnabled;
   options.resourceLayoutScheme = static_cast<lgc::ResourceLayoutScheme>(getPipelineOptions()->resourceLayoutScheme);

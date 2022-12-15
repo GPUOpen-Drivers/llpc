@@ -121,6 +121,19 @@ using namespace Pal::Gfx9::Chip;
     }                                                                                                                  \
   }
 
+#if LLPC_BUILD_GFX11
+// GFX11 only
+#define INIT_REG_GFX11(_gfx, _reg)                                                                                     \
+  {                                                                                                                    \
+    if (_gfx == 11) {                                                                                                  \
+      _reg##_ID = Pal::Gfx9::Chip::Gfx11::mm##_reg;                                                                    \
+      _reg##_VAL.u32All = 0;                                                                                           \
+    } else {                                                                                                           \
+      INIT_REG_TO_INVALID(_reg);                                                                                       \
+    }                                                                                                                  \
+  }
+#endif
+
 // GFX9-GFX10 only
 #define INIT_REG_GFX9_10(_gfx, _reg)                                                                                   \
   {                                                                                                                    \
@@ -192,6 +205,10 @@ using namespace Pal::Gfx9::Chip;
 #define SET_REG_GFX10_3_PLUS_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx103Plus._field = (_val);
 #define SET_REG_GFX10_3_PLUS_EXCLUSIVE_FIELD(_stage, _reg, _field, _val)                                               \
   (_stage)->_reg##_VAL.gfx103PlusExclusive._field = (_val);
+#if LLPC_BUILD_GFX11
+#define SET_REG_GFX10_4_PLUS_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx104Plus._field = (_val);
+#define SET_REG_GFX11_FIELD(_stage, _reg, _field, _val) (_stage)->_reg##_VAL.gfx11._field = (_val);
+#endif
 
 // Preferred number of GS primitives per ES thread.
 constexpr unsigned GsPrimsPerEsThread = 256;
@@ -557,6 +574,11 @@ struct MeshRegConfig {
 
   DEF_REG(GE_NGG_SUBGRP_CNTL);
   DEF_REG(SPI_SHADER_IDX_FORMAT);
+
+#if LLPC_BUILD_GFX11
+  DEF_REG(SPI_SHADER_GS_MESHLET_DIM);
+  DEF_REG(SPI_SHADER_GS_MESHLET_EXP_ALLOC);
+#endif
 
   MeshRegConfig(GfxIpVersion gfxIp);
 };

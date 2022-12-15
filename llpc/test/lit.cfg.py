@@ -82,3 +82,11 @@ tools = ['amdllpc', 'llvm-objdump', 'llvm-readelf', 'not', 'count']
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)
 
+#if LLPC_BUILD_NAVI31
+# Propagate options for lit feature tests. These can be used in XFAIL, REQUIRES, and UNSUPPORTED
+p = subprocess.Popen([config.amdllpc_dir + "/amdllpc", "-gfxip=11.0.0","dummy.comp"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+out,err = p.communicate()
+check_str = out.decode("utf-8")
+if check_str.find("Invalid gfxip: gfx1100") == -1:
+    config.available_features.add('gfx11')
+#endif

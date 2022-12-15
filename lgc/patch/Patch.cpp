@@ -170,11 +170,23 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
   }
 
+#if LLPC_BUILD_GFX11
+  // Collect image operations
+  passMgr.addPass(PatchImageOpCollect());
+#endif
+
   // Second part of lowering to "AMDGCN-style"
   passMgr.addPass(PatchPreparePipelineAbi());
 
+#if LLPC_BUILD_GFX11
+  const bool canUseNgg = pipelineState->isGraphics() &&
+                         ((pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
+                           (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0) ||
+                          pipelineState->getTargetInfo().getGfxIpVersion().major >= 11); // Must enable NGG on GFX11+
+#else
   const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
                          (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
+#endif
   if (canUseNgg) {
     if (patchTimer) {
       LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
@@ -412,11 +424,23 @@ void LegacyPatch::addPasses(PipelineState *pipelineState, legacy::PassManager &p
   passMgr.add(createLegacyPatchBufferOp());
   passMgr.add(createInstructionCombiningPass(2));
 
+#if LLPC_BUILD_GFX11
+  // Collect image operations
+  passMgr.add(createLegacyPatchImageOpCollect());
+#endif
+
   // Fully prepare the pipeline ABI (must be after optimizations)
   passMgr.add(createLegacyPatchPreparePipelineAbi());
 
+#if LLPC_BUILD_GFX11
+  const bool canUseNgg = pipelineState->isGraphics() &&
+                         ((pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
+                           (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0) ||
+                          pipelineState->getTargetInfo().getGfxIpVersion().major >= 11); // Must enable NGG on GFX11+
+#else
   const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
                          (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
+#endif
   if (canUseNgg) {
     // Stop timer for patching passes and restart timer for optimization passes.
     if (patchTimer) {

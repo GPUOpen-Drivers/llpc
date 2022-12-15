@@ -172,6 +172,14 @@ bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipe
       BUF_FORMAT_32_32_32_FLOAT_GFX10,
       BUF_FORMAT_32_32_32_32_FLOAT_GFX10,
   };
+#if LLPC_BUILD_GFX11
+  static const std::array<unsigned char, 4> BufferFormatsGfx11 = {
+      BUF_FORMAT_32_FLOAT,
+      BUF_FORMAT_32_32_FLOAT_GFX11,
+      BUF_FORMAT_32_32_32_FLOAT_GFX11,
+      BUF_FORMAT_32_32_32_32_FLOAT_GFX11,
+  };
+#endif
 
   switch (m_gfxIp.major) {
   default:
@@ -180,6 +188,11 @@ bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipe
   case 10:
     m_buffFormats = &BufferFormatsGfx10;
     break;
+#if LLPC_BUILD_GFX11
+  case 11:
+    m_buffFormats = &BufferFormatsGfx11;
+    break;
+#endif
   }
 
   // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
@@ -330,9 +343,15 @@ void PatchInOutImportExport::processShader() {
       // On-chip  | Input Patch | Output Patch | Patch Const | Tess Factor | (LDS)
       //          +-------------+--------------+-------------+-------------+
       //
+#if LLPC_BUILD_GFX11
+      //          +-------------+-------------+----------------+------------------+
+      // Off-chip | Input Patch | Tess Factor | HS Patch Count | Special TF Value | (LDS)
+      //          +-------------+-------------+----------------+------------------+
+#else
       //          +-------------+-------------+
       // Off-chip | Input Patch | Tess Factor | (LDS)
       //          +-------------+-------------+
+#endif
       //          +--------------+-------------+
       //          | Output Patch | Patch Const | (LDS Buffer)
       //          +--------------+-------------+
@@ -408,6 +427,30 @@ void PatchInOutImportExport::processShader() {
       calcFactor.tessFactorStride = tessFactorStride;
       calcFactor.tessOnChipLdsSize = calcFactor.onChip.tessFactorStart + tessFactorTotalSize;
 
+#if LLPC_BUILD_GFX11
+      if (m_pipelineState->canOptimizeTessFactor()) {
+        //
+        // NOTE: If we are going to optimize TF store, we need additional on-chip LDS size. The required size is
+        // 2 dwords per HS wave (1 dword all-ones flag and 1 dword all-zeros flag) plus an extra dword to count
+        // actual HS patches. The layout is as follow:
+        //
+        // +----------------+--------+--------+-----+--------+--------+
+        // | HS Patch Count | All 1s | All 0s | ... | All 1s | All 0s |
+        // +----------------+--------+--------+-----+--------+--------+
+        //                  |<---- Wave 0 --->|     |<---- Wave N --->|
+        //
+        assert(m_gfxIp.major >= 11);
+        calcFactor.onChip.hsPatchCountStart = calcFactor.tessOnChipLdsSize; // One dword to store actual HS wave count
+        calcFactor.onChip.specialTfValueStart = calcFactor.onChip.hsPatchCountStart + 1;
+
+        const unsigned maxNumHsWaves =
+            Gfx9::MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStageTessControl);
+        calcFactor.specialTfValueSize = maxNumHsWaves * 2;
+
+        calcFactor.tessOnChipLdsSize += 1 + calcFactor.specialTfValueSize;
+      }
+#endif
+
 #if VKI_RAY_TRACING
       // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
       // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
@@ -446,6 +489,14 @@ void PatchInOutImportExport::processShader() {
       LLPC_OUTS("Tess factor start: " << calcFactor.onChip.tessFactorStart << " (LDS)\n");
       LLPC_OUTS("Tess factor total size (in dwords): " << tessFactorTotalSize << "\n");
       LLPC_OUTS("\n");
+#if LLPC_BUILD_GFX11
+      LLPC_OUTS("HS patch count start: " << calcFactor.onChip.hsPatchCountStart << " (LDS)\n");
+      LLPC_OUTS("HS wave count size (in dwords): " << 1 << "\n");
+      LLPC_OUTS("\n");
+      LLPC_OUTS("Special TF value start: " << calcFactor.onChip.specialTfValueStart << " (LDS)\n");
+      LLPC_OUTS("Special TF value size (in dwords): " << calcFactor.specialTfValueSize << "\n");
+      LLPC_OUTS("\n");
+#endif
       LLPC_OUTS("Tess factor stride: " << tessFactorStride << " (");
       switch (m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode) {
       case PrimitiveMode::Triangles:
@@ -1665,6 +1716,21 @@ Value *PatchInOutImportExport::performFsFloatInterpolation(BuilderBase &builder,
                                                            Value *coordI, Value *coordJ, Value *primMask) {
   Value *result = nullptr;
   Attribute::AttrKind attribs[] = {Attribute::ReadNone};
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11) {
+    // llvm.amdgcn.lds.param.load(attr_channel, attr, m0)
+    Value *param =
+        builder.CreateNamedCall("llvm.amdgcn.lds.param.load", builder.getFloatTy(), {channel, attr, primMask}, attribs);
+
+    // tmp = llvm.amdgcn.interp.inreg.p10(p10, coordI, p0)
+    result =
+        builder.CreateNamedCall("llvm.amdgcn.interp.inreg.p10", builder.getFloatTy(), {param, coordI, param}, attribs);
+
+    // llvm.amdgcn.interp.inreg.p2(p20, coordJ, tmp)
+    result =
+        builder.CreateNamedCall("llvm.amdgcn.interp.inreg.p2", builder.getFloatTy(), {param, coordJ, result}, attribs);
+  } else
+#endif
   {
     // llvm.amdgcn.interp.p1(coordI, attr_channel, attr, m0)
     result = builder.CreateNamedCall("llvm.amdgcn.interp.p1", builder.getFloatTy(), {coordI, channel, attr, primMask},
@@ -1692,6 +1758,21 @@ Value *PatchInOutImportExport::performFsHalfInterpolation(BuilderBase &builder, 
                                                           Value *highHalf) {
   Value *result = nullptr;
   Attribute::AttrKind attribs[] = {Attribute::ReadNone};
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11) {
+    // llvm.amdgcn.lds.param.load(attr_channel, attr, m0)
+    Value *param =
+        builder.CreateNamedCall("llvm.amdgcn.lds.param.load", builder.getFloatTy(), {channel, attr, primMask}, attribs);
+
+    // tmp = llvm.amdgcn.interp.inreg.p10.f16(p10, coordI, p0, highHalf)
+    result = builder.CreateNamedCall("llvm.amdgcn.interp.inreg.p10.f16", builder.getFloatTy(),
+                                     {param, coordI, param, highHalf}, attribs);
+
+    // llvm.amdgcn.interp.inreg.p2.f16(p20, coordJ, tmp, highHalf)
+    result = builder.CreateNamedCall("llvm.amdgcn.interp.inreg.p2.f16", builder.getHalfTy(),
+                                     {param, coordJ, result, highHalf}, attribs);
+  } else
+#endif
   {
     // llvm.amdgcn.interp.p1.f16(coordI, attr_channel, attr, highhalf, m0)
     result = builder.CreateNamedCall("llvm.amdgcn.interp.p1.f16", builder.getFloatTy(),
@@ -1719,6 +1800,29 @@ Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Valu
                                                       bool highHalf) {
   Value *compValue = nullptr;
 
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11) {
+    // llvm.amdgcn.lds.param.load(attr_channel, attr, m0)
+    compValue = builder.CreateNamedCall("llvm.amdgcn.lds.param.load", builder.getFloatTy(), {channel, attr, primMask},
+                                        {Attribute::ReadNone});
+    DppCtrl dppCtrl;
+    if (interpParam == INTERP_PARAM_P0)
+      dppCtrl = DppCtrl::DppQuadPerm0000;
+    else if (interpParam == INTERP_PARAM_P10)
+      dppCtrl = DppCtrl::DppQuadPerm1111;
+    else
+      dppCtrl = DppCtrl::DppQuadPerm2222;
+
+    compValue = builder.CreateBitCast(compValue, builder.getInt32Ty());
+    compValue = builder.CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
+                                        {compValue, builder.getInt32(static_cast<unsigned>(dppCtrl)),
+                                         builder.getInt32(15), builder.getInt32(15), builder.getTrue()});
+    // NOTE: Make mov_dpp and its source instructions run in WQM to make sure the mov_dpp could fetch
+    // correct data from possible inactive lanes.
+    compValue = builder.CreateIntrinsic(Intrinsic::amdgcn_wqm, builder.getInt32Ty(), compValue);
+    compValue = builder.CreateBitCast(compValue, builder.getFloatTy());
+  } else
+#endif
   {
     Value *args[] = {
         builder.getInt32(interpParam), // param
@@ -3495,6 +3599,38 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
   }
   assert(bitWidth == 16 || bitWidth == 32);
 
+#if LLPC_BUILD_GFX11
+  if (m_pipelineState->enableSwXfb() && m_shaderStage == ShaderStageCopyShader) {
+    // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced with
+    // real instructions when when NGG primitive shader is generated.
+    if (compCount > 4) {
+      CallInst *importCall = cast<CallInst>(output);
+      assert(importCall != nullptr);
+      unsigned location = cast<ConstantInt>(importCall->getArgOperand(0))->getZExtValue();
+
+      // vecX -> vec4 + vec(X - 4)
+      assert(compCount <= 8);
+      Type *loadTy = FixedVectorType::get(Type::getFloatTy(*m_context), 4);
+      Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), location),
+                       ConstantInt::get(Type::getInt32Ty(*m_context), streamId)};
+      output = emitCall(lgcName::NggGsOutputImport + getTypeName(loadTy), loadTy, args,
+                        {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn}, insertPos);
+      storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
+
+      loadTy = FixedVectorType::get(Type::getFloatTy(*m_context), (compCount - 4));
+      args[0] = ConstantInt::get(Type::getInt32Ty(*m_context), location + 1);
+      output = emitCall(lgcName::NggGsOutputImport + getTypeName(loadTy), loadTy, args,
+                        {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn}, insertPos);
+      storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset + 4 * bitWidth / 8, xfbStride, streamId,
+                                  streamOutBufDesc, insertPos);
+    } else {
+      storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
+    }
+
+    return;
+  }
+#endif
+
   if (compCount == 8) {
     // vec8 -> vec4 + vec4
     assert(bitWidth == 32);
@@ -3661,6 +3797,19 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(Value *storeValu
     format = formatTable[compCount - 1][bitWidth == 32];
     break;
   }
+#if LLPC_BUILD_GFX11
+  case 11: {
+    static unsigned char formatTable[5][2] = {
+        {},
+        {BUF_FORMAT_16_FLOAT, BUF_FORMAT_32_FLOAT},
+        {BUF_FORMAT_16_16_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX11},
+        {},
+        {BUF_FORMAT_16_16_16_16_FLOAT_GFX11, BUF_FORMAT_32_32_32_32_FLOAT_GFX11},
+    };
+    format = formatTable[compCount][bitWidth == 32];
+    break;
+  }
+#endif
   }
 
   // byteOffset = streamOffsets[xfbBuffer] * 4 +
@@ -3813,6 +3962,22 @@ unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadVal
 void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset,
                                                          unsigned xfbStride, unsigned streamId, Value *streamOutBufDesc,
                                                          Instruction *insertPos) {
+#if LLPC_BUILD_GFX11
+  if (m_pipelineState->enableSwXfb()) {
+    // NOTE: For GFX11+, exporting transform feedback outputs is represented by a call and the call is replaced with
+    // real instructions when when NGG primitive shader is generated.
+    auto xfbBufOffset = m_pipelineSysValues.get(m_entryPoint)->getStreamOutBufOffset(xfbBuffer);
+    Value *args[] = {streamOutBufDesc,
+                     xfbBufOffset,
+                     ConstantInt::get(Type::getInt32Ty(*m_context), xfbBuffer),
+                     ConstantInt::get(Type::getInt32Ty(*m_context), xfbOffset),
+                     ConstantInt::get(Type::getInt32Ty(*m_context), streamId),
+                     storeValue};
+    std::string callName = lgcName::NggXfbOutputExport + getTypeName(storeValue->getType());
+    emitCall(callName, Type::getVoidTy(*m_context), args, {}, insertPos);
+    return;
+  }
+#endif
 
   auto storeTy = storeValue->getType();
 
@@ -4382,7 +4547,14 @@ Value *PatchInOutImportExport::readValueFromLds(bool offChip, Type *readTy, Valu
     else if (m_gfxIp.major == 10) {
       coherent.bits.glc = true;
       coherent.bits.dlc = true;
-    } else
+    }
+#if LLPC_BUILD_GFX11
+    else if (m_gfxIp.major == 11) {
+      // NOTE: dlc depends on MALL NOALLOC which isn't used by now.
+      coherent.bits.glc = true;
+    }
+#endif
+    else
       llvm_unreachable("Not implemented!");
 
     for (unsigned i = 0, combineCount = 0; i < numChannels; i += combineCount)
@@ -4771,6 +4943,17 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
   unsigned ldsSizePerPatch = inPatchSize + MaxTessFactorsPerPatch;
 
   unsigned ldsSizePerThreadGroup = m_pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup;
+#if LLPC_BUILD_GFX11
+  if (m_pipelineState->canOptimizeTessFactor()) {
+    // NOTE: If we are going to optimize TF store, we need additional on-chip LDS size. The required size is
+    // 2 dwords per HS wave (1 dword all-ones flag or 1 dword all-zeros flag) plus an extra dword to
+    // count actual HS patches.
+    assert(m_gfxIp.major >= 11);
+    const unsigned maxNumHsWaves =
+        Gfx9::MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStageTessControl);
+    ldsSizePerThreadGroup -= 1 + maxNumHsWaves * 2;
+  }
+#endif
 #if VKI_RAY_TRACING
   ldsSizePerThreadGroup -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
 #endif
@@ -5745,6 +5928,39 @@ void PatchInOutImportExport::exportShadingRate(Value *shadingRate, Instruction *
 
   Value *hwShadingRate = nullptr;
 
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11) {
+    // NOTE: In GFX11, the graphics pipeline is to support VRS rates till 4x4 which includes 2x4 and 4x2 along with
+    // the legacy rates. And 1x4 and 4x1 are not supported, hence clamp 1x4 and 4x1 to 1x2 and 2x1 respectively.
+    // The HW shading rate representations are as following:
+    //     SHADING_RATE_1x1    0x0
+    //     SHADING_RATE_1x2    0x1
+    //     SHADING_RATE_2x1    0x4
+    //     SHADING_RATE_2x2    0x5
+    //     SHADING_RATE_2x4    0x6
+    //     SHADING_RATE_4x2    0x9
+    //     SHADING_RATE_4x4    0xA
+    //
+    // [5:2] = HW rate enum
+    // hwShadingRate = shadingRate & (ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels |
+    //                                 ShadingRateVertical2Pixels | ShadingRateVertical4Pixels)
+    hwShadingRate =
+        builder.CreateAnd(shadingRate, builder.getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels |
+                                                        ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
+
+    // hwShadingRate = hwShadingRate == 1x4 ? 1x2 : hwShadingRate
+    Value *shadingRate1x4 = builder.CreateICmpEQ(hwShadingRate, builder.getInt32(2));
+    hwShadingRate = builder.CreateSelect(shadingRate1x4, builder.getInt32(1), hwShadingRate);
+
+    // hwShadingRate = hwShadingRate == 4x1 ? 2x1 : hwShadingRate
+    Value *shadingRate4x1 = builder.CreateICmpEQ(hwShadingRate, builder.getInt32(8));
+    hwShadingRate = builder.CreateSelect(shadingRate4x1, builder.getInt32(4), hwShadingRate);
+
+    // hwShadingRate = hwShadingRate << 2
+    hwShadingRate = builder.CreateShl(hwShadingRate, 2);
+    hwShadingRate = builder.CreateBitCast(hwShadingRate, builder.getFloatTy());
+  } else
+#endif
   {
     // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
     // and 4-pixel mode is not supported. But the spec requires us to accept unsupported rates and clamp them to
@@ -5806,6 +6022,26 @@ Value *PatchInOutImportExport::getShadingRate(Instruction *insertPos) {
   Value *yRate = builder.CreateAnd(ancillary, 0x30);
   yRate = builder.CreateLShr(yRate, 4);
 
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11) {
+    // NOTE: In GFX11, the graphics pipeline is to support VRS rates till 4x4 which includes 2x4 and 4x2
+    // along with the legacy rates.
+    //
+    // xRate = xRate == 0x1 ? Horizontal2Pixels : (xRate == 0x2 ? Horizontal4Pixels : None)
+    auto xRate2Pixels = builder.CreateICmpEQ(xRate, builder.getInt32(1));
+    auto xRate4Pixels = builder.CreateICmpEQ(xRate, builder.getInt32(2));
+    xRate = builder.CreateSelect(xRate2Pixels, builder.getInt32(ShadingRateHorizontal2Pixels),
+                                 builder.CreateSelect(xRate4Pixels, builder.getInt32(ShadingRateHorizontal4Pixels),
+                                                      builder.getInt32(ShadingRateNone)));
+
+    // yRate = yRate == 0x1 ? Vertical2Pixels : (yRate == 0x2 ? Vertical2Pixels : None)
+    auto yRate2Pixels = builder.CreateICmpEQ(yRate, builder.getInt32(1));
+    auto yRate4Pixels = builder.CreateICmpEQ(yRate, builder.getInt32(2));
+    yRate = builder.CreateSelect(yRate2Pixels, builder.getInt32(ShadingRateVertical2Pixels),
+                                 builder.CreateSelect(yRate4Pixels, builder.getInt32(ShadingRateVertical4Pixels),
+                                                      builder.getInt32(ShadingRateNone)));
+  } else
+#endif
   {
     // NOTE: The shading rates have different meanings in HW and LGC interface. Current HW only supports 2-pixel mode
     // and 4-pixel mode is not supported. The mapping is as follow:
@@ -5901,7 +6137,20 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
                                builder.getFalse(),                                        // done
                                builder.getFalse()});                                      // src0
     } else {
+#if LLPC_BUILD_GFX11
+      Value *attribValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), 4)); // Always be <4 x float>
+      for (unsigned i = 0; i < 4; ++i)
+        attribValue = builder.CreateInsertElement(attribValue, attribExport.second[i], i);
+      // NOTE: For GFX11+, vertex attributes are exported through memory. This call will be expanded when NGG primitive
+      // shader is generated. The arguments are: buffer descriptor of attribute ring, attribute location, and attribute
+      // export value.
+      emitCall(lgcName::NggAttribExport, builder.getVoidTy(),
+               {m_pipelineSysValues.get(m_entryPoint)->getAttribRingBufDesc(), builder.getInt32(attribExport.first),
+                attribValue},
+               {}, insertPos);
+#else
       llvm_unreachable("Not implemented!");
+#endif
     }
   }
 }

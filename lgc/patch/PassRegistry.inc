@@ -72,6 +72,9 @@ LLPC_FUNCTION_PASS("lgc-patch-buffer-op", PatchBufferOp)
 LLPC_MODULE_PASS("lgc-patch-workarounds", PatchWorkarounds)
 LLPC_FUNCTION_PASS("lgc-patch-load-scalarizer", PatchLoadScalarizer)
 LLPC_MODULE_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
+#if LLPC_BUILD_GFX11
+LLPC_MODULE_PASS("lgc-patch-image-op-collect", PatchImageOpCollect)
+#endif
 
 #undef LLPC_PASS
 #undef LLPC_LOOP_PASS

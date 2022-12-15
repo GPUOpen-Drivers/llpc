@@ -282,6 +282,11 @@ public:
   // ring is on-chip.
   bool isGsOnChip() const { return m_gsOnChip; }
 
+#if LLPC_BUILD_GFX11
+  // Determine whether can use tessellation factor optimization
+  bool canOptimizeTessFactor();
+#endif
+
   // Gets wave size for the specified shader stage
   unsigned getShaderWaveSize(ShaderStage stage);
   // Gets wave size for the merged shader stage
@@ -306,6 +311,11 @@ public:
 
   // Checks if row export for mesh shader is enabled or not
   bool enableMeshRowExport() const;
+
+#if LLPC_BUILD_GFX11
+  // Checks if SW-emulated stream-out should be enabled
+  bool enableSwXfb() const;
+#endif
 
   // Gets resource usage of the specified shader stage
   ResourceUsage *getShaderResourceUsage(ShaderStage shaderStage);

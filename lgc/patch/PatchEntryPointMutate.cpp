@@ -1045,6 +1045,27 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     userDataIdx += dwordSize;
   }
 
+#if LLPC_BUILD_GFX11
+  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waUserSgprInitBug) {
+    // Add dummy user data to bring the total to 16 SGPRS if hardware workaround
+    // is required
+
+    // Only applies to wave32
+    // TODO: Can we further exclude PS if LDS_GROUP_SIZE == 0
+    if (m_pipelineState->getShaderWaveSize(m_shaderStage) == 32 &&
+        (m_shaderStage == ShaderStageCompute || m_shaderStage == ShaderStageFragment ||
+         m_shaderStage == ShaderStageMesh)) {
+      unsigned userDataLimit = m_shaderStage == ShaderStageMesh ? 8 : 16;
+
+      while (userDataIdx < userDataLimit) {
+        argTys.push_back(builder.getInt32Ty());
+        argNames.push_back(("dummyInit" + Twine(userDataIdx)).str());
+        userDataIdx += 1;
+      }
+    }
+  }
+#endif
+
   intfData->userDataCount = userDataIdx;
   inRegMask = (1ull << argTys.size()) - 1;
 
@@ -1239,15 +1260,43 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       case ShaderStageVertex:
         userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
                                            &intfData->entryArgIdxs.vs.streamOutData.tablePtr));
+#if LLPC_BUILD_GFX11
+        if (m_pipelineState->enableSwXfb()) {
+          // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the
+          // stream-out control buffer address.
+          specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutControlBuf",
+                                                    UserDataMapping::StreamOutControlBuf,
+                                                    &intfData->entryArgIdxs.vs.streamOutData.controlBufPtr));
+        }
+#endif
         break;
       case ShaderStageTessEval:
         userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
                                            &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
+#if LLPC_BUILD_GFX11
+        if (m_pipelineState->enableSwXfb()) {
+          // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the
+          // stream-out control buffer address.
+          specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutControlBuf",
+                                                    UserDataMapping::StreamOutControlBuf,
+                                                    &intfData->entryArgIdxs.tes.streamOutData.controlBufPtr));
+        }
+#endif
         break;
       case ShaderStageGeometry:
         if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
           // Allocate dummy stream-out register for geometry shader
           userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "dummyStreamOut"));
+#if LLPC_BUILD_GFX11
+        } else if (m_pipelineState->enableSwXfb()) {
+          userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
+                                             &intfData->entryArgIdxs.gs.streamOutData.tablePtr));
+          // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the
+          // stream-out control buffer address.
+          specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutControlBuf",
+                                                    UserDataMapping::StreamOutControlBuf,
+                                                    &intfData->entryArgIdxs.gs.streamOutData.controlBufPtr));
+#endif
         }
         break;
       default:

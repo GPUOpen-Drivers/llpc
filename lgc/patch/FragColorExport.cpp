@@ -240,9 +240,44 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   }
   }
 
+#if LLPC_BUILD_GFX11
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
+      m_pipelineState->getColorExportState().dualSourceBlendEnable) {
+    // Save them for later dual-source-swizzle
+    m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
+    assert(hwColorTarget <= 1);
+    m_blendSources[hwColorTarget].append(comps.begin(), comps.end());
+    return nullptr;
+  }
+#endif
+
   Value *exportCall = nullptr;
 
   if (exportTy->isHalfTy()) {
+#if LLPC_BUILD_GFX11
+    // GFX11 removes compressed export, simply use 32bit-data export.
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
+      // Translate compCount into the number of 32bit data.
+      compCount = (compCount + 1) / 2;
+      for (unsigned i = 0; i < compCount; i++)
+        comps[i] = builder.CreateBitCast(comps[i], builder.getFloatTy());
+      for (unsigned i = compCount; i < 4; i++)
+        comps[i] = undefFloat;
+
+      Value *args[] = {
+          builder.getInt32(EXP_TARGET_MRT_0 + hwColorTarget), // tgt
+          builder.getInt32((1 << compCount) - 1),             // en
+          comps[0],                                           // src0
+          comps[1],                                           // src1
+          comps[2],                                           // src2
+          comps[3],                                           // src3
+          builder.getFalse(),                                 // done
+          builder.getTrue()                                   // vm
+      };
+
+      return builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {});
+    }
+#endif
     // 16-bit export (compressed)
     if (compCount <= 2)
       comps[1] = undefFloat16x2;
@@ -808,6 +843,85 @@ void FragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
   }
 }
 
+#if LLPC_BUILD_GFX11
+// =====================================================================================================================
+// Swizzle the output to MRT0/MRT1 for dual source blend on GFX11+, and return the last export instruction.
+//
+// @param builder : The builder object that will be used to create new instructions.
+Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
+  Value *result0[4], *result1[4];
+  unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageFragment);
+  auto undefFloat = UndefValue::get(builder.getFloatTy());
+
+  Value *threadId =
+      builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
+  if (waveSize == 64)
+    threadId = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadId});
+  threadId = builder.CreateAnd(threadId, builder.getInt32(1));
+  // mask: 0 1 0 1 0 1 ...
+  Value *mask = builder.CreateICmpNE(threadId, builder.getInt32(0));
+
+  for (unsigned i = 0; i < m_blendSourceChannels; i++) {
+    Value *src0 = m_blendSources[0][i];
+    Value *src1 = m_blendSources[1][i];
+    src0 = builder.CreateBitCast(src0, builder.getInt32Ty());
+    src1 = builder.CreateBitCast(src1, builder.getInt32Ty());
+
+    src0 = builder.CreateSetInactive(src0, builder.getInt32(0));
+    src1 = builder.CreateSetInactive(src1, builder.getInt32(0));
+    // Construct a mask to help the later swizzle work. As we are mainly swapping neighbouring even/odd lanes afterward,
+    // so we need the dpp8-mask(from LSB to MSB, each take 3bits): 1 0 3 2 5 4 7 6
+    Value *dpp8 = builder.getInt32(1 | 0 << 3 | 3 << 6 | 2 << 9 | 5 << 12 | 4 << 15 | 7 << 18 | 6 << 21);
+
+    // Swapping every even/odd lanes of Src1 (S10 means lane-0 of src1).
+    // src1Shuffle: S11 S10 S13 S12 ...
+    Value *src1Shuffle = builder.CreateIntrinsic(Intrinsic::amdgcn_mov_dpp8, builder.getInt32Ty(), {src1, dpp8});
+
+    // blend0: S00 S10 S02 S12 ...
+    Value *blend0 = builder.CreateSelect(mask, src1Shuffle, src0);
+    blend0 = builder.CreateBitCast(blend0, builder.getFloatTy());
+    result0[i] = blend0;
+
+    // blend1: S11 S01 S13 S03 ...
+    Value *blend1 = builder.CreateSelect(mask, src0, src1Shuffle);
+
+    // blend1: S01 S11 S03 S13 ...
+    blend1 = builder.CreateIntrinsic(Intrinsic::amdgcn_mov_dpp8, builder.getInt32Ty(), {blend1, dpp8});
+    blend1 = builder.CreateBitCast(blend1, builder.getFloatTy());
+    result1[i] = blend1;
+  }
+
+  for (unsigned i = m_blendSourceChannels; i < 4; i++) {
+    result0[i] = undefFloat;
+    result1[i] = undefFloat;
+  }
+
+  Value *args0[] = {
+      builder.getInt32(EXP_TARGET_DUAL_SRC_0),            // tgt
+      builder.getInt32((1 << m_blendSourceChannels) - 1), // en
+      result0[0],                                         // src0
+      result0[1],                                         // src1
+      result0[2],                                         // src2
+      result0[3],                                         // src3
+      builder.getFalse(),                                 // done
+      builder.getTrue()                                   // vm
+  };
+  builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args0, {});
+
+  Value *args1[] = {
+      builder.getInt32(EXP_TARGET_DUAL_SRC_1),            // tgt
+      builder.getInt32((1 << m_blendSourceChannels) - 1), // en
+      result1[0],                                         // src0
+      result1[1],                                         // src1
+      result1[2],                                         // src2
+      result1[3],                                         // src3
+      builder.getFalse(),                                 // done
+      builder.getTrue()                                   // vm
+  };
+  return builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args1, {});
+}
+#endif
+
 // =====================================================================================================================
 // Generates the export instructions based on the given color export information.
 //
@@ -846,7 +960,13 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
     }
   }
 
+#if LLPC_BUILD_GFX11
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
+      m_pipelineState->getColorExportState().dualSourceBlendEnable)
+    lastExport = dualSourceSwizzle(builder);
+#else
   (void(m_pipelineState)); // Unused
+#endif
 
   if (!lastExport && dummyExport) {
     lastExport = FragColorExport::addDummyExport(builder);

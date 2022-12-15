@@ -148,6 +148,10 @@ private:
   void createIntersectMatrix(llvm::Function *func, unsigned builtInId);
   void createIntersectBvh(llvm::Function *func);
   void createSampleGpuTime(llvm::Function *func);
+#if VKI_BUILD_GFX11
+  void createLdsStackInit(llvm::Function *func);
+  void createLdsStackStore(llvm::Function *func);
+#endif
   llvm::Value *getStackArrayIndex(llvm::Value *stackOffset);
   uint32_t getWorkgroupSize() const;
   llvm::Value *createGetInstanceNodeAddr(llvm::Value *instNodePtr, llvm::Value *rayQuery);

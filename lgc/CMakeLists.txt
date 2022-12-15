@@ -53,6 +53,12 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" OFF)
+#if VKI_BUILD_GFX11
+option(LLPC_BUILD_GFX11 "LLPC support for GFX11?" OFF)
+#endif
+#if VKI_BUILD_NAVI31
+option(LLPC_BUILD_NAVI31 "LLPC support for NAVI31?" OFF)
+#endif
 option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 ### Compiler Options ###################################################################################################
@@ -81,6 +87,21 @@ target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
         CHIP_HDR_NAVI12
     )
   endif()
+#if VKI_BUILD_GFX11
+  if(LLPC_BUILD_GFX11)
+    target_compile_definitions(LLVMlgc PUBLIC
+        LLPC_BUILD_GFX11
+    )
+  endif()
+#endif
+#if VKI_BUILD_NAVI31
+  if(LLPC_BUILD_NAVI31)
+    target_compile_definitions(LLVMlgc PRIVATE
+        LLPC_BUILD_NAVI31
+        CHIP_HDR_NAVI31
+    )
+  endif()
+#endif
 
 if(WIN32)
     target_compile_definitions(LLVMlgc PRIVATE
@@ -169,6 +190,14 @@ target_sources(LLVMlgc PRIVATE
     patch/VertexFetch.cpp
     patch/PatchWaveSizeAdjust.cpp
 )
+
+#if LLPC_BUILD_GFX11
+if(LLPC_BUILD_GFX11)
+  target_sources(LLVMlgc PRIVATE
+    patch/PatchImageOpCollect.cpp
+  )
+endif()
+#endif
 
 # lgc/state
 target_sources(LLVMlgc PRIVATE

@@ -334,6 +334,10 @@ const PalMetadataReg PalMetadataRegs[] = {
     {0xA298, "VGT_GSVS_RING_OFFSET_1"},
     {0xA299, "VGT_GSVS_RING_OFFSET_2"},
     {0xA29A, "VGT_GSVS_RING_OFFSET_3"},
+#if LLPC_BUILD_GFX11
+// TODO: VGT_GS_OUT_PRIM_TYPE is here only up to gfx10. A different
+// register number takes over the name in gfx11+.
+#endif
     {0xA29B, "VGT_GS_OUT_PRIM_TYPE"},
     {0xA2A1, "VGT_PRIMITIVEID_EN"},
     {0xA2A5, "VGT_GS_MAX_PRIMS_PER_SUBGROUP"},
@@ -365,6 +369,9 @@ const PalMetadataReg PalMetadataRegs[] = {
     {0xC258, "IA_MULTI_VGT_PARAM_PIPED"}, // TODO: Known as IA_MULTI_VGT_PARAM on gfx9 only (not present <=gfx8)
     {0xC25F, "GE_STEREO_CNTL"},
     {0xC262, "GE_USER_VGPR_EN"},
+#if LLPC_BUILD_GFX11
+    {0xC266, "VGT_GS_OUT_PRIM_TYPE"}, // TODO: gfx11+. A different register number has the same name up to gfx10.
+#endif
 };
 
 } // anonymous namespace

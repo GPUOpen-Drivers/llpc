@@ -794,6 +794,9 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.extendedRobustness.robustImageAccess = " << options->extendedRobustness.robustImageAccess
            << "\n";
   dumpFile << "options.extendedRobustness.nullDescriptor = " << options->extendedRobustness.nullDescriptor << "\n";
+#if VKI_BUILD_GFX11
+  dumpFile << "options.optimizeTessFactor = " << options->optimizeTessFactor << "\n";
+#endif
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   dumpFile << "options.optimizationLevel = " << options->optimizationLevel << "\n";
@@ -1086,6 +1089,9 @@ void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, std::ostream 
   dumpStream << "rtState.enableDispatchRaysOuterSwizzle = " << rtState->enableDispatchRaysOuterSwizzle << "\n";
   dumpStream << "rtState.forceInvalidAccelStruct = " << rtState->forceInvalidAccelStruct << "\n";
   dumpStream << "rtState.enableRayTracingCounters = " << rtState->enableRayTracingCounters << "\n";
+#if VKI_BUILD_GFX11
+  dumpStream << "rtState.enableRayTracingHwTraversalStack = " << rtState->enableRayTracingHwTraversalStack << "\n";
+#endif
   dumpStream << "rtState.enableOptimalLdsStackSizeForIndirect = " << rtState->enableOptimalLdsStackSizeForIndirect
              << "\n";
   dumpStream << "rtState.enableOptimalLdsStackSizeForUnified = " << rtState->enableOptimalLdsStackSizeForUnified
@@ -1161,6 +1167,9 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
   hasher->Update(rtState->enableDispatchRaysOuterSwizzle);
   hasher->Update(rtState->forceInvalidAccelStruct);
   hasher->Update(rtState->enableRayTracingCounters);
+#if VKI_BUILD_GFX11
+  hasher->Update(rtState->enableRayTracingHwTraversalStack);
+#endif
   hasher->Update(rtState->enableOptimalLdsStackSizeForIndirect);
   hasher->Update(rtState->enableOptimalLdsStackSizeForUnified);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 56
@@ -1486,8 +1495,11 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
 // @param stage : The unlinked shader stage that should be included in the hash.
 void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options, MetroHash64 *hasher, bool isCacheHash,
                                                   bool isRelocatableShader, UnlinkedShaderStage stage) {
+#if VKI_BUILD_GFX11
+#else
   assert(options->reserved1f == false && "The reserved1f bit should be unused at this time.");
 
+#endif
   hasher->Update(options->includeDisassembly);
   hasher->Update(options->scalarBlockLayout);
   hasher->Update(options->includeIr);
@@ -1510,6 +1522,11 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->extendedRobustness.robustBufferAccess);
   hasher->Update(options->extendedRobustness.robustImageAccess);
   hasher->Update(options->extendedRobustness.nullDescriptor);
+#if VKI_BUILD_GFX11
+  if (stage != UnlinkedStageCompute) {
+    hasher->Update(options->optimizeTessFactor);
+  }
+#endif
 
   if (stage == UnlinkedStageFragment || stage == UnlinkedStageCount) {
     hasher->Update(options->enableInterpModePatch);

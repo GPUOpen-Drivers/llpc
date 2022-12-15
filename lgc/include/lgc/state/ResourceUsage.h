@@ -156,6 +156,10 @@ struct ResourceUsage {
   unsigned numVgprsAvailable = UINT32_MAX; // Number of available VGPRs
   bool useImages = false;                  // Whether images are used
 
+#if LLPC_BUILD_GFX11
+  bool useImageOp = false; // Whether image instruction is called (for GFX11+, pixel wait sync+)
+#endif
+
 #if VKI_RAY_TRACING
   bool useRayQueryLdsStack = false; // Whether ray query uses LDS stack
 #endif
@@ -355,6 +359,12 @@ struct ResourceUsage {
     // Stream to transform feedback buffers
     unsigned streamXfbBuffers[MaxGsStreams] = {};
 
+#if LLPC_BUILD_GFX11
+    // Count of transform feedback output export call (each call is to export <4 x dword> at most), used in SW emulated
+    // stream-out for GFX11+
+    unsigned xfbOutputExpCount = 0;
+#endif
+
     // Count of mapped location for inputs/outputs (including those special locations to which the built-ins
     // are mapped)
     unsigned inputMapLocCount = 0;
@@ -382,6 +392,10 @@ struct ResourceUsage {
           unsigned patchConstStart; // Offset into LDS where patch constants start (in dword,
                                     // correspond to "patchConstBase")
           unsigned tessFactorStart; // Offset into LDS where tess factor start (in dword)
+#if LLPC_BUILD_GFX11
+          unsigned hsPatchCountStart;   // Offset into LDS where count of HS patches start (in dword)
+          unsigned specialTfValueStart; // Offset into LDS where special TF value start (in dword)
+#endif
         } onChip;
 
         // Off-chip calculation factors
@@ -397,8 +411,11 @@ struct ResourceUsage {
         unsigned outPatchSize; // Size of an output patch output (in dword, correspond to
                                // "patchOutputSize")
 
-        unsigned patchConstSize;    // Size of an output patch constants (in dword)
-        unsigned tessFactorStride;  // Size of tess factor stride (in dword)
+        unsigned patchConstSize;   // Size of an output patch constants (in dword)
+        unsigned tessFactorStride; // Size of tess factor stride (in dword)
+#if LLPC_BUILD_GFX11
+        unsigned specialTfValueSize; // Size of special TF value (in dword)
+#endif
         unsigned tessOnChipLdsSize; // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
 #if VKI_RAY_TRACING
         unsigned rayQueryLdsStackSize; // Ray query LDS stack size
@@ -478,7 +495,10 @@ struct ResourceUsage {
 
 // Represents stream-out data
 struct StreamOutData {
-  unsigned tablePtr;                                   // Table pointer for stream-out
+  unsigned tablePtr; // Table pointer for stream-out
+#if LLPC_BUILD_GFX11
+  unsigned controlBufPtr; // Control buffer pointer for stream-out (GFX11+)
+#endif
   unsigned streamInfo;                                 // Stream-out info (ID, vertex count, enablement)
   unsigned writeIndex;                                 // Write index for stream-out
   unsigned streamOffsets[MaxTransformFeedbackBuffers]; // Stream-out Offset
@@ -508,6 +528,9 @@ struct InterfaceData {
     struct {
       unsigned copyShaderEsGsLdsSize;    // ES -> GS ring LDS size (for copy shader)
       unsigned copyShaderStreamOutTable; // Stream-out table (for copy shader)
+#if LLPC_BUILD_GFX11
+      unsigned copyShaderStreamOutControlBuf; // Stream-out control buffer (for copy shader)
+#endif
     } gs;
 
     unsigned spillTable; // Spill table user data map

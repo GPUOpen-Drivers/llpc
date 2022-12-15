@@ -124,6 +124,9 @@
 //  |     48.0 | Removed the member 'polygonMode' of rsState                                                           |
 //  |     47.0 | Always get culling controls from primitive shader table                                               |
 //  |     46.3 | Added enableInterpModePatch to PipelineOptions                                                        |
+#if VKI_BUILD_GFX11
+//  |     46.2 | Added optimizeTessFactor to PipelineOptions for GFX11+                                                |
+#endif
 //  |     46.1 | Added dynamicVertexStride to GraphicsPipelineBuildInfo                                                |
 //  |     46.0 | Removed the member 'depthBiasEnable' of rsState                                                       |
 //  |     45.5 | Added new enum type ThreadGroupSwizzleMode for thread group swizzling for compute shaders             |
@@ -489,7 +492,12 @@ struct PipelineOptions {
   float rtMaxRayLength; ///< Overrides the rayTMax value
 #endif
 #endif
-  bool reserved1f;            /// Reserved for future functionality
+#if VKI_BUILD_GFX11
+  bool optimizeTessFactor; ///< If set, we can determine either send HT_TessFactor message or write to TF buffer
+                           ///< depending the values of tessellation factors.
+#else
+  bool reserved1f; /// Reserved for future functionality
+#endif
   bool enableInterpModePatch; ///< If set, per-sample interpolation for nonperspective and smooth input is enabled
   bool pageMigrationEnabled;  ///< If set, page migration is enabled
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
@@ -1069,8 +1077,11 @@ struct RtState {
                                                  ///  tracing shaders
   bool forceInvalidAccelStruct;                  ///< Force ray tracing invalid acceleration structure
   bool enableRayTracingCounters;                 ///< Enable using ray tracing counters
-  bool enableOptimalLdsStackSizeForIndirect;     ///< Enable optimal LDS stack size for indirect shaders
-  bool enableOptimalLdsStackSizeForUnified;      ///< Enable optimal LDS stack size for unified shaders
+#if VKI_BUILD_GFX11
+  bool enableRayTracingHwTraversalStack; ///< Enable using hardware accelerated traversal stack
+#endif
+  bool enableOptimalLdsStackSizeForIndirect; ///< Enable optimal LDS stack size for indirect shaders
+  bool enableOptimalLdsStackSizeForUnified;  ///< Enable optimal LDS stack size for unified shaders
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 56
   float maxRayLength; ///< Raytracing rayDesc.tMax override
 #endif

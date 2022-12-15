@@ -53,6 +53,26 @@ static cl::opt<unsigned> NggSmallSubgroupThreshold(
 
 namespace lgc {
 
+#if LLPC_BUILD_GFX11
+// Represents GDS GRBM register for SW-emulated stream-out
+enum {
+  // For 4 stream-out buffers
+  GDS_STRMOUT_DWORDS_WRITTEN_0 = 0,
+  GDS_STRMOUT_DWORDS_WRITTEN_1 = 1,
+  GDS_STRMOUT_DWORDS_WRITTEN_2 = 2,
+  GDS_STRMOUT_DWORDS_WRITTEN_3 = 3,
+  // For 4 stream-out streams
+  GDS_STRMOUT_PRIMS_NEEDED_0 = 8,
+  GDS_STRMOUT_PRIMS_WRITTEN_0 = 9,
+  GDS_STRMOUT_PRIMS_NEEDED_1 = 10,
+  GDS_STRMOUT_PRIMS_WRITTEN_1 = 11,
+  GDS_STRMOUT_PRIMS_NEEDED_2 = 12,
+  GDS_STRMOUT_PRIMS_WRITTEN_2 = 13,
+  GDS_STRMOUT_PRIMS_NEEDED_3 = 14,
+  GDS_STRMOUT_PRIMS_WRITTEN_3 = 15,
+};
+#endif
+
 // =====================================================================================================================
 //
 // @param pipelineState : Pipeline state
@@ -75,6 +95,10 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
   m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
   m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
   m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+
+#if LLPC_BUILD_GFX11
+  m_enableSwXfb = m_pipelineState->enableSwXfb();
+#endif
 
   // NOTE: For NGG GS mode, we change data layout of output vertices. They are grouped by vertex streams now.
   // Vertices belonging to different vertex streams are in different regions of GS-VS ring. Here, we calculate
@@ -127,6 +151,17 @@ unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
   if (pipelineState->getNggControl()->passthroughMode) {
     unsigned esGsRingItemSize = 1;
 
+#if LLPC_BUILD_GFX11
+    if (pipelineState->enableSwXfb()) {
+      const bool hasTs =
+          pipelineState->hasShaderStage(ShaderStageTessControl) || pipelineState->hasShaderStage(ShaderStageTessEval);
+      auto resUsage = pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+
+      // NOTE: For GFX11+, transform feedback outputs (each output is <4 x dword>) are stored as a ES-GS ring item.
+      assert(resUsage->inOutUsage.xfbOutputExpCount > 0);
+      esGsRingItemSize = resUsage->inOutUsage.xfbOutputExpCount * 4;
+    }
+#endif
     // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
     return esGsRingItemSize | 1;
   }
@@ -209,6 +244,20 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
 
   unsigned cullInfoSize = 0;
   unsigned cullInfoOffset = 0;
+
+#if LLPC_BUILD_GFX11
+  if (pipelineState->enableSwXfb()) {
+    const bool hasTs =
+        pipelineState->hasShaderStage(ShaderStageTessControl) || pipelineState->hasShaderStage(ShaderStageTessEval);
+    auto resUsage = pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+
+    // NOTE: Each transform feedback output is <4 x dword>.
+    const unsigned xfbOutputCount = resUsage->inOutUsage.xfbOutputExpCount;
+    cullInfoSize += sizeof(VertexCullInfo::xfbOutputs) * xfbOutputCount;
+    vertCullInfoOffsets.xfbOutputs = cullInfoOffset;
+    cullInfoOffset += sizeof(VertexCullInfo::xfbOutputs) * xfbOutputCount;
+  }
+#endif
 
   if (nggControl->enableCullDistanceCulling) {
     cullInfoSize += sizeof(VertexCullInfo::cullDistanceSignMask);
@@ -514,6 +563,14 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
   mergedWaveInfo->setName("mergedWaveInfo");
 
+#if LLPC_BUILD_GFX11
+  Value *attribRingBase = nullptr;
+  if (m_gfxIp.major >= 11) {
+    attribRingBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
+    attribRingBase->setName("attribRingBase");
+  }
+#endif
+
   // GS shader address is reused as primitive shader table address for NGG culling
   Value *primShaderTableAddrLow = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow));
   primShaderTableAddrLow->setName("primShaderTableAddrLow");
@@ -577,8 +634,17 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     //   if (threadIdInSubgroup < primCountInSubgroup)
     //     Do primitive connectivity data export
     //
+#if LLPC_BUILD_GFX11
+    //   if (enableSwXfb)
+    //     Process XFB output export (Run ES)
+    //   else {
+    //     if (threadIdInSubgroup < vertCountInSubgroup)
+    //       Run ES
+    //   }
+#else
     //   if (threadIdInSubgroup < vertCountInSubgroup)
     //     Run ES
+#endif
     // }
     //
 
@@ -599,7 +665,13 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       endReadPrimIdBlock = createBlock(entryPoint, ".endReadPrimId");
     }
 
+#if LLPC_BUILD_GFX11
+    // NOTE: For GFX11+, we use NO_MSG mode for NGG pass-through mode if SW-emulated stream-out is not requested. The
+    // message GS_ALLOC_REQ is no longer necessary.
+    bool passthroughNoMsg = m_gfxIp.major >= 11 && !m_enableSwXfb;
+#else
     bool passthroughNoMsg = false;
+#endif
 
     BasicBlock *allocReqBlock = nullptr;
     BasicBlock *endAllocReqBlock = nullptr;
@@ -611,14 +683,30 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     auto expPrimBlock = createBlock(entryPoint, ".expPrim");
     auto endExpPrimBlock = createBlock(entryPoint, ".endExpPrim");
 
+#if LLPC_BUILD_GFX11
+    BasicBlock *expVertBlock = nullptr;
+    BasicBlock *endExpVertBlock = nullptr;
+    if (!m_enableSwXfb) {
+      expVertBlock = createBlock(entryPoint, ".expVert");
+      endExpVertBlock = createBlock(entryPoint, ".endExpVert");
+    }
+#else
     auto expVertBlock = createBlock(entryPoint, ".expVert");
     auto endExpVertBlock = createBlock(entryPoint, ".endExpVert");
+#endif
 
     // Construct ".entry" block
     {
       m_builder->SetInsertPoint(entryBlock);
 
       initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
+
+#if LLPC_BUILD_GFX11
+      if (m_gfxIp.major >= 11) {
+        // Record attribute ring base ([14:0])
+        m_nggFactor.attribRingBase = CreateUBfe(attribRingBase, 0, 15);
+      }
+#endif
 
       // Record primitive connectivity data
       m_nggFactor.primData = esGsOffsets01;
@@ -742,27 +830,53 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(endExpPrimBlock);
 
+#if LLPC_BUILD_GFX11
+      // NOTE: For NGG passthrough mode, if SW-emulated stream-out is enabled, running ES is included in processing
+      // transform feedback output exporting. There won't be separated ES running (ES is not split any more). This is
+      // because we could encounter special cases in which there are memory atomics producing output values both for
+      // transform feedback exporting and for vertex exporting like following codes. The atomics shouldn't be separated
+      // and be run multiple times.
+      //
+      //   void ES() {
+      //     ...
+      //     value = atomicXXX()
+      //     xfbExport = value
+      //     vertexExport = value
+      //  }
+      //
+      if (m_enableSwXfb) {
+        processXfbOutputExport(module, entryPoint->arg_begin());
+        m_builder->CreateRetVoid();
+      } else {
+#else
       {
+#endif
         auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
         m_builder->CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
       }
     }
 
-    // Construct ".expVert" block
-    {
-      m_builder->SetInsertPoint(expVertBlock);
+#if LLPC_BUILD_GFX11
+    if (!m_enableSwXfb) {
+#endif
+      // Construct ".expVert" block
+      {
+        m_builder->SetInsertPoint(expVertBlock);
 
-      runEs(module, entryPoint->arg_begin());
+        runEs(module, entryPoint->arg_begin());
 
-      m_builder->CreateBr(endExpVertBlock);
+        m_builder->CreateBr(endExpVertBlock);
+      }
+
+      // Construct ".endExpVert" block
+      {
+        m_builder->SetInsertPoint(endExpVertBlock);
+
+        m_builder->CreateRetVoid();
+      }
+#if LLPC_BUILD_GFX11
     }
-
-    // Construct ".endExpVert" block
-    {
-      m_builder->SetInsertPoint(endExpVertBlock);
-
-      m_builder->CreateRetVoid();
-    }
+#endif
 
     return;
   }
@@ -783,6 +897,11 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   //     Barrier
   //   }
   //
+#if LLPC_BUILD_GFX11
+  //   if (enableSwXfb)
+  //     Process XFB output export
+  //
+#endif
   //   if (threadIdInWave < vertCountInWave)
   //     Run ES-partial to fetch vertex cull data
   //
@@ -934,6 +1053,13 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
+#if LLPC_BUILD_GFX11
+    if (m_gfxIp.major >= 11) {
+      // Record attribute ring base ([14:0])
+      m_nggFactor.attribRingBase = CreateUBfe(attribRingBase, 0, 15);
+    }
+#endif
+
     m_nggFactor.primShaderTableAddrLow = primShaderTableAddrLow;
     m_nggFactor.primShaderTableAddrHigh = primShaderTableAddrHigh;
 
@@ -949,6 +1075,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.primCountInWave);
       m_builder->CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
     } else {
+#if LLPC_BUILD_GFX11
+      if (m_enableSwXfb)
+        processXfbOutputExport(module, entryPoint->arg_begin());
+#endif
 
       auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
       m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1013,6 +1143,11 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
       m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+
+#if LLPC_BUILD_GFX11
+      if (m_enableSwXfb)
+        processXfbOutputExport(module, entryPoint->arg_begin());
+#endif
 
       auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
       m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1569,6 +1704,14 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
   mergedWaveInfo->setName("mergedWaveInfo");
 
+#if LLPC_BUILD_GFX11
+  Value *attribRingBase = nullptr;
+  if (m_gfxIp.major >= 11) {
+    attribRingBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
+    attribRingBase->setName("attribRingBase");
+  }
+#endif
+
   // GS shader address is reused as primitive shader table address for NGG culling
   Value *primShaderTableAddrLow = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow));
   primShaderTableAddrLow->setName("primShaderTableAddrLow");
@@ -1601,6 +1744,11 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   //   if (threadIdInWave < primCountInWave)
   //     Run GS
   //
+#if LLPC_BUILD_GFX11
+  //   if (enableSwXfb)
+  //     Process XFB output export
+  //
+#endif
   //  if (threadIdInSubgroup < waveCount + 1)
   //     Initialize per-wave and per-subgroup count of output vertices
   //   Barrier
@@ -1703,6 +1851,13 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
+#if LLPC_BUILD_GFX11
+    if (m_gfxIp.major >= 11) {
+      // Record attribute ring base ([14:0])
+      m_nggFactor.attribRingBase = CreateUBfe(attribRingBase, 0, 15);
+    }
+#endif
+
     // Record primitive shader table address info
     m_nggFactor.primShaderTableAddrLow = primShaderTableAddrLow;
     m_nggFactor.primShaderTableAddrHigh = primShaderTableAddrHigh;
@@ -1740,8 +1895,22 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(initOutPrimDataBlock);
 
+#if LLPC_BUILD_GFX11
+    if (m_enableSwXfb) {
+      for (unsigned i = 0; i < MaxGsStreams; ++i) {
+        if (inOutUsage.outLocCount[i] > 0) { // Initialize primitive connectivity data if the stream is active
+          writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
+                                  SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * i);
+        }
+      }
+    } else {
+      writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
+                              SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
+    }
+#else
     writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
                             SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
+#endif
 
     m_builder->CreateBr(endInitOutPrimDataBlock);
   }
@@ -1771,6 +1940,11 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   // Construct ".endGs" block
   {
     m_builder->SetInsertPoint(endGsBlock);
+
+#if LLPC_BUILD_GFX11
+    if (m_enableSwXfb)
+      processGsXfbOutputExport(module, entryPoint->arg_begin());
+#endif
 
     auto waveValid =
         m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(waveCountInSubgroup + 1));
@@ -2133,6 +2307,9 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
   auto vertCountInWave = CreateUBfe(mergedWaveInfo, 0, 8);
   auto primCountInWave = CreateUBfe(mergedWaveInfo, 8, 8);
   auto waveIdInSubgroup = CreateUBfe(mergedWaveInfo, 24, 4);
+#if LLPC_BUILD_GFX11
+  auto orderedWaveId = CreateUBfe(mergedGroupInfo, 0, 12);
+#endif
 
   auto threadIdInSubgroup = m_builder->CreateMul(waveIdInSubgroup, m_builder->getInt32(waveSize));
   threadIdInSubgroup = m_builder->CreateAdd(threadIdInSubgroup, threadIdInWave);
@@ -2144,6 +2321,9 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
   threadIdInWave->setName("threadIdInWave");
   threadIdInSubgroup->setName("threadIdInSubgroup");
   waveIdInSubgroup->setName("waveIdInSubgroup");
+#if LLPC_BUILD_GFX11
+  orderedWaveId->setName("orderedWaveId");
+#endif
 
   // Record wave/thread info
   m_nggFactor.primCountInSubgroup = primCountInSubgroup;
@@ -2153,6 +2333,9 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
   m_nggFactor.threadIdInWave = threadIdInWave;
   m_nggFactor.threadIdInSubgroup = threadIdInSubgroup;
   m_nggFactor.waveIdInSubgroup = waveIdInSubgroup;
+#if LLPC_BUILD_GFX11
+  m_nggFactor.orderedWaveId = orderedWaveId;
+#endif
 }
 
 // =====================================================================================================================
@@ -2521,6 +2704,11 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
   auto esEntry = module->getFunction(lgcName::NggEsEntryPoint);
   assert(esEntry);
 
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11 && !m_hasGs) // For GS, vertex attribute exports are in copy shader
+    processVertexAttribExport(esEntry);
+#endif
+
   // Call ES entry
   Argument *arg = sysValueStart;
 
@@ -2553,6 +2741,19 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
   Value *instanceId = (arg + 8);
 
   std::vector<Value *> args;
+
+#if LLPC_BUILD_GFX11
+  // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex attributes
+  // through memory
+  if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
+    const auto attribCount =
+        m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex)->inOutUsage.expCount;
+    if (attribCount > 0) {
+      args.push_back(m_nggFactor.attribRingBase);
+      args.push_back(m_nggFactor.threadIdInSubgroup);
+    }
+  }
+#endif
 
   auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
   const unsigned userDataCount = intfData->userDataCount;
@@ -2816,6 +3017,19 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
 
   std::vector<Value *> args;
 
+#if LLPC_BUILD_GFX11
+  // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex attributes
+  // through memory
+  if (m_gfxIp.major >= 11 && deferredVertexExport) {
+    const auto attribCount =
+        m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex)->inOutUsage.expCount;
+    if (attribCount > 0) {
+      args.push_back(m_nggFactor.attribRingBase);
+      args.push_back(m_nggFactor.threadIdInSubgroup);
+    }
+  }
+#endif
+
   if (deferredVertexExport)
     args.push_back(position); // Setup vertex position data as the additional argument
 
@@ -2904,6 +3118,12 @@ void NggPrimShader::splitEs(Module *module) {
   for (auto &func : module->functions()) {
     if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
       expFuncs.push_back(&func);
+#if LLPC_BUILD_GFX11
+    else if (m_gfxIp.major >= 11) {
+      if (func.getName().startswith(lgcName::NggAttribExport) || func.getName().startswith(lgcName::NggXfbOutputExport))
+        expFuncs.push_back(&func);
+    }
+#endif
   }
 
   //
@@ -3068,6 +3288,11 @@ void NggPrimShader::splitEs(Module *module) {
       }
     }
   }
+
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11)
+    processVertexAttribExport(esDeferredVertexExportFunc);
+#endif
 
   // Original ES is no longer needed
   assert(esEntryPoint->use_empty());
@@ -3339,6 +3564,39 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
   // Run copy shader
   std::vector<Value *> args;
 
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11) {
+    // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex
+    // attributes through memory
+    const auto attribCount = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.expCount;
+    if (attribCount > 0) {
+      args.push_back(m_nggFactor.attribRingBase);
+      args.push_back(m_nggFactor.threadIdInSubgroup);
+    }
+
+    // Global table
+    auto userData = sysValueStart + NumSpecialSgprInputs;
+    assert(userData->getType()->isVectorTy());
+    auto globalTable = m_builder->CreateExtractElement(userData, static_cast<uint64_t>(0)); // The first user data SGPRs
+    args.push_back(globalTable);
+
+    // Stream-out table and stream-out control buffer
+    if (m_enableSwXfb) {
+      const auto &intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
+      // Stream-out table
+      auto streamOutTable = m_builder->CreateExtractElement(userData, intfData->entryArgIdxs.gs.streamOutData.tablePtr);
+      args.push_back(streamOutTable);
+      // Stream-out control buffer
+      auto streamOutControlBuf =
+          m_builder->CreateExtractElement(userData, intfData->entryArgIdxs.gs.streamOutData.controlBufPtr);
+      args.push_back(streamOutControlBuf);
+    } else {
+      args.push_back(UndefValue::get(m_builder->getInt32Ty()));
+      args.push_back(UndefValue::get(m_builder->getInt32Ty()));
+    }
+  }
+#endif
+
   // Vertex ID in sub-group
   args.push_back(vertexId);
 
@@ -3353,6 +3611,11 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
 Function *NggPrimShader::mutateCopyShader(Module *module) {
   auto copyShaderEntryPoint = module->getFunction(lgcName::NggCopyShaderEntryPoint);
   assert(copyShaderEntryPoint);
+
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11)
+    processVertexAttribExport(copyShaderEntryPoint);
+#endif
 
   IRBuilder<>::InsertPointGuard guard(*m_builder);
 
@@ -3444,9 +3707,15 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
 void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                                    Value *threadIdInSubgroup, Value *emitVerts) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+#if LLPC_BUILD_GFX11
+  if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
+    // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
+    // stream.
+#else
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: Only export those outputs that belong to the rasterization stream.
     assert(resUsage->inOutUsage.enableXfb == false); // Transform feedback must be disabled
+#endif
     return;
   }
 
@@ -3510,9 +3779,15 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
 // @param vertexOffset : Start offset of vertex item in GS-VS ring (in bytes)
 Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned streamId, Value *vertexOffset) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+#if LLPC_BUILD_GFX11
+  if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
+    // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
+    // stream.
+#else
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: Only import those outputs that belong to the rasterization stream.
     assert(resUsage->inOutUsage.enableXfb == false); // Transform feedback must be disabled
+#endif
     return UndefValue::get(outputTy);
   }
 
@@ -3562,9 +3837,15 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
 void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *threadIdInSubgroup, Value *emitVertsPtr,
                                   Value *outVertsPtr) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+#if LLPC_BUILD_GFX11
+  if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
+    // NOTE: If SW-emulated stream-out is not enabled, only handle GS_EMIT message that belongs to the rasterization
+    // stream.
+#else
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // Only handle GS_EMIT message that belongs to the rasterization stream.
     assert(resUsage->inOutUsage.enableXfb == false);
+#endif
     return;
   }
 
@@ -3583,9 +3864,15 @@ void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *thre
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsCut(Module *module, unsigned streamId, Value *outVertsPtr) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+#if LLPC_BUILD_GFX11
+  if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
+    // NOTE: If SW-emulated stream-out is not enabled, only handle GS_CUT message that belongs to the rasterization
+    // stream.
+#else
   if (resUsage->inOutUsage.gs.rasterStream != streamId) {
     // Only handle GS_CUT message that belongs to the rasterization stream.
     assert(resUsage->inOutUsage.enableXfb == false);
+#endif
     return;
   }
 
@@ -5552,6 +5839,1637 @@ Value *NggPrimShader::doSubgroupBallot(Value *value) {
 
   return ballot;
 }
+
+#if LLPC_BUILD_GFX11
+// =====================================================================================================================
+// Processes vertex attribute export calls in the target function. We mutate the argument list of the target function
+// by adding two additional arguments (one is attribute ring base and the other is vertex thread ID in sub-group).
+// Also, we expand all export calls by replacing it with real instructions that do vertex attribute exporting through
+// memory.
+//
+// @param [in/out] target : Targeted function that has vertex attribute calls to process
+void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
+  assert(m_gfxIp.major >= 11); // For GFX11+
+
+  const bool hasTs = m_hasTcs || m_hasTes;
+  const unsigned attribCount =
+      m_pipelineState
+          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex))
+          ->inOutUsage.expCount;
+  if (attribCount == 0)
+    return; // No vertex attribute exports
+
+  IRBuilder<>::InsertPointGuard guard(*m_builder);
+
+  //
+  // Mutate the argument list by adding two additional arguments
+  //
+  auto newTargetFunc = addFunctionArgs(targetFunc, nullptr,
+                                       {
+                                           m_builder->getInt32Ty(), // Attribute ring base (SGPR)
+                                           m_builder->getInt32Ty()  // Vertex thread ID in sub-group (VGPR)
+                                       },
+                                       {"attribRingBase", "vertexIndex"}, 0x1);
+
+  // Original function is no longer needed
+  assert(targetFunc->use_empty());
+  targetFunc->eraseFromParent();
+
+  targetFunc = newTargetFunc;
+
+  //
+  // Expand vertex attribute export calls by replacing them with real instructions
+  //
+  // Modify the field STRIDE of attribute ring buffer descriptor if we have more than one vertex attribute to export
+  bool modifyAttribRingBufDesc = attribCount > 1;
+  Value *attribRingBufDesc = nullptr;
+
+  // Always the first two arguments, added by us
+  auto attribRingBase = targetFunc->getArg(0);
+  auto vertexIndex = targetFunc->getArg(1);
+
+  SmallVector<CallInst *, 8> removeCalls;
+
+  for (auto &func : targetFunc->getParent()->functions()) {
+    if (func.getName().startswith(lgcName::NggAttribExport)) {
+      for (auto user : func.users()) {
+        CallInst *const call = dyn_cast<CallInst>(user);
+        assert(call);
+
+        if (call->getParent()->getParent() != targetFunc)
+          continue; // Export call doesn't belong to targeted function, skip
+
+        // NOTE: We always set the insert point before the terminator of the basic block to which this call belongs.
+        // This is because we might modify attribute ring buffer descriptor and this modified descriptor will be used
+        // by subsequent ring buffer store instructions that do vertex attribute exporting.
+        m_builder->SetInsertPoint(call->getParent()->getTerminator());
+
+        if (!attribRingBufDesc)
+          attribRingBufDesc = call->getArgOperand(0); // Initialize it if necessary
+        const unsigned location = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+        auto attribValue = call->getArgOperand(2);
+
+        // Modify the field STRIDE of attribute ring buffer descriptor
+        if (modifyAttribRingBufDesc) {
+          // STRIDE = WORD1[30:16], STRIDE is multiplied by attribute count
+          auto descWord1 = m_builder->CreateExtractElement(attribRingBufDesc, 1);
+          auto stride = CreateUBfe(descWord1, 16, 14);
+          stride = m_builder->CreateMul(stride, m_builder->getInt32(attribCount));
+
+          descWord1 = m_builder->CreateAnd(descWord1, ~0x3FFF0000);                     // Clear STRIDE
+          descWord1 = m_builder->CreateOr(descWord1, m_builder->CreateShl(stride, 16)); // Set new STRIDE
+          attribRingBufDesc = m_builder->CreateInsertElement(attribRingBufDesc, descWord1, 1);
+
+          modifyAttribRingBufDesc = false; // Clear the flag once finished
+        }
+
+        // Export vertex attributes
+        assert(attribValue->getType() == FixedVectorType::get(m_builder->getFloatTy(), 4)); // Must be <4 xfloat>
+
+        // ringOffset = attribRingBase * 32 * 16 + 32 * location * 16
+        //            = attribRingBase * 512 + location * 512
+        static const unsigned AttribGranularity = 32 * SizeOfVec4; // 32 * 16 bytes
+        auto ringOffset = m_builder->CreateMul(attribRingBase, m_builder->getInt32(AttribGranularity));
+        ringOffset = m_builder->CreateAdd(ringOffset, m_builder->getInt32(AttribGranularity * location));
+
+        CoherentFlag coherent = {};
+        coherent.bits.glc = true;
+        coherent.bits.slc = true;
+
+        m_builder->CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, attribValue->getType(),
+                                   {attribValue, attribRingBufDesc, vertexIndex, m_builder->getInt32(0), ringOffset,
+                                    m_builder->getInt32(coherent.u32All)});
+
+        removeCalls.push_back(call);
+      }
+
+      break; // Vertex attribute export calls are handled, could exit the loop
+    }
+  }
+
+  // NOTE: If the workaround of attributes-through-memory preceding vertex position data is required, we have to collect
+  // all vertex position export calls and move them before the return instruction. This actually places them after the
+  // writing operations of attributes-through-memory
+  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waAtmPrecedesPos) {
+    SmallVector<CallInst *, 4> exportCalls;
+
+    // Colllect export calls of vertex position data
+    for (auto &func : targetFunc->getParent()->functions()) {
+      if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) {
+        for (auto user : func.users()) {
+          CallInst *const call = dyn_cast<CallInst>(user);
+          assert(call);
+
+          if (call->getParent()->getParent() != targetFunc)
+            continue; // Export call doesn't belong to targeted function, skip
+
+          exportCalls.push_back(call);
+        }
+      }
+    }
+
+    // Move the export calls before the return instructions
+    ReturnInst *retInst = nullptr;
+    for (unsigned i = 0; i < exportCalls.size(); ++i) {
+      auto exportCall = exportCalls[i];
+
+      if (retInst) {
+        // All export calls are expected to be in the same basic block
+        assert(retInst == exportCall->getParent()->getTerminator());
+      } else {
+        retInst = dyn_cast<ReturnInst>(exportCall->getParent()->getTerminator());
+        assert(retInst);
+      }
+
+      exportCall->setOperand(
+          6, m_builder->getInt1(i == exportCalls.size() - 1)); // Make export done flag for the last export call
+      exportCall->moveBefore(retInst);
+    }
+
+    // Before the first export call, add s_wait_vscnt 0 to make sure the completion of all attributes being written
+    // to the attribute ring buffer
+    m_builder->SetInsertPoint(exportCalls[0]);
+    m_builder->CreateFence(AtomicOrdering::Release, SyncScope::System);
+  }
+
+  // Remove calls
+  for (auto call : removeCalls) {
+    call->dropAllReferences();
+    call->eraseFromParent();
+  }
+}
+
+// =====================================================================================================================
+// Processes VS/TES transform feedback output export calls
+//
+// @param module : LLVM module.
+// @param sysValueStart : Start of system value
+void NggPrimShader::processXfbOutputExport(Module *module, Argument *sysValueStart) {
+  assert(m_enableSwXfb);
+  assert(!m_hasGs); // Just for VS/TES
+
+  //
+  // The processing is something like this:
+  //
+  // NGG_XFB() {
+  //   if (threadIdInSubgroup < vertCountInSubgroup) {
+  //     Mutate/clone ES to fetch XFB outputs
+  //     Write XFB outputs to LDS region
+  //   }
+  //
+  //   if (threadIdInSubgroup == 0) {
+  //     Acquire the control of GDS_STRMOUT_DWORDS_WRITTEN_X
+  //     Calculate primsToWrite and dwordsToWrite
+  //     Increment GDS_STRMOUT_DWORDS_WRITTEN_X and release the control
+  //     Store XFB statistics info to LDS
+  //     Increment GDS_STRMOUT_PRIMS_NEEDED_X and GDS_STRMOUT_PRIMS_WRITTEN_X
+  //   }
+  //   Barrier
+  //
+  //   if (threadIdInWave < MaxXfbBuffers + 1)
+  //     Read XFB statistics info from LDS
+  //
+  //   Read primsToWrite and dwordsWritten from XFB statistics info
+  //
+  //   if (threadIdInSubgroup < primsToWrite)
+  //     Export XFB outputs to buffer for each vertice of this primitive
+  // }
+  //
+  BasicBlock *xfbEntryBlock = m_builder->GetInsertBlock();
+
+  BasicBlock *fetchXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".fetchXfbOutput");
+  fetchXfbOutputBlock->moveAfter(xfbEntryBlock);
+  BasicBlock *endFetchXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".endFetchXfbOutput");
+  endFetchXfbOutputBlock->moveAfter(fetchXfbOutputBlock);
+
+  BasicBlock *prepareXfbExportBlock = createBlock(xfbEntryBlock->getParent(), ".prepareXfbExport");
+  prepareXfbExportBlock->moveAfter(endFetchXfbOutputBlock);
+  BasicBlock *endPrepareXfbExportBlock = createBlock(xfbEntryBlock->getParent(), ".endPrepareXfbExport");
+  endPrepareXfbExportBlock->moveAfter(prepareXfbExportBlock);
+
+  BasicBlock *readXfbStatInfoBlock = createBlock(xfbEntryBlock->getParent(), ".readXfbStatInfo");
+  readXfbStatInfoBlock->moveAfter(endPrepareXfbExportBlock);
+  BasicBlock *endReadXfbStatInfoBlock = createBlock(xfbEntryBlock->getParent(), ".endReadXfbStatInfo");
+  endReadXfbStatInfoBlock->moveAfter(readXfbStatInfoBlock);
+
+  BasicBlock *exportXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".exportXfbOutput");
+  exportXfbOutputBlock->moveAfter(endReadXfbStatInfoBlock);
+  BasicBlock *endExportXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".endExportXfbOutput");
+  endExportXfbOutputBlock->moveAfter(exportXfbOutputBlock);
+
+  // Insert branching in current block to process transform feedback output export
+  {
+    auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
+    m_builder->CreateCondBr(vertValid, fetchXfbOutputBlock, endFetchXfbOutputBlock);
+  }
+
+  // Construct ".fetchXfbOutput" block
+  Value *streamOutBufDescs[MaxTransformFeedbackBuffers] = {};
+  Value *streamOutBufOffsets[MaxTransformFeedbackBuffers] = {};
+  SmallVector<XfbOutputExport, 32> xfbOutputExports;
+  {
+    m_builder->SetInsertPoint(fetchXfbOutputBlock);
+
+    auto xfbOutputs = fetchXfbOutput(module, sysValueStart, xfbOutputExports);
+    assert(xfbOutputs->getType()->isArrayTy()); // Must be arrayed
+
+    for (unsigned i = 0; i < cast<ArrayType>(xfbOutputs->getType())->getNumElements(); ++i) {
+      auto xfbOutput = m_builder->CreateExtractValue(xfbOutputs, i);
+      Value *streamOutBufDesc = m_builder->CreateExtractValue(xfbOutput, 0);
+      Value *streamOutBufOffset = m_builder->CreateExtractValue(xfbOutput, 1);
+      Value *outputValue = m_builder->CreateExtractValue(xfbOutput, 2);
+
+      // Record stream-out buffer descriptor if it is missing
+      auto xfbBuffer = xfbOutputExports[i].xfbBuffer;
+      if (!streamOutBufDescs[xfbBuffer])
+        streamOutBufDescs[xfbBuffer] = streamOutBufDesc;
+
+      // Record stream-out buffer offset if it is missing
+      if (!streamOutBufOffsets[xfbBuffer])
+        streamOutBufOffsets[xfbBuffer] = streamOutBufOffset;
+
+      // Write transform feedback outputs to LDS region
+      writeXfbOutputToLds(outputValue, m_nggFactor.threadIdInSubgroup, i);
+    }
+
+    m_builder->CreateBr(endFetchXfbOutputBlock);
+  }
+
+  // Construct ".endFetchXfbOutput" block
+  unsigned firstActiveXfbBuffer = InvalidValue;
+  unsigned lastActiveXfbBuffer = InvalidValue;
+  bool bufferActive[MaxTransformFeedbackBuffers] = {};
+  {
+    m_builder->SetInsertPoint(endFetchXfbOutputBlock);
+
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      bufferActive[i] = streamOutBufDescs[i] != nullptr;
+      // Update stream-out buffer descriptor and buffer offset
+      if (bufferActive[i]) {
+        auto streamOutBufDescPhi = m_builder->CreatePHI(streamOutBufDescs[i]->getType(), 2);
+        streamOutBufDescPhi->addIncoming(streamOutBufDescs[i], fetchXfbOutputBlock);
+        streamOutBufDescPhi->addIncoming(UndefValue::get(streamOutBufDescs[i]->getType()), xfbEntryBlock);
+        streamOutBufDescs[i] = streamOutBufDescPhi;
+
+        auto streamOutBufOffsetPhi = m_builder->CreatePHI(streamOutBufOffsets[i]->getType(), 2);
+        streamOutBufOffsetPhi->addIncoming(streamOutBufOffsets[i], fetchXfbOutputBlock);
+        streamOutBufOffsetPhi->addIncoming(UndefValue::get(streamOutBufOffsets[i]->getType()), xfbEntryBlock);
+        streamOutBufOffsets[i] = streamOutBufOffsetPhi;
+
+        if (firstActiveXfbBuffer == InvalidValue)
+          firstActiveXfbBuffer = i;
+        lastActiveXfbBuffer = i;
+      }
+    }
+
+    auto firstThreadInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(0));
+    m_builder->CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
+  }
+
+  // Construct ".prepareXfbExport" block
+  const bool hasTs = m_hasTcs || m_hasTes;
+  const auto &xfbStrides =
+      m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex)->inOutUsage.xfbStrides;
+  {
+    m_builder->SetInsertPoint(prepareXfbExportBlock);
+
+    const unsigned vertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
+    Value *numPrimsToWrite = m_nggFactor.primCountInSubgroup;
+
+    Value *dwordsWritten[MaxTransformFeedbackBuffers] = {};
+    Value *dwordsPerPrim[MaxTransformFeedbackBuffers] = {};
+
+    // Calculate numPrimsToWrite
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      if (!bufferActive[i])
+        continue;
+
+      if (i == firstActiveXfbBuffer) {
+        // ds_ordered_count
+        dwordsWritten[i] = m_builder->CreateIntrinsic(
+            Intrinsic::amdgcn_ds_ordered_add, {},
+            {
+                m_builder->CreateIntToPtr(m_nggFactor.orderedWaveId,
+                                          PointerType::get(m_builder->getInt32Ty(), ADDR_SPACE_REGION)), // m0
+                m_builder->getInt32(0),                                                                  // value to add
+                m_builder->getInt32(0),                                                                  // ordering
+                m_builder->getInt32(0),                                                                  // scope
+                m_builder->getFalse(),                                                                   // isVolatile
+                m_builder->getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
+                                    (1 << 24)), // ordered count index, [27:24] is dword count
+                m_builder->getFalse(),          // wave release
+                m_builder->getFalse(),          // wave done
+            });
+      } else {
+        // ds_add_gs_reg
+        dwordsWritten[i] =
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder->getInt32Ty(),
+                                       {m_builder->getInt32(0),                                         // value to add
+                                        m_builder->getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
+      }
+
+      // NUM_RECORDS = SQ_BUF_RSRC_WORD2
+      Value *numRecords = m_builder->CreateExtractElement(streamOutBufDescs[i], 2);
+      // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
+      Value *bufferSizeInDwords = m_builder->CreateLShr(numRecords, 2);
+      // dwordsRemaining = max(0, bufferSizeInDwords - (bufferOffset + dwordsWritten))
+      Value *dwordsRemaining =
+          m_builder->CreateSub(bufferSizeInDwords, m_builder->CreateAdd(streamOutBufOffsets[i], dwordsWritten[i]));
+      dwordsRemaining = m_builder->CreateIntrinsic(Intrinsic::smax, dwordsRemaining->getType(),
+                                                   {dwordsRemaining, m_builder->getInt32(0)});
+      // numPrimsToWrite = min(dwordsRemaining / dwordsPerPrim, numPrimsToWrite)
+      dwordsPerPrim[i] = m_builder->getInt32(vertsPerPrim * xfbStrides[i] / SizeOfDword);
+      Value *primsCanWrite = m_builder->CreateUDiv(dwordsRemaining, dwordsPerPrim[i]);
+      numPrimsToWrite =
+          m_builder->CreateIntrinsic(Intrinsic::umin, numPrimsToWrite->getType(), {numPrimsToWrite, primsCanWrite});
+    }
+
+    // Increment dwordsWritten
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      if (!bufferActive[i])
+        continue;
+
+      Value *dwordsToWrite = m_builder->CreateMul(numPrimsToWrite, dwordsPerPrim[i]);
+
+      if (i == lastActiveXfbBuffer) {
+        // ds_ordered_count, wave done
+        dwordsWritten[i] = m_builder->CreateIntrinsic(
+            Intrinsic::amdgcn_ds_ordered_add, {},
+            {
+                m_builder->CreateIntToPtr(m_nggFactor.orderedWaveId,
+                                          PointerType::get(m_builder->getInt32Ty(), ADDR_SPACE_REGION)), // m0
+                dwordsToWrite,                                                                           // value to add
+                m_builder->getInt32(0),                                                                  // ordering
+                m_builder->getInt32(0),                                                                  // scope
+                m_builder->getFalse(),                                                                   // isVolatile
+                m_builder->getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
+                                    (1 << 24)), // ordered count index, [27:24] is dword count
+                m_builder->getTrue(),           // wave release
+                m_builder->getTrue(),           // wave done
+            });
+      } else {
+        // ds_add_gs_reg
+        dwordsWritten[i] =
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, dwordsToWrite->getType(),
+                                       {dwordsToWrite,                                                  // value to add
+                                        m_builder->getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
+      }
+    }
+
+    // Store transform feedback statistics info to LDS and GDS
+    const unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionXfbStatInfo);
+    m_ldsManager->writeValueToLds(numPrimsToWrite,
+                                  m_builder->getInt32(regionStart + MaxTransformFeedbackBuffers * SizeOfDword));
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      if (!bufferActive[i])
+        continue;
+
+      m_ldsManager->writeValueToLds(dwordsWritten[i], m_builder->getInt32(regionStart + i * SizeOfDword));
+    }
+
+    m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_nggFactor.primCountInSubgroup->getType(),
+                               {m_nggFactor.primCountInSubgroup,                        // value to add
+                                m_builder->getInt32(GDS_STRMOUT_PRIMS_NEEDED_0 << 2)}); // count index
+
+    m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, numPrimsToWrite->getType(),
+                               {numPrimsToWrite,                                         // value to add
+                                m_builder->getInt32(GDS_STRMOUT_PRIMS_WRITTEN_0 << 2)}); // count index
+
+    m_builder->CreateBr(endPrepareXfbExportBlock);
+  }
+
+  // Construct ".endPrepareXfbExport" block
+  {
+    m_builder->SetInsertPoint(endPrepareXfbExportBlock);
+
+    // We are going to read transform feedback statistics info and outputs from LDS and export them to transform
+    // feedback buffers. Make sure the output values have been all written before this.
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
+    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+
+    auto threadValid =
+        m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_builder->getInt32(1 + MaxTransformFeedbackBuffers));
+    m_builder->CreateCondBr(threadValid, readXfbStatInfoBlock, endReadXfbStatInfoBlock);
+  }
+
+  // Construct ".readXfbStatInfo" block
+  Value *xfbStatInfo = nullptr;
+  {
+    m_builder->SetInsertPoint(readXfbStatInfoBlock);
+
+    xfbStatInfo = readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInWave, LdsRegionXfbStatInfo);
+    m_builder->CreateBr(endReadXfbStatInfoBlock);
+  }
+
+  // Construct ".endReadXfbStatInfo" block
+  Value *streamOutOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out offset to write transform feedback outputs
+  {
+    m_builder->SetInsertPoint(endReadXfbStatInfoBlock);
+
+    auto xfbStatInfoPhi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
+    xfbStatInfoPhi->addIncoming(xfbStatInfo, readXfbStatInfoBlock);
+    xfbStatInfoPhi->addIncoming(UndefValue::get(m_builder->getInt32Ty()), endPrepareXfbExportBlock);
+    xfbStatInfo = xfbStatInfoPhi;
+
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      if (bufferActive[i]) {
+        streamOutOffsets[i] =
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder->getInt32(i)});
+        streamOutOffsets[i] = m_builder->CreateAdd(streamOutBufOffsets[i], streamOutOffsets[i]);
+        streamOutOffsets[i] = m_builder->CreateShl(streamOutOffsets[i], 2);
+      }
+    }
+    auto numPrimsToWrite = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+                                                      {xfbStatInfo, m_builder->getInt32(MaxTransformFeedbackBuffers)});
+
+    auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, numPrimsToWrite);
+    m_builder->CreateCondBr(primValid, exportXfbOutputBlock, endExportXfbOutputBlock);
+  }
+
+  // Construct ".exportXfbOutput" block
+  {
+    m_builder->SetInsertPoint(exportXfbOutputBlock);
+
+    Value *vertexIds[3] = {};
+
+    const unsigned vertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
+    if (m_nggControl->passthroughMode) {
+      // [8:0]   = vertexId0
+      vertexIds[0] = CreateUBfe(m_nggFactor.primData, 0, 9);
+      // [18:10] = vertexId1
+      if (vertsPerPrim > 1)
+        vertexIds[1] = CreateUBfe(m_nggFactor.primData, 10, 9);
+      // [28:20] = vertexId2
+      if (vertsPerPrim > 2)
+        vertexIds[2] = CreateUBfe(m_nggFactor.primData, 20, 9);
+
+    } else {
+      // Must be triangle
+      assert(vertsPerPrim == 3);
+      vertexIds[0] = m_nggFactor.esGsOffset0;
+      vertexIds[1] = m_nggFactor.esGsOffset1;
+      vertexIds[2] = m_nggFactor.esGsOffset2;
+    }
+
+    for (unsigned i = 0; i < vertsPerPrim; ++i) {
+      for (unsigned j = 0; j < xfbOutputExports.size(); ++j) {
+        const auto &xfbOutputExport = xfbOutputExports[j];
+        auto outputValue = readXfbOutputFromLds(
+            xfbOutputExport.numElements > 1 ? FixedVectorType::get(m_builder->getFloatTy(), xfbOutputExport.numElements)
+                                            : m_builder->getFloatTy(),
+            vertexIds[i], j);
+
+        if (xfbOutputExport.is16bit) {
+          // NOTE: For 16-bit transform feedbakc outputs, they are stored as 32-bit without tightly packed in LDS.
+          outputValue = m_builder->CreateBitCast(
+              outputValue, FixedVectorType::get(m_builder->getInt32Ty(), xfbOutputExport.numElements));
+          outputValue = m_builder->CreateTrunc(
+              outputValue, FixedVectorType::get(m_builder->getInt16Ty(), xfbOutputExport.numElements));
+          outputValue = m_builder->CreateBitCast(
+              outputValue, FixedVectorType::get(m_builder->getHalfTy(), xfbOutputExport.numElements));
+        }
+
+        unsigned format = 0;
+        switch (xfbOutputExport.numElements) {
+        case 1:
+          format = xfbOutputExport.is16bit ? BUF_FORMAT_16_FLOAT : BUF_FORMAT_32_FLOAT;
+          break;
+        case 2:
+          format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_FLOAT_GFX11;
+          break;
+        case 3:
+          format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_32_FLOAT_GFX11;
+          break;
+        case 4:
+          format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_16_16_FLOAT_GFX11 : BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
+          break;
+        default:
+          llvm_unreachable("Unexpected element number!");
+          break;
+        }
+
+        CoherentFlag coherent = {};
+        coherent.bits.glc = true;
+        coherent.bits.slc = true;
+
+        // vertexOffset = (threadIdInSubgroup * vertsPerPrim + vertexIndex) * xfbStride
+        Value *vertexOffset = m_builder->CreateAdd(
+            m_builder->CreateMul(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(vertsPerPrim)),
+            m_builder->getInt32(i));
+        vertexOffset = m_builder->CreateMul(vertexOffset, m_builder->getInt32(xfbStrides[xfbOutputExport.xfbBuffer]));
+        // xfbOutputOffset = vertexOffset + xfbOffset
+        Value *xfbOutputOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(xfbOutputExport.xfbOffset));
+
+        if (xfbOutputExport.is16bit && xfbOutputExport.numElements == 3) {
+          // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2
+          // and 16scalar.
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store,
+                                     FixedVectorType::get(m_builder->getHalfTy(), 2),
+                                     {m_builder->CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
+                                      streamOutBufDescs[xfbOutputExport.xfbBuffer],                     // rsrc
+                                      xfbOutputOffset,                                                  // offset
+                                      streamOutOffsets[xfbOutputExport.xfbBuffer],                      // soffset
+                                      m_builder->getInt32(BUF_FORMAT_16_16_FLOAT),                      // format
+                                      m_builder->getInt32(coherent.u32All)}); // auxiliary data
+
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, m_builder->getHalfTy(),
+                                     {m_builder->CreateExtractElement(outputValue, 2), // vdata
+                                      streamOutBufDescs[xfbOutputExport.xfbBuffer],    // rsrc
+                                      m_builder->CreateAdd(xfbOutputOffset,
+                                                           m_builder->getInt32(2 * sizeof(uint16_t))), // offset
+                                      streamOutOffsets[xfbOutputExport.xfbBuffer],                     // soffset
+                                      m_builder->getInt32(BUF_FORMAT_16_FLOAT),                        // format
+                                      m_builder->getInt32(coherent.u32All)});                          // auxiliary data
+        } else {
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outputValue->getType(),
+                                     {outputValue,                                  // vdata
+                                      streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
+                                      xfbOutputOffset,                              // offset
+                                      streamOutOffsets[xfbOutputExport.xfbBuffer],  // soffset
+                                      m_builder->getInt32(format),                  // format
+                                      m_builder->getInt32(coherent.u32All)});       // auxiliary data
+        }
+      }
+    }
+
+    m_builder->CreateBr(endExportXfbOutputBlock);
+  }
+
+  // Construct ".endExportXfbOutput" block
+  { m_builder->SetInsertPoint(endExportXfbOutputBlock); }
+}
+
+// =====================================================================================================================
+// Processes GS transform feedback output export calls
+//
+// @param module : LLVM module.
+// @param sysValueStart : Start of system value
+void NggPrimShader::processGsXfbOutputExport(Module *module, Argument *sysValueStart) {
+  assert(m_enableSwXfb);
+  assert(m_hasGs); // Just for GS
+
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  assert(waveSize == 32 || waveSize == 64);
+  const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
+
+  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+
+  unsigned firstActiveStream = InvalidValue;
+  unsigned lastActiveStream = InvalidValue;
+  bool streamActive[MaxGsStreams] = {};
+  for (unsigned i = 0; i < MaxGsStreams; ++i) {
+    streamActive[i] = inOutUsage.gs.outLocCount[i] > 0;
+    if (streamActive[i]) {
+      if (firstActiveStream == InvalidValue)
+        firstActiveStream = i;
+      lastActiveStream = i;
+    }
+  }
+
+  //
+  // The processing is something like this:
+  //
+  // NGG_GS_XFB() {
+  //   if (threadIdInSubgroup < waveCount + 1)
+  //     Initialize per-wave and per-subgroup count of output primitives
+  //   Barrier
+  //
+  //   if (threadIdInSubgroup < primCountInSubgroup)
+  //     Check the draw flag of output primitives and compute draw mask
+  //
+  //   if (threadIdInWave < waveCount - waveId)
+  //     Accumulate per-wave and per-subgroup count of output primitives
+  //   Barrier
+  //
+  //   for each vertex stream) {
+  //     if (primitive drawn)
+  //       Compact primitive thread ID (map: compacted -> uncompacted)
+  //   }
+  //
+  //   Mutate copy shader to fetch XFB outputs
+  //
+  //   if (threadIdInSubgroup == 0) {
+  //     Acquire the control of GDS_STRMOUT_DWORDS_WRITTEN_X
+  //     Calculate primsToWrite and dwordsToWrite
+  //     Increment GDS_STRMOUT_DWORDS_WRITTEN_X and release the control
+  //     Store GS XFB statistics info to LDS
+  //     Increment GDS_STRMOUT_PRIMS_NEEDED_X and GDS_STRMOUT_PRIMS_WRITTEN_X
+  //   }
+  //   Barrier
+  //
+  //   Read XFB statistics info from LDS
+  //   Read primsToWrite and dwordsWritten from XFB statistics info
+  //
+  //   for each vertex stream {
+  //     if (threadIdInSubgroup < primsToWrite)
+  //       Export XFB outputs to buffer for each vertice of this primitive
+  //   }
+  // }
+  //
+  BasicBlock *xfbEntryBlock = m_builder->GetInsertBlock();
+
+  BasicBlock *initOutPrimCountBlock = createBlock(xfbEntryBlock->getParent(), ".initOutPrimCount");
+  initOutPrimCountBlock->moveAfter(xfbEntryBlock);
+  BasicBlock *endInitOutPrimCountBlock = createBlock(xfbEntryBlock->getParent(), ".endInitOutPrimCount");
+  endInitOutPrimCountBlock->moveAfter(initOutPrimCountBlock);
+
+  BasicBlock *checkOutPrimDrawFlagBlock = createBlock(xfbEntryBlock->getParent(), ".checkOutPrimDrawFlag");
+  checkOutPrimDrawFlagBlock->moveAfter(endInitOutPrimCountBlock);
+  BasicBlock *endCheckOutPrimDrawFlagBlock = createBlock(xfbEntryBlock->getParent(), ".endCheckOutPrimDrawFlag");
+  endCheckOutPrimDrawFlagBlock->moveAfter(checkOutPrimDrawFlagBlock);
+
+  BasicBlock *accumOutPrimCountBlock = createBlock(xfbEntryBlock->getParent(), ".accumOutPrimCount");
+  accumOutPrimCountBlock->moveAfter(endCheckOutPrimDrawFlagBlock);
+  BasicBlock *endAccumOutPrimCountBlock = createBlock(xfbEntryBlock->getParent(), ".endAccumOutPrimCount");
+  endAccumOutPrimCountBlock->moveAfter(accumOutPrimCountBlock);
+
+  BasicBlock *compactOutPrimIdBlock[MaxGsStreams] = {};
+  BasicBlock *endCompactOutPrimIdBlock[MaxGsStreams] = {};
+  BasicBlock *insertPos = endAccumOutPrimCountBlock;
+  for (unsigned i = 0; i < MaxGsStreams; ++i) {
+    if (streamActive[i]) {
+      compactOutPrimIdBlock[i] =
+          createBlock(xfbEntryBlock->getParent(), ".compactOutPrimIdInStream" + std::to_string(i));
+      compactOutPrimIdBlock[i]->moveAfter(insertPos);
+      insertPos = compactOutPrimIdBlock[i];
+
+      endCompactOutPrimIdBlock[i] =
+          createBlock(xfbEntryBlock->getParent(), ".endCompactOutPrimIdInStream" + std::to_string(i));
+      endCompactOutPrimIdBlock[i]->moveAfter(insertPos);
+      insertPos = endCompactOutPrimIdBlock[i];
+    }
+  }
+
+  BasicBlock *prepareXfbExportBlock = createBlock(xfbEntryBlock->getParent(), ".prepareXfbExport");
+  prepareXfbExportBlock->moveAfter(insertPos);
+  BasicBlock *endPrepareXfbExportBlock = createBlock(xfbEntryBlock->getParent(), ".endPrepareXfbExport");
+  endPrepareXfbExportBlock->moveAfter(prepareXfbExportBlock);
+
+  BasicBlock *exportXfbOutputBlock[MaxGsStreams] = {};
+  BasicBlock *endExportXfbOutputBlock[MaxGsStreams] = {};
+  insertPos = endPrepareXfbExportBlock;
+  for (unsigned i = 0; i < MaxGsStreams; ++i) {
+    if (streamActive[i]) {
+      exportXfbOutputBlock[i] = createBlock(xfbEntryBlock->getParent(), ".exportXfbOutputInStream" + std::to_string(i));
+      exportXfbOutputBlock[i]->moveAfter(insertPos);
+      insertPos = exportXfbOutputBlock[i];
+
+      endExportXfbOutputBlock[i] =
+          createBlock(xfbEntryBlock->getParent(), ".endExportXfbOutputInStream" + std::to_string(i));
+      endExportXfbOutputBlock[i]->moveAfter(insertPos);
+      insertPos = endExportXfbOutputBlock[i];
+    }
+  }
+
+  // Insert branching in current block to process transform feedback output export
+  {
+    auto waveValid =
+        m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(waveCountInSubgroup + 1));
+    m_builder->CreateCondBr(waveValid, initOutPrimCountBlock, endInitOutPrimCountBlock);
+  }
+
+  // Construct ".initOutPrimCount" block
+  {
+    m_builder->SetInsertPoint(initOutPrimCountBlock);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (streamActive[i]) {
+        writePerThreadDataToLds(m_builder->getInt32(0), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimCountInWaves,
+                                (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * i);
+      }
+    }
+
+    m_builder->CreateBr(endInitOutPrimCountBlock);
+  }
+
+  // Construct ".endInitOutPrimCount" block
+  {
+    m_builder->SetInsertPoint(endInitOutPrimCountBlock);
+
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
+    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+
+    auto outPrimValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
+    m_builder->CreateCondBr(outPrimValid, checkOutPrimDrawFlagBlock, endCheckOutPrimDrawFlagBlock);
+  }
+
+  // Construct ".checkOutPrimDrawFlag" block
+  Value *drawFlag[MaxGsStreams] = {};
+  {
+    m_builder->SetInsertPoint(checkOutPrimDrawFlagBlock);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (streamActive[i]) {
+        // drawFlag = primData[N] != NullPrim
+        auto primData =
+            readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
+                                     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * i);
+        drawFlag[i] = m_builder->CreateICmpNE(primData, m_builder->getInt32(NullPrim));
+      }
+    }
+
+    m_builder->CreateBr(endCheckOutPrimDrawFlagBlock);
+  }
+
+  // Construct ".endCheckOutPrimDrawFlag" block
+  Value *drawMask[MaxGsStreams] = {};
+  Value *outPrimCountInWave[MaxGsStreams] = {};
+  {
+    m_builder->SetInsertPoint(endCheckOutPrimDrawFlagBlock);
+
+    // Update draw flags
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (streamActive[i]) {
+        auto drawFlagPhi = m_builder->CreatePHI(m_builder->getInt1Ty(), 2);
+        drawFlagPhi->addIncoming(drawFlag[i], checkOutPrimDrawFlagBlock);
+        drawFlagPhi->addIncoming(m_builder->getFalse(), endInitOutPrimCountBlock);
+        drawFlag[i] = drawFlagPhi;
+      }
+    }
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (streamActive[i]) {
+        drawMask[i] = doSubgroupBallot(drawFlag[i]);
+
+        outPrimCountInWave[i] = m_builder->CreateIntrinsic(Intrinsic::ctpop, m_builder->getInt64Ty(), drawMask[i]);
+        outPrimCountInWave[i] = m_builder->CreateTrunc(outPrimCountInWave[i], m_builder->getInt32Ty());
+      }
+    }
+    auto threadIdUpbound = m_builder->CreateSub(m_builder->getInt32(waveCountInSubgroup), m_nggFactor.waveIdInSubgroup);
+    auto threadValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, threadIdUpbound);
+
+    m_builder->CreateCondBr(threadValid, accumOutPrimCountBlock, endAccumOutPrimCountBlock);
+  }
+
+  // Construct ".accumOutPrimCount" block
+  {
+    m_builder->SetInsertPoint(accumOutPrimCountBlock);
+
+    unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionOutPrimCountInWaves);
+
+    auto ldsOffset = m_builder->CreateAdd(m_nggFactor.waveIdInSubgroup, m_nggFactor.threadIdInWave);
+    ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(1));
+    ldsOffset = m_builder->CreateShl(ldsOffset, 2);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (streamActive[i]) {
+        m_ldsManager->atomicOpWithLds(
+            AtomicRMWInst::Add, outPrimCountInWave[i],
+            m_builder->CreateAdd(
+                ldsOffset,
+                m_builder->getInt32(regionStart + (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * i)));
+      }
+    }
+
+    m_builder->CreateBr(endAccumOutPrimCountBlock);
+  }
+
+  // Construct ".endAccumOutPrimCount" block
+  Value *primCountInPrevWaves[MaxGsStreams] = {};
+  Value *primCountInSubgroup[MaxGsStreams] = {};
+  {
+    m_builder->SetInsertPoint(endAccumOutPrimCountBlock);
+
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
+    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (streamActive[i]) {
+        auto outPrimCountInWaves =
+            readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInWave, LdsRegionOutPrimCountInWaves,
+                                     (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * i);
+
+        // The last dword following dwords for all waves (each wave has one dword) stores GS output primitive count of
+        // the entire sub-group
+        primCountInSubgroup[i] = m_builder->CreateIntrinsic(
+            Intrinsic::amdgcn_readlane, {}, {outPrimCountInWaves, m_builder->getInt32(waveCountInSubgroup)});
+
+        // Get output primitive count for all waves prior to this wave
+        primCountInPrevWaves[i] = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+                                                             {outPrimCountInWaves, m_nggFactor.waveIdInSubgroup});
+      }
+    }
+
+    m_builder->CreateCondBr(drawFlag[firstActiveStream], compactOutPrimIdBlock[firstActiveStream],
+                            endCompactOutPrimIdBlock[firstActiveStream]);
+  }
+
+  Value *streamOutBufDescs[MaxTransformFeedbackBuffers] = {};
+  Value *streamOutBufOffsets[MaxTransformFeedbackBuffers] = {};
+  SmallVector<XfbOutputExport, 32> xfbOutputExports;
+
+  unsigned firstActiveXfbBuffer = ~0U;
+  unsigned lastActiveXfbBuffer = 0;
+  bool bufferActive[MaxTransformFeedbackBuffers] = {};
+  for (unsigned i = 0; i < MaxGsStreams; ++i) {
+    if (!streamActive[i])
+      continue;
+
+    // Construct ".compactOutPrimIdInStream[N]" block
+    {
+      m_builder->SetInsertPoint(compactOutPrimIdBlock[i]);
+
+      auto drawMaskVec = m_builder->CreateBitCast(drawMask[i], FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
+
+      auto drawMaskLow = m_builder->CreateExtractElement(drawMaskVec, static_cast<uint64_t>(0));
+      Value *compactPrimitiveId =
+          m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {drawMaskLow, m_builder->getInt32(0)});
+
+      if (waveSize == 64) {
+        auto drawMaskHigh = m_builder->CreateExtractElement(drawMaskVec, 1);
+        compactPrimitiveId =
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {drawMaskHigh, compactPrimitiveId});
+      }
+
+      compactPrimitiveId = m_builder->CreateAdd(primCountInPrevWaves[i], compactPrimitiveId);
+      writePerThreadDataToLds(m_nggFactor.threadIdInSubgroup, compactPrimitiveId, LdsRegionOutPrimThreadIdMap,
+                              SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * i);
+
+      m_builder->CreateBr(endCompactOutPrimIdBlock[i]);
+    }
+
+    // Construct ".endCompactOutPrimIdInStream[N]" block
+    {
+      m_builder->SetInsertPoint(endCompactOutPrimIdBlock[i]);
+
+      if (i == lastActiveStream) {
+        // Start to fetch transform feedback outputs after we finish compacting primitive thread IDs of the last vertex
+        // stream.
+        auto xfbOutputs = fetchXfbOutput(module, sysValueStart, xfbOutputExports);
+        assert(xfbOutputs->getType()->isArrayTy()); // Must be arrayed
+
+        for (unsigned i = 0; i < cast<ArrayType>(xfbOutputs->getType())->getNumElements(); ++i) {
+          auto xfbOutput = m_builder->CreateExtractValue(xfbOutputs, i);
+          Value *streamOutBufDesc = m_builder->CreateExtractValue(xfbOutput, 0);
+          Value *streamOutBufOffset = m_builder->CreateExtractValue(xfbOutput, 1);
+
+          // Record stream-out buffer descriptor if it is missing
+          auto xfbBuffer = xfbOutputExports[i].xfbBuffer;
+          if (!streamOutBufDescs[xfbBuffer])
+            streamOutBufDescs[xfbBuffer] = streamOutBufDesc;
+
+          // Record stream-out buffer offset if it is missing
+          if (!streamOutBufOffsets[xfbBuffer])
+            streamOutBufOffsets[xfbBuffer] = streamOutBufOffset;
+
+          bufferActive[xfbBuffer] = true;
+          firstActiveXfbBuffer = std::min(firstActiveXfbBuffer, xfbBuffer);
+          lastActiveXfbBuffer = std::max(lastActiveXfbBuffer, xfbBuffer);
+        }
+
+        for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+          bufferActive[i] = streamOutBufDescs[i] != nullptr;
+          // Update stream-out buffer descriptor and buffer offset
+          if (bufferActive[i]) {
+            if (firstActiveXfbBuffer == InvalidValue)
+              firstActiveXfbBuffer = i;
+            lastActiveXfbBuffer = i;
+          }
+        }
+
+        auto firstThreadInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(0));
+        m_builder->CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
+      } else {
+        unsigned nextActiveStream = i + 1;
+        while (!streamActive[nextActiveStream]) {
+          ++nextActiveStream;
+        }
+
+        assert(nextActiveStream <= lastActiveStream);
+        m_builder->CreateCondBr(drawFlag[nextActiveStream], compactOutPrimIdBlock[nextActiveStream],
+                                endCompactOutPrimIdBlock[nextActiveStream]);
+      }
+    }
+  }
+
+  // Construct ".prepareXfbExport" block
+  const auto &streamXfbBuffers = inOutUsage.streamXfbBuffers;
+  const auto &xfbStrides = inOutUsage.xfbStrides;
+  {
+    m_builder->SetInsertPoint(prepareXfbExportBlock);
+
+    const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
+
+    Value *numPrimsToWrite[MaxGsStreams] = {};
+    for (unsigned i = 0; i < MaxGsStreams; ++i)
+      numPrimsToWrite[i] = primCountInSubgroup[i];
+
+    Value *dwordsWritten[MaxTransformFeedbackBuffers] = {};
+    Value *dwordsPerPrim[MaxTransformFeedbackBuffers] = {};
+
+    // Determine the associated vertex streams
+    unsigned xfbBufferToStream[MaxTransformFeedbackBuffers] = {};
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      for (unsigned j = 0; j < MaxGsStreams; ++j) {
+        if (!streamActive[j])
+          continue;
+
+        if ((streamXfbBuffers[j] & (1 << i)) != 0) {
+          // NOTE: According to GLSL spec, all outputs assigned to a given transform feedback buffer are required to
+          // come from a single vertex stream.
+          xfbBufferToStream[i] = j;
+          break;
+        }
+      }
+    }
+
+    // Calculate numPrimsToWrite[N]
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      if (!bufferActive[i])
+        continue;
+
+      if (i == firstActiveXfbBuffer) {
+        // ds_ordered_count
+        dwordsWritten[i] = m_builder->CreateIntrinsic(
+            Intrinsic::amdgcn_ds_ordered_add, {},
+            {
+                m_builder->CreateIntToPtr(m_nggFactor.orderedWaveId,
+                                          PointerType::get(m_builder->getInt32Ty(), ADDR_SPACE_REGION)), // m0
+                m_builder->getInt32(0),                                                                  // value to add
+                m_builder->getInt32(0),                                                                  // ordering
+                m_builder->getInt32(0),                                                                  // scope
+                m_builder->getFalse(),                                                                   // isVolatile
+                m_builder->getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
+                                    (1 << 24)), // ordered count index, [27:24] is dword count
+                m_builder->getFalse(),          // wave release
+                m_builder->getFalse(),          // wave done
+            });
+      } else {
+        // ds_add_gs_reg
+        dwordsWritten[i] =
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder->getInt32Ty(),
+                                       {m_builder->getInt32(0),                                         // value to add
+                                        m_builder->getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
+      }
+
+      // NUM_RECORDS = SQ_BUF_RSRC_WORD2
+      Value *numRecords = m_builder->CreateExtractElement(streamOutBufDescs[i], 2);
+      // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
+      Value *bufferSizeInDwords = m_builder->CreateLShr(numRecords, 2);
+      // dwordsRemaining = max(0, bufferSizeInDwords - (bufferOffset + dwordsWritten))
+      Value *dwordsRemaining =
+          m_builder->CreateSub(bufferSizeInDwords, m_builder->CreateAdd(streamOutBufOffsets[i], dwordsWritten[i]));
+      dwordsRemaining = m_builder->CreateIntrinsic(Intrinsic::smax, dwordsRemaining->getType(),
+                                                   {dwordsRemaining, m_builder->getInt32(0)});
+      // numPrimsToWrite = min(dwordsRemaining / dwordsPerPrim, numPrimsToWrite)
+      dwordsPerPrim[i] = m_builder->getInt32(outVertsPerPrim * xfbStrides[i] / SizeOfDword);
+      Value *primsCanWrite = m_builder->CreateUDiv(dwordsRemaining, dwordsPerPrim[i]);
+      numPrimsToWrite[xfbBufferToStream[i]] =
+          m_builder->CreateIntrinsic(Intrinsic::umin, numPrimsToWrite[xfbBufferToStream[i]]->getType(),
+                                     {numPrimsToWrite[xfbBufferToStream[i]], primsCanWrite});
+    }
+
+    // Increment dwordsWritten
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      if (!bufferActive[i])
+        continue;
+
+      Value *dwordsToWrite = m_builder->CreateMul(numPrimsToWrite[xfbBufferToStream[i]], dwordsPerPrim[i]);
+
+      if (i == lastActiveXfbBuffer) {
+        // ds_ordered_count, wave done
+        dwordsWritten[i] = m_builder->CreateIntrinsic(
+            Intrinsic::amdgcn_ds_ordered_add, {},
+            {
+                m_builder->CreateIntToPtr(m_nggFactor.orderedWaveId,
+                                          PointerType::get(m_builder->getInt32Ty(), ADDR_SPACE_REGION)), // m0
+                dwordsToWrite,                                                                           // value to add
+                m_builder->getInt32(0),                                                                  // ordering
+                m_builder->getInt32(0),                                                                  // scope
+                m_builder->getFalse(),                                                                   // isVolatile
+                m_builder->getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
+                                    (1 << 24)), // ordered count index, [27:24] is dword count
+                m_builder->getTrue(),           // wave release
+                m_builder->getTrue(),           // wave done
+            });
+      } else {
+        // ds_add_gs_reg
+        dwordsWritten[i] =
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, dwordsToWrite->getType(),
+                                       {dwordsToWrite,                                                  // value to add
+                                        m_builder->getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
+      }
+    }
+
+    // Store transform feedback statistics info to LDS and GDS
+    const unsigned regionStart = m_ldsManager->getLdsRegionStart(LdsRegionGsXfbStatInfo);
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      if (!bufferActive[i])
+        continue;
+
+      m_ldsManager->writeValueToLds(dwordsWritten[i], m_builder->getInt32(regionStart + i * SizeOfDword));
+    }
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (!streamActive[i])
+        continue;
+
+      m_ldsManager->writeValueToLds(
+          numPrimsToWrite[i],
+          m_builder->getInt32(regionStart + MaxTransformFeedbackBuffers * SizeOfDword + i * SizeOfDword));
+
+      m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, primCountInSubgroup[i]->getType(),
+                                 {primCountInSubgroup[i],                                           // value to add
+                                  m_builder->getInt32((GDS_STRMOUT_PRIMS_NEEDED_0 + 2 * i) << 2)}); // count index
+
+      m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, numPrimsToWrite[i]->getType(),
+                                 {numPrimsToWrite[i],                                                // value to add
+                                  m_builder->getInt32((GDS_STRMOUT_PRIMS_WRITTEN_0 + 2 * i) << 2)}); // count index
+    }
+
+    m_builder->CreateBr(endPrepareXfbExportBlock);
+  }
+
+  // Construct ".endPrepareXfbExport" block
+  Value *streamOutOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out offset to write transform feedback outputs
+  Value *numPrimsToWrite[MaxGsStreams] = {};
+  {
+    m_builder->SetInsertPoint(endPrepareXfbExportBlock);
+
+    // We are going to read transform feedback statistics info from LDS. Make sure the info has been written before
+    // this.
+    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
+    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
+    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+
+    auto xfbStatInfo =
+        readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInWave, LdsRegionGsXfbStatInfo);
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      if (bufferActive[i]) {
+        streamOutOffsets[i] =
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder->getInt32(i)});
+        streamOutOffsets[i] = m_builder->CreateAdd(streamOutBufOffsets[i], streamOutOffsets[i]);
+        streamOutOffsets[i] = m_builder->CreateShl(streamOutOffsets[i], 2);
+      }
+    }
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (streamActive[i]) {
+        numPrimsToWrite[i] = m_builder->CreateIntrinsic(
+            Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder->getInt32(MaxTransformFeedbackBuffers + i)});
+      }
+    }
+
+    auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, numPrimsToWrite[firstActiveStream]);
+    m_builder->CreateCondBr(primValid, exportXfbOutputBlock[firstActiveStream],
+                            endExportXfbOutputBlock[firstActiveStream]);
+  }
+
+  for (unsigned i = 0; i < MaxGsStreams; ++i) {
+    if (!streamActive[i])
+      continue;
+
+    // Construct ".exportXfbOutputInStream[N]" block
+    {
+      m_builder->SetInsertPoint(exportXfbOutputBlock[i]);
+
+      Value *vertexIds[3] = {};
+
+      Value *uncompactedPrimitiveId =
+          readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimThreadIdMap,
+                                   SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * i);
+      Value *vertexId = uncompactedPrimitiveId;
+
+      const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
+      vertexIds[0] = vertexId;
+
+      if (outVertsPerPrim > 1)
+        vertexIds[1] = m_builder->CreateAdd(vertexId, m_builder->getInt32(1));
+      if (outVertsPerPrim > 2) {
+        vertexIds[2] = m_builder->CreateAdd(vertexId, m_builder->getInt32(2));
+
+        Value *primData =
+            readPerThreadDataFromLds(m_builder->getInt32Ty(), uncompactedPrimitiveId, LdsRegionOutPrimData,
+                                     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * i);
+        Value *winding = m_builder->CreateICmpNE(primData, m_builder->getInt32(0));
+        Value *vertexId1 = m_builder->CreateSelect(winding, vertexIds[2], vertexIds[1]);
+        Value *vertexId2 = m_builder->CreateSelect(winding, vertexIds[1], vertexIds[2]);
+        vertexIds[1] = vertexId1;
+        vertexIds[2] = vertexId2;
+      }
+
+      for (unsigned j = 0; j < outVertsPerPrim; ++j) {
+        for (unsigned k = 0; k < xfbOutputExports.size(); ++k) {
+          const auto &xfbOutputExport = xfbOutputExports[k];
+          if (xfbOutputExport.locInfo.streamId != i)
+            continue; // Output not belong to this stream
+
+          auto outputValue =
+              importGsOutput(xfbOutputExport.numElements > 1
+                                 ? FixedVectorType::get(m_builder->getFloatTy(), xfbOutputExport.numElements)
+                                 : m_builder->getFloatTy(),
+                             xfbOutputExport.locInfo.loc, i, calcVertexItemOffset(i, vertexIds[j]));
+
+          if (xfbOutputExport.is16bit) {
+            // NOTE: For 16-bit transform feedbakc outputs, they are stored as 32-bit without tightly packed in LDS.
+            outputValue = m_builder->CreateBitCast(
+                outputValue, FixedVectorType::get(m_builder->getInt32Ty(), xfbOutputExport.numElements));
+            outputValue = m_builder->CreateTrunc(
+                outputValue, FixedVectorType::get(m_builder->getInt16Ty(), xfbOutputExport.numElements));
+            outputValue = m_builder->CreateBitCast(
+                outputValue, FixedVectorType::get(m_builder->getHalfTy(), xfbOutputExport.numElements));
+          }
+
+          unsigned format = 0;
+          switch (xfbOutputExport.numElements) {
+          case 1:
+            format = xfbOutputExport.is16bit ? BUF_FORMAT_16_FLOAT : BUF_FORMAT_32_FLOAT;
+            break;
+          case 2:
+            format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_FLOAT_GFX11;
+            break;
+          case 3:
+            format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_32_FLOAT_GFX11;
+            break;
+          case 4:
+            format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_16_16_FLOAT_GFX11 : BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
+            break;
+          default:
+            llvm_unreachable("Unexpected element number!");
+            break;
+          }
+
+          CoherentFlag coherent = {};
+          coherent.bits.glc = true;
+          coherent.bits.slc = true;
+
+          // vertexOffset = (threadIdInSubgroup * outVertsPerPrim + vertexIndex) * xfbStride
+          Value *vertexOffset = m_builder->CreateAdd(
+              m_builder->CreateMul(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(outVertsPerPrim)),
+              m_builder->getInt32(j));
+          vertexOffset = m_builder->CreateMul(vertexOffset, m_builder->getInt32(xfbStrides[xfbOutputExport.xfbBuffer]));
+          // xfbOutputOffset = vertexOffset + xfbOffset
+          Value *xfbOutputOffset = m_builder->CreateAdd(vertexOffset, m_builder->getInt32(xfbOutputExport.xfbOffset));
+
+          if (xfbOutputExport.is16bit && xfbOutputExport.numElements == 3) {
+            // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2
+            // and 16scalar.
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store,
+                                       FixedVectorType::get(m_builder->getHalfTy(), 2),
+                                       {m_builder->CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
+                                        streamOutBufDescs[xfbOutputExport.xfbBuffer],                     // rsrc
+                                        xfbOutputOffset,                                                  // offset
+                                        streamOutOffsets[xfbOutputExport.xfbBuffer],                      // soffset
+                                        m_builder->getInt32(BUF_FORMAT_16_16_FLOAT),                      // format
+                                        m_builder->getInt32(coherent.u32All)}); // auxiliary data
+
+            m_builder->CreateIntrinsic(
+                Intrinsic::amdgcn_raw_tbuffer_store, m_builder->getHalfTy(),
+                {m_builder->CreateExtractElement(outputValue, 2),                                  // vdata
+                 streamOutBufDescs[xfbOutputExport.xfbBuffer],                                     // rsrc
+                 m_builder->CreateAdd(xfbOutputOffset, m_builder->getInt32(2 * sizeof(uint16_t))), // offset
+                 streamOutOffsets[xfbOutputExport.xfbBuffer],                                      // soffset
+                 m_builder->getInt32(BUF_FORMAT_16_FLOAT),                                         // format
+                 m_builder->getInt32(coherent.u32All)});                                           // auxiliary data
+          } else {
+            m_builder->CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outputValue->getType(),
+                                       {outputValue,                                  // vdata
+                                        streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
+                                        xfbOutputOffset,                              // offset
+                                        streamOutOffsets[xfbOutputExport.xfbBuffer],  // soffset
+                                        m_builder->getInt32(format),                  // format
+                                        m_builder->getInt32(coherent.u32All)});       // auxiliary data
+          }
+        }
+      }
+
+      m_builder->CreateBr(endExportXfbOutputBlock[i]);
+    }
+
+    // Construct ".endExportXfbOutputInStream[N]" block
+    {
+      m_builder->SetInsertPoint(endExportXfbOutputBlock[i]);
+
+      if (i != lastActiveStream) {
+        unsigned nextActiveStream = i + 1;
+        while (!streamActive[nextActiveStream]) {
+          ++nextActiveStream;
+        }
+
+        assert(nextActiveStream <= lastActiveStream);
+        auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, numPrimsToWrite[nextActiveStream]);
+        m_builder->CreateCondBr(primValid, exportXfbOutputBlock[nextActiveStream],
+                                endExportXfbOutputBlock[nextActiveStream]);
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
+// Fetches transform feedback outputs by creating a fetch function cloned from ES/copy shader entry-point or just
+// mutating existing ES and running it after that. Meanwhile, we collect the transform feedback export info.
+//
+// @param module : LLVM module.
+// @param sysValueStart : Start of system value
+// @param [out] xfbOutputExports : Export info of transform feedback outputs
+Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
+                                     SmallVector<XfbOutputExport, 32> &xfbOutputExports) {
+  assert(m_enableSwXfb);
+
+  //
+  // Clone ES/copy shader entry-point or just mutate existing ES entry-point to fetch transform feedback outputs
+  //
+  auto entryPoint = module->getFunction(m_hasGs ? lgcName::NggCopyShaderEntryPoint : lgcName::NggEsEntryPoint);
+  assert(entryPoint);
+
+  // We don't clone the entry-point if we are in passthrough mode without GS
+  bool dontClone = !m_hasGs && m_nggControl->passthroughMode;
+
+  // Collect all export calls for further analysis
+  SmallVector<Function *, 8> expFuncs;
+  for (auto &func : module->functions()) {
+    if (dontClone) {
+      if (func.getName().startswith(lgcName::NggXfbOutputExport))
+        expFuncs.push_back(&func);
+    } else {
+      if ((func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) ||
+          func.getName().startswith(lgcName::NggAttribExport) || func.getName().startswith(lgcName::NggXfbOutputExport))
+        expFuncs.push_back(&func);
+    }
+  }
+
+  // Clone or mutate entry-point
+  const bool hasTs = m_hasTcs || m_hasTes;
+  const unsigned xfbOutputCount =
+      m_pipelineState
+          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex))
+          ->inOutUsage.xfbOutputExpCount;
+  assert(xfbOutputCount > 0);
+  xfbOutputExports.resize(xfbOutputCount);
+
+  // Each output is represented as a structure:
+  //   ES: {streamOutBufDesc, streamOutBufOffset, outputValue}
+  //   GS: {streamOutBufDesc, streamOutBufOffset}
+  //
+  // NOTE: For GS transform feedback, the output value must be loaded by GS output import call. Thus, we don't have to
+  // return output value. Instead, we recode the location in transform feedback export info and use it later.
+  auto xfbOutputTy =
+      m_hasGs ? StructType::get(*m_context,
+
+                                {
+                                    FixedVectorType::get(m_builder->getInt32Ty(), 4), // streamOutBufDesc
+                                    m_builder->getInt32Ty(),                          // streamOutBufOffset
+                                })
+              : StructType::get(*m_context, {
+                                                FixedVectorType::get(m_builder->getInt32Ty(), 4), // streamOutBufDesc
+                                                m_builder->getInt32Ty(),                          // streamOutBufOffset
+                                                FixedVectorType::get(m_builder->getInt32Ty(), 4), // outputValue
+                                            });
+
+  auto xfbOutputsTy = ArrayType::get(xfbOutputTy, xfbOutputCount);
+
+  Function *xfbOutputFetchFunc = entryPoint;
+  if (dontClone) {
+    processVertexAttribExport(entryPoint);
+    xfbOutputFetchFunc = addFunctionArgs(entryPoint, xfbOutputsTy, {}, {}, 0);
+
+    // Original function is no longer needed
+    assert(entryPoint->use_empty());
+    entryPoint->eraseFromParent();
+  } else {
+    auto xfbOutputFetchFuncTy = FunctionType::get(xfbOutputsTy, entryPoint->getFunctionType()->params(), false);
+    xfbOutputFetchFunc = Function::Create(xfbOutputFetchFuncTy, entryPoint->getLinkage(), "", module);
+
+    ValueToValueMapTy valueMap;
+
+    Argument *newArg = xfbOutputFetchFunc->arg_begin();
+    for (Argument &arg : entryPoint->args())
+      valueMap[&arg] = newArg++;
+
+    SmallVector<ReturnInst *, 8> retInsts;
+    CloneFunctionInto(xfbOutputFetchFunc, entryPoint, valueMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
+    xfbOutputFetchFunc->setName(m_hasGs ? lgcName::NggGsXfbOutputFetch : lgcName::NggEsXfbOutputFetch);
+  }
+
+  // Find the return block
+  BasicBlock *retBlock = nullptr;
+  for (BasicBlock &block : *xfbOutputFetchFunc) {
+    auto retInst = dyn_cast<ReturnInst>(block.getTerminator());
+    if (retInst) {
+      retInst->dropAllReferences();
+      retInst->eraseFromParent();
+
+      retBlock = &block;
+      break;
+    }
+  }
+  assert(retBlock);
+
+  auto savedInsertPos = m_builder->saveIP();
+  m_builder->SetInsertPoint(retBlock);
+
+  // Visit all export calls, removing those unnecessary and mutating the return type
+  SmallVector<CallInst *, 8> removeCalls;
+
+  Value *xfbOutputs = UndefValue::get(xfbOutputsTy);
+  unsigned outputIndex = 0;
+
+  for (auto func : expFuncs) {
+    for (auto user : func->users()) {
+      CallInst *const call = dyn_cast<CallInst>(user);
+      assert(call);
+
+      if (!dontClone) {
+        // Remove transform feedback output export calls from original ES/copy shader. No need of doing this if we
+        // don't clone the entry-point.
+        if (call->getFunction() == entryPoint && func->getName().startswith(lgcName::NggXfbOutputExport)) {
+          removeCalls.push_back(call);
+          continue;
+        }
+      }
+
+      if (call->getFunction() != xfbOutputFetchFunc)
+        continue;
+
+      assert(call->getParent() == retBlock); // Must in return block
+
+      if (func->getName().startswith(lgcName::NggXfbOutputExport)) {
+        // Lower transform feedback export calls
+        auto streamOutBufDesc = call->getArgOperand(0);
+        auto streamOutBufOffset = call->getArgOperand(1);
+        auto xfbBuffer = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
+        auto xfbOffset = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
+        auto outputValue = call->getArgOperand(5);
+
+        const unsigned numElements =
+            outputValue->getType()->isVectorTy() ? cast<FixedVectorType>(outputValue->getType())->getNumElements() : 1;
+        const bool is16bit = outputValue->getType()->getScalarSizeInBits() == 16;
+
+        // Those values are just for GS
+        auto streamId = InvalidValue;
+        unsigned loc = InvalidValue;
+
+        if (m_hasGs) {
+          // NOTE: For GS, the output value must be loaded by GS output import call. This is generated by copy shader.
+          CallInst *importCall = dyn_cast<CallInst>(outputValue);
+          assert(importCall && importCall->getCalledFunction()->getName().startswith(lgcName::NggGsOutputImport));
+          streamId = cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
+          assert(streamId == cast<ConstantInt>(importCall->getArgOperand(1))->getZExtValue()); // Stream ID must match
+          loc = cast<ConstantInt>(importCall->getArgOperand(0))->getZExtValue();
+        } else {
+          // If the output value is floating point, cast it to integer type
+          if (outputValue->getType()->isFPOrFPVectorTy()) {
+            if (numElements == 1) {
+              outputValue =
+                  m_builder->CreateBitCast(outputValue, is16bit ? m_builder->getInt16Ty() : m_builder->getInt32Ty());
+            } else {
+              outputValue = m_builder->CreateBitCast(
+                  outputValue,
+                  FixedVectorType::get(is16bit ? m_builder->getInt16Ty() : m_builder->getInt32Ty(), numElements));
+            }
+          }
+
+          // If the output value is 16-bit, zero-extend it to 32-bit
+          if (is16bit)
+            outputValue =
+                m_builder->CreateZExt(outputValue, FixedVectorType::get(m_builder->getInt32Ty(), numElements));
+
+          // Always pad the output value to <4 x i32>
+          if (numElements == 1) {
+            outputValue =
+                m_builder->CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 4)),
+                                               outputValue, static_cast<uint64_t>(0));
+          } else if (numElements < 4) {
+            outputValue = m_builder->CreateShuffleVector(outputValue, UndefValue::get(outputValue->getType()),
+                                                         ArrayRef<int>({0U, 1U, 2U, 3U}));
+          }
+        }
+
+        // Construct the return value
+        Value *xfbOutput = UndefValue::get(xfbOutputTy);
+        xfbOutput = m_builder->CreateInsertValue(xfbOutput, streamOutBufDesc, 0);
+        xfbOutput = m_builder->CreateInsertValue(xfbOutput, streamOutBufOffset, 1);
+        if (!m_hasGs)
+          xfbOutput = m_builder->CreateInsertValue(xfbOutput, outputValue, 2); // For VS/TES, return the output value
+        xfbOutputs = m_builder->CreateInsertValue(xfbOutputs, xfbOutput, outputIndex);
+
+        // Collect export info
+        xfbOutputExports[outputIndex].xfbBuffer = xfbBuffer;
+        xfbOutputExports[outputIndex].xfbOffset = xfbOffset;
+        xfbOutputExports[outputIndex].numElements = numElements;
+        xfbOutputExports[outputIndex].is16bit = is16bit;
+        // Those values are just for GS
+        xfbOutputExports[outputIndex].locInfo.streamId = streamId;
+        xfbOutputExports[outputIndex].locInfo.loc = loc;
+
+        ++outputIndex;
+      }
+
+      removeCalls.push_back(call); // Remove export
+    }
+  }
+
+  assert(outputIndex == xfbOutputCount); // Visit all transform feedback output export calls
+  m_builder->CreateRet(xfbOutputs);
+
+  // Remove calls
+  for (auto call : removeCalls) {
+    call->dropAllReferences();
+    call->eraseFromParent();
+  }
+
+  m_builder->restoreIP(savedInsertPos);
+
+  //
+  // Run transform feedback output fetch function
+  //
+  if (m_hasGs) {
+    // Copy shader has fixed argument layout
+    Value *userData = sysValueStart + NumSpecialSgprInputs;
+    assert(userData->getType()->isVectorTy());
+
+    const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
+    auto globalTable = m_builder->CreateExtractElement(userData, static_cast<uint64_t>(0));
+    auto streamOutTable = m_builder->CreateExtractElement(userData, entryArgIdxs.streamOutData.tablePtr);
+    auto streamOutControlBuf = m_builder->CreateExtractElement(userData, entryArgIdxs.streamOutData.controlBufPtr);
+
+    return m_builder->CreateCall(xfbOutputFetchFunc,
+                                 {globalTable,                      // Global table
+                                  streamOutTable,                   // Stream-out table
+                                  streamOutControlBuf,              // Stream-out control buffer
+                                  m_nggFactor.threadIdInSubgroup}); // Vertex ID in sub-rgoup
+  }
+
+  Argument *arg = sysValueStart;
+
+  Value *offChipLdsBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase));
+  offChipLdsBase->setName("offChipLdsBase");
+
+  Value *isOffChip = UndefValue::get(m_builder->getInt32Ty()); // NOTE: This flag is unused.
+
+  arg += NumSpecialSgprInputs;
+
+  Value *userData = arg++;
+
+  Value *tessCoordX = (arg + 5);
+  Value *tessCoordY = (arg + 6);
+  Value *relPatchId = (arg + 7);
+  Value *patchId = (arg + 8);
+
+  Value *vertexId = (arg + 5);
+  Value *relVertexId = (arg + 6);
+  // NOTE: VS primitive ID for NGG is specially obtained, not simply from system VGPR.
+  Value *vsPrimitiveId = m_nggFactor.primitiveId ? m_nggFactor.primitiveId : UndefValue::get(m_builder->getInt32Ty());
+  Value *instanceId = (arg + 8);
+
+  std::vector<Value *> args;
+
+  // If we don't clone the entry-point, we are going to run the whole ES and handle vertex attribute through memory
+  // here.
+  if (dontClone) {
+    // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex
+    // attributes through memory
+    if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
+      const auto attribCount =
+          m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex)->inOutUsage.expCount;
+      if (attribCount > 0) {
+        args.push_back(m_nggFactor.attribRingBase);
+        args.push_back(m_nggFactor.threadIdInSubgroup);
+      }
+    }
+  }
+
+  auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+  const unsigned userDataCount = intfData->userDataCount;
+
+  unsigned userDataIdx = 0;
+
+  auto argBegin = xfbOutputFetchFunc->arg_begin();
+  const unsigned argCount = xfbOutputFetchFunc->arg_size();
+  (void(argCount)); // Unused
+
+  // Set up user data SGPRs
+  while (userDataIdx < userDataCount) {
+    assert(args.size() < argCount);
+
+    auto arg = (argBegin + args.size());
+    assert(arg->hasAttribute(Attribute::InReg));
+
+    auto argTy = arg->getType();
+    if (argTy->isVectorTy()) {
+      assert(cast<VectorType>(argTy)->getElementType()->isIntegerTy());
+
+      const unsigned userDataSize = cast<FixedVectorType>(argTy)->getNumElements();
+
+      std::vector<int> shuffleMask;
+      for (unsigned i = 0; i < userDataSize; ++i)
+        shuffleMask.push_back(userDataIdx + i);
+
+      args.push_back(m_builder->CreateShuffleVector(userData, userData, shuffleMask));
+      userDataIdx += userDataSize;
+    } else {
+      assert(argTy->isIntegerTy());
+      args.push_back(m_builder->CreateExtractElement(userData, userDataIdx));
+      ++userDataIdx;
+    }
+  }
+
+  if (hasTs) {
+    // Set up system value SGPRs
+    if (m_pipelineState->isTessOffChip()) {
+      args.push_back(isOffChip);
+      args.push_back(offChipLdsBase);
+    }
+
+    // Set up system value VGPRs
+    args.push_back(tessCoordX);
+    args.push_back(tessCoordY);
+    args.push_back(relPatchId);
+    args.push_back(patchId);
+  } else {
+    // Set up system value VGPRs
+    args.push_back(vertexId);
+    args.push_back(relVertexId);
+    args.push_back(vsPrimitiveId);
+    args.push_back(instanceId);
+
+    if (m_nggControl->passthroughMode) {
+      // When tessellation is not enabled, the ES is actually a fetchless VS. Then, we need to add arguments for the
+      // vertex fetches. Also set the name of each vertex fetch primitive shader argument while we're here.
+      unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
+      if (vertexFetchCount != 0) {
+        // The last vertexFetchCount arguments of the primitive shader and ES are the vertex fetches
+        Function *primShader = m_builder->GetInsertBlock()->getParent();
+        unsigned primArgCount = primShader->arg_size();
+        for (unsigned i = 0; i != vertexFetchCount; ++i) {
+          Argument *vertexFetch = primShader->getArg(primArgCount - vertexFetchCount + i);
+          vertexFetch->setName(
+              xfbOutputFetchFunc->getArg(argCount - vertexFetchCount + i)->getName()); // Copy argument name
+          args.push_back(vertexFetch);
+        }
+      }
+    }
+  }
+
+  assert(args.size() == argCount); // Must have visit all arguments
+
+  return m_builder->CreateCall(xfbOutputFetchFunc, args);
+}
+
+// =====================================================================================================================
+// Reads transform feedback output from LDS
+//
+// @param readDataTy : Data read from LDS
+// @param vertexId: Vertex thread ID in sub-group
+// @param outputIndex : Index of this transform feedback output
+Value *NggPrimShader::readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexId, unsigned outputIndex) {
+  assert(m_enableSwXfb); // SW-emulated stream-out must be enabled
+  assert(!m_hasGs);
+
+  const unsigned esGsRingItemSize =
+      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+  auto vertexItemOffset = m_builder->CreateMul(vertexId, m_builder->getInt32(esGsRingItemSize * SizeOfDword));
+
+  if (m_nggControl->passthroughMode) {
+    const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionXfbOutput);
+    Value *ldsOffset =
+        m_builder->CreateAdd(vertexItemOffset, m_builder->getInt32(regionStart + SizeOfVec4 * outputIndex));
+    return m_ldsManager->readValueFromLds(readDataTy, ldsOffset);
+  }
+
+  // NOTE: For NGG culling mode, transform feedback outputs are part of vertex cull info.
+  const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionVertCullInfo);
+  Value *ldsOffset = m_builder->CreateAdd(
+      vertexItemOffset, m_builder->getInt32(regionStart + m_vertCullInfoOffsets.xfbOutputs + SizeOfVec4 * outputIndex));
+  return m_ldsManager->readValueFromLds(readDataTy, ldsOffset);
+}
+
+// =====================================================================================================================
+// Writes transform feedback output from LDS
+//
+// @param writeData : Data written to LDS
+// @param vertexId: Vertex thread ID in sub-group
+// @param outputIndex : Index of this transform feedback output
+void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexId, unsigned outputIndex) {
+  assert(m_enableSwXfb); // SW-emulated stream-out must be enabled
+  assert(!m_hasGs);
+
+  const unsigned esGsRingItemSize =
+      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+  auto vertexItemOffset = m_builder->CreateMul(vertexId, m_builder->getInt32(esGsRingItemSize * SizeOfDword));
+
+  if (m_nggControl->passthroughMode) {
+    const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionXfbOutput);
+    Value *ldsOffset =
+        m_builder->CreateAdd(vertexItemOffset, m_builder->getInt32(regionStart + SizeOfVec4 * outputIndex));
+    m_ldsManager->writeValueToLds(writeData, ldsOffset);
+    return;
+  }
+
+  // NOTE: For NGG culling mode, transform feedback outputs are part of vertex cull info.
+  const auto regionStart = m_ldsManager->getLdsRegionStart(LdsRegionVertCullInfo);
+  Value *ldsOffset = m_builder->CreateAdd(
+      vertexItemOffset, m_builder->getInt32(regionStart + m_vertCullInfoOffsets.xfbOutputs + SizeOfVec4 * outputIndex));
+  m_ldsManager->writeValueToLds(writeData, ldsOffset);
+}
+#endif
 
 // =====================================================================================================================
 // Fetches the position data for the specified vertex ID.
