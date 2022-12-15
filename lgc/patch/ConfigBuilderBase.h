@@ -83,6 +83,9 @@ protected:
   void setEsGsLdsSize(unsigned value);
   void setNggSubgroupSize(unsigned value);
   void setThreadgroupDimensions(llvm::ArrayRef<unsigned> values);
+#if LLPC_BUILD_GFX11
+  void setStreamOutVertexStrides(llvm::ArrayRef<unsigned> values);
+#endif
   unsigned setupFloatingPointMode(ShaderStage shaderStage);
 
   void appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config);

@@ -66,6 +66,9 @@ void initializeLegacyPatchWaveSizeAdjustPass(PassRegistry &);
 void initializeLegacyPatchImageDerivativesPass(PassRegistry &);
 void initializeLegacyPatchInitializeWorkgroupMemoryPass(PassRegistry &);
 void initializeLegacyPatchInvariantLoadsPass(PassRegistry &);
+#if LLPC_BUILD_GFX11
+void initializeLegacyPatchImageOpCollectPass(PassRegistry &);
+#endif
 } // namespace llvm
 
 namespace lgc {
@@ -97,11 +100,17 @@ inline void initializePatchPasses(llvm::PassRegistry &passRegistry) {
   initializeLegacyPatchImageDerivativesPass(passRegistry);
   initializeLegacyPatchInitializeWorkgroupMemoryPass(passRegistry);
   initializeLegacyPatchInvariantLoadsPass(passRegistry);
+#if LLPC_BUILD_GFX11
+  initializeLegacyPatchImageOpCollectPass(passRegistry);
+#endif
 }
 
 llvm::ModulePass *createLegacyLowerFragColorExport();
 llvm::ModulePass *createLegacyLowerVertexFetch();
 llvm::FunctionPass *createLegacyPatchBufferOp();
+#if LLPC_BUILD_GFX11
+llvm::ModulePass *createLegacyPatchImageOpCollect();
+#endif
 LegacyPatchCheckShaderCache *createLegacyPatchCheckShaderCache();
 llvm::ModulePass *createLegacyPatchCopyShader();
 llvm::ModulePass *createLegacyPatchEntryPointMutate();

@@ -476,6 +476,14 @@ private:
     IMG_FMT_BG_RG_UNORM__GFX10CORE = 151,
   };
 
+#if LLPC_BUILD_GFX11
+  enum ImgFmtGfx11 {
+    IMG_FMT_8_8_8_8_UNORM__GFX104PLUS = 42,
+    IMG_FMT_GB_GR_UNORM__GFX104PLUS = 82,
+    IMG_FMT_BG_RG_UNORM__GFX104PLUS = 86,
+  };
+#endif
+
   static const unsigned AtomicOpCompareSwap = 1;
 };
 

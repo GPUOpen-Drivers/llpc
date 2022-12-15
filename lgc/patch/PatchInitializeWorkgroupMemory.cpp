@@ -176,6 +176,33 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
   Value *localInvocationId = getFunctionArgument(m_entryPoint, entryArgIdxs.cs.localInvocationId);
   const unsigned actualNumThreads = shaderMode.workgroupSizeX * shaderMode.workgroupSizeY * shaderMode.workgroupSizeZ;
 
+#if LLPC_BUILD_GFX11
+  // On GFX11, it is a single VGPR and we need to extract the three components.
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
+    assert(localInvocationId->getType() == builder.getInt32Ty());
+
+    static constexpr unsigned LocalInvocationIdPackMask = 0x3FF;
+    Value *unpackedLocalInvocationId = UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 3));
+
+    // X = PackedId[9:0]
+    unpackedLocalInvocationId = builder.CreateInsertElement(
+        unpackedLocalInvocationId, builder.CreateAnd(localInvocationId, builder.getInt32(LocalInvocationIdPackMask)),
+        uint64_t(0));
+
+    // Y = PackedId[19:10]
+    localInvocationId = builder.CreateLShr(localInvocationId, builder.getInt32(10));
+    unpackedLocalInvocationId = builder.CreateInsertElement(
+        unpackedLocalInvocationId, builder.CreateAnd(localInvocationId, builder.getInt32(LocalInvocationIdPackMask)),
+        1);
+
+    // Z = PackedId[29:20], PackedId[31:30] set to 0 by hardware
+    localInvocationId = builder.CreateLShr(localInvocationId, builder.getInt32(10));
+    unpackedLocalInvocationId = builder.CreateInsertElement(unpackedLocalInvocationId, localInvocationId, 2);
+
+    localInvocationId = unpackedLocalInvocationId;
+  }
+#endif
+
   Value *threadId = builder.CreateExtractElement(localInvocationId, uint64_t(0));
   if (shaderMode.workgroupSizeY > 1) {
     Value *stride = builder.CreateMul(builder.getInt32(shaderMode.workgroupSizeX),

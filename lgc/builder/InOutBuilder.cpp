@@ -740,6 +740,17 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
   assert(xfbBuffer < MaxTransformFeedbackBuffers);
   assert(streamId < MaxGsStreams);
 
+#if LLPC_BUILD_GFX11
+  if (m_shaderStage == ShaderStageGeometry && getPipelineState()->enableSwXfb()) {
+    // NOTE: For SW-emulated stream-out, we disable GS output packing. This is because
+    // the packing operation might cause a vector components belong to different vectors after the
+    // packing. In handling of SW-emulated stream-out, we expect components of the same vector
+    // should stay in it corresponding to a location all the time.
+    getPipelineState()->setPackOutput(ShaderStageGeometry, false);
+    getPipelineState()->setPackInput(ShaderStageFragment, false);
+  }
+#endif
+
   // Collect the XFB output.
   XfbOutInfo xfbOutInfo = {};
   xfbOutInfo.streamId = streamId;
@@ -1184,6 +1195,29 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     // LocalInvocationId is a v3i32 shader input (three VGPRs set up in hardware).
     Value *localInvocationId =
         ShaderInputs::getInput(ShaderInput::LocalInvocationId, BuilderBase::get(*this), *getLgcContext());
+
+#if LLPC_BUILD_GFX11
+    // On GFX11, it is a single VGPR and we need to extract the three components.
+    if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11) {
+      static const unsigned mask = 0x3ff;
+      Value *unpackedLocalInvocationId = UndefValue::get(FixedVectorType::get(getInt32Ty(), 3));
+
+      // X = PackedId[9:0]
+      unpackedLocalInvocationId =
+          CreateInsertElement(unpackedLocalInvocationId, CreateAnd(localInvocationId, getInt32(mask)), uint64_t(0));
+
+      // Y = PackedId[19:10]
+      localInvocationId = CreateLShr(localInvocationId, getInt32(10));
+      unpackedLocalInvocationId =
+          CreateInsertElement(unpackedLocalInvocationId, CreateAnd(localInvocationId, getInt32(mask)), 1);
+
+      // Z = PackedId[29:20], PackedId[31:30] set to 0 by hardware
+      localInvocationId = CreateLShr(localInvocationId, getInt32(10));
+      unpackedLocalInvocationId = CreateInsertElement(unpackedLocalInvocationId, localInvocationId, 2);
+
+      localInvocationId = unpackedLocalInvocationId;
+    }
+#endif
 
     // Unused dimensions need zero-initializing.
     if (shaderMode.workgroupSizeZ <= 1) {

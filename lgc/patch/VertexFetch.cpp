@@ -119,6 +119,9 @@ private:
 
   static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
   static const unsigned char m_vertexFormatMapGfx10[][8];     // Info table of vertex format mapping for GFX10
+#if LLPC_BUILD_GFX11
+  static const unsigned char m_vertexFormatMapGfx11[][8]; // Info table of vertex format mapping for GFX11
+#endif
 
   // Default values for vertex fetch (<4 x i32> or <8 x i32>)
   struct {
@@ -332,6 +335,182 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_INVALID},
 };
 // clang-format on
+
+#if LLPC_BUILD_GFX11
+// clang-format off
+const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
+    // BUF_DATA_FORMAT
+    //   BUF_NUM_FORMAT_UNORM
+    //   BUF_NUM_FORMAT_SNORM
+    //   BUF_NUM_FORMAT_USCALED
+    //   BUF_NUM_FORMAT_SSCALED
+    //   BUF_NUM_FORMAT_UINT
+    //   BUF_NUM_FORMAT_SINT
+    //   BUF_NUM_FORMAT_SNORM_NZ
+    //   BUF_NUM_FORMAT_FLOAT
+
+    // BUF_DATA_FORMAT_INVALID
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
+
+    // BUF_DATA_FORMAT_8
+    {BUF_FORMAT_8_UNORM,
+     BUF_FORMAT_8_SNORM,
+     BUF_FORMAT_8_USCALED,
+     BUF_FORMAT_8_SSCALED,
+     BUF_FORMAT_8_UINT,
+     BUF_FORMAT_8_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
+
+    // BUF_DATA_FORMAT_16
+    {BUF_FORMAT_16_UNORM,
+     BUF_FORMAT_16_SNORM,
+     BUF_FORMAT_16_USCALED,
+     BUF_FORMAT_16_SSCALED,
+     BUF_FORMAT_16_UINT,
+     BUF_FORMAT_16_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_16_FLOAT},
+
+    // BUF_DATA_FORMAT_8_8
+    {BUF_FORMAT_8_8_UNORM,
+     BUF_FORMAT_8_8_SNORM,
+     BUF_FORMAT_8_8_USCALED,
+     BUF_FORMAT_8_8_SSCALED,
+     BUF_FORMAT_8_8_UINT,
+     BUF_FORMAT_8_8_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
+
+    // BUF_DATA_FORMAT_32
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_UINT,
+     BUF_FORMAT_32_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_FLOAT},
+
+    // BUF_DATA_FORMAT_16_16
+    {BUF_FORMAT_16_16_UNORM,
+     BUF_FORMAT_16_16_SNORM,
+     BUF_FORMAT_16_16_USCALED,
+     BUF_FORMAT_16_16_SSCALED,
+     BUF_FORMAT_16_16_UINT,
+     BUF_FORMAT_16_16_SINT,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_16_16_FLOAT},
+
+    // BUF_DATA_FORMAT_10_11_11
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_10_11_11_FLOAT_GFX11},
+
+    // BUF_DATA_FORMAT_11_11_10
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_11_11_10_FLOAT_GFX11},
+
+    // BUF_DATA_FORMAT_10_10_10_2
+    {BUF_FORMAT_10_10_10_2_UNORM_GFX11,
+     BUF_FORMAT_10_10_10_2_SNORM_GFX11,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_10_10_10_2_UINT_GFX11,
+     BUF_FORMAT_10_10_10_2_SINT_GFX11,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
+
+    // BUF_DATA_FORMAT_2_10_10_10
+    {BUF_FORMAT_2_10_10_10_UNORM_GFX11,
+     BUF_FORMAT_2_10_10_10_SNORM_GFX11,
+     BUF_FORMAT_2_10_10_10_USCALED_GFX11,
+     BUF_FORMAT_2_10_10_10_SSCALED_GFX11,
+     BUF_FORMAT_2_10_10_10_UINT_GFX11,
+     BUF_FORMAT_2_10_10_10_SINT_GFX11,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
+
+    // BUF_DATA_FORMAT_8_8_8_8
+    {BUF_FORMAT_8_8_8_8_UNORM_GFX11,
+     BUF_FORMAT_8_8_8_8_SNORM_GFX11,
+     BUF_FORMAT_8_8_8_8_USCALED_GFX11,
+     BUF_FORMAT_8_8_8_8_SSCALED_GFX11,
+     BUF_FORMAT_8_8_8_8_UINT_GFX11,
+     BUF_FORMAT_8_8_8_8_SINT_GFX11,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
+
+    // BUF_DATA_FORMAT_32_32
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_UINT_GFX11,
+     BUF_FORMAT_32_32_SINT_GFX11,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_FLOAT_GFX11},
+
+    // BUF_DATA_FORMAT_16_16_16_16
+    {BUF_FORMAT_16_16_16_16_UNORM_GFX11,
+     BUF_FORMAT_16_16_16_16_SNORM_GFX11,
+     BUF_FORMAT_16_16_16_16_USCALED_GFX11,
+     BUF_FORMAT_16_16_16_16_SSCALED_GFX11,
+     BUF_FORMAT_16_16_16_16_UINT_GFX11,
+     BUF_FORMAT_16_16_16_16_SINT_GFX11,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_16_16_16_16_FLOAT_GFX11},
+
+    // BUF_DATA_FORMAT_32_32_32
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_32_UINT_GFX11,
+     BUF_FORMAT_32_32_32_SINT_GFX11,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_32_FLOAT_GFX11},
+
+    // BUF_DATA_FORMAT_32_32_32_32
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_32_32_UINT_GFX11,
+     BUF_FORMAT_32_32_32_32_SINT_GFX11,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_32_32_32_32_FLOAT_GFX11},
+
+    // BUF_DATA_FORMAT_RESERVED_15
+    {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID},
+};
+// clang-format on
+#endif
 
 char LegacyLowerVertexFetch::ID = 0;
 
@@ -905,6 +1084,13 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
     assert(nfmt < sizeof(m_vertexFormatMapGfx10[0]) / sizeof(m_vertexFormatMapGfx10[0][0]));
     format = m_vertexFormatMapGfx10[dfmt][nfmt];
     break;
+#if LLPC_BUILD_GFX11
+  case 11:
+    assert(dfmt < sizeof(m_vertexFormatMapGfx11) / sizeof(m_vertexFormatMapGfx11[0]));
+    assert(nfmt < sizeof(m_vertexFormatMapGfx11[0]) / sizeof(m_vertexFormatMapGfx11[0][0]));
+    format = m_vertexFormatMapGfx11[dfmt][nfmt];
+    break;
+#endif
   }
   return format;
 }

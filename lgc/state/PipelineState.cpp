@@ -1273,6 +1273,10 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
       } else if (hasShaderStage(ShaderStageGeometry)) {
         // Legacy (non-NGG) hardware path for GS does not support wave32.
         waveSize = 64;
+#if LLPC_BUILD_GFX11
+        if (getTargetInfo().getGfxIpVersion().major >= 11)
+          waveSize = 32;
+#endif
       }
 
       // Experimental data from performance tuning show that wave64 is more efficient than wave32 in most cases for CS
@@ -1353,6 +1357,28 @@ bool PipelineState::enableMeshRowExport() const {
 
   return m_meshRowExport;
 }
+
+#if LLPC_BUILD_GFX11
+// =====================================================================================================================
+// Checks if SW-emulated stream-out should be enabled.
+bool PipelineState::enableSwXfb() const {
+  assert(isGraphics());
+
+  // SW-emulated stream-out is enabled on GFX11+
+  if (getTargetInfo().getGfxIpVersion().major < 11)
+    return false;
+
+  auto lastVertexStage = getLastVertexProcessingStage();
+  lastVertexStage = lastVertexStage == ShaderStageCopyShader ? ShaderStageGeometry : lastVertexStage;
+
+  if (lastVertexStage == ShaderStageInvalid) {
+    assert(isUnlinked()); // Unlinked pipeline only having fragment shader.
+    return false;
+  }
+
+  return const_cast<PipelineState *>(this)->getShaderResourceUsage(lastVertexStage)->inOutUsage.enableXfb;
+}
+#endif
 
 // =====================================================================================================================
 // Gets resource usage of the specified shader stage
@@ -1549,6 +1575,21 @@ StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
     return "unknown";
   }
 }
+
+#if LLPC_BUILD_GFX11
+// =====================================================================================================================
+// Determine whether can use tessellation factor optimization
+bool PipelineState::canOptimizeTessFactor() {
+  if (getTargetInfo().getGfxIpVersion().major < 11)
+    return false;
+  auto resUsage = getShaderResourceUsage(ShaderStageTessControl);
+  auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
+  // Disable tessellation factor optimization if TFs are read in TES or TCS
+  if (perPatchBuiltInOutLocMap.count(BuiltInTessLevelOuter) || perPatchBuiltInOutLocMap.count(BuiltInTessLevelInner))
+    return false;
+  return getOptions().optimizeTessFactor;
+}
+#endif
 
 // =====================================================================================================================
 // Set the packable state of generic input/output

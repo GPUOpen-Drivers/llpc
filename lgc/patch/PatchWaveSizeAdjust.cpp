@@ -32,6 +32,9 @@
 #include "lgc/patch/Patch.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/InstIterator.h"
+#if LLPC_BUILD_GFX11
+#include "llvm/IR/IntrinsicInst.h"
+#endif
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
 
@@ -97,8 +100,79 @@ bool PatchWaveSizeAdjust::runImpl(Module &module, PipelineState *pipelineState) 
     }
   }
 
+#if LLPC_BUILD_GFX11
+  if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
+    // Prefer Wave64 when 16-bit arithmetic is used by the shader.
+    // Except when API subgroup size requirements require Wave32 or tuning option specifies wave32.
+    // Check if there are any 16-bit arithmetic operations per-stage.
+    bool stageChecked[ShaderStageCount] = {};
+    for (auto &func : module) {
+      auto shaderStage = lgc::getShaderStage(&func);
+      if (shaderStage == ShaderStageInvalid || stageChecked[shaderStage])
+        continue;
+      if (pipelineState->getShaderWaveSize(shaderStage) == 32) {
+        const auto &shaderOptions = pipelineState->getShaderOptions(shaderStage);
+        if ((pipelineState->getShaderModes()->getAnyUseSubgroupSize() && shaderOptions.subgroupSize != 0) ||
+            shaderOptions.waveSize != 0)
+          continue;
+        bool hasAny16BitArith = false;
+        for (inst_iterator instIter = inst_begin(&func); instIter != inst_end(&func); ++instIter) {
+          if (is16BitArithmeticOp(&*instIter)) {
+            hasAny16BitArith = true;
+            stageChecked[shaderStage] = true;
+            break;
+          }
+        }
+        if (hasAny16BitArith)
+          pipelineState->setShaderWaveSize(shaderStage, 64);
+      }
+    }
+  }
+#endif
   return false;
 }
+
+#if LLPC_BUILD_GFX11
+// =====================================================================================================================
+// Check if the given instruction is a 16-bit arithmetic operation
+//
+// @param inst : The instruction
+bool PatchWaveSizeAdjust::is16BitArithmeticOp(Instruction *inst) {
+  if (dyn_cast<BinaryOperator>(inst) || dyn_cast<UnaryOperator>(inst))
+    return true;
+  if (auto intrinsicInst = dyn_cast<IntrinsicInst>(inst)) {
+    Intrinsic::ID intrinsicId = intrinsicInst->getIntrinsicID();
+    switch (intrinsicId) {
+    case Intrinsic::rint:
+    case Intrinsic::trunc:
+    case Intrinsic::fabs:
+    case Intrinsic::floor:
+    case Intrinsic::ceil:
+    case Intrinsic::sin:
+    case Intrinsic::cos:
+    case Intrinsic::exp2:
+    case Intrinsic::log2:
+    case Intrinsic::sqrt:
+    case Intrinsic::minnum:
+    case Intrinsic::maxnum:
+    case Intrinsic::umin:
+    case Intrinsic::smin:
+    case Intrinsic::umax:
+    case Intrinsic::smax:
+    case Intrinsic::fma:
+    case Intrinsic::amdgcn_fract:
+    case Intrinsic::amdgcn_frexp_mant:
+    case Intrinsic::amdgcn_frexp_exp:
+    case Intrinsic::amdgcn_fmed3:
+    case Intrinsic::amdgcn_ldexp:
+      return true;
+    default:
+      return false;
+    }
+  }
+  return false;
+}
+#endif
 
 // =====================================================================================================================
 // Initializes the pass

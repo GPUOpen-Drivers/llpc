@@ -160,10 +160,24 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     //   void copyShader(
     //     i32 vertexIndex)
     //
+#if LLPC_BUILD_GFX11
+    // GFX11+:
+    //   void copyShader(
+    //     i32 inreg globalTable,
+    //     i32 inreg streamOutTable,
+    //     i32 inreg streamOutControlBuf,
+    //     i32 vertexId)
+#endif
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
       argTys = {int32Ty};
       argInReg = {false};
       argNames = {"vertexId"};
+#if LLPC_BUILD_GFX11
+    } else {
+      argTys = {int32Ty, int32Ty, int32Ty, int32Ty};
+      argInReg = {true, true, true, false};
+      argNames = {"globalTable", "streamOutTable", "streamOutControlBuf", "vertexId"};
+#endif
     }
   }
 
@@ -211,6 +225,10 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
       // If NGG, esGsLdsSize is not used
       intfData->userDataUsage.gs.copyShaderEsGsLdsSize = InvalidValue;
       intfData->userDataUsage.gs.copyShaderStreamOutTable = 1;
+#if LLPC_BUILD_GFX11
+      if (m_pipelineState->enableSwXfb())
+        intfData->userDataUsage.gs.copyShaderStreamOutControlBuf = 2;
+#endif
     }
   }
 
@@ -308,6 +326,9 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
       //   return
       // }
       //
+#if LLPC_BUILD_GFX11
+      assert(gfxIp.major >= 11); // Must be GFX11+
+#endif
       for (unsigned streamId = 0; streamId < MaxGsStreams; ++streamId) {
         if (resUsage->inOutUsage.gs.outLocCount[streamId] > 0)
           exportOutput(streamId, builder);
@@ -701,6 +722,15 @@ void PatchCopyShader::exportXfbOutput(Value *outputValue, const XfbOutInfo &xfbO
     }
   }
 
+#if LLPC_BUILD_GFX11
+  // Collect transform feedback output export calls, used in SW-emulated stream-out.
+  if (m_pipelineState->enableSwXfb()) {
+    auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage;
+    // A transform feedback output export call is expected to be <4 x dword> at most
+    inOutUsage.xfbOutputExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
+  }
+#endif
+
   Value *args[] = {builder.getInt32(xfbOutInfo.xfbBuffer), builder.getInt32(xfbOutInfo.xfbOffset),
                    builder.getInt32(xfbOutInfo.streamId), outputValue};
 
@@ -729,6 +759,14 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
     auto &locInfoXfbOutInfoMap = resUsage->inOutUsage.locInfoXfbOutInfoMap;
     const auto &locInfoXfbOutInfoMapIt = locInfoXfbOutInfoMap.find(outLocInfo);
     if (locInfoXfbOutInfoMapIt != locInfoXfbOutInfoMap.end()) {
+#if LLPC_BUILD_GFX11
+      // Collect transform feedback output export calls, used in SW-emulated stream-out.
+      if (m_pipelineState->enableSwXfb()) {
+        auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage;
+        // A transform feedback output export call is expected to be <4 x dword> at most
+        inOutUsage.xfbOutputExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
+      }
+#endif
 
       const auto &xfbOutInfo = locInfoXfbOutInfoMapIt->second;
       std::string instName(lgcName::OutputExportXfb);

@@ -318,6 +318,11 @@ GlobalVariable *MeshTaskShader::getOrCreateMeshLds(Module *module, unsigned mesh
 // @param pipelineState : Pipeline state
 // @returns : The flag indicating whether flat workgroup ID is used.
 unsigned MeshTaskShader::useFlatWorkgroupId(PipelineState *pipelineState) {
+#if LLPC_BUILD_GFX11
+  // NOTE: For GFX11+, HW will provide workgroup ID via SGPRs. We don't need flat workgroup ID to do emulation.
+  if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 11)
+    return false;
+#endif
 
   const auto &builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageMesh)->builtInUsage.mesh;
   return builtInUsage.workgroupId || builtInUsage.globalInvocationId;
@@ -623,6 +628,11 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
                                m_builder->CreateMul(loopIndexPhi, m_builder->getInt32(waveSize)), "primitiveIndex");
     }
 
+#if LLPC_BUILD_GFX11
+    if (m_gfxIp.major >= 11)
+      prepareAttribRingAccess();
+#endif
+
     auto validPrimitive =
         m_builder->CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(meshMode.outputPrimitives));
     m_builder->CreateCondBr(validPrimitive, initPrimitiveIndicesBodyBlock, endInitPrimitiveIndicesBlock);
@@ -851,6 +861,14 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       m_waveThreadInfo.primOrVertexIndex =
           m_builder->CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
                                m_builder->CreateMul(loopIndexPhi, m_builder->getInt32(waveSize)), "primitiveIndex");
+
+#if LLPC_BUILD_GFX11
+      if (m_gfxIp.major >= 11) {
+        // rowInSubgroup = waveIdInSubgroup + loopIndex
+        m_waveThreadInfo.rowInSubgroup =
+            m_builder->CreateAdd(m_waveThreadInfo.waveIdInSubgroup, loopIndexPhi, "rowInSubgroup");
+      }
+#endif
     }
 
     auto validPrimitive = m_builder->CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, primitiveCount);
@@ -867,6 +885,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       //
       //   loopIndex = 0
       //   primitiveIndex = threadIdInSubgroup
+#if LLPC_BUILD_GFX11
+      //   rowInSubgroup = waveIdInSubgroup
+#endif
       //
       //   while (primitiveIndex < primitiveCount) {
       //     Export primitive
@@ -874,6 +895,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       //
       //     loopIndex += numWaves
       //     primitiveIndex += loopIndex * waveSize
+#if LLPC_BUILD_GFX11
+      //     rowInSubgroup += loopIndex
+#endif
       //   }
       //
       auto loopIndex = m_builder->CreateAdd(loopIndexPhi, m_builder->getInt32(numWaves)); // loopIndex += numWaves
@@ -903,6 +927,14 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       m_waveThreadInfo.primOrVertexIndex =
           m_builder->CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
                                m_builder->CreateMul(loopIndexPhi, m_builder->getInt32(waveSize)), "vertexIndex");
+
+#if LLPC_BUILD_GFX11
+      if (m_gfxIp.major >= 11) {
+        // rowInSubgroup = waveIdInSubgroup + loopIndex
+        m_waveThreadInfo.rowInSubgroup =
+            m_builder->CreateAdd(m_waveThreadInfo.waveIdInSubgroup, loopIndexPhi, "rowInSubgroup");
+      }
+#endif
     }
 
     auto validVertex = m_builder->CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, vertexCount);
@@ -919,6 +951,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       //
       //   loopIndex = 0
       //   vertexIndex = threadIdInSubgroup
+#if LLPC_BUILD_GFX11
+      //   rowInSubgroup = waveIdInSubgroup
+#endif
       //
       //   while (vertexIndex < vertexCount) {
       //     Export vertex position data
@@ -926,6 +961,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       //
       //     loopIndex += numWaves
       //     vertexIndex += loopIndex * waveSize
+#if LLPC_BUILD_GFX11
+      //     rowInSubgroup += loopIndex
+#endif
       //   }
       //
       auto loopIndex = m_builder->CreateAdd(loopIndexPhi, m_builder->getInt32(numWaves)); // loopIndex += numWaves
@@ -1295,6 +1333,27 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
 
     m_waveThreadInfo.primOrVertexIndex =
         m_waveThreadInfo.threadIdInSubgroup; // Primitive or vertex index is initialized to thread ID in subgroup
+
+#if LLPC_BUILD_GFX11
+    if (m_gfxIp.major >= 11) {
+      // The workgroup ID X and Y are reused via the SGPR of off-chip LDS base in NGG new fast launch mode
+      Value *workgroupIdYX =
+          getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase));
+      // workgroupIdY = workgroupIdXY[31:16]
+      m_waveThreadInfo.workgroupIdY =
+          m_builder->CreateAnd(m_builder->CreateLShr(workgroupIdYX, 16), 0xFFFF, "workgroupIdY");
+      // workgroupIdX = workgroupIdXY[15:0]
+      m_waveThreadInfo.workgroupIdX = m_builder->CreateAnd(workgroupIdYX, 0xFFFF, "workgroupIdX");
+      // workgroupIdZ = attribRingBaseAndWorkgroupIdZ[31:16]
+      Value *workgroupIdZAndAttribRingBase =
+          getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
+      m_waveThreadInfo.workgroupIdZ =
+          m_builder->CreateAnd(m_builder->CreateLShr(workgroupIdZAndAttribRingBase, 16), 0xFFFF, "workgroupIdZ");
+
+      m_waveThreadInfo.rowInSubgroup =
+          m_waveThreadInfo.waveIdInSubgroup; // Row number is initialized to wave ID in subgroup
+    }
+#endif
   }
 }
 
@@ -1534,9 +1593,22 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
       "offChipLdsBase",    "sharedScratchOffset", "gsShaderAddrLow", "gsShaderAddrHigh",
   };
 
+#if LLPC_BUILD_GFX11
+  // GFX10 special SGPR input names
+  static const SmallVector<std::string, NumSpecialSgprInputs> SpecialSgprInputNamesGfx11 = {
+      "gsProgramAddrLow", "gsProgramAddrHigh", "mergedGroupInfo",
+      "mergedWaveInfo",   "workgroupIdYX",     "workgroupIdZAndAttribRingBase",
+      "flatScratchLow",   "flatScratchHigh",
+  };
+#endif
+
   ArrayRef<std::string> specialSgprInputNames;
   if (m_gfxIp.major == 10)
     specialSgprInputNames = makeArrayRef(SpecialSgprInputNamesGfx10);
+#if LLPC_BUILD_GFX11
+  else if (m_gfxIp.major == 11)
+    specialSgprInputNames = makeArrayRef(SpecialSgprInputNamesGfx11);
+#endif
   assert(specialSgprInputNames.size() == NumSpecialSgprInputs);
 
   // Add special SGPR inputs, prior to existing user data SGPRs
@@ -1950,6 +2022,15 @@ void MeshTaskShader::exportPrimitive() {
   //   | VRS Rate Y | VRS Rate X | Unused  | Viewport Index | RT Slice Index | Pipeline Prim ID |
   //   | [31:30]    | [29:28]    | [27:24] | [23:20]        | [19:17]        | [16:0]           |
   //   +------------+------------+---------+----------------+----------------+------------------+
+#if LLPC_BUILD_GFX11
+  //
+  // On GFX11, the bit layout is changed:
+  //
+  //   +---------------+---------+----------------+---------+----------------+
+  //   | VRS Rate Enum | Unused  | Viewport Index | Unused  | RT Slice Index |
+  //   | [31:28]       | [27:24] | [23:20]        | [19:13] | [12:0]         |
+  //   +---------------+---------+----------------+---------+----------------+
+#endif
   Value *primitivePayload = nullptr;
   Value *primitiveId = nullptr;
   if (builtInUsage.primitiveId) {
@@ -1977,12 +2058,20 @@ void MeshTaskShader::exportPrimitive() {
   }
 
   if (enableMultiView || builtInUsage.layer) {
+#if LLPC_BUILD_GFX11
+    // [19:17] = RT slice index (on GFX11, [12:0] = RT slice index)
+#else
     // [19:17] = RT slice index
+#endif
     // When multi-view is enabled, the input view index is treated as the output layer.
     Value *layerMaskAndShift = nullptr;
     if (m_gfxIp.major < 11) {
       layerMaskAndShift = m_builder->CreateAnd(enableMultiView ? viewIndex : layer, 0x7);
       layerMaskAndShift = m_builder->CreateShl(layerMaskAndShift, 17);
+#if LLPC_BUILD_GFX11
+    } else {
+      layerMaskAndShift = m_builder->CreateAnd(enableMultiView ? viewIndex : layer, 0x1FFF);
+#endif
     }
     if (primitivePayload)
       primitivePayload = m_builder->CreateOr(primitivePayload, layerMaskAndShift);
@@ -2179,6 +2268,10 @@ void MeshTaskShader::exportVertex() {
   }
 
   bool waAtmPrecedesPos = false;
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11)
+    waAtmPrecedesPos = m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waAtmPrecedesPos;
+#endif
 
   if (!waAtmPrecedesPos)
     doExport(ExportKind::Pos, posExports);
@@ -2379,7 +2472,53 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
     if ((kind == ExportKind::Pos || kind == ExportKind::Prim) && i == exports.size() - 1)
       exportDone = true; // Last export
 
+#if LLPC_BUILD_GFX11
+    if (m_gfxIp.major >= 11) {
+      if (kind == ExportKind::Pos || kind == ExportKind::Prim) {
+        m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp_row, valueTy,
+                                   {
+                                       m_builder->getInt32(target + exports[i].index), // tgt
+                                       m_builder->getInt32(validMask),                 // en
+                                       values[0],                                      // src0
+                                       values[1] ? values[1] : undef,                  // src1
+                                       values[2] ? values[2] : undef,                  // src2
+                                       values[3] ? values[3] : undef,                  // src3
+                                       m_builder->getInt1(exportDone),                 // done
+                                       m_waveThreadInfo.rowInSubgroup,                 // row number
+                                   });
+      } else {
+        assert(kind == ExportKind::VertAttr || kind == ExportKind::PrimAttr);
+
+        Value *valueToStore = UndefValue::get(FixedVectorType::get(valueTy, 4));
+        for (unsigned j = 0; j < 4; ++j) {
+          if (values[j])
+            valueToStore = m_builder->CreateInsertElement(valueToStore, values[j], j);
+        }
+
+        // ringOffset = attribRingBaseOffset + 32 * exportIndex * 16
+        //            = attribRingBaseOffset + exportIndex * 512
+        unsigned exportIndex = exports[i].index;
+        if (kind == ExportKind::PrimAttr && m_hasNoVertexAttrib) {
+          // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and
+          // PRIM_EXPORT_COUNT. When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even
+          // though this is not what we want. Hence, we should reserve param0 as a dummy vertex attribute and all
+          // primitive attributes are moved after it.
+          ++exportIndex;
+        }
+        auto ringOffset =
+            m_builder->CreateAdd(m_attribRingBaseOffset, m_builder->getInt32(AttribGranularity * exportIndex));
+
+        CoherentFlag coherent = {};
+        coherent.bits.glc = true;
+
+        m_builder->CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, valueToStore->getType(),
+                                   {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.threadIdInSubgroup,
+                                    m_builder->getInt32(0), ringOffset, m_builder->getInt32(coherent.u32All)});
+      }
+    } else {
+#else
     {
+#endif
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, valueTy,
                                  {
                                      m_builder->getInt32(target + exports[i].index), // tgt
@@ -2394,6 +2533,67 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
     }
   }
 }
+
+#if LLPC_BUILD_GFX11
+// =====================================================================================================================
+// Prepare attribute ring access by collecting attribute count, modifying the STRIDE field of attribute ring buffer
+// descriptor, and calculating subgroup's attribute ring base offset.
+void MeshTaskShader::prepareAttribRingAccess() {
+  assert(m_gfxIp.major >= 11); // Must be GFX11+
+
+  // The allocated numbers of vertex/primitive attributes are something as follow:
+  //   1. Generic vertex attributes
+  //   2. Vertex attributes mapped from vertex builtins
+  //   3. Generic primitive attributes
+  //   4. Primitive attributes mapped from primitive builtins
+  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage.mesh;
+  unsigned vertAttribCount = inOutUsage.genericOutputMapLocCount;
+  for (auto &builtInExport : inOutUsage.builtInExportLocs) {
+    const unsigned exportLoc = builtInExport.second;
+    vertAttribCount = std::max(vertAttribCount, exportLoc + 1);
+  }
+
+  unsigned primAttribCount = inOutUsage.perPrimitiveGenericOutputMapLocCount;
+  for (auto &perPrimitiveBuiltInExport : inOutUsage.perPrimitiveBuiltInExportLocs) {
+    const unsigned exportLoc = perPrimitiveBuiltInExport.second;
+    primAttribCount = std::max(primAttribCount, exportLoc + 1);
+  }
+
+  unsigned attribCount = vertAttribCount + primAttribCount;
+  if (attribCount == 0)
+    return; // No attribute export
+
+  // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and PRIM_EXPORT_COUNT.
+  // When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even though this is not what we
+  // want. Hence, we should reserve param0 as a dummy vertex attribute.
+  if (vertAttribCount == 0) {
+    m_hasNoVertexAttrib = true;
+    ++attribCount; // Count in this dummy vertex attribute
+  }
+
+  // attribRingBase[14:0]
+  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  Value *attribRingBase =
+      getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
+  attribRingBase = m_builder->CreateAnd(attribRingBase, 0x7FFF);
+  m_attribRingBaseOffset =
+      m_builder->CreateMul(attribRingBase, m_builder->getInt32(AttribGranularity), "attribRingBaseOffset");
+
+  m_attribRingBufDesc = m_pipelineSysValues.get(entryPoint)->getAttribRingBufDesc();
+
+  // Modify the field STRIDE of attribute ring buffer descriptor
+  if (attribCount >= 2) {
+    // STRIDE = WORD1[30:16], STRIDE is multiplied by attribute count
+    auto descWord1 = m_builder->CreateExtractElement(m_attribRingBufDesc, 1);
+    auto stride = m_builder->CreateAnd(m_builder->CreateLShr(descWord1, 16), 0x3FFF);
+    stride = m_builder->CreateMul(stride, m_builder->getInt32(attribCount));
+
+    descWord1 = m_builder->CreateAnd(descWord1, ~0x3FFF0000);                     // Clear STRIDE
+    descWord1 = m_builder->CreateOr(descWord1, m_builder->CreateShl(stride, 16)); // Set new STRIDE
+    m_attribRingBufDesc = m_builder->CreateInsertElement(m_attribRingBufDesc, descWord1, 1);
+  }
+}
+#endif
 
 // =====================================================================================================================
 // Get the flat workgroup ID of mesh shader.
@@ -2436,7 +2636,19 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
   assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
 
   if (!m_meshWorkgroupId) {
+#if LLPC_BUILD_GFX11
+    if (m_gfxIp.major >= 11) {
+      Value *workgroupId = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
+      workgroupId =
+          m_builder->CreateInsertElement(workgroupId, m_waveThreadInfo.workgroupIdX, static_cast<uint64_t>(0));
+      workgroupId = m_builder->CreateInsertElement(workgroupId, m_waveThreadInfo.workgroupIdY, 1);
+      workgroupId = m_builder->CreateInsertElement(workgroupId, m_waveThreadInfo.workgroupIdZ, 2);
+
+      m_meshWorkgroupId = workgroupId;
+    } else {
+#else
     {
+#endif
       // flatWorkgroupId = workgroupId.z * dispatchDims.x * dispatchDims.y +
       //                   workgroupId.y * dispatchDims.x + workgroupId.x
       //
@@ -2667,6 +2879,60 @@ Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
 // @param primitiveShadingRate : Primitive shading rate from API
 // @returns : HW-specific shading rate
 Value *MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
+#if LLPC_BUILD_GFX11
+  if (m_gfxIp.major >= 11) {
+    // NOTE: In GFX11, the graphics pipeline is to support VRS rates till 4x4 which includes 2x4 and 4x2 along with
+    // the legacy rates. And 1x4 and 4x1 are not supported, hence clamp 1x4 and 4x1 to 1x2 and 2x1 respectively.
+    // The HW shading rate representations are enumerations as following:
+    //
+    //   SHADING_RATE_1x1  0x0
+    //   SHADING_RATE_1x2  0x1
+    //   SHADING_RATE_2x1  0x4
+    //   SHADING_RATE_2x2  0x5
+    //   SHADING_RATE_2x4  0x6
+    //   SHADING_RATE_4x2  0x9
+    //   SHADING_RATE_4x4  0xA
+    //
+    // The shading rate is mapped as follow:
+    //
+    //   HorizontalNone    | VerticalNone    (1x1) = 0b0000 -> 0b0000 = 0x0
+    //   HorizontalNone    | Vertical2Pixels (1x2) = 0b0001 -> 0b0001 = 0x1
+    //   HorizontalNone    | Vertical4Pixels (1x4) = 0b0010 -> 0b0001 = 0x1 (clamped)
+    //   Horizontal2Pixels | VerticalNone    (2x1) = 0b0100 -> 0b0100 = 0x4
+    //   Horizontal2Pixels | Vertical2Pixels (2x2) = 0b0101 -> 0b0101 = 0x5
+    //   Horizontal2Pixels | Vertical4Pixels (2x4) = 0b0110 -> 0b0110 = 0x6
+    //   Horizontal4Pixels | VerticalNone    (4x1) = 0b1000 -> 0b0100 = 0x4 (clamped)
+    //   Horizontal4Pixels | Vertical2Pixels (4x2) = 0b1001 -> 0b1001 = 0x9
+    //   Horizontal4Pixels | Vertical4Pixels (4x4) = 0b1010 -> 0b1010 = 0xA
+    //
+
+    enum : unsigned {
+      HwShadingRate1x1 = 0x0,
+      HwShadingRate1x2 = 0x1,
+      HwShadingRate2x1 = 0x4,
+      HwShadingRate2x2 = 0x5,
+      HwShadingRate2x4 = 0x6,
+      HwShadingRate4x2 = 0x9,
+      HwShadingRate4x4 = 0xA,
+    };
+
+    // hwShadingRate = primitiveShadingRate & (Horizontal2Pixels | Horizontal4Pixels |
+    //                                         Vertical2Pixels | Vertical4Pixels)
+    auto hwShadingRate = m_builder->CreateAnd(
+        primitiveShadingRate, m_builder->getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels |
+                                                  ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
+
+    // hwShadingRate = hwShadingRate == 1x4 ? 1x2 : hwShadingRate
+    Value *isRate1x4 = m_builder->CreateICmpEQ(hwShadingRate, m_builder->getInt32(ShadingRateVertical4Pixels));
+    hwShadingRate = m_builder->CreateSelect(isRate1x4, m_builder->getInt32(HwShadingRate1x2), hwShadingRate);
+
+    // hwShadingRate = hwShadingRate == 4x1 ? 2x1 : hwShadingRate
+    Value *isRate4x1 = m_builder->CreateICmpEQ(hwShadingRate, m_builder->getInt32(ShadingRateHorizontal4Pixels));
+    hwShadingRate = m_builder->CreateSelect(isRate4x1, m_builder->getInt32(HwShadingRate2x1), hwShadingRate);
+
+    return hwShadingRate;
+  }
+#endif
 
   assert(m_gfxIp.isGfx(10, 3)); // Must be GFX10.3
 

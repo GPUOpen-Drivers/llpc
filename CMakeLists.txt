@@ -56,6 +56,18 @@ else()
     target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=LLPC_INTERFACE_MAJOR_VERSION)
 endif()
 
+#if VKI_BUILD_GFX11
+if(LLPC_BUILD_GFX11)
+    target_compile_definitions(vkgc_headers INTERFACE VKI_BUILD_GFX11)
+endif()
+#endif
+
+#if VKI_BUILD_NAVI31
+if(LLPC_BUILD_NAVI31)
+    target_compile_definitions(vkgc_headers INTERFACE LLPC_BUILD_NAVI31)
+endif()
+#endif
+
 #if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
     target_compile_definitions(vkgc_headers INTERFACE VKI_RAY_TRACING)
