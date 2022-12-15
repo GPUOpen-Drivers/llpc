@@ -6127,9 +6127,7 @@ void NggPrimShader::processXfbOutputExport(Module *module, Argument *sysValueSta
   }
 
   // Construct ".prepareXfbExport" block
-  const bool hasTs = m_hasTcs || m_hasTes;
-  const auto &xfbStrides =
-      m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex)->inOutUsage.xfbStrides;
+  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
   {
     m_builder->SetInsertPoint(prepareXfbExportBlock);
 
@@ -6749,8 +6747,8 @@ void NggPrimShader::processGsXfbOutputExport(Module *module, Argument *sysValueS
   }
 
   // Construct ".prepareXfbExport" block
-  const auto &streamXfbBuffers = inOutUsage.streamXfbBuffers;
-  const auto &xfbStrides = inOutUsage.xfbStrides;
+  const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
+  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
   {
     m_builder->SetInsertPoint(prepareXfbExportBlock);
 

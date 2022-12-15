@@ -1494,12 +1494,12 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   // Build SW stream-out configuration (GFX11+)
   //
   if (m_pipelineState->enableSwXfb()) {
-    auto resUsage = hasGs ? gsResUsage : (hasTs ? tesResUsage : vsResUsage);
+    const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
     std::array<unsigned, MaxTransformFeedbackBuffers> xfbStridesInDwords;
     for (unsigned i = 0; i < xfbStridesInDwords.size(); ++i) {
       // Must be multiple of dword (PAL doesn't support 16-bit transform feedback outputs)
-      assert(resUsage->inOutUsage.xfbStrides[i] % sizeof(unsigned) == 0);
-      xfbStridesInDwords[i] = resUsage->inOutUsage.xfbStrides[i] / sizeof(unsigned);
+      assert(xfbStrides[i] % sizeof(unsigned) == 0);
+      xfbStridesInDwords[i] = xfbStrides[i] / sizeof(unsigned);
     }
     setStreamOutVertexStrides(xfbStridesInDwords); // Set SW stream-out vertex strides
   }
