@@ -1376,7 +1376,7 @@ bool PipelineState::enableSwXfb() const {
     return false;
   }
 
-  return const_cast<PipelineState *>(this)->getShaderResourceUsage(lastVertexStage)->inOutUsage.enableXfb;
+  return enableXfb();
 }
 #endif
 
