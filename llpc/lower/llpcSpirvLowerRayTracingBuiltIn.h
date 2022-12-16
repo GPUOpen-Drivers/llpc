@@ -72,20 +72,4 @@ private:
   llvm::Value *m_dispatchRaysInfoDesc;                 // Descriptor of the DispatchRaysInfo
 };
 
-// =====================================================================================================================
-// Represents the pass of SPIR-V lowering ray tracing.
-class LegacySpirvLowerRayTracingBuiltIn : public llvm::ModulePass {
-public:
-  LegacySpirvLowerRayTracingBuiltIn();
-
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerRayTracingBuiltIn(const LegacySpirvLowerRayTracingBuiltIn &) = delete;
-  LegacySpirvLowerRayTracingBuiltIn &operator=(const LegacySpirvLowerRayTracingBuiltIn &) = delete;
-
-  SpirvLowerRayTracingBuiltIn Impl;
-};
 } // namespace Llpc

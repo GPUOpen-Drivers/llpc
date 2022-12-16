@@ -180,29 +180,7 @@ static_assert(lgc::ShadingRateHorizontal4Pixels ==
               "Shading rate flag mismatch");
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacySpirvLowerGlobal::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering operations for globals
-ModulePass *createLegacySpirvLowerGlobal() {
-  return new LegacySpirvLowerGlobal();
-}
-
-// =====================================================================================================================
 SpirvLowerGlobal::SpirvLowerGlobal() : m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false) {
-}
-
-// =====================================================================================================================
-LegacySpirvLowerGlobal::LegacySpirvLowerGlobal() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
-bool LegacySpirvLowerGlobal::runOnModule(Module &module) {
-  return Impl.runImpl(module);
 }
 
 // =====================================================================================================================
@@ -2727,8 +2705,3 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
 }
 
 } // namespace Llpc
-
-// =====================================================================================================================
-// Initializes the pass of SPIR-V lowering operations for globals.
-INITIALIZE_PASS(LegacySpirvLowerGlobal, DEBUG_TYPE, "Lower SPIR-V globals (global variables, inputs, and outputs)",
-                false, false)

@@ -51,28 +51,6 @@ using namespace Llpc;
 namespace Llpc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacySpirvLowerTerminator::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering terminator operations
-ModulePass *createLegacySpirvLowerTerminator() {
-  return new LegacySpirvLowerTerminator();
-}
-
-// =====================================================================================================================
-LegacySpirvLowerTerminator::LegacySpirvLowerTerminator() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
-bool LegacySpirvLowerTerminator::runOnModule(Module &module) {
-  return Impl.runImpl(module);
-}
-
-// =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
@@ -168,7 +146,3 @@ void SpirvLowerTerminator::visitCallInst(CallInst &callInst) {
 }
 
 } // namespace Llpc
-
-// =====================================================================================================================
-// Initializes the pass of SPIR-V lowering terminator operations..
-INITIALIZE_PASS(LegacySpirvLowerTerminator, DEBUG_TYPE, "Lower SPIR-V terminator", false, false)

@@ -46,23 +46,4 @@ public:
   static llvm::StringRef name() { return "Include LLVM IR as a separate section in the ELF binary"; }
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patch operations of including LLVM IR as a separate section in the ELF binary.
-class LegacyPatchLlvmIrInclusion : public LegacyPatch {
-public:
-  LegacyPatchLlvmIrInclusion();
-
-  bool runOnModule(llvm::Module &module) override;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override { analysisUsage.setPreservesAll(); }
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchLlvmIrInclusion(const LegacyPatchLlvmIrInclusion &) = delete;
-  LegacyPatchLlvmIrInclusion &operator=(const LegacyPatchLlvmIrInclusion &) = delete;
-
-  PatchLlvmIrInclusion m_impl;
-};
-
 } // namespace lgc

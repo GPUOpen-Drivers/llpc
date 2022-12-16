@@ -56,29 +56,6 @@ extern opt<bool> InRegEsGsLdsSize;
 using namespace lgc;
 using namespace llvm;
 
-char LegacyPatchCopyShader::ID = 0;
-
-// =====================================================================================================================
-// Create pass to generate copy shader if required.
-ModulePass *lgc::createLegacyPatchCopyShader() {
-  return new LegacyPatchCopyShader();
-}
-
-// =====================================================================================================================
-LegacyPatchCopyShader::LegacyPatchCopyShader() : llvm::ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchCopyShader::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
-  return m_impl.runImpl(module, pipelineShaders, pipelineState);
-}
-
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
@@ -785,7 +762,3 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
     builder.CreateNamedCall(callName, builder.getVoidTy(), args, {});
   }
 }
-
-// =====================================================================================================================
-// Initializes the pass
-INITIALIZE_PASS(LegacyPatchCopyShader, DEBUG_TYPE, "Patch LLVM for copy shader generation", false, false)

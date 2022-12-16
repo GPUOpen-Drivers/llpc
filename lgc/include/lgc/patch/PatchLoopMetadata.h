@@ -62,22 +62,4 @@ private:
   GfxIpVersion m_gfxIp;
 };
 
-// =====================================================================================================================
-// Represents the LLVM pass for patching loop metadata.
-class LegacyPatchLoopMetadata : public llvm::LoopPass {
-public:
-  LegacyPatchLoopMetadata();
-
-  bool runOnLoop(llvm::Loop *loop, llvm::LPPassManager &loopPassMgr) override;
-
-  static char ID; // ID of this pass
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
-
-private:
-  PatchLoopMetadata m_impl;
-};
-
 } // namespace lgc

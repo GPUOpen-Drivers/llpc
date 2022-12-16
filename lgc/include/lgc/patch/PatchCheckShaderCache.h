@@ -40,8 +40,6 @@ namespace lgc {
 // Represents the pass of LLVM patching operations for checking shader cache
 class PatchCheckShaderCache : public Patch, public llvm::PassInfoMixin<PatchCheckShaderCache> {
 public:
-  // NOTE: This constructor is only used by the LegacyPatchCheckShaderCache class and can be removed once
-  // the switch to the new pass manager is completed.
   PatchCheckShaderCache() {}
 
   PatchCheckShaderCache(Pipeline::CheckShaderCacheFunc callbackFunc);
@@ -60,34 +58,6 @@ public:
 
 private:
   Pipeline::CheckShaderCacheFunc m_callbackFunc;
-};
-
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for checking shader cache
-class LegacyPatchCheckShaderCache : public llvm::ModulePass {
-public:
-  LegacyPatchCheckShaderCache();
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-  }
-
-  virtual bool runOnModule(llvm::Module &module) override;
-
-  // Set the callback function that this pass uses to ask the front-end whether it wants to remove
-  // any shader stages. The function takes the LLVM IR module and a per-shader-stage array of input/output
-  // usage checksums, and it returns the shader stage mask with bits removed for shader stages that it wants
-  // removed.
-  void setCallbackFunction(Pipeline::CheckShaderCacheFunc callbackFunc) { m_impl.setCallbackFunction(callbackFunc); }
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchCheckShaderCache(const LegacyPatchCheckShaderCache &) = delete;
-  LegacyPatchCheckShaderCache &operator=(const LegacyPatchCheckShaderCache &) = delete;
-
-  PatchCheckShaderCache m_impl;
 };
 
 } // namespace lgc

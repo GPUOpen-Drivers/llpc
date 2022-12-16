@@ -37,98 +37,11 @@
 namespace llvm {
 
 class PassBuilder;
-class PassRegistry;
 
-namespace legacy {
-
-class PassManager;
-
-} // namespace legacy
-
-void initializeLegacyLowerFragColorExportPass(PassRegistry &);
-void initializeLegacyLowerVertexFetchPass(PassRegistry &);
-void initializeLegacyPatchBufferOpPass(PassRegistry &);
-void initializeLegacyPatchCheckShaderCachePass(PassRegistry &);
-void initializeLegacyPatchCopyShaderPass(PassRegistry &);
-void initializeLegacyPatchEntryPointMutatePass(PassRegistry &);
-void initializeLegacyPatchInOutImportExportPass(PassRegistry &);
-void initializeLegacyPatchLlvmIrInclusionPass(PassRegistry &);
-void initializeLegacyPatchLoadScalarizerPass(PassRegistry &);
-void initializeLegacyPatchLoopMetadataPass(PassRegistry &);
-void initializeLegacyPatchNullFragShaderPass(PassRegistry &);
-void initializeLegacyPatchPeepholeOptPass(PassRegistry &);
-void initializeLegacyPatchPreparePipelineAbiPass(PassRegistry &);
-void initializeLegacyPatchResourceCollectPass(PassRegistry &);
-void initializeLegacyPatchSetupTargetFeaturesPass(PassRegistry &);
-void initializeLegacyPatchWorkaroundsPass(PassRegistry &);
-void initializeLegacyPatchReadFirstLanePass(PassRegistry &);
-void initializeLegacyPatchWaveSizeAdjustPass(PassRegistry &);
-void initializeLegacyPatchImageDerivativesPass(PassRegistry &);
-void initializeLegacyPatchInitializeWorkgroupMemoryPass(PassRegistry &);
-void initializeLegacyPatchInvariantLoadsPass(PassRegistry &);
-#if LLPC_BUILD_GFX11
-void initializeLegacyPatchImageOpCollectPass(PassRegistry &);
-#endif
 } // namespace llvm
 
 namespace lgc {
 
-class LegacyPatchCheckShaderCache;
-
-// Initialize passes for patching
-//
-// @param passRegistry : Pass registry
-inline void initializePatchPasses(llvm::PassRegistry &passRegistry) {
-  initializeLegacyLowerFragColorExportPass(passRegistry);
-  initializeLegacyLowerVertexFetchPass(passRegistry);
-  initializeLegacyPatchBufferOpPass(passRegistry);
-  initializeLegacyPatchCheckShaderCachePass(passRegistry);
-  initializeLegacyPatchCopyShaderPass(passRegistry);
-  initializeLegacyPatchEntryPointMutatePass(passRegistry);
-  initializeLegacyPatchInOutImportExportPass(passRegistry);
-  initializeLegacyPatchLlvmIrInclusionPass(passRegistry);
-  initializeLegacyPatchLoadScalarizerPass(passRegistry);
-  initializeLegacyPatchLoopMetadataPass(passRegistry);
-  initializeLegacyPatchNullFragShaderPass(passRegistry);
-  initializeLegacyPatchPeepholeOptPass(passRegistry);
-  initializeLegacyPatchPreparePipelineAbiPass(passRegistry);
-  initializeLegacyPatchResourceCollectPass(passRegistry);
-  initializeLegacyPatchSetupTargetFeaturesPass(passRegistry);
-  initializeLegacyPatchWorkaroundsPass(passRegistry);
-  initializeLegacyPatchReadFirstLanePass(passRegistry);
-  initializeLegacyPatchWaveSizeAdjustPass(passRegistry);
-  initializeLegacyPatchImageDerivativesPass(passRegistry);
-  initializeLegacyPatchInitializeWorkgroupMemoryPass(passRegistry);
-  initializeLegacyPatchInvariantLoadsPass(passRegistry);
-#if LLPC_BUILD_GFX11
-  initializeLegacyPatchImageOpCollectPass(passRegistry);
-#endif
-}
-
-llvm::ModulePass *createLegacyLowerFragColorExport();
-llvm::ModulePass *createLegacyLowerVertexFetch();
-llvm::FunctionPass *createLegacyPatchBufferOp();
-#if LLPC_BUILD_GFX11
-llvm::ModulePass *createLegacyPatchImageOpCollect();
-#endif
-LegacyPatchCheckShaderCache *createLegacyPatchCheckShaderCache();
-llvm::ModulePass *createLegacyPatchCopyShader();
-llvm::ModulePass *createLegacyPatchEntryPointMutate();
-llvm::ModulePass *createLegacyPatchInOutImportExport();
-llvm::ModulePass *createLegacyPatchLlvmIrInclusion();
-llvm::FunctionPass *createLegacyPatchLoadScalarizer();
-llvm::LoopPass *createLegacyPatchLoopMetadata();
-llvm::ModulePass *createLegacyPatchNullFragShader();
-llvm::FunctionPass *createLegacyPatchPeepholeOpt();
-llvm::ModulePass *createLegacyPatchPreparePipelineAbi();
-llvm::ModulePass *createLegacyPatchResourceCollect();
-llvm::ModulePass *createLegacyPatchSetupTargetFeatures();
-llvm::ModulePass *createLegacyPatchWorkarounds();
-llvm::FunctionPass *createLegacyPatchReadFirstLane();
-llvm::ModulePass *createLegacyPatchWaveSizeAdjust();
-llvm::ModulePass *createLegacyPatchImageDerivatives();
-llvm::ModulePass *createLegacyPatchInitializeWorkgroupMemory();
-llvm::FunctionPass *createLegacyPatchInvariantLoads();
 class PipelineState;
 class PassManager;
 
@@ -160,25 +73,6 @@ protected:
   llvm::LLVMContext *m_context; // Associated LLVM context of the LLVM module that passes run on
   ShaderStage m_shaderStage;    // Shader stage
   llvm::Function *m_entryPoint; // Entry-point
-};
-
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations, as the base class.
-class LegacyPatch : public llvm::ModulePass, public Patch {
-public:
-  explicit LegacyPatch(char &pid) : llvm::ModulePass(pid) {}
-  virtual ~LegacyPatch() {}
-
-  static void addPasses(PipelineState *pipelineState, llvm::legacy::PassManager &passMgr,
-                        llvm::ModulePass *replayerPass, llvm::Timer *patchTimer, llvm::Timer *optTimer,
-                        Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, llvm::CodeGenOpt::Level optLevel);
-
-private:
-  static void addOptimizationPasses(llvm::legacy::PassManager &passMgr, llvm::CodeGenOpt::Level optLevel);
-
-  LegacyPatch() = delete;
-  LegacyPatch(const LegacyPatch &) = delete;
-  LegacyPatch &operator=(const LegacyPatch &) = delete;
 };
 
 } // namespace lgc

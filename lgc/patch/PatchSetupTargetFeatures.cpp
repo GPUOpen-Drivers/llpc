@@ -40,48 +40,6 @@
 using namespace llvm;
 using namespace lgc;
 
-namespace lgc {
-
-// =====================================================================================================================
-// Pass to set up target features on shader entry-points
-class LegacyPatchSetupTargetFeatures : public LegacyPatch {
-public:
-  static char ID;
-  LegacyPatchSetupTargetFeatures() : LegacyPatch(ID) {}
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
-
-  bool runOnModule(Module &module) override;
-
-  LegacyPatchSetupTargetFeatures(const LegacyPatchSetupTargetFeatures &) = delete;
-  LegacyPatchSetupTargetFeatures &operator=(const LegacyPatchSetupTargetFeatures &) = delete;
-
-private:
-  PatchSetupTargetFeatures m_impl;
-};
-
-char LegacyPatchSetupTargetFeatures::ID = 0;
-
-} // namespace lgc
-
-// =====================================================================================================================
-// Create pass to set up target features
-ModulePass *lgc::createLegacyPatchSetupTargetFeatures() {
-  return new LegacyPatchSetupTargetFeatures();
-}
-
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchSetupTargetFeatures::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  return m_impl.runImpl(module, pipelineState);
-}
-
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
@@ -231,7 +189,3 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     func->addFnAttrs(builder);
   }
 }
-
-// =====================================================================================================================
-// Initializes the pass
-INITIALIZE_PASS(LegacyPatchSetupTargetFeatures, DEBUG_TYPE, "Patch LLVM to set up target features", false, false)

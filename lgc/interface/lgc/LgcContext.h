@@ -42,12 +42,6 @@ class raw_pwrite_stream;
 class TargetMachine;
 class Timer;
 
-namespace legacy {
-
-class PassManager;
-
-} // namespace legacy
-
 } // namespace llvm
 
 namespace lgc {
@@ -115,12 +109,6 @@ public:
   //
   // @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
   Builder *createBuilder(Pipeline *pipeline);
-
-  // Prepare a legacy pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
-  // think that we have library functions.
-  //
-  // @param [in/out] passMgr : Pass manager
-  void preparePassManager(llvm::legacy::PassManager *passMgr);
 
   // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
   // think that we have library functions.

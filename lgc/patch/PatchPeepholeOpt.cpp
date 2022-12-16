@@ -44,28 +44,6 @@ using namespace llvm;
 namespace lgc {
 
 // =====================================================================================================================
-// Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char LegacyPatchPeepholeOpt::ID;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
-FunctionPass *createLegacyPatchPeepholeOpt() {
-  return new LegacyPatchPeepholeOpt();
-}
-
-LegacyPatchPeepholeOpt::LegacyPatchPeepholeOpt() : FunctionPass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
-//
-// @param [in/out] function : Function that we will peephole optimize.
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchPeepholeOpt::runOnFunction(Function &function) {
-  return m_impl.runImpl(function);
-}
-
-// =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
 // @param [in/out] function : Function that we will peephole optimize.
@@ -96,14 +74,6 @@ bool PatchPeepholeOpt::runImpl(Function &function) {
   m_instsToErase.clear();
 
   return changed;
-}
-
-// =====================================================================================================================
-// Specify what analysis passes this pass depends on.
-//
-// @param [in/out] analysisUsage : The place to record our analysis pass usage requirements.
-void LegacyPatchPeepholeOpt::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.setPreservesCFG();
 }
 
 // =====================================================================================================================
@@ -176,7 +146,3 @@ void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patching operations for peephole optimizations.
-INITIALIZE_PASS(LegacyPatchPeepholeOpt, DEBUG_TYPE, "Patch LLVM for peephole optimizations", false, false)

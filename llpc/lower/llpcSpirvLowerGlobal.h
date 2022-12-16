@@ -139,21 +139,4 @@ private:
                                                          // (fragment shader)
 };
 
-// =====================================================================================================================
-// Legacy pass manager wrapper class
-class LegacySpirvLowerGlobal : public llvm::ModulePass {
-public:
-  LegacySpirvLowerGlobal();
-
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerGlobal(const LegacySpirvLowerGlobal &) = delete;
-  LegacySpirvLowerGlobal &operator=(const LegacySpirvLowerGlobal &) = delete;
-
-  SpirvLowerGlobal Impl;
-};
-
 } // namespace Llpc

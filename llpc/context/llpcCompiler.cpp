@@ -371,8 +371,6 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
   std::lock_guard<sys::Mutex> lock(*SCompilerMutex);
   MetroHash::Hash optionHash = Compiler::generateHashForCompileOptions(optionCount, options);
 
-  // Initialize passes so they can be referenced by -print-after etc.
-  initializeLowerPasses(*PassRegistry::getPassRegistry());
   LgcContext::initialize();
 
   bool parseCmdOption = true;
@@ -1267,7 +1265,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
           timerProfiler.getTimer(TimerCodeGen),
       };
 
-      pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers, true);
+      pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers);
 #if LLPC_ENABLE_EXCEPTION
       result = Result::Success;
 #endif
@@ -2189,7 +2187,7 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, Module *module, El
         timerProfiler.getTimer(TimerCodeGen),
     };
 
-    pipeline->generate(std::move(pipelineModule), elfStream, nullptr, timers, true);
+    pipeline->generate(std::move(pipelineModule), elfStream, nullptr, timers);
   }
 #if LLPC_ENABLE_EXCEPTION
   catch (const char *) {
@@ -2806,28 +2804,6 @@ Context *Compiler::acquireContext() const {
   freeContext->setInUse(true);
 
   return freeContext;
-}
-
-// =====================================================================================================================
-// Run legacy pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
-//
-// @param passMgr : Pass manager
-// @param [in/out] module : Module
-bool Compiler::runPasses(lgc::LegacyPassManager *passMgr, Module *module) const {
-  bool success = false;
-#if LLPC_ENABLE_EXCEPTION
-  try
-#endif
-  {
-    passMgr->run(*module);
-    success = true;
-  }
-#if LLPC_ENABLE_EXCEPTION
-  catch (const char *) {
-    success = false;
-  }
-#endif
-  return success;
 }
 
 // =====================================================================================================================

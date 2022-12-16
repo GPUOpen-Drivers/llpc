@@ -90,25 +90,4 @@ private:
   GfxIpVersion m_gfxIp; // Graphics IP version info
 };
 
-// =====================================================================================================================
-// Pass to prepare the pipeline ABI
-class LegacyPatchPreparePipelineAbi final : public llvm::ModulePass {
-public:
-  static char ID; // NOLINT
-  LegacyPatchPreparePipelineAbi();
-
-  bool runOnModule(llvm::Module &module) override;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-  }
-
-private:
-  LegacyPatchPreparePipelineAbi(const LegacyPatchPreparePipelineAbi &) = delete;
-  LegacyPatchPreparePipelineAbi &operator=(const LegacyPatchPreparePipelineAbi &) = delete;
-
-  PatchPreparePipelineAbi m_impl;
-};
-
 } // namespace lgc

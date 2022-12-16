@@ -45,14 +45,8 @@
 namespace llvm {
 
 class MDString;
-class ModulePass;
 class NamedMDNode;
-class PassRegistry;
 class Timer;
-
-void initializeLegacyPipelineShadersPass(PassRegistry &);
-void initializeLegacyPipelineStateClearerPass(PassRegistry &);
-void initializeLegacyPipelineStateWrapperPass(PassRegistry &);
 
 } // namespace llvm
 
@@ -62,17 +56,6 @@ class ElfLinker;
 class PalMetadata;
 class PipelineState;
 class TargetInfo;
-
-llvm::ModulePass *createLegacyPipelineStateClearer();
-
-// Initialize passes in state directory
-//
-// @param passRegistry : Pass registry
-inline static void initializeStatePasses(llvm::PassRegistry &passRegistry) {
-  initializeLegacyPipelineShadersPass(passRegistry);
-  initializeLegacyPipelineStateClearerPass(passRegistry);
-  initializeLegacyPipelineStateWrapperPass(passRegistry);
-}
 
 // Resource node type used to ask to find any buffer node, whether constant or not.
 static constexpr ResourceNodeType DescriptorAnyBuffer = ResourceNodeType::Count;
@@ -180,8 +163,7 @@ public:
 
   // Generate pipeline module
   bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
-                CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers,
-                bool newPassManager) override final;
+                CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) override final;
 
   // Create an ELF linker object for linking unlinked shader/part-pipeline ELFs into a pipeline ELF using the
   // pipeline state
@@ -480,17 +462,6 @@ public:
   }
 
 private:
-  // NOTE: These two functions are temporarily used to generate pipeline modules
-  // with and without using the new pass manager. Once the switch to the new pass
-  // manager is done, these functions will be removed and we'll use a single
-  // generate function.
-  // Generate pipeline module
-  void generateWithNewPassManager(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
-                                  CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers);
-  // Generate pipeline module
-  void generateWithLegacyPassManager(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
-                                     CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers);
-
   // Read shaderStageMask from IR
   void readShaderStageMask(llvm::Module *module);
 
@@ -587,28 +558,6 @@ public:
   PipelineStateWrapper(PipelineState *pipelineState);
   Result run(llvm::Module &module, llvm::ModuleAnalysisManager &);
   static llvm::AnalysisKey Key; // NOLINT
-
-private:
-  LgcContext *m_builderContext = nullptr;                  // LgcContext for allocating PipelineState
-  PipelineState *m_pipelineState = nullptr;                // Cached pipeline state
-  std::unique_ptr<PipelineState> m_allocatedPipelineState; // Pipeline state allocated by this pass
-};
-
-// =====================================================================================================================
-// Wrapper pass for the pipeline state in the middle-end
-class LegacyPipelineStateWrapper : public llvm::ImmutablePass {
-public:
-  LegacyPipelineStateWrapper(LgcContext *builderContext = nullptr);
-
-  bool doFinalization(llvm::Module &module) override;
-
-  // Get (create if necessary) the PipelineState from this wrapper pass.
-  PipelineState *getPipelineState(llvm::Module *module);
-
-  // Set the PipelineState.
-  void setPipelineState(PipelineState *pipelineState) { m_pipelineState = pipelineState; }
-
-  static char ID; // ID of this pass
 
 private:
   LgcContext *m_builderContext = nullptr;                  // LgcContext for allocating PipelineState

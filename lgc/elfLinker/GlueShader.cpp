@@ -34,6 +34,7 @@
 #include "FetchShader.h"
 #include "NullFragmentShader.h"
 #include "lgc/state/PassManagerCache.h"
+#include "llvm/IR/LegacyPassManager.h"
 
 using namespace lgc;
 using namespace llvm;

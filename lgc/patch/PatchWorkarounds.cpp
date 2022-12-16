@@ -47,29 +47,6 @@ using namespace llvm;
 namespace lgc {
 
 // =====================================================================================================================
-// Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char LegacyPatchWorkarounds::ID;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
-ModulePass *createLegacyPatchWorkarounds() {
-  return new LegacyPatchWorkarounds();
-}
-
-LegacyPatchWorkarounds::LegacyPatchWorkarounds() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchWorkarounds::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  return m_impl.runImpl(module, pipelineState);
-}
-
-// =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
 // @param [in/out] module : LLVM module to be run on
@@ -242,18 +219,4 @@ void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLas
   }
 }
 
-// =====================================================================================================================
-// Get the analysis usage of this pass.
-//
-// @param [out] analysisUsage : The analysis usage.
-void LegacyPatchWorkarounds::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  analysisUsage.addRequired<LegacyPipelineShaders>();
-  analysisUsage.addPreserved<LegacyPipelineShaders>();
-}
-
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patching operations for workarounds
-INITIALIZE_PASS(LegacyPatchWorkarounds, DEBUG_TYPE, "Patch LLVM for workarounds", false, false)

@@ -42,38 +42,6 @@ using namespace lgc;
 namespace lgc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacyPatchImageOpCollect::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching for image operation collecting
-ModulePass *createLegacyPatchImageOpCollect() {
-  return new LegacyPatchImageOpCollect();
-}
-
-// =====================================================================================================================
-LegacyPatchImageOpCollect::LegacyPatchImageOpCollect() : llvm::ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Get the analysis usage of this pass.
-//
-// @param [out] analysisUsage : The analysis usage.
-void LegacyPatchImageOpCollect::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-}
-
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchImageOpCollect::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  return m_impl.runImpl(module, pipelineState);
-}
-
-// =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
@@ -111,7 +79,3 @@ bool PatchImageOpCollect::runImpl(llvm::Module &module, PipelineState *pipelineS
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patch operations for image operation collecting.
-INITIALIZE_PASS(LegacyPatchImageOpCollect, DEBUG_TYPE, "Patch LLVM for image operation collecting", false, false)

@@ -60,32 +60,7 @@ cl::opt<bool> DisableGsOnChip("disable-gs-onchip", cl::desc("Disable geometry sh
 namespace lgc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacyPatchResourceCollect::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching operations for resource collecting
-ModulePass *createLegacyPatchResourceCollect() {
-  return new LegacyPatchResourceCollect();
-}
-
-// =====================================================================================================================
 PatchResourceCollect::PatchResourceCollect() : m_resUsage(nullptr) {
-}
-
-// =====================================================================================================================
-LegacyPatchResourceCollect::LegacyPatchResourceCollect() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchResourceCollect::runOnModule(Module &module) {
-  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  return m_impl.runImpl(module, pipelineShaders, pipelineState);
 }
 
 // =====================================================================================================================
@@ -3666,7 +3641,3 @@ bool InOutLocationInfoMapManager::findMap(const InOutLocationInfo &origLocInfo,
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patch operations for resource collecting.
-INITIALIZE_PASS(LegacyPatchResourceCollect, DEBUG_TYPE, "Patch LLVM for resource collecting", false, false)

@@ -52,53 +52,6 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 
-namespace Llpc {
-
-// =====================================================================================================================
-// Legacy pass manager wrapper class
-class LegacySpirvLowerMathConstFolding : public ModulePass {
-public:
-  LegacySpirvLowerMathConstFolding() : ModulePass(ID) {}
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<TargetLibraryInfoWrapperPass>();
-  }
-
-  virtual bool runOnModule(Module &module) override;
-
-  static char ID;
-
-  LegacySpirvLowerMathConstFolding(const LegacySpirvLowerMathConstFolding &) = delete;
-  LegacySpirvLowerMathConstFolding &operator=(const LegacySpirvLowerMathConstFolding &) = delete;
-
-private:
-  SpirvLowerMathConstFolding m_impl;
-};
-
-// =====================================================================================================================
-// Legacy pass manager wrapper class
-class LegacySpirvLowerMathFloatOp : public ModulePass {
-public:
-  LegacySpirvLowerMathFloatOp() : ModulePass(ID) {}
-
-  virtual bool runOnModule(Module &module) override;
-
-  static char ID;
-
-  LegacySpirvLowerMathFloatOp(const LegacySpirvLowerMathFloatOp &) = delete;
-  LegacySpirvLowerMathFloatOp &operator=(const LegacySpirvLowerMathFloatOp &) = delete;
-
-private:
-  SpirvLowerMathFloatOp m_impl;
-};
-
-} // namespace Llpc
-
-// =====================================================================================================================
-// Initializes static members.
-char LegacySpirvLowerMathConstFolding::ID = 0;
-char LegacySpirvLowerMathFloatOp::ID = 0;
-
 // =====================================================================================================================
 SpirvLowerMath::SpirvLowerMath()
     : m_changed(false), m_fp16DenormFlush(false), m_fp32DenormFlush(false), m_fp64DenormFlush(false),
@@ -206,16 +159,6 @@ void SpirvLowerMath::disableFastMath(Value *value) {
 // Executes constant folding SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
-bool LegacySpirvLowerMathConstFolding::runOnModule(Module &module) {
-  return m_impl.runImpl(module, [&]() -> TargetLibraryInfo & {
-    return getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(*(m_impl.getEntryPoint()));
-  });
-}
-
-// =====================================================================================================================
-// Executes constant folding SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerMathConstFolding::run(Module &module, ModuleAnalysisManager &analysisManager) {
   runImpl(module, [&]() -> TargetLibraryInfo & {
@@ -313,14 +256,6 @@ bool SpirvLowerMathFloatOp::runImpl(Module &module) {
   visit(m_module);
 
   return m_changed;
-}
-
-// =====================================================================================================================
-// Executes floating point optimisation SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
-bool LegacySpirvLowerMathFloatOp::runOnModule(Module &module) {
-  return m_impl.runImpl(module);
 }
 
 // =====================================================================================================================
@@ -491,29 +426,3 @@ void SpirvLowerMathFloatOp::visitFPTruncInst(FPTruncInst &fptruncInst) {
 }
 
 #undef DEBUG_TYPE // DEBUG_TYPE_FLOAT_OP
-
-// =====================================================================================================================
-// Initializes SPIR-V lowering - math constant folding.
-INITIALIZE_PASS(LegacySpirvLowerMathConstFolding, DEBUG_TYPE_CONST_FOLDING, "Lower SPIR-V math constant folding", false,
-                false)
-
-// =====================================================================================================================
-// Initializes SPIR-V lowering - math constant folding.
-INITIALIZE_PASS(LegacySpirvLowerMathFloatOp, DEBUG_TYPE_FLOAT_OP, "Lower SPIR-V math floating point optimisation",
-                false, false)
-
-namespace Llpc {
-
-// =====================================================================================================================
-// Pass creator, SPIR-V lowering for math constant folding.
-ModulePass *createLegacySpirvLowerMathConstFolding() {
-  return new LegacySpirvLowerMathConstFolding();
-}
-
-// =====================================================================================================================
-// Pass creator, SPIR-V lowering for math floating point optimisation.
-ModulePass *createLegacySpirvLowerMathFloatOp() {
-  return new LegacySpirvLowerMathFloatOp();
-}
-
-} // namespace Llpc
