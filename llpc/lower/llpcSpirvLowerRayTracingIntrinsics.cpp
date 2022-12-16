@@ -136,7 +136,13 @@ bool SpirvLowerRayTracingIntrinsics::processIntrinsicsFunction(Function *func) {
 // @param func : Function to create
 // @param loadTy : Base type of the load value
 void SpirvLowerRayTracingIntrinsics::createLoadDwordAtAddr(Function *func, Type *loadTy) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445928
+  // Old version of the code
   assert(func->getBasicBlockList().size() == 1);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  assert(func->size() == 1);
+#endif
   (*func->begin()).eraseFromParent();
 
   Type *loadPtrTy = loadTy->getPointerTo(SPIRAS_Global);
@@ -178,7 +184,13 @@ void SpirvLowerRayTracingIntrinsics::createConvertF32toF16(Function *func, unsig
   //   return uint3(f32tof16NegInf/PosInf(inVec));
   // }
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445928
+  // Old version of the code
   assert(func->getBasicBlockList().size() == 1);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  assert(func->size() == 1);
+#endif
   (*func->begin()).eraseFromParent();
 
   BasicBlock *entryBlock = BasicBlock::Create(m_builder->getContext(), "", func);
