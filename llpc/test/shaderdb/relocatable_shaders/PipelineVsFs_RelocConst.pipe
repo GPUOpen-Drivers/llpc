@@ -7,13 +7,12 @@
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_vs_main>:
 ; SHADERTEST: s_cmp_eq_u32 0, 0 //{{.*}}
 ; SHADERTEST: s_cselect_b32 s[[RELOCCOND:[0-9]+]], s{{[0-9]+}}, s{{[0-9]+}} //{{.*}}
-; SHADERTEST: s_mov_b32 s[[RELOREG:[0-9]+]], 12 //{{.*}}
-; SHADERTEST: s_load_dwordx4 s[{{.*}}:{{.*}}], s[{{.*}}:{{.*}}], s[[RELOREG]] //{{.*}}
+; SHADERTEST: s_add_u32 s[[RELOREG:[0-9]+]], s[[RELOCCOND]], 12
 ; SHADERTEST: {{[0-9A-Za-z]+}} <_amdgpu_ps_main>:
 ; SHADERTEST: s_cmp_eq_u32 0, 0 //{{.*}}
 ; SHADERTEST: s_cselect_b32 s[[RELOCCOND1:[0-9]+]], s{{[0-9]+}}, s{{[0-9]+}} //{{.*}}
-; SHADERTEST: s_mov_b32 s[[RELOREG1:[0-9]+]], 12 //{{.*}}
-; SHADERTEST: s_load_dwordx4 s[{{.*}}:{{.*}}], s[{{.*}}:{{.*}}], s[[RELOREG1]] //{{.*}}
+; SHADERTEST: s_add_u32 s[[RELOREG1:[0-9]+]], s[[RELOCCOND1]], 12
+
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
@@ -28,7 +27,6 @@
 ; SHADERTEST1: %[[OFFCONSTEXT:.+]] = zext i32 %[[OFFCONST]] to i64
 ; SHADERTEST1: %[[BUFFFERDESCADDR:.+]] = add i64 %{{.+}}, %[[OFFCONSTEXT]]
 ; SHADERTEST1: %[[BUFFERDESCPTR:.+]] = inttoptr i64 %[[BUFFFERDESCADDR]] {{.*}}
-; SHADERTEST1: %{{.+}} = load <4 x i32>, {{<4 x i32> addrspace\(4\)\*|ptr addrspace\(4\)}} %[[BUFFERDESCPTR]], align 1
 ; SHADERTEST1: ![[SPILLNODE]] = !{!"dusespill_0_0"}
 ; SHADERTEST1: ![[OFFNODE]] = !{!"doff_0_0_b"}
 ; SHADERTEST1-LABEL: {{^// LLPC}} final pipeline module info

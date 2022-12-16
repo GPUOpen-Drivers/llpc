@@ -7,7 +7,7 @@
 ; SHADERTEST: s_cmp_eq_u32 dusespill_0_0@abs32@lo, 0
 ; SHADERTEST: s_cselect_b32 s[[RELOCCOND:[0-9]+]], s[[ds0:[0-9]*]], s[[spill:[0-9]*]]
 ; SHADERTEST: s_mov_b32 s[[RELOREG:[0-9]+]], doff_0_0_b@abs32@lo
-; SHADERTEST: s_load_dwordx4 s[{{.*}}:{{.*}}], s[{{.*}}:{{.*}}], s[[RELOREG]]
+; SHADERTEST: s_load_dwordx2 s[{{.*}}:{{.*}}], s[{{.*}}:{{.*}}], s[[RELOREG]]
 // register is reserved for the user data node holding descriptor set 0.
 ; SHADERTEST: SPI_SHADER_USER_DATA_VS_[[ds0]]                     0x0000000080000000
 // register pointed to the user data spill table

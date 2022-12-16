@@ -159,6 +159,7 @@ struct Options {
 #else
   bool reserved15;
 #endif
+  bool enableUberFetchShader; // Enable UberShader
 };
 
 /// Represent a pipeline option which can be automatic as well as explicitly set.
@@ -413,6 +414,22 @@ struct VertexInputDescription {
   BufDataFormat dfmt; // Data format of input; one of the BufDataFormat* values
   BufNumFormat nfmt;  // Numeric format of input; one of the BufNumFormat* values
   unsigned inputRate; // Vertex input rate for the binding
+};
+
+// Represents assistant info for each vertex attribute in uber fetch shader
+struct UberFetchShaderAttribInfo {
+  uint32_t binding : 8;       //< Attribute binding in vertex buffer table
+  uint32_t perInstance : 1;   //< Whether vertex input rate is per-instance
+  uint32_t isCurrent : 1;     //< Whether it is a current attribute
+  uint32_t isPacked : 1;      //< Whether it is a packed format
+  uint32_t isFixed : 1;       //< Whether it is a fixed format
+  uint32_t componentSize : 4; //< Byte size per component
+  uint32_t componentMask : 4; //< Component mask of this attribute.
+  uint32_t isBgra : 1;        //< Whether is BGRA format
+  uint32_t reserved : 11;     //< reserved bits in DWORD 0
+  uint32_t offset;            //< Attribute offset
+  uint32_t instanceDivisor;   //< Reciprocal of instance divisor
+  uint32_t bufferFormat;      //< Buffer format info. it is a copy of buffer SRD DWORD3.
 };
 
 // A single color export format.

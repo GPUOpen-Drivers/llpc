@@ -415,6 +415,10 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
     if (func.isDeclaration())
       continue;
 
+    // Only entrypoint and amd_gfx functions use user data, others don't use.
+    if (!isShaderEntryPoint(&func) && (func.getCallingConv() != CallingConv::AMDGPU_Gfx))
+      continue;
+
     ShaderStage stage = getShaderStage(&func);
     auto userDataUsage = getUserDataUsage(stage);
 

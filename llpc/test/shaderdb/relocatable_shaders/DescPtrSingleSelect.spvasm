@@ -3,11 +3,11 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -o %t.elf -gfxip=9 -amdgpu-transform-discard-to-demote %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL:_amdgpu_ps_main
-; SHADERTEST: s_cbranch_scc0
+; SHADERTEST: s_getpc_b64
 ; SHADERTEST-COUNT-1: s_cselect_b32
 ; SHADERTEST-NOT: v_cndmask_b32
 ; SHADERTEST-NOT: v_readfirstlane_b32
-; SHADERTEST: s_load_dwordx4
+; SHADERTEST: s_load_dwordx2
 ; END_SHADERTEST
 
 ; SPIR-V

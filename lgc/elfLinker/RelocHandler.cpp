@@ -105,8 +105,6 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
 
       if (!node)
         report_fatal_error("No resource node for " + name);
-      if (node->concreteType == ResourceNodeType::DescriptorBufferCompact)
-        getPipelineState()->setError("Cannot relocate to compact buffer descriptor");
 
       value = node->offsetInDwords * 4;
       if (type == ResourceNodeType::DescriptorSampler &&
@@ -153,7 +151,6 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
       if (!node)
         report_fatal_error("No resource node for " + name);
 
-      assert(node->concreteType == ResourceNodeType::DescriptorBuffer);
       // Check if this is a top-level node.
       value = (node == outerNode) ? 1 : 0;
 
@@ -177,6 +174,25 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
       if (!node)
         report_fatal_error("No resource node for " + name);
       value = node->stride * sizeof(uint32_t);
+      return true;
+    }
+  }
+
+  if (name.startswith(reloc::CompactBuffer)) {
+    // Descriptor stride in bytes.
+    unsigned descSet = 0;
+    unsigned binding = 0;
+    ResourceNodeType type = ResourceNodeType::Unknown;
+    if (parseDescSetBinding(name.drop_front(strlen(reloc::CompactBuffer)), descSet, binding, type)) {
+      const ResourceNode *outerNode = nullptr;
+      const ResourceNode *node = nullptr;
+      std::tie(outerNode, node) = getPipelineState()->findResourceNode(type, descSet, binding);
+      if (!node)
+        report_fatal_error("No resource node for " + name);
+      value = (node->concreteType == ResourceNodeType::DescriptorBufferCompact ||
+               node->concreteType == ResourceNodeType::DescriptorConstBufferCompact)
+                  ? 1
+                  : 0;
       return true;
     }
   }

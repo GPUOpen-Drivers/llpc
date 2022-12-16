@@ -1,0 +1,107 @@
+// Test uber shader
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -enable-opaque-pointers=true -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; Load input descriptor
+
+; SHADERTEST: [[DESCPTR:%[0-9]*]] = bitcast <2 x i32> %rootDesc2 to i64
+; SHADERTEST: [[INTDESCPTR:%[0-9]*]] = inttoptr i64 [[DESCPTR]] to ptr addrspace(4)
+; SHADERTEST: [[UBERINFO:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[INTDESCPTR]], align 16
+
+; Load vertex
+; SHADERTEST-COUNT-5: call i32 @llvm.amdgcn.struct.buffer.load.format
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 57
+
+[VsGlsl]
+#version 440
+layout(constant_id = 0) const int numAttributes = 16;
+layout(location = 0) in int attr0;
+layout(location = 0) out highp vec4 vtxColor;
+out gl_PerVertex {
+  vec4 gl_Position;
+};
+void main (void)
+{
+	int okCount = 0;
+	if (attr0 == -(1 * gl_InstanceIndex + 0))
+		okCount++;
+
+	if (okCount == 1)
+	{
+		if (gl_InstanceIndex == 0)
+			vtxColor = vec4(1.0, 0.0, 0.0, 1.0);
+		else
+			vtxColor = vec4(0.0, 0.0, 1.0, 1.0);
+	}
+	else
+	{
+		vtxColor = vec4(okCount / float(1), 0.0f, 0.0f, 1.0);
+	}
+
+	if (gl_InstanceIndex == 0)
+	{
+		if (gl_VertexIndex == 0) gl_Position = vec4(-1.0, -1.0, 0.0, 1.0);
+		else if (gl_VertexIndex == 1) gl_Position = vec4(0.0, -1.0, 0.0, 1.0);
+		else if (gl_VertexIndex == 2) gl_Position = vec4(-1.0, 1.0, 0.0, 1.0);
+		else if (gl_VertexIndex == 3) gl_Position = vec4(0.0, 1.0, 0.0, 1.0);
+		else gl_Position = vec4(0.0);
+	}
+	else
+	{
+		if (gl_VertexIndex == 0) gl_Position = vec4(0.0, -1.0, 0.0, 1.0);
+		else if (gl_VertexIndex == 1) gl_Position = vec4(1.0, -1.0, 0.0, 1.0);
+		else if (gl_VertexIndex == 2) gl_Position = vec4(0.0, 1.0, 0.0, 1.0);
+		else if (gl_VertexIndex == 3) gl_Position = vec4(1.0, 1.0, 0.0, 1.0);
+		else gl_Position = vec4(0.0);
+	}
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 440
+layout(location = 0) in highp vec4 vtxColor;
+layout(location = 0) out highp vec4 fragColor;
+void main (void)
+{
+   fragColor = vtxColor;
+}
+
+[FsInfo]
+entryPoint = main
+
+
+[ResourceMapping]
+userDataNode[0].visibility = 4
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 2
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 4
+userDataNode[2].visibility = 2
+userDataNode[2].type = DescriptorBufferCompact
+userDataNode[2].offsetInDwords = 2
+userDataNode[2].sizeInDwords = 2
+userDataNode[2].set = 0xFFFFFFFF
+userDataNode[2].binding = 5
+
+[GraphicsPipelineState]
+enableUberFetchShader = 1
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 2
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R16_SINT
+attribute[0].offset = 0

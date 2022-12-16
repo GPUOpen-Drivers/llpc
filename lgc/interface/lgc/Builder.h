@@ -704,13 +704,17 @@ public:
     BufferFlagNonConst = 8,   // Non-const buffer: Find a DescriptorBuffer/DescriptorBufferCompact descriptor
                               //  entry, rather than DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
     BufferFlagShaderResource = 16, // Flag to find a Descriptor Resource
-    BufferFlagSampler = 32         // Flag to find Descriptor Sampler
+    BufferFlagSampler = 32,        // Flag to find Descriptor Sampler
+    BufferFlagAddress = 64         // Flag to return an i64 address of the descriptor
   };
 
   // Get the type of pointer returned by CreateLoadBufferDesc.
   llvm::PointerType *getBufferDescTy(llvm::Type *pointeeTy);
 
   // Create a load of a buffer descriptor.
+  //
+  // If descSet = -1, this is an internal user data, which is a plain 64-bit pointer, flags must be 'BufferFlagAddress'
+  // i64 address is returned.
   //
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding

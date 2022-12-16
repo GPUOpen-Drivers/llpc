@@ -75,6 +75,7 @@ LLPC_MODULE_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
 #if LLPC_BUILD_GFX11
 LLPC_MODULE_PASS("lgc-patch-image-op-collect", PatchImageOpCollect)
 #endif
+LLPC_MODULE_PASS("lgc-vertex-fetch", LowerVertexFetch)
 
 #undef LLPC_PASS
 #undef LLPC_LOOP_PASS
