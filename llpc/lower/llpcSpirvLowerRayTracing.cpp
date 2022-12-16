@@ -583,7 +583,7 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
       // Assuming AnyHit/Intersect module is inlined, find the processed call instructions first
       std::vector<CallInst *> callInsts;
 
-      for (auto &block : m_entryPoint->getBasicBlockList()) {
+      for (auto &block : *m_entryPoint) {
         for (auto &inst : block.getInstList()) {
           if (isa<CallInst>(&inst))
             callInsts.push_back(dyn_cast<CallInst>(&inst));
@@ -2079,7 +2079,7 @@ void SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func) {
 // @param func : Function to gather ReturnInst
 // @param rets : returned vector of  ReturnInst instructions
 void SpirvLowerRayTracing::getFuncRets(Function *func, SmallVector<Instruction *, 4> &rets) {
-  for (auto &block : func->getBasicBlockList()) {
+  for (auto &block : *func) {
     auto blockTerm = block.getTerminator();
     if (blockTerm != nullptr && isa<ReturnInst>(blockTerm))
       rets.push_back(blockTerm);
