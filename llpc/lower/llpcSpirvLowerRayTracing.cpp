@@ -584,7 +584,13 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
       std::vector<CallInst *> callInsts;
 
       for (auto &block : *m_entryPoint) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445640
+        // Old version of the code
         for (auto &inst : block.getInstList()) {
+#else
+        // New version of the code (also handles unknown version, which we treat as latest)
+        for (auto &inst : block) {
+#endif
           if (isa<CallInst>(&inst))
             callInsts.push_back(dyn_cast<CallInst>(&inst));
         }

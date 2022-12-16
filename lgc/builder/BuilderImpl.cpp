@@ -298,7 +298,13 @@ BranchInst *BuilderImplBase::createIf(Value *condition, bool wantElse, const Twi
   BasicBlock *ifBlock = BasicBlock::Create(getContext(), "", endIfBlock->getParent(), endIfBlock);
   ifBlock->takeName(endIfBlock);
   endIfBlock->setName(instName + ".endif");
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445640
+  // Old version of the code
   ifBlock->getInstList().splice(ifBlock->end(), endIfBlock->getInstList(), endIfBlock->begin(), GetInsertPoint());
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  ifBlock->splice(ifBlock->end(), endIfBlock, endIfBlock->begin(), GetInsertPoint());
+#endif
 
   // Replace non-phi uses of the original block with the new "if" block.
   SmallVector<Use *, 4> nonPhiUses;
