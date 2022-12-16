@@ -966,7 +966,13 @@ void OutputSection::layout() {
 //
 // @param inputSection : InputSection
 uint64_t OutputSection::getAlignment(const InputSection &inputSection) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445640
+  // Old version of the code
   uint64_t alignment = inputSection.sectionRef.getAlignment();
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  uint64_t alignment = inputSection.sectionRef.getAlignment().value();
+#endif
   // Check if alignment is reduced for this section
   // for gluing code together.
   if (alignment > 0x40 && getReduceAlign(inputSection))
