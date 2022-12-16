@@ -45,28 +45,6 @@ using namespace Llpc;
 namespace Llpc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacySpirvLowerAccessChain::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering operations for access chain
-ModulePass *createLegacySpirvLowerAccessChain() {
-  return new LegacySpirvLowerAccessChain();
-}
-
-// =====================================================================================================================
-LegacySpirvLowerAccessChain::LegacySpirvLowerAccessChain() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool LegacySpirvLowerAccessChain::runOnModule(Module &module) {
-  return Impl.runImpl(module);
-}
-
-// =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
@@ -252,7 +230,3 @@ void SpirvLowerAccessChain::appendZeroIndexToMatchTypes(SmallVectorImpl<Value *>
 }
 
 } // namespace Llpc
-
-// =====================================================================================================================
-// Initializes the pass of SPIR-V lowering operations for access chain.
-INITIALIZE_PASS(LegacySpirvLowerAccessChain, DEBUG_TYPE, "Lower SPIR-V access chain", false, false)

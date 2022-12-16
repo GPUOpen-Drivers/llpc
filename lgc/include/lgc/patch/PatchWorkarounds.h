@@ -67,25 +67,4 @@ private:
   void processImageDescWorkaround(llvm::CallInst &callInst, bool isLastUse);
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for applying workarounds:
-//
-// - fix up issues when buffer descriptor is incorrectly given when it should be an image descriptor. Some architectures
-//   require a fix so the hardware will ignore this difference (actually an app error, but common enough to require
-//   handling)
-//
-class LegacyPatchWorkarounds final : public llvm::ModulePass {
-public:
-  LegacyPatchWorkarounds();
-
-  bool runOnModule(llvm::Module &module) override;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-
-  static char ID; // ID of this pass
-
-private:
-  PatchWorkarounds m_impl;
-};
-
 } // namespace lgc

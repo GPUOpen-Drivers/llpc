@@ -1,5 +1,5 @@
 ; Check that input-output packing works with non-zero-based vector components.
-; RUN: lgc -mcpu=gfx900 --stop-after=lgc-patch-resource-collect %s -v --emit-llvm --verify-ir -o=- 2>&1 \
+; RUN: lgc -mcpu=gfx900 --print-after=lgc-patch-resource-collect %s -v --emit-llvm --verify-ir -o=/dev/null 2>&1 \
 ; RUN:   | FileCheck %s
 
 ; ModuleID = 'lgcPipeline'

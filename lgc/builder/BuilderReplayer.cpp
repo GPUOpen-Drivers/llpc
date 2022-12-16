@@ -41,42 +41,6 @@
 using namespace lgc;
 using namespace llvm;
 
-namespace {
-
-// =====================================================================================================================
-// Pass to replay Builder calls recorded by BuilderRecorder
-class LegacyBuilderReplayer final : public ModulePass, BuilderRecorderMetadataKinds {
-public:
-  LegacyBuilderReplayer() : ModulePass(ID), m_impl(nullptr) {}
-  LegacyBuilderReplayer(Pipeline *pipeline);
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
-
-  bool runOnModule(Module &module) override;
-
-  static char ID;
-
-private:
-  LegacyBuilderReplayer(const LegacyBuilderReplayer &) = delete;
-  LegacyBuilderReplayer &operator=(const LegacyBuilderReplayer &) = delete;
-
-  BuilderReplayer m_impl;
-};
-
-} // namespace
-
-char LegacyBuilderReplayer::ID = 0;
-
-// =====================================================================================================================
-// Create BuilderReplayer pass
-//
-// @param pipeline : Pipeline object
-ModulePass *lgc::createLegacyBuilderReplayer(Pipeline *pipeline) {
-  return new LegacyBuilderReplayer(pipeline);
-}
-
 // =====================================================================================================================
 // Constructor
 //
@@ -96,23 +60,6 @@ bool BuilderReplayer::parsePass(llvm::StringRef params, llvm::ModulePassManager 
 
   passMgr.addPass(BuilderReplayer(nullptr));
   return true;
-}
-
-// =====================================================================================================================
-// Constructor
-//
-// @param pipeline : Pipeline object
-LegacyBuilderReplayer::LegacyBuilderReplayer(Pipeline *pipeline) : ModulePass(ID), m_impl(pipeline) {
-}
-
-// =====================================================================================================================
-// Run the BuilderReplayer pass on a module
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyBuilderReplayer::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  return m_impl.runImpl(module, pipelineState);
 }
 
 // =====================================================================================================================
@@ -922,7 +869,3 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   }
 }
-
-// =====================================================================================================================
-// Initializes the pass
-INITIALIZE_PASS(LegacyBuilderReplayer, DEBUG_TYPE, "Replay LLPC builder calls", false, false)

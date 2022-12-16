@@ -31,8 +31,13 @@
 #pragma once
 
 #include "lgc/util/BuilderBase.h"
-#include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/IR/PassManager.h"
+
+namespace llvm {
+
+class TargetTransformInfo;
+
+} // namespace llvm
 
 namespace lgc {
 

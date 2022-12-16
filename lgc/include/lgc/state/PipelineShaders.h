@@ -60,27 +60,4 @@ public:
   static llvm::AnalysisKey Key;
 };
 
-// =====================================================================================================================
-// Simple analysis pass that finds the shaders in the pipeline module
-class LegacyPipelineShaders : public llvm::ModulePass {
-public:
-  static char ID;
-  LegacyPipelineShaders() : llvm::ModulePass(ID) {}
-
-  PipelineShadersResult &getResult() { return m_result; }
-
-  bool runOnModule(llvm::Module &module) override;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override { analysisUsage.setPreservesAll(); }
-
-private:
-  LegacyPipelineShaders(const LegacyPipelineShaders &) = delete;
-  LegacyPipelineShaders &operator=(const LegacyPipelineShaders &) = delete;
-
-  PipelineShaders m_impl;
-  PipelineShadersResult m_result;
-};
-
-llvm::ModulePass *createLegacyPipelineShaders();
-
 } // namespace lgc

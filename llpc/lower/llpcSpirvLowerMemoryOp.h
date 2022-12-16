@@ -79,21 +79,4 @@ private:
   llvm::SmallVector<StoreExpandInfo, 1> m_storeExpandInfo;
 };
 
-// =====================================================================================================================
-// Represents the pass of SPIR-V lowering memory operations.
-class LegacySpirvLowerMemoryOp : public llvm::ModulePass, public llvm::InstVisitor<LegacySpirvLowerMemoryOp> {
-public:
-  LegacySpirvLowerMemoryOp();
-
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerMemoryOp(const LegacySpirvLowerMemoryOp &) = delete;
-  LegacySpirvLowerMemoryOp &operator=(const LegacySpirvLowerMemoryOp &) = delete;
-
-  SpirvLowerMemoryOp Impl;
-};
-
 } // namespace Llpc

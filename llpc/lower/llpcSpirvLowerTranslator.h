@@ -59,28 +59,4 @@ private:
   const PipelineShaderInfo *m_shaderInfo; // Input shader info
 };
 
-// =====================================================================================================================
-// Legacy pass manager wrapper class
-class LegacySpirvLowerTranslator : public LegacySpirvLower {
-public:
-  static char ID;
-  LegacySpirvLowerTranslator() : LegacySpirvLower(ID) {}
-
-  //
-  // @param stage : Shader stage
-  // @param shaderInfo : Shader info for this shader
-  LegacySpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo)
-      : LegacySpirvLower(ID), Impl(stage, shaderInfo) {}
-
-  bool runOnModule(llvm::Module &module) override;
-
-private:
-  LegacySpirvLowerTranslator(const LegacySpirvLowerTranslator &) = delete;
-  LegacySpirvLowerTranslator &operator=(const LegacySpirvLowerTranslator &) = delete;
-
-  // -----------------------------------------------------------------------------------------------------------------
-
-  SpirvLowerTranslator Impl;
-};
-
 } // namespace Llpc

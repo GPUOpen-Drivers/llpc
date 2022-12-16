@@ -45,38 +45,6 @@ using namespace lgc;
 namespace lgc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacyPatchImageDerivatives::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass
-ModulePass *createLegacyPatchImageDerivatives() {
-  return new LegacyPatchImageDerivatives();
-}
-
-// =====================================================================================================================
-LegacyPatchImageDerivatives::LegacyPatchImageDerivatives() : llvm::ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Get the analysis usage of this pass.
-//
-// @param [out] analysisUsage : The analysis usage.
-void LegacyPatchImageDerivatives::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-}
-
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchImageDerivatives::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  return m_impl.runImpl(module, pipelineState);
-}
-
-// =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
@@ -195,7 +163,3 @@ bool PatchImageDerivatives::runImpl(llvm::Module &module, PipelineState *pipelin
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patch image derivative operations dependent on discards.
-INITIALIZE_PASS(LegacyPatchImageDerivatives, DEBUG_TYPE, "Patch image derivatives after discards", false, false)

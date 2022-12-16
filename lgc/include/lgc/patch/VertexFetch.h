@@ -65,23 +65,4 @@ public:
   static llvm::StringRef name() { return "Lower vertex fetch calls"; }
 };
 
-// =====================================================================================================================
-// Pass to lower vertex fetch calls
-class LegacyLowerVertexFetch : public llvm::ModulePass {
-public:
-  LegacyLowerVertexFetch();
-  LegacyLowerVertexFetch(const LegacyLowerVertexFetch &) = delete;
-  LegacyLowerVertexFetch &operator=(const LegacyLowerVertexFetch &) = delete;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
-
-  virtual bool runOnModule(llvm::Module &module) override;
-
-  static char ID; // ID of this pass
-private:
-  LowerVertexFetch m_impl;
-};
-
 } // namespace lgc

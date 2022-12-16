@@ -1,4 +1,4 @@
-﻿/*
+/*
  ***********************************************************************************************************************
  *
  *  Copyright (c) 2017-2022 Advanced Micro Devices, Inc. All Rights Reserved.
@@ -51,27 +51,9 @@ using namespace lgc;
 namespace lgc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacyPatchInOutImportExport::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching operations for input import and output export
-ModulePass *createLegacyPatchInOutImportExport() {
-  return new LegacyPatchInOutImportExport();
-}
-
-// =====================================================================================================================
 PatchInOutImportExport::PatchInOutImportExport() : m_lds(nullptr) {
   memset(&m_gfxIp, 0, sizeof(m_gfxIp));
   initPerShader();
-}
-
-// =====================================================================================================================
-LegacyPatchInOutImportExport::LegacyPatchInOutImportExport() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-LegacyPatchInOutImportExport::~LegacyPatchInOutImportExport() {
 }
 
 // =====================================================================================================================
@@ -89,20 +71,6 @@ void PatchInOutImportExport::initPerShader() {
   m_threadId = nullptr;
 
   m_attribExports.clear();
-}
-
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchInOutImportExport::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
-  auto getPDT = [&](Function &f) -> PostDominatorTree & {
-    return getAnalysis<PostDominatorTreeWrapperPass>(f).getPostDomTree();
-  };
-  return m_impl.runImpl(module, pipelineShaders, pipelineState, getPDT);
 }
 
 // =====================================================================================================================
@@ -6161,8 +6129,3 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patching operations for input import and output export.
-INITIALIZE_PASS(LegacyPatchInOutImportExport, DEBUG_TYPE, "Patch LLVM for input import and output export operations",
-                false, false)

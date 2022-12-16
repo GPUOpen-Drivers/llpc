@@ -416,7 +416,7 @@ int main(int argc, char **argv) {
           return 1;
       } else {
         // Run the middle-end compiler.
-        if (!pipeline->generate(std::move(module), outStream, nullptr, {}, true))
+        if (!pipeline->generate(std::move(module), outStream, nullptr, {}))
           err = pipeline->getLastError();
       }
 

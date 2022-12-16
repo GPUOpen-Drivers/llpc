@@ -42,33 +42,11 @@
 #define LLVM_SUPPORT_SPIRV_H
 
 #include "spirvExt.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
 #include <iostream>
 #include <map>
 #include <string>
-
-namespace llvm {
-// llvm::Pass initialization functions need to be declared before inclusion of
-// PassSupport.h.
-class PassRegistry;
-void initializeSPIRVLowerBoolPass(PassRegistry &);
-void initializeSPIRVLowerConstExprPass(PassRegistry &);
-void initializeSPIRVRegularizeLLVMPass(PassRegistry &);
-void initializeSPIRVLowerInputPass(PassRegistry &);
-void initializeSPIRVLowerOutputPass(PassRegistry &);
-void initializeSPIRVResourceCollectPass(PassRegistry &);
-void initializeLLVMInputPass(PassRegistry &);
-void initializeLLVMOutputPass(PassRegistry &);
-void initializeSPIRVLowerGlobalPass(PassRegistry &);
-void initializeSPIRVLowerBufferPass(PassRegistry &);
-void initializeSPIRVLowerFetchPass(PassRegistry &);
-void initializeLLVMDescriptorPass(PassRegistry &);
-void initializeLLVMBuiltInFuncPass(PassRegistry &);
-void initializeLLVMMutateEntryPass(PassRegistry &);
-void initializeSPIRVLowerMemmovePass(PassRegistry &);
-} // namespace llvm
-
-#include "llvm/IR/Module.h"
-#include "llvm/Pass.h"
 
 namespace SPIRV {
 class SPIRVModule;
@@ -122,49 +100,6 @@ bool readSpirv(lgc::Builder *Builder, const Vkgc::ShaderModuleUsage *ModuleData,
 /// \brief Regularize LLVM module by removing entities not representable by
 /// SPIRV.
 bool regularizeLlvmForSpirv(llvm::Module *M, std::string &ErrMsg);
-
-/// Create a pass for lowering cast instructions of i1 type.
-llvm::ModulePass *createSPIRVLowerBool();
-
-/// Create a pass for lowering constant expressions to instructions.
-llvm::ModulePass *createSPIRVLowerConstExpr();
-
-/// Create a pass for regularize LLVM module to be translated to SPIR-V.
-llvm::ModulePass *createSPIRVRegularizeLLVM();
-
-/// Create a pass for lowering llvm.memmove to llvm.memcpys with a temporary variable.
-llvm::ModulePass *createSPIRVLowerMemmove();
-
-/// Create a pass for lowering GLSL inputs to function calls
-llvm::ModulePass *createSPIRVLowerInput();
-
-/// Create a pass for lowering GLSL outputs to function calls
-llvm::ModulePass *createSPIRVLowerOutput();
-
-/// Create a pass for translating GLSL generic global variables to function local variables
-llvm::ModulePass *createSPIRVLowerGlobal();
-
-/// Create a pass for lowering GLSL buffers (UBO and SSBO) to function calls
-llvm::ModulePass *createSPIRVLowerBuffer();
-
-/// Create a pass for lowering resource fetches to function calls
-llvm::ModulePass *createSPIRVLowerFetch();
-
-llvm::ModulePass *createSPIRVResourceCollect();
-
-/// Create a pass for translating input function call to real access input instruction
-llvm::ModulePass *createLLVMInput();
-
-/// Create a pass for translating input function call to real access output instruction
-llvm::ModulePass *createLLVMOutput();
-
-/// Create a pass for translating descriptor function call to real descriptor setup instruction
-llvm::ModulePass *createLLVMDescriptor();
-
-/// Create a pass for removing unused built-in functions
-llvm::ModulePass *createLLVMBuiltInFunc();
-
-llvm::ModulePass *createLLVMMutateEntry();
 
 } // namespace llvm
 

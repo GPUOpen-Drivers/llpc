@@ -79,9 +79,6 @@ static const char *RemapCapturedVaToReplayVa = "AmdTraceRayRemapCapturedVaToRepl
 } // namespace RtName
 
 namespace Llpc {
-// =====================================================================================================================
-// Initializes static members.
-char LegacySpirvLowerRayTracing::ID = 0;
 
 // TraceParams Type size in DWORD
 static unsigned TraceParamsTySize[] = {
@@ -106,18 +103,6 @@ static unsigned TraceParamsTySize[] = {
 // Get payload idx for TraceRayKHR instruction.
 unsigned getTraceRayParamPayloadIdx(void) {
   return TraceRayParam::Payload;
-}
-
-// =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering ray operations.
-// @param rayQueryLibrary : ray query library
-ModulePass *createLegacySpirvLowerRayTracing(bool rayQueryLibrary) {
-  return new LegacySpirvLowerRayTracing(rayQueryLibrary);
-}
-
-// =====================================================================================================================
-LegacySpirvLowerRayTracing::LegacySpirvLowerRayTracing(bool rayQueryLibrary) : ModulePass(ID), Impl(rayQueryLibrary) {
-  initializeLegacySpirvLowerRayTracingPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
@@ -449,14 +434,6 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpReportIntersection
   Value *result =
       m_builder->CreateICmpNE(m_builder->CreateLoad(statusTy, status), m_builder->getInt32(RayHitStatus::Ignore));
   m_builder->CreateRet(result);
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool LegacySpirvLowerRayTracing::runOnModule(Module &module) {
-  return Impl.runImpl(module);
 }
 
 // =====================================================================================================================
@@ -2392,7 +2369,3 @@ Function *SpirvLowerRayTracing::getOrCreateRemapCapturedVaToReplayVaFunc() {
 }
 
 } // namespace Llpc
-
-// =====================================================================================================================
-// Initializes the pass of SPIR-V lowering the ray tracing operations.
-INITIALIZE_PASS(LegacySpirvLowerRayTracing, DEBUG_TYPE, "Lower SPIR-V RayTracing operations", false, false)

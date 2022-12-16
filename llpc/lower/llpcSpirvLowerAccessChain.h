@@ -55,21 +55,4 @@ private:
                                    llvm::Type *baseType);
 };
 
-// =====================================================================================================================
-// Represents the pass of SPIR-V lowering operations for access chain.
-class LegacySpirvLowerAccessChain : public llvm::ModulePass {
-public:
-  LegacySpirvLowerAccessChain();
-
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerAccessChain(const LegacySpirvLowerAccessChain &) = delete;
-  LegacySpirvLowerAccessChain &operator=(const LegacySpirvLowerAccessChain &) = delete;
-
-  SpirvLowerAccessChain Impl;
-};
-
 } // namespace Llpc

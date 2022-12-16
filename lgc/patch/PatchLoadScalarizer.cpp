@@ -44,42 +44,8 @@ using namespace llvm;
 namespace lgc {
 
 // =====================================================================================================================
-// Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char LegacyPatchLoadScalarizer::ID;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching operations for load scalarizer optimizations.
-FunctionPass *createLegacyPatchLoadScalarizer() {
-  return new LegacyPatchLoadScalarizer();
-}
-
-// =====================================================================================================================
 PatchLoadScalarizer::PatchLoadScalarizer() {
   m_scalarThreshold = 0;
-}
-
-// =====================================================================================================================
-LegacyPatchLoadScalarizer::LegacyPatchLoadScalarizer() : FunctionPass(ID) {
-}
-
-// =====================================================================================================================
-// Get the analysis usage of this pass.
-//
-// @param [out] analysisUsage : The analysis usage.
-void LegacyPatchLoadScalarizer::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  analysisUsage.addRequired<LegacyPipelineShaders>();
-  analysisUsage.addPreserved<LegacyPipelineShaders>();
-}
-
-// =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
-//
-// @param [in/out] function : Function that we will peephole optimize.
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchLoadScalarizer::runOnFunction(Function &function) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
-  return m_impl.runImpl(function, pipelineState);
 }
 
 // =====================================================================================================================
@@ -203,7 +169,3 @@ void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patching operations for load scalarizer optimization.
-INITIALIZE_PASS(LegacyPatchLoadScalarizer, DEBUG_TYPE, "Patch LLVM for load scalarizer optimization", false, false)

@@ -165,21 +165,4 @@ private:
   llvm::GlobalVariable *m_rayQueryObjGen;  // Ray query Object Id generator
 };
 
-// =====================================================================================================================
-// Represents the pass of SPIR-V lowering ray query.
-class LegacySpirvLowerRayQuery : public llvm::ModulePass {
-public:
-  LegacySpirvLowerRayQuery() : llvm::ModulePass(ID), Impl(false) {}
-  LegacySpirvLowerRayQuery(char &pid) : llvm::ModulePass(pid), Impl(false) {}
-  LegacySpirvLowerRayQuery(bool rayQueryLibrary);
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-private:
-  LegacySpirvLowerRayQuery(const LegacySpirvLowerRayQuery &) = delete;
-  LegacySpirvLowerRayQuery &operator=(const LegacySpirvLowerRayQuery &) = delete;
-
-  SpirvLowerRayQuery Impl;
-};
-
 } // namespace Llpc

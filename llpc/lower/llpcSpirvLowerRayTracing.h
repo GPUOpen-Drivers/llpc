@@ -187,20 +187,4 @@ private:
   llvm::SmallVector<llvm::Type *, TraceParam::Count> m_traceParamsTys; // Trace Params types
 };
 
-// =====================================================================================================================
-// Represents the pass of SPIR-V lowering ray tracing.
-class LegacySpirvLowerRayTracing : public llvm::ModulePass {
-public:
-  LegacySpirvLowerRayTracing() : ModulePass(ID) {}
-  LegacySpirvLowerRayTracing(bool rayQueryLibrary);
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerRayTracing(const LegacySpirvLowerRayTracing &) = delete;
-  LegacySpirvLowerRayTracing &operator=(const LegacySpirvLowerRayTracing &) = delete;
-
-  SpirvLowerRayTracing Impl;
-};
 } // namespace Llpc

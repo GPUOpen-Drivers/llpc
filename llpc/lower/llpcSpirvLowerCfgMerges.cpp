@@ -70,28 +70,6 @@ static cl::opt<bool> EnableLoopReconvergence("enable-loop-reconvergence",
 namespace Llpc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacySpirvLowerCfgMerges::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering terminator operations
-ModulePass *createLegacySpirvLowerCfgMerges() {
-  return new LegacySpirvLowerCfgMerges();
-}
-
-// =====================================================================================================================
-LegacySpirvLowerCfgMerges::LegacySpirvLowerCfgMerges() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
-bool LegacySpirvLowerCfgMerges::runOnModule(Module &module) {
-  return Impl.runImpl(module);
-}
-
-// =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
@@ -670,7 +648,3 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
 }
 
 } // namespace Llpc
-
-// =====================================================================================================================
-// Initializes the pass of SPIR-V lowering terminator operations..
-INITIALIZE_PASS(LegacySpirvLowerCfgMerges, DEBUG_TYPE, "Lower SPIR-V CFG merges", false, false)

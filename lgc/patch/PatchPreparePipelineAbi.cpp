@@ -43,54 +43,8 @@
 using namespace llvm;
 using namespace lgc;
 
-char LegacyPatchPreparePipelineAbi::ID = 0;
-
-// =====================================================================================================================
-// Create pass to prepare the pipeline ABI
-//
-// @param onlySetCallingConvs : Should we only set the calling conventions, or do the full prepare.
-ModulePass *lgc::createLegacyPatchPreparePipelineAbi() {
-  return new LegacyPatchPreparePipelineAbi;
-}
-
 // =====================================================================================================================
 PatchPreparePipelineAbi::PatchPreparePipelineAbi() {
-}
-
-// =====================================================================================================================
-LegacyPatchPreparePipelineAbi::LegacyPatchPreparePipelineAbi() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchPreparePipelineAbi::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
-
-  auto getPostDomTree = [&](Function &func) -> PostDominatorTree & {
-    return getAnalysis<PostDominatorTreeWrapperPass>(func).getPostDomTree();
-  };
-  auto getCycleInfo = [&](Function &func) -> CycleInfo & {
-#if (LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445694) ||                                                             \
-    (LLVM_MAIN_REVISION >= 445696 && LLVM_MAIN_REVISION < 445701) ||                                                   \
-    (LLVM_MAIN_REVISION >= 445977 && LLVM_MAIN_REVISION < 445978) ||                                                   \
-    (LLVM_MAIN_REVISION >= 445979 && LLVM_MAIN_REVISION < 446084)
-    // Old version of the code
-    return getAnalysis<CycleInfoWrapperPass>(func).getCycleInfo();
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
-    return getAnalysis<CycleInfoWrapperPass>(func).getResult();
-#endif
-  };
-
-  PatchPreparePipelineAbi::FunctionAnalysisHandlers analysisHandlers = {};
-  analysisHandlers.getPostDomTree = getPostDomTree;
-  analysisHandlers.getCycleInfo = getCycleInfo;
-
-  return m_impl.runImpl(module, pipelineShaders, pipelineState, analysisHandlers);
 }
 
 // =====================================================================================================================
@@ -565,7 +519,3 @@ void PatchPreparePipelineAbi::storeTessFactors(Function *entryPoint) {
 
   pipelineSysValues.clear();
 }
-
-// =====================================================================================================================
-// Initializes the pass
-INITIALIZE_PASS(LegacyPatchPreparePipelineAbi, DEBUG_TYPE, "Patch LLVM for preparing pipeline ABI", false, false)

@@ -42,28 +42,6 @@ using namespace llvm;
 using namespace Llpc;
 
 namespace Llpc {
-// =====================================================================================================================
-// Initializes static members.
-char LegacySpirvLowerRayQueryPostInline::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering ray query post inline operations.
-ModulePass *createLegacySpirvLowerRayQueryPostInline() {
-  return new LegacySpirvLowerRayQueryPostInline();
-}
-
-// =====================================================================================================================
-LegacySpirvLowerRayQueryPostInline::LegacySpirvLowerRayQueryPostInline() : ModulePass(ID) {
-  initializeLegacySpirvLowerRayQueryPostInlinePass(*PassRegistry::getPassRegistry());
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool LegacySpirvLowerRayQueryPostInline::runOnModule(Module &module) {
-  return Impl.runImpl(module);
-}
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
@@ -104,8 +82,3 @@ bool SpirvLowerRayQueryPostInline::runImpl(Module &module) {
 }
 
 } // namespace Llpc
-
-// =====================================================================================================================
-// Initializes the pass of SPIR-V lowering the ray query operations.
-INITIALIZE_PASS(LegacySpirvLowerRayQueryPostInline, DEBUG_TYPE, "Lower SPIR-V RayQueryPostInline operations", false,
-                false)

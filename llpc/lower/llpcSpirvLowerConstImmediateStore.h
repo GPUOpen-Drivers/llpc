@@ -55,21 +55,4 @@ private:
   void convertAllocaToReadOnlyGlobal(llvm::StoreInst *storeInst);
 };
 
-// =====================================================================================================================
-// Legacy pass manager wrapper class
-class LegacySpirvLowerConstImmediateStore : public llvm::ModulePass {
-public:
-  LegacySpirvLowerConstImmediateStore();
-
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerConstImmediateStore(const LegacySpirvLowerConstImmediateStore &) = delete;
-  LegacySpirvLowerConstImmediateStore &operator=(const LegacySpirvLowerConstImmediateStore &) = delete;
-
-  SpirvLowerConstImmediateStore Impl;
-};
-
 } // namespace Llpc

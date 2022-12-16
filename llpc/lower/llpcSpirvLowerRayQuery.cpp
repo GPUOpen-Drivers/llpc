@@ -296,18 +296,6 @@ Type *getRayQueryInternalTy(lgc::Builder *builder) {
 }
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacySpirvLowerRayQuery::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering ray query operations.
-//
-// @param rayQueryLibrary : ray query library
-ModulePass *createLegacySpirvLowerRayQuery(bool rayQueryLibrary) {
-  return new LegacySpirvLowerRayQuery(rayQueryLibrary);
-}
-
-// =====================================================================================================================
 SpirvLowerRayQuery::SpirvLowerRayQuery() : SpirvLowerRayQuery(false) {
 }
 
@@ -315,19 +303,6 @@ SpirvLowerRayQuery::SpirvLowerRayQuery() : SpirvLowerRayQuery(false) {
 SpirvLowerRayQuery::SpirvLowerRayQuery(bool rayQueryLibrary)
     : m_rayQueryLibrary(rayQueryLibrary), m_spirvOpMetaKindId(0), m_ldsStack(nullptr), m_prevRayQueryObj(nullptr),
       m_rayQueryObjGen(nullptr) {
-}
-
-// =====================================================================================================================
-LegacySpirvLowerRayQuery::LegacySpirvLowerRayQuery(bool rayQueryLibrary) : ModulePass(ID), Impl(rayQueryLibrary) {
-  initializeLegacySpirvLowerRayQueryPass(*PassRegistry::getPassRegistry());
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool LegacySpirvLowerRayQuery::runOnModule(Module &module) {
-  return Impl.runImpl(module);
 }
 
 // =====================================================================================================================
@@ -1878,7 +1853,3 @@ void SpirvLowerRayQuery::createLdsStackStore(Function *func) {
 #endif
 
 } // namespace Llpc
-
-// =====================================================================================================================
-// Initializes the pass of SPIR-V lowering the ray query operations.
-INITIALIZE_PASS(LegacySpirvLowerRayQuery, DEBUG_TYPE, "Lower SPIR-V RayQuery operations", false, false)

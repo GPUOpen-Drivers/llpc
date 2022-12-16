@@ -54,21 +54,4 @@ private:
   bool processIntrinsicsFunction(llvm::Function *func);
 };
 
-// =====================================================================================================================
-// Represents the pass of SPIR-V lowering ray tracing intrinsics.
-class LegacySpirvLowerRayTracingIntrinsics : public llvm::ModulePass {
-public:
-  LegacySpirvLowerRayTracingIntrinsics() : ModulePass(ID) {}
-  LegacySpirvLowerRayTracingIntrinsics(char &pid) : ModulePass(pid) {}
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerRayTracingIntrinsics(const SpirvLowerRayTracingIntrinsics &) = delete;
-  LegacySpirvLowerRayTracingIntrinsics &operator=(const SpirvLowerRayTracingIntrinsics &) = delete;
-
-  SpirvLowerRayTracingIntrinsics Impl;
-};
-
 } // namespace Llpc

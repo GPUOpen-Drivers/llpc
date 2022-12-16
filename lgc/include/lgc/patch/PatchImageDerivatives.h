@@ -47,23 +47,4 @@ public:
   static llvm::StringRef name() { return "Patch attributes when image derivatives dependent on discard"; }
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for image operations
-class LegacyPatchImageDerivatives : public llvm::ModulePass {
-public:
-  LegacyPatchImageDerivatives();
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-
-  bool runOnModule(llvm::Module &module) override;
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchImageDerivatives(const LegacyPatchImageDerivatives &) = delete;
-  LegacyPatchImageDerivatives &operator=(const LegacyPatchImageDerivatives &) = delete;
-
-  PatchImageDerivatives m_impl;
-};
-
 } // namespace lgc

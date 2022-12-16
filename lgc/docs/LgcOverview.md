@@ -114,7 +114,7 @@ The front-end flow is:
   - Where the front-end creates a pass manager for its own passes, it should call
     `BuilderContext::PreparePassManager` to ensure it is suitably set up. It can optionally
     use `PassManager::Create` to create the middle-end's subclass pass manager instead of
-    using the standard `legacy::PassManager`.
+    using the standard `PassManager`.
   - For a shader compile, you're done: The IR module at this point is the result of
     the compile, and can be stored away and kept for later linking with other shaders.
 

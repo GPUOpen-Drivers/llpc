@@ -126,24 +126,4 @@ private:
   llvm::SmallVector<llvm::Value *, 10> m_exportValues; // The value to be exported indexed by the hw render target.
 };
 
-// =====================================================================================================================
-// Pass to lower color export calls
-class LegacyLowerFragColorExport : public llvm::ModulePass {
-public:
-  LegacyLowerFragColorExport();
-  LegacyLowerFragColorExport(const LegacyLowerFragColorExport &) = delete;
-  LegacyLowerFragColorExport &operator=(const LegacyLowerFragColorExport &) = delete;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-  }
-
-  virtual bool runOnModule(llvm::Module &module) override;
-
-  static char ID; // ID of this pass
-private:
-  LowerFragColorExport m_impl;
-};
-
 } // namespace lgc

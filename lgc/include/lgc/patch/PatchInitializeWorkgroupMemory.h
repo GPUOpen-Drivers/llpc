@@ -55,26 +55,4 @@ private:
   PipelineState *m_pipelineState = nullptr;
 };
 
-// =====================================================================================================================
-// Represents the pass of setting up the value for workgroup global variables.
-class LegacyPatchInitializeWorkgroupMemory final : public llvm::ModulePass {
-public:
-  LegacyPatchInitializeWorkgroupMemory();
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
-
-  virtual bool runOnModule(llvm::Module &module) override;
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchInitializeWorkgroupMemory(const LegacyPatchInitializeWorkgroupMemory &) = delete;
-  LegacyPatchInitializeWorkgroupMemory &operator=(const LegacyPatchInitializeWorkgroupMemory &) = delete;
-
-  PatchInitializeWorkgroupMemory m_impl;
-};
-
 } // namespace lgc
