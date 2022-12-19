@@ -74,7 +74,16 @@ bool LegacyPatchPreparePipelineAbi::runOnModule(Module &module) {
     return getAnalysis<PostDominatorTreeWrapperPass>(func).getPostDomTree();
   };
   auto getCycleInfo = [&](Function &func) -> CycleInfo & {
+#if (LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445694) ||                                                             \
+    (LLVM_MAIN_REVISION >= 445696 && LLVM_MAIN_REVISION < 445701) ||                                                   \
+    (LLVM_MAIN_REVISION >= 445977 && LLVM_MAIN_REVISION < 445978) ||                                                   \
+    (LLVM_MAIN_REVISION >= 445979 && LLVM_MAIN_REVISION < 446084)
+    // Old version of the code
     return getAnalysis<CycleInfoWrapperPass>(func).getCycleInfo();
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    return getAnalysis<CycleInfoWrapperPass>(func).getResult();
+#endif
   };
 
   PatchPreparePipelineAbi::FunctionAnalysisHandlers analysisHandlers = {};
