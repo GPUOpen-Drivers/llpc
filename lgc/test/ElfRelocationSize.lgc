@@ -2,7 +2,7 @@
 ; in the relocation section (`.rel.text`). To check that, we extract the offsets of
 ; the relocation section and the following section from the elf and subtract
 ; them. Here we write 4 16-bit relocations, so the expected value should be
-; around 0x40 (65 dec) (because of section alignment).
+; around 0x40 (64 dec) (depending on section alignment).
 ; RUN: lgc -mcpu=gfx1030 -extract=2 -o %t.fs.elf %s
 ; RUN: lgc -mcpu=gfx1030 -extract=3 -other=%t.fs.elf -o %t.vs.elf %s
 ; RUN: lgc -mcpu=gfx1030 -extract=1 -l %s -o %t.pipe.elf %t.vs.elf %t.fs.elf
@@ -12,7 +12,7 @@
 ; CHECK-LABEL: Name: .rel.text ({{[0-9]+}})
 ; CHECK:       Offset: 0x[[#%X,OFFSET1:]]
 ; CHECK-LABEL: Name: .rodata.cst32 ({{[0-9]+}})
-; CHECK:       Offset: 0x[[#OFFSET1 + 65]]
+; CHECK:       Offset: 0x[[#OFFSET1 + 64]]
 ; CHECK-LABEL: Name: .note.GNU-stack ({{[0-9]+}})
 
 ; ----------------------------------------------------------------------
