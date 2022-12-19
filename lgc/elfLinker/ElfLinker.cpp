@@ -100,7 +100,7 @@ public:
   uint64_t getOutputOffset(unsigned inputIdx) { return m_offset + m_inputSections[inputIdx].offset; }
 
   // Get the overall alignment requirement, after calling layout().
-  uint64_t getAlignment() const { return m_alignment; }
+  Align getAlignment() const { return m_alignment; }
 
   // Write the output section
   void write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr);
@@ -117,14 +117,14 @@ private:
   }
 
   // Get alignment for an input section. This takes into account the reduceAlign flag.
-  uint64_t getAlignment(const InputSection &inputSection);
+  Align getAlignment(const InputSection &inputSection);
 
   ElfLinkerImpl *m_linker;
   StringRef m_name;                             // Section name
   unsigned m_type;                              // Section type (SHT_* value)
   uint64_t m_offset = 0;                        // File offset of this output section
   SmallVector<InputSection, 4> m_inputSections; // Input sections contributing to this output section
-  uint64_t m_alignment = 0;                     // Overall alignment required for the section
+  Align m_alignment;                            // Overall alignment required for the section
   unsigned m_reduceAlign = 0;                   // Bitmap of input sections to reduce alignment for
 };
 
@@ -556,8 +556,8 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
     if (sectionIndex == noteSectionIdx)
       continue;
     OutputSection &outputSection = m_outputSections[sectionIndex];
-    unsigned align = std::min(unsigned(outputSection.getAlignment()), 4U);
-    outStream << StringRef("\0\0\0", 3).slice(0, -outStream.tell() & align - 1);
+    Align align = std::min(outputSection.getAlignment(), Align(4));
+    outStream << StringRef("\0\0\0", 3).slice(0, offsetToAlignment(outStream.tell(), align));
     shdrs[sectionIndex].sh_offset = outStream.tell();
     outputSection.write(outStream, &shdrs[sectionIndex]);
   }
@@ -612,8 +612,8 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
 
   // Output the note section now that the metadata has been finalized.
   OutputSection &noteOutputSection = m_outputSections[noteSectionIdx];
-  unsigned align = std::min(unsigned(noteOutputSection.getAlignment()), 4U);
-  outStream << StringRef("\0\0\0", 3).slice(0, -outStream.tell() & align - 1);
+  Align align = std::min(noteOutputSection.getAlignment(), Align(4));
+  outStream << StringRef("\0\0\0", 3).slice(0, offsetToAlignment(outStream.tell(), align));
   shdrs[noteSectionIdx].sh_offset = outStream.tell();
   noteOutputSection.write(outStream, &shdrs[noteSectionIdx]);
 
@@ -948,16 +948,16 @@ void OutputSection::layout() {
     }
 
     // Gain alignment as required for the next input section.
-    uint64_t alignment = getAlignment(inputSection);
+    Align alignment = getAlignment(inputSection);
     m_alignment = std::max(m_alignment, alignment);
-    size = (size + alignment - 1) & -alignment;
+    size = alignTo(size, alignment);
     // Store the start offset for the section.
     inputSection.offset = size;
     // Add on the size for this section.
     size += inputSection.size;
   }
   if (m_type == ELF::SHT_NOTE)
-    m_alignment = 4;
+    m_alignment = Align(4);
 }
 
 // =====================================================================================================================
@@ -965,12 +965,12 @@ void OutputSection::layout() {
 // from 0x100 to 0x40 when gluing code together.
 //
 // @param inputSection : InputSection
-uint64_t OutputSection::getAlignment(const InputSection &inputSection) {
-  uint64_t alignment = inputSection.sectionRef.getAlignment();
+Align OutputSection::getAlignment(const InputSection &inputSection) {
+  Align alignment = Align(inputSection.sectionRef.getAlignment());
   // Check if alignment is reduced for this section
   // for gluing code together.
   if (alignment > 0x40 && getReduceAlign(inputSection))
-    alignment = 0x40;
+    alignment = Align(0x40);
   return alignment;
 }
 
@@ -1090,7 +1090,7 @@ void OutputSection::write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr) {
   for (InputSection &inputSection : m_inputSections) {
     assert(m_alignment >= getAlignment(inputSection));
     // Gain alignment as required for the next input section.
-    uint64_t alignmentGap = -size & (getAlignment(inputSection) - 1);
+    uint64_t alignmentGap = offsetToAlignment(size, getAlignment(inputSection));
     while (alignmentGap != 0) {
       size_t thisSize = std::min(alignmentGap, paddingUnit - (size & (paddingUnit - 1)));
       outStream << StringRef(&padding[size & (paddingUnit - 1)], thisSize);
@@ -1122,5 +1122,5 @@ void OutputSection::write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr) {
   }
 
   shdr->sh_size = size;
-  shdr->sh_addralign = m_alignment;
+  shdr->sh_addralign = m_alignment.value();
 }
