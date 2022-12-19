@@ -1612,7 +1612,7 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
 // Create sample gpu time
 //
 void SpirvLowerRayQuery::createSampleGpuTime(llvm::Function *func) {
-  assert(func->getBasicBlockList().size() == 1);
+  assert(func->size() == 1);
   m_builder->SetInsertPoint(func->getEntryBlock().getTerminator());
   Value *clocksHiPtr = func->getArg(0);
   Value *clocksLoPtr = func->getArg(1);
