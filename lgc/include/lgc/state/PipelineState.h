@@ -139,9 +139,6 @@ public:
   // Set the resource mapping nodes for the pipeline
   void setUserDataNodes(llvm::ArrayRef<ResourceNode> nodes) override final;
 
-  // Set shader stage mask
-  void setShaderStageMask(unsigned mask) override final { m_stageMask = mask; }
-
   // Set whether pre-rasterization part has a geometry shader
   // NOTE: Only applicable in the part pipeline compilation mode.
   void setPreRasterHasGs(bool preRasterHasGs) override final { m_preRasterHasGs = preRasterHasGs; }
@@ -207,6 +204,9 @@ public:
 
   // -----------------------------------------------------------------------------------------------------------------
   // Other methods
+
+  // Set shader stage mask
+  void setShaderStageMask(unsigned mask) { m_stageMask = mask; }
 
   // Get the embedded ShaderModes object
   ShaderModes *getShaderModes() { return &m_shaderModes; }

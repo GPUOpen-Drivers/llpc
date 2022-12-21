@@ -146,22 +146,19 @@ public:
   // Get the LgcContext
   LgcContext *getLgcContext() const { return m_builderContext; }
 
-  // Set the current shader stage, clamp shader stage to the ShaderStageCompute
-  void setShaderStage(ShaderStage stage) { m_shaderStage = stage > ShaderStageCompute ? ShaderStageCompute : stage; }
-
   // -----------------------------------------------------------------------------------------------------------------
   // Methods to set shader modes (FP modes, tessellation modes, fragment modes, workgroup size) for the current
   // shader that come from the input language. The structs passed to the methods are declared in Pipeline.h.
   // For a particular shader stage, these methods must be called before any Builder::Create* calls that
   // generate IR.
 
-  // Set the common shader mode for the current shader, containing hardware FP round and denorm modes.
+  // Set the common shader mode for the given shader stage, containing hardware FP round and denorm modes.
   // The client should always zero-initialize the struct before setting it up, in case future versions
   // add more fields. A local struct variable can be zero-initialized with " = {}".
-  void setCommonShaderMode(const CommonShaderMode &commonShaderMode);
+  void setCommonShaderMode(ShaderStage shaderStage, const CommonShaderMode &commonShaderMode);
 
-  // Get the common shader mode for the current shader.
-  const CommonShaderMode &getCommonShaderMode();
+  // Get the common shader mode for the given shader stage.
+  const CommonShaderMode &getCommonShaderMode(ShaderStage shaderStage);
 
   // Set the tessellation mode. This can be called in multiple shaders, and the values are merged
   // together -- a zero value in one call is overridden by a non-zero value in another call. LLPC needs
@@ -1703,9 +1700,6 @@ protected:
 
   // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
   llvm::Constant *getFpConstant(llvm::Type *ty, llvm::APFloat value);
-
-  bool m_isBuilderRecorder = false;               // Whether this is a BuilderRecorder
-  ShaderStage m_shaderStage = ShaderStageInvalid; // Current shader stage being built.
 
   //
   // @param matrixType : The matrix type to transpose

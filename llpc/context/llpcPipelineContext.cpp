@@ -242,14 +242,7 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
   if (hasRayTracingShaderStage(stageMask))
     stageMask = ShaderStageComputeBit;
 #endif
-  unsigned lgcStageMask = 0;
-  const auto stages = maskToShaderStages(stageMask);
-  for (ShaderStage stage : make_filter_range(stages, isNativeStage)) {
-    if (isShaderStageInMask(stage, stageMask))
-      lgcStageMask |= 1 << getLgcShaderStage(stage);
-  }
   if (pipeline) {
-    pipeline->setShaderStageMask(lgcStageMask);
     pipeline->set128BitCacheHash(get128BitCacheHashCode(),
                                  VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION));
     pipeline->setClient("Vulkan");

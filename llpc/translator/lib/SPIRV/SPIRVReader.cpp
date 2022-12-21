@@ -6996,7 +6996,36 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
       }
     }
   }
-  getBuilder()->setCommonShaderMode(shaderMode);
+
+  // Figure out the LGC shader stage so we can use it in the setCommonShaderMode call.
+  lgc::ShaderStage shaderStage = lgc::ShaderStageCompute;
+  switch (entryExecModel) {
+  case ExecutionModelTaskEXT:
+    shaderStage = lgc::ShaderStageTask;
+    break;
+  case ExecutionModelVertex:
+    shaderStage = lgc::ShaderStageVertex;
+    break;
+  case ExecutionModelTessellationControl:
+    shaderStage = lgc::ShaderStageTessControl;
+    break;
+  case ExecutionModelTessellationEvaluation:
+    shaderStage = lgc::ShaderStageTessEval;
+    break;
+  case ExecutionModelGeometry:
+    shaderStage = lgc::ShaderStageGeometry;
+    break;
+  case ExecutionModelMeshEXT:
+    shaderStage = lgc::ShaderStageMesh;
+    break;
+  case ExecutionModelFragment:
+    shaderStage = lgc::ShaderStageFragment;
+    break;
+  default:
+    break;
+  }
+
+  getBuilder()->setCommonShaderMode(shaderStage, shaderMode);
 
   m_enableGatherLodNz =
       m_bm->hasCapability(CapabilityImageGatherBiasLodAMD) && entryExecModel == ExecutionModelFragment;

@@ -659,9 +659,6 @@ public:
   // -----------------------------------------------------------------------------------------------------------------
   // State setting methods
 
-  // Set the shader stage mask
-  virtual void setShaderStageMask(unsigned mask) = 0;
-
   // Set whether pre-rasterization part has a geometry shader
   // NOTE: Only applicable in the part pipeline compilation mode.
   virtual void setPreRasterHasGs(bool preRasterHasGs) = 0;

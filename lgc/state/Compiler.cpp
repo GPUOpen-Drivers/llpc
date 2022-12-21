@@ -94,9 +94,6 @@ ShaderStage Pipeline::getShaderStage(llvm::Function *func) {
 // @param pipelineLink : Enum saying whether this is a pipeline, unlinked or part-pipeline compile.
 Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineLink) {
   m_pipelineLink = pipelineLink;
-#ifndef NDEBUG
-  unsigned shaderStageMask = 0;
-#endif
 
   // Processing for each shader module before linking.
   IRBuilder<> builder(getContext());
@@ -111,10 +108,6 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
         continue;
       // We have the entry-point (marked as DLLExportStorageClass).
       stage = getShaderStage(&func);
-#ifndef NDEBUG
-      assert((shaderStageMask & (1 << stage)) == 0);
-      shaderStageMask |= 1 << stage;
-#endif
 
       // Rename the entry-point to ensure there is no clash on linking.
       func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
@@ -125,9 +118,6 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
     if (stage == ShaderStageInvalid) {
       stage = ShaderStageCompute;
       m_computeLibrary = true;
-#ifndef NDEBUG
-      shaderStageMask |= 1 << stage;
-#endif
     }
 
     // Mark all other function definitions in the module with the same shader stage.
@@ -136,13 +126,6 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
         setShaderStage(&func, stage);
     }
   }
-
-#ifndef NDEBUG
-  // Assert that the front-end's call to setShaderStageMask was correct. (We want the front-end to call it
-  // before calling any builder calls in case it is using direct BuilderImpl and one of the builder calls needs
-  // the shader stage mask.)
-  assert(shaderStageMask == getShaderStageMask());
-#endif
 
   // The front-end was using a BuilderRecorder; record pipeline state into IR metadata.
   record(modules[0]);
