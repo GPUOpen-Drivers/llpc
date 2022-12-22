@@ -84,8 +84,6 @@ attributes #0 = { nounwind }
 
 ; _amdgpu_gs_main must be first, so it can be linked with a potential vertex fetch shader.
 ; CHECK-NGG3: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage [[geom_stage:![0-9]*]] {
-; CHECK-NGG3: define internal{{.*}} amdgpu_es void @_amdgpu_es_main{{.*}} !lgc.shaderstage [[geom_stage:![0-9]*]] {
-; CHECK-NGG3: define internal{{.*}} amdgpu_gs void @_amdgpu_gs_main.1{{.*}} !lgc.shaderstage [[geom_stage]] {
 ; CHECK-NGG3: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage [[copy_stage:![0-9]*]] {
 ; CHECK-NGG3: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage [[frag_stage:![0-8]*]] {
 ; CHECK-NGG3-DAG: [[geom_stage]] = !{i32 4}
@@ -188,7 +186,6 @@ attributes #0 = { nounwind }
 
 ; CHECK-NGG4: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage !5 {
 ; CHECK-NGG4: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !6 {
-; CHECK-NGG4: define internal{{.*}} amdgpu_hs void @_amdgpu_hs_main.1{{.*}} !lgc.shaderstage !6 {
 ; CHECK-NGG4: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !7 {
 ; CHECK-NGG4: !5 = !{i32 3}
 ; CHECK-NGG4: !6 = !{i32 2}
@@ -263,7 +260,6 @@ attributes #1 = { nounwind readonly }
 ; CHECK-NO-NGG5: !5 = !{i32 2}
 
 ; CHECK-NGG5: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !5 {
-; CHECK-NGG5: define internal{{.*}} amdgpu_hs void @_amdgpu_hs_main.1{{.*}} !lgc.shaderstage !5 {
 ; CHECK-NGG5: !5 = !{i32 2}
 
 define dllexport spir_func void @lgc.shader.TCS.main() local_unnamed_addr #0 !lgc.shaderstage !5 {
@@ -399,10 +395,6 @@ attributes #1 = { nounwind readonly }
 ; vertex fetch shader.
 ; CHECK-NGG7: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage [[tc_stage:![0-9]*]] {
 ; CHECK-NGG7: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage [[geom_stage:![0-9]*]] {
-; CHECK-NGG7: define internal{{.*}} amdgpu_hs void @_amdgpu_hs_main.1{{.*}} !lgc.shaderstage [[tc_stage]] {
-; CHECK-NGG7: define internal{{.*}} amdgpu_es void @_amdgpu_es_main{{.*}} !lgc.shaderstage [[geom_stage]] {
-; CHECK-NGG7: define internal{{.*}} amdgpu_gs void @_amdgpu_gs_main.2{{.*}} !lgc.shaderstage [[geom_stage]] {
-; CHECK-NGG7: define internal{{.*}} amdgpu_ls void @_amdgpu_ls_main{{.*}} !lgc.shaderstage [[tc_stage]] {
 ; CHECK-NGG7: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage [[copy_stage:![0-9]*]] {
 ; CHECK-NGG7: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage [[frag_stage:![0-9]*]] {
 ; CHECK-NGG7-DAG: [[copy_stage]] = !{i32 8}

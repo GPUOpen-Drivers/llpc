@@ -156,8 +156,6 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
       pipelineModule = nullptr;
     }
   }
-  // Ensure m_stageMask is set up.
-  readShaderStageMask(pipelineModule);
   return pipelineModule;
 }
 
@@ -199,6 +197,9 @@ bool PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
 
   // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
   getLgcContext()->preparePassManager(*passMgr);
+
+  // Ensure m_stageMask is set up in this PipelineState, as Patch::addPasses uses it.
+  readShaderStageMask(&*pipelineModule);
 
   // Manually add a PipelineStateWrapper pass.
   // We were using BuilderRecorder, so we do not give our PipelineState to it.
