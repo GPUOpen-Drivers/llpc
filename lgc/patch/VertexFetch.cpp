@@ -29,8 +29,8 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/VertexFetch.h"
-#include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/IntrinsDefs.h"
@@ -587,7 +587,7 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     assert(pipelineState->getLgcContext()->getTargetInfo().getGfxIpVersion().major > 9);
 
     std::unique_ptr<lgc::Builder> desBuilder(Builder::createBuilderImpl(pipelineState->getLgcContext(), pipelineState));
-    desBuilder->setShaderStage(ShaderStageVertex);
+    static_cast<BuilderImplBase *>(&*desBuilder)->setShaderStage(ShaderStageVertex);
     desBuilder->SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
     auto desc =
         desBuilder->CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,

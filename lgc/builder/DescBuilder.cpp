@@ -28,8 +28,8 @@
  * @brief LLPC source file: implementation of Builder methods for descriptor loads
  ***********************************************************************************************************************
  */
-#include "BuilderImpl.h"
 #include "lgc/LgcContext.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"

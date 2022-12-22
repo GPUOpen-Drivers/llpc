@@ -28,7 +28,7 @@
  * @brief LLPC source file: implementation of subgroup Builder methods
  ***********************************************************************************************************************
  */
-#include "BuilderImpl.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/Intrinsics.h"
