@@ -115,7 +115,7 @@ protected:
     return BuilderBase::get(*this).CreateMapToInt32(mapFunc, mappedArgs, passthroughArgs);
   }
 
-  PipelineState *m_pipelineState = nullptr; // Pipeline state
+  PipelineState *m_pipelineState = nullptr;       // Pipeline state
   ShaderStage m_shaderStage = ShaderStageInvalid; // Current shader stage being built.
 
 private:
