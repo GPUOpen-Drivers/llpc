@@ -555,13 +555,11 @@ unsigned PalMetadata::getShaderStageMask() {
   static const struct TableEntry {
     const char *key;
     unsigned maskBit;
-  } table[] = {
-    { ".cs", 1U << ShaderStageCompute },
-    { ".ps", 1U << ShaderStageFragment },
-    { ".vs", 1U << ShaderStageVertex },
-    { ".gs", 1U << ShaderStageVertex },
-    { ".hs", 1U << ShaderStageTessControl | 1U << ShaderStageTessEval }
-  };
+  } table[] = {{".cs", 1U << ShaderStageCompute},
+               {".ps", 1U << ShaderStageFragment},
+               {".vs", 1U << ShaderStageVertex},
+               {".gs", 1U << ShaderStageVertex},
+               {".hs", 1U << ShaderStageTessControl | 1U << ShaderStageTessEval}};
   unsigned stageMask = 0;
   for (const auto &entry : ArrayRef<TableEntry>(table)) {
     if (hwStages.find(m_document->getNode(entry.key)) != hwStages.end())
