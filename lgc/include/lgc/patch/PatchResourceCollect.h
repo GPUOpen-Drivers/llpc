@@ -117,29 +117,6 @@ private:
   bool m_processMissingFs = false;           // Whether to process a missing FS (part-pipeline compilation).
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for resource collecting
-class LegacyPatchResourceCollect : public llvm::ModulePass {
-public:
-  LegacyPatchResourceCollect();
-
-  virtual bool runOnModule(llvm::Module &module) override;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    analysisUsage.addPreserved<LegacyPipelineShaders>();
-  }
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchResourceCollect(const LegacyPatchResourceCollect &) = delete;
-  LegacyPatchResourceCollect &operator=(const LegacyPatchResourceCollect &) = delete;
-
-  PatchResourceCollect m_impl;
-};
-
 // Represents the compatibility info of input/output
 union InOutCompatibilityInfo {
   struct {

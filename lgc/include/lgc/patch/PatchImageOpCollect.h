@@ -47,23 +47,4 @@ public:
   static llvm::StringRef name() { return "Patch LLVM for image operation collecting"; }
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for image operations
-class LegacyPatchImageOpCollect : public llvm::ModulePass {
-public:
-  LegacyPatchImageOpCollect();
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-
-  bool runOnModule(llvm::Module &module) override;
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchImageOpCollect(const LegacyPatchImageOpCollect &) = delete;
-  LegacyPatchImageOpCollect &operator=(const LegacyPatchImageOpCollect &) = delete;
-
-  PatchImageOpCollect m_impl;
-};
-
 } // namespace lgc

@@ -71,26 +71,4 @@ private:
                                                                               // the mapped location for each stream
 };
 
-// =====================================================================================================================
-// Pass to generate copy shader if required
-class LegacyPatchCopyShader : public llvm::ModulePass {
-public:
-  static char ID;
-  LegacyPatchCopyShader();
-
-  bool runOnModule(llvm::Module &module) override;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    // Pass does not preserve PipelineShaders as it adds a new shader.
-  }
-
-private:
-  LegacyPatchCopyShader(const LegacyPatchCopyShader &) = delete;
-  LegacyPatchCopyShader &operator=(const LegacyPatchCopyShader &) = delete;
-
-  PatchCopyShader m_impl;
-};
-
 } // namespace lgc

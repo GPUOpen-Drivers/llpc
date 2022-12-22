@@ -51,27 +51,4 @@ private:
 #endif
 };
 
-// =====================================================================================================================
-// Pass to adjust wave size per shader stage heuristically.
-class LegacyPatchWaveSizeAdjust final : public llvm::ModulePass {
-public:
-  LegacyPatchWaveSizeAdjust();
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.setPreservesAll();
-  }
-
-  bool runOnModule(llvm::Module &module) override;
-
-  static char ID;
-
-private:
-  LegacyPatchWaveSizeAdjust(const LegacyPatchWaveSizeAdjust &) = delete;
-  LegacyPatchWaveSizeAdjust &operator=(const LegacyPatchWaveSizeAdjust &) = delete;
-
-  PatchWaveSizeAdjust m_impl;
-};
-
 } // namespace lgc

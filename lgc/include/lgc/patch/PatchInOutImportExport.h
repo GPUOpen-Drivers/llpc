@@ -238,29 +238,4 @@ private:
   const std::array<unsigned char, 4> *m_buffFormats; // The format of MTBUF instructions for specified GFX
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for input import and output export.
-class LegacyPatchInOutImportExport : public llvm::ModulePass {
-public:
-  LegacyPatchInOutImportExport();
-  ~LegacyPatchInOutImportExport();
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    analysisUsage.addRequired<llvm::PostDominatorTreeWrapperPass>();
-    analysisUsage.addPreserved<LegacyPipelineShaders>();
-  }
-
-  bool runOnModule(llvm::Module &module) override;
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchInOutImportExport(const LegacyPatchInOutImportExport &) = delete;
-  LegacyPatchInOutImportExport &operator=(const LegacyPatchInOutImportExport &) = delete;
-
-  PatchInOutImportExport m_impl;
-};
-
 } // namespace lgc

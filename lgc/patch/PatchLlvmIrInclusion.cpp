@@ -40,29 +40,6 @@ using namespace lgc;
 namespace lgc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacyPatchLlvmIrInclusion::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF.
-ModulePass *createLegacyPatchLlvmIrInclusion() {
-  return new LegacyPatchLlvmIrInclusion();
-}
-
-// =====================================================================================================================
-LegacyPatchLlvmIrInclusion::LegacyPatchLlvmIrInclusion() : LegacyPatch(ID) {
-}
-
-// =====================================================================================================================
-// Executes this patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchLlvmIrInclusion::runOnModule(Module &module) {
-  return m_impl.runImpl(module);
-}
-
-// =====================================================================================================================
 // Executes this patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
@@ -102,8 +79,3 @@ bool PatchLlvmIrInclusion::runImpl(Module &module) {
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF binary.
-INITIALIZE_PASS(LegacyPatchLlvmIrInclusion, DEBUG_TYPE, "Include LLVM IR as a separate section in the ELF binary",
-                false, false)

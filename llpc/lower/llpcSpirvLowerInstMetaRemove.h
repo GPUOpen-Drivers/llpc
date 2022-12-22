@@ -50,21 +50,4 @@ private:
   bool m_changed; // Whether the module is changed
 };
 
-// =====================================================================================================================
-// Legacy pass manager wrapper class
-class LegacySpirvLowerInstMetaRemove : public llvm::ModulePass {
-public:
-  LegacySpirvLowerInstMetaRemove();
-
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerInstMetaRemove(const LegacySpirvLowerInstMetaRemove &) = delete;
-  LegacySpirvLowerInstMetaRemove &operator=(const LegacySpirvLowerInstMetaRemove &) = delete;
-
-  SpirvLowerInstMetaRemove Impl;
-};
-
 } // namespace Llpc

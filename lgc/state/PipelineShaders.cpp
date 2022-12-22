@@ -39,14 +39,6 @@
 using namespace lgc;
 using namespace llvm;
 
-char LegacyPipelineShaders::ID = 0;
-
-// =====================================================================================================================
-// Create an instance of the pass.
-ModulePass *createLegacyPipelineShaders() {
-  return new LegacyPipelineShaders();
-}
-
 // =====================================================================================================================
 AnalysisKey PipelineShaders::Key;
 
@@ -54,16 +46,6 @@ AnalysisKey PipelineShaders::Key;
 PipelineShadersResult::PipelineShadersResult() {
   for (auto &entryPoint : m_entryPoints)
     entryPoint = nullptr;
-}
-
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPipelineShaders::runOnModule(Module &module) {
-  m_result = m_impl.runImpl(module);
-  return false;
 }
 
 // =====================================================================================================================
@@ -121,7 +103,3 @@ ShaderStage PipelineShadersResult::getShaderStage(const Function *func) const {
     return ShaderStageInvalid;
   return entryMapIt->second;
 }
-
-// =====================================================================================================================
-// Initializes the pass
-INITIALIZE_PASS(LegacyPipelineShaders, DEBUG_TYPE, "LLVM pass for getting pipeline shaders", false, true)

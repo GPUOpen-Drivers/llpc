@@ -47,22 +47,4 @@ public:
   static llvm::StringRef name() { return "Patch metadata for invariant loads"; }
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for image operations
-class LegacyPatchInvariantLoads : public llvm::FunctionPass {
-public:
-  LegacyPatchInvariantLoads();
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-  bool runOnFunction(llvm::Function &function) override;
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchInvariantLoads(const LegacyPatchInvariantLoads &) = delete;
-  LegacyPatchInvariantLoads &operator=(const LegacyPatchInvariantLoads &) = delete;
-
-  PatchInvariantLoads m_impl;
-};
-
 } // namespace lgc

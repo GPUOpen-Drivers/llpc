@@ -29,8 +29,8 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/VertexFetch.h"
-#include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/IntrinsDefs.h"
@@ -525,28 +525,6 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
 // clang-format on
 #endif
 
-char LegacyLowerVertexFetch::ID = 0;
-
-// =====================================================================================================================
-// Create the vertex fetch pass
-ModulePass *lgc::createLegacyLowerVertexFetch() {
-  return new LegacyLowerVertexFetch();
-}
-
-// =====================================================================================================================
-LegacyLowerVertexFetch::LegacyLowerVertexFetch() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Run the lower vertex fetch pass on a module
-//
-// @param [in/out] module : Module
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyLowerVertexFetch::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  return m_impl.runImpl(module, pipelineState);
-}
-
 // =====================================================================================================================
 // Run the lower vertex fetch pass on a module
 //
@@ -587,7 +565,7 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     assert(pipelineState->getLgcContext()->getTargetInfo().getGfxIpVersion().major > 9);
 
     std::unique_ptr<lgc::Builder> desBuilder(Builder::createBuilderImpl(pipelineState->getLgcContext(), pipelineState));
-    desBuilder->setShaderStage(ShaderStageVertex);
+    static_cast<BuilderImplBase *>(&*desBuilder)->setShaderStage(ShaderStageVertex);
     desBuilder->SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
     auto desc =
         desBuilder->CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
@@ -1828,7 +1806,3 @@ bool VertexFetchImpl::needPatchA2S(const VertexInputDescription *inputDesc) cons
 bool VertexFetchImpl::needSecondVertexFetch(const VertexInputDescription *inputDesc) const {
   return inputDesc->dfmt == BufDataFormat64_64_64 || inputDesc->dfmt == BufDataFormat64_64_64_64;
 }
-
-// =====================================================================================================================
-// Initialize the lower vertex fetch pass
-INITIALIZE_PASS(LegacyLowerVertexFetch, DEBUG_TYPE, "Lower vertex fetch calls", false, false)

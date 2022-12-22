@@ -102,23 +102,4 @@ private:
   static constexpr unsigned MinMemOpLoopBytes = 256;
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for buffer operations
-class LegacyPatchBufferOp final : public llvm::FunctionPass, public llvm::InstVisitor<LegacyPatchBufferOp> {
-public:
-  LegacyPatchBufferOp();
-
-  bool runOnFunction(llvm::Function &function) override;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-
-  static char ID; // NOLINT
-
-private:
-  LegacyPatchBufferOp(const LegacyPatchBufferOp &) = delete;
-  LegacyPatchBufferOp &operator=(const LegacyPatchBufferOp &) = delete;
-
-  PatchBufferOp m_impl;
-};
-
 } // namespace lgc

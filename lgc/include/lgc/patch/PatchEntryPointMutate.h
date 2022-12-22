@@ -152,25 +152,4 @@ private:
   llvm::SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
 };
 
-// =====================================================================================================================
-// The entry-point mutation pass
-class LegacyPatchEntryPointMutate : public llvm::ModulePass {
-public:
-  LegacyPatchEntryPointMutate();
-  LegacyPatchEntryPointMutate(const LegacyPatchEntryPointMutate &) = delete;
-  LegacyPatchEntryPointMutate &operator=(const LegacyPatchEntryPointMutate &) = delete;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-    analysisUsage.addRequired<LegacyPipelineShaders>();
-    // Does not preserve PipelineShaders because it replaces the entrypoints.
-  }
-
-  virtual bool runOnModule(llvm::Module &module) override;
-
-  static char ID; // ID of this pass
-private:
-  PatchEntryPointMutate m_impl;
-};
-
 } // namespace lgc

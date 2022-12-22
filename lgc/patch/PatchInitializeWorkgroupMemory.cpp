@@ -49,31 +49,6 @@ static cl::opt<bool>
 namespace lgc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacyPatchInitializeWorkgroupMemory::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of setting up the value for workgroup global variables.
-ModulePass *createLegacyPatchInitializeWorkgroupMemory() {
-  return new LegacyPatchInitializeWorkgroupMemory();
-}
-
-// =====================================================================================================================
-LegacyPatchInitializeWorkgroupMemory::LegacyPatchInitializeWorkgroupMemory() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchInitializeWorkgroupMemory::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
-  return m_impl.runImpl(module, pipelineShaders, pipelineState);
-}
-
-// =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
@@ -300,7 +275,3 @@ unsigned PatchInitializeWorkgroupMemory::getTypeSizeInDwords(Type *inputTy) {
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of initialize workgroup memory with zero.
-INITIALIZE_PASS(LegacyPatchInitializeWorkgroupMemory, DEBUG_TYPE, "Patch for initialize workgroup memory", false, false)

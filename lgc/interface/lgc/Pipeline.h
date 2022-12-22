@@ -799,16 +799,13 @@ public:
   //                 timers[1]: LLVM optimizations
   //                 timers[2]: codegen
   // @param otherElf : Optional ELF for the other part-pipeline when compiling an unlinked part-pipeline ELF.
-  // @param newPassManager : Whether to use the new pass manager or not
   // @returns : True for success.
   //           False if irLink asked for an "unlinked" shader or part-pipeline, and there is some reason why the
   //           module cannot be compiled that way.  The client typically then does a whole-pipeline compilation
   //           instead. The client can call getLastError() to get a textual representation of the error, for
   //           use in logging or in error reporting in a command-line utility.
-  // NOTE: The newPassManager argument will be removed once the switch to the new pass manager is completed.
   virtual bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
-                        CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers,
-                        bool newPassManager) = 0;
+                        CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) = 0;
 
   // Create an ELF linker object for linking unlinked shader or part-pipeline ELFs into a pipeline ELF using
   // the pipeline state. This needs to be deleted after use.

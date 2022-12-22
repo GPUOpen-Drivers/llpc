@@ -36,7 +36,6 @@
 #include "lgc/state/TargetInfo.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/DivergenceAnalysis.h"
-#include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -51,43 +50,6 @@ using namespace llvm;
 using namespace lgc;
 
 namespace lgc {
-
-// =====================================================================================================================
-// Initializes static members.
-char LegacyPatchBufferOp::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching for buffer operations
-FunctionPass *createLegacyPatchBufferOp() {
-  return new LegacyPatchBufferOp();
-}
-
-// =====================================================================================================================
-LegacyPatchBufferOp::LegacyPatchBufferOp() : FunctionPass(ID) {
-}
-
-// =====================================================================================================================
-// Get the analysis usage of this pass.
-//
-// @param [out] analysisUsage : The analysis usage.
-void LegacyPatchBufferOp::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.addRequired<LegacyDivergenceAnalysis>();
-  analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  analysisUsage.addRequired<TargetTransformInfoWrapperPass>();
-  analysisUsage.addPreserved<TargetTransformInfoWrapperPass>();
-}
-
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM function.
-//
-// @param [in/out] function : LLVM function to be run on
-// @returns : True if the function was modified by the transformation and false otherwise
-bool LegacyPatchBufferOp::runOnFunction(Function &function) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
-  LegacyDivergenceAnalysis *divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
-  auto isDivergent = [divergenceAnalysis](const Value &value) { return divergenceAnalysis->isDivergent(&value); };
-  return m_impl.runImpl(function, pipelineState, isDivergent);
-}
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM function.
@@ -1817,10 +1779,3 @@ void PatchBufferOp::fixIncompletePhis() {
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patch operations for buffer operations.
-INITIALIZE_PASS_BEGIN(LegacyPatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)
-INITIALIZE_PASS_DEPENDENCY(LegacyDivergenceAnalysis)
-INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
-INITIALIZE_PASS_END(LegacyPatchBufferOp, DEBUG_TYPE, "Patch LLVM for buffer operations", false, false)

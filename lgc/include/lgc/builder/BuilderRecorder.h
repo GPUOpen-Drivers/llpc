@@ -35,15 +35,6 @@
 #include "llvm/IR/ValueHandle.h"
 #endif
 
-namespace llvm {
-
-class ModulePass;
-class PassRegistry;
-
-void initializeLegacyBuilderReplayerPass(PassRegistry &);
-
-} // namespace llvm
-
 namespace lgc {
 
 class PipelineState;
@@ -617,8 +608,5 @@ private:
   std::unique_ptr<ShaderModes> m_shaderModes; // ShaderModes for a shader compile
   bool m_omitOpcodes;                         // Omit opcodes on lgc.create.* function declarations
 };
-
-// Create BuilderReplayer pass
-llvm::ModulePass *createLegacyBuilderReplayer(Pipeline *pipeline);
 
 } // namespace lgc

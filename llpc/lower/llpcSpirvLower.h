@@ -40,30 +40,6 @@ class Constant;
 class GlobalVariable;
 class Timer;
 
-namespace legacy {
-
-class PassManager;
-
-} // namespace legacy
-
-class PassRegistry;
-void initializeLegacySpirvLowerAccessChainPass(PassRegistry &);
-void initializeLegacySpirvLowerCfgMergesPass(PassRegistry &);
-void initializeLegacySpirvLowerMathConstFoldingPass(PassRegistry &);
-void initializeLegacySpirvLowerMathFloatOpPass(PassRegistry &);
-void initializeLegacySpirvLowerConstImmediateStorePass(PassRegistry &);
-void initializeLegacySpirvLowerMemoryOpPass(PassRegistry &);
-void initializeLegacySpirvLowerGlobalPass(PassRegistry &);
-void initializeLegacySpirvLowerInstMetaRemovePass(PassRegistry &);
-#if VKI_RAY_TRACING
-void initializeLegacySpirvLowerRayTracingPass(PassRegistry &);
-void initializeLegacySpirvLowerRayTracingBuiltInPass(PassRegistry &);
-void initializeLegacySpirvLowerRayQueryPass(PassRegistry &);
-void initializeLegacySpirvLowerRayQueryPostInlinePass(PassRegistry &);
-void initializeLegacySpirvLowerRayTracingIntrinsicsPass(PassRegistry &);
-#endif
-void initializeLegacySpirvLowerTerminatorPass(PassRegistry &);
-void initializeLegacySpirvLowerTranslatorPass(PassRegistry &);
 } // namespace llvm
 
 namespace lgc {
@@ -75,49 +51,7 @@ class PassManager;
 
 namespace Llpc {
 
-// Initialize passes for SPIR-V lowering
-//
-// @param passRegistry : Pass registry
-inline void initializeLowerPasses(llvm::PassRegistry &passRegistry) {
-  initializeLegacySpirvLowerAccessChainPass(passRegistry);
-  initializeLegacySpirvLowerCfgMergesPass(passRegistry);
-  initializeLegacySpirvLowerConstImmediateStorePass(passRegistry);
-  initializeLegacySpirvLowerMathConstFoldingPass(passRegistry);
-  initializeLegacySpirvLowerMathFloatOpPass(passRegistry);
-  initializeLegacySpirvLowerMemoryOpPass(passRegistry);
-  initializeLegacySpirvLowerGlobalPass(passRegistry);
-  initializeLegacySpirvLowerInstMetaRemovePass(passRegistry);
-#if VKI_RAY_TRACING
-  initializeLegacySpirvLowerRayTracingPass(passRegistry);
-  initializeLegacySpirvLowerRayTracingBuiltInPass(passRegistry);
-  initializeLegacySpirvLowerRayQueryPass(passRegistry);
-  initializeLegacySpirvLowerRayQueryPostInlinePass(passRegistry);
-  initializeLegacySpirvLowerRayTracingIntrinsicsPass(passRegistry);
-#endif
-  initializeLegacySpirvLowerTerminatorPass(passRegistry);
-  initializeLegacySpirvLowerTranslatorPass(passRegistry);
-}
-
 class Context;
-
-llvm::ModulePass *createLegacySpirvLowerAccessChain();
-llvm::ModulePass *createLegacySpirvLowerCfgMerges();
-llvm::ModulePass *createLegacySpirvLowerConstImmediateStore();
-llvm::ModulePass *createLegacySpirvLowerMathConstFolding();
-llvm::ModulePass *createLegacySpirvLowerMathFloatOp();
-llvm::ModulePass *createLegacySpirvLowerMemoryOp();
-llvm::ModulePass *createLegacySpirvLowerGlobal();
-llvm::ModulePass *createLegacySpirvLowerInstMetaRemove();
-#if VKI_RAY_TRACING
-llvm::ModulePass *createLegacySpirvLowerRayTracing(bool rayQueryLibrary);
-llvm::ModulePass *createLegacySpirvLowerRayTracingBuiltIn();
-llvm::ModulePass *createLegacySpirvLowerRayQuery(bool rayQueryLibrary);
-llvm::ModulePass *createLegacySpirvLowerRayQueryPostInline();
-llvm::ModulePass *createLegacySpirvLowerRayTracingIntrinsics();
-#endif
-llvm::ModulePass *createSpirvLowerResourceCollect(bool collectDetailUsage);
-llvm::ModulePass *createLegacySpirvLowerTerminator();
-llvm::ModulePass *createSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo);
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations, as the base class.
@@ -147,27 +81,6 @@ protected:
   ShaderStage m_shaderStage = ShaderStageInvalid; // Shader stage
   llvm::Function *m_entryPoint = nullptr;         // Entry point of input module
   lgc::Builder *m_builder = nullptr;              // LGC builder object
-};
-
-// =====================================================================================================================
-// Legacy pass manager wrapper class. Used as the base class for the legacy
-// lower passes.
-class LegacySpirvLower : public llvm::ModulePass, public SpirvLower {
-public:
-  explicit LegacySpirvLower(char &pid) : llvm::ModulePass(pid) {}
-
-  // Add per-shader lowering passes to pass manager
-  static void addPasses(Context *context, ShaderStage stage, llvm::legacy::PassManager &passMgr, llvm::Timer *lowerTimer
-#if VKI_RAY_TRACING
-                        ,
-                        bool rayTracing, bool rayQuery, bool isInternalRtShader
-#endif
-  );
-
-private:
-  LegacySpirvLower() = delete;
-  LegacySpirvLower(const LegacySpirvLower &) = delete;
-  LegacySpirvLower &operator=(const LegacySpirvLower &) = delete;
 };
 
 } // namespace Llpc

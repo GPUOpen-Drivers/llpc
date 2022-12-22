@@ -28,8 +28,8 @@
  * @brief LLPC source file: implementation of lgc::Builder
  ***********************************************************************************************************************
  */
-#include "BuilderImpl.h"
 #include "lgc/LgcContext.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/builder/BuilderRecorder.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ShaderModes.h"

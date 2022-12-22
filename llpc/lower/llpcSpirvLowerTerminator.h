@@ -55,21 +55,4 @@ private:
   llvm::SmallVector<llvm::Instruction *, 8> m_removalStack;
 };
 
-// =====================================================================================================================
-// Legacy pass manager wrapper class
-class LegacySpirvLowerTerminator : public llvm::ModulePass {
-public:
-  LegacySpirvLowerTerminator();
-
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerTerminator(const LegacySpirvLowerTerminator &) = delete;
-  LegacySpirvLowerTerminator &operator=(const LegacySpirvLowerTerminator &) = delete;
-
-  SpirvLowerTerminator Impl;
-};
-
 } // namespace Llpc

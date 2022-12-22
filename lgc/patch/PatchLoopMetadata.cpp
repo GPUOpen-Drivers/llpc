@@ -47,10 +47,6 @@ typedef OuterAnalysisManagerProxy<ModuleAnalysisManager, Loop, LoopStandardAnaly
 } // namespace llvm
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacyPatchLoopMetadata::ID = 0;
-
-// =====================================================================================================================
 // Update metadata by removing any existing metadata with the specified prefix, and then adding the new metadata if
 // existing metadata was removed or conditional is false.
 //
@@ -88,33 +84,9 @@ MDNode *PatchLoopMetadata::updateMetadata(MDNode *loopId, ArrayRef<StringRef> pr
 };
 
 // =====================================================================================================================
-// Pass creator, creates the pass for patching loop metadata
-LoopPass *lgc::createLegacyPatchLoopMetadata() {
-  return new LegacyPatchLoopMetadata();
-}
-
-// =====================================================================================================================
 PatchLoopMetadata::PatchLoopMetadata()
     : m_context(nullptr), m_forceLoopUnrollCount(0), m_disableLoopUnroll(false), m_disableLicmThreshold(0),
       m_unrollHintThreshold(0), m_dontUnrollHintThreshold(0) {
-}
-
-// =====================================================================================================================
-LegacyPatchLoopMetadata::LegacyPatchLoopMetadata() : LoopPass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] loop : LLVM loop to be run on
-// @param [in/out] loopPassMgr : Legacy loop pass pass manager
-// @returns : True if the loop was modified by the transformation and false otherwise
-bool LegacyPatchLoopMetadata::runOnLoop(Loop *loop, LPPassManager &loopPassMgr) {
-  if (skipLoop(loop))
-    return false;
-  Module *module = loop->getHeader()->getModule();
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(module);
-  return m_impl.runImpl(*loop, pipelineState);
 }
 
 // =====================================================================================================================
@@ -239,7 +211,3 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
 
   return changed;
 }
-
-// =====================================================================================================================
-// Initializes the pass for patching Loop metadata.
-INITIALIZE_PASS(LegacyPatchLoopMetadata, DEBUG_TYPE, "Set or amend metadata to control loop unrolling", false, false)

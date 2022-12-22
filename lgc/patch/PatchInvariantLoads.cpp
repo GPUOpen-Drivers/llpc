@@ -45,38 +45,6 @@ using namespace lgc;
 namespace lgc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacyPatchInvariantLoads::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass
-FunctionPass *createLegacyPatchInvariantLoads() {
-  return new LegacyPatchInvariantLoads();
-}
-
-// =====================================================================================================================
-LegacyPatchInvariantLoads::LegacyPatchInvariantLoads() : llvm::FunctionPass(ID) {
-}
-
-// =====================================================================================================================
-// Get the analysis usage of this pass.
-//
-// @param [out] analysisUsage : The analysis usage.
-void LegacyPatchInvariantLoads::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-}
-
-// =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
-//
-// @param [in/out] function : Function that we will patch.
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchInvariantLoads::runOnFunction(Function &function) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(function.getParent());
-  return m_impl.runImpl(function, pipelineState);
-}
-
-// =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
 // @param [in/out] function : Function that we will patch.
@@ -261,7 +229,3 @@ bool PatchInvariantLoads::runImpl(Function &function, PipelineState *pipelineSta
 }
 
 } // namespace lgc
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patch image derivative operations dependent on discards.
-INITIALIZE_PASS(LegacyPatchInvariantLoads, DEBUG_TYPE, "Patch invariant loads", false, false)

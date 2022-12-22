@@ -44,28 +44,6 @@ using namespace Llpc;
 namespace Llpc {
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacySpirvLowerConstImmediateStore::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering operations for constant immediate store
-ModulePass *createLegacySpirvLowerConstImmediateStore() {
-  return new LegacySpirvLowerConstImmediateStore();
-}
-
-// =====================================================================================================================
-LegacySpirvLowerConstImmediateStore::LegacySpirvLowerConstImmediateStore() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
-bool LegacySpirvLowerConstImmediateStore::runOnModule(Module &module) {
-  return Impl.runImpl(module);
-}
-
-// =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
@@ -219,7 +197,3 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *sto
 }
 
 } // namespace Llpc
-
-// =====================================================================================================================
-// Initializes the pass of SPIR-V lowering operations for constant immediate store.
-INITIALIZE_PASS(LegacySpirvLowerConstImmediateStore, DEBUG_TYPE, "Lower SPIR-V constant immediate store", false, false)

@@ -86,16 +86,6 @@ opt<bool> InRegEsGsLdsSize("inreg-esgs-lds-size", desc("For GS on-chip, add esGs
 } // namespace llvm
 
 // =====================================================================================================================
-// Initializes static members.
-char LegacyPatchEntryPointMutate::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching operations for entry-point mutation
-ModulePass *lgc::createLegacyPatchEntryPointMutate() {
-  return new LegacyPatchEntryPointMutate();
-}
-
-// =====================================================================================================================
 PatchEntryPointMutate::PatchEntryPointMutate() : m_hasTs(false), m_hasGs(false) {
 }
 
@@ -113,21 +103,6 @@ PatchEntryPointMutate::UserDataArg::UserDataArg(llvm::Type *argTy, const llvm::T
 PatchEntryPointMutate::UserDataArg::UserDataArg(llvm::Type *argTy, const llvm::Twine &name,
                                                 UserDataMapping userDataValue, unsigned *argIndex)
     : UserDataArg(argTy, name, static_cast<unsigned>(userDataValue), argIndex) {
-}
-
-// =====================================================================================================================
-LegacyPatchEntryPointMutate::LegacyPatchEntryPointMutate() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchEntryPointMutate::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
-  return m_impl.runImpl(module, pipelineShaders, pipelineState);
 }
 
 // =====================================================================================================================
@@ -1693,7 +1668,3 @@ bool PatchEntryPointMutate::UserDataUsage::isSpecialUserDataUsed(UserDataMapping
   unsigned index = static_cast<unsigned>(kind) - static_cast<unsigned>(UserDataMapping::GlobalTable);
   return specialUserData.size() > index && !specialUserData[index].users.empty();
 }
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patching operations for entry-point mutation.
-INITIALIZE_PASS(LegacyPatchEntryPointMutate, DEBUG_TYPE, "Patch LLVM for entry-point mutation", false, false)

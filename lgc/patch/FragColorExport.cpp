@@ -62,10 +62,6 @@ LowerFragColorExport::LowerFragColorExport() : m_exportValues(MaxColorTargets + 
 }
 
 // =====================================================================================================================
-LegacyLowerFragColorExport::LegacyLowerFragColorExport() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
 // Extract all the scalar elements of a scalar or vector type (with at-most four elements) input. Return an array of
 // elements, padded with null values at the end when the input vector has less than 4 elements.
 //
@@ -434,25 +430,6 @@ Value *FragColorExport::convertToInt(Value *value, bool signedness, BuilderBase 
 }
 
 } // namespace lgc
-
-char LegacyLowerFragColorExport::ID = 0;
-
-// =====================================================================================================================
-// Create the color export pass
-ModulePass *lgc::createLegacyLowerFragColorExport() {
-  return new LegacyLowerFragColorExport();
-}
-
-// =====================================================================================================================
-// Run the lower color export pass on a module
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyLowerFragColorExport::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  PipelineShadersResult &pipelineShaders = getAnalysis<LegacyPipelineShaders>().getResult();
-  return m_impl.runImpl(module, pipelineShaders, pipelineState);
-}
 
 // =====================================================================================================================
 // Run the lower color export pass on a module
@@ -1034,7 +1011,3 @@ void FragColorExport::generateNullFragmentShaderBody(llvm::Function *entryPoint)
   BuilderBase builder(block);
   builder.CreateRetVoid();
 }
-
-// =====================================================================================================================
-// Initialize the lower fragment color export pass
-INITIALIZE_PASS(LegacyLowerFragColorExport, DEBUG_TYPE, "Lower fragment color export calls", false, false)

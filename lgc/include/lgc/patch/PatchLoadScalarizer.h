@@ -59,22 +59,4 @@ private:
   unsigned m_scalarThreshold;                               // The threshold for load scalarizer
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for scalarize load.
-class LegacyPatchLoadScalarizer final : public llvm::FunctionPass {
-public:
-  explicit LegacyPatchLoadScalarizer();
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-  bool runOnFunction(llvm::Function &function) override;
-
-  static char ID; // NOLINT
-
-private:
-  LegacyPatchLoadScalarizer(const LegacyPatchLoadScalarizer &) = delete;
-  LegacyPatchLoadScalarizer &operator=(const LegacyPatchLoadScalarizer &) = delete;
-
-  PatchLoadScalarizer m_impl;
-};
-
 } // namespace lgc

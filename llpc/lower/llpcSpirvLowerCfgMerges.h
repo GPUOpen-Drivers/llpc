@@ -50,21 +50,4 @@ private:
   llvm::DenseSet<llvm::Value *> m_convergentValues;
 };
 
-// =====================================================================================================================
-// Legacy pass manager wrapper class
-class LegacySpirvLowerCfgMerges : public llvm::ModulePass {
-public:
-  LegacySpirvLowerCfgMerges();
-
-  virtual bool runOnModule(llvm::Module &module);
-
-  static char ID; // ID of this pass
-
-private:
-  LegacySpirvLowerCfgMerges(const LegacySpirvLowerCfgMerges &) = delete;
-  LegacySpirvLowerCfgMerges &operator=(const LegacySpirvLowerCfgMerges &) = delete;
-
-  SpirvLowerCfgMerges Impl;
-};
-
 } // namespace Llpc

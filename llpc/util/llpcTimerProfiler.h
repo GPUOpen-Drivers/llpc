@@ -37,7 +37,6 @@
 
 namespace lgc {
 
-class LegacyPassManager;
 class PassManager;
 
 } // namespace lgc
@@ -65,7 +64,6 @@ public:
 
   ~TimerProfiler();
 
-  void addTimerStartStopPass(lgc::LegacyPassManager *passMgr, TimerKind timerKind, bool start);
   void addTimerStartStopPass(lgc::PassManager &passMgr, TimerKind timerKind, bool start);
 
   void startStopTimer(TimerKind name, bool start);

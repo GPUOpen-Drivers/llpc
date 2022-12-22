@@ -43,33 +43,6 @@
 using namespace lgc;
 using namespace llvm;
 
-char LegacyPatchWaveSizeAdjust::ID = 0;
-
-// =====================================================================================================================
-// Create PatchWaveSizeAdjust pass
-//
-// @param pipeline : Pipeline object
-ModulePass *lgc::createLegacyPatchWaveSizeAdjust() {
-  return new LegacyPatchWaveSizeAdjust();
-}
-
-// =====================================================================================================================
-// Constructor
-//
-// @param pipeline : Pipeline object
-LegacyPatchWaveSizeAdjust::LegacyPatchWaveSizeAdjust() : ModulePass(ID) {
-}
-
-// =====================================================================================================================
-// Run the PatchWaveSizeAdjust pass on a module
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchWaveSizeAdjust::runOnModule(Module &module) {
-  auto pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  return m_impl.runImpl(module, pipelineState);
-}
-
 // =====================================================================================================================
 // Run the PatchWaveSizeAdjust pass on a module
 //
@@ -173,7 +146,3 @@ bool PatchWaveSizeAdjust::is16BitArithmeticOp(Instruction *inst) {
   return false;
 }
 #endif
-
-// =====================================================================================================================
-// Initializes the pass
-INITIALIZE_PASS(LegacyPatchWaveSizeAdjust, DEBUG_TYPE, "Patch LLVM for per-shader wave size adjustment", false, false)

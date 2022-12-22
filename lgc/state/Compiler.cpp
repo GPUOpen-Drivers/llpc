@@ -52,8 +52,7 @@ using namespace lgc;
 using namespace llvm;
 
 namespace lgc {
-// Create BuilderReplayer pass
-ModulePass *createLegacyBuilderReplayer(Pipeline *pipeline);
+
 ElfLinker *createElfLinkerImpl(PipelineState *pipelineState, llvm::ArrayRef<llvm::MemoryBufferRef> elfs);
 
 } // namespace lgc
@@ -174,29 +173,15 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
 //                 timers[0]: patch passes
 //                 timers[1]: LLVM optimizations
 //                 timers[2]: codegen
-// @param newPassManager : Whether to use the new pass manager or not.
 // @returns : True for success.
 //           False if irLink asked for an "unlinked" shader or part-pipeline, and there is some reason why the
 //           module cannot be compiled that way.  The client typically then does a whole-pipeline compilation
 //           instead. The client can call getLastError() to get a textual representation of the error, for
 //           use in logging or in error reporting in a command-line utility.
 bool PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_stream &outStream,
-                             Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, ArrayRef<Timer *> timers,
-                             bool newPassManager) {
+                             Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, ArrayRef<Timer *> timers) {
   m_lastError.clear();
 
-  if (newPassManager)
-    generateWithNewPassManager(std::move(pipelineModule), outStream, std::move(checkShaderCacheFunc), timers);
-  else
-    generateWithLegacyPassManager(std::move(pipelineModule), outStream, std::move(checkShaderCacheFunc), timers);
-
-  // See if there was a recoverable error.
-  return getLastError() == "";
-}
-
-void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineModule, raw_pwrite_stream &outStream,
-                                               Pipeline::CheckShaderCacheFunc checkShaderCacheFunc,
-                                               ArrayRef<Timer *> timers) {
   unsigned passIndex = 1000;
   Timer *patchTimer = timers.size() >= 1 ? timers[0] : nullptr;
   Timer *optTimer = timers.size() >= 2 ? timers[1] : nullptr;
@@ -241,53 +226,9 @@ void PipelineState::generateWithNewPassManager(std::unique_ptr<Module> pipelineM
     // Run the codegen passes
     codegenPassMgr->run(*pipelineModule);
   }
-}
 
-void PipelineState::generateWithLegacyPassManager(std::unique_ptr<Module> pipelineModule, raw_pwrite_stream &outStream,
-                                                  Pipeline::CheckShaderCacheFunc checkShaderCacheFunc,
-                                                  ArrayRef<Timer *> timers) {
-
-  unsigned passIndex = 1000;
-  Timer *patchTimer = timers.size() >= 1 ? timers[0] : nullptr;
-  Timer *optTimer = timers.size() >= 2 ? timers[1] : nullptr;
-  Timer *codeGenTimer = timers.size() >= 3 ? timers[2] : nullptr;
-
-  // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
-  std::unique_ptr<LegacyPassManager> passMgr(LegacyPassManager::Create());
-  passMgr->setPassIndex(&passIndex);
-  passMgr->add(createTargetTransformInfoWrapperPass(getLgcContext()->getTargetMachine()->getTargetIRAnalysis()));
-
-  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  getLgcContext()->preparePassManager(&*passMgr);
-
-  // Manually add a PipelineStateWrapper pass.
-  // We were not using BuilderRecorder, so we do not give our PipelineState to it.
-  // (The first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
-  // it by reading IR metadata.)
-  LegacyPipelineStateWrapper *pipelineStateWrapper = new LegacyPipelineStateWrapper(getLgcContext());
-  passMgr->add(pipelineStateWrapper);
-
-  if (m_emitLgc) {
-    // -emit-lgc: Just write the module.
-    passMgr->add(createPrintModulePass(outStream));
-    passMgr->stop();
-  }
-
-  // Get a BuilderReplayer pass.
-  ModulePass *replayerPass = createLegacyBuilderReplayer(this);
-
-  // Patching.
-  LegacyPatch::addPasses(this, *passMgr, replayerPass, patchTimer, optTimer, std::move(checkShaderCacheFunc),
-                         getLgcContext()->getOptimizationLevel());
-
-  // Add pass to clear pipeline state from IR
-  passMgr->add(createLegacyPipelineStateClearer());
-
-  // Code generation.
-  getLgcContext()->addTargetPasses(*passMgr, codeGenTimer, outStream);
-
-  // Run the "whole pipeline" passes.
-  passMgr->run(*pipelineModule);
+  // See if there was a recoverable error.
+  return getLastError() == "";
 }
 
 // =====================================================================================================================

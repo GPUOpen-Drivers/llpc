@@ -46,48 +46,6 @@
 using namespace lgc;
 using namespace llvm;
 
-namespace lgc {
-
-// =====================================================================================================================
-// Pass to generate null fragment shader if required
-class LegacyPatchNullFragShader : public ModulePass {
-public:
-  static char ID;
-  LegacyPatchNullFragShader() : ModulePass(ID) {}
-
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override {
-    analysisUsage.addRequired<LegacyPipelineStateWrapper>();
-  }
-
-  bool runOnModule(Module &module) override;
-
-private:
-  LegacyPatchNullFragShader(const LegacyPatchNullFragShader &) = delete;
-  LegacyPatchNullFragShader &operator=(const LegacyPatchNullFragShader &) = delete;
-
-  PatchNullFragShader m_impl;
-};
-
-char LegacyPatchNullFragShader::ID = 0;
-
-} // namespace lgc
-
-// =====================================================================================================================
-// Create the pass that generates a null fragment shader if required.
-ModulePass *lgc::createLegacyPatchNullFragShader() {
-  return new LegacyPatchNullFragShader();
-}
-
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchNullFragShader::runOnModule(Module &module) {
-  PipelineState *pipelineState = getAnalysis<LegacyPipelineStateWrapper>().getPipelineState(&module);
-  return m_impl.runImpl(module, pipelineState);
-}
-
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
@@ -141,7 +99,3 @@ void PatchNullFragShader::updatePipelineState(PipelineState *pipelineState) cons
   auto &newOutLocInfo = resUsage->inOutUsage.outputLocInfoMap[origLocInfo];
   newOutLocInfo.setData(InvalidValue);
 }
-
-// =====================================================================================================================
-// Initializes the pass
-INITIALIZE_PASS(LegacyPatchNullFragShader, DEBUG_TYPE, "Patch LLVM for null fragment shader generation", false, false)

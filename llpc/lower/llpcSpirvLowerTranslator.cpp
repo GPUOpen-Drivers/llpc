@@ -41,17 +41,6 @@
 using namespace llvm;
 using namespace Llpc;
 
-char LegacySpirvLowerTranslator::ID = 0;
-
-// =====================================================================================================================
-// Creates the pass of translating SPIR-V to LLVM IR.
-//
-// @param stage : Shader stage
-// @param shaderInfo : Shader info for this shader
-ModulePass *Llpc::createSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo) {
-  return new LegacySpirvLowerTranslator(stage, shaderInfo);
-}
-
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 //
@@ -80,14 +69,6 @@ bool SpirvLowerTranslator::runImpl(Module &module) {
   // Translate SPIR-V binary to machine-independent LLVM module
   translateSpirvToLlvm(m_shaderInfo, &module);
   return true;
-}
-
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
-bool LegacySpirvLowerTranslator::runOnModule(Module &module) {
-  return Impl.runImpl(module);
 }
 
 // =====================================================================================================================
@@ -181,7 +162,3 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
     func.addFnAttr(Attribute::AlwaysInline);
   }
 }
-
-// =====================================================================================================================
-// Initializes the pass
-INITIALIZE_PASS(LegacySpirvLowerTranslator, DEBUG_TYPE, "LLPC translate SPIR-V binary to LLVM IR", false, false)

@@ -32,7 +32,6 @@
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/Analysis/DivergenceAnalysis.h"
-#include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/InstVisitor.h"
@@ -47,35 +46,6 @@
 
 using namespace lgc;
 using namespace llvm;
-
-namespace {
-class LegacyPatchReadFirstLane final : public FunctionPass {
-public:
-  LegacyPatchReadFirstLane();
-
-  virtual bool runOnFunction(Function &function) override;
-  void getAnalysisUsage(AnalysisUsage &analysisUsage) const override;
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchReadFirstLane(const LegacyPatchReadFirstLane &) = delete;
-  LegacyPatchReadFirstLane &operator=(const LegacyPatchReadFirstLane &) = delete;
-
-  PatchReadFirstLane m_impl;
-};
-
-} // anonymous namespace
-
-// =====================================================================================================================
-// Initializes static members.
-char LegacyPatchReadFirstLane::ID = 0;
-
-// =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching operations for readfirstlane optimizations.
-FunctionPass *lgc::createLegacyPatchReadFirstLane() {
-  return new LegacyPatchReadFirstLane();
-}
 
 // =====================================================================================================================
 // Returns true if all users of the given instruction defined in the given block.
@@ -111,28 +81,6 @@ PatchReadFirstLane::PatchReadFirstLane() : m_targetTransformInfo(nullptr) {
 }
 
 // =====================================================================================================================
-LegacyPatchReadFirstLane::LegacyPatchReadFirstLane() : FunctionPass(ID) {
-}
-
-// =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
-//
-// @param [in/out] function : Function that we will peephole optimize.
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LegacyPatchReadFirstLane::runOnFunction(Function &function) {
-  auto *targetTransformInfoWrapperPass = getAnalysisIfAvailable<TargetTransformInfoWrapperPass>();
-  TargetTransformInfo *targetTransformInfo;
-  if (targetTransformInfoWrapperPass)
-    targetTransformInfo = &targetTransformInfoWrapperPass->getTTI(function);
-  else
-    llvm_unreachable("TTI should be available");
-
-  LegacyDivergenceAnalysis *divergenceAnalysis = &getAnalysis<LegacyDivergenceAnalysis>();
-  auto isDivergentUse = [divergenceAnalysis](const Use &use) { return divergenceAnalysis->isDivergentUse(&use); };
-  return m_impl.runImpl(function, isDivergentUse, targetTransformInfo);
-}
-
-// =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
 // @param [in/out] function : Function that we will peephole optimize.
@@ -165,15 +113,6 @@ bool PatchReadFirstLane::runImpl(Function &function, std::function<bool(const Us
   bool changed = promoteEqualUniformOps(function);
   changed |= liftReadFirstLane(function);
   return changed;
-}
-
-// =====================================================================================================================
-// Specify what analysis passes this pass depends on.
-//
-// @param [in,out] analysisUsage : The place to record our analysis pass usage requirements.
-void LegacyPatchReadFirstLane::getAnalysisUsage(AnalysisUsage &analysisUsage) const {
-  analysisUsage.addRequired<LegacyDivergenceAnalysis>();
-  analysisUsage.setPreservesCFG();
 }
 
 // =====================================================================================================================
@@ -557,10 +496,3 @@ void PatchReadFirstLane::applyReadFirstLane(Instruction *inst, BuilderBase &buil
   }
   inst->replaceUsesWithIf(replaceInst, [newInst](Use &U) { return U.getUser() != newInst; });
 }
-
-// =====================================================================================================================
-// Initializes the pass of LLVM patching operations for readfirstlane optimizations.
-INITIALIZE_PASS_BEGIN(LegacyPatchReadFirstLane, DEBUG_TYPE, "Patch LLVM for readfirstlane optimizations", false, false)
-INITIALIZE_PASS_DEPENDENCY(LegacyDivergenceAnalysis)
-INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
-INITIALIZE_PASS_END(LegacyPatchReadFirstLane, DEBUG_TYPE, "Patch LLVM for readfirstlane optimizations", false, false)

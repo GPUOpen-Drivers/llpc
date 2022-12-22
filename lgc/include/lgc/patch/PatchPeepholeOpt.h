@@ -58,27 +58,4 @@ private:
   llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase;
 };
 
-// =====================================================================================================================
-// Represents the pass of LLVM patching operations for peephole optimizations, with the following patterns covered:
-//
-// - Change inttoptr ( add x, const ) -> gep ( inttoptr x, const ) to improve value tracking and load/store
-//   vectorization.
-//
-class LegacyPatchPeepholeOpt final : public llvm::FunctionPass {
-public:
-  LegacyPatchPeepholeOpt();
-
-  bool runOnFunction(llvm::Function &function) override;
-
-  void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-
-  static char ID; // ID of this pass
-
-private:
-  LegacyPatchPeepholeOpt(const LegacyPatchPeepholeOpt &) = delete;
-  LegacyPatchPeepholeOpt &operator=(const LegacyPatchPeepholeOpt &) = delete;
-
-  PatchPeepholeOpt m_impl;
-};
-
 } // namespace lgc
