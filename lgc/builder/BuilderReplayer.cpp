@@ -29,8 +29,8 @@
  ***********************************************************************************************************************
  */
 #include "lgc/builder/BuilderReplayer.h"
-#include "BuilderImpl.h"
 #include "lgc/LgcContext.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/builder/BuilderRecorder.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/Internal.h"

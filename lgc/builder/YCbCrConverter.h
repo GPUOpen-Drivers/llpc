@@ -31,8 +31,8 @@
 
 #pragma once
 
-#include "BuilderImpl.h"
 #include "YCbCrAddressHandler.h"
+#include "lgc/builder/BuilderImpl.h"
 
 namespace lgc {
 

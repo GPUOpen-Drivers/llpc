@@ -28,7 +28,7 @@
  * @brief LLPC source file: implementation of matrix Builder methods
  ***********************************************************************************************************************
  */
-#include "BuilderImpl.h"
+#include "lgc/builder/BuilderImpl.h"
 
 #define DEBUG_TYPE "lgc-builder-impl-matrix"
 

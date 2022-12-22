@@ -28,9 +28,9 @@
  * @brief LLPC source file: implementation of Builder methods for image operations
  ***********************************************************************************************************************
  */
-#include "BuilderImpl.h"
 #include "YCbCrConverter.h"
 #include "lgc/LgcContext.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/Intrinsics.h"
