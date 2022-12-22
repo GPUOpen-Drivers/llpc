@@ -107,6 +107,7 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
         continue;
       // We have the entry-point (marked as DLLExportStorageClass).
       stage = getShaderStage(&func);
+      m_stageMask |= 1U << stage;
 
       // Rename the entry-point to ensure there is no clash on linking.
       func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
@@ -155,6 +156,8 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
       pipelineModule = nullptr;
     }
   }
+  // Ensure m_stageMask is set up.
+  readShaderStageMask(pipelineModule);
   return pipelineModule;
 }
 

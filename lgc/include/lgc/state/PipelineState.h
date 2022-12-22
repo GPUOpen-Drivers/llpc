@@ -213,10 +213,10 @@ public:
   void record(llvm::Module *module);
 
   // Accessors for shader stage mask
-  unsigned getShaderStageMask() const { return m_stageMask; }
+  unsigned getShaderStageMask();
   bool getPreRasterHasGs() const { return m_preRasterHasGs; }
-  bool hasShaderStage(ShaderStage stage) const { return (getShaderStageMask() >> stage) & 1; }
-  bool isGraphics() const;
+  bool hasShaderStage(ShaderStage stage) { return (getShaderStageMask() >> stage) & 1; }
+  bool isGraphics();
   bool isComputeLibrary() const { return m_computeLibrary; }
   ShaderStage getLastVertexProcessingStage() const;
   ShaderStage getPrevShaderStage(ShaderStage shaderStage) const;
@@ -306,7 +306,7 @@ public:
 
 #if LLPC_BUILD_GFX11
   // Checks if SW-emulated stream-out should be enabled
-  bool enableSwXfb() const;
+  bool enableSwXfb();
 #endif
 
   // Gets resource usage of the specified shader stage
