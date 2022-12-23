@@ -1227,12 +1227,21 @@ public:
                                                   unsigned xfbBuffer, unsigned xfbStride, llvm::Value *xfbOffset,
                                                   InOutInfo outputInfo) = 0;
 
+  // Get the type of a built-in -- static edition of the method below, so you can use it without a Builder object.
+  //
+  // @param builtIn : Built-in kind, one of the BuiltIn* constants
+  // @param inOutInfo : Extra input/output info (shader-defined array length)
+  // @param context : LLVMContext
+  static llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo, llvm::LLVMContext &context);
+
   // Get the type of a built-in. Where the built-in has a shader-defined array length (ClipDistance,
   // CullDistance, SampleMask), inOutInfo.GetArraySize() is used as the array size.
   //
   // @param builtIn : Built-in kind, one of the BuiltIn* constants
   // @param inOutInfo : Extra input/output info (shader-defined array length)
-  llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
+  llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
+    return getBuiltInTy(builtIn, inOutInfo, getContext());
+  }
 
   // Create a read of barycoord input value.
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
