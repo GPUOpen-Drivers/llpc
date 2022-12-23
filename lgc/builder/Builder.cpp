@@ -75,17 +75,19 @@ Builder::Builder(LgcContext *builderContext)
 }
 
 // =====================================================================================================================
-// Set the common shader mode for the current shader, containing hardware FP round and denorm modes.
+// Set the common shader mode for the given shader stage, containing hardware FP round and denorm modes.
 //
+// @param shaderStage : Shader stage to set modes for
 // @param commonShaderMode : FP round and denorm modes
-void Builder::setCommonShaderMode(const CommonShaderMode &commonShaderMode) {
-  getShaderModes()->setCommonShaderMode(m_shaderStage, commonShaderMode);
+void Builder::setCommonShaderMode(ShaderStage shaderStage, const CommonShaderMode &commonShaderMode) {
+  getShaderModes()->setCommonShaderMode(shaderStage, commonShaderMode);
 }
 
 // =====================================================================================================================
-// Get the common shader mode for the current shader.
-const CommonShaderMode &Builder::getCommonShaderMode() {
-  return getShaderModes()->getCommonShaderMode(m_shaderStage);
+// Get the common shader mode for the given shader stage.
+// @param shaderStage : Shader stage to get modes for
+const CommonShaderMode &Builder::getCommonShaderMode(ShaderStage shaderStage) {
+  return getShaderModes()->getCommonShaderMode(shaderStage);
 }
 
 // =====================================================================================================================
@@ -449,11 +451,7 @@ CallInst *Builder::CreateIntrinsic(Intrinsic::ID id, ArrayRef<Type *> types, Arr
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value *origin, Value *direction,
                                            Value *invDirection, Value *imageDesc, const Twine &instName) {
-  if (m_isBuilderRecorder) {
-    return static_cast<BuilderRecorder *>(this)->CreateImageBvhIntersectRay(nodePtr, extent, origin, direction,
-                                                                            invDirection, imageDesc, instName);
-  }
-  return static_cast<BuilderImplBase *>(this)->CreateImageBvhIntersectRay(nodePtr, extent, origin, direction,
+  return static_cast<BuilderRecorder *>(this)->CreateImageBvhIntersectRay(nodePtr, extent, origin, direction,
                                                                           invDirection, imageDesc, instName);
 }
 

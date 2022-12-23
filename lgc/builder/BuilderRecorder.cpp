@@ -343,7 +343,6 @@ BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(LLVMContext &context)
 BuilderRecorder::BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline, bool omitOpcodes)
     : Builder(builderContext), BuilderRecorderMetadataKinds(builderContext->getContext()),
       m_pipelineState(reinterpret_cast<PipelineState *>(pipeline)), m_omitOpcodes(omitOpcodes) {
-  m_isBuilderRecorder = true;
 }
 
 // =====================================================================================================================

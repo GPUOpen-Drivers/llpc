@@ -122,9 +122,6 @@ public:
   // Set the resource mapping nodes for the pipeline
   void setUserDataNodes(llvm::ArrayRef<ResourceNode> nodes) override final;
 
-  // Set shader stage mask
-  void setShaderStageMask(unsigned mask) override final { m_stageMask = mask; }
-
   // Set whether pre-rasterization part has a geometry shader
   // NOTE: Only applicable in the part pipeline compilation mode.
   void setPreRasterHasGs(bool preRasterHasGs) override final { m_preRasterHasGs = preRasterHasGs; }
@@ -190,6 +187,9 @@ public:
   // -----------------------------------------------------------------------------------------------------------------
   // Other methods
 
+  // Set shader stage mask
+  void setShaderStageMask(unsigned mask) { m_stageMask = mask; }
+
   // Get the embedded ShaderModes object
   ShaderModes *getShaderModes() { return &m_shaderModes; }
 
@@ -213,10 +213,10 @@ public:
   void record(llvm::Module *module);
 
   // Accessors for shader stage mask
-  unsigned getShaderStageMask() const { return m_stageMask; }
+  unsigned getShaderStageMask();
   bool getPreRasterHasGs() const { return m_preRasterHasGs; }
-  bool hasShaderStage(ShaderStage stage) const { return (getShaderStageMask() >> stage) & 1; }
-  bool isGraphics() const;
+  bool hasShaderStage(ShaderStage stage) { return (getShaderStageMask() >> stage) & 1; }
+  bool isGraphics();
   bool isComputeLibrary() const { return m_computeLibrary; }
   ShaderStage getLastVertexProcessingStage() const;
   ShaderStage getPrevShaderStage(ShaderStage shaderStage) const;
@@ -306,7 +306,7 @@ public:
 
 #if LLPC_BUILD_GFX11
   // Checks if SW-emulated stream-out should be enabled
-  bool enableSwXfb() const;
+  bool enableSwXfb();
 #endif
 
   // Gets resource usage of the specified shader stage

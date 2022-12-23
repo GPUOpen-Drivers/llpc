@@ -50,6 +50,9 @@ public:
   llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
                                        unsigned flags, const llvm::Twine &instName = "") override final;
 
+  // Set the current shader stage, clamp shader stage to the ShaderStageCompute
+  void setShaderStage(ShaderStage stage) { m_shaderStage = stage > ShaderStageCompute ? ShaderStageCompute : stage; }
+
 protected:
   // Get the ShaderModes object.
   ShaderModes *getShaderModes() override final;
@@ -112,7 +115,8 @@ protected:
     return BuilderBase::get(*this).CreateMapToInt32(mapFunc, mappedArgs, passthroughArgs);
   }
 
-  PipelineState *m_pipelineState = nullptr; // Pipeline state
+  PipelineState *m_pipelineState = nullptr;       // Pipeline state
+  ShaderStage m_shaderStage = ShaderStageInvalid; // Current shader stage being built.
 
 private:
   BuilderImplBase() = delete;

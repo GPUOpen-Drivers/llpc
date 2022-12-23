@@ -546,20 +546,27 @@ void PalMetadata::fixUpRegisters() {
 }
 
 // =====================================================================================================================
-// Test whether this is a graphics pipeline (even works in a link-only pipeline).
-bool PalMetadata::isGraphics() {
-  assert(m_pipelineState->isWholePipeline());
-  if (m_pipelineState->getShaderStageMask() != 0) {
-    // This is a whole pipeline compile, and the shader stage mask is set. Therefore, we can use the PipelineState's
-    // isGraphics method.
-    return m_pipelineState->isGraphics();
-  }
-
-  // Otherwise, this is the pipeline and PAL metadata for a pipeline being linked, and the shader stage mask is not
-  // set. We detect whether it is a graphics pipeline by what hardware shader stages we can find in PAL metadata.
+// Get shader stage mask (only called for a link-only pipeline whose shader stage mask has not been set yet).
+// The result is slightly approximate because we don't know if a GS is a user GS or an NGG VS without looking
+// at some other metadata. The important thing that ElfLinker needs to know from it is whether it is a graphics
+// pipeline and whether there is an FS or any non-FS.
+unsigned PalMetadata::getShaderStageMask() {
   msgpack::MapDocNode hwStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
-  return hwStages.find(m_document->getNode(".gs")) != hwStages.end() ||
-         hwStages.find(m_document->getNode(".vs")) != hwStages.end();
+  static const struct TableEntry {
+    const char *key;
+    unsigned maskBit;
+  } table[] = {{".cs", 1U << ShaderStageCompute},
+               {".ps", 1U << ShaderStageFragment},
+               {".vs", 1U << ShaderStageVertex},
+               {".gs", 1U << ShaderStageVertex},
+               {".hs", 1U << ShaderStageTessControl | 1U << ShaderStageTessEval}};
+  unsigned stageMask = 0;
+  for (const auto &entry : ArrayRef<TableEntry>(table)) {
+    if (hwStages.find(m_document->getNode(entry.key)) != hwStages.end())
+      stageMask |= entry.maskBit;
+  }
+  assert(stageMask != 0);
+  return stageMask;
 }
 
 // =====================================================================================================================

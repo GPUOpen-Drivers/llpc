@@ -1113,9 +1113,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || (stageSkipMask & shaderStageToMask(entryStage)))
         continue;
 
-      // Set the shader stage in the Builder.
-      context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
-
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
       lowerPassMgr->setPassIndex(&passIndex);
       SpirvLower::registerPasses(*lowerPassMgr);
@@ -1195,7 +1192,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         continue;
       }
 
-      context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
       lowerPassMgr->setPassIndex(&passIndex);
       SpirvLower::registerPasses(*lowerPassMgr);
@@ -2123,8 +2119,6 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, Module *module, El
                                             std::vector<bool> &moduleCallsTraceRay, unsigned moduleIndex,
                                             std::unique_ptr<Pipeline> &pipeline, TimerProfiler &timerProfiler) {
   // Per-shader SPIR-V lowering passes.
-  context->getBuilder()->setShaderStage(getLgcShaderStage(ShaderStageCompute));
-
   unsigned passIndex = 0;
   std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
   lowerPassMgr->setPassIndex(&passIndex);
@@ -2339,9 +2333,6 @@ Result Compiler::buildRayTracingPipelineInternal(Context *context, ArrayRef<cons
     lowerPassMgr->setPassIndex(&passIndex);
     SpirvLower::registerPasses(*lowerPassMgr);
 
-    // Set the shader stage in the Builder.
-    context->getBuilder()->setShaderStage(getLgcShaderStage(shaderInfoEntry->entryStage));
-
     // SPIR-V translation, then dump the result.
     lowerPassMgr->addPass(SpirvLowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
 
@@ -2359,9 +2350,6 @@ Result Compiler::buildRayTracingPipelineInternal(Context *context, ArrayRef<cons
     std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
     lowerPassMgr->setPassIndex(&passIndex);
     SpirvLower::registerPasses(*lowerPassMgr);
-
-    // Set the shader stage in the Builder.
-    context->getBuilder()->setShaderStage(getLgcShaderStage(entryStage));
 
     // Start timer for translate.
     timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);

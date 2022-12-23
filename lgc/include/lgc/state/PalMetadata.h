@@ -202,6 +202,12 @@ public:
   // Returns the location of the fragment builtin or InvalidValue if the builtin is not found.
   unsigned getFragmentShaderBuiltInLoc(unsigned builtIn);
 
+  // Get shader stage mask (only called for a link-only pipeline whose shader stage mask has not been set yet).
+  // The result is slightly approximate because we don't know if a GS is a user GS or an NGG VS without looking
+  // at some other metadata. The important thing that ElfLinker needs to know from it is whether it is a graphics
+  // pipeline and whether there is an FS or any non-FS.
+  unsigned getShaderStageMask();
+
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
   void initialize();
@@ -217,9 +223,6 @@ private:
 
   // Returns true of the some of the user data nodes are spilled.
   bool userDataNodesAreSpilled() const { return m_spillThreshold->getUInt() != MAX_SPILL_THRESHOLD; }
-
-  // Test whether this is a graphics pipeline (even works in a link-only pipeline).
-  bool isGraphics();
 
   // Finalize PAL metadata user data limit for any compilation (shader, part-pipeline, whole pipeline)
   void finalizeUserDataLimit();

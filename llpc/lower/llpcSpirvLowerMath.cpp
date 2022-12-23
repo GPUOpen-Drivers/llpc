@@ -66,7 +66,7 @@ void SpirvLowerMath::init(Module &module) {
   SpirvLower::init(&module);
   m_changed = false;
 
-  auto &commonShaderMode = m_context->getBuilder()->getCommonShaderMode();
+  auto &commonShaderMode = m_context->getBuilder()->getCommonShaderMode(getLgcShaderStage(m_shaderStage));
   m_fp16DenormFlush = commonShaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
                       commonShaderMode.fp16DenormMode == FpDenormMode::FlushInOut;
   m_fp32DenormFlush = commonShaderMode.fp32DenormMode == FpDenormMode::FlushOut ||

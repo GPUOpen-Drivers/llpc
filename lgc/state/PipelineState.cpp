@@ -434,8 +434,19 @@ ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage) const {
 }
 
 // =====================================================================================================================
+// Get the shader stage mask.
+unsigned PipelineState::getShaderStageMask() {
+  if (!m_stageMask && !m_computeLibrary) {
+    // No shader stage mask set (and it isn't a compute library). We must be in ElfLinker; get the shader stage
+    // mask from PAL metadata.
+    m_stageMask = getPalMetadata()->getShaderStageMask();
+  }
+  return m_stageMask;
+}
+
+// =====================================================================================================================
 // Check whether the pipeline is a graphics pipeline
-bool PipelineState::isGraphics() const {
+bool PipelineState::isGraphics() {
   return (getShaderStageMask() & ((1U << ShaderStageTask) | (1U << ShaderStageVertex) | (1U << ShaderStageTessControl) |
                                   (1U << ShaderStageTessEval) | (1U << ShaderStageGeometry) | (1U << ShaderStageMesh) |
                                   (1U << ShaderStageFragment))) != 0;
@@ -1356,7 +1367,7 @@ bool PipelineState::enableMeshRowExport() const {
 #if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Checks if SW-emulated stream-out should be enabled.
-bool PipelineState::enableSwXfb() const {
+bool PipelineState::enableSwXfb() {
   assert(isGraphics());
 
   // SW-emulated stream-out is enabled on GFX11+

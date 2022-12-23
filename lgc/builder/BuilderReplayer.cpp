@@ -149,7 +149,7 @@ void BuilderReplayer::replayCall(unsigned opcode, CallInst *call) {
       m_shaderStageMap[enclosingFunc] = stage;
     } else
       stage = mapIt->second;
-    m_builder->setShaderStage(stage);
+    static_cast<BuilderImplBase *>(&*m_builder)->setShaderStage(stage);
   }
 
   // Set the insert point on the Builder. Also sets debug location to that of call.
