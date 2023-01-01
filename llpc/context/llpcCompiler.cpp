@@ -992,6 +992,9 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
   if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
     return false;
 
+  if (pipelineInfo->iaState.enableMultiView)
+    return false;
+
   if (shaderInfos[0]) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfos[0]->pModuleData);
     if (moduleData && moduleData->binType != BinaryType::Spirv)

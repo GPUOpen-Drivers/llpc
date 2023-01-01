@@ -419,7 +419,8 @@ void PalMetadata::fixUpRegisters() {
     const bool hasTs =
         m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
     const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
-    if (!hasTs && !hasGs) {
+    const bool hasMesh = m_pipelineState->hasShaderStage(ShaderStageMesh);
+    if (!hasTs && !hasGs && !hasMesh) {
       // Here we use register field to determine if NGG is enabled, because enabling NGG depends on other conditions.
       // see PatchResourceCollect::canUseNgg.
       if (m_registers.find(m_document->getNode(mmVGT_GS_OUT_PRIM_TYPE)) != m_registers.end()) {
@@ -547,23 +548,22 @@ void PalMetadata::fixUpRegisters() {
 
 // =====================================================================================================================
 // Get shader stage mask (only called for a link-only pipeline whose shader stage mask has not been set yet).
-// The result is slightly approximate because we don't know if a GS is a user GS or an NGG VS without looking
-// at some other metadata. The important thing that ElfLinker needs to know from it is whether it is a graphics
-// pipeline and whether there is an FS or any non-FS.
 unsigned PalMetadata::getShaderStageMask() {
-  msgpack::MapDocNode hwStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
+  msgpack::MapDocNode shaderStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::Shaders].getMap(true);
   static const struct TableEntry {
     const char *key;
     unsigned maskBit;
-  } table[] = {{".cs", 1U << ShaderStageCompute},
-               {".ps", 1U << ShaderStageFragment},
-               {".vs", 1U << ShaderStageVertex},
-               {".gs", 1U << ShaderStageVertex},
-               {".hs", 1U << ShaderStageTessControl | 1U << ShaderStageTessEval}};
+  } table[] = {{".compute", 1U << ShaderStageCompute}, {".pixel", 1U << ShaderStageFragment},
+               {".mesh", 1U << ShaderStageMesh},       {".geometry", 1U << ShaderStageGeometry},
+               {".domain", 1U << ShaderStageTessEval}, {".hull", 1U << ShaderStageTessControl},
+               {".vertex", 1U << ShaderStageVertex},   {".task", 1U << ShaderStageTask}};
   unsigned stageMask = 0;
   for (const auto &entry : ArrayRef<TableEntry>(table)) {
-    if (hwStages.find(m_document->getNode(entry.key)) != hwStages.end())
-      stageMask |= entry.maskBit;
+    if (shaderStages.find(m_document->getNode(entry.key)) != shaderStages.end()) {
+      msgpack::MapDocNode stageNode = shaderStages[entry.key].getMap(true);
+      if (stageNode.find(m_document->getNode(Util::Abi::ShaderMetadataKey::ApiShaderHash)) != stageNode.end())
+        stageMask |= entry.maskBit;
+    }
   }
   assert(stageMask != 0);
   return stageMask;

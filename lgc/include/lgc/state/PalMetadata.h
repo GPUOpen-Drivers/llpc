@@ -203,9 +203,6 @@ public:
   unsigned getFragmentShaderBuiltInLoc(unsigned builtIn);
 
   // Get shader stage mask (only called for a link-only pipeline whose shader stage mask has not been set yet).
-  // The result is slightly approximate because we don't know if a GS is a user GS or an NGG VS without looking
-  // at some other metadata. The important thing that ElfLinker needs to know from it is whether it is a graphics
-  // pipeline and whether there is an FS or any non-FS.
   unsigned getShaderStageMask();
 
 private:
