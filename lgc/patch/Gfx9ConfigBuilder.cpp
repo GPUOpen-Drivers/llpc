@@ -954,10 +954,14 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, floatMode);
   SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, DX10_CLAMP, true); // Follow PAL setting
 
-  unsigned lsVgtCompCnt = 1;
-  if (vsBuiltInUsage.instanceIndex)
-    lsVgtCompCnt += 2; // Enable instance ID
-  SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, LS_VGPR_COMP_CNT, lsVgtCompCnt);
+  unsigned lsVgprCompCnt = 0;
+  if (m_gfxIp.major <= 11) {
+    if (vsBuiltInUsage.instanceIndex)
+      lsVgprCompCnt = 3; // Enable all LS VGPRs (LS VGPR2 - VGPR5)
+    else
+      lsVgprCompCnt = 1; // Must enable relative vertex ID (LS VGPR2 and VGPR3)
+  }
+  SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, LS_VGPR_COMP_CNT, lsVgprCompCnt);
 
   const auto &vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
   const auto &tcsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
