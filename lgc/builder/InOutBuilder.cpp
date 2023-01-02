@@ -123,7 +123,7 @@ Value *InOutBuilder::CreateReadPerVertexInput(Type *resultTy, unsigned location,
   switch (primType) {
   case PrimitiveType::TriangleList:
     vertexIndex = getInt32((vertexIndexInt + 2) % 3); // 0->2, 1->0, 2->1
-    [[clang::fallthrough]];
+    LLVM_FALLTHROUGH;
     // fall through...
   case PrimitiveType::Point:
   case PrimitiveType::LineList:

@@ -113,7 +113,7 @@ private:
                       unsigned &argIdx, llvm::Value *userData, unsigned userDataCount,
                       llvm::ArrayRef<std::pair<unsigned, unsigned>> substitutions = {});
   void appendVertexFetchTypes(std::vector<llvm::Type *> &argTys) const;
-  void appendArguments(llvm::SmallVectorImpl<llvm::Value *> &args, llvm::Argument *begin, llvm::Argument *end) const;
+  void appendArguments(llvm::SmallVectorImpl<llvm::Value *> &args, llvm::ArrayRef<llvm::Argument *> argsToAppend) const;
 
   void gatherTuningAttributes(llvm::AttrBuilder &tuningAttrs, const llvm::Function *srcEntryPoint) const;
   void applyTuningAttributes(llvm::Function *dstEntryPoint, const llvm::AttrBuilder &tuningAttrs) const;

@@ -273,15 +273,21 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
   argTys.push_back(FixedVectorType::get(Type::getInt32Ty(*m_context), userDataCount));
   *inRegMask |= (1ull << NumSpecialSgprInputs);
 
-  // Other system values (VGPRs)
+  // HS VGPRs
   argTys.push_back(Type::getInt32Ty(*m_context)); // Patch ID
   argTys.push_back(Type::getInt32Ty(*m_context)); // Relative patch ID (control point ID included)
+
+  // LS VGPRs
   argTys.push_back(Type::getInt32Ty(*m_context)); // Vertex ID
-  argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
-  argTys.push_back(Type::getInt32Ty(*m_context)); // Step rate
+  if (m_gfxIp.major <= 11) {
+    argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
+    argTys.push_back(Type::getInt32Ty(*m_context)); // Step rate
+  }
   argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
 
+  // Vertex fetch VGPRs
   appendVertexFetchTypes(argTys);
+
   return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
 }
 
@@ -344,21 +350,20 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   //     Run HS
   // }
   //
+  SmallVector<Argument *, 32> args;
+  for (auto &arg : entryPoint->args())
+    args.push_back(&arg);
 
-  auto arg = entryPoint->arg_begin();
-
-  Value *offChipLdsBase = (arg + getSpecialSgprInputIndex(m_gfxIp, LsHs::OffChipLdsBase));
+  Value *offChipLdsBase = args[getSpecialSgprInputIndex(m_gfxIp, LsHs::OffChipLdsBase)];
   offChipLdsBase->setName("offChipLdsBase");
 
-  Value *mergeWaveInfo = (arg + getSpecialSgprInputIndex(m_gfxIp, LsHs::MergedWaveInfo));
+  Value *mergeWaveInfo = args[getSpecialSgprInputIndex(m_gfxIp, LsHs::MergedWaveInfo)];
   mergeWaveInfo->setName("mergeWaveInfo");
 
-  Value *tfBufferBase = (arg + getSpecialSgprInputIndex(m_gfxIp, LsHs::TfBufferBase));
+  Value *tfBufferBase = args[getSpecialSgprInputIndex(m_gfxIp, LsHs::TfBufferBase)];
   tfBufferBase->setName("tfBufferBase");
 
-  arg += NumSpecialSgprInputs;
-
-  Value *userData = arg++;
+  Value *userData = args[NumSpecialSgprInputs];
 
   // Define basic blocks
   auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint);
@@ -391,14 +396,24 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
                                              {mergeWaveInfo, builder.getInt32(0), builder.getInt32(8)});
   lsVertCount->setName("lsVertCount");
 
-  Value *patchId = arg;
-  Value *relPatchId = (arg + 1);
-  Value *vertexId = (arg + 2);
-  Value *relVertexId = (arg + 3);
-  Value *stepRate = (arg + 4);
-  Value *instanceId = (arg + 5);
-  auto vertexFetchesStart = (arg + 6);
-  auto vertexFetchesEnd = entryPoint->arg_end();
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
+
+  // HS VGPRs
+  Value *patchId = vgprArgs[0];
+  Value *relPatchId = vgprArgs[1];
+
+  // LS VGPRs
+  Value *vertexId = vgprArgs[2];
+  Value *relVertexId = PoisonValue::get(builder.getInt32Ty());
+  Value *stepRate = PoisonValue::get(builder.getInt32Ty());
+  if (m_gfxIp.major <= 11) {
+    relVertexId = vgprArgs[3];
+    stepRate = vgprArgs[4];
+  }
+  Value *instanceId = m_gfxIp.major <= 11 ? vgprArgs[5] : vgprArgs[3];
+
+  // Vertex fetch VGPRs
+  ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 6 : 4);
 
   auto hsVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
                                              {mergeWaveInfo, builder.getInt32(8), builder.getInt32(8)});
@@ -410,10 +425,10 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   if (gpuWorkarounds->gfx9.fixLsVgprInput) {
     auto nullHs = builder.CreateICmpEQ(hsVertCount, builder.getInt32(0));
 
-    vertexId = builder.CreateSelect(nullHs, arg, (arg + 2));
-    relVertexId = builder.CreateSelect(nullHs, (arg + 1), (arg + 3));
-    stepRate = builder.CreateSelect(nullHs, (arg + 2), (arg + 4));
-    instanceId = builder.CreateSelect(nullHs, (arg + 3), (arg + 5));
+    vertexId = builder.CreateSelect(nullHs, vgprArgs[0], vgprArgs[2]);
+    relVertexId = builder.CreateSelect(nullHs, vgprArgs[1], vgprArgs[3]);
+    stepRate = builder.CreateSelect(nullHs, vgprArgs[2], vgprArgs[4]);
+    instanceId = builder.CreateSelect(nullHs, vgprArgs[3], vgprArgs[5]);
   }
 
   auto validLsVert = builder.CreateICmpULT(threadIdInWave, lsVertCount, "validLsVert");
@@ -424,39 +439,39 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   if (m_hasVs) {
     // Call LS main function
-    SmallVector<Value *> args;
+    SmallVector<Value *> lsArgs;
     auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
 
     unsigned lsArgIdx = 0;
     const unsigned lsArgCount = lsEntryPoint->arg_size();
 
-    appendUserData(builder, args, lsEntryPoint, lsArgIdx, userData, intfData->userDataCount);
+    appendUserData(builder, lsArgs, lsEntryPoint, lsArgIdx, userData, intfData->userDataCount);
 
     // Set up system value VGPRs (LS does not have system value SGPRs)
     if (lsArgIdx < lsArgCount) {
-      args.push_back(vertexId);
+      lsArgs.push_back(vertexId);
       ++lsArgIdx;
     }
 
     if (lsArgIdx < lsArgCount) {
-      args.push_back(relVertexId);
+      lsArgs.push_back(relVertexId);
       ++lsArgIdx;
     }
 
     if (lsArgIdx < lsArgCount) {
-      args.push_back(stepRate);
+      lsArgs.push_back(stepRate);
       ++lsArgIdx;
     }
 
     if (lsArgIdx < lsArgCount) {
-      args.push_back(instanceId);
+      lsArgs.push_back(instanceId);
       ++lsArgIdx;
     }
 
-    appendArguments(args, vertexFetchesStart, vertexFetchesEnd);
-    lsArgIdx += (vertexFetchesEnd - vertexFetchesStart);
+    appendArguments(lsArgs, vertexFetches);
+    lsArgIdx += vertexFetches.size();
 
-    CallInst *call = builder.CreateCall(lsEntryPoint, args);
+    CallInst *call = builder.CreateCall(lsEntryPoint, lsArgs);
     call->setCallingConv(CallingConv::AMDGPU_LS);
   }
 
@@ -503,7 +518,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   if (m_hasTcs) {
     // Call HS main function
-    SmallVector<Value *> args;
+    SmallVector<Value *> hsArgs;
 
     auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
 
@@ -515,27 +530,27 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
       assert(vsIntfData->userDataUsage.spillTable > 0);
       substitutions.emplace_back(intfData->userDataUsage.spillTable, vsIntfData->userDataUsage.spillTable);
     }
-    appendUserData(builder, args, hsEntryPoint, hsArgIdx, userData, intfData->userDataCount, substitutions);
+    appendUserData(builder, hsArgs, hsEntryPoint, hsArgIdx, userData, intfData->userDataCount, substitutions);
 
     // Set up system value SGPRs
     if (m_pipelineState->isTessOffChip()) {
-      args.push_back(offChipLdsBase);
+      hsArgs.push_back(offChipLdsBase);
       ++hsArgIdx;
     }
 
-    args.push_back(tfBufferBase);
+    hsArgs.push_back(tfBufferBase);
     ++hsArgIdx;
 
     // Set up system value VGPRs
-    args.push_back(patchId);
+    hsArgs.push_back(patchId);
     ++hsArgIdx;
 
-    args.push_back(relPatchId);
+    hsArgs.push_back(relPatchId);
     ++hsArgIdx;
 
     assert(hsArgIdx == hsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
 
-    CallInst *call = builder.CreateCall(hsEntryPoint, args);
+    CallInst *call = builder.CreateCall(hsEntryPoint, hsArgs);
     call->setCallingConv(CallingConv::AMDGPU_HS);
   }
   builder.CreateBr(endHsBlock);
@@ -608,7 +623,7 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
   argTys.push_back(FixedVectorType::get(Type::getInt32Ty(*m_context), userDataCount));
   *inRegMask |= (1ull << NumSpecialSgprInputs);
 
-  // Other system values (VGPRs)
+  // GS VGPRs
   argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offsets (vertex 0 and 1)
   argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offsets (vertex 2 and 3)
   argTys.push_back(Type::getInt32Ty(*m_context)); // Primitive ID (GS)
@@ -616,15 +631,19 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
   argTys.push_back(Type::getInt32Ty(*m_context)); // ES to GS offsets (vertex 4 and 5)
 
   if (hasTs) {
+    // ES VGPRs
     argTys.push_back(Type::getFloatTy(*m_context)); // X of TessCoord (U)
     argTys.push_back(Type::getFloatTy(*m_context)); // Y of TessCoord (V)
     argTys.push_back(Type::getInt32Ty(*m_context)); // Relative patch ID
     argTys.push_back(Type::getInt32Ty(*m_context)); // Patch ID
   } else {
+    // ES VGPRs
     argTys.push_back(Type::getInt32Ty(*m_context)); // Vertex ID
     argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
     argTys.push_back(Type::getInt32Ty(*m_context)); // Primitive ID (VS)
     argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
+
+    // Vertex fetch VGPRs
     appendVertexFetchTypes(argTys);
   }
 
@@ -692,23 +711,22 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   //     Run GS
   // }
   //
-
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
-  auto arg = entryPoint->arg_begin();
+  SmallVector<Argument *, 32> args;
+  for (auto &arg : entryPoint->args())
+    args.push_back(&arg);
 
-  Value *gsVsOffset = (arg + getSpecialSgprInputIndex(m_gfxIp, EsGs::GsVsOffset, false));
+  Value *gsVsOffset = args[getSpecialSgprInputIndex(m_gfxIp, EsGs::GsVsOffset, false)];
   gsVsOffset->setName("gsVsOffset");
 
-  Value *mergedWaveInfo = (arg + getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo, false));
+  Value *mergedWaveInfo = args[getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo, false)];
   mergedWaveInfo->setName("mergedWaveInfo");
 
-  Value *offChipLdsBase = (arg + getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase, false));
+  Value *offChipLdsBase = args[getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase, false)];
   offChipLdsBase->setName("offChipLdsBase");
 
-  arg += NumSpecialSgprInputs;
-
-  Value *userData = arg++;
+  Value *userData = args[NumSpecialSgprInputs];
 
   // Define basic blocks
   auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint);
@@ -749,34 +767,39 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   auto validEsVert = builder.CreateICmpULT(threadIdInWave, esVertCount, "validEsVert");
   builder.CreateCondBr(validEsVert, beginEsBlock, endEsBlock);
 
-  Value *esGsOffsets01 = arg;
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
 
-  Value *esGsOffsets23 = PoisonValue::get(Type::getInt32Ty(*m_context));
+  // GS VGPRs
+  Value *esGsOffsets01 = vgprArgs[0];
+
+  Value *esGsOffsets23 = PoisonValue::get(builder.getInt32Ty());
   if (calcFactor.inputVertices > 2) {
     // NOTE: ES to GS offset (vertex 2 and 3) is valid once the primitive type has more than 2 vertices.
-    esGsOffsets23 = (arg + 1);
+    esGsOffsets23 = vgprArgs[1];
   }
 
-  Value *gsPrimitiveId = (arg + 2);
-  Value *invocationId = (arg + 3);
+  Value *gsPrimitiveId = vgprArgs[2];
+  Value *invocationId = vgprArgs[3];
 
-  Value *esGsOffsets45 = PoisonValue::get(Type::getInt32Ty(*m_context));
+  Value *esGsOffsets45 = PoisonValue::get(builder.getInt32Ty());
   if (calcFactor.inputVertices > 4) {
     // NOTE: ES to GS offset (vertex 4 and 5) is valid once the primitive type has more than 4 vertices.
-    esGsOffsets45 = (arg + 4);
+    esGsOffsets45 = vgprArgs[4];
   }
 
-  Value *tessCoordX = (arg + 5);
-  Value *tessCoordY = (arg + 6);
-  Value *relPatchId = (arg + 7);
-  Value *patchId = (arg + 8);
+  // ES VGPRs
+  Value *tessCoordX = vgprArgs[5];
+  Value *tessCoordY = vgprArgs[6];
+  Value *relPatchId = vgprArgs[7];
+  Value *patchId = vgprArgs[8];
 
-  Value *vertexId = (arg + 5);
-  Value *relVertexId = (arg + 6);
-  Value *vsPrimitiveId = (arg + 7);
-  Value *instanceId = (arg + 8);
-  auto vertexFetchesStart = (arg + 9);
-  auto vertexFetchesEnd = entryPoint->arg_end();
+  Value *vertexId = vgprArgs[5];
+  Value *relVertexId = vgprArgs[6];
+  Value *vsPrimitiveId = vgprArgs[7];
+  Value *instanceId = vgprArgs[8];
+
+  // Vertex fetch VGPRs
+  ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(9);
 
   // Construct ".beginEs" block
   unsigned spillTableIdx = 0;
@@ -784,71 +807,71 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   if ((hasTs && m_hasTes) || (!hasTs && m_hasVs)) {
     // Call ES main function
-    SmallVector<Value *> args;
+    SmallVector<Value *> esArgs;
     auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
     spillTableIdx = intfData->userDataUsage.spillTable;
 
     unsigned esArgIdx = 0;
     const unsigned esArgCount = esEntryPoint->arg_size();
 
-    appendUserData(builder, args, esEntryPoint, esArgIdx, userData, intfData->userDataCount);
+    appendUserData(builder, esArgs, esEntryPoint, esArgIdx, userData, intfData->userDataCount);
 
     if (hasTs) {
       // Set up system value SGPRs
       if (m_pipelineState->isTessOffChip()) {
-        args.push_back(offChipLdsBase);
+        esArgs.push_back(offChipLdsBase);
         ++esArgIdx;
 
-        args.push_back(offChipLdsBase);
+        esArgs.push_back(offChipLdsBase);
         ++esArgIdx;
       }
 
-      args.push_back(esGsOffset);
+      esArgs.push_back(esGsOffset);
       ++esArgIdx;
 
       // Set up system value VGPRs
-      args.push_back(tessCoordX);
+      esArgs.push_back(tessCoordX);
       ++esArgIdx;
 
-      args.push_back(tessCoordY);
+      esArgs.push_back(tessCoordY);
       ++esArgIdx;
 
-      args.push_back(relPatchId);
+      esArgs.push_back(relPatchId);
       ++esArgIdx;
 
-      args.push_back(patchId);
+      esArgs.push_back(patchId);
       ++esArgIdx;
     } else {
       // Set up system value SGPRs
-      args.push_back(esGsOffset);
+      esArgs.push_back(esGsOffset);
       ++esArgIdx;
 
       // Set up system value VGPRs
       if (esArgIdx < esArgCount) {
-        args.push_back(vertexId);
+        esArgs.push_back(vertexId);
         ++esArgIdx;
       }
 
       if (esArgIdx < esArgCount) {
-        args.push_back(relVertexId);
+        esArgs.push_back(relVertexId);
         ++esArgIdx;
       }
 
       if (esArgIdx < esArgCount) {
-        args.push_back(vsPrimitiveId);
+        esArgs.push_back(vsPrimitiveId);
         ++esArgIdx;
       }
 
       if (esArgIdx < esArgCount) {
-        args.push_back(instanceId);
+        esArgs.push_back(instanceId);
         ++esArgIdx;
       }
 
-      appendArguments(args, vertexFetchesStart, vertexFetchesEnd);
-      esArgIdx += (vertexFetchesEnd - vertexFetchesStart);
+      appendArguments(esArgs, vertexFetches);
+      esArgIdx += vertexFetches.size();
     }
 
-    CallInst *call = builder.CreateCall(esEntryPoint, args);
+    CallInst *call = builder.CreateCall(esEntryPoint, esArgs);
     call->setCallingConv(CallingConv::AMDGPU_ES);
   }
   builder.CreateBr(endEsBlock);
@@ -881,50 +904,50 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
                                                {esGsOffsets45, builder.getInt32(16), builder.getInt32(16)});
 
     // Call GS main function
-    SmallVector<llvm::Value *> args;
+    SmallVector<llvm::Value *> gsArgs;
     auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
     unsigned gsArgIdx = 0;
 
     SmallVector<std::pair<unsigned, unsigned>> substitutions;
     if (intfData->spillTable.sizeInDwords > 0 && spillTableIdx > 0)
       substitutions.emplace_back(intfData->userDataUsage.spillTable, spillTableIdx);
-    appendUserData(builder, args, gsEntryPoint, gsArgIdx, userData, intfData->userDataCount, substitutions);
+    appendUserData(builder, gsArgs, gsEntryPoint, gsArgIdx, userData, intfData->userDataCount, substitutions);
 
     // Set up system value SGPRs
-    args.push_back(gsVsOffset);
+    gsArgs.push_back(gsVsOffset);
     ++gsArgIdx;
 
-    args.push_back(gsWaveId);
+    gsArgs.push_back(gsWaveId);
     ++gsArgIdx;
 
     // Set up system value VGPRs
-    args.push_back(esGsOffset0);
+    gsArgs.push_back(esGsOffset0);
     ++gsArgIdx;
 
-    args.push_back(esGsOffset1);
+    gsArgs.push_back(esGsOffset1);
     ++gsArgIdx;
 
-    args.push_back(gsPrimitiveId);
+    gsArgs.push_back(gsPrimitiveId);
     ++gsArgIdx;
 
-    args.push_back(esGsOffset2);
+    gsArgs.push_back(esGsOffset2);
     ++gsArgIdx;
 
-    args.push_back(esGsOffset3);
+    gsArgs.push_back(esGsOffset3);
     ++gsArgIdx;
 
-    args.push_back(esGsOffset4);
+    gsArgs.push_back(esGsOffset4);
     ++gsArgIdx;
 
-    args.push_back(esGsOffset5);
+    gsArgs.push_back(esGsOffset5);
     ++gsArgIdx;
 
-    args.push_back(invocationId);
+    gsArgs.push_back(invocationId);
     ++gsArgIdx;
 
     assert(gsArgIdx == gsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
 
-    CallInst *call = builder.CreateCall(gsEntryPoint, args);
+    CallInst *call = builder.CreateCall(gsEntryPoint, gsArgs);
     call->setCallingConv(CallingConv::AMDGPU_GS);
   }
   builder.CreateBr(endGsBlock);
@@ -974,8 +997,8 @@ void ShaderMerger::appendUserData(BuilderBase &builder, SmallVectorImpl<Value *>
 
       userDataIdx += userDataSize;
 
-      auto lsUserData = builder.CreateShuffleVector(userData, userData, shuffleMask);
-      args.push_back(lsUserData);
+      auto newUserData = builder.CreateShuffleVector(userData, userData, shuffleMask);
+      args.push_back(newUserData);
     } else {
       assert(argTy->isIntegerTy());
 
@@ -987,8 +1010,8 @@ void ShaderMerger::appendUserData(BuilderBase &builder, SmallVectorImpl<Value *>
         }
       }
 
-      auto lsUserData = builder.CreateExtractElement(userData, actualUserDataIdx);
-      args.push_back(lsUserData);
+      auto newUserData = builder.CreateExtractElement(userData, actualUserDataIdx);
+      args.push_back(newUserData);
       ++userDataIdx;
     }
 
@@ -1015,11 +1038,10 @@ void ShaderMerger::appendVertexFetchTypes(std::vector<Type *> &argTys) const {
 // Appends the arguments in the range [begin,end) to the vector.
 //
 // @param [in/out] args : The vector to which the arguments will be appends.
-// @param begin : The start of the argument to add.
-// @param end : One past the last argument to add.
-void ShaderMerger::appendArguments(SmallVectorImpl<Value *> &args, Argument *begin, Argument *end) const {
-  for (auto &fetch : make_range(begin, end)) {
-    args.push_back(&fetch);
+// @param argsToAppend : The arguments to be appended
+void ShaderMerger::appendArguments(SmallVectorImpl<Value *> &args, ArrayRef<Argument *> argsToAppend) const {
+  for (auto arg : argsToAppend) {
+    args.push_back(arg);
   }
 }
 
