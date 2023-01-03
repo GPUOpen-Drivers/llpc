@@ -452,34 +452,24 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     SmallVector<Value *> lsArgs;
     auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
 
-    unsigned lsArgIdx = 0;
-    const unsigned lsArgCount = lsEntryPoint->arg_size();
+    const auto lsArgCount = lsEntryPoint->arg_size();
 
-    appendUserData(builder, lsArgs, lsEntryPoint, lsArgIdx, userData, intfData->userDataCount);
+    appendUserData(builder, lsArgs, lsEntryPoint, 0, userData, intfData->userDataCount);
 
     // Set up system value VGPRs (LS does not have system value SGPRs)
-    if (lsArgIdx < lsArgCount) {
+    if (lsArgs.size() < lsArgCount)
       lsArgs.push_back(vertexId);
-      ++lsArgIdx;
-    }
 
-    if (lsArgIdx < lsArgCount) {
+    if (lsArgs.size() < lsArgCount)
       lsArgs.push_back(relVertexId);
-      ++lsArgIdx;
-    }
 
-    if (lsArgIdx < lsArgCount) {
+    if (lsArgs.size() < lsArgCount)
       lsArgs.push_back(stepRate);
-      ++lsArgIdx;
-    }
 
-    if (lsArgIdx < lsArgCount) {
+    if (lsArgs.size() < lsArgCount)
       lsArgs.push_back(instanceId);
-      ++lsArgIdx;
-    }
 
     appendArguments(lsArgs, vertexFetches);
-    lsArgIdx += vertexFetches.size();
 
     CallInst *call = builder.CreateCall(lsEntryPoint, lsArgs);
     call->setCallingConv(CallingConv::AMDGPU_LS);
@@ -534,33 +524,22 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
     auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
 
-    unsigned hsArgIdx = 0;
-
     SmallVector<std::pair<unsigned, unsigned>> substitutions;
     if (intfData->spillTable.sizeInDwords > 0 && m_hasVs) {
       auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
       assert(vsIntfData->userDataUsage.spillTable > 0);
       substitutions.emplace_back(intfData->userDataUsage.spillTable, vsIntfData->userDataUsage.spillTable);
     }
-    appendUserData(builder, hsArgs, hsEntryPoint, hsArgIdx, userData, intfData->userDataCount, substitutions);
+    appendUserData(builder, hsArgs, hsEntryPoint, 0, userData, intfData->userDataCount, substitutions);
 
     // Set up system value SGPRs
-    if (m_pipelineState->isTessOffChip()) {
+    if (m_pipelineState->isTessOffChip())
       hsArgs.push_back(offChipLdsBase);
-      ++hsArgIdx;
-    }
-
     hsArgs.push_back(tfBufferBase);
-    ++hsArgIdx;
 
     // Set up system value VGPRs
     hsArgs.push_back(patchId);
-    ++hsArgIdx;
-
     hsArgs.push_back(relPatchId);
-    ++hsArgIdx;
-
-    assert(hsArgIdx == hsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
 
     CallInst *call = builder.CreateCall(hsEntryPoint, hsArgs);
     call->setCallingConv(CallingConv::AMDGPU_HS);
@@ -824,64 +803,41 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
     auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
     spillTableIdx = intfData->userDataUsage.spillTable;
 
-    unsigned esArgIdx = 0;
     const unsigned esArgCount = esEntryPoint->arg_size();
 
-    appendUserData(builder, esArgs, esEntryPoint, esArgIdx, userData, intfData->userDataCount);
+    appendUserData(builder, esArgs, esEntryPoint, 0, userData, intfData->userDataCount);
 
     if (hasTs) {
       // Set up system value SGPRs
       if (m_pipelineState->isTessOffChip()) {
         esArgs.push_back(offChipLdsBase);
-        ++esArgIdx;
-
         esArgs.push_back(offChipLdsBase);
-        ++esArgIdx;
       }
-
       esArgs.push_back(esGsOffset);
-      ++esArgIdx;
 
       // Set up system value VGPRs
       esArgs.push_back(tessCoordX);
-      ++esArgIdx;
-
       esArgs.push_back(tessCoordY);
-      ++esArgIdx;
-
       esArgs.push_back(relPatchId);
-      ++esArgIdx;
-
       esArgs.push_back(patchId);
-      ++esArgIdx;
     } else {
       // Set up system value SGPRs
       esArgs.push_back(esGsOffset);
-      ++esArgIdx;
 
       // Set up system value VGPRs
-      if (esArgIdx < esArgCount) {
+      if (esArgs.size() < esArgCount)
         esArgs.push_back(vertexId);
-        ++esArgIdx;
-      }
 
-      if (esArgIdx < esArgCount) {
+      if (esArgs.size() < esArgCount)
         esArgs.push_back(relVertexId);
-        ++esArgIdx;
-      }
 
-      if (esArgIdx < esArgCount) {
+      if (esArgs.size() < esArgCount)
         esArgs.push_back(vsPrimitiveId);
-        ++esArgIdx;
-      }
 
-      if (esArgIdx < esArgCount) {
+      if (esArgs.size() < esArgCount)
         esArgs.push_back(instanceId);
-        ++esArgIdx;
-      }
 
       appendArguments(esArgs, vertexFetches);
-      esArgIdx += vertexFetches.size();
     }
 
     CallInst *call = builder.CreateCall(esEntryPoint, esArgs);
@@ -919,46 +875,25 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
     // Call GS main function
     SmallVector<llvm::Value *> gsArgs;
     auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
-    unsigned gsArgIdx = 0;
 
     SmallVector<std::pair<unsigned, unsigned>> substitutions;
     if (intfData->spillTable.sizeInDwords > 0 && spillTableIdx > 0)
       substitutions.emplace_back(intfData->userDataUsage.spillTable, spillTableIdx);
-    appendUserData(builder, gsArgs, gsEntryPoint, gsArgIdx, userData, intfData->userDataCount, substitutions);
+    appendUserData(builder, gsArgs, gsEntryPoint, 0, userData, intfData->userDataCount, substitutions);
 
     // Set up system value SGPRs
     gsArgs.push_back(gsVsOffset);
-    ++gsArgIdx;
-
     gsArgs.push_back(gsWaveId);
-    ++gsArgIdx;
 
     // Set up system value VGPRs
     gsArgs.push_back(esGsOffset0);
-    ++gsArgIdx;
-
     gsArgs.push_back(esGsOffset1);
-    ++gsArgIdx;
-
     gsArgs.push_back(gsPrimitiveId);
-    ++gsArgIdx;
-
     gsArgs.push_back(esGsOffset2);
-    ++gsArgIdx;
-
     gsArgs.push_back(esGsOffset3);
-    ++gsArgIdx;
-
     gsArgs.push_back(esGsOffset4);
-    ++gsArgIdx;
-
     gsArgs.push_back(esGsOffset5);
-    ++gsArgIdx;
-
     gsArgs.push_back(invocationId);
-    ++gsArgIdx;
-
-    assert(gsArgIdx == gsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
 
     CallInst *call = builder.CreateCall(gsEntryPoint, gsArgs);
     call->setCallingConv(CallingConv::AMDGPU_GS);
@@ -974,18 +909,18 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
 // =====================================================================================================================
 // Append the user data arguments for calling @p target to @p args by referring to the arguments of @p target starting
-// at @p argIdx (which will be updated). User data values are taken from the @p userData vector.
+// at @p argIdx. User data values are taken from the @p userData vector.
 //
 // @param builder : The builder that will be used to create code to prepare the arguments
 // @param [in/out] args : The argument vector that will be appended to
 // @param target : The function we are preparing to call
-// @param [in/out] argIdx : Index into the target function's arguments
+// @param argIdx : Index into the target function's arguments
 // @param userData : The <N x i32> vector of user data values
 // @param userDataCount : The number of element of @p userData that should be processed
 // @param substitutions : A mapping of "target function user data index to merged function user data index" that is
 //                        applied to i32 arguments of the target function.
 void ShaderMerger::appendUserData(BuilderBase &builder, SmallVectorImpl<Value *> &args, Function *target,
-                                  unsigned &argIdx, Value *userData, unsigned userDataCount,
+                                  unsigned argIdx, Value *userData, unsigned userDataCount,
                                   ArrayRef<std::pair<unsigned, unsigned>> substitutions) {
   unsigned userDataIdx = 0;
 
