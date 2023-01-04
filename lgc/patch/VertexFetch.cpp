@@ -92,7 +92,7 @@ public:
                      BuilderBase &builder) override;
 
   // Generate code to fetch a vertex value for uber shader
-  Value *fetchVertex(llvm::CallInst *callInst, Value *descPtr, BuilderBase &builder);
+  Value *fetchVertex(llvm::CallInst *callInst, Value *descPtr, BuilderBase &builder) override;
 
 private:
   void initialize(PipelineState *pipelineState);
