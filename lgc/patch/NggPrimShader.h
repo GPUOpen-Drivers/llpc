@@ -290,12 +290,12 @@ private:
 
   static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
 
-  PipelineState *m_pipelineState; // Pipeline state
-  GfxIpVersion m_gfxIp;           // Graphics IP version info
+  PipelineState *m_pipelineState = nullptr; // Pipeline state
+  GfxIpVersion m_gfxIp;                     // Graphics IP version info
 
-  const NggControl *m_nggControl; // NGG control settings
+  const NggControl *m_nggControl = nullptr; // NGG control settings
 
-  NggLdsManager *m_ldsManager; // NGG LDS manager
+  NggLdsManager *m_ldsManager = nullptr; // NGG LDS manager
 
   // NGG factors used for calculation (different modes use different factors)
   struct {
@@ -328,19 +328,18 @@ private:
     llvm::Value *esGsOffset4; // ES-GS offset of vertex4
     llvm::Value *esGsOffset5; // ES-GS offset of vertex5
 
-  } m_nggInputs;
+  } m_nggInputs = {};
 
-  bool m_hasVs;  // Whether the pipeline has vertex shader
-  bool m_hasTcs; // Whether the pipeline has tessellation control shader
-  bool m_hasTes; // Whether the pipeline has tessellation evaluation shader
-  bool m_hasGs;  // Whether the pipeline has geometry shader
+  bool m_hasVs = false;  // Whether the pipeline has vertex shader
+  bool m_hasTes = false; // Whether the pipeline has tessellation evaluation shader
+  bool m_hasGs = false;  // Whether the pipeline has geometry shader
 
-  bool m_enableSwXfb; // Whether SW-emulated stream-out is enabled (GFX11+)
+  bool m_enableSwXfb = false; // Whether SW-emulated stream-out is enabled (GFX11+)
 
-  bool m_constPositionZ; // Whether the Z channel of vertex position data is constant
+  bool m_constPositionZ = false; // Whether the Z channel of vertex position data is constant
 
   // Base offsets (in dwords) of GS output vertex streams in GS-VS ring
-  unsigned m_gsStreamBases[MaxGsStreams];
+  unsigned m_gsStreamBases[MaxGsStreams] = {};
 
   PrimShaderCbLayoutLookupTable m_cbLayoutTable; // Layout lookup table of primitive shader constant buffer
   VertexCullInfoOffsets m_vertCullInfoOffsets;   // A collection of offsets within an item of vertex cull info
