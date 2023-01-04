@@ -284,13 +284,12 @@ private:
   }
 
   llvm::BasicBlock *createBlock(llvm::Function *parent, const llvm::Twine &blockName = "");
-
-  llvm::Value *CreateUBfe(llvm::Value *value, unsigned offset, unsigned count);
+  llvm::Value *createUBfe(llvm::Value *value, unsigned offset, unsigned count);
+  void createFenceAndBarrier();
 
   static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
 
   PipelineState *m_pipelineState; // Pipeline state
-  llvm::LLVMContext *m_context;   // LLVM context
   GfxIpVersion m_gfxIp;           // Graphics IP version info
 
   const NggControl *m_nggControl; // NGG control settings

@@ -75,9 +75,9 @@ enum {
 //
 // @param pipelineState : Pipeline state
 NggPrimShader::NggPrimShader(PipelineState *pipelineState)
-    : m_pipelineState(pipelineState), m_context(&pipelineState->getContext()),
-      m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()), m_nggControl(m_pipelineState->getNggControl()),
-      m_ldsManager(nullptr), m_constPositionZ(false), m_builder(new IRBuilder<>(*m_context)) {
+    : m_pipelineState(pipelineState), m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()),
+      m_nggControl(m_pipelineState->getNggControl()), m_ldsManager(nullptr), m_constPositionZ(false),
+      m_builder(new IRBuilder<>(pipelineState->getContext())) {
   assert(m_nggControl->enableNgg);
 
   // Always allow approximation, to change fdiv(1.0, x) to rcp(x)
@@ -680,7 +680,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
       if (m_gfxIp.major >= 11) {
         // Record attribute ring base ([14:0])
-        m_nggFactor.attribRingBase = CreateUBfe(attribRingBase, 0, 15);
+        m_nggFactor.attribRingBase = createUBfe(attribRingBase, 0, 15);
       }
 
       // Record primitive connectivity data
@@ -716,9 +716,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         // Distribute primitive ID
         Value *vertexId = nullptr;
         if (m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst)
-          vertexId = CreateUBfe(m_nggFactor.primData, 0, 9);
+          vertexId = createUBfe(m_nggFactor.primData, 0, 9);
         else
-          vertexId = CreateUBfe(m_nggFactor.primData, 20, 9);
+          vertexId = createUBfe(m_nggFactor.primData, 20, 9);
         writePerThreadDataToLds(gsPrimitiveId, vertexId, LdsRegionDistribPrimId);
 
         BranchInst::Create(endWritePrimIdBlock, writePrimIdBlock);
@@ -728,10 +728,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       {
         m_builder->SetInsertPoint(endWritePrimIdBlock);
 
-        SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-        m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-        m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+        createFenceAndBarrier();
 
         auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
         m_builder->CreateCondBr(vertValid, readPrimIdBlock, endReadPrimIdBlock);
@@ -760,10 +757,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         // Record primitive ID
         m_nggFactor.primitiveId = primitiveIdPhi;
 
-        SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-        m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-        m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+        createFenceAndBarrier();
 
         if (!passthroughNoMsg) {
           auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
@@ -1020,16 +1014,16 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
     if (m_gfxIp.major >= 11) {
       // Record attribute ring base ([14:0])
-      m_nggFactor.attribRingBase = CreateUBfe(attribRingBase, 0, 15);
+      m_nggFactor.attribRingBase = createUBfe(attribRingBase, 0, 15);
     }
 
     m_nggFactor.primShaderTableAddrLow = primShaderTableAddrLow;
     m_nggFactor.primShaderTableAddrHigh = primShaderTableAddrHigh;
 
     // Record ES-GS vertex offsets info
-    m_nggFactor.esGsOffset0 = CreateUBfe(esGsOffsets01, 0, 16);
-    m_nggFactor.esGsOffset1 = CreateUBfe(esGsOffsets01, 16, 16);
-    m_nggFactor.esGsOffset2 = CreateUBfe(esGsOffsets23, 0, 16);
+    m_nggFactor.esGsOffset0 = createUBfe(esGsOffsets01, 0, 16);
+    m_nggFactor.esGsOffset1 = createUBfe(esGsOffsets01, 16, 16);
+    m_nggFactor.esGsOffset2 = createUBfe(esGsOffsets23, 0, 16);
 
     vertexItemOffset =
         m_builder->CreateMul(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(esGsRingItemSize * SizeOfDword));
@@ -1069,10 +1063,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(endWritePrimIdBlock);
 
-      SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-      m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-      m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+      createFenceAndBarrier();
 
       auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
       m_builder->CreateCondBr(vertValid, readPrimIdBlock, endReadPrimIdBlock);
@@ -1100,10 +1091,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       // Record primitive ID
       m_nggFactor.primitiveId = primitiveIdPhi;
 
-      SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-      m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-      m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+      createFenceAndBarrier();
 
       if (m_enableSwXfb)
         processXfbOutputExport(module, entryPoint->arg_begin());
@@ -1219,7 +1207,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         auto cullDistanceVal = m_builder->CreateExtractValue(cullDistance, i);
         cullDistanceVal = m_builder->CreateBitCast(cullDistanceVal, m_builder->getInt32Ty());
 
-        Value *signBit = CreateUBfe(cullDistanceVal, 31, 1);
+        Value *signBit = createUBfe(cullDistanceVal, 31, 1);
         signBit = m_builder->CreateShl(signBit, i);
 
         signMask = m_builder->CreateOr(signMask, signBit);
@@ -1235,10 +1223,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   {
     m_builder->SetInsertPoint(endWriteVertCullDataBlock);
 
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
     m_builder->CreateCondBr(primValid, cullingBlock, endCullingBlock);
@@ -1285,10 +1270,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     cullFlagPhi->addIncoming(m_builder->getTrue(), endWriteVertCullDataBlock);
     cullFlag = cullFlagPhi;
 
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
     m_builder->CreateCondBr(vertValid, checkVertDrawFlagBlock, endCheckVertDrawFlagBlock);
@@ -1350,10 +1332,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   {
     m_builder->SetInsertPoint(endAccumVertCountBlock);
 
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     auto vertCountInWaves =
         readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInWave, LdsRegionVertCountInWaves);
@@ -1380,7 +1359,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(compactVertBlock);
 
-      auto drawMaskVec = m_builder->CreateBitCast(drawMask, FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
+      auto drawMaskVec = m_builder->CreateBitCast(drawMask, FixedVectorType::get(m_builder->getInt32Ty(), 2));
 
       auto drawMaskLow = m_builder->CreateExtractElement(drawMaskVec, static_cast<uint64_t>(0));
       Value *compactVertexId =
@@ -1530,10 +1509,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   {
     m_builder->SetInsertPoint(endAllocReqBlock);
 
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     if (waNggCullingNoEmptySubgroups)
       m_builder->CreateCondBr(fullyCulled, earlyExitBlock, noEarlyExitBlock);
@@ -1808,7 +1784,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
     if (m_gfxIp.major >= 11) {
       // Record attribute ring base ([14:0])
-      m_nggFactor.attribRingBase = CreateUBfe(attribRingBase, 0, 15);
+      m_nggFactor.attribRingBase = createUBfe(attribRingBase, 0, 15);
     }
 
     // Record primitive shader table address info
@@ -1816,12 +1792,12 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     m_nggFactor.primShaderTableAddrHigh = primShaderTableAddrHigh;
 
     // Record ES-GS vertex offsets info
-    m_nggFactor.esGsOffset0 = CreateUBfe(esGsOffsets01, 0, 16);
-    m_nggFactor.esGsOffset1 = CreateUBfe(esGsOffsets01, 16, 16);
-    m_nggFactor.esGsOffset2 = CreateUBfe(esGsOffsets23, 0, 16);
-    m_nggFactor.esGsOffset3 = CreateUBfe(esGsOffsets23, 16, 16);
-    m_nggFactor.esGsOffset4 = CreateUBfe(esGsOffsets45, 0, 16);
-    m_nggFactor.esGsOffset5 = CreateUBfe(esGsOffsets45, 16, 16);
+    m_nggFactor.esGsOffset0 = createUBfe(esGsOffsets01, 0, 16);
+    m_nggFactor.esGsOffset1 = createUBfe(esGsOffsets01, 16, 16);
+    m_nggFactor.esGsOffset2 = createUBfe(esGsOffsets23, 0, 16);
+    m_nggFactor.esGsOffset3 = createUBfe(esGsOffsets23, 16, 16);
+    m_nggFactor.esGsOffset4 = createUBfe(esGsOffsets45, 0, 16);
+    m_nggFactor.esGsOffset5 = createUBfe(esGsOffsets45, 16, 16);
 
     auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
     m_builder->CreateCondBr(vertValid, beginEsBlock, endEsBlock);
@@ -1867,10 +1843,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(endInitOutPrimDataBlock);
 
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.primCountInWave);
     m_builder->CreateCondBr(primValid, beginGsBlock, endGsBlock);
@@ -1912,10 +1885,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(endInitOutVertCountBlock);
 
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     if (cullingMode) {
       // Do culling
@@ -1970,10 +1940,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     {
       m_builder->SetInsertPoint(endCullingBlock);
 
-      SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-      m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-      m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+      createFenceAndBarrier();
 
       auto outVertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
       m_builder->CreateCondBr(outVertValid, checkOutVertDrawFlagBlock, endCheckOutVertDrawFlagBlock);
@@ -2065,10 +2032,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(endAccumOutVertCountBlock);
 
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     if (disableCompact) {
       auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggFactor.waveIdInSubgroup, m_builder->getInt32(0));
@@ -2102,7 +2066,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     {
       m_builder->SetInsertPoint(compactOutVertIdBlock);
 
-      auto drawMaskVec = m_builder->CreateBitCast(drawMask, FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
+      auto drawMaskVec = m_builder->CreateBitCast(drawMask, FixedVectorType::get(m_builder->getInt32Ty(), 2));
 
       auto drawMaskLow = m_builder->CreateExtractElement(drawMaskVec, static_cast<uint64_t>(0));
       compactVertexId =
@@ -2146,12 +2110,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     m_builder->SetInsertPoint(endAllocReqBlock);
 
     // NOTE: This barrier is not necessary if we disable vertex compaction.
-    if (!disableCompact) {
-      SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-      m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-      m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
-    }
+    if (!disableCompact)
+      createFenceAndBarrier();
 
     auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
     m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
@@ -2248,12 +2208,12 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {m_builder->getInt32(-1), threadIdInWave});
   }
 
-  auto primCountInSubgroup = CreateUBfe(mergedGroupInfo, 22, 9);
-  auto vertCountInSubgroup = CreateUBfe(mergedGroupInfo, 12, 9);
-  auto vertCountInWave = CreateUBfe(mergedWaveInfo, 0, 8);
-  auto primCountInWave = CreateUBfe(mergedWaveInfo, 8, 8);
-  auto waveIdInSubgroup = CreateUBfe(mergedWaveInfo, 24, 4);
-  auto orderedWaveId = CreateUBfe(mergedGroupInfo, 0, 12);
+  auto primCountInSubgroup = createUBfe(mergedGroupInfo, 22, 9);
+  auto vertCountInSubgroup = createUBfe(mergedGroupInfo, 12, 9);
+  auto vertCountInWave = createUBfe(mergedWaveInfo, 0, 8);
+  auto primCountInWave = createUBfe(mergedWaveInfo, 8, 8);
+  auto waveIdInSubgroup = createUBfe(mergedWaveInfo, 24, 4);
+  auto orderedWaveId = createUBfe(mergedGroupInfo, 0, 12);
 
   auto threadIdInSubgroup = m_builder->CreateMul(waveIdInSubgroup, m_builder->getInt32(waveSize));
   threadIdInSubgroup = m_builder->CreateAdd(threadIdInSubgroup, threadIdInWave);
@@ -3097,7 +3057,7 @@ void NggPrimShader::splitEs(Module *module) {
 
   Type *cullDataTy = positionTy;
   if (m_nggControl->enableCullDistanceCulling)
-    cullDataTy = StructType::get(*m_context, {positionTy, cullDistanceTy});
+    cullDataTy = StructType::get(m_builder->getContext(), {positionTy, cullDistanceTy});
 
   // Clone ES
   auto esCullDataFetchFuncTy = FunctionType::get(cullDataTy, esEntryPoint->getFunctionType()->params(), false);
@@ -4231,14 +4191,14 @@ Value *NggPrimShader::fetchCullingControlRegister(Module *module, unsigned regOf
 Function *NggPrimShader::createBackfaceCuller(Module *module) {
   auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                   {
-                                      m_builder->getInt1Ty(),                                // %cullFlag
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex0
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex1
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex2
-                                      m_builder->getInt32Ty(),                               // %backfaceExponent
-                                      m_builder->getInt32Ty(),                               // %paSuScModeCntl
-                                      m_builder->getInt32Ty(),                               // %paClVportXscale
-                                      m_builder->getInt32Ty()                                // %paClVportYscale
+                                      m_builder->getInt1Ty(),                           // %cullFlag
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex0
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex1
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex2
+                                      m_builder->getInt32Ty(),                          // %backfaceExponent
+                                      m_builder->getInt32Ty(),                          // %paSuScModeCntl
+                                      m_builder->getInt32Ty(),                          // %paClVportXscale
+                                      m_builder->getInt32Ty()                           // %paClVportYscale
                                   },
                                   false);
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingBackface, module);
@@ -4350,10 +4310,10 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     auto frontFace = m_builder->CreateXor(paClVportXscale, paClVportYscale);
 
     // signbit(xScale ^ yScale)
-    frontFace = CreateUBfe(frontFace, 31, 1);
+    frontFace = createUBfe(frontFace, 31, 1);
 
     // face = (FACE, PA_SU_SC_MODE_CNTL[2], 0 = CCW, 1 = CW)
-    auto face = CreateUBfe(paSuScModeCntl, 2, 1);
+    auto face = createUBfe(paSuScModeCntl, 2, 1);
 
     // frontFace = face ^ signbit(xScale ^ yScale)
     frontFace = m_builder->CreateXor(face, frontFace);
@@ -4372,7 +4332,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     cullFront = m_builder->CreateTrunc(cullFront, m_builder->getInt1Ty());
 
     // cullBack = (CULL_BACK, PA_SU_SC_MODE_CNTL[1], 0 = DONT CULL, 1 = CULL)
-    Value *cullBack = CreateUBfe(paSuScModeCntl, 1, 1);
+    Value *cullBack = createUBfe(paSuScModeCntl, 1, 1);
     cullBack = m_builder->CreateTrunc(cullBack, m_builder->getInt1Ty());
 
     // cullFront = cullFront ? frontFace : false
@@ -4432,7 +4392,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
     cullFlagPhi->addIncoming(cullFlag2, backfaceExponentBlock);
 
     // polyMode = (POLY_MODE, PA_SU_SC_MODE_CNTL[4:3], 0 = DISABLE, 1 = DUAL)
-    auto polyMode = CreateUBfe(paSuScModeCntl, 3, 2);
+    auto polyMode = createUBfe(paSuScModeCntl, 3, 2);
 
     // polyMode == 1
     auto wireFrameMode = m_builder->CreateICmpEQ(polyMode, m_builder->getInt32(1));
@@ -4454,13 +4414,13 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
 Function *NggPrimShader::createFrustumCuller(Module *module) {
   auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                   {
-                                      m_builder->getInt1Ty(),                                // %cullFlag
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex0
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex1
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex2
-                                      m_builder->getInt32Ty(),                               // %paClClipCntl
-                                      m_builder->getInt32Ty(),                               // %paClGbHorzDiscAdj
-                                      m_builder->getInt32Ty()                                // %paClGbVertDiscAdj
+                                      m_builder->getInt1Ty(),                           // %cullFlag
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex0
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex1
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex2
+                                      m_builder->getInt32Ty(),                          // %paClClipCntl
+                                      m_builder->getInt32Ty(),                          // %paClGbHorzDiscAdj
+                                      m_builder->getInt32Ty()                           // %paClGbVertDiscAdj
                                   },
                                   false);
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingFrustum, module);
@@ -4522,7 +4482,7 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
     //
 
     // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
-    Value *clipSpaceDef = CreateUBfe(paClClipCntl, 19, 1);
+    Value *clipSpaceDef = createUBfe(paClClipCntl, 19, 1);
     clipSpaceDef = m_builder->CreateTrunc(clipSpaceDef, m_builder->getInt1Ty());
 
     // zNear = clipSpaceDef ? -1.0 : 0.0, zFar = 1.0
@@ -4709,14 +4669,14 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
 Function *NggPrimShader::createBoxFilterCuller(Module *module) {
   auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                   {
-                                      m_builder->getInt1Ty(),                                // %cullFlag
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex0
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex1
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex2
-                                      m_builder->getInt32Ty(),                               // %paClVteCntl
-                                      m_builder->getInt32Ty(),                               // %paClClipCntl
-                                      m_builder->getInt32Ty(),                               // %paClGbHorzDiscAdj
-                                      m_builder->getInt32Ty()                                // %paClGbVertDiscAdj
+                                      m_builder->getInt1Ty(),                           // %cullFlag
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex0
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex1
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex2
+                                      m_builder->getInt32Ty(),                          // %paClVteCntl
+                                      m_builder->getInt32Ty(),                          // %paClClipCntl
+                                      m_builder->getInt32Ty(),                          // %paClGbHorzDiscAdj
+                                      m_builder->getInt32Ty()                           // %paClGbVertDiscAdj
                                   },
                                   false);
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingBoxFilter, module);
@@ -4778,15 +4738,15 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
-    Value *vtxXyFmt = CreateUBfe(paClVteCntl, 8, 1);
+    Value *vtxXyFmt = createUBfe(paClVteCntl, 8, 1);
     vtxXyFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // vtxZFmt = (VTX_Z_FMT, PA_CL_VTE_CNTL[9], 0 = 1/W0, 1 = none)
-    Value *vtxZFmt = CreateUBfe(paClVteCntl, 9, 1);
+    Value *vtxZFmt = createUBfe(paClVteCntl, 9, 1);
     vtxZFmt = m_builder->CreateTrunc(vtxZFmt, m_builder->getInt1Ty());
 
     // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
-    Value *clipSpaceDef = CreateUBfe(paClClipCntl, 19, 1);
+    Value *clipSpaceDef = createUBfe(paClClipCntl, 19, 1);
     clipSpaceDef = m_builder->CreateTrunc(clipSpaceDef, m_builder->getInt1Ty());
 
     // zNear = clipSpaceDef ? -1.0 : 0.0, zFar = 1.0
@@ -4932,14 +4892,14 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
 Function *NggPrimShader::createSphereCuller(Module *module) {
   auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                   {
-                                      m_builder->getInt1Ty(),                                // %cullFlag
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex0
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex1
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex2
-                                      m_builder->getInt32Ty(),                               // %paClVteCntl
-                                      m_builder->getInt32Ty(),                               // %paClClipCntl
-                                      m_builder->getInt32Ty(),                               // %paClGbHorzDiscAdj
-                                      m_builder->getInt32Ty()                                // %paClGbVertDiscAdj
+                                      m_builder->getInt1Ty(),                           // %cullFlag
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex0
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex1
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex2
+                                      m_builder->getInt32Ty(),                          // %paClVteCntl
+                                      m_builder->getInt32Ty(),                          // %paClClipCntl
+                                      m_builder->getInt32Ty(),                          // %paClGbHorzDiscAdj
+                                      m_builder->getInt32Ty()                           // %paClGbVertDiscAdj
                                   },
                                   false);
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingSphere, module);
@@ -5003,15 +4963,15 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
-    Value *vtxXyFmt = CreateUBfe(paClVteCntl, 8, 1);
+    Value *vtxXyFmt = createUBfe(paClVteCntl, 8, 1);
     vtxXyFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // vtxZFmt = (VTX_Z_FMT, PA_CL_VTE_CNTL[9], 0 = 1/W0, 1 = none)
-    Value *vtxZFmt = CreateUBfe(paClVteCntl, 9, 1);
+    Value *vtxZFmt = createUBfe(paClVteCntl, 9, 1);
     vtxZFmt = m_builder->CreateTrunc(vtxZFmt, m_builder->getInt1Ty());
 
     // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
-    Value *clipSpaceDef = CreateUBfe(paClClipCntl, 19, 1);
+    Value *clipSpaceDef = createUBfe(paClClipCntl, 19, 1);
     clipSpaceDef = m_builder->CreateTrunc(clipSpaceDef, m_builder->getInt1Ty());
 
     // zNear = clipSpaceDef ? -1.0 : 0.0
@@ -5108,9 +5068,9 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
     Value *z0Z0 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, {z0, z0});
     Value *z2Z1 = m_builder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, {z2, z1});
 
-    z0Z0 = m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(Type::getHalfTy(*m_context), 2),
+    z0Z0 = m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(m_builder->getHalfTy(), 2),
                                       {zNearPlusTwo, z0Z0, negOneMinusZNear});
-    z2Z1 = m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(Type::getHalfTy(*m_context), 2),
+    z2Z1 = m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(m_builder->getHalfTy(), 2),
                                       {zNearPlusTwo, z2Z1, negOneMinusZNear});
 
     //
@@ -5195,17 +5155,17 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
     //
 
     // <s, t>
-    auto st = m_builder->CreateInsertElement(UndefValue::get(FixedVectorType::get(Type::getHalfTy(*m_context), 2)), s,
+    auto st = m_builder->CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder->getHalfTy(), 2)), s,
                                              static_cast<uint64_t>(0));
     st = m_builder->CreateInsertElement(st, t, 1);
 
     // <s', t'> = <0.5 - 0.5(t - s), 0.5 + 0.5(t - s)>
     auto tMinusS = m_builder->CreateFSub(t, s);
-    auto sT1 = m_builder->CreateInsertElement(UndefValue::get(FixedVectorType::get(Type::getHalfTy(*m_context), 2)),
-                                              tMinusS, static_cast<uint64_t>(0));
+    auto sT1 = m_builder->CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder->getHalfTy(), 2)), tMinusS,
+                                              static_cast<uint64_t>(0));
     sT1 = m_builder->CreateInsertElement(sT1, tMinusS, 1);
 
-    sT1 = m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(Type::getHalfTy(*m_context), 2),
+    sT1 = m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(m_builder->getHalfTy(), 2),
                                      {ConstantVector::get({ConstantFP::get(m_builder->getHalfTy(), -0.5),
                                                            ConstantFP::get(m_builder->getHalfTy(), 0.5)}),
                                       sT1,
@@ -5213,10 +5173,10 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
                                                            ConstantFP::get(m_builder->getHalfTy(), 0.5)})});
 
     // <s", t"> = clamp(<s, t>)
-    auto sT2 = m_builder->CreateIntrinsic(Intrinsic::maxnum, FixedVectorType::get(Type::getHalfTy(*m_context), 2),
+    auto sT2 = m_builder->CreateIntrinsic(Intrinsic::maxnum, FixedVectorType::get(m_builder->getHalfTy(), 2),
                                           {st, ConstantVector::get({ConstantFP::get(m_builder->getHalfTy(), 0.0),
                                                                     ConstantFP::get(m_builder->getHalfTy(), 0.0)})});
-    sT2 = m_builder->CreateIntrinsic(Intrinsic::minnum, FixedVectorType::get(Type::getHalfTy(*m_context), 2),
+    sT2 = m_builder->CreateIntrinsic(Intrinsic::minnum, FixedVectorType::get(m_builder->getHalfTy(), 2),
                                      {sT2, ConstantVector::get({ConstantFP::get(m_builder->getHalfTy(), 1.0),
                                                                 ConstantFP::get(m_builder->getHalfTy(), 1.0)})});
 
@@ -5238,12 +5198,11 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
     auto tt = m_builder->CreateInsertElement(st, t, static_cast<uint64_t>(0));
 
     // s * <x10, y10> + <x0", y0">
-    auto xy = m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(Type::getHalfTy(*m_context), 2),
-                                         {ss, x10Y10, x0Y0});
+    auto xy =
+        m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(m_builder->getHalfTy(), 2), {ss, x10Y10, x0Y0});
 
     // <x, y> = t * <x20, y20> + (s * <x10, y10> + <x0", y0">)
-    xy = m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(Type::getHalfTy(*m_context), 2),
-                                    {tt, x20Y20, xy});
+    xy = m_builder->CreateIntrinsic(Intrinsic::fma, FixedVectorType::get(m_builder->getHalfTy(), 2), {tt, x20Y20, xy});
 
     // s * z10 + z0"
     z0 = m_builder->CreateExtractElement(z0Z0, static_cast<uint64_t>(0));
@@ -5295,16 +5254,16 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
 Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
   auto funcTy = FunctionType::get(m_builder->getInt1Ty(),
                                   {
-                                      m_builder->getInt1Ty(),                                // %cullFlag
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex0
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex1
-                                      FixedVectorType::get(Type::getFloatTy(*m_context), 4), // %vertex2
-                                      m_builder->getInt32Ty(),                               // %paClVteCntl
-                                      m_builder->getInt32Ty(),                               // %paClVportXscale
-                                      m_builder->getInt32Ty(),                               // %paClVportXoffset
-                                      m_builder->getInt32Ty(),                               // %paClVportYscale
-                                      m_builder->getInt32Ty(),                               // %paClVportYoffset
-                                      m_builder->getInt1Ty()                                 // %conservativeRaster
+                                      m_builder->getInt1Ty(),                           // %cullFlag
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex0
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex1
+                                      FixedVectorType::get(m_builder->getFloatTy(), 4), // %vertex2
+                                      m_builder->getInt32Ty(),                          // %paClVteCntl
+                                      m_builder->getInt32Ty(),                          // %paClVportXscale
+                                      m_builder->getInt32Ty(),                          // %paClVportXoffset
+                                      m_builder->getInt32Ty(),                          // %paClVportYscale
+                                      m_builder->getInt32Ty(),                          // %paClVportYoffset
+                                      m_builder->getInt1Ty()                            // %conservativeRaster
                                   },
                                   false);
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::NggCullingSmallPrimFilter, module);
@@ -5381,7 +5340,7 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
-    Value *vtxXyFmt = CreateUBfe(paClVteCntl, 8, 1);
+    Value *vtxXyFmt = createUBfe(paClVteCntl, 8, 1);
     vtxXyFmt = m_builder->CreateTrunc(vtxXyFmt, m_builder->getInt1Ty());
 
     // xScale = (VPORT_XSCALE, PA_CL_VPORT_XSCALE[31:0])
@@ -5686,7 +5645,7 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
     m_builder->SetInsertPoint(entryBlock);
 
     Value *primShaderTableAddr =
-        m_builder->CreateInsertElement(UndefValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 2)),
+        m_builder->CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 2)),
                                        primShaderTableAddrLow, static_cast<uint64_t>(0));
 
     primShaderTableAddr = m_builder->CreateInsertElement(primShaderTableAddr, primShaderTableAddrHigh, 1);
@@ -5814,7 +5773,7 @@ void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
         if (modifyAttribRingBufDesc) {
           // STRIDE = WORD1[30:16], STRIDE is multiplied by attribute count
           auto descWord1 = m_builder->CreateExtractElement(attribRingBufDesc, 1);
-          auto stride = CreateUBfe(descWord1, 16, 14);
+          auto stride = createUBfe(descWord1, 16, 14);
           stride = m_builder->CreateMul(stride, m_builder->getInt32(attribCount));
 
           descWord1 = m_builder->CreateAnd(descWord1, ~0x3FFF0000);                     // Clear STRIDE
@@ -6143,10 +6102,7 @@ void NggPrimShader::processXfbOutputExport(Module *module, Argument *sysValueSta
 
     // We are going to read transform feedback statistics info and outputs from LDS and export them to transform
     // feedback buffers. Make sure the output values have been all written before this.
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     auto threadValid =
         m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_builder->getInt32(1 + MaxTransformFeedbackBuffers));
@@ -6196,13 +6152,13 @@ void NggPrimShader::processXfbOutputExport(Module *module, Argument *sysValueSta
     const unsigned vertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
     if (m_nggControl->passthroughMode) {
       // [8:0]   = vertexId0
-      vertexIds[0] = CreateUBfe(m_nggFactor.primData, 0, 9);
+      vertexIds[0] = createUBfe(m_nggFactor.primData, 0, 9);
       // [18:10] = vertexId1
       if (vertsPerPrim > 1)
-        vertexIds[1] = CreateUBfe(m_nggFactor.primData, 10, 9);
+        vertexIds[1] = createUBfe(m_nggFactor.primData, 10, 9);
       // [28:20] = vertexId2
       if (vertsPerPrim > 2)
-        vertexIds[2] = CreateUBfe(m_nggFactor.primData, 20, 9);
+        vertexIds[2] = createUBfe(m_nggFactor.primData, 20, 9);
 
     } else {
       // Must be triangle
@@ -6447,10 +6403,7 @@ void NggPrimShader::processGsXfbOutputExport(Module *module, Argument *sysValueS
   {
     m_builder->SetInsertPoint(endInitOutPrimCountBlock);
 
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     auto outPrimValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.primCountInSubgroup);
     m_builder->CreateCondBr(outPrimValid, checkOutPrimDrawFlagBlock, endCheckOutPrimDrawFlagBlock);
@@ -6533,10 +6486,7 @@ void NggPrimShader::processGsXfbOutputExport(Module *module, Argument *sysValueS
   {
     m_builder->SetInsertPoint(endAccumOutPrimCountBlock);
 
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (streamActive[i]) {
@@ -6574,7 +6524,7 @@ void NggPrimShader::processGsXfbOutputExport(Module *module, Argument *sysValueS
     {
       m_builder->SetInsertPoint(compactOutPrimIdBlock[i]);
 
-      auto drawMaskVec = m_builder->CreateBitCast(drawMask[i], FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
+      auto drawMaskVec = m_builder->CreateBitCast(drawMask[i], FixedVectorType::get(m_builder->getInt32Ty(), 2));
 
       auto drawMaskLow = m_builder->CreateExtractElement(drawMaskVec, static_cast<uint64_t>(0));
       Value *compactPrimitiveId =
@@ -6793,10 +6743,7 @@ void NggPrimShader::processGsXfbOutputExport(Module *module, Argument *sysValueS
 
     // We are going to read transform feedback statistics info from LDS. Make sure the info has been written before
     // this.
-    SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, workgroupScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
+    createFenceAndBarrier();
 
     auto xfbStatInfo =
         readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggFactor.threadIdInWave, LdsRegionGsXfbStatInfo);
@@ -7009,18 +6956,18 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
   //
   // NOTE: For GS transform feedback, the output value must be loaded by GS output import call. Thus, we don't have to
   // return output value. Instead, we recode the location in transform feedback export info and use it later.
-  auto xfbOutputTy =
-      m_hasGs ? StructType::get(*m_context,
+  auto xfbOutputTy = m_hasGs ? StructType::get(m_builder->getContext(),
 
-                                {
-                                    FixedVectorType::get(m_builder->getInt32Ty(), 4), // streamOutBufDesc
-                                    m_builder->getInt32Ty(),                          // streamOutBufOffset
-                                })
-              : StructType::get(*m_context, {
-                                                FixedVectorType::get(m_builder->getInt32Ty(), 4), // streamOutBufDesc
-                                                m_builder->getInt32Ty(),                          // streamOutBufOffset
-                                                FixedVectorType::get(m_builder->getInt32Ty(), 4), // outputValue
-                                            });
+                                               {
+                                                   FixedVectorType::get(m_builder->getInt32Ty(), 4), // streamOutBufDesc
+                                                   m_builder->getInt32Ty(), // streamOutBufOffset
+                                               })
+                             : StructType::get(m_builder->getContext(),
+                                               {
+                                                   FixedVectorType::get(m_builder->getInt32Ty(), 4), // streamOutBufDesc
+                                                   m_builder->getInt32Ty(), // streamOutBufOffset
+                                                   FixedVectorType::get(m_builder->getInt32Ty(), 4), // outputValue
+                                               });
 
   auto xfbOutputsTy = ArrayType::get(xfbOutputTy, xfbOutputCount);
 
@@ -7423,7 +7370,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexId) {
     auto cullDistance = m_builder->CreateExtractValue(cullDistances, i);
     cullDistance = m_builder->CreateBitCast(cullDistance, m_builder->getInt32Ty());
 
-    Value *signBit = CreateUBfe(cullDistance, 31, 1);
+    Value *signBit = createUBfe(cullDistance, 31, 1);
     signBit = m_builder->CreateShl(signBit, i);
     signMask = m_builder->CreateOr(signMask, signBit);
   }
@@ -7459,7 +7406,7 @@ Value *NggPrimShader::calcVertexItemOffset(unsigned streamId, Value *vertexId) {
 // @param parent : Parent function to which the new block belongs
 // @param blockName : Name of the new block
 BasicBlock *NggPrimShader::createBlock(Function *parent, const Twine &blockName) {
-  return BasicBlock::Create(*m_context, blockName, parent);
+  return BasicBlock::Create(m_builder->getContext(), blockName, parent);
 }
 
 // =====================================================================================================================
@@ -7470,7 +7417,7 @@ BasicBlock *NggPrimShader::createBlock(Function *parent, const Twine &blockName)
 // @param offset : Bit number of least-significant end of bitfield
 // @param count : Count of bits in bitfield
 // @returns : The extracted bitfield
-Value *NggPrimShader::CreateUBfe(Value *value, unsigned offset, unsigned count) {
+Value *NggPrimShader::createUBfe(Value *value, unsigned offset, unsigned count) {
   assert(value->getType()->isIntegerTy(32));
   assert(offset <= 31 && count >= 1 && offset + count - 1 <= 31);
 
@@ -7481,6 +7428,15 @@ Value *NggPrimShader::CreateUBfe(Value *value, unsigned offset, unsigned count) 
     return m_builder->CreateAnd(value, (1U << count) - 1); // Just need mask
 
   return m_builder->CreateAnd(m_builder->CreateLShr(value, offset), (1U << count) - 1);
+}
+
+// =====================================================================================================================
+// Create LDS fence and barrier to guarantee the synchronization of LDS operations.
+void NggPrimShader::createFenceAndBarrier() {
+  SyncScope::ID syncScope = m_builder->getContext().getOrInsertSyncScopeID("workgroup");
+  m_builder->CreateFence(AtomicOrdering::Release, syncScope);
+  m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  m_builder->CreateFence(AtomicOrdering::Acquire, syncScope);
 }
 
 } // namespace lgc
