@@ -76,8 +76,8 @@ enum {
 // @param pipelineState : Pipeline state
 NggPrimShader::NggPrimShader(PipelineState *pipelineState)
     : m_pipelineState(pipelineState), m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()),
-      m_nggControl(m_pipelineState->getNggControl()), m_ldsManager(nullptr), m_constPositionZ(false),
-      m_builder(new IRBuilder<>(pipelineState->getContext())) {
+      m_nggControl(m_pipelineState->getNggControl()),
+      m_builder(std::make_unique<IRBuilder<>>(pipelineState->getContext())) {
   assert(m_nggControl->enableNgg);
 
   // Always allow approximation, to change fdiv(1.0, x) to rcp(x)
@@ -87,10 +87,7 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
 
   assert(m_pipelineState->isGraphics());
 
-  memset(&m_nggInputs, 0, sizeof(m_nggInputs));
-
   m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
-  m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
   m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
   m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
 
@@ -117,8 +114,7 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
       m_gsStreamBases[i] = gsStreamBase;
       gsStreamBase += gsVsRingItemSizes[i] * gsPrimsPerSubgroup;
     }
-  } else
-    memset(m_gsStreamBases, 0, sizeof(m_gsStreamBases));
+  }
 
   buildPrimShaderCbLayoutLookupTable();
   calcVertexCullInfoSizeAndOffsets(m_pipelineState, m_vertCullInfoOffsets);
@@ -148,9 +144,8 @@ unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
     unsigned esGsRingItemSize = 1;
 
     if (pipelineState->enableSwXfb()) {
-      const bool hasTs =
-          pipelineState->hasShaderStage(ShaderStageTessControl) || pipelineState->hasShaderStage(ShaderStageTessEval);
-      auto resUsage = pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+      const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
+      auto resUsage = pipelineState->getShaderResourceUsage(hasTes ? ShaderStageTessEval : ShaderStageVertex);
 
       // NOTE: For GFX11+, transform feedback outputs (each output is <4 x dword>) are stored as a ES-GS ring item.
       assert(resUsage->inOutUsage.xfbOutputExpCount > 0);
@@ -241,9 +236,8 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
   unsigned cullInfoOffset = 0;
 
   if (pipelineState->enableSwXfb()) {
-    const bool hasTs =
-        pipelineState->hasShaderStage(ShaderStageTessControl) || pipelineState->hasShaderStage(ShaderStageTessEval);
-    auto resUsage = pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+    const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
+    auto resUsage = pipelineState->getShaderResourceUsage(hasTes ? ShaderStageTessEval : ShaderStageVertex);
 
     // NOTE: Each transform feedback output is <4 x dword>.
     const unsigned xfbOutputCount = resUsage->inOutUsage.xfbOutputExpCount;
@@ -267,9 +261,8 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
     vertCullInfoOffsets.compactThreadId = cullInfoOffset;
     cullInfoOffset += sizeof(VertexCullInfo::compactThreadId);
 
-    const bool hasTs =
-        pipelineState->hasShaderStage(ShaderStageTessControl) || pipelineState->hasShaderStage(ShaderStageTessEval);
-    if (hasTs) {
+    const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
+    if (hasTes) {
       auto builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
       if (builtInUsage.tessCoord) {
         cullInfoSize += sizeof(VertexCullInfo::tes.tessCoordX);
@@ -336,40 +329,29 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
   const auto tesIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval);
   const auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
 
-  bool hasTs = (m_hasTcs || m_hasTes);
   if (m_hasGs) {
     // GS is present in primitive shader (ES-GS merged shader)
     userDataCount = gsIntfData->userDataCount;
 
-    if (hasTs) {
-      if (m_hasTes) {
-        userDataCount = std::max(tesIntfData->userDataCount, userDataCount);
+    if (m_hasTes) {
+      userDataCount = std::max(tesIntfData->userDataCount, userDataCount);
 
-        if (gsIntfData->spillTable.sizeInDwords > 0 && tesIntfData->spillTable.sizeInDwords == 0) {
-          tesIntfData->userDataUsage.spillTable = userDataCount;
-          ++userDataCount;
-          assert(userDataCount <= m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount);
-        }
+      if (gsIntfData->spillTable.sizeInDwords > 0 && tesIntfData->spillTable.sizeInDwords == 0) {
+        tesIntfData->userDataUsage.spillTable = userDataCount;
+        ++userDataCount;
+        assert(userDataCount <= m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount);
       }
     } else {
-      if (m_hasVs) {
-        userDataCount = std::max(vsIntfData->userDataCount, userDataCount);
+      userDataCount = std::max(vsIntfData->userDataCount, userDataCount);
 
-        if (gsIntfData->spillTable.sizeInDwords > 0 && vsIntfData->spillTable.sizeInDwords == 0) {
-          vsIntfData->userDataUsage.spillTable = userDataCount;
-          ++userDataCount;
-        }
+      if (gsIntfData->spillTable.sizeInDwords > 0 && vsIntfData->spillTable.sizeInDwords == 0) {
+        vsIntfData->userDataUsage.spillTable = userDataCount;
+        ++userDataCount;
       }
     }
   } else {
     // No GS in primitive shader (ES only)
-    if (hasTs) {
-      if (m_hasTes)
-        userDataCount = tesIntfData->userDataCount;
-    } else {
-      if (m_hasVs)
-        userDataCount = vsIntfData->userDataCount;
-    }
+    userDataCount = m_hasTes ? tesIntfData->userDataCount : vsIntfData->userDataCount;
   }
 
   assert(userDataCount > 0);
@@ -383,7 +365,7 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
   argTys.push_back(m_builder->getInt32Ty()); // Invocation ID
   argTys.push_back(m_builder->getInt32Ty()); // ES to GS offsets (vertex 4 and 5)
 
-  if (hasTs) {
+  if (m_hasTes) {
     argTys.push_back(m_builder->getFloatTy()); // X of TessCoord (U)
     argTys.push_back(m_builder->getFloatTy()); // Y of TessCoord (V)
     argTys.push_back(m_builder->getInt32Ty()); // Relative patch ID
@@ -396,7 +378,7 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
   }
 
   // If the ES is the API VS, and it is a fetchless VS, then we need to add args for the vertex fetches.
-  if (!hasTs) {
+  if (!m_hasTes) {
     unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
     if (vertexFetchCount != 0) {
       // TODO: This will not work with non-GS culling.
@@ -543,8 +525,6 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
   assert(m_nggControl->passthroughMode); // Make sure NGG passthrough mode is enabled
   assert(!m_hasGs);                      // Make sure API GS is not present
 
-  const bool hasTs = (m_hasTcs || m_hasTes);
-
   auto arg = entryPoint->arg_begin();
 
   Value *mergedGroupInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo));
@@ -579,8 +559,8 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
   //     Barrier
   //   }
   //
-  bool distributePrimitiveId =
-      !hasTs ? m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.primitiveId : false;
+  const bool distributePrimitiveId =
+      !m_hasTes ? m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.primitiveId : false;
 
   //
   // For pass-through mode, the processing is something like this:
@@ -827,8 +807,6 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   assert(!m_nggControl->passthroughMode); // Make sure NGG passthrough mode is not enabled
   assert(!m_hasGs);                       // Make sure API GS is not present
 
-  const bool hasTs = (m_hasTcs || m_hasTes);
-
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   assert(waveSize == 32 || waveSize == 64);
 
@@ -869,7 +847,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   Value *vertexId = (arg + 5);
   Value *instanceId = (arg + 8);
 
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
 
   //
   // NOTE: If primitive ID is used in VS, we have to insert several basic blocks to distribute the value across
@@ -886,7 +864,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   //     Barrier
   //   }
   //
-  bool distributePrimitiveId = !hasTs ? resUsage->builtInUsage.vs.primitiveId : false;
+  const bool distributePrimitiveId = !m_hasTes ? resUsage->builtInUsage.vs.primitiveId : false;
 
   //
   // The processing is something like this:
@@ -1423,7 +1401,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       // Write compacted thread ID
       writeVertexCullInfoToLds(compactVertexId, vertexItemOffset, m_vertCullInfoOffsets.compactThreadId);
 
-      if (hasTs) {
+      if (m_hasTes) {
         // Write X/Y of tessCoord (U/V)
         if (resUsage->builtInUsage.tes.tessCoord) {
           writeVertexCullInfoToLds(tessCoordX, vertexItemOffset, m_vertCullInfoOffsets.tessCoordX);
@@ -2588,7 +2566,7 @@ void NggPrimShader::doEarlyExit(unsigned fullyCulledExportCount) {
           ++posExpCount;
 
         posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
-      } else if (m_hasTcs || m_hasTes) {
+      } else if (m_hasTes) {
         const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.tes;
 
         bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
@@ -2639,9 +2617,8 @@ void NggPrimShader::doEarlyExit(unsigned fullyCulledExportCount) {
 // @param module : LLVM module
 // @param sysValueStart : Start of system value
 void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
-  const bool hasTs = (m_hasTcs || m_hasTes);
-  if (!((hasTs && m_hasTes) || (!hasTs && m_hasVs))) {
-    // No TES (tessellation is enabled) or VS (tessellation is disabled), don't have to run
+  if (!m_hasTes && !m_hasVs) {
+    // No TES or VS, don't have to run
     return;
   }
 
@@ -2687,15 +2664,15 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
   // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex attributes
   // through memory
   if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
-    const auto attribCount =
-        m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex)->inOutUsage.expCount;
+    const auto attribCount = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
+                                 ->inOutUsage.expCount;
     if (attribCount > 0) {
       args.push_back(m_nggInputs.attribRingBase);
       args.push_back(m_nggInputs.threadIdInSubgroup);
     }
   }
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+  auto intfData = m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
   const unsigned userDataCount = intfData->userDataCount;
 
   unsigned userDataIdx = 0;
@@ -2734,7 +2711,7 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
     }
   }
 
-  if (hasTs) {
+  if (m_hasTes) {
     // Set up system value SGPRs
     if (m_pipelineState->isTessOffChip()) {
       args.push_back(m_hasGs ? offChipLdsBase : isOffChip);
@@ -2797,8 +2774,6 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
       module->getFunction(deferredVertexExport ? lgcName::NggEsDeferredVertexExport : lgcName::NggEsCullDataFetch);
   assert(esPartialEntry);
 
-  const bool hasTs = (m_hasTcs || m_hasTes);
-
   // Call ES-partial entry
   Argument *arg = sysValueStart;
 
@@ -2858,8 +2833,8 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
 
       // NOTE: For deferred vertex export, some system values could be from vertex compaction info rather than from
       // VGPRs (caused by NGG culling and vertex compaction)
-      const auto resUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
-      if (hasTs) {
+      const auto resUsage = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
+      if (m_hasTes) {
         if (resUsage->builtInUsage.tes.tessCoord) {
           newTessCoordX =
               readVertexCullInfoFromLds(m_builder->getFloatTy(), vertexItemOffset, m_vertCullInfoOffsets.tessCoordX);
@@ -2903,7 +2878,7 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
       positionPhi->addIncoming(position, expVertBlock);
       position = positionPhi;
 
-      if (hasTs) {
+      if (m_hasTes) {
         if (newTessCoordX) {
           auto tessCoordXPhi = m_builder->CreatePHI(m_builder->getFloatTy(), 2);
           tessCoordXPhi->addIncoming(newTessCoordX, uncompactVertBlock);
@@ -2960,8 +2935,8 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
   // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex attributes
   // through memory
   if (m_gfxIp.major >= 11 && deferredVertexExport) {
-    const auto attribCount =
-        m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex)->inOutUsage.expCount;
+    const auto attribCount = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
+                                 ->inOutUsage.expCount;
     if (attribCount > 0) {
       args.push_back(m_nggInputs.attribRingBase);
       args.push_back(m_nggInputs.threadIdInSubgroup);
@@ -2971,7 +2946,7 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
   if (deferredVertexExport)
     args.push_back(position); // Setup vertex position data as the additional argument
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+  auto intfData = m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
   const unsigned userDataCount = intfData->userDataCount;
 
   unsigned userDataIdx = 0;
@@ -3010,7 +2985,7 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
     }
   }
 
-  if (hasTs) {
+  if (m_hasTes) {
     // Set up system value SGPRs
     if (m_pipelineState->isTessOffChip()) {
       args.push_back(isOffChip);
@@ -3070,10 +3045,9 @@ void NggPrimShader::splitEs(Module *module) {
   unsigned cullDistanceCount = 0;
 
   if (m_nggControl->enableCullDistanceCulling) {
-    const bool hasTs = (m_hasTcs || m_hasTes);
-    const auto &resUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+    const auto &resUsage = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
 
-    if (hasTs) {
+    if (m_hasTes) {
       const auto &builtInUsage = resUsage->builtInUsage.tes;
 
       bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
@@ -5755,10 +5729,9 @@ Value *NggPrimShader::doSubgroupBallot(Value *value) {
 void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
   assert(m_gfxIp.major >= 11); // For GFX11+
 
-  const bool hasTs = m_hasTcs || m_hasTes;
   const unsigned attribCount =
       m_pipelineState
-          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex))
+          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (m_hasTes ? ShaderStageTessEval : ShaderStageVertex))
           ->inOutUsage.expCount;
   if (attribCount == 0)
     return; // No vertex attribute exports
@@ -6985,10 +6958,9 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
   }
 
   // Clone or mutate entry-point
-  const bool hasTs = m_hasTcs || m_hasTes;
   const unsigned xfbOutputCount =
       m_pipelineState
-          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex))
+          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (m_hasTes ? ShaderStageTessEval : ShaderStageVertex))
           ->inOutUsage.xfbOutputExpCount;
   assert(xfbOutputCount > 0);
   xfbOutputExports.resize(xfbOutputCount);
@@ -7217,7 +7189,8 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
     // attributes through memory
     if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
       const auto attribCount =
-          m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex)->inOutUsage.expCount;
+          m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
+              ->inOutUsage.expCount;
       if (attribCount > 0) {
         args.push_back(m_nggInputs.attribRingBase);
         args.push_back(m_nggInputs.threadIdInSubgroup);
@@ -7225,7 +7198,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
     }
   }
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+  auto intfData = m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
   const unsigned userDataCount = intfData->userDataCount;
 
   unsigned userDataIdx = 0;
@@ -7260,7 +7233,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
     }
   }
 
-  if (hasTs) {
+  if (m_hasTes) {
     // Set up system value SGPRs
     if (m_pipelineState->isTessOffChip()) {
       args.push_back(isOffChip);
