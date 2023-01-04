@@ -327,7 +327,7 @@ private:
     llvm::Value *esGsOffset4; // ES-GS offset of vertex4
     llvm::Value *esGsOffset5; // ES-GS offset of vertex5
 
-  } m_nggFactor;
+  } m_nggInputs;
 
   bool m_hasVs;  // Whether the pipeline has vertex shader
   bool m_hasTcs; // Whether the pipeline has tessellation control shader
