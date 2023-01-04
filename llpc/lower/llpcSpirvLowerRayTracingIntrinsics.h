@@ -49,6 +49,9 @@ public:
 protected:
   void createLoadDwordAtAddr(llvm::Function *func, llvm::Type *loadTy);
   void createConvertF32toF16(llvm::Function *func, unsigned roundingMode);
+  void createGetBaseAddrFromResource(llvm::Function *func);
+  void createAtomicFMinMaxAtAddr(llvm::Function *func, bool isMin, bool is64Ty);
+  void createAtomicLdsFMinMax(llvm::Function *func, bool isMin);
 
 private:
   bool processIntrinsicsFunction(llvm::Function *func);

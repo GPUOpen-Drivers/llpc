@@ -46,6 +46,13 @@ const char *LoadDwordAtAddrx2 = "AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx2";
 const char *LoadDwordAtAddrx4 = "AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx4";
 const char *ConvertF32toF16NegInf = "AmdExtD3DShaderIntrinsics_ConvertF32toF16NegInf";
 const char *ConvertF32toF16PosInf = "AmdExtD3DShaderIntrinsics_ConvertF32toF16PosInf";
+static const char *GetBaseAddrFromResource = "AmdExtGetBaseAddrFromResource";
+static const char *AtomicFMinAtAddrx2 = "AmdExtAtomicFMinAtAddrx2";
+static const char *AtomicFMinAtAddr = "AmdExtAtomicFMinAtAddr";
+static const char *AtomicFMaxAtAddrx2 = "AmdExtAtomicFMaxAtAddrx2";
+static const char *AtomicFMaxAtAddr = "AmdExtAtomicFMaxAtAddr";
+static const char *AtomicLdsFMin = "AmdExtAtomicLdsFMin";
+static const char *AtomicLdsFMax = "AmdExtAtomicLdsFMax";
 } // namespace RtName
 
 namespace Llpc {
@@ -105,6 +112,27 @@ bool SpirvLowerRayTracingIntrinsics::processIntrinsicsFunction(Function *func) {
   } else if (mangledName.equals(RtName::ConvertF32toF16PosInf)) {
     // RM = fp::rmUpward;
     createConvertF32toF16(func, 3);
+    changed = true;
+  } else if (mangledName.startswith(RtName::GetBaseAddrFromResource)) {
+    createGetBaseAddrFromResource(func);
+    changed = true;
+  } else if (mangledName.startswith(RtName::AtomicFMinAtAddrx2)) {
+    createAtomicFMinMaxAtAddr(func, /* isMin */ true, /* is64Ty */ true);
+    changed = true;
+  } else if (mangledName.startswith(RtName::AtomicFMinAtAddr)) {
+    createAtomicFMinMaxAtAddr(func, /* isMin */ true, /* is64Ty */ false);
+    changed = true;
+  } else if (mangledName.startswith(RtName::AtomicFMaxAtAddrx2)) {
+    createAtomicFMinMaxAtAddr(func, /* isMin */ false, /* is64Ty */ true);
+    changed = true;
+  } else if (mangledName.startswith(RtName::AtomicFMaxAtAddr)) {
+    createAtomicFMinMaxAtAddr(func, /* isMin */ false, /* is64Ty */ false);
+    changed = true;
+  } else if (mangledName.startswith(RtName::AtomicLdsFMin)) {
+    createAtomicLdsFMinMax(func, /* isMin */ true);
+    changed = true;
+  } else if (mangledName.startswith(RtName::AtomicLdsFMax)) {
+    createAtomicLdsFMinMax(func, /* isMin */ false);
     changed = true;
   }
 
@@ -181,6 +209,110 @@ void SpirvLowerRayTracingIntrinsics::createConvertF32toF16(Function *func, unsig
   result = m_builder->CreateZExt(result, FixedVectorType::get(m_builder->getInt32Ty(), 3));
 
   m_builder->CreateRet(result);
+}
+
+// =====================================================================================================================
+// Create AmdExtGetBaseAddrFromResource
+//
+// @param func : Function to create
+void SpirvLowerRayTracingIntrinsics::createGetBaseAddrFromResource(Function *func) {
+  // uint64_t AmdExtGetBaseAddrFromResource(resource)
+  // {
+  //   return resource.baseAddr;
+  // }
+
+  assert(func->getBasicBlockList().size() == 1);
+  (*func->begin()).eraseFromParent();
+
+  BasicBlock *entryBlock = BasicBlock::Create(m_builder->getContext(), "", func);
+  m_builder->SetInsertPoint(entryBlock);
+  auto argIt = func->arg_begin();
+
+  Value *zero = m_builder->getInt32(0);
+
+  Value *resourcePtr = m_builder->CreateLoad(argIt->getType()->getPointerElementType(), argIt);
+  Value *ptr = m_builder->CreateGEP(resourcePtr->getType()->getPointerElementType(), resourcePtr, {zero});
+
+  m_builder->CreateRet(m_builder->CreatePtrToInt(ptr, m_builder->getInt64Ty()));
+}
+
+// =====================================================================================================================
+// Create AmdExtAtomicFMinAtAddrx2, AmdExtAtomicFMinAtAddr, AmdExtAtomicFMaxAtAddrx2, AmdExtAtomicFMaxAtAddr
+//
+// @param func : Function to create
+// @param isMin : Whether is Min operation, otherwise Max operation
+// @param is64Ty : Whether is 64-bit type operation, otherwise 32-bit type operation
+void SpirvLowerRayTracingIntrinsics::createAtomicFMinMaxAtAddr(Function *func, bool isMin, bool is64Ty) {
+  // float(2) AmdExtAtomicFMinAtAddr(x2)(uint64_t gpuVa, uint offset, float(2) value)
+
+  assert(func->getBasicBlockList().size() == 1);
+  (*func->begin()).eraseFromParent();
+
+  BasicBlock *entryBlock = BasicBlock::Create(m_builder->getContext(), "", func);
+  m_builder->SetInsertPoint(entryBlock);
+  auto argIt = func->arg_begin();
+
+  Type *gpuVaTy = m_builder->getInt64Ty();
+  Type *valueTy = is64Ty ? cast<Type>(FixedVectorType::get(m_builder->getFloatTy(), 2)) : m_builder->getFloatTy();
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), gpuVaTy));
+  Value *gpuVa = m_builder->CreateLoad(gpuVaTy, argIt++);
+  Value *offset = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
+  // TODO: Remove this when LLPC will switch fully to opaque pointers.
+  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), valueTy));
+  Value *value = m_builder->CreateLoad(valueTy, argIt);
+
+  if (is64Ty)
+    value = m_builder->CreateBitCast(value, m_builder->getDoubleTy());
+
+  Type *gpuVaAsPtrTy = Type::getInt8PtrTy(m_builder->getContext(), SPIRAS_Uniform);
+  auto gpuVaAsPtr = m_builder->CreateIntToPtr(gpuVa, gpuVaAsPtrTy);
+  // Create GEP to get the byte address with byte offset
+  gpuVaAsPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), gpuVaAsPtr, offset);
+  Type *gpuVaPtrTy = is64Ty ? Type::getDoublePtrTy(m_builder->getContext(), SPIRAS_Uniform)
+                            : Type::getFloatPtrTy(m_builder->getContext(), SPIRAS_Uniform);
+  gpuVaAsPtr = m_builder->CreateBitCast(gpuVaAsPtr, gpuVaPtrTy);
+
+  AtomicRMWInst::BinOp binOp = isMin ? AtomicRMWInst::FMin : AtomicRMWInst::FMax;
+
+  Value *ret =
+      m_builder->CreateAtomicRMW(binOp, gpuVaAsPtr, value, MaybeAlign(), AtomicOrdering::Monotonic, SyncScope::System);
+  m_builder->CreateRet(ret);
+}
+
+// =====================================================================================================================
+// Create AmdExtAtomicLdsFMin, AmdExtAtomicLdsFMax
+//
+// @param func : Function to create
+// @param isMin : Whether is Min operation, otherwise Max operation
+void SpirvLowerRayTracingIntrinsics::createAtomicLdsFMinMax(Function *func, bool isMin) {
+  // float AmdExtAtomicLdsFMin(uint lds[], uint offset, float value)
+  assert(func->getBasicBlockList().size() == 1);
+  (*func->begin()).eraseFromParent();
+
+  BasicBlock *entryBlock = BasicBlock::Create(m_builder->getContext(), "", func);
+  m_builder->SetInsertPoint(entryBlock);
+  auto argIt = func->arg_begin();
+
+  // NOTE: HLSL does not allow function parameter to be groupshared (StorageClassWorkgroup), but can call a function
+  // with a groupshared argument. For this intrinsic, we can always assume the parameter is groupshared so mutate its
+  // type here to resolve the mismatch.
+  // Known issue: SPIRVReader will assert because of the described mismatch function call.
+  argIt->mutateType(PointerType::getWithSamePointeeType(dyn_cast<PointerType>(argIt->getType()), SPIRAS_Local));
+
+  Value *ldsPtr = argIt++;
+  Value *index = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
+  Value *value = m_builder->CreateLoad(m_builder->getFloatTy(), argIt);
+
+  ldsPtr = m_builder->CreateGEP(ldsPtr->getType()->getPointerElementType(), ldsPtr, {m_builder->getInt32(0), index});
+  ldsPtr = m_builder->CreateBitCast(ldsPtr, Type::getFloatPtrTy(m_builder->getContext(), SPIRAS_Local));
+
+  AtomicRMWInst::BinOp binOp = isMin ? AtomicRMWInst::FMin : AtomicRMWInst::FMax;
+
+  Value *ret =
+      m_builder->CreateAtomicRMW(binOp, ldsPtr, value, MaybeAlign(), AtomicOrdering::Monotonic, SyncScope::System);
+
+  m_builder->CreateRet(ret);
 }
 
 } // namespace Llpc
