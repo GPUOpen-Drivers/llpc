@@ -88,12 +88,10 @@ struct PrimShaderCbLayoutLookupTable {
 
 // Represents the layout structure of an item of vertex cull info (this acts as ES-GS ring item from HW's perspective)
 struct VertexCullInfo {
-#if LLPC_BUILD_GFX11
   //
   // Vertex transform feedback outputs
   //
   unsigned xfbOutputs[4];
-#endif
   //
   // Vertex cull data
   //
@@ -123,12 +121,10 @@ struct VertexCullInfo {
 
 // Represents a collection of LDS offsets (in bytes) within an item of vertex cull info.
 struct VertexCullInfoOffsets {
-#if LLPC_BUILD_GFX11
   //
   // Vertex transform feedback outputs
   //
   unsigned xfbOutputs;
-#endif
   //
   // Vertex cull data
   //
@@ -152,7 +148,6 @@ struct VertexCullInfoOffsets {
   unsigned relPatchId;
 };
 
-#if LLPC_BUILD_GFX11
 // Represents export info of a transform feedback output
 struct XfbOutputExport {
   unsigned xfbBuffer;   // Transform feedback buffer
@@ -164,7 +159,6 @@ struct XfbOutputExport {
     unsigned loc;      // Output location
   } locInfo;           // Output location info in GS-VS ring (just for GS)
 };
-#endif
 
 // =====================================================================================================================
 // Represents the manager of NGG primitive shader.
@@ -272,7 +266,6 @@ private:
   llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexId);
   llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertexId);
 
-#if LLPC_BUILD_GFX11
   void processVertexAttribExport(llvm::Function *&targetFunc);
 
   void processXfbOutputExport(llvm::Module *module, llvm::Argument *sysValueStart);
@@ -282,7 +275,6 @@ private:
 
   llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexId, unsigned outputIndex);
   void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertexId, unsigned outputIndex);
-#endif
 
   // Checks if NGG culling operations are enabled
   bool enableCulling() const {
@@ -316,17 +308,13 @@ private:
     llvm::Value *threadIdInSubgroup; // Thread ID in sub-group
 
     llvm::Value *waveIdInSubgroup; // Wave ID in sub-group
-#if LLPC_BUILD_GFX11
-    llvm::Value *orderedWaveId; // Ordered wave ID
-#endif
+    llvm::Value *orderedWaveId;    // Ordered wave ID
 
     llvm::Value *primitiveId;   // Primitive ID (for VS)
     llvm::Value *vertCompacted; // Whether vertex compaction is performed (for culling mode)
 
     // System values (SGPRs)
-#if LLPC_BUILD_GFX11
-    llvm::Value *attribRingBase; // Attribute ring base for this sub-group
-#endif
+    llvm::Value *attribRingBase;          // Attribute ring base for this sub-group
     llvm::Value *primShaderTableAddrLow;  // Primitive shader table address low
     llvm::Value *primShaderTableAddrHigh; // Primitive shader table address high
 
@@ -347,9 +335,7 @@ private:
   bool m_hasTes; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs;  // Whether the pipeline has geometry shader
 
-#if LLPC_BUILD_GFX11
   bool m_enableSwXfb; // Whether SW-emulated stream-out is enabled (GFX11+)
-#endif
 
   bool m_constPositionZ; // Whether the Z channel of vertex position data is constant
 

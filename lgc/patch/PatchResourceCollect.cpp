@@ -195,11 +195,9 @@ void PatchResourceCollect::setNggControl(Module *module) {
   NggControl &nggControl = *m_pipelineState->getNggControl();
 
   nggControl.enableNgg = canUseNgg(module);
-  nggControl.enableGsUse = (options.nggFlags & NggFlagEnableGsUse);
-#if LLPC_BUILD_GFX11
-  nggControl.enableGsUse |=
-      m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11; // Always enable NGG on GS for GFX11+
-#endif
+  nggControl.enableGsUse =
+      (options.nggFlags & NggFlagEnableGsUse) ||
+      (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11); // Always enable NGG on GS for GFX11+
   nggControl.compactMode = (options.nggFlags & NggFlagCompactDisable) ? NggCompactDisable : NggCompactVertices;
 
   nggControl.enableVertexReuse = (options.nggFlags & NggFlagEnableVertexReuse);
@@ -293,11 +291,9 @@ bool PatchResourceCollect::canUseNgg(Module *module) {
   assert(m_pipelineState->isGraphics());
   assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
 
-#if LLPC_BUILD_GFX11
   // Always enable NGG for GFX11+
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11)
     return true;
-#endif
 
   const bool hasTs =
       m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
@@ -1362,7 +1358,6 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       // NOTE: If an output value is undefined, we can safely drop it and remove the transform feedback output export
       // call.
       m_deadCalls.push_back(&callInst);
-#if LLPC_BUILD_GFX11
     } else if (m_pipelineState->enableSwXfb()) {
       // Collect transform feedback output export calls, used in SW-emulated stream-out. For GS, the collecting will
       // be done when we generate copy shader since GS is primitive-based.
@@ -1371,7 +1366,6 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
         // A transform feedback output export call is expected to be <4 x dword> at most
         inOutUsage.xfbOutputExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
       }
-#endif
     }
   }
 }

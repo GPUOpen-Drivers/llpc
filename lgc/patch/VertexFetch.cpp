@@ -132,9 +132,7 @@ private:
 
   static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
   static const unsigned char m_vertexFormatMapGfx10[][8];     // Info table of vertex format mapping for GFX10
-#if LLPC_BUILD_GFX11
-  static const unsigned char m_vertexFormatMapGfx11[][8]; // Info table of vertex format mapping for GFX11
-#endif
+  static const unsigned char m_vertexFormatMapGfx11[][8];     // Info table of vertex format mapping for GFX11
 
   // Default values for vertex fetch (<4 x i32> or <8 x i32>)
   struct {
@@ -349,7 +347,6 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
 };
 // clang-format on
 
-#if LLPC_BUILD_GFX11
 // clang-format off
 const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
     // BUF_DATA_FORMAT
@@ -523,7 +520,6 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_INVALID},
 };
 // clang-format on
-#endif
 
 // =====================================================================================================================
 // Run the lower vertex fetch pass on a module
@@ -1553,13 +1549,11 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
     assert(nfmt < sizeof(m_vertexFormatMapGfx10[0]) / sizeof(m_vertexFormatMapGfx10[0][0]));
     format = m_vertexFormatMapGfx10[dfmt][nfmt];
     break;
-#if LLPC_BUILD_GFX11
   case 11:
     assert(dfmt < sizeof(m_vertexFormatMapGfx11) / sizeof(m_vertexFormatMapGfx11[0]));
     assert(nfmt < sizeof(m_vertexFormatMapGfx11[0]) / sizeof(m_vertexFormatMapGfx11[0][0]));
     format = m_vertexFormatMapGfx11[dfmt][nfmt];
     break;
-#endif
   }
   return format;
 }

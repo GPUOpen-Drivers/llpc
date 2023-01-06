@@ -53,7 +53,6 @@ static cl::opt<unsigned> NggSmallSubgroupThreshold(
 
 namespace lgc {
 
-#if LLPC_BUILD_GFX11
 // Represents GDS GRBM register for SW-emulated stream-out
 enum {
   // For 4 stream-out buffers
@@ -71,7 +70,6 @@ enum {
   GDS_STRMOUT_PRIMS_NEEDED_3 = 14,
   GDS_STRMOUT_PRIMS_WRITTEN_3 = 15,
 };
-#endif
 
 // =====================================================================================================================
 //
@@ -96,9 +94,7 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
   m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
   m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
 
-#if LLPC_BUILD_GFX11
   m_enableSwXfb = m_pipelineState->enableSwXfb();
-#endif
 
   // NOTE: For NGG GS mode, we change data layout of output vertices. They are grouped by vertex streams now.
   // Vertices belonging to different vertex streams are in different regions of GS-VS ring. Here, we calculate
@@ -151,7 +147,6 @@ unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
   if (pipelineState->getNggControl()->passthroughMode) {
     unsigned esGsRingItemSize = 1;
 
-#if LLPC_BUILD_GFX11
     if (pipelineState->enableSwXfb()) {
       const bool hasTs =
           pipelineState->hasShaderStage(ShaderStageTessControl) || pipelineState->hasShaderStage(ShaderStageTessEval);
@@ -161,7 +156,7 @@ unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
       assert(resUsage->inOutUsage.xfbOutputExpCount > 0);
       esGsRingItemSize = resUsage->inOutUsage.xfbOutputExpCount * 4;
     }
-#endif
+
     // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
     return esGsRingItemSize | 1;
   }
@@ -245,7 +240,6 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
   unsigned cullInfoSize = 0;
   unsigned cullInfoOffset = 0;
 
-#if LLPC_BUILD_GFX11
   if (pipelineState->enableSwXfb()) {
     const bool hasTs =
         pipelineState->hasShaderStage(ShaderStageTessControl) || pipelineState->hasShaderStage(ShaderStageTessEval);
@@ -257,7 +251,6 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
     vertCullInfoOffsets.xfbOutputs = cullInfoOffset;
     cullInfoOffset += sizeof(VertexCullInfo::xfbOutputs) * xfbOutputCount;
   }
-#endif
 
   if (nggControl->enableCullDistanceCulling) {
     cullInfoSize += sizeof(VertexCullInfo::cullDistanceSignMask);
@@ -563,13 +556,11 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
   mergedWaveInfo->setName("mergedWaveInfo");
 
-#if LLPC_BUILD_GFX11
   Value *attribRingBase = nullptr;
   if (m_gfxIp.major >= 11) {
     attribRingBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
     attribRingBase->setName("attribRingBase");
   }
-#endif
 
   // GS shader address is reused as primitive shader table address for NGG culling
   Value *primShaderTableAddrLow = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow));
@@ -634,17 +625,12 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     //   if (threadIdInSubgroup < primCountInSubgroup)
     //     Do primitive connectivity data export
     //
-#if LLPC_BUILD_GFX11
     //   if (enableSwXfb)
     //     Process XFB output export (Run ES)
     //   else {
     //     if (threadIdInSubgroup < vertCountInSubgroup)
     //       Run ES
     //   }
-#else
-    //   if (threadIdInSubgroup < vertCountInSubgroup)
-    //     Run ES
-#endif
     // }
     //
 
@@ -665,13 +651,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       endReadPrimIdBlock = createBlock(entryPoint, ".endReadPrimId");
     }
 
-#if LLPC_BUILD_GFX11
     // NOTE: For GFX11+, we use NO_MSG mode for NGG pass-through mode if SW-emulated stream-out is not requested. The
     // message GS_ALLOC_REQ is no longer necessary.
     bool passthroughNoMsg = m_gfxIp.major >= 11 && !m_enableSwXfb;
-#else
-    bool passthroughNoMsg = false;
-#endif
 
     BasicBlock *allocReqBlock = nullptr;
     BasicBlock *endAllocReqBlock = nullptr;
@@ -683,17 +665,12 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     auto expPrimBlock = createBlock(entryPoint, ".expPrim");
     auto endExpPrimBlock = createBlock(entryPoint, ".endExpPrim");
 
-#if LLPC_BUILD_GFX11
     BasicBlock *expVertBlock = nullptr;
     BasicBlock *endExpVertBlock = nullptr;
     if (!m_enableSwXfb) {
       expVertBlock = createBlock(entryPoint, ".expVert");
       endExpVertBlock = createBlock(entryPoint, ".endExpVert");
     }
-#else
-    auto expVertBlock = createBlock(entryPoint, ".expVert");
-    auto endExpVertBlock = createBlock(entryPoint, ".endExpVert");
-#endif
 
     // Construct ".entry" block
     {
@@ -701,12 +678,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
       initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
-#if LLPC_BUILD_GFX11
       if (m_gfxIp.major >= 11) {
         // Record attribute ring base ([14:0])
         m_nggFactor.attribRingBase = CreateUBfe(attribRingBase, 0, 15);
       }
-#endif
 
       // Record primitive connectivity data
       m_nggFactor.primData = esGsOffsets01;
@@ -830,7 +805,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     {
       m_builder->SetInsertPoint(endExpPrimBlock);
 
-#if LLPC_BUILD_GFX11
       // NOTE: For NGG passthrough mode, if SW-emulated stream-out is enabled, running ES is included in processing
       // transform feedback output exporting. There won't be separated ES running (ES is not split any more). This is
       // because we could encounter special cases in which there are memory atomics producing output values both for
@@ -848,17 +822,12 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
         processXfbOutputExport(module, entryPoint->arg_begin());
         m_builder->CreateRetVoid();
       } else {
-#else
-      {
-#endif
         auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_nggFactor.vertCountInSubgroup);
         m_builder->CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
       }
     }
 
-#if LLPC_BUILD_GFX11
     if (!m_enableSwXfb) {
-#endif
       // Construct ".expVert" block
       {
         m_builder->SetInsertPoint(expVertBlock);
@@ -874,9 +843,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
         m_builder->CreateRetVoid();
       }
-#if LLPC_BUILD_GFX11
     }
-#endif
 
     return;
   }
@@ -897,11 +864,9 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   //     Barrier
   //   }
   //
-#if LLPC_BUILD_GFX11
   //   if (enableSwXfb)
   //     Process XFB output export
   //
-#endif
   //   if (threadIdInWave < vertCountInWave)
   //     Run ES-partial to fetch vertex cull data
   //
@@ -1053,12 +1018,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
-#if LLPC_BUILD_GFX11
     if (m_gfxIp.major >= 11) {
       // Record attribute ring base ([14:0])
       m_nggFactor.attribRingBase = CreateUBfe(attribRingBase, 0, 15);
     }
-#endif
 
     m_nggFactor.primShaderTableAddrLow = primShaderTableAddrLow;
     m_nggFactor.primShaderTableAddrHigh = primShaderTableAddrHigh;
@@ -1075,10 +1038,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       auto primValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.primCountInWave);
       m_builder->CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
     } else {
-#if LLPC_BUILD_GFX11
       if (m_enableSwXfb)
         processXfbOutputExport(module, entryPoint->arg_begin());
-#endif
 
       auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
       m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1144,10 +1105,8 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
       m_builder->CreateFence(AtomicOrdering::Acquire, workgroupScope);
 
-#if LLPC_BUILD_GFX11
       if (m_enableSwXfb)
         processXfbOutputExport(module, entryPoint->arg_begin());
-#endif
 
       auto vertValid = m_builder->CreateICmpULT(m_nggFactor.threadIdInWave, m_nggFactor.vertCountInWave);
       m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1704,13 +1663,11 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
   mergedWaveInfo->setName("mergedWaveInfo");
 
-#if LLPC_BUILD_GFX11
   Value *attribRingBase = nullptr;
   if (m_gfxIp.major >= 11) {
     attribRingBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
     attribRingBase->setName("attribRingBase");
   }
-#endif
 
   // GS shader address is reused as primitive shader table address for NGG culling
   Value *primShaderTableAddrLow = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow));
@@ -1744,11 +1701,9 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   //   if (threadIdInWave < primCountInWave)
   //     Run GS
   //
-#if LLPC_BUILD_GFX11
   //   if (enableSwXfb)
   //     Process XFB output export
   //
-#endif
   //  if (threadIdInSubgroup < waveCount + 1)
   //     Initialize per-wave and per-subgroup count of output vertices
   //   Barrier
@@ -1851,12 +1806,10 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
-#if LLPC_BUILD_GFX11
     if (m_gfxIp.major >= 11) {
       // Record attribute ring base ([14:0])
       m_nggFactor.attribRingBase = CreateUBfe(attribRingBase, 0, 15);
     }
-#endif
 
     // Record primitive shader table address info
     m_nggFactor.primShaderTableAddrLow = primShaderTableAddrLow;
@@ -1895,7 +1848,6 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(initOutPrimDataBlock);
 
-#if LLPC_BUILD_GFX11
     if (m_enableSwXfb) {
       for (unsigned i = 0; i < MaxGsStreams; ++i) {
         if (inOutUsage.outLocCount[i] > 0) { // Initialize primitive connectivity data if the stream is active
@@ -1907,10 +1859,6 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
       writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
                               SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
     }
-#else
-    writePerThreadDataToLds(m_builder->getInt32(NullPrim), m_nggFactor.threadIdInSubgroup, LdsRegionOutPrimData,
-                            SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
-#endif
 
     m_builder->CreateBr(endInitOutPrimDataBlock);
   }
@@ -1941,10 +1889,8 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(endGsBlock);
 
-#if LLPC_BUILD_GFX11
     if (m_enableSwXfb)
       processGsXfbOutputExport(module, entryPoint->arg_begin());
-#endif
 
     auto waveValid =
         m_builder->CreateICmpULT(m_nggFactor.threadIdInSubgroup, m_builder->getInt32(waveCountInSubgroup + 1));
@@ -2307,9 +2253,7 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
   auto vertCountInWave = CreateUBfe(mergedWaveInfo, 0, 8);
   auto primCountInWave = CreateUBfe(mergedWaveInfo, 8, 8);
   auto waveIdInSubgroup = CreateUBfe(mergedWaveInfo, 24, 4);
-#if LLPC_BUILD_GFX11
   auto orderedWaveId = CreateUBfe(mergedGroupInfo, 0, 12);
-#endif
 
   auto threadIdInSubgroup = m_builder->CreateMul(waveIdInSubgroup, m_builder->getInt32(waveSize));
   threadIdInSubgroup = m_builder->CreateAdd(threadIdInSubgroup, threadIdInWave);
@@ -2321,9 +2265,7 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
   threadIdInWave->setName("threadIdInWave");
   threadIdInSubgroup->setName("threadIdInSubgroup");
   waveIdInSubgroup->setName("waveIdInSubgroup");
-#if LLPC_BUILD_GFX11
   orderedWaveId->setName("orderedWaveId");
-#endif
 
   // Record wave/thread info
   m_nggFactor.primCountInSubgroup = primCountInSubgroup;
@@ -2333,9 +2275,7 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
   m_nggFactor.threadIdInWave = threadIdInWave;
   m_nggFactor.threadIdInSubgroup = threadIdInSubgroup;
   m_nggFactor.waveIdInSubgroup = waveIdInSubgroup;
-#if LLPC_BUILD_GFX11
   m_nggFactor.orderedWaveId = orderedWaveId;
-#endif
 }
 
 // =====================================================================================================================
@@ -2704,10 +2644,8 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
   auto esEntry = module->getFunction(lgcName::NggEsEntryPoint);
   assert(esEntry);
 
-#if LLPC_BUILD_GFX11
   if (m_gfxIp.major >= 11 && !m_hasGs) // For GS, vertex attribute exports are in copy shader
     processVertexAttribExport(esEntry);
-#endif
 
   // Call ES entry
   Argument *arg = sysValueStart;
@@ -2742,7 +2680,6 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
 
   std::vector<Value *> args;
 
-#if LLPC_BUILD_GFX11
   // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex attributes
   // through memory
   if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
@@ -2753,7 +2690,6 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
       args.push_back(m_nggFactor.threadIdInSubgroup);
     }
   }
-#endif
 
   auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
   const unsigned userDataCount = intfData->userDataCount;
@@ -3017,7 +2953,6 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
 
   std::vector<Value *> args;
 
-#if LLPC_BUILD_GFX11
   // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex attributes
   // through memory
   if (m_gfxIp.major >= 11 && deferredVertexExport) {
@@ -3028,7 +2963,6 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
       args.push_back(m_nggFactor.threadIdInSubgroup);
     }
   }
-#endif
 
   if (deferredVertexExport)
     args.push_back(position); // Setup vertex position data as the additional argument
@@ -3118,12 +3052,10 @@ void NggPrimShader::splitEs(Module *module) {
   for (auto &func : module->functions()) {
     if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
       expFuncs.push_back(&func);
-#if LLPC_BUILD_GFX11
     else if (m_gfxIp.major >= 11) {
       if (func.getName().startswith(lgcName::NggAttribExport) || func.getName().startswith(lgcName::NggXfbOutputExport))
         expFuncs.push_back(&func);
     }
-#endif
   }
 
   //
@@ -3289,10 +3221,8 @@ void NggPrimShader::splitEs(Module *module) {
     }
   }
 
-#if LLPC_BUILD_GFX11
   if (m_gfxIp.major >= 11)
     processVertexAttribExport(esDeferredVertexExportFunc);
-#endif
 
   // Original ES is no longer needed
   assert(esEntryPoint->use_empty());
@@ -3564,7 +3494,6 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
   // Run copy shader
   std::vector<Value *> args;
 
-#if LLPC_BUILD_GFX11
   if (m_gfxIp.major >= 11) {
     // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex
     // attributes through memory
@@ -3595,7 +3524,6 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
       args.push_back(UndefValue::get(m_builder->getInt32Ty()));
     }
   }
-#endif
 
   // Vertex ID in sub-group
   args.push_back(vertexId);
@@ -3612,10 +3540,8 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
   auto copyShaderEntryPoint = module->getFunction(lgcName::NggCopyShaderEntryPoint);
   assert(copyShaderEntryPoint);
 
-#if LLPC_BUILD_GFX11
   if (m_gfxIp.major >= 11)
     processVertexAttribExport(copyShaderEntryPoint);
-#endif
 
   IRBuilder<>::InsertPointGuard guard(*m_builder);
 
@@ -3707,15 +3633,9 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
 void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                                    Value *threadIdInSubgroup, Value *emitVerts) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-#if LLPC_BUILD_GFX11
   if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
-#else
-  if (resUsage->inOutUsage.gs.rasterStream != streamId) {
-    // NOTE: Only export those outputs that belong to the rasterization stream.
-    assert(m_pipelineState->enableXfb() == false); // Transform feedback must be disabled
-#endif
     return;
   }
 
@@ -3779,15 +3699,9 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
 // @param vertexOffset : Start offset of vertex item in GS-VS ring (in bytes)
 Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned streamId, Value *vertexOffset) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-#if LLPC_BUILD_GFX11
   if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
-#else
-  if (resUsage->inOutUsage.gs.rasterStream != streamId) {
-    // NOTE: Only import those outputs that belong to the rasterization stream.
-    assert(m_pipelineState->enableXfb() == false); // Transform feedback must be disabled
-#endif
     return UndefValue::get(outputTy);
   }
 
@@ -3837,15 +3751,9 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
 void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *threadIdInSubgroup, Value *emitVertsPtr,
                                   Value *outVertsPtr) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-#if LLPC_BUILD_GFX11
   if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only handle GS_EMIT message that belongs to the rasterization
     // stream.
-#else
-  if (resUsage->inOutUsage.gs.rasterStream != streamId) {
-    // Only handle GS_EMIT message that belongs to the rasterization stream.
-    assert(m_pipelineState->enableXfb() == false);
-#endif
     return;
   }
 
@@ -3864,15 +3772,9 @@ void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *thre
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsCut(Module *module, unsigned streamId, Value *outVertsPtr) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-#if LLPC_BUILD_GFX11
   if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only handle GS_CUT message that belongs to the rasterization
     // stream.
-#else
-  if (resUsage->inOutUsage.gs.rasterStream != streamId) {
-    // Only handle GS_CUT message that belongs to the rasterization stream.
-    assert(m_pipelineState->enableXfb() == false);
-#endif
     return;
   }
 
@@ -5840,7 +5742,6 @@ Value *NggPrimShader::doSubgroupBallot(Value *value) {
   return ballot;
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Processes vertex attribute export calls in the target function. We mutate the argument list of the target function
 // by adding two additional arguments (one is attribute ring base and the other is vertex thread ID in sub-group).
@@ -7467,7 +7368,6 @@ void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexId, unsig
       vertexItemOffset, m_builder->getInt32(regionStart + m_vertCullInfoOffsets.xfbOutputs + SizeOfVec4 * outputIndex));
   m_ldsManager->writeValueToLds(writeData, ldsOffset);
 }
-#endif
 
 // =====================================================================================================================
 // Fetches the position data for the specified vertex ID.

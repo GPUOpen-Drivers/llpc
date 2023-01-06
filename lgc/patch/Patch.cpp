@@ -169,23 +169,17 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
   }
 
-#if LLPC_BUILD_GFX11
   // Collect image operations
-  passMgr.addPass(PatchImageOpCollect());
-#endif
+  if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 11)
+    passMgr.addPass(PatchImageOpCollect());
 
   // Second part of lowering to "AMDGCN-style"
   passMgr.addPass(PatchPreparePipelineAbi());
 
-#if LLPC_BUILD_GFX11
   const bool canUseNgg = pipelineState->isGraphics() &&
                          ((pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
                            (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0) ||
                           pipelineState->getTargetInfo().getGfxIpVersion().major >= 11); // Must enable NGG on GFX11+
-#else
-  const bool canUseNgg = pipelineState->isGraphics() && pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
-                         (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0;
-#endif
   if (canUseNgg) {
     if (patchTimer) {
       LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);

@@ -32,9 +32,7 @@
 #include "lgc/patch/Patch.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/InstIterator.h"
-#if LLPC_BUILD_GFX11
 #include "llvm/IR/IntrinsicInst.h"
-#endif
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
 
@@ -73,7 +71,6 @@ bool PatchWaveSizeAdjust::runImpl(Module &module, PipelineState *pipelineState) 
     }
   }
 
-#if LLPC_BUILD_GFX11
   if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
     // Prefer Wave64 when 16-bit arithmetic is used by the shader.
     // Except when API subgroup size requirements require Wave32 or tuning option specifies wave32.
@@ -101,11 +98,10 @@ bool PatchWaveSizeAdjust::runImpl(Module &module, PipelineState *pipelineState) 
       }
     }
   }
-#endif
+
   return false;
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Check if the given instruction is a 16-bit arithmetic operation
 //
@@ -145,4 +141,3 @@ bool PatchWaveSizeAdjust::is16BitArithmeticOp(Instruction *inst) {
   }
   return false;
 }
-#endif

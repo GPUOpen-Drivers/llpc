@@ -84,7 +84,6 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, LsHs::Specia
       {LsHs::HsShaderAddrHigh, 7},    // s7
   };
 
-#if LLPC_BUILD_GFX11
   static const std::unordered_map<LsHs::SpecialSgprInput, unsigned> LsHsSpecialSgprInputMapGfx11 = {
       {LsHs::HsShaderAddrLow, 0},  // s0
       {LsHs::HsShaderAddrHigh, 1}, // s1
@@ -93,16 +92,13 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, LsHs::Specia
       {LsHs::TfBufferBase, 4},     // s4
       {LsHs::waveIdInGroup, 5},    // s5
   };
-#endif
 
   assert(gfxIp.major >= 9); // Must be GFX9+
 
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     assert(LsHsSpecialSgprInputMapGfx11.count(sgprInput) > 0);
     return LsHsSpecialSgprInputMapGfx11.at(sgprInput);
   }
-#endif
 
   assert(LsHsSpecialSgprInputMapGfx9.count(sgprInput) > 0);
   return LsHsSpecialSgprInputMapGfx9.at(sgprInput);
@@ -138,7 +134,6 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, EsGs::Specia
       {EsGs::GsShaderAddrHigh, 7},    // s7
   };
 
-#if LLPC_BUILD_GFX11
   static const std::unordered_map<EsGs::SpecialSgprInput, unsigned> EsGsSpecialSgprInputMapGfx11 = {
       {EsGs::GsShaderAddrLow, 0},  // s0
       {EsGs::GsShaderAddrHigh, 1}, // s1
@@ -149,16 +144,13 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, EsGs::Specia
       {EsGs::FlatScratchLow, 6},   // s6
       {EsGs::FlatScratchHigh, 7},  // s7
   };
-#endif
 
   assert(gfxIp.major >= 9); // Must be GFX9+
 
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     assert(EsGsSpecialSgprInputMapGfx11.count(sgprInput) > 0);
     return EsGsSpecialSgprInputMapGfx11.at(sgprInput);
   }
-#endif
 
   if (gfxIp.major >= 10) {
     if (useNgg) {
@@ -372,14 +364,12 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint);
   auto beginLsBlock = BasicBlock::Create(*m_context, ".beginLs", entryPoint);
   auto endLsBlock = BasicBlock::Create(*m_context, ".endLs", entryPoint);
-#if LLPC_BUILD_GFX11
   BasicBlock *distribHsPatchCountBlock = nullptr;
   BasicBlock *endDistribHsPatchCountBlock = nullptr;
   if (m_pipelineState->canOptimizeTessFactor()) {
     distribHsPatchCountBlock = BasicBlock::Create(*m_context, ".distribHsPatchCount", entryPoint);
     endDistribHsPatchCountBlock = BasicBlock::Create(*m_context, ".endDistribHsPatchCount", entryPoint);
   }
-#endif
   auto beginHsBlock = BasicBlock::Create(*m_context, ".beginHs", entryPoint);
   auto endHsBlock = BasicBlock::Create(*m_context, ".endHs", entryPoint);
 
@@ -475,7 +465,6 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   // Construct ".endLs" block
   builder.SetInsertPoint(endLsBlock);
 
-#if LLPC_BUILD_GFX11
   if (m_pipelineState->canOptimizeTessFactor()) {
     assert(distribHsPatchCountBlock);
     assert(endDistribHsPatchCountBlock);
@@ -500,7 +489,6 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     // Construct ".endDistribHsPatchCount" block
     builder.SetInsertPoint(endDistribHsPatchCountBlock);
   }
-#endif
 
   SyncScope::ID syncScope = m_context->getOrInsertSyncScopeID("workgroup");
   builder.CreateFence(AtomicOrdering::Release, syncScope);
@@ -555,10 +543,9 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   // Construct ".endHs" block
   builder.SetInsertPoint(endHsBlock);
 
-#if LLPC_BUILD_GFX11
   if (m_pipelineState->canOptimizeTessFactor())
     storeTessFactorsWithOpt(threadIdInWave, builder);
-#endif
+
   builder.CreateRetVoid();
 
   return entryPoint;
@@ -1102,7 +1089,6 @@ void ShaderMerger::processRayQueryLdsStack(Function *entryPoint1, Function *entr
 }
 #endif
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Handle the store of tessellation factors with optimization (TF0/TF1 messaging)
 //
@@ -1486,4 +1472,3 @@ void ShaderMerger::writeValueToLds(Value *writeValue, Value *ldsOffset, IRBuilde
   writePtr = builder.CreateBitCast(writePtr, PointerType::get(writeTy, writePtr->getType()->getPointerAddressSpace()));
   builder.CreateAlignedStore(writeValue, writePtr, Align(4));
 }
-#endif

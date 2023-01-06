@@ -1279,10 +1279,8 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
       } else if (hasShaderStage(ShaderStageGeometry)) {
         // Legacy (non-NGG) hardware path for GS does not support wave32.
         waveSize = 64;
-#if LLPC_BUILD_GFX11
         if (getTargetInfo().getGfxIpVersion().major >= 11)
           waveSize = 32;
-#endif
       }
 
       // Experimental data from performance tuning show that wave64 is more efficient than wave32 in most cases for CS
@@ -1364,7 +1362,6 @@ bool PipelineState::enableMeshRowExport() const {
   return m_meshRowExport;
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Checks if SW-emulated stream-out should be enabled.
 bool PipelineState::enableSwXfb() {
@@ -1384,7 +1381,6 @@ bool PipelineState::enableSwXfb() {
 
   return enableXfb();
 }
-#endif
 
 // =====================================================================================================================
 // Gets resource usage of the specified shader stage
@@ -1582,7 +1578,6 @@ StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
   }
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Determine whether can use tessellation factor optimization
 bool PipelineState::canOptimizeTessFactor() {
@@ -1595,7 +1590,6 @@ bool PipelineState::canOptimizeTessFactor() {
     return false;
   return getOptions().optimizeTessFactor;
 }
-#endif
 
 // =====================================================================================================================
 // Set the packable state of generic input/output

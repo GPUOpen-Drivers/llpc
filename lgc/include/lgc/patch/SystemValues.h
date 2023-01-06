@@ -59,11 +59,9 @@ public:
   // Get the descriptor for tessellation factor (TF) buffer (TCS output)
   llvm::Value *getTessFactorBufDesc();
 
-#if LLPC_BUILD_GFX11
   // Get the descriptor for vertex attribute ring buffer (for VS, TES, and copy shader output)
   llvm::Value *getAttribRingBufDesc();
 
-#endif
   // Get the descriptor for task payload ring buffer (for task and mesh shader)
   llvm::Value *getTaskPayloadRingBufDesc();
 
@@ -109,10 +107,8 @@ public:
   // Get stream-out buffer descriptor
   llvm::Value *getStreamOutBufDesc(unsigned xfbBuffer);
 
-#if LLPC_BUILD_GFX11
   // Get stream-out buffer offset
   llvm::Value *getStreamOutBufOffset(unsigned xfbBuffer);
-#endif
 
   // Test if shadow descriptor table is enabled
   bool isShadowDescTableEnabled() const;
@@ -121,10 +117,8 @@ private:
   // Get stream-out buffer table pointer
   std::pair<llvm::Type *, llvm::Instruction *> getStreamOutTablePtr();
 
-#if LLPC_BUILD_GFX11
   // Get stream-out control buffer pointer
   llvm::Instruction *getStreamOutControlBufPtr();
-#endif
 
   // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
   llvm::Instruction *makePointer(llvm::Value *lowValue, llvm::Type *ptrTy, unsigned highValue);
@@ -140,20 +134,16 @@ private:
   PipelineState *m_pipelineState;         // Pipeline state
   ShaderStage m_shaderStage;              // Shader stage
 
-  llvm::Value *m_esGsRingBufDesc = nullptr; // ES -> GS ring buffer descriptor (VS, TES, and GS)
-  llvm::Value *m_tfBufDesc = nullptr;       // Descriptor for tessellation factor (TF) buffer (TCS)
-  llvm::Value *m_offChipLdsDesc = nullptr;  // Descriptor for off-chip LDS buffer (TCS and TES)
-#if LLPC_BUILD_GFX11
+  llvm::Value *m_esGsRingBufDesc = nullptr;   // ES -> GS ring buffer descriptor (VS, TES, and GS)
+  llvm::Value *m_tfBufDesc = nullptr;         // Descriptor for tessellation factor (TF) buffer (TCS)
+  llvm::Value *m_offChipLdsDesc = nullptr;    // Descriptor for off-chip LDS buffer (TCS and TES)
   llvm::Value *m_attribRingBufDesc = nullptr; // Descriptor for vertex attribute ring buffer (VS, TES, and copy shader)
-#endif
   llvm::Value *m_taskPayloadRingBufDesc = nullptr;  // Descriptor for task payload ring buffer (task and mesh shader)
   llvm::Value *m_taskDrawDataRingBufDesc = nullptr; // Descriptor for task draw data ring buffer (task and mesh shader)
   llvm::SmallVector<llvm::Value *, MaxGsStreams>
       m_gsVsRingBufDescs; // GS -> VS ring buffer descriptor (GS out and copy shader in)
-  llvm::SmallVector<llvm::Value *, MaxTransformFeedbackBuffers> m_streamOutBufDescs; // Stream-out buffer descriptors
-#if LLPC_BUILD_GFX11
+  llvm::SmallVector<llvm::Value *, MaxTransformFeedbackBuffers> m_streamOutBufDescs;   // Stream-out buffer descriptors
   llvm::SmallVector<llvm::Value *, MaxTransformFeedbackBuffers> m_streamOutBufOffsets; // Stream-out buffer offsets
-#endif
 
   llvm::Value *m_primitiveId = nullptr;                             // PrimitiveId (TCS)
   llvm::Value *m_invocationId = nullptr;                            // InvocationId (TCS)
@@ -168,10 +158,8 @@ private:
   llvm::Value *m_meshPipeStatsBufPtr = nullptr;              // Mesh pipeline statistics buffer pointer
   llvm::Value *m_internalPerShaderTablePtr = nullptr;        // Internal per shader table pointer
   llvm::Instruction *m_streamOutTablePtr = nullptr;          // Stream-out buffer table pointer
-#if LLPC_BUILD_GFX11
-  llvm::Instruction *m_streamOutControlBufPtr = nullptr; // Stream-out control buffer pointer
-#endif
-  llvm::Instruction *m_pc = nullptr; // Program counter as <2 x i32>
+  llvm::Instruction *m_streamOutControlBufPtr = nullptr;     // Stream-out control buffer pointer
+  llvm::Instruction *m_pc = nullptr;                         // Program counter as <2 x i32>
 };
 
 // =====================================================================================================================

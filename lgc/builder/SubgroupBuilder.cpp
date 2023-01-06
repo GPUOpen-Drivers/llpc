@@ -516,13 +516,10 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
                                          createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false)),
           result);
 
-#if LLPC_BUILD_GFX11
       if (supportPermLane64Dpp()) {
         result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
                               createGroupArithmeticOperation(groupArithOp, result, createPermLane64(result)), result);
-      } else
-#endif
-      {
+      } else {
         Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
         Value *const broadcast63 = CreateSubgroupBroadcast(result, getInt32(63), instName);
 
@@ -1324,7 +1321,6 @@ Value *SubgroupBuilder::createPermLaneX16(Value *const origValue, Value *const u
       {getInt32(selectBitsLow), getInt32(selectBitsHigh), getInt1(fetchInactive), getInt1(boundCtrl)});
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Create a call to permute lane 64.
 //
@@ -1336,7 +1332,6 @@ Value *SubgroupBuilder::createPermLane64(Value *const updateValue) {
 
   return CreateMapToInt32(mapFunc, updateValue, {});
 }
-#endif
 
 // =====================================================================================================================
 // Create a call to ds swizzle.

@@ -119,20 +119,16 @@ const static char LsHsEntryPoint[] = "lgc.shader.LSHS.main";
 const static char NggEsEntryPoint[] = "lgc.ngg.ES.main";
 const static char NggEsCullDataFetch[] = "lgc.ngg.ES.cull.data.fetch";
 const static char NggEsDeferredVertexExport[] = "lgc.ngg.ES.deferred.vertex.export";
-#if LLPC_BUILD_GFX11
 const static char NggEsXfbOutputFetch[] = "lgc.ngg.ES.xfb.output.fetch";
 const static char NggAttribExport[] = "lgc.ngg.attrib.export";
 const static char NggXfbOutputExport[] = "lgc.ngg.xfb.output.export.";
-#endif
 
 const static char NggGsEntryPoint[] = "lgc.ngg.GS.main";
 const static char NggGsOutputExport[] = "lgc.ngg.GS.output.export.";
 const static char NggGsOutputImport[] = "lgc.ngg.GS.output.import.";
 const static char NggGsEmit[] = "lgc.ngg.GS.emit";
 const static char NggGsCut[] = "lgc.ngg.GS.cut";
-#if LLPC_BUILD_GFX11
 const static char NggGsXfbOutputFetch[] = "lgc.ngg.GS.xfb.output.fetch";
-#endif
 
 const static char NggCopyShaderEntryPoint[] = "lgc.ngg.COPY.main";
 const static char NggPrimShaderEntryPoint[] = "lgc.shader.PRIM.main";

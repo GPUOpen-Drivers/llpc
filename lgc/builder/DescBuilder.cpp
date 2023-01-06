@@ -601,12 +601,10 @@ Value *DescBuilder::buildBufferCompactDesc(Value *desc) {
     sqBufRsrcWord3.gfx10.resourceLevel = 1;
     sqBufRsrcWord3.gfx10.oobSelect = 2;
     assert(sqBufRsrcWord3.u32All == 0x21014FAC);
-#if LLPC_BUILD_GFX11
   } else if (gfxIp.major == 11) {
     sqBufRsrcWord3.gfx11.format = BUF_FORMAT_32_UINT;
     sqBufRsrcWord3.gfx11.oobSelect = 2;
     assert(sqBufRsrcWord3.u32All == 0x20014FAC);
-#endif
   } else {
     llvm_unreachable("Not implemented!");
   }

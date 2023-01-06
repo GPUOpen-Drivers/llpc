@@ -60,10 +60,8 @@ void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {
   case 6:
   case 7:
   case 8:
-#if LLPC_BUILD_GFX11
-  case 11:
-#endif
-  case 9: {
+  case 9:
+  case 11: {
     pipeBankXor1 = pipeBankXorNone;
     pipeBankXor2 = pipeBankXorNone;
     break;
@@ -169,10 +167,8 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
 
     break;
   }
-#if LLPC_BUILD_GFX11
-  case 11:
-#endif
-  case 10: {
+  case 10:
+  case 11: {
     const unsigned elementBytes = bpp >> 3;
     const unsigned pitchAlign = (256 / elementBytes);
 

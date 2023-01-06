@@ -312,7 +312,6 @@ void ConfigBuilderBase::setThreadgroupDimensions(llvm::ArrayRef<unsigned> values
     arrayNode[i] = values[i];
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Set stream-out vertex strides (GFX11+)
 //
@@ -322,7 +321,6 @@ void ConfigBuilderBase::setStreamOutVertexStrides(ArrayRef<unsigned> values) {
   for (unsigned i = 0; i < values.size(); ++i)
     arrayNode[i] = values[i];
 }
-#endif
 
 // =====================================================================================================================
 /// Append a single entry to the PAL register metadata.

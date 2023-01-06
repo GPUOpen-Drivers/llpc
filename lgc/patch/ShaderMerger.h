@@ -56,10 +56,8 @@ enum SpecialSgprInput : unsigned {
   // GFX9~GFX10
   SharedScratchOffset,
 
-#if LLPC_BUILD_GFX11
   // GFX11+
   waveIdInGroup,
-#endif
 };
 } // namespace LsHs
 
@@ -80,12 +78,10 @@ enum SpecialSgprInput : unsigned {
   // GFX10+
   MergedGroupInfo, // NGG
 
-#if LLPC_BUILD_GFX11
   // GFX11+
   AttribRingBase,
   FlatScratchLow,
   FlatScratchHigh,
-#endif
 };
 } // namespace EsGs
 
@@ -126,11 +122,9 @@ private:
   void processRayQueryLdsStack(llvm::Function *entryPoint1, llvm::Function *entryPoint2) const;
 #endif
 
-#if LLPC_BUILD_GFX11
   void storeTessFactorsWithOpt(llvm::Value *threadIdInWave, llvm::IRBuilder<> &builder);
   llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset, llvm::IRBuilder<> &builder);
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, llvm::IRBuilder<> &builder);
-#endif
 
   PipelineState *m_pipelineState; // Pipeline state
   llvm::LLVMContext *m_context;   // LLVM context

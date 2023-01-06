@@ -81,14 +81,13 @@ private:
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToInt(llvm::Value *value, bool signedness, BuilderBase &builder) const;
 
-#if LLPC_BUILD_GFX11
   llvm::Value *dualSourceSwizzle(BuilderBase &builder);
 
   // Colors to be exported for dual-source-blend
   llvm::SmallVector<llvm::Value *, 4> m_blendSources[2];
   // Number of color channels for dual-source-blend
   unsigned m_blendSourceChannels;
-#endif
+
   llvm::LLVMContext *m_context;   // LLVM context
   PipelineState *m_pipelineState; // The pipeline state
 };
