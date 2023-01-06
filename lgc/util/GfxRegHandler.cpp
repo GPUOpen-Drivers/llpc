@@ -118,9 +118,7 @@ SqImgSampRegHandler::SqImgSampRegHandler(IRBuilder<> *builder, Value *reg, GfxIp
   case 8:
   case 9:
   case 10:
-#if LLPC_BUILD_GFX11
   case 11:
-#endif
     m_bitsInfo = SqImgSampRegBitsGfx9;
     break;
   default:
@@ -232,7 +230,6 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs
     {2, 0, 12},  // WidthHi
 };
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // SqImgSampReg Bits information look up table (Gfx11)
 // TODO: update comment when the registers file is available
@@ -254,7 +251,6 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx11[static_cast<unsigned>(SqRsrcRegs
     {1, 30, 2},  // WidthLo
     {2, 0, 12},  // WidthHi
 };
-#endif
 
 // =====================================================================================================================
 // Helper class for handling Registers defined in SQ_IMG_RSRC_WORD
@@ -278,11 +274,9 @@ SqImgRsrcRegHandler::SqImgRsrcRegHandler(IRBuilder<> *builder, Value *reg, GfxIp
   case 10:
     m_bitsInfo = SqImgRsrcRegBitsGfx10;
     break;
-#if LLPC_BUILD_GFX11
   case 11:
     m_bitsInfo = SqImgRsrcRegBitsGfx11;
     break;
-#endif
   default:
     llvm_unreachable("GFX IP is not supported!");
     break;
@@ -317,9 +311,7 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
     case 9:
       return m_builder->CreateAdd(getRegCommon(static_cast<unsigned>(regId)), m_one);
     case 10:
-#if LLPC_BUILD_GFX11
     case 11:
-#endif
       return m_builder->CreateAdd(
           getRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo), static_cast<unsigned>(SqRsrcRegs::WidthHi)), m_one);
     default:
@@ -372,9 +364,7 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
       setRegCommon(static_cast<unsigned>(regId), m_builder->CreateSub(regValue, m_one));
       break;
     case 10:
-#if LLPC_BUILD_GFX11
     case 11:
-#endif
       setRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo), static_cast<unsigned>(SqRsrcRegs::WidthHi),
                     m_builder->CreateSub(regValue, m_one));
       break;

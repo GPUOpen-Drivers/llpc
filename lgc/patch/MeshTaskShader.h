@@ -123,9 +123,7 @@ private:
   };
   void doExport(ExportKind kind, llvm::ArrayRef<ExportInfo> exports);
 
-#if LLPC_BUILD_GFX11
   void prepareAttribRingAccess();
-#endif
 
   llvm::Value *getMeshFlatWorkgroupId();
   llvm::Value *getMeshNumWorkgroups();
@@ -168,23 +166,20 @@ private:
     llvm::Value *threadIdInWave;
     llvm::Value *threadIdInSubgroup;
     llvm::Value *primOrVertexIndex;
-#if LLPC_BUILD_GFX11
     // Following info is for GFX11+
     llvm::Value *workgroupIdX;
     llvm::Value *workgroupIdY;
     llvm::Value *workgroupIdZ;
     llvm::Value *rowInSubgroup;
-#endif
   } m_waveThreadInfo = {};
 
   bool m_accessTaskPayload = false;                // Whether task shader has payload access operations
   llvm::Value *m_shaderRingEntryIndex = nullptr;   // Shader ring entry index of current workgroup
   llvm::Value *m_payloadRingEntryOffset = nullptr; // Entry offset (in bytes) of the payload ring
-#if LLPC_BUILD_GFX11
+
   bool m_hasNoVertexAttrib = false;              // Whether mesh shader has vertex attribute export or not
   llvm::Value *m_attribRingBufDesc = nullptr;    // Attribute ring buffer descriptor
   llvm::Value *m_attribRingBaseOffset = nullptr; // Subgroup's attribute ring base offset (in bytes)
-#endif
 
   llvm::Value *m_meshFlatWorkgroupId = nullptr;       // Flat workgroupId of mesh shader
   llvm::Value *m_meshWorkgroupId = nullptr;           // Built-in WorkgroupId of mesh shader

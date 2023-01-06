@@ -126,9 +126,7 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
   const bool isDot8 = (compCount <= 8 && compBitWidth == 4);
   const bool hasNativeIntrinsic =
       isSupportCompBitwidth && isSupportSignedness && (isDot2 || isDot4 || isDot8) && (expectedWidth <= 32);
-#if LLPC_BUILD_GFX11
   const bool hasSudot = getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11;
-#endif
 
   auto input1 = vector1;
   auto input2 = vector2;
@@ -140,25 +138,17 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
       intrinsic = isBothSigned ? Intrinsic::amdgcn_sdot2 : Intrinsic::amdgcn_udot2;
       supportedN = 2;
     } else if (isDot4) {
-#if LLPC_BUILD_GFX11
-      if (hasSudot) {
+      if (hasSudot)
         intrinsic = isSigned ? Intrinsic::amdgcn_sudot4 : Intrinsic::amdgcn_udot4;
-      } else
-#endif
-      {
+      else
         intrinsic = isBothSigned ? Intrinsic::amdgcn_sdot4 : Intrinsic::amdgcn_udot4;
-      }
       supportedN = 4;
     } else {
       assert(isDot8);
-#if LLPC_BUILD_GFX11
-      if (hasSudot) {
+      if (hasSudot)
         intrinsic = isSigned ? Intrinsic::amdgcn_sudot8 : Intrinsic::amdgcn_udot8;
-      } else
-#endif
-      {
+      else
         intrinsic = isBothSigned ? Intrinsic::amdgcn_sdot8 : Intrinsic::amdgcn_udot8;
-      }
       supportedN = 8;
     }
     assert(intrinsic != InvalidValue);
@@ -177,13 +167,10 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
 
     Value *clamp = hasAccumulator ? getTrue() : getFalse();
     accumulator = isSigned ? CreateSExt(accumulator, getInt32Ty()) : CreateZExt(accumulator, getInt32Ty());
-#if LLPC_BUILD_GFX11
     if (hasSudot && isSigned) {
       computedResult = CreateIntrinsic(
           intrinsic, {}, {getTrue(), input1, getInt1(isBothSigned), input2, accumulator, clamp}, nullptr, instName);
-    } else
-#endif
-    {
+    } else {
       computedResult = CreateIntrinsic(intrinsic, {}, {input1, input2, accumulator, clamp}, nullptr, instName);
     }
   } else {

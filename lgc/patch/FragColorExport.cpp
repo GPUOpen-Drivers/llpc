@@ -236,7 +236,6 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   }
   }
 
-#if LLPC_BUILD_GFX11
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
       m_pipelineState->getColorExportState().dualSourceBlendEnable) {
     // Save them for later dual-source-swizzle
@@ -245,12 +244,10 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
     m_blendSources[hwColorTarget].append(comps.begin(), comps.end());
     return nullptr;
   }
-#endif
 
   Value *exportCall = nullptr;
 
   if (exportTy->isHalfTy()) {
-#if LLPC_BUILD_GFX11
     // GFX11 removes compressed export, simply use 32bit-data export.
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
       // Translate compCount into the number of 32bit data.
@@ -273,7 +270,7 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
 
       return builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {});
     }
-#endif
+
     // 16-bit export (compressed)
     if (compCount <= 2)
       comps[1] = undefFloat16x2;
@@ -820,7 +817,6 @@ void FragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
   }
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Swizzle the output to MRT0/MRT1 for dual source blend on GFX11+, and return the last export instruction.
 //
@@ -897,7 +893,6 @@ Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
   };
   return builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args1, {});
 }
-#endif
 
 // =====================================================================================================================
 // Generates the export instructions based on the given color export information.
@@ -937,13 +932,9 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
     }
   }
 
-#if LLPC_BUILD_GFX11
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
       m_pipelineState->getColorExportState().dualSourceBlendEnable)
     lastExport = dualSourceSwizzle(builder);
-#else
-  (void(m_pipelineState)); // Unused
-#endif
 
   if (!lastExport && dummyExport) {
     lastExport = FragColorExport::addDummyExport(builder);

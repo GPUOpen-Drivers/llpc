@@ -149,7 +149,6 @@ struct WorkaroundFlags {
     unsigned u32All;
   } gfx10;
 
-#if LLPC_BUILD_GFX11
   union {
     struct {
       unsigned waUserSgprInitBug : 1;
@@ -157,7 +156,6 @@ struct WorkaroundFlags {
     };
     unsigned u32All;
   } gfx11;
-#endif
 };
 
 // =====================================================================================================================

@@ -99,7 +99,6 @@ Value *ShaderSystemValues::getTessFactorBufDesc() {
   return m_tfBufDesc;
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Get the descriptor for vertex attribute ring buffer (for VS, TES, and copy shader output)
 Value *ShaderSystemValues::getAttribRingBufDesc() {
@@ -115,7 +114,6 @@ Value *ShaderSystemValues::getAttribRingBufDesc() {
   return m_attribRingBufDesc;
 }
 
-#endif
 // =====================================================================================================================
 // Get the descriptor for task payload ring buffer (for task and mesh shader)
 Value *ShaderSystemValues::getTaskPayloadRingBufDesc() {
@@ -427,7 +425,6 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
   return m_streamOutBufDescs[xfbBuffer];
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Get stream-out buffer offset
 //
@@ -463,7 +460,6 @@ Value *ShaderSystemValues::getStreamOutBufOffset(unsigned xfbBuffer) {
   }
   return m_streamOutBufOffsets[xfbBuffer];
 }
-#endif
 
 // =====================================================================================================================
 // Get stream-out buffer table pointer
@@ -502,7 +498,6 @@ std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
   return std::make_pair(streamOutTableTy, m_streamOutTablePtr);
 }
 
-#if LLPC_BUILD_GFX11
 // =====================================================================================================================
 // Get stream-out control buffer pointer
 Instruction *ShaderSystemValues::getStreamOutControlBufPtr() {
@@ -543,7 +538,6 @@ Instruction *ShaderSystemValues::getStreamOutControlBufPtr() {
   }
   return m_streamOutControlBufPtr;
 }
-#endif
 
 // =====================================================================================================================
 // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue

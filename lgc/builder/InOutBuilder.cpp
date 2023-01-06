@@ -740,7 +740,6 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
   assert(xfbBuffer < MaxTransformFeedbackBuffers);
   assert(streamId < MaxGsStreams);
 
-#if LLPC_BUILD_GFX11
   if (m_shaderStage == ShaderStageGeometry && getPipelineState()->enableSwXfb()) {
     // NOTE: For SW-emulated stream-out, we disable GS output packing. This is because
     // the packing operation might cause a vector components belong to different vectors after the
@@ -749,7 +748,6 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
     getPipelineState()->setPackOutput(ShaderStageGeometry, false);
     getPipelineState()->setPackInput(ShaderStageFragment, false);
   }
-#endif
 
   // Collect the XFB output.
   XfbOutInfo xfbOutInfo = {};
@@ -1196,7 +1194,6 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     Value *localInvocationId =
         ShaderInputs::getInput(ShaderInput::LocalInvocationId, BuilderBase::get(*this), *getLgcContext());
 
-#if LLPC_BUILD_GFX11
     // On GFX11, it is a single VGPR and we need to extract the three components.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11) {
       static const unsigned mask = 0x3ff;
@@ -1217,7 +1214,6 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
 
       localInvocationId = unpackedLocalInvocationId;
     }
-#endif
 
     // Unused dimensions need zero-initializing.
     if (shaderMode.workgroupSizeZ <= 1) {

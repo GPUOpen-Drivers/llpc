@@ -56,18 +56,14 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     //
     // Distributed primitive ID size is dynamically calculated (don't use it)
     InvalidValue,                                             // LdsRegionDistribPrimId
-#if LLPC_BUILD_GFX11
     // Transform feedback output size is dynamically calculated (don't use it)
     InvalidValue,                                             // LdsRegionXfbOutput
-#endif
     // 4 dwords (vec4) per thread
     SizeOfVec4 * Gfx9::NggMaxThreadsPerSubgroup,              // LdsRegionVertPosData
     // Vertex cull info size is dynamically calculated (don't use it)
     InvalidValue,                                             // LdsRegionVertCullInfo
-#if LLPC_BUILD_GFX11
     // 1 dword per XFB buffer: dword written, 1 dword: primitives to write
     SizeOfDword * MaxTransformFeedbackBuffers + SizeOfDword,  // LdsRegionXfbStatInfo
-#endif
     // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionVertCountInWaves
     // 1 dword (uint32) per thread
@@ -81,24 +77,20 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     // 1 dword (uint32) per thread, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup) * MaxGsStreams,
                                                               // LdsRegionOutPrimData
-#if LLPC_BUILD_GFX11
     // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * MaxGsStreams,
                                                               // LdsRegionOutPrimCountInWaves
     // 1 dword (uint32) per thread, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup) * MaxGsStreams,
                                                               // LdsRegionOutPrimThreadIdMap
-#endif
     // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * MaxGsStreams,
                                                               // LdsRegionOutVertCountInWaves
     // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionOutVertThreadIdMap
-#if LLPC_BUILD_GFX11
     // 1 dword per XFB buffer: dword written, 1 dword per vertex stream: primitives to write
     SizeOfDword * MaxTransformFeedbackBuffers + SizeOfDword * MaxGsStreams,
                                                               // LdsRegionGsXfbStatInfo
-#endif
     // GS-VS ring size is dynamically calculated (don't use it)
     InvalidValue,                                             // LdsRegionGsVsRing
     // clang-format on
@@ -112,14 +104,10 @@ const char *NggLdsManager::m_ldsRegionNames[LdsRegionCount] = {
     // LDS region name for ES-only
     //
     "Distributed primitive ID",             // LdsRegionDistribPrimId
-#if LLPC_BUILD_GFX11
     "Transform feedback output",            // LdsRegionXfbOutput
-#endif
     "Vertex position data",                 // LdsRegionVertPosData
     "Vertex cull info",                     // LdsRegionVertCullInfo
-#if LLPC_BUILD_GFX11
     "Transform feedback statistics",        // LdsRegionXfbStatInfo
-#endif
     "Vertex count in waves",                // LdsRegionVertCountInWaves
     "Vertex thread ID map",                 // LdsRegionVertThreadIdMap
 
@@ -128,15 +116,11 @@ const char *NggLdsManager::m_ldsRegionNames[LdsRegionCount] = {
     //
     "ES-GS ring",                           // LdsRegionEsGsRing
     "GS out primitive data",                // LdsRegionOutPrimData
-#if LLPC_BUILD_GFX11
     "GS out primitive count in waves",      // LdsRegionOutPrimCountInWaves
     "GS out primitive thread ID map",       // LdsRegionOutPrimThreadIdMap
-#endif
     "GS out vertex count in waves",         // LdsRegionOutVertCountInWaves
     "GS out vertex thread ID map",          // LdsRegionOutVertThreadIdMap
-#if LLPC_BUILD_GFX11
     "GS transform feedback statistics",     // LdsRegionGsXfbStatInfo
-#endif
     "GS-VS ring",                           // LdsRegionGsVsRing
     // clang-format on
 };
@@ -175,7 +159,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
     //
     // The LDS layout is something like this:
     //
-#if LLPC_BUILD_GFX11
     // +------------+-----------------------+---------------------------------+--------------------------------+
     // | ES-GS ring | GS out primitive data | GS out vertex counts (waves)    | GS out vertex thread ID map    | >>>
     // +------------+-----------------------+---------------------------------+--------------------------------+
@@ -184,11 +167,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
     //       +-------------------+------------+
     //   >>> | GS XFB statistics | GS-VS ring |
     //       +-------------------+------------+
-#else
-    // +------------+-----------------------+------------------------------+-----------------------------+------------+
-    // | ES-GS ring | GS out primitive data | GS out vertex counts (waves) | GS out vertex thread ID map | GS-VS ring |
-    // +------------+-----------------------+------------------------------+-----------------------------+------------+
-#endif
     //
 
     // NOTE: We round ES-GS LDS size to 4-dword alignment. This is for later LDS read/write operations of mutilple
@@ -204,7 +182,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
       if (region == LdsRegionOutVertThreadIdMap && nggControl->compactMode == NggCompactDisable)
         continue;
 
-#if LLPC_BUILD_GFX11
       if (m_pipelineState->enableSwXfb()) {
         if (region == LdsRegionOutVertCountInWaves || region == LdsRegionOutVertThreadIdMap) {
           // NOTE: The two regions are overlapped with OutPrimCountInWaves and OutPrimThreadIdMap when SW-emulated
@@ -227,7 +204,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
             region == LdsRegionGsXfbStatInfo)
           continue;
       }
-#endif
 
       unsigned ldsRegionSize = LdsRegionSizes[region];
 
@@ -262,18 +238,12 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
       // | Distributed primitive ID |
       // +--------------------------+
       //
-#if LLPC_BUILD_GFX11
       // +----------------------+-------------------------------+----------------+-------------------------+
       // | Vertex position data | Vertex cull info (ES-GS ring) | XFB statistics | Vertex count (in waves) | >>>
       // +----------------------+-------------------------------+----------------+-------------------------+
       //       +----------------------+
       //   >>> | Vertex thread ID map |
       //       +----------------------+
-#else
-      // +----------------------+-------------------------------+-------------------------+----------------------+
-      // | Vertex position data | Vertex cull info (ES-GS ring) | Vertex count (in waves) | Vertex thread ID map |
-      // +----------------------+-------------------------------+-------------------------+----------------------+
-#endif
       //
       unsigned ldsRegionStart = 0;
       for (unsigned region = LdsRegionEsBeginRange; region <= LdsRegionEsEndRange; ++region) {
@@ -282,7 +252,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
         if (region == LdsRegionDistribPrimId)
           continue;
 
-#if LLPC_BUILD_GFX11
         // NOTE: For NGG culling mode, transform feedback output region is stored as part of vertex cull info. There
         // is no dedicated region.
         if (region == LdsRegionXfbOutput)
@@ -291,7 +260,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
         // NOTE: For transform feedback statistics info region, if SW-emuated stream-out is disabled, it is unused.
         if (region == LdsRegionXfbStatInfo && !m_pipelineState->enableSwXfb())
           continue;
-#endif
 
         // NOTE: For vertex compactionless mode, this region is unnecessary
         if (region == LdsRegionVertThreadIdMap && nggControl->compactMode == NggCompactDisable)
@@ -311,7 +279,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
                          m_ldsRegionStart[region], ldsRegionSize)
                   << "\n");
       }
-#if LLPC_BUILD_GFX11
     } else {
       //
       // The LDS layout is something like this:
@@ -338,7 +305,6 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
                          LdsRegionSizes[LdsRegionXfbStatInfo])
                   << "\n");
       }
-#endif
     }
   }
 
@@ -375,11 +341,9 @@ bool NggLdsManager::needsLds(PipelineState *pipelineState) {
       return true;
   }
 
-#if LLPC_BUILD_GFX11
   // SW-emulated stream-out needs LDS
   if (pipelineState->enableSwXfb())
     return true;
-#endif
 
   return false;
 }
@@ -400,10 +364,8 @@ unsigned NggLdsManager::calcEsExtraLdsSize(PipelineState *pipelineState) {
   }
 
   if (nggControl->passthroughMode) {
-#if LLPC_BUILD_GFX11
     if (pipelineState->enableSwXfb())
       return LdsRegionSizes[LdsRegionXfbStatInfo];
-#endif
 
     return 0;
   }
@@ -427,14 +389,12 @@ unsigned NggLdsManager::calcGsExtraLdsSize(PipelineState *pipelineState) {
     return 0;
   }
 
-#if LLPC_BUILD_GFX11
   if (pipelineState->enableSwXfb()) {
     // NOTE: The region OutVertCountInWaves and OutVertThreadIdMap is overlapped with OutPrimCountInWaves and
     // OutPrimThreadIdMap when SW-emulated stream-out is enabled. Therefore, they are not counted in here.
     return LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutPrimCountInWaves] +
            LdsRegionSizes[LdsRegionOutPrimThreadIdMap] + LdsRegionSizes[LdsRegionGsXfbStatInfo];
   }
-#endif
 
   return LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutVertCountInWaves] +
          (nggControl->compactMode == NggCompactDisable ? 0 : LdsRegionSizes[LdsRegionOutVertThreadIdMap]);

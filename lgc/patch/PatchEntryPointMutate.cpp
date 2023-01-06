@@ -1018,7 +1018,6 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     userDataIdx += dwordSize;
   }
 
-#if LLPC_BUILD_GFX11
   if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waUserSgprInitBug) {
     // Add dummy user data to bring the total to 16 SGPRS if hardware workaround
     // is required
@@ -1037,7 +1036,6 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
       }
     }
   }
-#endif
 
   intfData->userDataCount = userDataIdx;
   inRegMask = (1ull << argTys.size()) - 1;
@@ -1241,7 +1239,6 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       case ShaderStageVertex:
         userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
                                            &intfData->entryArgIdxs.vs.streamOutData.tablePtr));
-#if LLPC_BUILD_GFX11
         if (m_pipelineState->enableSwXfb()) {
           // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the
           // stream-out control buffer address.
@@ -1249,12 +1246,10 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
                                                     UserDataMapping::StreamOutControlBuf,
                                                     &intfData->entryArgIdxs.vs.streamOutData.controlBufPtr));
         }
-#endif
         break;
       case ShaderStageTessEval:
         userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
                                            &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
-#if LLPC_BUILD_GFX11
         if (m_pipelineState->enableSwXfb()) {
           // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the
           // stream-out control buffer address.
@@ -1262,13 +1257,11 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
                                                     UserDataMapping::StreamOutControlBuf,
                                                     &intfData->entryArgIdxs.tes.streamOutData.controlBufPtr));
         }
-#endif
         break;
       case ShaderStageGeometry:
         if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
           // Allocate dummy stream-out register for geometry shader
           userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "dummyStreamOut"));
-#if LLPC_BUILD_GFX11
         } else if (m_pipelineState->enableSwXfb()) {
           userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
                                              &intfData->entryArgIdxs.gs.streamOutData.tablePtr));
@@ -1277,7 +1270,6 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
           specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutControlBuf",
                                                     UserDataMapping::StreamOutControlBuf,
                                                     &intfData->entryArgIdxs.gs.streamOutData.controlBufPtr));
-#endif
         }
         break;
       default:

@@ -239,11 +239,9 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
   if (pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
     bufferFormatX2 = BUF_FORMAT_32_32_FLOAT_GFX10;
     bufferFormatX4 = BUF_FORMAT_32_32_32_32_FLOAT_GFX10;
-#if LLPC_BUILD_GFX11
   } else if (pipelineState->getTargetInfo().getGfxIpVersion().major == 11) {
     bufferFormatX2 = BUF_FORMAT_32_32_FLOAT_GFX11;
     bufferFormatX4 = BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
-#endif
   }
 
   auto primitiveMode = pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
@@ -485,10 +483,8 @@ void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
 void PatchPreparePipelineAbi::storeTessFactors(Function *entryPoint) {
   assert(getShaderStage(entryPoint) == ShaderStageTessControl); // Must be tessellation control shader
 
-#if LLPC_BUILD_GFX11
   if (m_pipelineState->canOptimizeTessFactor())
     return; // If TF store is to be optimized, skip further processing
-#endif
 
   // Find the return instruction
   Instruction *retInst = nullptr;

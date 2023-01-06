@@ -151,7 +151,6 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
   Value *localInvocationId = getFunctionArgument(m_entryPoint, entryArgIdxs.cs.localInvocationId);
   const unsigned actualNumThreads = shaderMode.workgroupSizeX * shaderMode.workgroupSizeY * shaderMode.workgroupSizeZ;
 
-#if LLPC_BUILD_GFX11
   // On GFX11, it is a single VGPR and we need to extract the three components.
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
     assert(localInvocationId->getType() == builder.getInt32Ty());
@@ -176,7 +175,6 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
 
     localInvocationId = unpackedLocalInvocationId;
   }
-#endif
 
   Value *threadId = builder.CreateExtractElement(localInvocationId, uint64_t(0));
   if (shaderMode.workgroupSizeY > 1) {

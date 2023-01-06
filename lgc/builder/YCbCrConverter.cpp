@@ -394,7 +394,6 @@ void YCbCrConverter::genImgDescChroma() {
                                   m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_8_8_8_8_UNORM__GFX10CORE));
       break;
     }
-#if LLPC_BUILD_GFX11
     case 11: {
       isGbGrFmt = m_builder->CreateICmpEQ(
           imgDataFmt, m_builder->getInt32(ImageBuilder::ImgFmtGfx11::IMG_FMT_BG_RG_UNORM__GFX104PLUS));
@@ -405,7 +404,6 @@ void YCbCrConverter::genImgDescChroma() {
                                   m_builder->getInt32(ImageBuilder::ImgFmtGfx11::IMG_FMT_8_8_8_8_UNORM__GFX104PLUS));
       break;
     }
-#endif
     default:
       llvm_unreachable("GFX IP not supported!");
       break;

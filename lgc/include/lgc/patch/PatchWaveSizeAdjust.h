@@ -45,10 +45,9 @@ public:
   bool runImpl(llvm::Module &module, PipelineState *pipelineState);
 
   static llvm::StringRef name() { return "Patch LLVM for per-shader wave size adjustment"; }
-#if LLPC_BUILD_GFX11
+
 private:
   bool is16BitArithmeticOp(llvm::Instruction *inst);
-#endif
 };
 
 } // namespace lgc

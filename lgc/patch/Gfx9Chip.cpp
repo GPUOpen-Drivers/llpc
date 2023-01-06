@@ -134,10 +134,8 @@ PrimShaderRegConfig::PrimShaderRegConfig(GfxIpVersion gfxIp) {
   // Special registers, having different register IDs
   if (gfxIp.major == 9 || gfxIp.major == 10) {
     INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
-#if LLPC_BUILD_GFX11
   } else if (gfxIp.major == 11) {
     INIT_REG_GFX11(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
-#endif
   } else {
     llvm_unreachable("Not implemented!");
   }
@@ -314,10 +312,8 @@ MeshRegConfig::MeshRegConfig(GfxIpVersion gfxIp) {
   // Special registers, having different register IDs
   if (gfxIp.major == 10) {
     INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
-#if LLPC_BUILD_GFX11
   } else if (gfxIp.major == 11) {
     INIT_REG_GFX11(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
-#endif
   } else {
     llvm_unreachable("Not implemented!");
   }
@@ -348,10 +344,8 @@ MeshRegConfig::MeshRegConfig(GfxIpVersion gfxIp) {
   INIT_REG_GFX10_PLUS(gfxIp.major, GE_NGG_SUBGRP_CNTL);
   INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_IDX_FORMAT);
 
-#if LLPC_BUILD_GFX11
   INIT_REG_GFX11(gfxIp.major, SPI_SHADER_GS_MESHLET_DIM);
   INIT_REG_GFX11(gfxIp.major, SPI_SHADER_GS_MESHLET_EXP_ALLOC);
-#endif
 }
 
 // =====================================================================================================================

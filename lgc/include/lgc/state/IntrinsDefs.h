@@ -79,22 +79,20 @@ enum AddrSpace {
 
 // Enumerates the target for "export" instruction.
 enum ExportTarget {
-  EXP_TARGET_MRT_0 = 0,   // MRT 0..7
-  EXP_TARGET_Z = 8,       // Z
-  EXP_TARGET_PS_NULL = 9, // Null pixel shader export (no data)
-  EXP_TARGET_POS_0 = 12,  // Position 0
-  EXP_TARGET_POS_1 = 13,  // Position 1
-  EXP_TARGET_POS_2 = 14,  // Position 2
-  EXP_TARGET_POS_3 = 15,  // Position 3
-  EXP_TARGET_POS_4 = 16,  // Position 4
-  EXP_TARGET_PRIM = 20,   // NGG primitive data (connectivity data)
-#if LLPC_BUILD_GFX11
+  EXP_TARGET_MRT_0 = 0,       // MRT 0..7
+  EXP_TARGET_Z = 8,           // Z
+  EXP_TARGET_PS_NULL = 9,     // Null pixel shader export (no data)
+  EXP_TARGET_POS_0 = 12,      // Position 0
+  EXP_TARGET_POS_1 = 13,      // Position 1
+  EXP_TARGET_POS_2 = 14,      // Position 2
+  EXP_TARGET_POS_3 = 15,      // Position 3
+  EXP_TARGET_POS_4 = 16,      // Position 4
+  EXP_TARGET_PRIM = 20,       // NGG primitive data (connectivity data)
   EXP_TARGET_DUAL_SRC_0 = 21, // Dual source blend left
   EXP_TARGET_DUAL_SRC_1 = 22, // Dual source blend right
-#endif
-  EXP_TARGET_PARAM_0 = 32,  // Param 0
-                            // Param 1..30
-  EXP_TARGET_PARAM_31 = 63, // Param 31
+  EXP_TARGET_PARAM_0 = 32,    // Param 0
+                              // Param 1..30
+  EXP_TARGET_PARAM_31 = 63,   // Param 31
 };
 
 // Enumerates shader export format used for "export" instruction.
@@ -406,7 +404,6 @@ enum BufFormat {
   BUF_FORMAT_32_32_32_32_SINT_GFX10 = 0x0000004C,
   BUF_FORMAT_32_32_32_32_FLOAT_GFX10 = 0x0000004D,
 
-#if LLPC_BUILD_GFX11
   BUF_FORMAT_10_11_11_FLOAT_GFX11 = 0x0000001E,
   BUF_FORMAT_11_11_10_FLOAT_GFX11 = 0x0000001F,
   BUF_FORMAT_10_10_10_2_UNORM_GFX11 = 0x00000020,
@@ -441,7 +438,6 @@ enum BufFormat {
   BUF_FORMAT_32_32_32_32_UINT_GFX11 = 0x0000003D,
   BUF_FORMAT_32_32_32_32_SINT_GFX11 = 0x0000003E,
   BUF_FORMAT_32_32_32_32_FLOAT_GFX11 = 0x0000003F,
-#endif
 };
 
 // Enumerates destination selection of data in memory buffer.
@@ -511,12 +507,10 @@ union SqBufRsrcWord1 {
     unsigned swizzleEnable : 1;
   } bits;
 
-#if LLPC_BUILD_GFX11
   struct {
     unsigned : 30;
     unsigned swizzleEnable : 2;
   } gfx11;
-#endif
 
   unsigned u32All;
 };
@@ -567,7 +561,6 @@ union SqBufRsrcWord3 {
     unsigned : 2;
   } gfx10;
 
-#if LLPC_BUILD_GFX11
   struct {
     unsigned : 12;
     unsigned format : 6;
@@ -575,7 +568,6 @@ union SqBufRsrcWord3 {
     unsigned oobSelect : 2;
     unsigned : 2;
   } gfx11;
-#endif
 
   unsigned u32All;
 };

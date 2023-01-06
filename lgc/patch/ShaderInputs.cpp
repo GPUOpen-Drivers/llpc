@@ -75,10 +75,8 @@ const char *ShaderInputs::getSpecialUserDataName(UserDataMapping kind) {
     return "MeshTaskRingIndex";
   case UserDataMapping::MeshPipeStatsBuf:
     return "MeshPipeStatsBuf";
-#if LLPC_BUILD_GFX11
   case UserDataMapping::StreamOutControlBuf:
     return "StreamOutControlBuf";
-#endif
   default:
     return "";
   }
@@ -163,10 +161,8 @@ Type *ShaderInputs::getInputType(ShaderInput inputKind, const LgcContext &lgcCon
   case ShaderInput::WorkgroupId:
     return FixedVectorType::get(Type::getInt32Ty(context), 3);
   case ShaderInput::LocalInvocationId:
-#if LLPC_BUILD_GFX11
     if (lgcContext.getTargetInfo().getGfxIpVersion().major >= 11)
       return Type::getInt32Ty(context);
-#endif
     return FixedVectorType::get(Type::getInt32Ty(context), 3);
 
   case ShaderInput::TessCoordX:
@@ -536,10 +532,8 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
   uint64_t inRegMask = 0;
   auto intfData = pipelineState->getShaderInterfaceData(shaderStage);
   const auto &xfbStrides = pipelineState->getXfbBufferStrides();
-#if LLPC_BUILD_GFX11
   // NOTE: For GFX11+, stream-out is actually SW-emulated in NGG primitive shader and we doesn't have relevant shader
   // inputs for HW stream-out.
-#endif
   const unsigned gfxIp = pipelineState->getTargetInfo().getGfxIpVersion().major;
   const bool enableHwXfb = pipelineState->enableXfb() && gfxIp <= 10;
 

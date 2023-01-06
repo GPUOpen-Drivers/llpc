@@ -449,13 +449,11 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
 
   SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
   SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     SET_REG_GFX10_4_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_NO_MSG,
                                nggControl->passthroughMode && !m_pipelineState->enableSwXfb());
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
   }
-#endif
 
   if (m_pipelineState->hasShaderStage(ShaderStageVertex)) {
     buildPrimShaderRegConfig<PipelineNggVsFsRegConfig>(ShaderStageVertex, ShaderStageInvalid, &config);
@@ -518,13 +516,11 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
 
   SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
   SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     SET_REG_GFX10_4_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_NO_MSG,
                                nggControl->passthroughMode && !m_pipelineState->enableSwXfb());
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
   }
-#endif
 
   if (m_pipelineState->hasShaderStage(ShaderStageVertex) || m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
     const bool hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
@@ -608,10 +604,8 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
   // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
   // hardware pass-through).
   SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11)
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
-#endif
 
   if (m_pipelineState->hasShaderStage(ShaderStageVertex) || m_pipelineState->hasShaderStage(ShaderStageGeometry)) {
     const bool hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
@@ -678,10 +672,8 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
   // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
   // hardware pass-through).
   SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11)
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
-#endif
 
   if (m_pipelineState->hasShaderStage(ShaderStageVertex) || m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
     const bool hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
@@ -975,10 +967,8 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
     SET_REG_GFX10_PLUS_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, WGP_MODE, wgpMode);
     SET_REG_GFX10_PLUS_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR_MSB, userSgprMsb);
 
-#if LLPC_BUILD_NAVI31
     // The shared scratch offset is reused by HW to provide HS wave ID in group
     SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, SCRATCH_EN, m_pipelineState->canOptimizeTessFactor());
-#endif
   } else {
     SET_REG_GFX9_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR_MSB, userSgprMsb);
   }
@@ -1005,13 +995,11 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
     SET_REG_GFX10_PLUS_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
   }
 
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     // Pixel wait sync+
     const bool useImageOp = vsResUsage->useImageOp || tcsResUsage->useImageOp;
     SET_REG_GFX11_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC4_HS, IMAGE_OP, useImageOp);
   }
-#endif
 
   setLdsSizeByteSize(Util::Abi::HardwareStage::Hs, ldsSizeInDwords * 4);
 
@@ -1350,7 +1338,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
   setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     // Pixel wait sync+
     bool useImageOp = hasGs ? gsResUsage->useImageOp : false;
@@ -1360,7 +1347,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
       useImageOp |= vsResUsage->useImageOp;
     SET_REG_GFX11_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC4_GS, IMAGE_OP, useImageOp);
   }
-#endif
 
   unsigned maxVertOut = std::max(1u, static_cast<unsigned>(geometryMode.outputVertices));
   SET_REG_FIELD(&config->primShaderRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
@@ -1488,7 +1474,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     // the address of that table.
     SET_REG(&config->primShaderRegs, SPI_SHADER_PGM_LO_GS, static_cast<unsigned>(UserDataMapping::NggCullingData));
   }
-#if LLPC_BUILD_GFX11
 
   //
   // Build SW stream-out configuration (GFX11+)
@@ -1503,7 +1488,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
     }
     setStreamOutVertexStrides(xfbStridesInDwords); // Set SW stream-out vertex strides
   }
-#endif
 }
 
 // =====================================================================================================================
@@ -1539,12 +1523,10 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     SET_REG_GFX9_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR_MSB, userSgprMsb);
   }
 
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     // Pixel wait sync+
     SET_REG_GFX11_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC4_PS, IMAGE_OP, resUsage->useImageOp);
   }
-#endif
 
   SET_REG_FIELD(&config->psRegs, SPI_BARYC_CNTL, FRONT_FACE_ALL_BITS, true);
   if (fragmentMode.pixelCenterInteger) {
@@ -1659,7 +1641,6 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     // NOTE: Flat shading flag is only set for per-vertex parameter.
     spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat && !interpInfoElem.isPerPrimitive;
     spiPsInputCntl.bits.OFFSET = interpInfoElem.loc;
-#if LLPC_BUILD_GFX11
     if (gfxIp.major >= 11 && interpInfoElem.isPerPrimitive) {
       const auto preStage = m_pipelineState->getPrevShaderStage(ShaderStageFragment);
       if (preStage == ShaderStageMesh) {
@@ -1673,7 +1654,6 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
       }
       spiPsInputCntl.gfx11.PRIM_ATTR = true;
     }
-#endif
 
     if (interpInfoElem.custom) {
       // NOTE: Force parameter cache data to be read in passthrough mode.
@@ -1701,13 +1681,11 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   }
 
   unsigned numInterp = resUsage->inOutUsage.fs.interpInfo.size() - numPrimInterp;
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     // NOTE: For GFX11+, vertex attributes and primitive attributes are counted together. The field
     // SPI_PS_INPUT_CNTL.PRIM_ATTR is used to differentiate them.
     numInterp = resUsage->inOutUsage.fs.interpInfo.size();
   }
-#endif
   SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, numInterp);
   if (gfxIp.isGfx(10, 3))
     SET_REG_GFX10_3_PLUS_EXCLUSIVE_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_PRIM_INTERP, numPrimInterp);
@@ -1774,15 +1752,10 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
 
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     static constexpr unsigned NEW_FAST_LAUNCH = 0x2;
     SET_REG_GFX09_1X_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_FAST_LAUNCH, NEW_FAST_LAUNCH);
   } else {
-#else
-  {
-#endif
-    (void(gfxIp)); // Unused
     static constexpr unsigned LEGACY_FAST_LAUNCH = 0x1;
     SET_REG_GFX09_1X_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_FAST_LAUNCH, LEGACY_FAST_LAUNCH);
   }
@@ -1826,12 +1799,10 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
   SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE, ldsSize);
   setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
 
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     // Pixel wait sync+
     SET_REG_GFX11_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC4_GS, IMAGE_OP, resUsage->useImageOp);
   }
-#endif
 
   unsigned maxVertOut = std::max(1u, static_cast<unsigned>(meshMode.outputVertices));
   SET_REG_FIELD(&config->meshRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
@@ -1890,7 +1861,6 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
                 hasPrimitivePayload ? SPI_SHADER_2COMP : SPI_SHADER_1COMP);
   SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_DRAW_PAYLOAD_CNTL, EN_PRIM_PAYLOAD, hasPrimitivePayload);
 
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     SET_REG_FIELD(&config->meshRegs, SPI_SHADER_GS_MESHLET_DIM, MESHLET_NUM_THREAD_X, meshMode.workgroupSizeX - 1);
     SET_REG_FIELD(&config->meshRegs, SPI_SHADER_GS_MESHLET_DIM, MESHLET_NUM_THREAD_Y, meshMode.workgroupSizeY - 1);
@@ -1905,7 +1875,6 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
     SET_REG_FIELD(&config->meshRegs, SPI_SHADER_GS_MESHLET_EXP_ALLOC, MAX_EXP_VERTS, meshMode.outputVertices);
     SET_REG_FIELD(&config->meshRegs, SPI_SHADER_GS_MESHLET_EXP_ALLOC, MAX_EXP_PRIMS, meshMode.outputPrimitives);
   }
-#endif
 
   setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
 
@@ -1997,12 +1966,10 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
     tidigCompCnt = 1;
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, tidigCompCnt);
 
-#if LLPC_BUILD_GFX11
   if (gfxIp.major >= 11) {
     // Pixel wait sync+
     SET_REG_GFX11_FIELD(config, COMPUTE_PGM_RSRC3, IMAGE_OP, resUsage->useImageOp);
   }
-#endif
 
   SET_REG_FIELD(config, COMPUTE_NUM_THREAD_X, NUM_THREAD_FULL, workgroupSizes[0]);
   SET_REG_FIELD(config, COMPUTE_NUM_THREAD_Y, NUM_THREAD_FULL, workgroupSizes[1]);
@@ -2236,11 +2203,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
     SET_REG_FIELD(config, PA_CL_CLIP_CNTL, VTE_VPORT_PROVOKE_DISABLE, false);
   }
 
-#if LLPC_BUILD_GFX11
   SET_REG_FIELD(config, VGT_REUSE_OFF, REUSE_OFF, disableVertexReuse || m_pipelineState->enableSwXfb());
-#else
-  SET_REG_FIELD(config, VGT_REUSE_OFF, REUSE_OFF, disableVertexReuse);
-#endif
 
   bool miscExport = usePointSize;
   if (!meshPipeline) {

@@ -141,12 +141,8 @@ struct Options {
   unsigned reserved0f;                 // Reserved for future functionality
   unsigned useResourceBindingRange;    // A resource node binding is the start of a range whose size is
                                        //  sizeInDwords/stride.
-#if LLPC_BUILD_GFX11
-  unsigned optimizeTessFactor; // If set, we can determine either send HT_TessFactor message or write to TF buffer
-                               // depending the values of tessellation factors.
-#else
-  unsigned reserved1f; // Reserved for future functionality
-#endif
+  unsigned optimizeTessFactor;    // If set, we can determine either send HT_TessFactor message or write to TF buffer
+                                  // depending the values of tessellation factors.
   unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
   unsigned pageMigrationEnabled;  // Enable page migration
   ResourceLayoutScheme resourceLayoutScheme;     // Resource layout scheme
