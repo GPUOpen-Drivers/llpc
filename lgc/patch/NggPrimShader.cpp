@@ -476,11 +476,14 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   }
 
   if (m_hasGs) {
-    // GS is present in primitive shader (ES-GS merged shader)
-    constructPrimShaderWithGs(module);
+    // API GS is present
+    buildPrimShaderWithGs(entryPoint);
+  } else if (m_nggControl->passthroughMode) {
+    // NGG passthrough mode is enabled
+    buildPassthroughPrimShader(entryPoint);
   } else {
-    // GS is not present in primitive shader (ES-only shader)
-    constructPrimShaderWithoutGs(module);
+    // NGG passthrough mode is disabled
+    buildPrimShader(entryPoint);
   }
 
   return entryPoint;
@@ -533,11 +536,296 @@ void NggPrimShader::buildPrimShaderCbLayoutLookupTable() {
 }
 
 // =====================================================================================================================
-// Constructs primitive shader for ES-only merged shader (GS is not present).
+// Build the body of passthrough primitive shader.
 //
-// @param module : LLVM module
-void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
-  assert(m_hasGs == false);
+// @param entryPoint : Entry-point of primitive shader to build
+void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
+  assert(m_nggControl->passthroughMode); // Make sure NGG passthrough mode is enabled
+  assert(!m_hasGs);                      // Make sure API GS is not present
+
+  const bool hasTs = (m_hasTcs || m_hasTes);
+
+  auto arg = entryPoint->arg_begin();
+
+  Value *mergedGroupInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo));
+  mergedGroupInfo->setName("mergedGroupInfo");
+
+  Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
+  mergedWaveInfo->setName("mergedWaveInfo");
+
+  Value *attribRingBase = nullptr;
+  if (m_gfxIp.major >= 11) {
+    attribRingBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
+    attribRingBase->setName("attribRingBase");
+  }
+
+  arg += (NumSpecialSgprInputs + 1);
+
+  Value *esGsOffsets01 = arg;
+  Value *gsPrimitiveId = (arg + 2);
+
+  //
+  // NOTE: If primitive ID is used in VS, we have to insert several basic blocks to distribute the value across
+  // LDS because the primitive ID is provided as per-primitive instead of per-vertex. The algorithm is something
+  // like this:
+  //
+  // if (distributePrimitiveId) {
+  //     if (threadIdInWave < primCountInWave)
+  //       Distribute primitive ID to provoking vertex (vertex0)
+  //     Barrier
+  //
+  //     if (threadIdInWave < vertCountInWave)
+  //       Get primitive ID
+  //     Barrier
+  //   }
+  //
+  bool distributePrimitiveId =
+      !hasTs ? m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.primitiveId : false;
+
+  //
+  // For pass-through mode, the processing is something like this:
+  //
+  // NGG_PASSTHROUGH() {
+  //   Initialize thread/wave info
+  //
+  //   if (distributePrimitiveId) {
+  //     if (threadIdInWave < primCountInWave)
+  //       Distribute primitive ID to provoking vertex (vertex0)
+  //     Barrier
+  //
+  //     if (threadIdInWave < vertCountInWave)
+  //       Get primitive ID
+  //   }
+  //   Barrier
+  //
+  //   if (waveId == 0)
+  //     GS allocation request (GS_ALLOC_REQ)
+  //
+  //   if (threadIdInSubgroup < primCountInSubgroup)
+  //     Do primitive connectivity data export
+  //
+  //   if (enableSwXfb)
+  //     Process XFB output export (Run ES)
+  //   else {
+  //     if (threadIdInSubgroup < vertCountInSubgroup)
+  //       Run ES
+  //   }
+  // }
+  //
+
+  // Define basic blocks
+  auto entryBlock = createBlock(entryPoint, ".entry");
+
+  // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
+  BasicBlock *writePrimIdBlock = nullptr;
+  BasicBlock *endWritePrimIdBlock = nullptr;
+  BasicBlock *readPrimIdBlock = nullptr;
+  BasicBlock *endReadPrimIdBlock = nullptr;
+
+  if (distributePrimitiveId) {
+    writePrimIdBlock = createBlock(entryPoint, ".writePrimId");
+    endWritePrimIdBlock = createBlock(entryPoint, ".endWritePrimId");
+
+    readPrimIdBlock = createBlock(entryPoint, ".readPrimId");
+    endReadPrimIdBlock = createBlock(entryPoint, ".endReadPrimId");
+  }
+
+  // NOTE: For GFX11+, we use NO_MSG mode for NGG pass-through mode if SW-emulated stream-out is not requested. The
+  // message GS_ALLOC_REQ is no longer necessary.
+  bool passthroughNoMsg = m_gfxIp.major >= 11 && !m_enableSwXfb;
+
+  BasicBlock *allocReqBlock = nullptr;
+  BasicBlock *endAllocReqBlock = nullptr;
+  if (!passthroughNoMsg) {
+    allocReqBlock = createBlock(entryPoint, ".allocReq");
+    endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
+  }
+
+  auto expPrimBlock = createBlock(entryPoint, ".expPrim");
+  auto endExpPrimBlock = createBlock(entryPoint, ".endExpPrim");
+
+  BasicBlock *expVertBlock = nullptr;
+  BasicBlock *endExpVertBlock = nullptr;
+  if (!m_enableSwXfb) {
+    expVertBlock = createBlock(entryPoint, ".expVert");
+    endExpVertBlock = createBlock(entryPoint, ".endExpVert");
+  }
+
+  // Construct ".entry" block
+  {
+    m_builder->SetInsertPoint(entryBlock);
+
+    initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
+
+    if (m_gfxIp.major >= 11) {
+      // Record attribute ring base ([14:0])
+      m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
+    }
+
+    // Record primitive connectivity data
+    m_nggInputs.primData = esGsOffsets01;
+
+    if (distributePrimitiveId) {
+      auto primValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.primCountInWave);
+      m_builder->CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
+    } else {
+      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+      if (!passthroughNoMsg) {
+        auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder->getInt32(0));
+        m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
+      } else {
+        auto primValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
+        m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
+      }
+    }
+  }
+
+  if (distributePrimitiveId) {
+    // Construct ".writePrimId" block
+    {
+      m_builder->SetInsertPoint(writePrimIdBlock);
+
+      // Primitive data layout
+      //   ES_GS_OFFSET01[31]    = null primitive flag
+      //   ES_GS_OFFSET01[28:20] = vertexId2 (in bytes)
+      //   ES_GS_OFFSET01[18:10] = vertexId1 (in bytes)
+      //   ES_GS_OFFSET01[8:0]   = vertexId0 (in bytes)
+
+      // Distribute primitive ID
+      Value *vertexId = nullptr;
+      if (m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst)
+        vertexId = createUBfe(m_nggInputs.primData, 0, 9);
+      else
+        vertexId = createUBfe(m_nggInputs.primData, 20, 9);
+      writePerThreadDataToLds(gsPrimitiveId, vertexId, LdsRegionDistribPrimId);
+
+      BranchInst::Create(endWritePrimIdBlock, writePrimIdBlock);
+    }
+
+    // Construct ".endWritePrimId" block
+    {
+      m_builder->SetInsertPoint(endWritePrimIdBlock);
+
+      createFenceAndBarrier();
+
+      auto vertValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
+      m_builder->CreateCondBr(vertValid, readPrimIdBlock, endReadPrimIdBlock);
+    }
+
+    // Construct ".readPrimId" block
+    Value *primitiveId = nullptr;
+    {
+      m_builder->SetInsertPoint(readPrimIdBlock);
+
+      primitiveId =
+          readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggInputs.threadIdInSubgroup, LdsRegionDistribPrimId);
+
+      m_builder->CreateBr(endReadPrimIdBlock);
+    }
+
+    // Construct ".endReadPrimId" block
+    {
+      m_builder->SetInsertPoint(endReadPrimIdBlock);
+
+      auto primitiveIdPhi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
+
+      primitiveIdPhi->addIncoming(primitiveId, readPrimIdBlock);
+      primitiveIdPhi->addIncoming(m_builder->getInt32(0), endWritePrimIdBlock);
+
+      // Record primitive ID
+      m_nggInputs.primitiveId = primitiveIdPhi;
+
+      createFenceAndBarrier();
+
+      if (!passthroughNoMsg) {
+        auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder->getInt32(0));
+        m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
+      } else {
+        auto primValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
+        m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
+      }
+    }
+  }
+
+  if (!passthroughNoMsg) {
+    // Construct ".allocReq" block
+    {
+      m_builder->SetInsertPoint(allocReqBlock);
+
+      doParamCacheAllocRequest();
+      m_builder->CreateBr(endAllocReqBlock);
+    }
+
+    // Construct ".endAllocReq" block
+    {
+      m_builder->SetInsertPoint(endAllocReqBlock);
+
+      auto primValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
+      m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
+    }
+  }
+
+  // Construct ".expPrim" block
+  {
+    m_builder->SetInsertPoint(expPrimBlock);
+
+    doPrimitiveExportWithoutGs();
+    m_builder->CreateBr(endExpPrimBlock);
+  }
+
+  // Construct ".endExpPrim" block
+  {
+    m_builder->SetInsertPoint(endExpPrimBlock);
+
+    // NOTE: For NGG passthrough mode, if SW-emulated stream-out is enabled, running ES is included in processing
+    // transform feedback output exporting. There won't be separated ES running (ES is not split any more). This is
+    // because we could encounter special cases in which there are memory atomics producing output values both for
+    // transform feedback exporting and for vertex exporting like following codes. The atomics shouldn't be separated
+    // and be run multiple times.
+    //
+    //   void ES() {
+    //     ...
+    //     value = atomicXXX()
+    //     xfbExport = value
+    //     vertexExport = value
+    //  }
+    //
+    if (m_enableSwXfb) {
+      processXfbOutputExport(entryPoint->getParent(), entryPoint->arg_begin());
+      m_builder->CreateRetVoid();
+    } else {
+      auto vertValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+      m_builder->CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
+    }
+  }
+
+  if (!m_enableSwXfb) {
+    // Construct ".expVert" block
+    {
+      m_builder->SetInsertPoint(expVertBlock);
+
+      runEs(entryPoint->getParent(), entryPoint->arg_begin());
+
+      m_builder->CreateBr(endExpVertBlock);
+    }
+
+    // Construct ".endExpVert" block
+    {
+      m_builder->SetInsertPoint(endExpVertBlock);
+
+      m_builder->CreateRetVoid();
+    }
+  }
+}
+
+// =====================================================================================================================
+// Build the body of primitive shader when API GS is not present.
+//
+// @param entryPoint : Entry-point of primitive shader to build
+void NggPrimShader::buildPrimShader(Function *entryPoint) {
+  assert(!m_nggControl->passthroughMode); // Make sure NGG passthrough mode is not enabled
+  assert(!m_hasGs);                       // Make sure API GS is not present
 
   const bool hasTs = (m_hasTcs || m_hasTes);
 
@@ -545,8 +833,6 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   assert(waveSize == 32 || waveSize == 64);
 
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
-
-  auto entryPoint = module->getFunction(lgcName::NggPrimShaderEntryPoint);
 
   auto arg = entryPoint->arg_begin();
 
@@ -590,7 +876,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   // LDS because the primitive ID is provided as per-primitive instead of per-vertex. The algorithm is something
   // like this:
   //
-  // if (distribPrimitiveId) {
+  // if (distributePrimitiveId) {
   //     if (threadIdInWave < primCountInWave)
   //       Distribute primitive ID to provoking vertex (vertex0)
   //     Barrier
@@ -600,255 +886,15 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
   //     Barrier
   //   }
   //
-  const bool distributePrimitiveId = hasTs ? false : resUsage->builtInUsage.vs.primitiveId;
-
-  if (m_nggControl->passthroughMode) {
-    //
-    // For pass-through mode, the processing is something like this:
-    //
-    // NGG() {
-    //   Initialize thread/wave info
-    //
-    //   if (distribPrimitiveId) {
-    //     if (threadIdInWave < primCountInWave)
-    //       Distribute primitive ID to provoking vertex (vertex0)
-    //     Barrier
-    //
-    //     if (threadIdInWave < vertCountInWave)
-    //       Get primitive ID
-    //   }
-    //   Barrier
-    //
-    //   if (waveId == 0)
-    //     GS allocation request (GS_ALLOC_REQ)
-    //
-    //   if (threadIdInSubgroup < primCountInSubgroup)
-    //     Do primitive connectivity data export
-    //
-    //   if (enableSwXfb)
-    //     Process XFB output export (Run ES)
-    //   else {
-    //     if (threadIdInSubgroup < vertCountInSubgroup)
-    //       Run ES
-    //   }
-    // }
-    //
-
-    // Define basic blocks
-    auto entryBlock = createBlock(entryPoint, ".entry");
-
-    // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
-    BasicBlock *writePrimIdBlock = nullptr;
-    BasicBlock *endWritePrimIdBlock = nullptr;
-    BasicBlock *readPrimIdBlock = nullptr;
-    BasicBlock *endReadPrimIdBlock = nullptr;
-
-    if (distributePrimitiveId) {
-      writePrimIdBlock = createBlock(entryPoint, ".writePrimId");
-      endWritePrimIdBlock = createBlock(entryPoint, ".endWritePrimId");
-
-      readPrimIdBlock = createBlock(entryPoint, ".readPrimId");
-      endReadPrimIdBlock = createBlock(entryPoint, ".endReadPrimId");
-    }
-
-    // NOTE: For GFX11+, we use NO_MSG mode for NGG pass-through mode if SW-emulated stream-out is not requested. The
-    // message GS_ALLOC_REQ is no longer necessary.
-    bool passthroughNoMsg = m_gfxIp.major >= 11 && !m_enableSwXfb;
-
-    BasicBlock *allocReqBlock = nullptr;
-    BasicBlock *endAllocReqBlock = nullptr;
-    if (!passthroughNoMsg) {
-      allocReqBlock = createBlock(entryPoint, ".allocReq");
-      endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
-    }
-
-    auto expPrimBlock = createBlock(entryPoint, ".expPrim");
-    auto endExpPrimBlock = createBlock(entryPoint, ".endExpPrim");
-
-    BasicBlock *expVertBlock = nullptr;
-    BasicBlock *endExpVertBlock = nullptr;
-    if (!m_enableSwXfb) {
-      expVertBlock = createBlock(entryPoint, ".expVert");
-      endExpVertBlock = createBlock(entryPoint, ".endExpVert");
-    }
-
-    // Construct ".entry" block
-    {
-      m_builder->SetInsertPoint(entryBlock);
-
-      initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
-
-      if (m_gfxIp.major >= 11) {
-        // Record attribute ring base ([14:0])
-        m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
-      }
-
-      // Record primitive connectivity data
-      m_nggInputs.primData = esGsOffsets01;
-
-      if (distributePrimitiveId) {
-        auto primValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.primCountInWave);
-        m_builder->CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
-      } else {
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-        if (!passthroughNoMsg) {
-          auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder->getInt32(0));
-          m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
-        } else {
-          auto primValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
-          m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
-        }
-      }
-    }
-
-    if (distributePrimitiveId) {
-      // Construct ".writePrimId" block
-      {
-        m_builder->SetInsertPoint(writePrimIdBlock);
-
-        // Primitive data layout
-        //   ES_GS_OFFSET01[31]    = null primitive flag
-        //   ES_GS_OFFSET01[28:20] = vertexId2 (in bytes)
-        //   ES_GS_OFFSET01[18:10] = vertexId1 (in bytes)
-        //   ES_GS_OFFSET01[8:0]   = vertexId0 (in bytes)
-
-        // Distribute primitive ID
-        Value *vertexId = nullptr;
-        if (m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst)
-          vertexId = createUBfe(m_nggInputs.primData, 0, 9);
-        else
-          vertexId = createUBfe(m_nggInputs.primData, 20, 9);
-        writePerThreadDataToLds(gsPrimitiveId, vertexId, LdsRegionDistribPrimId);
-
-        BranchInst::Create(endWritePrimIdBlock, writePrimIdBlock);
-      }
-
-      // Construct ".endWritePrimId" block
-      {
-        m_builder->SetInsertPoint(endWritePrimIdBlock);
-
-        createFenceAndBarrier();
-
-        auto vertValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
-        m_builder->CreateCondBr(vertValid, readPrimIdBlock, endReadPrimIdBlock);
-      }
-
-      // Construct ".readPrimId" block
-      Value *primitiveId = nullptr;
-      {
-        m_builder->SetInsertPoint(readPrimIdBlock);
-
-        primitiveId =
-            readPerThreadDataFromLds(m_builder->getInt32Ty(), m_nggInputs.threadIdInSubgroup, LdsRegionDistribPrimId);
-
-        m_builder->CreateBr(endReadPrimIdBlock);
-      }
-
-      // Construct ".endReadPrimId" block
-      {
-        m_builder->SetInsertPoint(endReadPrimIdBlock);
-
-        auto primitiveIdPhi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-
-        primitiveIdPhi->addIncoming(primitiveId, readPrimIdBlock);
-        primitiveIdPhi->addIncoming(m_builder->getInt32(0), endWritePrimIdBlock);
-
-        // Record primitive ID
-        m_nggInputs.primitiveId = primitiveIdPhi;
-
-        createFenceAndBarrier();
-
-        if (!passthroughNoMsg) {
-          auto firstWaveInSubgroup = m_builder->CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder->getInt32(0));
-          m_builder->CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
-        } else {
-          auto primValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
-          m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
-        }
-      }
-    }
-
-    if (!passthroughNoMsg) {
-      // Construct ".allocReq" block
-      {
-        m_builder->SetInsertPoint(allocReqBlock);
-
-        doParamCacheAllocRequest();
-        m_builder->CreateBr(endAllocReqBlock);
-      }
-
-      // Construct ".endAllocReq" block
-      {
-        m_builder->SetInsertPoint(endAllocReqBlock);
-
-        auto primValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
-        m_builder->CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
-      }
-    }
-
-    // Construct ".expPrim" block
-    {
-      m_builder->SetInsertPoint(expPrimBlock);
-
-      doPrimitiveExportWithoutGs();
-      m_builder->CreateBr(endExpPrimBlock);
-    }
-
-    // Construct ".endExpPrim" block
-    {
-      m_builder->SetInsertPoint(endExpPrimBlock);
-
-      // NOTE: For NGG passthrough mode, if SW-emulated stream-out is enabled, running ES is included in processing
-      // transform feedback output exporting. There won't be separated ES running (ES is not split any more). This is
-      // because we could encounter special cases in which there are memory atomics producing output values both for
-      // transform feedback exporting and for vertex exporting like following codes. The atomics shouldn't be separated
-      // and be run multiple times.
-      //
-      //   void ES() {
-      //     ...
-      //     value = atomicXXX()
-      //     xfbExport = value
-      //     vertexExport = value
-      //  }
-      //
-      if (m_enableSwXfb) {
-        processXfbOutputExport(module, entryPoint->arg_begin());
-        m_builder->CreateRetVoid();
-      } else {
-        auto vertValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
-        m_builder->CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
-      }
-    }
-
-    if (!m_enableSwXfb) {
-      // Construct ".expVert" block
-      {
-        m_builder->SetInsertPoint(expVertBlock);
-
-        runEs(module, entryPoint->arg_begin());
-
-        m_builder->CreateBr(endExpVertBlock);
-      }
-
-      // Construct ".endExpVert" block
-      {
-        m_builder->SetInsertPoint(endExpVertBlock);
-
-        m_builder->CreateRetVoid();
-      }
-    }
-
-    return;
-  }
+  bool distributePrimitiveId = !hasTs ? resUsage->builtInUsage.vs.primitiveId : false;
 
   //
-  // For culling mode, the processing is something like this:
+  // The processing is something like this:
   //
   // NGG() {
   //   Initialize thread/wave info
   //
-  //   if (distribPrimitiveId) {
+  //   if (distributePrimitiveId) {
   //     if (threadIdInWave < primCountInWave)
   //       Distribute primitive ID to provoking vertex (vertex0)
   //     Barrier
@@ -1033,7 +1079,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       m_builder->CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
     } else {
       if (m_enableSwXfb)
-        processXfbOutputExport(module, entryPoint->arg_begin());
+        processXfbOutputExport(entryPoint->getParent(), entryPoint->arg_begin());
 
       auto vertValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
       m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1094,7 +1140,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
       createFenceAndBarrier();
 
       if (m_enableSwXfb)
-        processXfbOutputExport(module, entryPoint->arg_begin());
+        processXfbOutputExport(entryPoint->getParent(), entryPoint->arg_begin());
 
       auto vertValid = m_builder->CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
       m_builder->CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1108,10 +1154,10 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     m_builder->SetInsertPoint(fetchVertCullDataBlock);
 
     // Split ES to two parts: fetch cull data before NGG culling; do deferred vertex export after NGG culling
-    splitEs(module);
+    splitEs(entryPoint->getParent());
 
     // Run ES-partial to fetch cull data
-    auto cullData = runEsPartial(module, entryPoint->arg_begin());
+    auto cullData = runEsPartial(entryPoint->getParent(), entryPoint->arg_begin());
     position = m_nggControl->enableCullDistanceCulling ? m_builder->CreateExtractValue(cullData, 0) : cullData;
 
     m_builder->CreateBr(endFetchVertCullDataBlock);
@@ -1238,7 +1284,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     auto vertexId1 = m_nggInputs.esGsOffset1;
     auto vertexId2 = m_nggInputs.esGsOffset2;
 
-    cullFlag = doCulling(module, vertexId0, vertexId1, vertexId2);
+    cullFlag = doCulling(entryPoint->getParent(), vertexId0, vertexId1, vertexId2);
     m_builder->CreateCondBr(cullFlag, endCullingBlock, writeVertDrawFlagBlock);
   }
 
@@ -1596,7 +1642,7 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
     m_builder->SetInsertPoint(expVertBlock);
 
     // Run ES-partial to do deferred vertex export
-    runEsPartial(module, entryPoint->arg_begin(), position);
+    runEsPartial(entryPoint->getParent(), entryPoint->arg_begin(), position);
 
     m_builder->CreateBr(endExpVertBlock);
   }
@@ -1610,11 +1656,11 @@ void NggPrimShader::constructPrimShaderWithoutGs(Module *module) {
 }
 
 // =====================================================================================================================
-// Constructs primitive shader for ES-GS merged shader (GS is present).
+// Build the body of primitive shader when API GS is present.
 //
-// @param module : LLVM module
-void NggPrimShader::constructPrimShaderWithGs(Module *module) {
-  assert(m_hasGs);
+// @param entryPoint : Entry-point of primitive shader to build
+void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
+  assert(m_hasGs); // Make sure API GS is present
 
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   assert(waveSize == 32 || waveSize == 64);
@@ -1628,8 +1674,6 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
 
   const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs;
   const auto rasterStream = inOutUsage.rasterStream;
-
-  auto entryPoint = module->getFunction(lgcName::NggPrimShaderEntryPoint);
 
   auto arg = entryPoint->arg_begin();
 
@@ -1807,7 +1851,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(beginEsBlock);
 
-    runEs(module, entryPoint->arg_begin());
+    runEs(entryPoint->getParent(), entryPoint->arg_begin());
 
     m_builder->CreateBr(endEsBlock);
   }
@@ -1853,7 +1897,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(beginGsBlock);
 
-    runGs(module, entryPoint->arg_begin());
+    runGs(entryPoint->getParent(), entryPoint->arg_begin());
 
     m_builder->CreateBr(endGsBlock);
   }
@@ -1863,7 +1907,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
     m_builder->SetInsertPoint(endGsBlock);
 
     if (m_enableSwXfb)
-      processGsXfbOutputExport(module, entryPoint->arg_begin());
+      processGsXfbOutputExport(entryPoint->getParent(), entryPoint->arg_begin());
 
     auto waveValid =
         m_builder->CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder->getInt32(waveCountInSubgroup + 1));
@@ -1922,7 +1966,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
           m_builder->CreateAdd(m_nggInputs.threadIdInSubgroup,
                                m_builder->CreateSelect(winding, m_builder->getInt32(1), m_builder->getInt32(2)));
 
-      auto cullFlag = doCulling(module, vertexId0, vertexId1, vertexId2);
+      auto cullFlag = doCulling(entryPoint->getParent(), vertexId0, vertexId1, vertexId2);
       m_builder->CreateCondBr(cullFlag, nullifyOutPrimDataBlock, endCullingBlock);
     }
 
@@ -2175,7 +2219,7 @@ void NggPrimShader::constructPrimShaderWithGs(Module *module) {
   {
     m_builder->SetInsertPoint(expVertBlock);
 
-    runCopyShader(module, entryPoint->arg_begin());
+    runCopyShader(entryPoint->getParent(), entryPoint->arg_begin());
     m_builder->CreateBr(endExpVertBlock);
   }
 

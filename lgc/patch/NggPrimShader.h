@@ -185,8 +185,9 @@ private:
 
   void buildPrimShaderCbLayoutLookupTable();
 
-  void constructPrimShaderWithoutGs(llvm::Module *module);
-  void constructPrimShaderWithGs(llvm::Module *module);
+  void buildPassthroughPrimShader(llvm::Function *entryPoint);
+  void buildPrimShader(llvm::Function *entryPoint);
+  void buildPrimShaderWithGs(llvm::Function *entryPoint);
 
   void initWaveThreadInfo(llvm::Value *mergedGroupInfo, llvm::Value *mergedWaveInfo);
 
