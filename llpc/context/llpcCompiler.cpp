@@ -726,12 +726,16 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
   BinaryData elfBin = {};
   ElfPackage elf[UnlinkedStageCount] = {};
   ElfPackage pipelineElf;
-  if (!cacheAccessor && cacheAccessor->isInCache()) {
+  if (cacheAccessor && cacheAccessor->isInCache()) {
     LLPC_OUTS("Cache hit for graphics pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
     pipelineOut->pipelineCacheAccess =
         cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
   } else {
+    LLPC_OUTS("Cache miss for graphics pipeline.\n");
+    if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
+
     GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
     Context *context = acquireContext();
     context->attachPipelineContext(&graphicsContext);
@@ -764,6 +768,11 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
 
     elfBin.codeSize = pipelineElf.size();
     elfBin.pCode = pipelineElf.data();
+
+    if (cacheAccessor && !cacheAccessor->isInCache()) {
+      LLPC_OUTS("Adding graphics pipeline to the cache.\n");
+      cacheAccessor->setElfInCache(elfBin);
+    }
   }
 
   void *allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfBin.codeSize);
