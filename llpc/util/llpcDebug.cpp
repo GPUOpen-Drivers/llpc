@@ -67,7 +67,7 @@ opt<std::string> LogFileOuts("log-file-outs", desc("Name of the file to log info
 // TODO: Remove this when LLPC will switch fully to opaque pointers.
 // opaque-pointers flag which is implemented in LLVM is by default enabled. Right now we do not want
 // to enable by default this flag for LLPC, but we need to have some flag to use for transition and for LIT tests.
-opt<bool> OpaquePointers("enable-opaque-pointers", desc("Enable opaque-pointers for LLPC"), init(false));
+opt<bool> OpaquePointers("enable-opaque-pointers", desc("Enable opaque-pointers for LLPC"), init(true));
 
 } // namespace cl
 
