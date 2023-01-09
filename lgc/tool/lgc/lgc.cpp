@@ -102,7 +102,7 @@ cl::opt<unsigned> PalAbiVersion("pal-abi-version", cl::init(0xFFFFFFFF), cl::cat
 // -v: enable verbose output
 cl::opt<bool> VerboseOutput("v", cl::cat(LgcCategory), cl::desc("Enable verbose output"), cl::init(false));
 
-cl::opt<bool> OpaquePointers("enable-opaque-pointers", cl::desc("Enable opaque-pointers in LGC"), cl::init(false));
+cl::opt<bool> OpaquePointers("enable-opaque-pointers", cl::desc("Enable opaque-pointers in LGC"), cl::init(true));
 } // anonymous namespace
 
 // =====================================================================================================================
