@@ -180,7 +180,7 @@ private:
   static unsigned calcVertexCullInfoSizeAndOffsets(PipelineState *pipelineState,
                                                    VertexCullInfoOffsets &vertCullInfoOffsets);
 
-  llvm::FunctionType *generatePrimShaderEntryPointType(llvm::Module *module, uint64_t *inRegMask) const;
+  llvm::FunctionType *generatePrimShaderEntryPointType(llvm::Module *module, uint64_t *inRegMask);
   llvm::Function *generatePrimShaderEntryPoint(llvm::Module *module);
 
   void buildPrimShaderCbLayoutLookupTable();
@@ -344,7 +344,7 @@ private:
   PrimShaderCbLayoutLookupTable m_cbLayoutTable; // Layout lookup table of primitive shader constant buffer
   VertexCullInfoOffsets m_vertCullInfoOffsets;   // A collection of offsets within an item of vertex cull info
 
-  std::unique_ptr<llvm::IRBuilder<>> m_builder; // LLVM IR builder
+  llvm::IRBuilder<> m_builder; // LLVM IR builder
 };
 
 } // namespace lgc
