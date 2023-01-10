@@ -536,6 +536,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     attribRingBase->setName("attribRingBase");
   }
 
+  Value *userData = arg + NumSpecialSgprInputs;
   arg += (NumSpecialSgprInputs + 1);
 
   Value *esGsOffsets01 = arg;
@@ -637,6 +638,9 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     if (m_gfxIp.major >= 11) {
       // Record attribute ring base ([14:0])
       m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
+
+      if (m_pipelineState->enableSwXfb())
+        loadStreamOutBufferInfo(userData);
     }
 
     // Record primitive connectivity data
@@ -830,6 +834,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   Value *primShaderTableAddrHigh = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrHigh));
   primShaderTableAddrHigh->setName("primShaderTableAddrHigh");
 
+  Value *userData = arg + NumSpecialSgprInputs;
   arg += (NumSpecialSgprInputs + 1);
 
   Value *esGsOffsets01 = arg;
@@ -1036,6 +1041,9 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     if (m_gfxIp.major >= 11) {
       // Record attribute ring base ([14:0])
       m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
+
+      if (m_pipelineState->enableSwXfb())
+        loadStreamOutBufferInfo(userData);
     }
 
     m_nggInputs.primShaderTableAddrLow = primShaderTableAddrLow;
@@ -1669,6 +1677,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   Value *primShaderTableAddrHigh = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrHigh));
   primShaderTableAddrHigh->setName("primShaderTableAddrHigh");
 
+  Value *userData = arg + NumSpecialSgprInputs;
   arg += (NumSpecialSgprInputs + 1);
 
   Value *esGsOffsets01 = arg;
@@ -1802,6 +1811,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     if (m_gfxIp.major >= 11) {
       // Record attribute ring base ([14:0])
       m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
+
+      if (m_pipelineState->enableSwXfb())
+        loadStreamOutBufferInfo(userData);
     }
 
     // Record primitive shader table address info
@@ -1842,8 +1854,10 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     m_builder.SetInsertPoint(initOutPrimDataBlock);
 
     if (m_pipelineState->enableSwXfb()) {
+      const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
       for (unsigned i = 0; i < MaxGsStreams; ++i) {
-        if (inOutUsage.outLocCount[i] > 0) { // Initialize primitive connectivity data if the stream is active
+        bool streamActive = streamXfbBuffers[i] != 0;
+        if (streamActive) { // Initialize primitive connectivity data if the stream is active
           writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup, LdsRegionOutPrimData,
                                   SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * i);
         }
@@ -2252,6 +2266,94 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
   m_nggInputs.threadIdInSubgroup = threadIdInSubgroup;
   m_nggInputs.waveIdInSubgroup = waveIdInSubgroup;
   m_nggInputs.orderedWaveId = orderedWaveId;
+}
+
+// =====================================================================================================================
+// Load stream-out info including stream-out buffer descriptors and buffer offsets.
+//
+// @param userData : User data
+void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
+  assert(m_gfxIp.major >= 11 && m_pipelineState->enableSwXfb()); // Must be GFX11+ and enable SW emulated stream-out
+
+  // Get stream-out table pointer and stream-out control buffer pointer
+  unsigned indexOfStreamOutTablePtr = InvalidValue;
+  unsigned indexOfStreamOutControlBufPtr = InvalidValue;
+  if (m_hasGs) {
+    const auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
+    indexOfStreamOutTablePtr = entryArgIdx.streamOutData.tablePtr;
+    indexOfStreamOutControlBufPtr = entryArgIdx.streamOutData.controlBufPtr;
+  } else if (m_hasTes) {
+    const auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes;
+    indexOfStreamOutTablePtr = entryArgIdx.streamOutData.tablePtr;
+    indexOfStreamOutControlBufPtr = entryArgIdx.streamOutData.controlBufPtr;
+  } else {
+    const auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
+    indexOfStreamOutTablePtr = entryArgIdx.streamOutData.tablePtr;
+    indexOfStreamOutControlBufPtr = entryArgIdx.streamOutData.controlBufPtr;
+  }
+
+  // Helper to make a pointer from its integer address value and the type
+  auto makePointer = [&](Value *ptrValue, Type *ptrTy) {
+    Value *pc = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
+    pc = m_builder.CreateBitCast(pc, FixedVectorType::get(m_builder.getInt32Ty(), 2));
+
+    Value *ptr = m_builder.CreateInsertElement(pc, ptrValue, static_cast<uint64_t>(0));
+    ptr = m_builder.CreateBitCast(ptr, m_builder.getInt64Ty());
+    ptr = m_builder.CreateIntToPtr(ptr, ptrTy, "globalTablePtr");
+
+    return ptr;
+  };
+
+  auto streamOutBufDescTy = FixedVectorType::get(m_builder.getInt32Ty(), 4);
+  auto streamOutTableTy = ArrayType::get(streamOutBufDescTy, MaxTransformFeedbackBuffers);
+  auto streamOutTablePtrTy = PointerType::get(streamOutTableTy, ADDR_SPACE_CONST);
+
+  assert(userData->getType()->isVectorTy());
+  auto streamOutTablePtr =
+      makePointer(m_builder.CreateExtractElement(userData, indexOfStreamOutTablePtr), streamOutTablePtrTy);
+
+  // NOTE: The stream-out control buffer has the following memory layout:
+  //   OFFSET[X]: OFFSET0, OFFSET1, ..., OFFSETN
+  //   FILLED_SIZE[X]: FILLED_SIZE0, FILLED_SIZE1, ..., FILLED_SIZEN
+  auto streamOutControlBufTy =
+      ArrayType::get(FixedVectorType::get(m_builder.getInt32Ty(), MaxTransformFeedbackBuffers), 2);
+  auto streamOutControlBufPtrTy = PointerType::get(streamOutControlBufTy, ADDR_SPACE_CONST);
+
+  auto streamOutControlBufPtr =
+      makePointer(m_builder.CreateExtractElement(userData, indexOfStreamOutControlBufPtr), streamOutControlBufPtrTy);
+
+  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
+  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+    bool bufferActive = xfbStrides[i] > 0;
+    if (!bufferActive)
+      continue; // Transform feedback buffer inactive
+
+    // Get stream-out buffer descriptors and record them
+    auto streamOutBufDescPtr =
+        m_builder.CreateGEP(streamOutTableTy, streamOutTablePtr, {m_builder.getInt32(0), m_builder.getInt32(i)});
+    cast<GetElementPtrInst>(streamOutBufDescPtr)->setMetadata(MetaNameUniform, MDNode::get(m_builder.getContext(), {}));
+
+    auto streamOutBufDesc = m_builder.CreateAlignedLoad(streamOutBufDescTy, streamOutBufDescPtr, Align(16));
+    streamOutBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
+    m_streamOutBufDescs[i] = streamOutBufDesc;
+
+    // Get stream-out buffer offsets and record them
+    auto streamOutBufOffsetPtr = m_builder.CreateGEP(streamOutControlBufTy, streamOutControlBufPtr,
+                                                     {m_builder.getInt32(0),
+                                                      m_builder.getInt32(0), // 0: OFFSET[X], 1: FILLED_SIZE[X]
+                                                      m_builder.getInt32(i)});
+    cast<GetElementPtrInst>(streamOutBufOffsetPtr)
+        ->setMetadata(MetaNameUniform, MDNode::get(m_builder.getContext(), {}));
+
+    auto streamOutBufOffset = m_builder.CreateAlignedLoad(m_builder.getInt32Ty(), streamOutBufOffsetPtr, Align(4));
+    // NOTE: PAL decided not to invalidate the SQC and L1 for every stream-out update, mainly because that will hurt
+    // overall performance worse than just forcing this one buffer to be read via L2. Since PAL would not have wider
+    // context, PAL believed that they would have to perform that invalidation on every Set/Load unconditionally.
+    // Thus, we force the load of stream-out control buffer to be volatile to let LLVM backend add GLC and DLC flags.
+    streamOutBufOffset->setVolatile(true);
+
+    m_streamOutBufOffsets[i] = streamOutBufOffset;
+  }
 }
 
 // =====================================================================================================================
@@ -3480,21 +3582,6 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
     assert(userData->getType()->isVectorTy());
     auto globalTable = m_builder.CreateExtractElement(userData, static_cast<uint64_t>(0)); // The first user data SGPRs
     args.push_back(globalTable);
-
-    // Stream-out table and stream-out control buffer
-    if (m_pipelineState->enableSwXfb()) {
-      const auto &intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
-      // Stream-out table
-      auto streamOutTable = m_builder.CreateExtractElement(userData, intfData->entryArgIdxs.gs.streamOutData.tablePtr);
-      args.push_back(streamOutTable);
-      // Stream-out control buffer
-      auto streamOutControlBuf =
-          m_builder.CreateExtractElement(userData, intfData->entryArgIdxs.gs.streamOutData.controlBufPtr);
-      args.push_back(streamOutControlBuf);
-    } else {
-      args.push_back(UndefValue::get(m_builder.getInt32Ty()));
-      args.push_back(UndefValue::get(m_builder.getInt32Ty()));
-    }
   }
 
   // Vertex ID in subgroup
@@ -5874,6 +5961,22 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
   assert(m_pipelineState->enableSwXfb());
   assert(!m_hasGs); // GS is not present
 
+  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
+
+  bool bufferActive[MaxTransformFeedbackBuffers] = {};
+  unsigned firstActiveXfbBuffer = InvalidValue;
+  unsigned lastActiveXfbBuffer = InvalidValue;
+
+  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+    bufferActive[i] = xfbStrides[i] > 0;
+    if (!bufferActive[i])
+      continue; // Transform feedback buffer is inactive
+
+    if (firstActiveXfbBuffer == InvalidValue)
+      firstActiveXfbBuffer = i;
+    lastActiveXfbBuffer = i;
+  }
+
   //
   // The processing is something like this:
   //
@@ -5930,29 +6033,15 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
   }
 
   // Construct ".fetchXfbOutput" block
-  Value *streamOutBufDescs[MaxTransformFeedbackBuffers] = {};
-  Value *streamOutBufOffsets[MaxTransformFeedbackBuffers] = {};
   SmallVector<XfbOutputExport, 32> xfbOutputExports;
   {
     m_builder.SetInsertPoint(fetchXfbOutputBlock);
 
     auto xfbOutputs = fetchXfbOutput(module, sysValueStart, xfbOutputExports);
-    assert(xfbOutputs->getType()->isArrayTy()); // Must be arrayed
 
-    for (unsigned i = 0; i < cast<ArrayType>(xfbOutputs->getType())->getNumElements(); ++i) {
-      auto xfbOutput = m_builder.CreateExtractValue(xfbOutputs, i);
-      Value *streamOutBufDesc = m_builder.CreateExtractValue(xfbOutput, 0);
-      Value *streamOutBufOffset = m_builder.CreateExtractValue(xfbOutput, 1);
-      Value *outputValue = m_builder.CreateExtractValue(xfbOutput, 2);
-
-      // Record stream-out buffer descriptor if it is missing
-      auto xfbBuffer = xfbOutputExports[i].xfbBuffer;
-      if (!streamOutBufDescs[xfbBuffer])
-        streamOutBufDescs[xfbBuffer] = streamOutBufDesc;
-
-      // Record stream-out buffer offset if it is missing
-      if (!streamOutBufOffsets[xfbBuffer])
-        streamOutBufOffsets[xfbBuffer] = streamOutBufOffset;
+    for (unsigned i = 0; i < xfbOutputExports.size(); ++i) {
+      assert(xfbOutputs->getType()->isArrayTy()); // Must be arrayed
+      auto outputValue = m_builder.CreateExtractValue(xfbOutputs, i);
 
       // Write transform feedback outputs to LDS region
       writeXfbOutputToLds(outputValue, m_nggInputs.threadIdInSubgroup, i);
@@ -5962,38 +6051,14 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
   }
 
   // Construct ".endFetchXfbOutput" block
-  unsigned firstActiveXfbBuffer = InvalidValue;
-  unsigned lastActiveXfbBuffer = InvalidValue;
-  bool bufferActive[MaxTransformFeedbackBuffers] = {};
   {
     m_builder.SetInsertPoint(endFetchXfbOutputBlock);
-
-    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-      bufferActive[i] = streamOutBufDescs[i] != nullptr;
-      // Update stream-out buffer descriptor and buffer offset
-      if (bufferActive[i]) {
-        auto streamOutBufDescPhi = m_builder.CreatePHI(streamOutBufDescs[i]->getType(), 2);
-        streamOutBufDescPhi->addIncoming(streamOutBufDescs[i], fetchXfbOutputBlock);
-        streamOutBufDescPhi->addIncoming(UndefValue::get(streamOutBufDescs[i]->getType()), xfbEntryBlock);
-        streamOutBufDescs[i] = streamOutBufDescPhi;
-
-        auto streamOutBufOffsetPhi = m_builder.CreatePHI(streamOutBufOffsets[i]->getType(), 2);
-        streamOutBufOffsetPhi->addIncoming(streamOutBufOffsets[i], fetchXfbOutputBlock);
-        streamOutBufOffsetPhi->addIncoming(UndefValue::get(streamOutBufOffsets[i]->getType()), xfbEntryBlock);
-        streamOutBufOffsets[i] = streamOutBufOffsetPhi;
-
-        if (firstActiveXfbBuffer == InvalidValue)
-          firstActiveXfbBuffer = i;
-        lastActiveXfbBuffer = i;
-      }
-    }
 
     auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
     m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
   }
 
   // Construct ".prepareXfbExport" block
-  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
   {
     m_builder.SetInsertPoint(prepareXfbExportBlock);
 
@@ -6033,12 +6098,12 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
       }
 
       // NUM_RECORDS = SQ_BUF_RSRC_WORD2
-      Value *numRecords = m_builder.CreateExtractElement(streamOutBufDescs[i], 2);
+      Value *numRecords = m_builder.CreateExtractElement(m_streamOutBufDescs[i], 2);
       // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
       Value *bufferSizeInDwords = m_builder.CreateLShr(numRecords, 2);
       // dwordsRemaining = max(0, bufferSizeInDwords - (bufferOffset + dwordsWritten))
       Value *dwordsRemaining =
-          m_builder.CreateSub(bufferSizeInDwords, m_builder.CreateAdd(streamOutBufOffsets[i], dwordsWritten[i]));
+          m_builder.CreateSub(bufferSizeInDwords, m_builder.CreateAdd(m_streamOutBufOffsets[i], dwordsWritten[i]));
       dwordsRemaining = m_builder.CreateIntrinsic(Intrinsic::smax, dwordsRemaining->getType(),
                                                   {dwordsRemaining, m_builder.getInt32(0)});
       // numPrimsToWrite = min(dwordsRemaining / dwordsPerPrim, numPrimsToWrite)
@@ -6138,7 +6203,7 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
       if (bufferActive[i]) {
         streamOutOffsets[i] =
             m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder.getInt32(i)});
-        streamOutOffsets[i] = m_builder.CreateAdd(streamOutBufOffsets[i], streamOutOffsets[i]);
+        streamOutOffsets[i] = m_builder.CreateAdd(m_streamOutBufOffsets[i], streamOutOffsets[i]);
         streamOutOffsets[i] = m_builder.CreateShl(streamOutOffsets[i], 2);
       }
     }
@@ -6227,7 +6292,7 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
           // and 16scalar.
           m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, FixedVectorType::get(m_builder.getHalfTy(), 2),
                                     {m_builder.CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
-                                     streamOutBufDescs[xfbOutputExport.xfbBuffer],                    // rsrc
+                                     m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                  // rsrc
                                      xfbOutputOffset,                                                 // offset
                                      streamOutOffsets[xfbOutputExport.xfbBuffer],                     // soffset
                                      m_builder.getInt32(BUF_FORMAT_16_16_FLOAT),                      // format
@@ -6235,7 +6300,7 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
 
           m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, m_builder.getHalfTy(),
                                     {m_builder.CreateExtractElement(outputValue, 2), // vdata
-                                     streamOutBufDescs[xfbOutputExport.xfbBuffer],   // rsrc
+                                     m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
                                      m_builder.CreateAdd(xfbOutputOffset,
                                                          m_builder.getInt32(2 * sizeof(uint16_t))), // offset
                                      streamOutOffsets[xfbOutputExport.xfbBuffer],                   // soffset
@@ -6243,12 +6308,12 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
                                      m_builder.getInt32(coherent.u32All)});                         // auxiliary data
         } else {
           m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outputValue->getType(),
-                                    {outputValue,                                  // vdata
-                                     streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
-                                     xfbOutputOffset,                              // offset
-                                     streamOutOffsets[xfbOutputExport.xfbBuffer],  // soffset
-                                     m_builder.getInt32(format),                   // format
-                                     m_builder.getInt32(coherent.u32All)});        // auxiliary data
+                                    {outputValue,                                    // vdata
+                                     m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
+                                     xfbOutputOffset,                                // offset
+                                     streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
+                                     m_builder.getInt32(format),                     // format
+                                     m_builder.getInt32(coherent.u32All)});          // auxiliary data
         }
       }
     }
@@ -6273,17 +6338,47 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
   assert(waveSize == 32 || waveSize == 64);
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
-  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
+  const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
 
+  bool bufferActive[MaxTransformFeedbackBuffers] = {};
+  unsigned firstActiveXfbBuffer = InvalidValue;
+  unsigned lastActiveXfbBuffer = InvalidValue;
+
+  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+    bufferActive[i] = xfbStrides[i] > 0;
+    if (!bufferActive[i])
+      continue; // Transform feedback buffer is inactive
+
+    if (firstActiveXfbBuffer == InvalidValue)
+      firstActiveXfbBuffer = i;
+    lastActiveXfbBuffer = i;
+  }
+
+  bool streamActive[MaxGsStreams] = {};
   unsigned firstActiveStream = InvalidValue;
   unsigned lastActiveStream = InvalidValue;
-  bool streamActive[MaxGsStreams] = {};
+
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    streamActive[i] = inOutUsage.gs.outLocCount[i] > 0;
-    if (streamActive[i]) {
-      if (firstActiveStream == InvalidValue)
-        firstActiveStream = i;
-      lastActiveStream = i;
+    streamActive[i] = streamXfbBuffers[i] != 0;
+    if (!streamActive[i])
+      continue; // Stream is inactive
+
+    if (firstActiveStream == InvalidValue)
+      firstActiveStream = i;
+    lastActiveStream = i;
+  }
+
+  unsigned xfbBufferToStream[MaxTransformFeedbackBuffers] = {};
+
+  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+    for (unsigned j = 0; j < MaxGsStreams; ++j) {
+      if ((streamXfbBuffers[j] & (1 << i)) != 0) {
+        // NOTE: According to GLSL spec, all outputs assigned to a given transform feedback buffer are required to
+        // come from a single vertex stream.
+        xfbBufferToStream[i] = j;
+        break;
+      }
     }
   }
 
@@ -6513,13 +6608,8 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
                            endCompactOutPrimIdBlock[firstActiveStream]);
   }
 
-  Value *streamOutBufDescs[MaxTransformFeedbackBuffers] = {};
-  Value *streamOutBufOffsets[MaxTransformFeedbackBuffers] = {};
   SmallVector<XfbOutputExport, 32> xfbOutputExports;
 
-  unsigned firstActiveXfbBuffer = ~0U;
-  unsigned lastActiveXfbBuffer = 0;
-  bool bufferActive[MaxTransformFeedbackBuffers] = {};
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
     if (!streamActive[i])
       continue;
@@ -6554,37 +6644,7 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
       if (i == lastActiveStream) {
         // Start to fetch transform feedback outputs after we finish compacting primitive thread IDs of the last vertex
         // stream.
-        auto xfbOutputs = fetchXfbOutput(module, sysValueStart, xfbOutputExports);
-        assert(xfbOutputs->getType()->isArrayTy()); // Must be arrayed
-
-        for (unsigned i = 0; i < cast<ArrayType>(xfbOutputs->getType())->getNumElements(); ++i) {
-          auto xfbOutput = m_builder.CreateExtractValue(xfbOutputs, i);
-          Value *streamOutBufDesc = m_builder.CreateExtractValue(xfbOutput, 0);
-          Value *streamOutBufOffset = m_builder.CreateExtractValue(xfbOutput, 1);
-
-          // Record stream-out buffer descriptor if it is missing
-          auto xfbBuffer = xfbOutputExports[i].xfbBuffer;
-          if (!streamOutBufDescs[xfbBuffer])
-            streamOutBufDescs[xfbBuffer] = streamOutBufDesc;
-
-          // Record stream-out buffer offset if it is missing
-          if (!streamOutBufOffsets[xfbBuffer])
-            streamOutBufOffsets[xfbBuffer] = streamOutBufOffset;
-
-          bufferActive[xfbBuffer] = true;
-          firstActiveXfbBuffer = std::min(firstActiveXfbBuffer, xfbBuffer);
-          lastActiveXfbBuffer = std::max(lastActiveXfbBuffer, xfbBuffer);
-        }
-
-        for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-          bufferActive[i] = streamOutBufDescs[i] != nullptr;
-          // Update stream-out buffer descriptor and buffer offset
-          if (bufferActive[i]) {
-            if (firstActiveXfbBuffer == InvalidValue)
-              firstActiveXfbBuffer = i;
-            lastActiveXfbBuffer = i;
-          }
-        }
+        fetchXfbOutput(module, sysValueStart, xfbOutputExports);
 
         auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
         m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
@@ -6602,8 +6662,6 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
   }
 
   // Construct ".prepareXfbExport" block
-  const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
-  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
   {
     m_builder.SetInsertPoint(prepareXfbExportBlock);
 
@@ -6615,22 +6673,6 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
 
     Value *dwordsWritten[MaxTransformFeedbackBuffers] = {};
     Value *dwordsPerPrim[MaxTransformFeedbackBuffers] = {};
-
-    // Determine the associated vertex streams
-    unsigned xfbBufferToStream[MaxTransformFeedbackBuffers] = {};
-    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-      for (unsigned j = 0; j < MaxGsStreams; ++j) {
-        if (!streamActive[j])
-          continue;
-
-        if ((streamXfbBuffers[j] & (1 << i)) != 0) {
-          // NOTE: According to GLSL spec, all outputs assigned to a given transform feedback buffer are required to
-          // come from a single vertex stream.
-          xfbBufferToStream[i] = j;
-          break;
-        }
-      }
-    }
 
     // Calculate numPrimsToWrite[N]
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
@@ -6662,12 +6704,12 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
       }
 
       // NUM_RECORDS = SQ_BUF_RSRC_WORD2
-      Value *numRecords = m_builder.CreateExtractElement(streamOutBufDescs[i], 2);
+      Value *numRecords = m_builder.CreateExtractElement(m_streamOutBufDescs[i], 2);
       // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
       Value *bufferSizeInDwords = m_builder.CreateLShr(numRecords, 2);
       // dwordsRemaining = max(0, bufferSizeInDwords - (bufferOffset + dwordsWritten))
       Value *dwordsRemaining =
-          m_builder.CreateSub(bufferSizeInDwords, m_builder.CreateAdd(streamOutBufOffsets[i], dwordsWritten[i]));
+          m_builder.CreateSub(bufferSizeInDwords, m_builder.CreateAdd(m_streamOutBufOffsets[i], dwordsWritten[i]));
       dwordsRemaining = m_builder.CreateIntrinsic(Intrinsic::smax, dwordsRemaining->getType(),
                                                   {dwordsRemaining, m_builder.getInt32(0)});
       // numPrimsToWrite = min(dwordsRemaining / dwordsPerPrim, numPrimsToWrite)
@@ -6755,7 +6797,7 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
       if (bufferActive[i]) {
         streamOutOffsets[i] =
             m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder.getInt32(i)});
-        streamOutOffsets[i] = m_builder.CreateAdd(streamOutBufOffsets[i], streamOutOffsets[i]);
+        streamOutOffsets[i] = m_builder.CreateAdd(m_streamOutBufOffsets[i], streamOutOffsets[i]);
         streamOutOffsets[i] = m_builder.CreateShl(streamOutOffsets[i], 2);
       }
     }
@@ -6863,7 +6905,7 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
             m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store,
                                       FixedVectorType::get(m_builder.getHalfTy(), 2),
                                       {m_builder.CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
-                                       streamOutBufDescs[xfbOutputExport.xfbBuffer],                    // rsrc
+                                       m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                  // rsrc
                                        xfbOutputOffset,                                                 // offset
                                        streamOutOffsets[xfbOutputExport.xfbBuffer],                     // soffset
                                        m_builder.getInt32(BUF_FORMAT_16_16_FLOAT),                      // format
@@ -6872,19 +6914,19 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
             m_builder.CreateIntrinsic(
                 Intrinsic::amdgcn_raw_tbuffer_store, m_builder.getHalfTy(),
                 {m_builder.CreateExtractElement(outputValue, 2),                                 // vdata
-                 streamOutBufDescs[xfbOutputExport.xfbBuffer],                                   // rsrc
+                 m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                                 // rsrc
                  m_builder.CreateAdd(xfbOutputOffset, m_builder.getInt32(2 * sizeof(uint16_t))), // offset
                  streamOutOffsets[xfbOutputExport.xfbBuffer],                                    // soffset
                  m_builder.getInt32(BUF_FORMAT_16_FLOAT),                                        // format
                  m_builder.getInt32(coherent.u32All)});                                          // auxiliary data
           } else {
             m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outputValue->getType(),
-                                      {outputValue,                                  // vdata
-                                       streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
-                                       xfbOutputOffset,                              // offset
-                                       streamOutOffsets[xfbOutputExport.xfbBuffer],  // soffset
-                                       m_builder.getInt32(format),                   // format
-                                       m_builder.getInt32(coherent.u32All)});        // auxiliary data
+                                      {outputValue,                                    // vdata
+                                       m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
+                                       xfbOutputOffset,                                // offset
+                                       streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
+                                       m_builder.getInt32(format),                     // format
+                                       m_builder.getInt32(coherent.u32All)});          // auxiliary data
           }
         }
       }
@@ -6922,6 +6964,15 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
                                      SmallVector<XfbOutputExport, 32> &xfbOutputExports) {
   assert(m_pipelineState->enableSwXfb());
 
+  const unsigned xfbOutputCount =
+      m_pipelineState
+          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (m_hasTes ? ShaderStageTessEval : ShaderStageVertex))
+          ->inOutUsage.xfbOutputExpCount;
+
+  // Skip following handling if transform feedback output is empty
+  if (xfbOutputCount == 0)
+    return nullptr;
+
   //
   // Clone ES/copy shader entry-point or just mutate existing ES entry-point to fetch transform feedback outputs
   //
@@ -6945,44 +6996,25 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
   }
 
   // Clone or mutate entry-point
-  const unsigned xfbOutputCount =
-      m_pipelineState
-          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (m_hasTes ? ShaderStageTessEval : ShaderStageVertex))
-          ->inOutUsage.xfbOutputExpCount;
-  assert(xfbOutputCount > 0);
   xfbOutputExports.resize(xfbOutputCount);
 
-  // Each output is represented as a structure:
-  //   ES: {streamOutBufDesc, streamOutBufOffset, outputValue}
-  //   GS: {streamOutBufDesc, streamOutBufOffset}
-  //
-  // NOTE: For GS transform feedback, the output value must be loaded by GS output import call. Thus, we don't have to
-  // return output value. Instead, we recode the location in transform feedback export info and use it later.
-  auto xfbOutputTy = m_hasGs ? StructType::get(m_builder.getContext(),
-
-                                               {
-                                                   FixedVectorType::get(m_builder.getInt32Ty(), 4), // streamOutBufDesc
-                                                   m_builder.getInt32Ty(), // streamOutBufOffset
-                                               })
-                             : StructType::get(m_builder.getContext(),
-                                               {
-                                                   FixedVectorType::get(m_builder.getInt32Ty(), 4), // streamOutBufDesc
-                                                   m_builder.getInt32Ty(), // streamOutBufOffset
-                                                   FixedVectorType::get(m_builder.getInt32Ty(), 4), // outputValue
-                                               });
-
-  auto xfbOutputsTy = ArrayType::get(xfbOutputTy, xfbOutputCount);
+  // NOTE: For non-GS transform feedback, the return type is represented as an array of transform feedback outputs; for
+  // GS transform feedback, the return type is void. This is because output values must be loaded by GS output import
+  // call. Thus, we don't have to return output values. Instead, we recode the location in transform feedback export
+  // info and fetch them later.
+  Type *xfbOutputsTy = ArrayType::get(FixedVectorType::get(m_builder.getInt32Ty(), 4), xfbOutputCount);
+  Type *xfbReturnTy = m_hasGs ? m_builder.getVoidTy() : xfbOutputsTy;
 
   Function *xfbOutputFetchFunc = entryPoint;
   if (dontClone) {
     processVertexAttribExport(entryPoint);
-    xfbOutputFetchFunc = addFunctionArgs(entryPoint, xfbOutputsTy, {}, {}, 0);
+    xfbOutputFetchFunc = addFunctionArgs(entryPoint, xfbReturnTy, {}, {}, 0);
 
     // Original function is no longer needed
     assert(entryPoint->use_empty());
     entryPoint->eraseFromParent();
   } else {
-    auto xfbOutputFetchFuncTy = FunctionType::get(xfbOutputsTy, entryPoint->getFunctionType()->params(), false);
+    auto xfbOutputFetchFuncTy = FunctionType::get(xfbReturnTy, entryPoint->getFunctionType()->params(), false);
     xfbOutputFetchFunc = Function::Create(xfbOutputFetchFuncTy, entryPoint->getLinkage(), "", module);
 
     ValueToValueMapTy valueMap;
@@ -7040,11 +7072,9 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
 
       if (func->getName().startswith(lgcName::NggXfbOutputExport)) {
         // Lower transform feedback export calls
-        auto streamOutBufDesc = call->getArgOperand(0);
-        auto streamOutBufOffset = call->getArgOperand(1);
-        auto xfbBuffer = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-        auto xfbOffset = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
-        auto outputValue = call->getArgOperand(5);
+        auto xfbBuffer = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
+        auto xfbOffset = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+        auto outputValue = call->getArgOperand(3);
 
         const unsigned numElements =
             outputValue->getType()->isVectorTy() ? cast<FixedVectorType>(outputValue->getType())->getNumElements() : 1;
@@ -7058,7 +7088,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
           // NOTE: For GS, the output value must be loaded by GS output import call. This is generated by copy shader.
           CallInst *importCall = dyn_cast<CallInst>(outputValue);
           assert(importCall && importCall->getCalledFunction()->getName().startswith(lgcName::NggGsOutputImport));
-          streamId = cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
+          streamId = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
           assert(streamId == cast<ConstantInt>(importCall->getArgOperand(1))->getZExtValue()); // Stream ID must match
           loc = cast<ConstantInt>(importCall->getArgOperand(0))->getZExtValue();
         } else {
@@ -7089,13 +7119,9 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
           }
         }
 
-        // Construct the return value
-        Value *xfbOutput = UndefValue::get(xfbOutputTy);
-        xfbOutput = m_builder.CreateInsertValue(xfbOutput, streamOutBufDesc, 0);
-        xfbOutput = m_builder.CreateInsertValue(xfbOutput, streamOutBufOffset, 1);
+        // For VS/TES, return the output value
         if (!m_hasGs)
-          xfbOutput = m_builder.CreateInsertValue(xfbOutput, outputValue, 2); // For VS/TES, return the output value
-        xfbOutputs = m_builder.CreateInsertValue(xfbOutputs, xfbOutput, outputIndex);
+          xfbOutputs = m_builder.CreateInsertValue(xfbOutputs, outputValue, outputIndex);
 
         // Collect export info
         xfbOutputExports[outputIndex].xfbBuffer = xfbBuffer;
@@ -7132,15 +7158,9 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
     Value *userData = sysValueStart + NumSpecialSgprInputs;
     assert(userData->getType()->isVectorTy());
 
-    const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
     auto globalTable = m_builder.CreateExtractElement(userData, static_cast<uint64_t>(0));
-    auto streamOutTable = m_builder.CreateExtractElement(userData, entryArgIdxs.streamOutData.tablePtr);
-    auto streamOutControlBuf = m_builder.CreateExtractElement(userData, entryArgIdxs.streamOutData.controlBufPtr);
-
     return m_builder.CreateCall(xfbOutputFetchFunc,
                                 {globalTable,                      // Global table
-                                 streamOutTable,                   // Stream-out table
-                                 streamOutControlBuf,              // Stream-out control buffer
                                  m_nggInputs.threadIdInSubgroup}); // Vertex ID in sub-rgoup
   }
 

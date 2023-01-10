@@ -62,6 +62,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Error.h"
+#include <optional>
 
 namespace Llpc {
 namespace StandaloneCompiler {

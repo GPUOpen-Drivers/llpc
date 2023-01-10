@@ -107,18 +107,12 @@ public:
   // Get stream-out buffer descriptor
   llvm::Value *getStreamOutBufDesc(unsigned xfbBuffer);
 
-  // Get stream-out buffer offset
-  llvm::Value *getStreamOutBufOffset(unsigned xfbBuffer);
-
   // Test if shadow descriptor table is enabled
   bool isShadowDescTableEnabled() const;
 
 private:
   // Get stream-out buffer table pointer
   std::pair<llvm::Type *, llvm::Instruction *> getStreamOutTablePtr();
-
-  // Get stream-out control buffer pointer
-  std::pair<llvm::Type *, llvm::Instruction *> getStreamOutControlBufPtr();
 
   // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
   llvm::Instruction *makePointer(llvm::Value *lowValue, llvm::Type *ptrTy, unsigned highValue);
@@ -142,8 +136,7 @@ private:
   llvm::Value *m_taskDrawDataRingBufDesc = nullptr; // Descriptor for task draw data ring buffer (task and mesh shader)
   llvm::SmallVector<llvm::Value *, MaxGsStreams>
       m_gsVsRingBufDescs; // GS -> VS ring buffer descriptor (GS out and copy shader in)
-  llvm::SmallVector<llvm::Value *, MaxTransformFeedbackBuffers> m_streamOutBufDescs;   // Stream-out buffer descriptors
-  llvm::SmallVector<llvm::Value *, MaxTransformFeedbackBuffers> m_streamOutBufOffsets; // Stream-out buffer offsets
+  llvm::SmallVector<llvm::Value *, MaxTransformFeedbackBuffers> m_streamOutBufDescs; // Stream-out buffer descriptors
 
   llvm::Value *m_primitiveId = nullptr;                             // PrimitiveId (TCS)
   llvm::Value *m_invocationId = nullptr;                            // InvocationId (TCS)
@@ -158,7 +151,6 @@ private:
   llvm::Value *m_meshPipeStatsBufPtr = nullptr;              // Mesh pipeline statistics buffer pointer
   llvm::Value *m_internalPerShaderTablePtr = nullptr;        // Internal per shader table pointer
   llvm::Instruction *m_streamOutTablePtr = nullptr;          // Stream-out buffer table pointer
-  llvm::Instruction *m_streamOutControlBufPtr = nullptr;     // Stream-out control buffer pointer
   llvm::Instruction *m_pc = nullptr;                         // Program counter as <2 x i32>
 };
 

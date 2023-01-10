@@ -3518,8 +3518,6 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
   assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
          m_shaderStage == ShaderStageCopyShader);
 
-  Value *streamOutBufDesc = m_pipelineSysValues.get(m_entryPoint)->getStreamOutBufDesc(xfbBuffer);
-
   const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
   unsigned xfbStride = xfbStrides[xfbBuffer];
 
@@ -3551,20 +3549,22 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
                        ConstantInt::get(Type::getInt32Ty(*m_context), streamId)};
       output = emitCall(lgcName::NggGsOutputImport + getTypeName(loadTy), loadTy, args,
                         {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn}, insertPos);
-      storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
+      storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset, xfbStride, streamId, nullptr, insertPos);
 
       loadTy = FixedVectorType::get(Type::getFloatTy(*m_context), (compCount - 4));
       args[0] = ConstantInt::get(Type::getInt32Ty(*m_context), location + 1);
       output = emitCall(lgcName::NggGsOutputImport + getTypeName(loadTy), loadTy, args,
                         {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn}, insertPos);
-      storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset + 4 * bitWidth / 8, xfbStride, streamId,
-                                  streamOutBufDesc, insertPos);
+      storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset + 4 * bitWidth / 8, xfbStride, streamId, nullptr,
+                                  insertPos);
     } else {
-      storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset, xfbStride, streamId, streamOutBufDesc, insertPos);
+      storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset, xfbStride, streamId, nullptr, insertPos);
     }
 
     return;
   }
+
+  Value *streamOutBufDesc = m_pipelineSysValues.get(m_entryPoint)->getStreamOutBufDesc(xfbBuffer);
 
   if (compCount == 8) {
     // vec8 -> vec4 + vec4
@@ -3890,7 +3890,7 @@ unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadVal
 // @param xfbOffset : Offset of the store value within transform feedback buffer
 // @param xfbStride : Transform feedback stride
 // @param streamId : Output stream ID
-// @param streamOutBufDesc : Transform feedback buffer descriptor
+// @param streamOutBufDesc : Transform feedback buffer descriptor (could be null)
 // @param insertPos : Where to insert the store instruction
 void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset,
                                                          unsigned xfbStride, unsigned streamId, Value *streamOutBufDesc,
@@ -3898,13 +3898,9 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
   if (m_pipelineState->enableSwXfb()) {
     // NOTE: For GFX11+, exporting transform feedback outputs is represented by a call and the call is replaced with
     // real instructions when when NGG primitive shader is generated.
-    auto xfbBufOffset = m_pipelineSysValues.get(m_entryPoint)->getStreamOutBufOffset(xfbBuffer);
-    Value *args[] = {streamOutBufDesc,
-                     xfbBufOffset,
-                     ConstantInt::get(Type::getInt32Ty(*m_context), xfbBuffer),
+    Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), xfbBuffer),
                      ConstantInt::get(Type::getInt32Ty(*m_context), xfbOffset),
-                     ConstantInt::get(Type::getInt32Ty(*m_context), streamId),
-                     storeValue};
+                     ConstantInt::get(Type::getInt32Ty(*m_context), streamId), storeValue};
     std::string callName = lgcName::NggXfbOutputExport + getTypeName(storeValue->getType());
     emitCall(callName, Type::getVoidTy(*m_context), args, {}, insertPos);
     return;

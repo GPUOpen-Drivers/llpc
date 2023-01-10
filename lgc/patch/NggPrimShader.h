@@ -190,6 +190,7 @@ private:
   void buildPrimShaderWithGs(llvm::Function *entryPoint);
 
   void initWaveThreadInfo(llvm::Value *mergedGroupInfo, llvm::Value *mergedWaveInfo);
+  void loadStreamOutBufferInfo(llvm::Value *userData);
 
   llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertexId0, llvm::Value *vertexId1, llvm::Value *vertexId2);
   void doParamCacheAllocRequest();
@@ -333,6 +334,9 @@ private:
   bool m_hasVs = false;  // Whether the pipeline has vertex shader
   bool m_hasTes = false; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs = false;  // Whether the pipeline has geometry shader
+
+  llvm::Value *m_streamOutBufDescs[MaxTransformFeedbackBuffers];   // Stream-out buffer descriptors
+  llvm::Value *m_streamOutBufOffsets[MaxTransformFeedbackBuffers]; // Stream-out buffer offsets
 
   bool m_constPositionZ = false; // Whether the Z channel of vertex position data is constant
 

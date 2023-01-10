@@ -515,9 +515,8 @@ struct InterfaceData {
   struct {
     // Geometry shader
     struct {
-      unsigned copyShaderEsGsLdsSize;         // ES -> GS ring LDS size (for copy shader)
-      unsigned copyShaderStreamOutTable;      // Stream-out table (for copy shader)
-      unsigned copyShaderStreamOutControlBuf; // Stream-out control buffer (for copy shader)
+      unsigned copyShaderEsGsLdsSize;    // ES -> GS ring LDS size (for copy shader)
+      unsigned copyShaderStreamOutTable; // Stream-out table (for copy shader)
     } gs;
 
     unsigned spillTable; // Spill table user data map
