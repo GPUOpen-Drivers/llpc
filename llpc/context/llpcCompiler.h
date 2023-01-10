@@ -37,6 +37,7 @@
 #include "vkgcElfReader.h"
 #include "vkgcMetroHash.h"
 #include "lgc/CommonDefs.h"
+#include <optional>
 
 namespace llvm {
 

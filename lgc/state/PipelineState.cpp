@@ -1365,7 +1365,9 @@ bool PipelineState::enableMeshRowExport() const {
 // =====================================================================================================================
 // Checks if SW-emulated stream-out should be enabled.
 bool PipelineState::enableSwXfb() {
-  assert(isGraphics());
+  // Not graphics pipeline
+  if (!isGraphics())
+    return false;
 
   // SW-emulated stream-out is enabled on GFX11+
   if (getTargetInfo().getGfxIpVersion().major < 11)

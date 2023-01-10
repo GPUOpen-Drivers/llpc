@@ -1065,21 +1065,21 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   LLPC_OUTS("\n");
 
   if (hasGs) {
-    LLPC_OUTS("GS stream item size:\n");
+    LLPC_OUTS("GS stream item sizes (in dwords):\n");
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       unsigned streamItemSize = gsResUsage->inOutUsage.gs.outLocCount[i] * geometryMode.outputVertices * 4;
-      LLPC_OUTS("    stream " << i << " = " << streamItemSize);
+      LLPC_OUTS("    stream[" << i << "] = " << streamItemSize);
 
       if (m_pipelineState->enableXfb()) {
-        LLPC_OUTS(", XFB buffer = ");
         const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
-        for (unsigned j = 0; j < MaxTransformFeedbackBuffers; ++j) {
-          if ((streamXfbBuffers[i] & (1 << j)) != 0) {
-            LLPC_OUTS(j);
-            if (j != MaxTransformFeedbackBuffers - 1)
-              LLPC_OUTS(", ");
+        LLPC_OUTS(", XFB buffers = { ");
+        if (streamXfbBuffers[i] != 0) {
+          for (unsigned j = 0; j < MaxTransformFeedbackBuffers; ++j) {
+            if ((streamXfbBuffers[i] & (1 << j)) != 0)
+              LLPC_OUTS(j << " ");
           }
         }
+        LLPC_OUTS("}");
       }
 
       LLPC_OUTS("\n");
