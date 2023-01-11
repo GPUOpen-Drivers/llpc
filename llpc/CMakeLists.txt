@@ -107,6 +107,7 @@ if(ICD_BUILD_LLPC)
             BitWriter
             CodeGen
             InstCombine
+            IRPrinter
             IRReader
             Linker
             MC

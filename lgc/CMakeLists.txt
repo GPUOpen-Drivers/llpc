@@ -38,6 +38,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     CodeGen
     Core
     InstCombine
+    IRPrinter
     ipo
     Linker
     MC
@@ -47,6 +48,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     SelectionDAG
     Support
     Target
+    TargetParser
     TransformUtils
     Vectorize
 )
