@@ -1189,7 +1189,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   }
 
   case BuiltInLocalInvocationId:
-  case BuiltInHwLocalInvocationId: {
+  case BuiltInUnswizzledLocalInvocationId: {
     // LocalInvocationId is a v3i32 shader input (three VGPRs set up in hardware).
     Value *localInvocationId =
         ShaderInputs::getInput(ShaderInput::LocalInvocationId, BuilderBase::get(*this), *getLgcContext());
@@ -1222,28 +1222,13 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
       localInvocationId = CreateInsertElement(localInvocationId, getInt32(0), 2);
     }
 
-    if (builtIn == BuiltInLocalInvocationId) {
-      // If the option is enabled, we might want to reconfigure the workgroup layout later, which
-      // means the value of LocalInvocationId needs modifying. We can't do that now, as we need to
-      // know whether the shader uses images. Detect here that we can't do that optimization in
-      // a compute library. We don't detect here that we can't do the optimization in a compute shader
-      // with calls, as that detection is slightly more expensive.
-      if (m_pipelineState->getOptions().reconfigWorkgroupLayout && !getPipelineState()->isComputeLibrary()) {
+    if (m_shaderStage == ShaderStageCompute) {
+      // Reconfigure the workgroup layout later if it's necessary.
+      if (!getPipelineState()->isComputeLibrary()) {
         // Insert a call that later on might get lowered to code to reconfigure the workgroup.
-        localInvocationId = CreateNamedCall(lgcName::ReconfigureLocalInvocationId, localInvocationId->getType(),
-                                            localInvocationId, Attribute::ReadNone);
-      }
-
-      // In the case of 16x16 thread group size, wave32 SIMD will be created in eight 16x2 regions.
-      // This function maps the eight 16x2 regions into eight 8x4 regions.
-      //
-      // Originally SIMDs cover 16x2 regions, after swizzling they cover 8x4 regions.
-      bool pipelineThreadIdSwizzling =
-          m_pipelineState->getOptions().forceCsThreadIdSwizzling && !getPipelineState()->isComputeLibrary();
-      if (pipelineThreadIdSwizzling) {
-        // Insert a call that later on might get lowered to code to reconfigure the workgroup.
-        localInvocationId = CreateNamedCall(lgcName::SwizzleLocalInvocationId, localInvocationId->getType(),
-                                            localInvocationId, Attribute::ReadNone);
+        localInvocationId = CreateNamedCall(
+            lgcName::ReconfigureLocalInvocationId, localInvocationId->getType(),
+            {localInvocationId, getInt32(builtIn == BuiltInUnswizzledLocalInvocationId)}, Attribute::ReadNone);
       }
     }
 
@@ -1267,7 +1252,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   }
 
   case BuiltInLocalInvocationIndex:
-  case BuiltInHwLocalInvocationIndex: {
+  case BuiltInUnswizzledLocalInvocationIndex: {
     // LocalInvocationIndex is
     // (WorkgroupSize.Y * LocalInvocationId.Z + LocalInvocationId.Y) * WorkGroupSize.X + LocalInvocationId.X
     Value *workgroupSize = readCsBuiltIn(BuiltInWorkgroupSize);
@@ -1275,7 +1260,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     if (builtIn == BuiltInLocalInvocationIndex) {
       localInvocationId = readCsBuiltIn(BuiltInLocalInvocationId, "readLocalInvocationId");
     } else {
-      localInvocationId = readCsBuiltIn(BuiltInHwLocalInvocationId, "readHWLocalInvocationId");
+      localInvocationId = readCsBuiltIn(BuiltInUnswizzledLocalInvocationId, "readHWLocalInvocationId");
     }
     Value *input = CreateMul(CreateExtractElement(workgroupSize, 1), CreateExtractElement(localInvocationId, 2));
     input = CreateAdd(input, CreateExtractElement(localInvocationId, 1));
@@ -1295,7 +1280,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
       return waveIdInSubgroup;
     } else {
       // Before Navi21, it should read the value before swizzling which is correct to calculate subgroup id.
-      Value *localInvocationIndex = readCsBuiltIn(BuiltInHwLocalInvocationIndex);
+      Value *localInvocationIndex = readCsBuiltIn(BuiltInUnswizzledLocalInvocationIndex);
       unsigned subgroupSize = getPipelineState()->getShaderSubgroupSize(m_shaderStage);
       return CreateLShr(localInvocationIndex, getInt32(Log2_32(subgroupSize)));
     }

@@ -619,14 +619,21 @@ struct FragmentShaderMode {
   ConservativeDepth conservativeStencilBack;
 };
 
+// Kind of derivativeMode:
+// None: Return 0 for derivatives calculation of compute shader
+// Linear: Calculating derivatives in linear mode(4*1)
+// Quads: Calculating derivatives in Quads mode(2*2)
+enum class DerivativeMode : unsigned { None, Linear, Quads };
+
 // Struct to pass to SetComputeShaderMode.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
 // All fields are unsigned, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 struct ComputeShaderMode {
-  unsigned workgroupSizeX; // X dimension of workgroup size. 0 is taken to be 1
-  unsigned workgroupSizeY; // Y dimension of workgroup size. 0 is taken to be 1
-  unsigned workgroupSizeZ; // Z dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeX;    // X dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeY;    // Y dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeZ;    // Z dimension of workgroup size. 0 is taken to be 1
+  DerivativeMode derivatives; // derivativeMode for computeShader
 };
 
 // Enum passed to Pipeline::irLink to give information on whether this is a whole or part pipeline.

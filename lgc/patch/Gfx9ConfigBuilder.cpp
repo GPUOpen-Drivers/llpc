@@ -1916,19 +1916,14 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   unsigned workgroupSizes[3] = {};
   if (shaderStage == ShaderStageCompute) {
     const auto &builtInUsage = resUsage->builtInUsage.cs;
-    switch (static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout)) {
-    case WorkgroupLayout::Unknown:
-    case WorkgroupLayout::Linear:
-      workgroupSizes[0] = computeMode.workgroupSizeX;
-      workgroupSizes[1] = computeMode.workgroupSizeY;
-      workgroupSizes[2] = computeMode.workgroupSizeZ;
-      break;
-    case WorkgroupLayout::Quads:
-    case WorkgroupLayout::SexagintiQuads:
+    if (builtInUsage.foldWorkgroupXY) {
       workgroupSizes[0] = computeMode.workgroupSizeX * computeMode.workgroupSizeY;
       workgroupSizes[1] = computeMode.workgroupSizeZ;
       workgroupSizes[2] = 1;
-      break;
+    } else {
+      workgroupSizes[0] = computeMode.workgroupSizeX;
+      workgroupSizes[1] = computeMode.workgroupSizeY;
+      workgroupSizes[2] = computeMode.workgroupSizeZ;
     }
   } else {
     assert(shaderStage == ShaderStageTask);

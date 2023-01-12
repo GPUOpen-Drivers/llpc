@@ -483,16 +483,26 @@ void PatchInOutImportExport::processShader() {
     // In a compute shader, process lgc.reconfigure.local.invocation.id calls.
     // This does not particularly have to be done here; it could be done anywhere after BuilderImpl.
     for (Function &func : *m_module) {
+      auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+
+      // Different with above, this will force the threadID swizzle which will rearrange thread ID within a group into
+      // blocks of 8*4, not to reconfig workgroup automatically and will support to be swizzled in 8*4 block
+      // split.
       if (func.isDeclaration() && func.getName().startswith(lgcName::ReconfigureLocalInvocationId)) {
-        WorkgroupLayout workgroupLayout = calculateWorkgroupLayout();
+        unsigned workgroupSizeX = mode.workgroupSizeX;
+        unsigned workgroupSizeY = mode.workgroupSizeY;
+        unsigned workgroupSizeZ = mode.workgroupSizeZ;
+        SwizzleWorkgroupLayout layout = calculateWorkgroupLayout();
         while (!func.use_empty()) {
           CallInst *reconfigCall = cast<CallInst>(*func.user_begin());
           Value *localInvocationId = reconfigCall->getArgOperand(0);
-
-          // If we do not need to configure our workgroup in linear layout and the layout info is not specified, we
-          // do the reconfiguration for this workgroup.
-          if (workgroupLayout != WorkgroupLayout::Unknown && workgroupLayout != WorkgroupLayout::Linear)
-            localInvocationId = reconfigWorkgroup(localInvocationId, reconfigCall);
+          bool isHwLocalInvocationId = dyn_cast<ConstantInt>(reconfigCall->getArgOperand(1))->getZExtValue();
+          if ((layout.microLayout == WorkgroupLayout::Quads) ||
+              (layout.macroLayout == WorkgroupLayout::SexagintiQuads)) {
+            localInvocationId =
+                reconfigWorkgroupLayout(localInvocationId, layout.macroLayout, layout.microLayout, workgroupSizeX,
+                                        workgroupSizeY, workgroupSizeZ, isHwLocalInvocationId, reconfigCall);
+          }
           reconfigCall->replaceAllUsesWith(localInvocationId);
           reconfigCall->eraseFromParent();
         }
@@ -500,19 +510,6 @@ void PatchInOutImportExport::processShader() {
 
       if (func.isDeclaration() && func.getName().startswith(lgcName::SwizzleWorkgroupId)) {
         createSwizzleThreadGroupFunction();
-      }
-      // Different with above, this will force the threadID swizzle which will rearrange thread ID within a group into
-      // blocks of 8*4, not to reconfig workgroup automatically and will support to be swizzled in 8*4 block
-      // split.
-      if (func.isDeclaration() && func.getName().startswith(lgcName::SwizzleLocalInvocationId)) {
-        while (!func.use_empty()) {
-          CallInst *swizzleCall = cast<CallInst>(*func.user_begin());
-          Value *localInvocationId = swizzleCall->getArgOperand(0);
-
-          localInvocationId = swizzleLocalInvocationIdIn8x4(localInvocationId, swizzleCall);
-          swizzleCall->replaceAllUsesWith(localInvocationId);
-          swizzleCall->eraseFromParent();
-        }
       }
     }
   }
@@ -5254,280 +5251,139 @@ Value *PatchInOutImportExport::getSubgroupLocalInvocationId(BuilderBase &builder
 }
 
 // =====================================================================================================================
-// Do automatic workgroup size reconfiguration in a compute shader, to allow ReconfigWorkgroup
+// Do automatic workgroup size reconfiguration in a compute shader, to allow ReconfigWorkgroupLayout
 // to apply optimizations.
-WorkgroupLayout PatchInOutImportExport::calculateWorkgroupLayout() {
-  auto &resUsage = *m_pipelineState->getShaderResourceUsage(ShaderStageCompute);
-  if (m_shaderStage == ShaderStageCompute) {
-    bool reconfig = false;
+SwizzleWorkgroupLayout PatchInOutImportExport::calculateWorkgroupLayout() {
+  auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+  SwizzleWorkgroupLayout resultLayout = {WorkgroupLayout::Unknown, WorkgroupLayout::Unknown};
 
-    switch (static_cast<WorkgroupLayout>(resUsage.builtInUsage.cs.workgroupLayout)) {
-    case WorkgroupLayout::Unknown:
-      // If no configuration has been specified, apply a reconfigure if the compute shader uses images and the
-      // pipeline option was enabled.
-      if (resUsage.useImages)
-        reconfig = m_pipelineState->getOptions().reconfigWorkgroupLayout;
-      break;
-    case WorkgroupLayout::Linear:
-      // The hardware by default applies the linear rules, so just ban reconfigure and we're done.
-      reconfig = false;
-      break;
-    case WorkgroupLayout::Quads:
-      // 2x2 requested.
-      reconfig = true;
-      break;
-    case WorkgroupLayout::SexagintiQuads:
-      // 8x8 requested.
-      reconfig = true;
-      break;
+  if (m_shaderStage == ShaderStageCompute) {
+    auto &resUsage = *m_pipelineState->getShaderResourceUsage(ShaderStageCompute);
+    if (resUsage.builtInUsage.cs.foldWorkgroupXY) {
+      llvm_unreachable("Should never be called!");
     }
 
-    if (reconfig) {
-      auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+    if (mode.derivatives == DerivativeMode::Quads) {
+      resultLayout.microLayout = WorkgroupLayout::Quads;
+    } else if (mode.derivatives == DerivativeMode::Linear) {
+      resultLayout.microLayout = WorkgroupLayout::Linear;
+    }
+
+    if (m_pipelineState->getOptions().forceCsThreadIdSwizzling) {
+      if ((mode.workgroupSizeX >= 16) && (mode.workgroupSizeX % 8 == 0) && (mode.workgroupSizeY % 4 == 0)) {
+        resultLayout.macroLayout = WorkgroupLayout::SexagintiQuads;
+      }
+    }
+
+    // If no configuration has been specified, apply a reconfigure if the compute shader uses images and the
+    // pipeline option was enabled.
+    if (m_pipelineState->getOptions().reconfigWorkgroupLayout) {
       if ((mode.workgroupSizeX % 2) == 0 && (mode.workgroupSizeY % 2) == 0) {
-        if ((mode.workgroupSizeX > 8 && mode.workgroupSizeY >= 8) ||
-            (mode.workgroupSizeX >= 8 && mode.workgroupSizeY > 8)) {
-          // If our local size in the X & Y dimensions are greater than 8, we can reconfigure.
-          resUsage.builtInUsage.cs.workgroupLayout = static_cast<unsigned>(WorkgroupLayout::SexagintiQuads);
+        if (mode.workgroupSizeX % 8 == 0) {
+          // It can be reconfigured into 8 X N
+          if (resultLayout.macroLayout == WorkgroupLayout::Unknown) {
+            resultLayout.macroLayout = WorkgroupLayout::SexagintiQuads;
+          }
         } else {
           // If our local size in the X & Y dimensions are multiples of 2, we can reconfigure.
-          resUsage.builtInUsage.cs.workgroupLayout = static_cast<unsigned>(WorkgroupLayout::Quads);
+          if (resultLayout.microLayout == WorkgroupLayout::Unknown) {
+            resultLayout.microLayout = WorkgroupLayout::Quads;
+          }
         }
       }
     }
   }
-  return static_cast<WorkgroupLayout>(resUsage.builtInUsage.cs.workgroupLayout);
+  return resultLayout;
 }
 
 // =====================================================================================================================
 // Reconfigure the workgroup for optimization purposes.
-//
-// @param localInvocationId : The original workgroup ID.
+// @param localInvocationId : This is a v3i32 shader input (three VGPRs set up in hardware).
+// @param macroLayout : Swizzle the thread id into macroLayout from macro level
+// @param microLayout : Swizzle the thread id into microLayout from micro level
+// @param workgroupSizeX : WorkgroupSize X for thread Id numbers
+// @param workgroupSizeY : WorkgroupSize Y for thread Id numbers
+// @param workgroupSizeZ : WorkgroupSize Z for thread Id numbers
+// @param isHwLocalInvocationId : identify whether the localInvocationId is builtInLocalInvcocationId or
+// BuiltInUnswizzledLocalInvocationId
 // @param insertPos : Where to insert instructions.
-Value *PatchInOutImportExport::reconfigWorkgroup(Value *localInvocationId, Instruction *insertPos) {
-  auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
-  auto workgroupLayout = static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout);
-  auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
-
-  // NOTE: Here, we implement "GDC 2018 Engine Optimization Hot Lap Workgroup Optimization " (slides 40-45, by
-  // Timothy Lottes).
-  // uvec2 Remap(uint a) {
-  //   uint y = bitfieldExtract(a,3,4); // v_bfe_u32 ---> {...0,y3,y2,y1,x2}
-  //   y = bitfieldInsert(y,a,0,1);     // v_bfi_b32 ---> {...0,y3,y2,y1,y0}
-  //   uint x = bitfieldExtract(a,1,3); // v_bfe_u32 ---> {...0,x2,x1,x0}
-  //   a = bitfieldExtract(a,4,5);      // v_bfe_u32 ---> {...0,x4,x3,y3,y2,y1}
-  //   x = bitfieldInsert(a,x,0,3);     // v_bfi_b32 ---> {...0,x4,x3,x2,x1,x0}
-  //   return uvec2(x, y);
-  // }
-  // usage in shader
-  //   uvec2 xy = Remap(gl_LocalInvocationID.x);
-  //   xy.x += gl_WorkGroupID.x << 5; // v_lshl_add_u32
-  //   xy.y += gl_WorkGroupID.y << 4; // v_lshl_add_u32
-
-  Type *const int16Ty = Type::getInt16Ty(*m_context);
-  Type *const int32Ty = Type::getInt32Ty(*m_context);
-
-  Value *remappedId = localInvocationId;
-
-  // For a reconfigured workgroup, we map Y -> Z
-  if (mode.workgroupSizeZ > 1) {
-    Constant *shuffleMask[] = {ConstantInt::get(int32Ty, 0), UndefValue::get(int32Ty), ConstantInt::get(int32Ty, 1)};
-
-    remappedId = new ShuffleVectorInst(remappedId, UndefValue::get(remappedId->getType()),
-                                       ConstantVector::get(shuffleMask), "", insertPos);
-  } else {
-    remappedId = InsertElementInst::Create(remappedId, ConstantInt::get(int32Ty, 0), ConstantInt::get(int32Ty, 2), "",
-                                           insertPos);
-  }
-
-  Instruction *const x = ExtractElementInst::Create(remappedId, ConstantInt::get(int32Ty, 0), "", insertPos);
-
-  Instruction *const bit0 = BinaryOperator::CreateAnd(x, ConstantInt::get(int32Ty, 0x1), "", insertPos);
-
-  Instruction *bit1 = BinaryOperator::CreateAnd(x, ConstantInt::get(int32Ty, 0x2), "", insertPos);
-  bit1 = BinaryOperator::CreateLShr(bit1, ConstantInt::get(int32Ty, 1), "", insertPos);
-
-  Instruction *offset = nullptr;
-  Instruction *maskedX = x;
-
-  // Check if we are doing 8x8, as we need to calculate an offset and mask out the top bits of X if so.
-  if (workgroupLayout == WorkgroupLayout::SexagintiQuads) {
-    const unsigned workgroupSizeYMul8 = mode.workgroupSizeY * 8;
-
-    if (isPowerOf2_32(workgroupSizeYMul8)) {
-      // If we have a power of two, we can use a right shift to compute the division more efficiently.
-      offset = BinaryOperator::CreateLShr(x, ConstantInt::get(int32Ty, log2(workgroupSizeYMul8)), "", insertPos);
-    } else {
-      // Otherwise we truncate down to a 16-bit integer, do the division, and zero extend. This will
-      // result in significantly less instructions to do the divide.
-      offset = CastInst::CreateIntegerCast(x, int16Ty, false, "", insertPos);
-
-      offset = BinaryOperator::CreateUDiv(offset, ConstantInt::get(int16Ty, workgroupSizeYMul8), "", insertPos);
-
-      offset = CastInst::CreateIntegerCast(offset, int32Ty, false, "", insertPos);
-    }
-
-    Instruction *const mulOffset =
-        BinaryOperator::CreateMul(offset, ConstantInt::get(int32Ty, workgroupSizeYMul8), "", insertPos);
-
-    maskedX = BinaryOperator::CreateSub(x, mulOffset, "", insertPos);
-  }
-
-  Instruction *const remainingBits = BinaryOperator::CreateAnd(maskedX, ConstantInt::get(int32Ty, ~0x3), "", insertPos);
-
-  Instruction *div = nullptr;
-  Instruction *rem = nullptr;
-
-  if (offset) {
-    if ((mode.workgroupSizeX % 8) == 0 && (mode.workgroupSizeY % 8) == 0) {
-      // Divide by 16.
-      div = BinaryOperator::CreateLShr(remainingBits, ConstantInt::get(int32Ty, 4), "", insertPos);
-
-      // Multiply by 16.
-      rem = BinaryOperator::CreateShl(div, ConstantInt::get(int32Ty, 4), "", insertPos);
-
-      // Subtract to get remainder.
-      rem = BinaryOperator::CreateSub(remainingBits, rem, "", insertPos);
-    } else {
-      // Multiply by 8.
-      Instruction *divideBy = BinaryOperator::CreateShl(offset, ConstantInt::get(int32Ty, 3), "", insertPos);
-
-      divideBy = BinaryOperator::CreateSub(ConstantInt::get(int32Ty, mode.workgroupSizeX), divideBy, "", insertPos);
-
-      Instruction *const cond = new ICmpInst(insertPos, ICmpInst::ICMP_ULT, divideBy, ConstantInt::get(int32Ty, 8), "");
-
-      // We do a minimum operation to ensure that we never divide by more than 8, which forces our
-      // workgroup layout into 8x8 tiles.
-      divideBy = SelectInst::Create(cond, divideBy, ConstantInt::get(int32Ty, 8), "", insertPos);
-
-      // Multiply by 2.
-      divideBy = BinaryOperator::CreateShl(divideBy, ConstantInt::get(int32Ty, 1), "", insertPos);
-
-      Instruction *const divideByTrunc = CastInst::CreateIntegerCast(divideBy, int16Ty, false, "", insertPos);
-
-      // Truncate down to a 16-bit integer, do the division, and zero extend.
-      div = CastInst::CreateIntegerCast(maskedX, int16Ty, false, "", insertPos);
-
-      div = BinaryOperator::CreateUDiv(div, divideByTrunc, "", insertPos);
-
-      div = CastInst::CreateIntegerCast(div, int32Ty, false, "", insertPos);
-
-      Instruction *const mulDiv = BinaryOperator::CreateMul(div, divideBy, "", insertPos);
-
-      rem = BinaryOperator::CreateSub(remainingBits, mulDiv, "", insertPos);
-    }
-  } else {
-    const unsigned workgroupSizeXMul2 = mode.workgroupSizeX * 2;
-
-    if (isPowerOf2_32(workgroupSizeXMul2)) {
-      // If we have a power of two, we can use a right shift to compute the division more efficiently.
-      div = BinaryOperator::CreateLShr(maskedX, ConstantInt::get(int32Ty, log2(workgroupSizeXMul2)), "", insertPos);
-    } else {
-      // Otherwise we truncate down to a 16-bit integer, do the division, and zero extend. This will
-      // result in significantly less instructions to do the divide.
-      div = CastInst::CreateIntegerCast(maskedX, int16Ty, false, "", insertPos);
-
-      div = BinaryOperator::CreateUDiv(div, ConstantInt::get(int16Ty, workgroupSizeXMul2), "", insertPos);
-
-      div = CastInst::CreateIntegerCast(div, int32Ty, false, "", insertPos);
-    }
-
-    Instruction *const mulDiv =
-        BinaryOperator::CreateMul(div, ConstantInt::get(int32Ty, workgroupSizeXMul2), "", insertPos);
-
-    rem = BinaryOperator::CreateSub(remainingBits, mulDiv, "", insertPos);
-  }
-
-  // Now we have all the components to reconstruct X & Y!
-  Instruction *newX = BinaryOperator::CreateLShr(rem, ConstantInt::get(int32Ty, 1), "", insertPos);
-
-  newX = BinaryOperator::CreateAdd(newX, bit0, "", insertPos);
-
-  // If we have an offset, we need to incorporate this into X.
-  if (offset) {
-    const unsigned workgroupSizeYMin8 = std::min(mode.workgroupSizeY, 8u);
-    Instruction *const mul =
-        BinaryOperator::CreateMul(offset, ConstantInt::get(int32Ty, workgroupSizeYMin8), "", insertPos);
-
-    newX = BinaryOperator::CreateAdd(newX, mul, "", insertPos);
-  }
-
-  remappedId = InsertElementInst::Create(remappedId, newX, ConstantInt::get(int32Ty, 0), "", insertPos);
-
-  Instruction *newY = BinaryOperator::CreateShl(div, ConstantInt::get(int32Ty, 1), "", insertPos);
-
-  newY = BinaryOperator::CreateAdd(newY, bit1, "", insertPos);
-
-  remappedId = InsertElementInst::Create(remappedId, newY, ConstantInt::get(int32Ty, 1), "", insertPos);
-
-  return remappedId;
-}
-
-// =====================================================================================================================
-// This function adds instructions to swizzle thread ID inside a group.
-//
-// The data layout in TCP is typically 8 x something.
-// The typewriter style SIMD layout does not match well with the data layout,
-// which will potentially cause partial cache line read/write.
-//
-// In the case of 16x16 thread group size, wf32 SIMD will be created in eight 16x2 regions.
-// This function maps the eight 16x2 regions into eight 8x4 regions.
-//
-// Originally SIMDs cover 16x2 regions, after swizzling they cover 8x4 regions.
-//
-// @param localInvocationId : The original workgroup ID.
-// @param insertPos : Where to insert instructions.
-Value *PatchInOutImportExport::swizzleLocalInvocationIdIn8x4(Value *localInvocationId, Instruction *insertPos) {
+Value *PatchInOutImportExport::reconfigWorkgroupLayout(Value *localInvocationId, WorkgroupLayout macroLayout,
+                                                       WorkgroupLayout microLayout, unsigned workgroupSizeX,
+                                                       unsigned workgroupSizeY, unsigned workgroupSizeZ,
+                                                       bool isHwLocalInvocationId, llvm::Instruction *insertPos) {
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
-  auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+  Value *apiX = builder.getInt32(0);
+  Value *apiY = builder.getInt32(0);
+  Value *newLocalInvocationId = UndefValue::get(localInvocationId->getType());
+  unsigned bitsX = 0;
+  unsigned bitsY = 0;
+  auto &resUsage = *m_pipelineState->getShaderResourceUsage(ShaderStageCompute);
+  resUsage.builtInUsage.cs.foldWorkgroupXY = true;
 
-  const unsigned workgroupSizeX = mode.workgroupSizeX;
-  const unsigned workgroupSizeY = mode.workgroupSizeY;
-
-  if (workgroupSizeX < 16)
-    return localInvocationId;
-
-  if (workgroupSizeX % 8 != 0)
-    return localInvocationId;
-
-  if (workgroupSizeY % 4 != 0)
-    return localInvocationId;
-
-  if ((workgroupSizeX >= 16) && (workgroupSizeX % 8 == 0) && (workgroupSizeY % 4 == 0)) {
-    Value *threadIdInGroupX = builder.CreateExtractElement(localInvocationId, (uint64_t)0);
-    Value *threadIdInGroupY = builder.CreateExtractElement(localInvocationId, 1);
-    Value *threadIdInGroupZ = builder.CreateExtractElement(localInvocationId, 2);
-    const unsigned blockSizeX = 8;
-    const unsigned blockSizeY = 4;
-    const unsigned blockDimY = workgroupSizeY / 4; // How many blocks are split in Y level.
-
-    const unsigned blockSize = blockSizeX * blockSizeY; // 32 threads per-block
-
-    Value *linearId = builder.CreateMul(threadIdInGroupY, builder.getInt32(workgroupSizeX));
-    linearId = builder.CreateAdd(linearId, threadIdInGroupX);
-
-    Value *waveId = builder.CreateUDiv(linearId, builder.getInt32(blockSize));
-    Value *waveLinearId = builder.CreateURem(linearId, builder.getInt32(blockSize));
-    Value *blockOffsX = builder.CreateUDiv(waveId, builder.getInt32(blockDimY));
-    Value *blockOffsY = builder.CreateURem(waveId, builder.getInt32(blockDimY));
-
-    Value *blockThreadIdX = builder.CreateURem(waveLinearId, builder.getInt32(blockSizeX));
-    Value *blockThreadIdY = builder.CreateUDiv(waveLinearId, builder.getInt32(blockSizeX));
-
-    Value *newThreadIdInGroupX = builder.CreateMul(blockOffsX, builder.getInt32(blockSizeX));
-    newThreadIdInGroupX = builder.CreateAdd(newThreadIdInGroupX, blockThreadIdX);
-    Value *newThreadIdInGroupY = builder.CreateMul(blockOffsY, builder.getInt32(blockSizeY));
-    newThreadIdInGroupY = builder.CreateAdd(newThreadIdInGroupY, blockThreadIdY);
-
-    Value *newThreadIdInGroupZ = threadIdInGroupZ;
-    Value *newThreadIdInGroup = PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 3));
-    newThreadIdInGroup = builder.CreateInsertElement(newThreadIdInGroup, newThreadIdInGroupX, uint64_t(0));
-    newThreadIdInGroup = builder.CreateInsertElement(newThreadIdInGroup, newThreadIdInGroupY, 1);
-    newThreadIdInGroup = builder.CreateInsertElement(newThreadIdInGroup, newThreadIdInGroupZ, 2);
-    return newThreadIdInGroup;
+  Value *tidXY = builder.CreateExtractElement(localInvocationId, builder.getInt32(0), "tidXY");
+  Value *apiZ = builder.getInt32(0);
+  if (workgroupSizeZ > 1) {
+    apiZ = builder.CreateExtractElement(localInvocationId, builder.getInt32(1), "tidZ");
   }
-  return localInvocationId;
+  // For BuiltInUnswizzledLocalInvocationId, it shouldn't swizzle and return the localInvocation<apiX,apiY,apiZ> without
+  // foldXY.
+  if (isHwLocalInvocationId) {
+    apiX = builder.CreateURem(tidXY, builder.getInt32(workgroupSizeX));
+    apiY = builder.CreateUDiv(tidXY, builder.getInt32(workgroupSizeX));
+  } else {
+    // Micro-tiling with quad:2x2, the thread-id will be marked as {<0,0>,<1,0>,<0,1>,<1,1>}
+    // for each quad. Each 4 threads will be wrapped in the same tid.
+    if (microLayout == WorkgroupLayout::Quads) {
+      apiX = builder.CreateAnd(tidXY, builder.getInt32(1));
+      apiY = builder.CreateAnd(builder.CreateLShr(tidXY, builder.getInt32(1)), builder.getInt32(1));
+      tidXY = builder.CreateLShr(tidXY, builder.getInt32(2));
+      bitsX = 1;
+      bitsY = 1;
+    }
+
+    // Macro-tiling with 8xN block
+    if (macroLayout == WorkgroupLayout::SexagintiQuads) {
+      unsigned bits = 3 - bitsX;
+      Value *subTileApiX = builder.CreateAnd(tidXY, builder.getInt32((1 << bits) - 1));
+      subTileApiX = builder.CreateShl(subTileApiX, builder.getInt32(bitsX));
+      apiX = builder.CreateOr(apiX, subTileApiX);
+
+      // 1. Folding 4 threads as one tid if micro-tiling with quad before.
+      //    After the folding, each 4 hwThreadIdX share the same tid after tid>>=bits.
+      //    For example: hwThreadId.X = 0~3, the tid will be 0; <apiX,apiY> will be {<0,0>,<1,0>,<0,1>,<1,1>}
+      //                 hwThreadId.X = 4~7, the tid will be 1; <apiX,apiY> will be {<0,0>,<1,0>,<0,1>,<1,1>}
+      // 2. Folding 8 threads as one tid without any micro-tiling before.
+      //    After the folding, each 8 hwThreadIdX share the same tid after tid>>=bits and only apiX are calculated.
+      //    For example: hwThreadId.X = 0~7, tid = hwThreadId.X/8 = 0; <apiX> will be {0,1,...,7}
+      //                 hwThreadId.X = 8~15, tid = hwThreadId.X/8 = 1; <apiX> will be {0,1,...,7}
+      tidXY = builder.CreateLShr(tidXY, builder.getInt32(bits));
+      bitsX = 3;
+
+      // 1. Unfolding 4 threads, it needs to set walkY = workgroupSizeY/2 as these threads are wrapped in 2X2 size.
+      // 2. Unfolding 8 threads, it needs to set walkY = workgroupSizeY/2 as these threads are wrapped in 1x8 size.
+      // After unfolding these threads, it needs '| apiX and | apiY' to calculated each thread's coordinate
+      // in the unfolded wrap threads.
+      unsigned walkY = workgroupSizeY >> bitsY;
+      Value *tileApiY = builder.CreateShl(builder.CreateURem(tidXY, builder.getInt32(walkY)), builder.getInt32(bitsY));
+      apiY = builder.CreateOr(apiY, tileApiY);
+      Value *tileApiX = builder.CreateShl(builder.CreateUDiv(tidXY, builder.getInt32(walkY)), builder.getInt32(bitsX));
+      apiX = builder.CreateOr(apiX, tileApiX);
+    } else {
+      // Update the coordinates for each 4 wrap-threads then unfold each thread to calculate the coordinate by '| apiX
+      // and | apiY'
+      unsigned walkX = workgroupSizeX >> bitsX;
+      Value *tileApiX = builder.CreateShl(builder.CreateURem(tidXY, builder.getInt32(walkX)), builder.getInt32(bitsX));
+      apiX = builder.CreateOr(apiX, tileApiX);
+      Value *tileApiY = builder.CreateShl(builder.CreateUDiv(tidXY, builder.getInt32(walkX)), builder.getInt32(bitsY));
+      apiY = builder.CreateOr(apiY, tileApiY);
+    }
+  }
+
+  newLocalInvocationId = builder.CreateInsertElement(newLocalInvocationId, apiX, uint64_t(0));
+  newLocalInvocationId = builder.CreateInsertElement(newLocalInvocationId, apiY, uint64_t(1));
+  newLocalInvocationId = builder.CreateInsertElement(newLocalInvocationId, apiZ, uint64_t(2));
+  return newLocalInvocationId;
 }
 
 // =====================================================================================================================
