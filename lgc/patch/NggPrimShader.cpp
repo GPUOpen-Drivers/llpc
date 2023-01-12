@@ -76,7 +76,9 @@ enum {
 // @param pipelineState : Pipeline state
 NggPrimShader::NggPrimShader(PipelineState *pipelineState)
     : m_pipelineState(pipelineState), m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()),
-      m_nggControl(m_pipelineState->getNggControl()), m_builder(pipelineState->getContext()) {
+      m_nggControl(m_pipelineState->getNggControl()), m_hasVs(pipelineState->hasShaderStage(ShaderStageVertex)),
+      m_hasTes(pipelineState->hasShaderStage(ShaderStageTessEval)),
+      m_hasGs(pipelineState->hasShaderStage(ShaderStageGeometry)), m_builder(pipelineState->getContext()) {
   assert(m_nggControl->enableNgg);
 
   // Always allow approximation, to change fdiv(1.0, x) to rcp(x)
@@ -85,10 +87,6 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
   m_builder.setFastMathFlags(fastMathFlags);
 
   assert(m_pipelineState->isGraphics());
-
-  m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
-  m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
-  m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
 
   // NOTE: For NGG GS mode, we change data layout of output vertices. They are grouped by vertex streams now.
   // Vertices belonging to different vertex streams are in different regions of GS-VS ring. Here, we calculate
@@ -432,7 +430,6 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
 
   Value *vertexId = (arg + 5);
   Value *relVertexId = (arg + 6);
-  Value *vsPrimitiveId = (arg + 7);
   Value *instanceId = (arg + 8);
 
   userData->setName("userData");
@@ -450,7 +447,6 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   } else {
     vertexId->setName("vertexId");
     relVertexId->setName("relVertexId");
-    vsPrimitiveId->setName("vsPrimitiveId");
     instanceId->setName("instanceId");
   }
 
@@ -709,7 +705,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(endReadPrimIdBlock);
 
-      m_nggInputs.primitiveId = createPhi(
+      m_distributedPrimitiveId = createPhi(
           {{primitiveId, readPrimIdBlock}, {m_builder.getInt32(0), endWritePrimIdBlock}}, "distributedPrimitiveId");
 
       createFenceAndBarrier();
@@ -1104,7 +1100,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(endReadPrimIdBlock);
 
-      m_nggInputs.primitiveId = createPhi(
+      m_distributedPrimitiveId = createPhi(
           {{primitiveId, readPrimIdBlock}, {m_builder.getInt32(0), endWritePrimIdBlock}}, "distributedPrimitiveId");
 
       createFenceAndBarrier();
@@ -1411,8 +1407,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
         // Write primitive ID
         if (resUsage->builtInUsage.vs.primitiveId) {
-          assert(m_nggInputs.primitiveId);
-          writeVertexCullInfoToLds(m_nggInputs.primitiveId, vertexItemOffset, m_vertCullInfoOffsets.primitiveId);
+          assert(m_distributedPrimitiveId);
+          writeVertexCullInfoToLds(m_distributedPrimitiveId, vertexItemOffset, m_vertCullInfoOffsets.primitiveId);
         }
       }
 
@@ -2709,8 +2705,8 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
 
   Value *vertexId = (arg + 5);
   Value *relVertexId = (arg + 6);
-  // NOTE: VS primitive ID for NGG is specially obtained, not simply from system VGPR.
-  Value *vsPrimitiveId = m_nggInputs.primitiveId ? m_nggInputs.primitiveId : UndefValue::get(m_builder.getInt32Ty());
+  // NOTE: VS primitive ID for NGG is specially obtained from primitive ID distribution.
+  Value *vsPrimitiveId = m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
   Value *instanceId = (arg + 8);
 
   std::vector<Value *> args;
@@ -2847,8 +2843,8 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
 
   Value *vertexId = (arg + 5);
   Value *relVertexId = (arg + 6);
-  // NOTE: VS primitive ID for NGG is specially obtained, not simply from system VGPR.
-  Value *vsPrimitiveId = m_nggInputs.primitiveId ? m_nggInputs.primitiveId : UndefValue::get(m_builder.getInt32Ty());
+  // NOTE: VS primitive ID for NGG is specially obtained from primitive ID distribution.
+  Value *vsPrimitiveId = m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
   Value *instanceId = (arg + 8);
 
   if (deferredVertexExport && m_nggInputs.vertCompacted) {
@@ -7092,8 +7088,8 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
 
   Value *vertexId = (arg + 5);
   Value *relVertexId = (arg + 6);
-  // NOTE: VS primitive ID for NGG is specially obtained, not simply from system VGPR.
-  Value *vsPrimitiveId = m_nggInputs.primitiveId ? m_nggInputs.primitiveId : UndefValue::get(m_builder.getInt32Ty());
+  // NOTE: VS primitive ID for NGG is specially obtained from primitive ID distribution.
+  Value *vsPrimitiveId = m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
   Value *instanceId = (arg + 8);
 
   std::vector<Value *> args;
