@@ -301,7 +301,7 @@ private:
 
   NggLdsManager *m_ldsManager = nullptr; // NGG LDS manager
 
-  // NGG factors used for calculation (different modes use different factors)
+  // NGG inputs (from system values or derived from them)
   struct {
     llvm::Value *vertCountInSubgroup; // Number of vertices in subgroup
     llvm::Value *primCountInSubgroup; // Number of primitives in subgroup
@@ -314,7 +314,6 @@ private:
     llvm::Value *waveIdInSubgroup; // Wave ID in subgroup
     llvm::Value *orderedWaveId;    // Ordered wave ID
 
-    llvm::Value *primitiveId;   // Primitive ID (for VS)
     llvm::Value *vertCompacted; // Whether vertex compaction is performed (for culling mode)
 
     // System values (SGPRs)
@@ -333,6 +332,8 @@ private:
     llvm::Value *esGsOffset5; // ES-GS offset of vertex5
 
   } m_nggInputs = {};
+
+  llvm::Value *m_distributedPrimitiveId = nullptr; // Distributed primitive ID (from geomeotry based to vertex based)
 
   bool m_hasVs = false;  // Whether the pipeline has vertex shader
   bool m_hasTes = false; // Whether the pipeline has tessellation evaluation shader
