@@ -17,7 +17,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{.*}} = insertelement <4 x double> {{undef|poison}}, double %{{.*}}, i32 0
+; SHADERTEST: %{{.*}} = insertelement <4 x double> {{undef|poison}}, double %{{.*}}, i{{32|64}} 0
 ; SHADERTEST: %{{.*}} = shufflevector <4 x double> %{{.*}}, <4 x double> {{undef|poison}}, <4 x i32> zeroinitializer
 ; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract <4 x double> %{{.*}}, %{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
