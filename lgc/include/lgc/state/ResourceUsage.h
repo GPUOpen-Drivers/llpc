@@ -153,6 +153,13 @@ enum class WorkgroupLayout : unsigned {
   SexagintiQuads // 8x8
 };
 
+// Enumerate the workgroup layout for macro-tiling and
+// Workgroup layout for micro-tiling when swizzle thread id.
+struct SwizzleWorkgroupLayout {
+  WorkgroupLayout microLayout;
+  WorkgroupLayout macroLayout;
+};
+
 // Represents the usage info of shader resources.
 //
 // NOTE: All fields must be initialized in InitShaderResourceUsage().
@@ -328,7 +335,7 @@ struct ResourceUsage {
       // Compute shader
       struct {
         // Workgroup layout
-        unsigned workgroupLayout : 2; // The layout of the workgroup
+        unsigned foldWorkgroupXY : 1; // The layout of the workgroup
       } cs;
     };
 

@@ -160,6 +160,7 @@ void ShaderModes::setComputeShaderMode(const ComputeShaderMode &inMode) {
   m_computeShaderMode.workgroupSizeX = std::max(1U, inMode.workgroupSizeX);
   m_computeShaderMode.workgroupSizeY = std::max(1U, inMode.workgroupSizeY);
   m_computeShaderMode.workgroupSizeZ = std::max(1U, inMode.workgroupSizeZ);
+  m_computeShaderMode.derivatives = inMode.derivatives;
 
   assert(m_computeShaderMode.workgroupSizeX <= MaxComputeWorkgroupSize &&
          m_computeShaderMode.workgroupSizeY <= MaxComputeWorkgroupSize &&
