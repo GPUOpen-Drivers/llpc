@@ -38,13 +38,4 @@ config.test_exec_root = os.path.join(config.llvm_obj_root, 'test')
 # Tweak the PATH to include the tools dir.
 llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
-#if LLPC_BUILD_NAVI31
-# Propagate options for lit feature tests. These can be used in XFAIL, REQUIRES, and UNSUPPORTED
-p = subprocess.Popen([config.llvm_tools_dir + "/lgc", "-mcpu=gfx1100","dummy.lgc"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-out,err = p.communicate()
-check_str = out.decode("utf-8")
-if check_str.find("'gfx1100' not recognized") == -1:
-    config.available_features.add('gfx11')
-#endif
-
 llvm_config.use_default_substitutions()

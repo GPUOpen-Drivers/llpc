@@ -141,6 +141,7 @@ COMMENT_PREFIXES_BY_FILE_SUFFIX = {
   '.pipe': ';',
   '.spvasm': ';',
   '.ll': ';',
+  '.lgc': ';',
   # Everything else defaults to '//'
 }
 
