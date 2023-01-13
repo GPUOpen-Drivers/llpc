@@ -90,8 +90,6 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
   m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
   m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
 
-  m_enableSwXfb = m_pipelineState->enableSwXfb();
-
   // NOTE: For NGG GS mode, we change data layout of output vertices. They are grouped by vertex streams now.
   // Vertices belonging to different vertex streams are in different regions of GS-VS ring. Here, we calculate
   // the base offset of each vertex streams and record them. See NggPrimShader::exportGsOutput for detail.
@@ -611,7 +609,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
 
   // NOTE: For GFX11+, we use NO_MSG mode for NGG pass-through mode if SW-emulated stream-out is not requested. The
   // message GS_ALLOC_REQ is no longer necessary.
-  bool passthroughNoMsg = m_gfxIp.major >= 11 && !m_enableSwXfb;
+  bool passthroughNoMsg = m_gfxIp.major >= 11 && !m_pipelineState->enableSwXfb();
 
   BasicBlock *allocReqBlock = nullptr;
   BasicBlock *endAllocReqBlock = nullptr;
@@ -625,7 +623,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
 
   BasicBlock *expVertBlock = nullptr;
   BasicBlock *endExpVertBlock = nullptr;
-  if (!m_enableSwXfb) {
+  if (!m_pipelineState->enableSwXfb()) {
     expVertBlock = createBlock(entryPoint, ".expVert");
     endExpVertBlock = createBlock(entryPoint, ".endExpVert");
   }
@@ -770,8 +768,8 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     //     vertexExport = value
     //  }
     //
-    if (m_enableSwXfb) {
-      processXfbOutputExport(entryPoint->getParent(), entryPoint->arg_begin());
+    if (m_pipelineState->enableSwXfb()) {
+      processSwXfb(entryPoint->getParent(), entryPoint->arg_begin());
       m_builder.CreateRetVoid();
     } else {
       auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
@@ -779,7 +777,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     }
   }
 
-  if (!m_enableSwXfb) {
+  if (!m_pipelineState->enableSwXfb()) {
     // Construct ".expVert" block
     {
       m_builder.SetInsertPoint(expVertBlock);
@@ -1055,8 +1053,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.primCountInWave);
       m_builder.CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
     } else {
-      if (m_enableSwXfb)
-        processXfbOutputExport(entryPoint->getParent(), entryPoint->arg_begin());
+      if (m_pipelineState->enableSwXfb())
+        processSwXfb(entryPoint->getParent(), entryPoint->arg_begin());
 
       auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
       m_builder.CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1116,8 +1114,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
       createFenceAndBarrier();
 
-      if (m_enableSwXfb)
-        processXfbOutputExport(entryPoint->getParent(), entryPoint->arg_begin());
+      if (m_pipelineState->enableSwXfb())
+        processSwXfb(entryPoint->getParent(), entryPoint->arg_begin());
 
       auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
       m_builder.CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1843,7 +1841,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(initOutPrimDataBlock);
 
-    if (m_enableSwXfb) {
+    if (m_pipelineState->enableSwXfb()) {
       for (unsigned i = 0; i < MaxGsStreams; ++i) {
         if (inOutUsage.outLocCount[i] > 0) { // Initialize primitive connectivity data if the stream is active
           writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup, LdsRegionOutPrimData,
@@ -1881,8 +1879,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(endGsBlock);
 
-    if (m_enableSwXfb)
-      processGsXfbOutputExport(entryPoint->getParent(), entryPoint->arg_begin());
+    if (m_pipelineState->enableSwXfb())
+      processSwXfbWithGs(entryPoint->getParent(), entryPoint->arg_begin());
 
     auto waveValid =
         m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(waveCountInSubgroup + 1));
@@ -3484,7 +3482,7 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
     args.push_back(globalTable);
 
     // Stream-out table and stream-out control buffer
-    if (m_enableSwXfb) {
+    if (m_pipelineState->enableSwXfb()) {
       const auto &intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
       // Stream-out table
       auto streamOutTable = m_builder.CreateExtractElement(userData, intfData->entryArgIdxs.gs.streamOutData.tablePtr);
@@ -3607,7 +3605,7 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
 void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                                    Value *threadIdInSubgroup, Value *emitVerts) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-  if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
+  if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
     return;
@@ -3673,7 +3671,7 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
 // @param vertexOffset : Start offset of vertex item in GS-VS ring (in bytes)
 Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned streamId, Value *vertexOffset) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-  if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
+  if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
     return UndefValue::get(outputTy);
@@ -3725,7 +3723,7 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
 void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *threadIdInSubgroup, Value *emitVertsPtr,
                                   Value *outVertsPtr) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-  if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
+  if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only handle GS_EMIT message that belongs to the rasterization
     // stream.
     return;
@@ -3746,7 +3744,7 @@ void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *thre
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsCut(Module *module, unsigned streamId, Value *outVertsPtr) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-  if (!m_enableSwXfb && resUsage->inOutUsage.gs.rasterStream != streamId) {
+  if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only handle GS_CUT message that belongs to the rasterization
     // stream.
     return;
@@ -5868,13 +5866,13 @@ void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
 }
 
 // =====================================================================================================================
-// Processes VS/TES transform feedback output export calls
+// Processes SW emulated transform feedback when API GS is not present.
 //
 // @param module : LLVM module.
 // @param sysValueStart : Start of system value
-void NggPrimShader::processXfbOutputExport(Module *module, Argument *sysValueStart) {
-  assert(m_enableSwXfb);
-  assert(!m_hasGs); // Just for VS/TES
+void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
+  assert(m_pipelineState->enableSwXfb());
+  assert(!m_hasGs); // GS is not present
 
   //
   // The processing is something like this:
@@ -6263,13 +6261,13 @@ void NggPrimShader::processXfbOutputExport(Module *module, Argument *sysValueSta
 }
 
 // =====================================================================================================================
-// Processes GS transform feedback output export calls
+// Process SW emulated transform feedback when API GS is present.
 //
 // @param module : LLVM module.
 // @param sysValueStart : Start of system value
-void NggPrimShader::processGsXfbOutputExport(Module *module, Argument *sysValueStart) {
-  assert(m_enableSwXfb);
-  assert(m_hasGs); // Just for GS
+void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) {
+  assert(m_pipelineState->enableSwXfb());
+  assert(m_hasGs); // GS is present
 
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   assert(waveSize == 32 || waveSize == 64);
@@ -6922,7 +6920,7 @@ void NggPrimShader::processGsXfbOutputExport(Module *module, Argument *sysValueS
 // @param [out] xfbOutputExports : Export info of transform feedback outputs
 Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
                                      SmallVector<XfbOutputExport, 32> &xfbOutputExports) {
-  assert(m_enableSwXfb);
+  assert(m_pipelineState->enableSwXfb());
 
   //
   // Clone ES/copy shader entry-point or just mutate existing ES entry-point to fetch transform feedback outputs
@@ -7270,7 +7268,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
 // @param vertexId: Vertex thread ID in subgroup
 // @param outputIndex : Index of this transform feedback output
 Value *NggPrimShader::readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexId, unsigned outputIndex) {
-  assert(m_enableSwXfb); // SW-emulated stream-out must be enabled
+  assert(m_pipelineState->enableSwXfb()); // SW-emulated stream-out must be enabled
   assert(!m_hasGs);
 
   const unsigned esGsRingItemSize =
@@ -7298,7 +7296,7 @@ Value *NggPrimShader::readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *
 // @param vertexId: Vertex thread ID in subgroup
 // @param outputIndex : Index of this transform feedback output
 void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexId, unsigned outputIndex) {
-  assert(m_enableSwXfb); // SW-emulated stream-out must be enabled
+  assert(m_pipelineState->enableSwXfb()); // SW-emulated stream-out must be enabled
   assert(!m_hasGs);
 
   const unsigned esGsRingItemSize =
