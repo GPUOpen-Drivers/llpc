@@ -103,7 +103,7 @@ struct VertexCullInfo {
   //
   // Vertex compaction info (vertex compaction only, must in the end of this structure)
   //
-  unsigned compactThreadId;
+  unsigned compactedVertexIndex;
   union {
     struct {
       unsigned vertexId;
@@ -136,7 +136,7 @@ struct VertexCullInfoOffsets {
   //
   // Vertex compaction info
   //
-  unsigned compactThreadId;
+  unsigned compactedVertexIndex;
   // VS
   unsigned vertexId;
   unsigned instanceId;
@@ -192,10 +192,11 @@ private:
   void initWaveThreadInfo(llvm::Value *mergedGroupInfo, llvm::Value *mergedWaveInfo);
   void loadStreamOutBufferInfo(llvm::Value *userData);
 
-  llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertexId0, llvm::Value *vertexId1, llvm::Value *vertexId2);
+  llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertxIndex0, llvm::Value *vertxIndex1,
+                         llvm::Value *vertxIndex2);
   void doParamCacheAllocRequest();
   void doPrimitiveExportWithoutGs(llvm::Value *cullFlag = nullptr);
-  void doPrimitiveExportWithGs(llvm::Value *vertexId);
+  void doPrimitiveExportWithGs(llvm::Value *vertxIndex);
 
   void doEarlyExit(unsigned fullyCulledExportCount);
 
@@ -264,9 +265,9 @@ private:
 
   llvm::Value *doSubgroupBallot(llvm::Value *value);
 
-  llvm::Value *fetchVertexPositionData(llvm::Value *vertexId);
-  llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexId);
-  llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertexId);
+  llvm::Value *fetchVertexPositionData(llvm::Value *vertxIndex);
+  llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertxIndex);
+  llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertxIndex);
 
   void processVertexAttribExport(llvm::Function *&targetFunc);
 
@@ -275,8 +276,8 @@ private:
   llvm::Value *fetchXfbOutput(llvm::Module *module, llvm::Argument *sysValueStart,
                               llvm::SmallVector<XfbOutputExport, 32> &xfbOutputExports);
 
-  llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexId, unsigned outputIndex);
-  void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertexId, unsigned outputIndex);
+  llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertxIndex, unsigned outputIndex);
+  void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertxIndex, unsigned outputIndex);
 
   // Checks if NGG culling operations are enabled
   bool enableCulling() const {
