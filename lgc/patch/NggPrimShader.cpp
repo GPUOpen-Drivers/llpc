@@ -1333,7 +1333,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   // Construct ".endAccumVertCount" block
   Value *vertCountInPrevWaves = nullptr;
   Value *vertCountInSubgroup = nullptr;
-  Value *vertCompacted = nullptr;
+  Value *hasCulledVertices = nullptr;
   {
     m_builder.SetInsertPoint(endAccumVertCountBlock);
 
@@ -1354,8 +1354,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       vertCountInPrevWaves =
           m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
 
-      vertCompacted = m_builder.CreateICmpULT(vertCountInSubgroup, m_nggInputs.vertCountInSubgroup);
-      m_builder.CreateCondBr(m_builder.CreateAnd(drawFlag, vertCompacted), compactVertBlock, endCompactVertBlock);
+      hasCulledVertices = m_builder.CreateICmpULT(vertCountInSubgroup, m_nggInputs.vertCountInSubgroup);
+      m_builder.CreateCondBr(m_builder.CreateAnd(drawFlag, hasCulledVertices), compactVertBlock, endCompactVertBlock);
     }
   }
 
@@ -1452,11 +1452,10 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     // and no runtime passthrough path (normal culling path).
 
     if (m_nggControl->compactVertex) {
-      // Update vertex compaction flag
-      m_nggInputs.vertCompacted = createPhi(
-          {{vertCompacted, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "vertCompacted");
+      m_compactVertex = createPhi(
+          {{hasCulledVertices, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "compactVertex");
     } else {
-      assert(!m_nggInputs.vertCompacted); // Must be null
+      assert(!m_compactVertex); // Must be null
     }
 
     // Update cull flag
@@ -2047,12 +2046,13 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
       vertCountInPrevWaves = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
                                                        {outVertCountInWaves, m_nggInputs.waveIdInSubgroup});
 
-      auto vertCompacted = m_builder.CreateICmpULT(vertCountInSubgroup, m_nggInputs.vertCountInSubgroup);
-      m_builder.CreateCondBr(m_builder.CreateAnd(drawFlag, vertCompacted), compactOutVertIdBlock,
-                             endCompactOutVertIdBlock);
+      auto hasCulledVertices = m_builder.CreateICmpULT(vertCountInSubgroup, m_nggInputs.vertCountInSubgroup);
 
       m_nggInputs.vertCountInSubgroup = vertCountInSubgroup; // Update GS output vertex count in subgroup
-      m_nggInputs.vertCompacted = vertCompacted;             // Record vertex compaction flag
+      m_compactVertex = hasCulledVertices;
+
+      m_builder.CreateCondBr(m_builder.CreateAnd(drawFlag, hasCulledVertices), compactOutVertIdBlock,
+                             endCompactOutVertIdBlock);
     }
   }
 
@@ -2413,14 +2413,14 @@ void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
 
     auto expPrimBlock = m_builder.GetInsertBlock();
 
-    if (m_nggInputs.vertCompacted) {
+    if (m_compactVertex) {
       auto compactVertIdBlock = createBlock(expPrimBlock->getParent(), ".compactVertId");
       compactVertIdBlock->moveAfter(expPrimBlock);
 
       auto endCompactVertIdBlock = createBlock(expPrimBlock->getParent(), ".endCompactVertId");
       endCompactVertIdBlock->moveAfter(compactVertIdBlock);
 
-      m_builder.CreateCondBr(m_nggInputs.vertCompacted, compactVertIdBlock, endCompactVertIdBlock);
+      m_builder.CreateCondBr(m_compactVertex, compactVertIdBlock, endCompactVertIdBlock);
 
       // Construct ".compactVertId" block
       Value *compactedVertexIndex0 = nullptr;
@@ -2847,7 +2847,7 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
   Value *vsPrimitiveId = m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
   Value *instanceId = (arg + 8);
 
-  if (deferredVertexExport && m_nggInputs.vertCompacted) {
+  if (deferredVertexExport && m_compactVertex) {
     auto expVertBlock = m_builder.GetInsertBlock();
 
     auto uncompactVertBlock = createBlock(expVertBlock->getParent(), ".uncompactVert");
@@ -2856,7 +2856,7 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
     auto endUncompactVertBlock = createBlock(expVertBlock->getParent(), ".endUncompactVert");
     endUncompactVertBlock->moveAfter(uncompactVertBlock);
 
-    m_builder.CreateCondBr(m_nggInputs.vertCompacted, uncompactVertBlock, endUncompactVertBlock);
+    m_builder.CreateCondBr(m_compactVertex, uncompactVertBlock, endUncompactVertBlock);
 
     // Construct ".uncompactVert" block
     Value *newPosition = nullptr;
@@ -3455,7 +3455,7 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
   //   Calculate vertex offset and run copy shader
   //
   Value *vertexIndex = m_nggInputs.threadIdInSubgroup;
-  if (m_nggInputs.vertCompacted) {
+  if (m_compactVertex) {
     auto expVertBlock = m_builder.GetInsertBlock();
 
     auto uncompactOutVertIdBlock = createBlock(expVertBlock->getParent(), ".uncompactOutVertId");
@@ -3464,7 +3464,7 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
     auto endUncompactOutVertIdBlock = createBlock(expVertBlock->getParent(), ".endUncompactOutVertId");
     endUncompactOutVertIdBlock->moveAfter(uncompactOutVertIdBlock);
 
-    m_builder.CreateCondBr(m_nggInputs.vertCompacted, uncompactOutVertIdBlock, endUncompactOutVertIdBlock);
+    m_builder.CreateCondBr(m_compactVertex, uncompactOutVertIdBlock, endUncompactOutVertIdBlock);
 
     // Construct ".uncompactOutVertId" block
     Value *uncompactedVertexIndex = nullptr;

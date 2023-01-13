@@ -314,8 +314,6 @@ private:
     llvm::Value *waveIdInSubgroup; // Wave ID in subgroup
     llvm::Value *orderedWaveId;    // Ordered wave ID
 
-    llvm::Value *vertCompacted; // Whether vertex compaction is performed (for culling mode)
-
     // System values (SGPRs)
     llvm::Value *attribRingBase;          // Attribute ring base for this subgroup
     llvm::Value *primShaderTableAddrLow;  // Primitive shader table address low
@@ -334,6 +332,9 @@ private:
   } m_nggInputs = {};
 
   llvm::Value *m_distributedPrimitiveId = nullptr; // Distributed primitive ID (from geomeotry based to vertex based)
+
+  llvm::Value *m_compactVertex = nullptr; // Flag indicating whether to perform vertex compaction (if
+                                          // null, we are in vertex compactionless mode)
 
   bool m_hasVs = false;  // Whether the pipeline has vertex shader
   bool m_hasTes = false; // Whether the pipeline has tessellation evaluation shader
