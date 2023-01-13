@@ -269,8 +269,8 @@ private:
 
   void processVertexAttribExport(llvm::Function *&targetFunc);
 
-  void processXfbOutputExport(llvm::Module *module, llvm::Argument *sysValueStart);
-  void processGsXfbOutputExport(llvm::Module *module, llvm::Argument *sysValueStart);
+  void processSwXfb(llvm::Module *module, llvm::Argument *sysValueStart);
+  void processSwXfbWithGs(llvm::Module *module, llvm::Argument *sysValueStart);
   llvm::Value *fetchXfbOutput(llvm::Module *module, llvm::Argument *sysValueStart,
                               llvm::SmallVector<XfbOutputExport, 32> &xfbOutputExports);
 
@@ -333,8 +333,6 @@ private:
   bool m_hasVs = false;  // Whether the pipeline has vertex shader
   bool m_hasTes = false; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs = false;  // Whether the pipeline has geometry shader
-
-  bool m_enableSwXfb = false; // Whether SW-emulated stream-out is enabled (GFX11+)
 
   bool m_constPositionZ = false; // Whether the Z channel of vertex position data is constant
 
