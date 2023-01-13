@@ -175,7 +175,6 @@ def main():
     if not re.match(r'^%s(-\d+)?(\.exe)?$' % (initial_args.tool), tool_basename):
       common.error('Unexpected tool name: ' + tool_basename)
       sys.exit(1)
-  tool_basename = initial_args.tool
 
   for ti in common.itertests(initial_args.tests, parser, 'tool/update_llpc_test_checks.py',
                              comment_prefix_callback=get_comment_prefix):
@@ -184,6 +183,11 @@ def main():
       common.SCRUB_TRAILING_WHITESPACE_TEST_RE = common.SCRUB_TRAILING_WHITESPACE_AND_ATTRIBUTES_RE
     else:
       common.SCRUB_TRAILING_WHITESPACE_TEST_RE = common.SCRUB_TRAILING_WHITESPACE_RE
+
+    tool_basename = ti.args.tool
+    tool_binary = tool_basename
+    if tool_basename == initial_args.tool and initial_args.tool_binary:
+      tool_binary = initial_args.tool_binary
 
     prefix_list = []
     for l in ti.run_lines:
@@ -225,10 +229,6 @@ def main():
       flags=ti.args,
       scrubber_args=[],
       path=ti.path)
-
-    tool_binary = ti.args.tool_binary
-    if not tool_binary:
-      tool_binary = tool_basename
 
     function_re = None
     scrubber = None
